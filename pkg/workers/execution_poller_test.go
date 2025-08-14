@@ -26,6 +26,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	connections := []models.Connection{
 		{
 			SourceID:   r.Source.ID,
+			SourceName: r.Source.Name,
 			SourceType: models.SourceTypeEventSource,
 		},
 	}
@@ -41,6 +42,22 @@ func Test__ExecutionPoller(t *testing.T) {
 		WithExecutorSpec(executorSpec).
 		ForResource(integrationResource).
 		ForIntegration(r.Integration).
+		WithInputs([]models.InputDefinition{{Name: "version"}}).
+		WithInputMappings([]models.InputMapping{
+			{
+				Values: []models.ValueDefinition{
+					{
+						Name: "version",
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
+								Connection: r.Source.Name,
+								Expression: "$.ref",
+							},
+						},
+					},
+				},
+			},
+		}).
 		Create()
 
 	require.NoError(t, err)
@@ -60,7 +77,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		execution := support.CreateExecutionWithData(t, r.Source, stage,
 			[]byte(`{"ref":"v1"}`),
 			[]byte(`{"ref":"v1"}`),
-			map[string]any{},
+			map[string]any{"version": "v1"},
 		)
 
 		require.NoError(t, execution.Start())
@@ -101,6 +118,8 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
 		assert.Equal(t, models.ResultFailed, e.Execution.Result)
+		assert.Empty(t, e.Outputs)
+		assert.Equal(t, map[string]any{"version": "v1"}, e.Inputs)
 		assert.NotEmpty(t, e.Execution.CreatedAt)
 		assert.NotEmpty(t, e.Execution.StartedAt)
 		assert.NotEmpty(t, e.Execution.FinishedAt)
@@ -179,7 +198,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		execution := support.CreateExecutionWithData(t, r.Source, stage,
 			[]byte(`{"ref":"v1"}`),
 			[]byte(`{"ref":"v1"}`),
-			map[string]any{},
+			map[string]any{"version": "v1"},
 		)
 
 		require.NoError(t, execution.Start())
@@ -221,6 +240,8 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
 		assert.Equal(t, models.ResultPassed, e.Execution.Result)
+		assert.Empty(t, e.Outputs)
+		assert.Equal(t, map[string]any{"version": "v1"}, e.Inputs)
 		assert.NotEmpty(t, e.Execution.CreatedAt)
 		assert.NotEmpty(t, e.Execution.StartedAt)
 		assert.NotEmpty(t, e.Execution.FinishedAt)

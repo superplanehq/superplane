@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
 
@@ -82,7 +83,7 @@ func NewServer(
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -723,9 +724,15 @@ func (s *Server) HandleCustomWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "custom", body, headers); err != nil {
+	event, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, "custom", body, headers)
+	if err != nil {
 		http.Error(w, "Error receiving event", http.StatusInternalServerError)
 		return
+	}
+
+	err = messages.NewEventCreatedMessage(source.CanvasID.String(), event).Publish()
+	if err != nil {
+		log.Errorf("failed to publish event created message: %v", err)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -822,9 +829,15 @@ func (s *Server) HandleIntegrationWebhook(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, event.Type(), body, headers); err != nil {
+	newEvent, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, event.Type(), body, headers)
+	if err != nil {
 		http.Error(w, "error creating event", http.StatusInternalServerError)
 		return
+	}
+
+	err = messages.NewEventCreatedMessage(source.CanvasID.String(), newEvent).Publish()
+	if err != nil {
+		log.Errorf("failed to publish event created message: %v", err)
 	}
 
 	w.WriteHeader(http.StatusOK)

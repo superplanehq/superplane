@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -73,7 +74,17 @@ func (w *PendingFieldSetsWorker) ProcessFieldSet(fieldSet models.ConnectionGroup
 	case models.ConnectionGroupTimeoutBehaviorEmit:
 		log.Infof("Field set %s for %s has timed out - processing", fieldSet.String(), connectionGroup.Name)
 
-		return connectionGroup.Emit(&fieldSet, models.ConnectionGroupFieldSetStateReasonTimeout, missingConnections)
+		newEvent, err := connectionGroup.Emit(&fieldSet, models.ConnectionGroupFieldSetStateReasonTimeout, missingConnections)
+		if err != nil {
+			return err
+		}
+
+		err = messages.NewEventCreatedMessage(connectionGroup.CanvasID.String(), newEvent).Publish()
+		if err != nil {
+			log.Errorf("failed to publish event created message: %v", err)
+		}
+
+		return nil
 
 	case models.ConnectionGroupTimeoutBehaviorDrop:
 		log.Infof("Field set %s for %s timed out - discarding", fieldSet.String(), connectionGroup.Name)

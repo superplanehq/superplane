@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { Heading } from '../../../components/Heading/heading'
 import { Button } from '../../../components/Button/button'
 import { Textarea } from '../../../components/Textarea/textarea'
@@ -18,6 +19,7 @@ import {
 import { organizationsListInvitations, organizationsCreateInvitation } from '../../../api-client/sdk.gen'
 import type { OrganizationsInvitation } from '../../../api-client/types.gen'
 import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
+import { organizationKeys } from '../../../hooks/useOrganizationData'
 
 
 interface InvitationsProps {
@@ -29,6 +31,7 @@ export function Invitations({ organizationId }: InvitationsProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [invitationError, setInvitationError] = useState<string | null>(null)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   // Fetch pending invitations
   const { data: invitations = [], isLoading: loadingInvitations } = useQuery<OrganizationsInvitation[]>({
@@ -52,9 +55,17 @@ export function Invitations({ organizationId }: InvitationsProps) {
       }))
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['invitations', organizationId] })
       setInvitationError(null)
+      
+      // If the invitation was already accepted, which means that the email being invited already has an account,
+      // and was already added to the organization, we redirect to members page.
+      if (data.invitation?.status === 'accepted') {
+        // Invalidate members list to ensure it gets reloaded when navigating to members page
+        queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
+        navigate(`/${organizationId}/settings/members`)
+      }
     },
     onError: (error: Error) => {
       setInvitationError(error.message)

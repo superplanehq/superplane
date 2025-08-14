@@ -18,8 +18,8 @@ export const transformEventSourcesToNodes = (
   return eventSources.map((es, idx) => {
     const lastEvents = es.events
       ? es.events.sort((a, b) => {
-          const timeA = new Date(a.createdAt || 0).getTime();
-          const timeB = new Date(b.createdAt || 0).getTime();
+          const timeA = new Date(a.receivedAt || 0).getTime();
+          const timeB = new Date(b.receivedAt || 0).getTime();
           return timeB - timeA;
         }).slice(0, 3)
       : [];

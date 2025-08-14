@@ -12,16 +12,19 @@ import (
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 type Handler struct {
-	jwtSigner *jwt.Signer
-	encryptor crypto.Encryptor
-	isDev     bool
+	jwtSigner   *jwt.Signer
+	authService authorization.Authorization
+	encryptor   crypto.Encryptor
+	isDev       bool
 }
 
 type ProviderConfig struct {
@@ -30,11 +33,12 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, appEnv string) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string) *Handler {
 	return &Handler{
-		jwtSigner: jwtSigner,
-		encryptor: encryptor,
-		isDev:     appEnv == "development",
+		jwtSigner:   jwtSigner,
+		encryptor:   encryptor,
+		authService: authService,
+		isDev:       appEnv == "development",
 	}
 }
 
@@ -123,7 +127,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = acceptPendingInvitations(account)
+	err = a.acceptPendingInvitations(account)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -151,7 +155,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = acceptPendingInvitations(account)
+	err = a.acceptPendingInvitations(account)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -160,7 +164,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	a.handleSuccessfulAuth(w, r, gothUser)
 }
 
-func acceptPendingInvitations(account *models.Account) error {
+func (a *Handler) acceptPendingInvitations(account *models.Account) error {
 	invitations, err := account.FindPendingInvitations()
 	if err != nil {
 		log.Errorf("Error finding pending invitations for account %s: %v", account.Email, err)
@@ -168,7 +172,7 @@ func acceptPendingInvitations(account *models.Account) error {
 	}
 
 	for _, invitation := range invitations {
-		err := invitation.Accept(account)
+		err := a.acceptInvitation(invitation, account)
 		if err != nil {
 			log.Errorf("Error accepting invitation to %s for account %s: %v", invitation.OrganizationID, account.Email, err)
 			return err
@@ -176,6 +180,27 @@ func acceptPendingInvitations(account *models.Account) error {
 	}
 
 	return nil
+}
+
+func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, account *models.Account) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		user, err := models.CreateUserInTransaction(tx, invitation.OrganizationID, account.ID, account.Email, account.Name)
+		if err != nil {
+			return err
+		}
+
+		invitation.Status = models.InvitationStatusAccepted
+		invitation.UpdatedAt = time.Now()
+		err = tx.Save(&invitation).Error
+		if err != nil {
+			return err
+		}
+
+		//
+		// TODO: this is not using the transaction properly
+		//
+		return a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
+	})
 }
 
 func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {

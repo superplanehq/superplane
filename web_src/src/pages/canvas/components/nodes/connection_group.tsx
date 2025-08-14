@@ -271,7 +271,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
               {isEditMode && <InlineEditable
                 value={connectionGroupDescription}
                 onSave={handleConnectionGroupDescriptionChange}
-                placeholder={isEditMode ? "Add description..." : "No description available"}
+                placeholder={isEditMode ? "Add description..." : ""}
                 className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
                 isEditMode={isEditMode}
               />}
@@ -279,7 +279,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           </div>
         </div>
         {!isEditMode && (
-          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || 'No description available'}</div>
+          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || ''}</div>
         )}
       </div>
 

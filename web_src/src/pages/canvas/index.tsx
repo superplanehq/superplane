@@ -3,9 +3,10 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups } from "@/api-client";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneListEvents } from "@/api-client";
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
+import { EventSourceSidebar } from "./components/EventSourceSidebar";
 import { ComponentSidebar } from "./components/ComponentSidebar";
 import { CanvasNavigation, CanvasNavigationContent, type CanvasView } from "../../components/CanvasNavigation";
 import { useNodeHandlers } from "./utils/nodeHandlers";
@@ -17,7 +18,7 @@ export function Canvas() {
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode, lockedNodes } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, selectedEventSourceId, cleanSelectedEventSourceId, editingStageId, stages, eventSources, approveStageEvent, fitViewNode, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
@@ -58,6 +59,7 @@ export function Canvas() {
   const { applyElkAutoLayout } = useAutoLayout();
 
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
+  const selectedEventSource = useMemo(() => eventSources.find(eventSource => eventSource.metadata!.id === selectedEventSourceId), [eventSources, selectedEventSourceId]);
 
 
   useEffect(() => {
@@ -152,23 +154,24 @@ export function Canvas() {
           });
         }
 
-        // Group events by source ID
-        const eventsBySourceId = Object.values(allEvents).reduce((acc, event) => {
-          const sourceId = event.sourceId;
-          if (sourceId) {
-            if (!acc[sourceId]) {
-              acc[sourceId] = [];
-            }
-            acc[sourceId].push(event);
-          }
-          return acc;
-        }, {} as Record<string, SuperplaneStageEvent[]>);
+        // Fetch events for each event source using the new ListEvents API
+        const eventSourcesWithEvents: EventSourceWithEvents[] = [];
+        for (const eventSource of (eventSourcesResponse.data?.eventSources || [])) {
+          const eventsResponse = await superplaneListEvents(
+            withOrganizationHeader({
+              path: { canvasIdOrName: canvasId! },
+              query: { 
+                sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
+                sourceId: eventSource.metadata?.id 
+              }
+            })
+          );
 
-        // Assign events to their corresponding event sources
-        const eventSourcesWithEvents: EventSourceWithEvents[] = (eventSourcesResponse.data?.eventSources || []).map(eventSource => ({
-          ...eventSource,
-          events: eventSource.metadata?.id ? eventsBySourceId[eventSource.metadata.id] : []
-        }));
+          eventSourcesWithEvents.push({
+            ...eventSource,
+            events: eventsResponse.data?.events || []
+          });
+        }
 
         // Initialize the store with the mapped data
         const initialData = {
@@ -206,6 +209,17 @@ export function Canvas() {
     try {
       const config = getNodeConfig(nodeType, executorType, eventSourceType);
       const nodeId = handleAddNode(nodeType, config);
+
+      setFocusedNodeId(nodeId);
+
+      setTimeout(() => {
+        const currentNodes = useCanvasStore.getState().nodes;
+        const updatedNodes = currentNodes.map(node => ({
+          ...node,
+          selected: node.id === nodeId
+        }));
+        setNodes(updatedNodes);
+      }, 10);
 
       if (lockedNodes) {
         setTimeout(async () => {
@@ -282,6 +296,7 @@ export function Canvas() {
 
             <FlowRenderer />
             {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
+            {selectedEventSource && <EventSourceSidebar selectedEventSource={selectedEventSource} onClose={() => cleanSelectedEventSourceId()} />}
           </div>
         ) : (
           <div className="h-[calc(100%-2.7rem)] p-6 bg-zinc-50 dark:bg-zinc-950" >

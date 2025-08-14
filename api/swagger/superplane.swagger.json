@@ -443,6 +443,57 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/events": {
+      "get": {
+        "summary": "List events",
+        "description": "Returns a list of events with optional filtering by source type and source ID",
+        "operationId": "Superplane_ListEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListEventsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "EVENT_SOURCE_TYPE_UNKNOWN",
+              "EVENT_SOURCE_TYPE_EVENT_SOURCE",
+              "EVENT_SOURCE_TYPE_STAGE",
+              "EVENT_SOURCE_TYPE_CONNECTION_GROUP"
+            ],
+            "default": "EVENT_SOURCE_TYPE_UNKNOWN"
+          },
+          {
+            "name": "sourceId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Event"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/stages": {
       "get": {
         "summary": "List stages",
@@ -3296,6 +3347,39 @@
         }
       }
     },
+    "SuperplaneEvent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "sourceName": {
+          "type": "string"
+        },
+        "sourceType": {
+          "$ref": "#/definitions/SuperplaneEventSourceType"
+        },
+        "type": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/SuperplaneEventState"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "raw": {
+          "type": "object"
+        },
+        "headers": {
+          "type": "object"
+        }
+      }
+    },
     "SuperplaneEventSource": {
       "type": "object",
       "properties": {
@@ -3349,6 +3433,26 @@
           }
         }
       }
+    },
+    "SuperplaneEventSourceType": {
+      "type": "string",
+      "enum": [
+        "EVENT_SOURCE_TYPE_UNKNOWN",
+        "EVENT_SOURCE_TYPE_EVENT_SOURCE",
+        "EVENT_SOURCE_TYPE_STAGE",
+        "EVENT_SOURCE_TYPE_CONNECTION_GROUP"
+      ],
+      "default": "EVENT_SOURCE_TYPE_UNKNOWN"
+    },
+    "SuperplaneEventState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_DISCARDED",
+        "STATE_PROCESSED"
+      ],
+      "default": "STATE_UNKNOWN"
     },
     "SuperplaneExecution": {
       "type": "object",
@@ -3568,6 +3672,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneEventSource"
+          }
+        }
+      }
+    },
+    "SuperplaneListEventsResponse": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneEvent"
           }
         }
       }

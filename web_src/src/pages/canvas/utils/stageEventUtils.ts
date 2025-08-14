@@ -22,6 +22,22 @@ export const formatRelativeTime = (dateString: string | undefined) => {
     return rtf.format(-diffDays, 'day');
   }
 };
+
+export const formatFullTimestamp = (dateString: string | undefined) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  const timeFormat = date.toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    hour12: false 
+  });
+  const dateFormat = date.toLocaleDateString('en-GB', { 
+    day: '2-digit', 
+    month: 'short', 
+    year: '2-digit' 
+  });
+  return `${timeFormat} - ${dateFormat}`;
+};
   
 export const getExecutionStatusIcon = (state: string, result?: string) => {
   switch (state) {
