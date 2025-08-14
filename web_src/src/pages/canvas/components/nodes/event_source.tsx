@@ -260,7 +260,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       )}
 
       {/* Header Section */}
-      <div className="px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
+      <div className="px-4 py-4 justify-between items-start">
         <div className="flex items-start flex-1 min-w-0">
           <div className='max-w-8 mt-1 flex items-center justify-center'>
             {EventSourceImageMap[eventSourceType as keyof typeof EventSourceImageMap]}
@@ -299,7 +299,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         {!isEditMode && (
           <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
         )}
+
       </div>
+      {!isEditMode && props.data.resource?.name &&
+        <div className="flex items-center w-full gap-2 px-4 pb-4 font-semibold">
+          <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+            <MaterialSymbol name="assignment" size="md" />
+            <span>{(props.data.resource?.name as string)?.replace('.semaphore/', '')}</span>
+          </div>
+        </div>}
 
       {isEditMode ? (
         <EventSourceEditModeContent
@@ -338,7 +346,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         />
       ) : (
         <>
-          <div className="px-3 py-3 w-full">
+          <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-sm my-2 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Events</div>
             </div>

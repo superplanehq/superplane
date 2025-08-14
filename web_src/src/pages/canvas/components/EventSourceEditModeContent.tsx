@@ -302,7 +302,7 @@ export function EventSourceEditModeContent({
   };
 
   return (
-    <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
+    <div className="w-full h-full text-left border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
       <div className="">
         {requireIntegration && availableIntegrations.length === 0 && (
           <IntegrationZeroState
