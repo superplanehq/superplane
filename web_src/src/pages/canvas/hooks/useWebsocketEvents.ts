@@ -3,6 +3,7 @@ import useWebSocket from 'react-use-websocket';
 import { EventMap, ServerEvent } from '../types/events';
 import { useCanvasStore } from "../store/canvasStore";
 import { EventSourceWithEvents } from '../store/types';
+import { pollEventSourceUntilNoPending } from '../utils/eventSourcePolling';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
 
@@ -84,6 +85,14 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
       case 'canvas_updated':
         updateCanvas(payload as EventMap['canvas_updated']);
         break;
+
+      case 'event_created':
+        if (payload.source_type === 'event-source') {
+          eventSourceWithNewEvent = eventSources.find(es => es.metadata!.id === payload.source_id);
+          pollEventSourceUntilNoPending(canvasId, eventSourceWithNewEvent?.metadata?.id || '');
+        }
+        break;
+
       case 'new_stage_event':
         newEventPayload = payload as EventMap['new_stage_event'];
         eventSourceWithNewEvent = eventSources.find(es => es.metadata!.id === newEventPayload.source_id);

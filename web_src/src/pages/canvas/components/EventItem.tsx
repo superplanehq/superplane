@@ -5,11 +5,12 @@ import { PayloadModal } from './PayloadModal';
 import { Button } from '@/components/Button/button';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
+import { SuperplaneEventState } from '@/api-client';
 
 interface EventItemProps {
   eventId: string;
   timestamp: string;
-  state?: string;
+  state?: SuperplaneEventState;
   eventType?: string;
   sourceName?: string;
   headers?: { [key: string]: unknown };
@@ -38,19 +39,19 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
 
   const renderStateIcon = () => {
     switch (state) {
-      case 'processed':
+      case 'STATE_PROCESSED':
         return (
           <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
             <MaterialSymbol name="check_circle" size='lg' className="text-green-600 dark:text-green-400" />
           </div>
         );
-      case 'pending':
+      case 'STATE_PENDING':
         return (
           <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
             <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 dark:text-orange-400" />
           </div>
         );
-      case 'discarded':
+      case 'STATE_DISCARDED':
         return (
           <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
             <MaterialSymbol name="cancel" size='lg' className="text-red-600 dark:text-red-400" />
@@ -67,16 +68,23 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
 
   const getBackgroundClass = () => {
     switch (state) {
-      case 'processed':
+      case 'STATE_PROCESSED':
         return 'bg-green-50 dark:bg-green-900/50 border-t-1 border-green-500 dark:border-green-700';
-      case 'pending':
+      case 'STATE_PENDING':
         return 'bg-yellow-50 dark:bg-yellow-900/50 border-t-1 border-yellow-500 dark:border-yellow-700';
-      case 'discarded':
+      case 'STATE_DISCARDED':
         return 'bg-red-50 dark:bg-red-900/50 border-t-1 border-red-500 dark:border-red-700';
       default:
         return 'bg-blue-50 dark:bg-blue-900/50 border-t-1 border-blue-500 dark:border-blue-700';
     }
   };
+
+  const mapEventType = () => {
+    if (state === "STATE_PROCESSED")
+      return "FOWARDED";
+
+    return state?.replace("STATE_", "").toUpperCase();
+  }
 
   return (
     <>
@@ -108,7 +116,7 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
                 <div className="grid grid-cols-2 gap-4 text-xs p-4 rounded-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
                   <div>
                     <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">State</div>
-                    <div className="font-semibold text-blue-600 dark:text-blue-400">{state?.toUpperCase() || 'UNKNOWN'}</div>
+                    <div className="font-semibold text-blue-600 dark:text-blue-400">{mapEventType() || 'UNKNOWN'}</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Type</div>
