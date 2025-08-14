@@ -2,37 +2,20 @@ package events
 
 import (
 	"context"
-	"errors"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gorm.io/gorm"
 )
 
 func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string) (*pb.ListEventsResponse, error) {
-	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
-	orgUUID, err := uuid.Parse(orgID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
-	}
-
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
-	}
-
-	_, err = models.FindCanvasByID(canvasID, orgUUID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.InvalidArgument, "canvas not found")
-		}
-		return nil, err
 	}
 
 	sourceTypeStr := EventSourceTypeToString(sourceType)
