@@ -43,7 +43,7 @@ func (r ApiSuperplaneAddUserRequest) Execute() (map[string]interface{}, *http.Re
 /*
 SuperplaneAddUser Add a user to a canvas
 
-Adds a user to a canvas (canvas can be referenced by ID or name)
+Add a user to a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
@@ -641,9 +641,9 @@ func (r ApiSuperplaneRemoveUserRequest) Execute() (map[string]interface{}, *http
 }
 
 /*
-SuperplaneRemoveUser Add a user to a canvas
+SuperplaneRemoveUser Remove a user from a canvas
 
-Adds a user to a canvas (canvas can be referenced by ID or name)
+Remove a user from a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName

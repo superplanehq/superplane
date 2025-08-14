@@ -252,7 +252,7 @@ service Superplane {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Add a user to a canvas";
-      description: "Adds a user to a canvas (canvas can be referenced by ID or name)";
+      description: "Add a user to a canvas";
       tags: "Canvas";
     };
   }
@@ -262,8 +262,8 @@ service Superplane {
       delete: "/api/v1/canvases/{canvas_id_or_name}/users/{user_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Add a user to a canvas";
-      description: "Adds a user to a canvas (canvas can be referenced by ID or name)";
+      summary: "Remove a user from a canvas";
+      description: "Remove a user from a canvas";
       tags: "Canvas";
     };
   }

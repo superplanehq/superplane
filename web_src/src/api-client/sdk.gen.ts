@@ -239,7 +239,7 @@ export const superplaneApproveStageEvent = <ThrowOnError extends boolean = true>
 
 /**
  * Add a user to a canvas
- * Adds a user to a canvas (canvas can be referenced by ID or name)
+ * Add a user to a canvas
  */
 export const superplaneAddUser = <ThrowOnError extends boolean = true>(options: Options<SuperplaneAddUserData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<SuperplaneAddUserResponse2, SuperplaneAddUserError, ThrowOnError>({
@@ -253,8 +253,8 @@ export const superplaneAddUser = <ThrowOnError extends boolean = true>(options: 
 };
 
 /**
- * Add a user to a canvas
- * Adds a user to a canvas (canvas can be referenced by ID or name)
+ * Remove a user from a canvas
+ * Remove a user from a canvas
  */
 export const superplaneRemoveUser = <ThrowOnError extends boolean = true>(options: Options<SuperplaneRemoveUserData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).delete<SuperplaneRemoveUserResponse2, SuperplaneRemoveUserError, ThrowOnError>({

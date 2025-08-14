@@ -27,14 +27,14 @@ func Test_AssignRole(t *testing.T) {
 	})
 
 	t.Run("assign role with user ID", func(t *testing.T) {
-		newUser := support.CreateUser(t, r.Organization.ID)
+		newUser := support.CreateUser(t, r, r.Organization.ID)
 		resp, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, newUser.ID.String(), "", r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
 	t.Run("assign role with user email", func(t *testing.T) {
-		newUser := support.CreateUser(t, r.Organization.ID)
+		newUser := support.CreateUser(t, r, r.Organization.ID)
 		resp, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", newUser.Email, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)

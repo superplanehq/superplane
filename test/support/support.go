@@ -360,11 +360,13 @@ func CreateCanvas(t *testing.T, r *ResourceRegistry, organizationID, userID uuid
 	return canvas
 }
 
-func CreateUser(t *testing.T, organizationID uuid.UUID) *models.User {
+func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *models.User {
 	name := RandomName("user")
 	account, err := models.CreateAccount(name, name+"@test.com")
 	require.NoError(t, err)
 	user, err := models.CreateUser(organizationID, account.ID, account.Name, account.Email)
+	require.NoError(t, err)
+	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgViewer, organizationID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
 	return user
 }

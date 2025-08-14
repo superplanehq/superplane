@@ -6126,7 +6126,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x12FILTER_TYPE_HEADER\x10\x02*A\n" +
 	"\x0eFilterOperator\x12\x17\n" +
 	"\x13FILTER_OPERATOR_AND\x10\x00\x12\x16\n" +
-	"\x12FILTER_OPERATOR_OR\x10\x012\xd5,\n" +
+	"\x12FILTER_OPERATOR_OR\x10\x012\x8a,\n" +
 	"\n" +
 	"Superplane\x12\xa5\x01\n" +
 	"\fListCanvases\x12\x1f.Superplane.ListCanvasesRequest\x1a .Superplane.ListCanvasesResponse\"R\x92A7\n" +
@@ -6167,12 +6167,12 @@ const file_canvases_proto_rawDesc = "" +
 	"\x15UpdateConnectionGroup\x12(.Superplane.UpdateConnectionGroupRequest\x1a).Superplane.UpdateConnectionGroupResponse\"\xce\x01\x92A}\n" +
 	"\x0fConnectionGroup\x12\x19Update a connection group\x1aOUpdates the specified connection group (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02H:\x01*2C/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}\x12\xb4\x02\n" +
 	"\x11ApproveStageEvent\x12$.Superplane.ApproveStageEventRequest\x1a%.Superplane.ApproveStageEventResponse\"\xd1\x01\x92Ak\n" +
-	"\x05Stage\x12\x15Approve a stage event\x1aKApproves the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02]:\x01*\"X/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve\x12\xdf\x01\n" +
-	"\aAddUser\x12\x1a.Superplane.AddUserRequest\x1a\x1b.Superplane.AddUserResponse\"\x9a\x01\x92Ab\n" +
-	"\x06Canvas\x12\x16Add a user to a canvas\x1a@Adds a user to a canvas (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02/:\x01*\"*/api/v1/canvases/{canvas_id_or_name}/users\x12\xef\x01\n" +
+	"\x05Stage\x12\x15Approve a stage event\x1aKApproves the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02]:\x01*\"X/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve\x12\xb4\x01\n" +
+	"\aAddUser\x12\x1a.Superplane.AddUserRequest\x1a\x1b.Superplane.AddUserResponse\"p\x92A8\n" +
+	"\x06Canvas\x12\x16Add a user to a canvas\x1a\x16Add a user to a canvas\x82\xd3\xe4\x93\x02/:\x01*\"*/api/v1/canvases/{canvas_id_or_name}/users\x12\xcf\x01\n" +
 	"\n" +
-	"RemoveUser\x12\x1d.Superplane.RemoveUserRequest\x1a\x1e.Superplane.RemoveUserResponse\"\xa1\x01\x92Ab\n" +
-	"\x06Canvas\x12\x16Add a user to a canvas\x1a@Adds a user to a canvas (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x026*4/api/v1/canvases/{canvas_id_or_name}/users/{user_id}B\xc2\x01\x92A\x86\x01\x12\\\n" +
+	"RemoveUser\x12\x1d.Superplane.RemoveUserRequest\x1a\x1e.Superplane.RemoveUserResponse\"\x81\x01\x92AB\n" +
+	"\x06Canvas\x12\x1bRemove a user from a canvas\x1a\x1bRemove a user from a canvas\x82\xd3\xe4\x93\x026*4/api/v1/canvases/{canvas_id_or_name}/users/{user_id}B\xc2\x01\x92A\x86\x01\x12\\\n" +
 	"\x0eSuperplane API\x12\x1eAPI for the Superplane service\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ6github.com/superplanehq/superplane/pkg/protos/canvasesb\x06proto3"
 

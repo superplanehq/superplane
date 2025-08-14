@@ -731,7 +731,7 @@
     "/api/v1/canvases/{canvasIdOrName}/users": {
       "post": {
         "summary": "Add a user to a canvas",
-        "description": "Adds a user to a canvas (canvas can be referenced by ID or name)",
+        "description": "Add a user to a canvas",
         "operationId": "Superplane_AddUser",
         "responses": {
           "200": {
@@ -770,8 +770,8 @@
     },
     "/api/v1/canvases/{canvasIdOrName}/users/{userId}": {
       "delete": {
-        "summary": "Add a user to a canvas",
-        "description": "Adds a user to a canvas (canvas can be referenced by ID or name)",
+        "summary": "Remove a user from a canvas",
+        "description": "Remove a user from a canvas",
         "operationId": "Superplane_RemoveUser",
         "responses": {
           "200": {

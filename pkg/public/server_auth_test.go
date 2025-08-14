@@ -163,7 +163,7 @@ func Test__CanvasWebSocket(t *testing.T) {
 	})
 
 	t.Run("user does not have access to canvas", func(t *testing.T) {
-		user := support.CreateUser(t, r.Organization.ID)
+		user := support.CreateUser(t, r, r.Organization.ID)
 		canvas := support.CreateCanvas(t, r, r.Organization.ID, user.ID)
 
 		req, _ := http.NewRequest(http.MethodGet, "/ws/"+canvas.ID.String(), nil)

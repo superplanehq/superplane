@@ -18,7 +18,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	orgID := r.Organization.ID.String()
 
 	// Create a group first
-	newUser := support.CreateUser(t, r.Organization.ID)
+	newUser := support.CreateUser(t, r, r.Organization.ID)
 	groupName := support.RandomName("group")
 	require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, models.RoleOrgAdmin, "", ""))
 
