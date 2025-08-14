@@ -29,7 +29,7 @@ spec:
           valueFrom:
             eventData:
               connection: docs
-              expression: ref
+              expression: $.ref
         - name: TERRAFORM_VERSION
           valueFrom:
             lastExecution:
@@ -48,7 +48,7 @@ spec:
           valueFrom:
             eventData:
               connection: terraform
-              expression: ref
+              expression: $.ref
 
   executor:
     type: semaphore
@@ -97,7 +97,7 @@ spec:
           valueFrom:
             eventData:
               connection: source-1
-              expression: ref
+              expression: $.ref
 
   executor:
     type: semaphore
@@ -114,4 +114,62 @@ spec:
           value: ${{ inputs.DOCS_VERSION }}
         - name: TERRAFORM_VERSION
           value: ${{ inputs.TERRAFORM_VERSION }}
+```
+
+### Forwarding inputs between stages
+
+Similarly to how you can use outputs from one stage as inputs on another, you can also forward inputs between stages, as the inputs used in the execution are present in the event emitted by the stage when it finishes. Here's an example:
+
+```yaml
+kind: Stage
+metadata:
+  name: stage-1
+spec:
+  connections:
+    - name: git-repo
+      type: TYPE_EVENT_SOURCE
+  inputs:
+    - name: version
+  outputs:
+    - name: output_1
+      required: true
+  inputMappings:
+    - values:
+        - name: version
+          valueFrom:
+            eventData:
+              expression: $.ref
+---
+
+kind: Stage
+metadata:
+  name: stage-2
+spec:
+  connections:
+    - name: stage-1
+      type: TYPE_STAGE
+  inputs:
+    - name: version
+    - name: output_1
+  inputMappings:
+    - when:
+        triggeredBy:
+          connection: stage-1
+      values:
+        - name: version
+          valueFrom:
+            eventData:
+
+              #
+              # You can access the inputs used in the execution that finished with the $.inputs.* expression
+              #
+              expression: $.inputs.version
+        - name: output_1
+          valueFrom:
+            eventData:
+
+              #
+              # You can access the outputs produced in the execution that finished with the $.outputs.* expression
+              #
+              expression: $.outputs.output_1
 ```

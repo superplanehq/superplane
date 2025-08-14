@@ -118,10 +118,15 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 		return err
 	}
 
+	inputs, err := e.GetInputs()
+	if err != nil {
+		return err
+	}
+
 	//
 	// Create stage execution completion event
 	//
-	event, err := NewExecutionCompletionEvent(e, e.Outputs.Data())
+	event, err := NewExecutionCompletionEvent(e, inputs, e.Outputs.Data())
 	if err != nil {
 		return fmt.Errorf("error creating stage completion event: %v", err)
 	}
