@@ -25,10 +25,10 @@ func Test__ListEvents(t *testing.T) {
 	})
 
 	t.Run("canvas with events - list all", func(t *testing.T) {
-		event1, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "data1"}`), []byte(`{"x-header": "value1"}`))
+		event1, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "data1"}`), []byte(`{"x-header": "value1"}`))
 		require.NoError(t, err)
 
-		event2, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "data2"}`), []byte(`{"x-header": "value2"}`))
+		event2, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "data2"}`), []byte(`{"x-header": "value2"}`))
 		require.NoError(t, err)
 
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
@@ -61,7 +61,7 @@ func Test__ListEvents(t *testing.T) {
 	})
 
 	t.Run("filter by source type", func(t *testing.T) {
-		_, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "data1"}`), []byte(`{"x-header": "value1"}`))
+		_, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "data1"}`), []byte(`{"x-header": "value1"}`))
 		require.NoError(t, err)
 
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())

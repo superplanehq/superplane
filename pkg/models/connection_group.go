@@ -99,7 +99,7 @@ func (g *ConnectionGroup) EmitInTransaction(tx *gorm.DB, fieldSet *ConnectionGro
 		return nil, fmt.Errorf("error marshaling connection group event: %v", err)
 	}
 
-	createdEvent, err := CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, event.Type, eventData, []byte(`{}`))
+	createdEvent, err := CreateEventInTransaction(tx, g.ID, g.CanvasID, g.Name, SourceTypeConnectionGroup, event.Type, eventData, []byte(`{}`))
 	if err != nil {
 		return nil, err
 	}

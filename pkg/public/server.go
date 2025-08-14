@@ -724,7 +724,7 @@ func (s *Server) HandleCustomWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "custom", body, headers)
+	event, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, "custom", body, headers)
 	if err != nil {
 		http.Error(w, "Error receiving event", http.StatusInternalServerError)
 		return
@@ -829,7 +829,7 @@ func (s *Server) HandleIntegrationWebhook(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	newEvent, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, event.Type(), body, headers)
+	newEvent, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, event.Type(), body, headers)
 	if err != nil {
 		http.Error(w, "error creating event", http.StatusInternalServerError)
 		return

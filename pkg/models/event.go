@@ -46,6 +46,7 @@ const (
 type Event struct {
 	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	SourceID   uuid.UUID
+	CanvasID   uuid.UUID
 	SourceName string
 	SourceType string
 	Type       string
@@ -199,15 +200,16 @@ func (e *Event) EvaluateStringExpression(expression string) (string, error) {
 	return v, nil
 }
 
-func CreateEvent(sourceID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, headers []byte) (*Event, error) {
-	return CreateEventInTransaction(database.Conn(), sourceID, sourceName, sourceType, eventType, raw, headers)
+func CreateEvent(sourceID uuid.UUID, canvasID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, headers []byte) (*Event, error) {
+	return CreateEventInTransaction(database.Conn(), sourceID, canvasID, sourceName, sourceType, eventType, raw, headers)
 }
 
-func CreateEventInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, headers []byte) (*Event, error) {
+func CreateEventInTransaction(tx *gorm.DB, sourceID uuid.UUID, canvasID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, headers []byte) (*Event, error) {
 	now := time.Now()
 
 	event := Event{
 		SourceID:   sourceID,
+		CanvasID:   canvasID,
 		SourceName: sourceName,
 		SourceType: sourceType,
 		Type:       eventType,
@@ -269,16 +271,11 @@ func FindLastEventBySourceID(sourceID uuid.UUID) (map[string]any, error) {
 
 func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr string) ([]Event, error) {
 	var events []Event
-	
-	query := database.Conn().Table("events")
-	
-	query = query.Joins("LEFT JOIN event_sources ON events.source_id = event_sources.id AND events.source_type = ?", SourceTypeEventSource).
-		Joins("LEFT JOIN stages ON events.source_id = stages.id AND events.source_type = ?", SourceTypeStage).
-		Joins("LEFT JOIN connection_groups ON events.source_id = connection_groups.id AND events.source_type = ?", SourceTypeConnectionGroup).
-		Where("event_sources.canvas_id = ? OR stages.canvas_id = ? OR connection_groups.canvas_id = ?", canvasID, canvasID, canvasID)
+
+	query := database.Conn().Where("canvas_id = ?", canvasID)
 
 	if sourceType != "" {
-		query = query.Where("events.source_type = ?", sourceType)
+		query = query.Where("source_type = ?", sourceType)
 	}
 
 	if sourceIDStr != "" {
@@ -286,10 +283,10 @@ func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr str
 		if err != nil {
 			return nil, fmt.Errorf("invalid source ID: %v", err)
 		}
-		query = query.Where("events.source_id = ?", sourceID)
+		query = query.Where("source_id = ?", sourceID)
 	}
 
-	query = query.Order("events.received_at DESC")
+	query = query.Order("received_at DESC")
 
 	err := query.Find(&events).Error
 	if err != nil {

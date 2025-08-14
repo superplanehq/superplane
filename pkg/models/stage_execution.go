@@ -136,7 +136,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 		return nil, fmt.Errorf("error marshaling event: %v", err)
 	}
 
-	createdEvent, err := CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, event.Type, raw, []byte(`{}`))
+	createdEvent, err := CreateEventInTransaction(tx, e.StageID, stage.CanvasID, stage.Name, SourceTypeStage, event.Type, raw, []byte(`{}`))
 	if err != nil {
 		return nil, fmt.Errorf("error creating event: %v", err)
 	}
