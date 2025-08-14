@@ -102,6 +102,24 @@ export function EventSourceWorkflowNodeReactFlow({
   // Selected integration state
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   
+  // No state needed for hover-triggered popovers
+  
+  // Mock filters data
+  const appliedFilters = [
+    {
+      id: 'filter-1',
+      type: 'Branch',
+      value: 'main',
+      operator: 'equals'
+    },
+    {
+      id: 'filter-2', 
+      type: 'Event Type',
+      value: 'push',
+      operator: 'equals'
+    }
+  ];
+  
   // Available integrations (mock data + created ones)
   const [availableIntegrations, setAvailableIntegrations] = useState<Array<{
     id: string;
@@ -269,15 +287,96 @@ export function EventSourceWorkflowNodeReactFlow({
                 <img width={24} height={24} src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
               )}
          
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {data.title}
-            </h3>
+            <div className="flex items-center w-full">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {data.title}
+              </h3>
+              {/* Configuration indicator - only show when properly configured (no events but saved) */}
+            </div>
             
           </div>
           <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300 mt-4'>
-              <BadgeButton color='zinc' href='#' className='!text-xs'>
-                <MaterialSymbol name="deployed_code" size="md"/> {data.cluster}
-              </BadgeButton>
+              <Tippy
+                content={
+                  <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                    <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
+                      Project Configuration
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">Project:</span>
+                        <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded">
+                          semaphore-project
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">Organization:</span>
+                        <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                          {data.icon === 'semaphore' ? 'Semaphore CI' : data.icon === 'github' ? 'GitHub' : 'External Service'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">Status:</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-xs text-green-600 dark:text-green-400">Connected</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+                interactive={true}
+                placement="bottom"
+                trigger="mouseenter"
+                delay={[200, 100]}
+                className="z-50"
+              >
+                <BadgeButton 
+                  color='zinc' 
+                  href='#' 
+                  className='!text-xs'
+                >
+                  <MaterialSymbol name="assignment" size="md"/> semaphore-project
+                </BadgeButton>
+              </Tippy>
+              <Tippy
+                content={
+                  <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[280px]">
+                    <div className="space-y-3">
+                      {appliedFilters.map((filter) => (
+                        <div key={filter.id} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                              {filter.type}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-zinc-500 dark:text-zinc-400">
+                              {filter.operator}
+                            </span>
+                            <span className="bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
+                              {filter.value}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                }
+                interactive={true}
+                placement="bottom"
+                trigger="mouseenter"
+                delay={[200, 100]}
+                className="z-50"
+              >
+                <BadgeButton 
+                  color='zinc' 
+                  href='#' 
+                  className='!text-xs'
+                >
+                 {appliedFilters.length} Filters
+                </BadgeButton>
+              </Tippy>
               
             </div>
         </div>
@@ -319,15 +418,20 @@ export function EventSourceWorkflowNodeReactFlow({
             </div>
           ) : (
             /* noEvents variant - empty state */
-            <EmptyState
-              size="xs"
-              icon="sensors"
-              animated={true}
-              animationType="pulse"
-              title='Waiting for events'
-              body="Listening to activities in your semaphore project."
-              className="pt-6 bg-zinc-50 dark:bg-zinc-800 px-4 rounded-lg"
-            />
+            <div className="bg-zinc-50 dark:bg-zinc-800 px-4 rounded-lg">
+              
+              
+              {/* Empty State */}
+              <EmptyState
+                size="xs"
+                icon="sensors"
+                animated={true}
+                animationType="pulse"
+                title='Ready to receive events'
+                body={`Listening to changes in your Semaphore project`}
+                className="pt-6 pb-4"
+              />
+            </div>
           )}
         </div>
 
