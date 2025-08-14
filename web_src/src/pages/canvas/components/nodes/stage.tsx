@@ -401,7 +401,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         )}
 
         {/* Header Section */}
-        <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
+        <div className={twMerge('mt-1 px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>
           <div className="flex items-start flex-1 min-w-0">
             <div className='max-w-8 mt-1 flex items-center justify-center'>
               {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}

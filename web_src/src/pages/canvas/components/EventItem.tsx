@@ -69,7 +69,7 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
               <div className="flex items-center gap-2">
                 {!isExpanded && (
                   <Tippy content={formatFullTimestamp(timestamp)} placement="top">
-                    <div className="text-xs text-gray-500 dark:text-zinc-400 cursor-help">{formatRelativeTime(timestamp)}</div>
+                    <div className="text-xs text-gray-500 dark:text-zinc-400">{formatRelativeTime(timestamp)}</div>
                   </Tippy>
                 )}
               </div>
