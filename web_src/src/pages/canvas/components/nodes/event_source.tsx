@@ -48,6 +48,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [apiError, setApiError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
+  const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
   const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
@@ -82,6 +83,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setEditingEventSource(props.id);
     setEventSourceName(props.data.name);
     setEventSourceDescription(props.data.description || '');
+    
+    // Initialize currentFormData with existing event source data for editing
+    if (currentEventSource?.spec) {
+      setCurrentFormData({
+        name: props.data.name || '',
+        description: props.data.description || '',
+        spec: currentEventSource.spec
+      });
+    }
   };
 
   const handleSaveEventSource = async () => {
@@ -198,6 +208,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         description: yamlData.metadata?.description || eventSourceDescription,
         spec: yamlData.spec
       });
+      // Force re-render of EventSourceEditModeContent by incrementing counter
+      setYamlUpdateCounter(prev => prev + 1);
     }
   };
 
@@ -311,12 +323,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
       {isEditMode ? (
         <EventSourceEditModeContent
+          key={yamlUpdateCounter}
           data={{
             ...props.data,
             name: eventSourceName,
             description: eventSourceDescription,
-            ...(currentFormData && {
-              spec: currentFormData.spec
+            ...(currentFormData?.spec && {
+              integration: currentFormData.spec.integration,
+              resource: currentFormData.spec.resource,
+              events: currentFormData.spec.events
             })
           }}
           canvasId={canvasId}
