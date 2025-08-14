@@ -18,8 +18,7 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
 	}
 
-	sourceTypeStr := EventSourceTypeToString(sourceType)
-	events, err := models.ListEventsByCanvasID(canvasUUID, sourceTypeStr, sourceID)
+	events, err := models.ListEventsByCanvasID(canvasUUID, EventSourceTypeToString(sourceType), sourceID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,22 +100,6 @@ func serializeEvents(in []models.Event) ([]*pb.Event, error) {
 }
 
 func serializeEvent(in models.Event) (*pb.Event, error) {
-	rawStruct, err := structpb.NewStruct(map[string]interface{}{})
-	if err == nil && len(in.Raw) > 0 {
-		data, dataErr := in.GetData()
-		if dataErr == nil {
-			rawStruct, _ = structpb.NewStruct(data)
-		}
-	}
-
-	headersStruct, err := structpb.NewStruct(map[string]interface{}{})
-	if err == nil && len(in.Headers) > 0 {
-		headers, headersErr := in.GetHeaders()
-		if headersErr == nil {
-			headersStruct, _ = structpb.NewStruct(headers)
-		}
-	}
-
 	event := &pb.Event{
 		Id:         in.ID.String(),
 		SourceId:   in.SourceID.String(),
@@ -125,8 +108,32 @@ func serializeEvent(in models.Event) (*pb.Event, error) {
 		Type:       in.Type,
 		State:      StringToEventStateProto(in.State),
 		ReceivedAt: timestamppb.New(*in.ReceivedAt),
-		Raw:        rawStruct,
-		Headers:    headersStruct,
+	}
+
+	if len(in.Raw) > 0 {
+		data, err := in.GetData()
+		if err != nil {
+			return nil, err
+		}
+
+		event.Raw, err = structpb.NewStruct(data)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(in.Headers) > 0 {
+		headers, err := in.GetHeaders()
+		if err != nil {
+			return nil, err
+		}
+
+		event.Headers, err = structpb.NewStruct(headers)
+
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return event, nil
