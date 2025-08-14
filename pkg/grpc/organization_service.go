@@ -40,7 +40,7 @@ func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.De
 
 func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateInvitation(ctx, orgID, req.Email)
+	return organizations.CreateInvitation(ctx, s.authorizationService, orgID, req.Email)
 }
 
 func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {

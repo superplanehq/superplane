@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -22,6 +23,10 @@ func (u *User) Delete() error {
 }
 
 func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
+	return CreateUserInTransaction(database.Conn(), orgID, accountID, email, name)
+}
+
+func CreateUserInTransaction(tx *gorm.DB, orgID, accountID uuid.UUID, email, name string) (*User, error) {
 	user := &User{
 		OrganizationID: orgID,
 		AccountID:      accountID,
@@ -29,7 +34,7 @@ func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
 		Name:           name,
 	}
 
-	err := database.Conn().Create(user).Error
+	err := tx.Create(user).Error
 	if err != nil {
 		return nil, err
 	}
