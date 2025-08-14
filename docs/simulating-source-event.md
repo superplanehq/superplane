@@ -7,7 +7,7 @@ export EVENT="{\"ref\":\"v1.0\",\"ref_type\":\"tag\"}"
 export SIGNATURE=$(echo -n "$EVENT" | openssl dgst -sha256 -hmac "$SOURCE_KEY" | awk '{print $2}')
 
 curl -X POST \
-  -H "X-Hub-Signature-256: sha256=$SIGNATURE" \
+  -H "X-Signature-256: sha256=$SIGNATURE" \
   -H "Content-Type: application/json" \
   --data "$EVENT" \
   http://localhost:8000/api/v1/sources/$SOURCE_ID/github

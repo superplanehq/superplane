@@ -125,7 +125,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 
 	inputs, err := e.GetInputs()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	//
