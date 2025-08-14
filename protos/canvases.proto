@@ -198,6 +198,17 @@ service Superplane {
     };
   }
 
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/events"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List events";
+      description: "Returns a list of events with optional filtering by source type and source ID";
+      tags: "Event";
+    };
+  }
+
   rpc ListConnectionGroupFieldSets(ListConnectionGroupFieldSetsRequest) returns (ListConnectionGroupFieldSetsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}/field-sets"
@@ -746,6 +757,42 @@ message ApproveStageEventResponse {
   StageEvent event = 1;
 }
 
+enum EventSourceType {
+  EVENT_SOURCE_TYPE_UNKNOWN = 0;
+  EVENT_SOURCE_TYPE_EVENT_SOURCE = 1;
+  EVENT_SOURCE_TYPE_STAGE = 2;
+  EVENT_SOURCE_TYPE_CONNECTION_GROUP = 3;
+}
+
+message ListEventsRequest {
+  string canvas_id_or_name = 1;
+  EventSourceType source_type = 2;
+  string source_id = 3;
+}
+
+message ListEventsResponse {
+  repeated Event events = 1;
+}
+
+message Event {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_DISCARDED = 2;
+    STATE_PROCESSED = 3;
+  }
+
+  string id = 1;
+  string source_id = 2;
+  string source_name = 3;
+  EventSourceType source_type = 4;
+  string type = 5;
+  State state = 6;
+  google.protobuf.Timestamp received_at = 7;
+  google.protobuf.Struct raw = 8;
+  google.protobuf.Struct headers = 9;
+}
+
 message StageCreated {
   string canvas_id = 1;
   string stage_id = 2;
@@ -775,6 +822,14 @@ message StageEventCreated {
   string stage_id = 2;
   string event_id = 3;
   string source_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message EventCreated {
+  string canvas_id = 1;
+  string source_id = 2;
+  string event_id = 3;
+  EventSourceType source_type = 4;
   google.protobuf.Timestamp timestamp = 5;
 }
 

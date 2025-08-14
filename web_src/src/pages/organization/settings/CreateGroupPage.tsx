@@ -178,7 +178,7 @@ export function CreateGroupPage() {
                         <DropdownItem key={role.metadata?.name} onClick={() => setSelectedRole(role.metadata?.name || '')}>
                           <DropdownLabel >{role.spec?.displayName}</DropdownLabel>
                           <DropdownDescription>
-                            {role.spec?.description || 'No description available'}
+                            {role.spec?.description || ''}
                           </DropdownDescription>
                         </DropdownItem>
                       ))}

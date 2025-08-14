@@ -83,13 +83,18 @@ func (e *StageExecution) Start() error {
 		Error
 }
 
-func (e *StageExecution) Finish(stage *Stage, result string) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		return e.FinishInTransaction(tx, stage, result)
+func (e *StageExecution) Finish(stage *Stage, result string) (*Event, error) {
+	var event *Event
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		event, err = e.FinishInTransaction(tx, stage, result)
+		return err
 	})
+
+	return event, err
 }
 
-func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result string) error {
+func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result string) (*Event, error) {
 	now := time.Now()
 
 	//
@@ -104,7 +109,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 		Error
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	//
@@ -115,7 +120,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 	)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	//
@@ -123,20 +128,20 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 	//
 	event, err := NewExecutionCompletionEvent(e, e.Outputs.Data())
 	if err != nil {
-		return fmt.Errorf("error creating stage completion event: %v", err)
+		return nil, fmt.Errorf("error creating stage completion event: %v", err)
 	}
 
 	raw, err := json.Marshal(&event)
 	if err != nil {
-		return fmt.Errorf("error marshaling event: %v", err)
+		return nil, fmt.Errorf("error marshaling event: %v", err)
 	}
 
-	_, err = CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, event.Type, raw, []byte(`{}`))
+	createdEvent, err := CreateEventInTransaction(tx, e.StageID, stage.CanvasID, stage.Name, SourceTypeStage, event.Type, raw, []byte(`{}`))
 	if err != nil {
-		return fmt.Errorf("error creating event: %v", err)
+		return nil, fmt.Errorf("error creating event: %v", err)
 	}
 
-	return nil
+	return createdEvent, nil
 }
 
 func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {

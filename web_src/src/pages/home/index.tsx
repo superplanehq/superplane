@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Heading } from '../../components/Heading/heading'
 import { Text } from '../../components/Text/text'
 import { Button } from '../../components/Button/button'
@@ -30,6 +30,7 @@ const HomePage = () => {
   const [showCreateCanvasModal, setShowCreateCanvasModal] = useState(false)
   const { organizationId } = useParams<{ organizationId: string }>()
   const { account } = useAccount()
+  const navigate = useNavigate()
 
   // Use the organization canvases hook with organization ID from URL
   const { data: canvasesData = [], isLoading: canvasesLoading, error: apiError } = useOrganizationCanvases(organizationId || '')
@@ -69,7 +70,7 @@ const HomePage = () => {
 
   const handleCreateCanvasSubmit = async (data: { name: string; description?: string }) => {
     if (organizationId) {
-      await createCanvasMutation.mutateAsync({
+      const result = await createCanvasMutation.mutateAsync({
         canvas: {
           metadata: {
             name: data.name,
@@ -78,6 +79,11 @@ const HomePage = () => {
         },
         organizationId: organizationId
       })
+
+      if (result) {
+        setShowCreateCanvasModal(false)
+        navigate(`/${organizationId}/canvas/${result.data?.canvas?.metadata?.id}`)
+      }
     }
   }
 
@@ -104,20 +110,11 @@ const HomePage = () => {
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className='bg-zinc-50 dark:bg-zinc-900 w-full flex-grow-1 p-6'>
           <div className="p-4">
-            {/* Welcome Header */}
-            <div className="text-center mb-8">
-              <Heading level={1} className="!text-3xl mb-2">
-                Welcome back, {account.name}!
-              </Heading>
-              <Text className="text-zinc-600 dark:text-zinc-400">
-                {account.email}
-              </Text>
-            </div>
-
             {/* Page Header */}
             <div className='flex items-center justify-between mb-8'>
-              <Heading level={2} className="!text-2xl mb-2">Your Canvases</Heading>
+              <Heading level={2} className="!text-2xl mb-2">Canvases</Heading>
               <Button
+                color="blue"
                 className='flex items-center bg-blue-700 text-white hover:bg-blue-600'
                 onClick={handleCreateCanvasClick}
               >
@@ -201,7 +198,7 @@ const HomePage = () => {
                             {/* Content */}
                             <div className="mb-4">
                               <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
-                                {canvas.description || 'No description available'}
+                                {canvas.description || ''}
                               </Text>
                             </div>
                           </div>
@@ -251,7 +248,7 @@ const HomePage = () => {
                                 </div>
 
                                 <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
-                                  {canvas.description || 'No description available'}
+                                  {canvas.description || ''}
                                 </Text>
                               </div>
                             </div>
@@ -294,15 +291,6 @@ const HomePage = () => {
                         ? 'Try adjusting your search criteria.'
                         : 'Get started by creating your first canvas.'}
                     </Text>
-                    {!searchQuery && (
-                      <Button
-                        className='bg-blue-700 text-white hover:bg-blue-600'
-                        onClick={handleCreateCanvasClick}
-                      >
-                        <MaterialSymbol name="add" className="mr-2" />
-                        Create Your First Canvas
-                      </Button>
-                    )}
                   </div>
                 )}
               </>

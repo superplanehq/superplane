@@ -207,7 +207,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                   {canvasRoles.map((role) => (
                     <DropdownItem key={role.metadata?.name} onClick={() => setBulkUserRole(role.metadata?.name || '')}>
                       <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
-                      <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
+                      <DropdownDescription>{role.spec?.description || ''}</DropdownDescription>
                     </DropdownItem>
                   ))}
                 </DropdownMenu>
