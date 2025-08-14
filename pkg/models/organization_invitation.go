@@ -25,9 +25,13 @@ type OrganizationInvitation struct {
 }
 
 func FindPendingInvitation(email, organizationID string) (*OrganizationInvitation, error) {
+	return FindPendingInvitationInTransaction(database.Conn(), email, organizationID)
+}
+
+func FindPendingInvitationInTransaction(tx *gorm.DB, email, organizationID string) (*OrganizationInvitation, error) {
 	var invitation OrganizationInvitation
 
-	err := database.Conn().
+	err := tx.
 		Where("email = ?", email).
 		Where("organization_id = ?", organizationID).
 		Where("status = ?", InvitationStatusPending).
@@ -50,20 +54,12 @@ func ListPendingInvitations(organizationID string) ([]OrganizationInvitation, er
 	return invitations, err
 }
 
-func (i *OrganizationInvitation) Accept(account *Account) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, err := CreateUser(i.OrganizationID, account.ID, account.Email, account.Name)
-		if err != nil {
-			return err
-		}
-
-		i.Status = InvitationStatusAccepted
-		return database.Conn().Save(i).Error
-	})
+func CreateInvitation(organizationID, invitedBy uuid.UUID, email, status string) (*OrganizationInvitation, error) {
+	return CreateInvitationInTransaction(database.Conn(), organizationID, invitedBy, email, status)
 }
 
-func CreateInvitation(organizationID, invitedBy uuid.UUID, email string) (*OrganizationInvitation, error) {
-	_, err := FindPendingInvitation(email, organizationID.String())
+func CreateInvitationInTransaction(tx *gorm.DB, organizationID, invitedBy uuid.UUID, email, status string) (*OrganizationInvitation, error) {
+	_, err := FindPendingInvitationInTransaction(tx, email, organizationID.String())
 	if err == nil {
 		return nil, fmt.Errorf("invitation already exists for %s", email)
 	}
@@ -72,10 +68,10 @@ func CreateInvitation(organizationID, invitedBy uuid.UUID, email string) (*Organ
 		OrganizationID: organizationID,
 		Email:          email,
 		InvitedBy:      invitedBy,
-		Status:         InvitationStatusPending,
+		Status:         status,
 	}
 
-	err = database.Conn().Create(invitation).Error
+	err = tx.Create(invitation).Error
 	if err != nil {
 		return nil, err
 	}
