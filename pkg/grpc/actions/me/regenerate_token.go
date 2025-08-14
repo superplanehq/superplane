@@ -1,4 +1,4 @@
-package auth
+package me
 
 import (
 	"context"
@@ -6,23 +6,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/users"
+	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func RegenerateUserToken(ctx context.Context, orgID string, userID string) (*pb.RegenerateTokenResponse, error) {
-	authenticatedUser, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	//
-	// TODO: we are enforcing regeneration only for the user being authenticated,
-	// but teoretically, the organization owner/admin should be able to regenerate any user's token.
-	//
-	if authenticatedUser != userID {
-		return nil, status.Error(codes.PermissionDenied, "user not authorized")
+	orgID, orgIsSet := authentication.GetOrganizationIdFromMetadata(ctx)
+	if !orgIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
 	user, err := models.FindUserByID(orgID, userID)

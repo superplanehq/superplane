@@ -71,21 +71,6 @@ service Users {
       tags: "Users";
     };
   }
-
-  //
-  // Endpoint for regenerating a user's API token
-  // Operation is synchronous and idempotent.
-  //
-  rpc RegenerateToken(RegenerateTokenRequest) returns (RegenerateTokenResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/users/{user_id}/token"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Regenerate API token";
-      description: "Regenerates a user's API token";
-      tags: "Users";
-    };
-  }
 }
 
 message ListUserPermissionsRequest {
@@ -121,14 +106,6 @@ message ListUsersRequest {
 
 message ListUsersResponse {
   repeated User users = 1;
-}
-
-message RegenerateTokenRequest {
-  string user_id = 1;
-}
-
-message RegenerateTokenResponse {
-  string token = 1;
 }
 
 message User {

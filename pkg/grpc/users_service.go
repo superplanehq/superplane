@@ -36,8 +36,3 @@ func (s *UsersService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) 
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return auth.ListUsers(ctx, domainType, domainID, s.authService)
 }
-
-func (s *UsersService) RegenerateToken(ctx context.Context, req *pb.RegenerateTokenRequest) (*pb.RegenerateTokenResponse, error) {
-	orgID := ctx.Value(authorization.DomainTypeContextKey).(string)
-	return auth.RegenerateUserToken(ctx, orgID, req.UserId)
-}

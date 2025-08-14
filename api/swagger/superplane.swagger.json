@@ -30,6 +30,9 @@
     },
     {
       "name": "Roles"
+    },
+    {
+      "name": "Me"
     }
   ],
   "schemes": [
@@ -1307,6 +1310,54 @@
         ]
       }
     },
+    "/api/v1/me": {
+      "get": {
+        "summary": "Get current user",
+        "description": "Returns the currently authenticated user",
+        "operationId": "Me_Me",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneMeUser"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/api/v1/me/token": {
+      "post": {
+        "summary": "Regenerate API token",
+        "description": "Regenerates the currently authencated user's API token",
+        "operationId": "Me_RegenerateToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/MeRegenerateTokenResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Me"
+        ]
+      }
+    },
     "/api/v1/organizations/{id}": {
       "get": {
         "summary": "Get organization details",
@@ -2114,38 +2165,6 @@
           "Users"
         ]
       }
-    },
-    "/api/v1/users/{userId}/token": {
-      "post": {
-        "summary": "Regenerate API token",
-        "description": "Regenerates a user's API token",
-        "operationId": "Users_RegenerateToken",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/UsersRegenerateTokenResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Users"
-        ]
-      }
     }
   },
   "definitions": {
@@ -2339,7 +2358,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/UsersUser"
+            "$ref": "#/definitions/SuperplaneUsersUser"
           }
         },
         "group": {
@@ -2546,6 +2565,14 @@
           "type": "string"
         },
         "name": {
+          "type": "string"
+        }
+      }
+    },
+    "MeRegenerateTokenResponse": {
+      "type": "object",
+      "properties": {
+        "token": {
           "type": "string"
         }
       }
@@ -3712,6 +3739,27 @@
         }
       }
     },
+    "SuperplaneMeUser": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "hasToken": {
+          "type": "boolean"
+        }
+      }
+    },
     "SuperplaneOutputDefinition": {
       "type": "object",
       "properties": {
@@ -3941,6 +3989,20 @@
         }
       }
     },
+    "SuperplaneUsersUser": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/UsersUserMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/UsersUserSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/UsersUserStatus"
+        }
+      }
+    },
     "SuperplaneValueDefinition": {
       "type": "object",
       "properties": {
@@ -4082,30 +4144,8 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/UsersUser"
+            "$ref": "#/definitions/SuperplaneUsersUser"
           }
-        }
-      }
-    },
-    "UsersRegenerateTokenResponse": {
-      "type": "object",
-      "properties": {
-        "token": {
-          "type": "string"
-        }
-      }
-    },
-    "UsersUser": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "$ref": "#/definitions/UsersUserMetadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/UsersUserSpec"
-        },
-        "status": {
-          "$ref": "#/definitions/UsersUserStatus"
         }
       }
     },

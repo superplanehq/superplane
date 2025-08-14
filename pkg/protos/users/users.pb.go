@@ -378,94 +378,6 @@ func (x *ListUsersResponse) GetUsers() []*User {
 	return nil
 }
 
-type RegenerateTokenRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RegenerateTokenRequest) Reset() {
-	*x = RegenerateTokenRequest{}
-	mi := &file_users_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RegenerateTokenRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegenerateTokenRequest) ProtoMessage() {}
-
-func (x *RegenerateTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_users_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegenerateTokenRequest.ProtoReflect.Descriptor instead.
-func (*RegenerateTokenRequest) Descriptor() ([]byte, []int) {
-	return file_users_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *RegenerateTokenRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
-type RegenerateTokenResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RegenerateTokenResponse) Reset() {
-	*x = RegenerateTokenResponse{}
-	mi := &file_users_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RegenerateTokenResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RegenerateTokenResponse) ProtoMessage() {}
-
-func (x *RegenerateTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_users_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RegenerateTokenResponse.ProtoReflect.Descriptor instead.
-func (*RegenerateTokenResponse) Descriptor() ([]byte, []int) {
-	return file_users_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *RegenerateTokenResponse) GetToken() string {
-	if x != nil {
-		return x.Token
-	}
-	return ""
-}
-
 type User struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *User_Metadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -477,7 +389,7 @@ type User struct {
 
 func (x *User) Reset() {
 	*x = User{}
-	mi := &file_users_proto_msgTypes[8]
+	mi := &file_users_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -489,7 +401,7 @@ func (x *User) String() string {
 func (*User) ProtoMessage() {}
 
 func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_users_proto_msgTypes[8]
+	mi := &file_users_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -502,7 +414,7 @@ func (x *User) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User.ProtoReflect.Descriptor instead.
 func (*User) Descriptor() ([]byte, []int) {
-	return file_users_proto_rawDescGZIP(), []int{8}
+	return file_users_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *User) GetMetadata() *User_Metadata {
@@ -540,7 +452,7 @@ type UserRoleAssignment struct {
 
 func (x *UserRoleAssignment) Reset() {
 	*x = UserRoleAssignment{}
-	mi := &file_users_proto_msgTypes[9]
+	mi := &file_users_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -552,7 +464,7 @@ func (x *UserRoleAssignment) String() string {
 func (*UserRoleAssignment) ProtoMessage() {}
 
 func (x *UserRoleAssignment) ProtoReflect() protoreflect.Message {
-	mi := &file_users_proto_msgTypes[9]
+	mi := &file_users_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -565,7 +477,7 @@ func (x *UserRoleAssignment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserRoleAssignment.ProtoReflect.Descriptor instead.
 func (*UserRoleAssignment) Descriptor() ([]byte, []int) {
-	return file_users_proto_rawDescGZIP(), []int{9}
+	return file_users_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UserRoleAssignment) GetRoleName() string {
@@ -625,7 +537,7 @@ type AccountProvider struct {
 
 func (x *AccountProvider) Reset() {
 	*x = AccountProvider{}
-	mi := &file_users_proto_msgTypes[10]
+	mi := &file_users_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -637,7 +549,7 @@ func (x *AccountProvider) String() string {
 func (*AccountProvider) ProtoMessage() {}
 
 func (x *AccountProvider) ProtoReflect() protoreflect.Message {
-	mi := &file_users_proto_msgTypes[10]
+	mi := &file_users_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -650,7 +562,7 @@ func (x *AccountProvider) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountProvider.ProtoReflect.Descriptor instead.
 func (*AccountProvider) Descriptor() ([]byte, []int) {
-	return file_users_proto_rawDescGZIP(), []int{10}
+	return file_users_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AccountProvider) GetProviderType() string {
@@ -714,7 +626,7 @@ type User_Metadata struct {
 
 func (x *User_Metadata) Reset() {
 	*x = User_Metadata{}
-	mi := &file_users_proto_msgTypes[11]
+	mi := &file_users_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -726,7 +638,7 @@ func (x *User_Metadata) String() string {
 func (*User_Metadata) ProtoMessage() {}
 
 func (x *User_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_users_proto_msgTypes[11]
+	mi := &file_users_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -739,7 +651,7 @@ func (x *User_Metadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User_Metadata.ProtoReflect.Descriptor instead.
 func (*User_Metadata) Descriptor() ([]byte, []int) {
-	return file_users_proto_rawDescGZIP(), []int{8, 0}
+	return file_users_proto_rawDescGZIP(), []int{6, 0}
 }
 
 func (x *User_Metadata) GetId() string {
@@ -780,7 +692,7 @@ type User_Spec struct {
 
 func (x *User_Spec) Reset() {
 	*x = User_Spec{}
-	mi := &file_users_proto_msgTypes[12]
+	mi := &file_users_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -792,7 +704,7 @@ func (x *User_Spec) String() string {
 func (*User_Spec) ProtoMessage() {}
 
 func (x *User_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_users_proto_msgTypes[12]
+	mi := &file_users_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -805,7 +717,7 @@ func (x *User_Spec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User_Spec.ProtoReflect.Descriptor instead.
 func (*User_Spec) Descriptor() ([]byte, []int) {
-	return file_users_proto_rawDescGZIP(), []int{8, 1}
+	return file_users_proto_rawDescGZIP(), []int{6, 1}
 }
 
 func (x *User_Spec) GetDisplayName() string {
@@ -831,7 +743,7 @@ type User_Status struct {
 
 func (x *User_Status) Reset() {
 	*x = User_Status{}
-	mi := &file_users_proto_msgTypes[13]
+	mi := &file_users_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -843,7 +755,7 @@ func (x *User_Status) String() string {
 func (*User_Status) ProtoMessage() {}
 
 func (x *User_Status) ProtoReflect() protoreflect.Message {
-	mi := &file_users_proto_msgTypes[13]
+	mi := &file_users_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -856,7 +768,7 @@ func (x *User_Status) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User_Status.ProtoReflect.Descriptor instead.
 func (*User_Status) Descriptor() ([]byte, []int) {
-	return file_users_proto_rawDescGZIP(), []int{8, 2}
+	return file_users_proto_rawDescGZIP(), []int{6, 2}
 }
 
 func (x *User_Status) GetRoleAssignments() []*UserRoleAssignment {
@@ -898,11 +810,7 @@ const file_users_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\"A\n" +
 	"\x11ListUsersResponse\x12,\n" +
-	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"1\n" +
-	"\x16RegenerateTokenRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"/\n" +
-	"\x17RegenerateTokenResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"\xaa\x04\n" +
+	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xaa\x04\n" +
 	"\x04User\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.Superplane.Users.User.MetadataR\bmetadata\x12/\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1b.Superplane.Users.User.SpecR\x04spec\x125\n" +
@@ -939,7 +847,7 @@ const file_users_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xea\x06\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x9a\x05\n" +
 	"\x05Users\x12\xfe\x01\n" +
 	"\x13ListUserPermissions\x12,.Superplane.Users.ListUserPermissionsRequest\x1a-.Superplane.Users.ListUserPermissionsResponse\"\x89\x01\x92A[\n" +
 	"\x05Users\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x02%\x12#/api/v1/users/{user_id}/permissions\x12\xd8\x01\n" +
@@ -947,9 +855,7 @@ const file_users_proto_rawDesc = "" +
 	"\x05Users\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/users/{user_id}/roles\x12\xb4\x01\n" +
 	"\tListUsers\x12\".Superplane.Users.ListUsersRequest\x1a#.Superplane.Users.ListUsersResponse\"^\x92AF\n" +
 	"\x05Users\x12\n" +
-	"List users\x1a1Returns all users that have roles within a domain\x82\xd3\xe4\x93\x02\x0f\x12\r/api/v1/users\x12\xcd\x01\n" +
-	"\x0fRegenerateToken\x12(.Superplane.Users.RegenerateTokenRequest\x1a).Superplane.Users.RegenerateTokenResponse\"e\x92A=\n" +
-	"\x05Users\x12\x14Regenerate API token\x1a\x1eRegenerates a user's API token\x82\xd3\xe4\x93\x02\x1f\"\x1d/api/v1/users/{user_id}/tokenB\xbf\x01\x92A\x86\x01\x12\\\n" +
+	"List users\x1a1Returns all users that have roles within a domain\x82\xd3\xe4\x93\x02\x0f\x12\r/api/v1/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
 	"\x14Superplane Users API\x12\x18API for Superplane Users\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ3github.com/superplanehq/superplane/pkg/protos/usersb\x06proto3"
 
@@ -965,7 +871,7 @@ func file_users_proto_rawDescGZIP() []byte {
 	return file_users_proto_rawDescData
 }
 
-var file_users_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_users_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_users_proto_goTypes = []any{
 	(*ListUserPermissionsRequest)(nil),  // 0: Superplane.Users.ListUserPermissionsRequest
 	(*ListUserPermissionsResponse)(nil), // 1: Superplane.Users.ListUserPermissionsResponse
@@ -973,49 +879,45 @@ var file_users_proto_goTypes = []any{
 	(*ListUserRolesResponse)(nil),       // 3: Superplane.Users.ListUserRolesResponse
 	(*ListUsersRequest)(nil),            // 4: Superplane.Users.ListUsersRequest
 	(*ListUsersResponse)(nil),           // 5: Superplane.Users.ListUsersResponse
-	(*RegenerateTokenRequest)(nil),      // 6: Superplane.Users.RegenerateTokenRequest
-	(*RegenerateTokenResponse)(nil),     // 7: Superplane.Users.RegenerateTokenResponse
-	(*User)(nil),                        // 8: Superplane.Users.User
-	(*UserRoleAssignment)(nil),          // 9: Superplane.Users.UserRoleAssignment
-	(*AccountProvider)(nil),             // 10: Superplane.Users.AccountProvider
-	(*User_Metadata)(nil),               // 11: Superplane.Users.User.Metadata
-	(*User_Spec)(nil),                   // 12: Superplane.Users.User.Spec
-	(*User_Status)(nil),                 // 13: Superplane.Users.User.Status
-	(authorization.DomainType)(0),       // 14: Superplane.Authorization.DomainType
-	(*authorization.Permission)(nil),    // 15: Superplane.Authorization.Permission
-	(*roles.Role)(nil),                  // 16: Superplane.Roles.Role
-	(*timestamp.Timestamp)(nil),         // 17: google.protobuf.Timestamp
+	(*User)(nil),                        // 6: Superplane.Users.User
+	(*UserRoleAssignment)(nil),          // 7: Superplane.Users.UserRoleAssignment
+	(*AccountProvider)(nil),             // 8: Superplane.Users.AccountProvider
+	(*User_Metadata)(nil),               // 9: Superplane.Users.User.Metadata
+	(*User_Spec)(nil),                   // 10: Superplane.Users.User.Spec
+	(*User_Status)(nil),                 // 11: Superplane.Users.User.Status
+	(authorization.DomainType)(0),       // 12: Superplane.Authorization.DomainType
+	(*authorization.Permission)(nil),    // 13: Superplane.Authorization.Permission
+	(*roles.Role)(nil),                  // 14: Superplane.Roles.Role
+	(*timestamp.Timestamp)(nil),         // 15: google.protobuf.Timestamp
 }
 var file_users_proto_depIdxs = []int32{
-	14, // 0: Superplane.Users.ListUserPermissionsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	14, // 1: Superplane.Users.ListUserPermissionsResponse.domain_type:type_name -> Superplane.Authorization.DomainType
-	15, // 2: Superplane.Users.ListUserPermissionsResponse.permissions:type_name -> Superplane.Authorization.Permission
-	14, // 3: Superplane.Users.ListUserRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	14, // 4: Superplane.Users.ListUserRolesResponse.domain_type:type_name -> Superplane.Authorization.DomainType
-	16, // 5: Superplane.Users.ListUserRolesResponse.roles:type_name -> Superplane.Roles.Role
-	14, // 6: Superplane.Users.ListUsersRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	8,  // 7: Superplane.Users.ListUsersResponse.users:type_name -> Superplane.Users.User
-	11, // 8: Superplane.Users.User.metadata:type_name -> Superplane.Users.User.Metadata
-	12, // 9: Superplane.Users.User.spec:type_name -> Superplane.Users.User.Spec
-	13, // 10: Superplane.Users.User.status:type_name -> Superplane.Users.User.Status
-	14, // 11: Superplane.Users.UserRoleAssignment.domain_type:type_name -> Superplane.Authorization.DomainType
-	17, // 12: Superplane.Users.UserRoleAssignment.assigned_at:type_name -> google.protobuf.Timestamp
-	17, // 13: Superplane.Users.AccountProvider.created_at:type_name -> google.protobuf.Timestamp
-	17, // 14: Superplane.Users.AccountProvider.updated_at:type_name -> google.protobuf.Timestamp
-	17, // 15: Superplane.Users.User.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	17, // 16: Superplane.Users.User.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	10, // 17: Superplane.Users.User.Spec.account_providers:type_name -> Superplane.Users.AccountProvider
-	9,  // 18: Superplane.Users.User.Status.role_assignments:type_name -> Superplane.Users.UserRoleAssignment
+	12, // 0: Superplane.Users.ListUserPermissionsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	12, // 1: Superplane.Users.ListUserPermissionsResponse.domain_type:type_name -> Superplane.Authorization.DomainType
+	13, // 2: Superplane.Users.ListUserPermissionsResponse.permissions:type_name -> Superplane.Authorization.Permission
+	12, // 3: Superplane.Users.ListUserRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	12, // 4: Superplane.Users.ListUserRolesResponse.domain_type:type_name -> Superplane.Authorization.DomainType
+	14, // 5: Superplane.Users.ListUserRolesResponse.roles:type_name -> Superplane.Roles.Role
+	12, // 6: Superplane.Users.ListUsersRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	6,  // 7: Superplane.Users.ListUsersResponse.users:type_name -> Superplane.Users.User
+	9,  // 8: Superplane.Users.User.metadata:type_name -> Superplane.Users.User.Metadata
+	10, // 9: Superplane.Users.User.spec:type_name -> Superplane.Users.User.Spec
+	11, // 10: Superplane.Users.User.status:type_name -> Superplane.Users.User.Status
+	12, // 11: Superplane.Users.UserRoleAssignment.domain_type:type_name -> Superplane.Authorization.DomainType
+	15, // 12: Superplane.Users.UserRoleAssignment.assigned_at:type_name -> google.protobuf.Timestamp
+	15, // 13: Superplane.Users.AccountProvider.created_at:type_name -> google.protobuf.Timestamp
+	15, // 14: Superplane.Users.AccountProvider.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 15: Superplane.Users.User.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	15, // 16: Superplane.Users.User.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	8,  // 17: Superplane.Users.User.Spec.account_providers:type_name -> Superplane.Users.AccountProvider
+	7,  // 18: Superplane.Users.User.Status.role_assignments:type_name -> Superplane.Users.UserRoleAssignment
 	0,  // 19: Superplane.Users.Users.ListUserPermissions:input_type -> Superplane.Users.ListUserPermissionsRequest
 	2,  // 20: Superplane.Users.Users.ListUserRoles:input_type -> Superplane.Users.ListUserRolesRequest
 	4,  // 21: Superplane.Users.Users.ListUsers:input_type -> Superplane.Users.ListUsersRequest
-	6,  // 22: Superplane.Users.Users.RegenerateToken:input_type -> Superplane.Users.RegenerateTokenRequest
-	1,  // 23: Superplane.Users.Users.ListUserPermissions:output_type -> Superplane.Users.ListUserPermissionsResponse
-	3,  // 24: Superplane.Users.Users.ListUserRoles:output_type -> Superplane.Users.ListUserRolesResponse
-	5,  // 25: Superplane.Users.Users.ListUsers:output_type -> Superplane.Users.ListUsersResponse
-	7,  // 26: Superplane.Users.Users.RegenerateToken:output_type -> Superplane.Users.RegenerateTokenResponse
-	23, // [23:27] is the sub-list for method output_type
-	19, // [19:23] is the sub-list for method input_type
+	1,  // 22: Superplane.Users.Users.ListUserPermissions:output_type -> Superplane.Users.ListUserPermissionsResponse
+	3,  // 23: Superplane.Users.Users.ListUserRoles:output_type -> Superplane.Users.ListUserRolesResponse
+	5,  // 24: Superplane.Users.Users.ListUsers:output_type -> Superplane.Users.ListUsersResponse
+	22, // [22:25] is the sub-list for method output_type
+	19, // [19:22] is the sub-list for method input_type
 	19, // [19:19] is the sub-list for extension type_name
 	19, // [19:19] is the sub-list for extension extendee
 	0,  // [0:19] is the sub-list for field type_name
@@ -1032,7 +934,7 @@ func file_users_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_users_proto_rawDesc), len(file_users_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
