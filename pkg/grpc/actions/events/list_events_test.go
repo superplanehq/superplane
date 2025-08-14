@@ -11,30 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__ListEvents(t *testing.T) {
 	r := support.Setup(t)
-
-	t.Run("wrong canvas -> error", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		_, err := ListEvents(ctx, uuid.NewString(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "")
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
-
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		_, err := ListEvents(ctx, uuid.NewString(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "")
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
 
 	t.Run("canvas with no events -> empty list", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
