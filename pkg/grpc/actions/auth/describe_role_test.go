@@ -22,7 +22,7 @@ func Test_DescribeRole(t *testing.T) {
 		assert.NotNil(t, resp.Role.Spec.InheritedRole)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Role.Metadata.Name)
 		assert.Equal(t, models.RoleOrgViewer, resp.Role.Spec.InheritedRole.Metadata.Name)
-		assert.Len(t, resp.Role.Spec.Permissions, 25)
+		assert.Len(t, resp.Role.Spec.Permissions, 24)
 		assert.Len(t, resp.Role.Spec.InheritedRole.Spec.Permissions, 5)
 		assert.Equal(t, "Admin", resp.Role.Spec.DisplayName)
 		assert.Equal(t, "Viewer", resp.Role.Spec.InheritedRole.Spec.DisplayName)

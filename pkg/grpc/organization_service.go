@@ -28,6 +28,11 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.Up
 	return organizations.UpdateOrganization(ctx, orgID, req.Organization)
 }
 
+func (s *OrganizationService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.RemoveUser(ctx, s.authorizationService, orgID, req.UserId)
+}
+
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.DeleteOrganization(ctx, s.authorizationService, orgID)

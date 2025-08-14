@@ -17,6 +17,10 @@ type User struct {
 	UpdatedAt      time.Time
 }
 
+func (u *User) Delete() error {
+	return database.Conn().Delete(u).Error
+}
+
 func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
 	user := &User{
 		OrganizationID: orgID,

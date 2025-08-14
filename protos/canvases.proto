@@ -244,6 +244,29 @@ service Superplane {
       tags: "Stage";
     };
   }
+
+  rpc AddUser(AddUserRequest) returns (AddUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/users"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add a user to a canvas";
+      description: "Adds a user to a canvas (canvas can be referenced by ID or name)";
+      tags: "Canvas";
+    };
+  }
+
+  rpc RemoveUser(RemoveUserRequest) returns (RemoveUserResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id_or_name}/users/{user_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add a user to a canvas";
+      description: "Adds a user to a canvas (canvas can be referenced by ID or name)";
+      tags: "Canvas";
+    };
+  }
 }
 
 message ListCanvasesRequest {
@@ -745,6 +768,20 @@ message ApproveStageEventRequest {
 message ApproveStageEventResponse {
   StageEvent event = 1;
 }
+
+message AddUserRequest {
+  string canvas_id_or_name = 1;
+  string user_id = 2;
+}
+
+message AddUserResponse {}
+
+message RemoveUserRequest {
+  string canvas_id_or_name = 1;
+  string user_id = 2;
+}
+
+message RemoveUserResponse {}
 
 message StageCreated {
   string canvas_id = 1;

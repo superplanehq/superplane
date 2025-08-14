@@ -51,6 +51,18 @@ func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRe
 	return canvases.ListCanvases(ctx, orgID, s.authorizationService)
 }
 
+func (s *CanvasService) AddUser(ctx context.Context, req *pb.AddUserRequest) (*pb.AddUserResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return canvases.AddUser(ctx, s.authorizationService, orgID, canvasID, req.UserId)
+}
+
+func (s *CanvasService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return canvases.RemoveUser(ctx, s.authorizationService, orgID, canvasID, req.UserId)
+}
+
 //
 // Methods for event sources
 //

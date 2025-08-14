@@ -3,7 +3,6 @@ import {
   rolesListRoles,
   usersListUsers,
   rolesAssignRole,
-  rolesRemoveRole,
   superplaneListStages,
   superplaneCreateStage,
   superplaneUpdateStage,
@@ -15,6 +14,8 @@ import {
   superplaneUpdateConnectionGroup,
   superplaneDescribeConnectionGroup,
   integrationsListIntegrations,
+  superplaneAddUser,
+  superplaneRemoveUser,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping } from '../api-client/types.gen'
@@ -104,21 +105,34 @@ export const useAssignCanvasRole = (canvasId: string) => {
   })
 }
 
-export const useRemoveCanvasRole = (canvasId: string) => {
+export const useAddCanvasUser = (canvasId: string) => {
   const queryClient = useQueryClient()
   
   return useMutation({
     mutationFn: async (params: { 
-      userId: string, 
-      role: string,
+      userId: string,
     }) => {
-      return await rolesRemoveRole(withOrganizationHeader({
-        body: {
-          userId: params.userId,
-          roleName: params.role,
-          domainId: canvasId,
-          domainType: 'DOMAIN_TYPE_CANVAS'
-        }
+      return await superplaneAddUser(withOrganizationHeader({
+        path: { canvasIdOrName: canvasId },
+        body: { userId: params.userId }
+      }))
+    },
+    onSuccess: () => {
+      // Invalidate and refetch canvas users
+      queryClient.invalidateQueries({ queryKey: canvasKeys.users(canvasId) })
+    }
+  })
+}
+
+export const useRemoveCanvasUser = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (params: { 
+      userId: string,
+    }) => {
+      return await superplaneRemoveUser(withOrganizationHeader({
+        path: { canvasIdOrName: canvasId, userId: params.userId }
       }))
     },
     onSuccess: () => {

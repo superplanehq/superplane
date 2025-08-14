@@ -15,41 +15,40 @@ import (
 	"encoding/json"
 )
 
-// checks if the RolesRemoveRoleRequest type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &RolesRemoveRoleRequest{}
+// checks if the RolesAssignRoleBody type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &RolesAssignRoleBody{}
 
-// RolesRemoveRoleRequest struct for RolesRemoveRoleRequest
-type RolesRemoveRoleRequest struct {
+// RolesAssignRoleBody struct for RolesAssignRoleBody
+type RolesAssignRoleBody struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
-	RoleName *string `json:"roleName,omitempty"`
 	UserId *string `json:"userId,omitempty"`
 	UserEmail *string `json:"userEmail,omitempty"`
 }
 
-// NewRolesRemoveRoleRequest instantiates a new RolesRemoveRoleRequest object
+// NewRolesAssignRoleBody instantiates a new RolesAssignRoleBody object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewRolesRemoveRoleRequest() *RolesRemoveRoleRequest {
-	this := RolesRemoveRoleRequest{}
+func NewRolesAssignRoleBody() *RolesAssignRoleBody {
+	this := RolesAssignRoleBody{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
-// NewRolesRemoveRoleRequestWithDefaults instantiates a new RolesRemoveRoleRequest object
+// NewRolesAssignRoleBodyWithDefaults instantiates a new RolesAssignRoleBody object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewRolesRemoveRoleRequestWithDefaults() *RolesRemoveRoleRequest {
-	this := RolesRemoveRoleRequest{}
+func NewRolesAssignRoleBodyWithDefaults() *RolesAssignRoleBody {
+	this := RolesAssignRoleBody{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
 // GetDomainType returns the DomainType field value if set, zero value otherwise.
-func (o *RolesRemoveRoleRequest) GetDomainType() AuthorizationDomainType {
+func (o *RolesAssignRoleBody) GetDomainType() AuthorizationDomainType {
 	if o == nil || IsNil(o.DomainType) {
 		var ret AuthorizationDomainType
 		return ret
@@ -59,7 +58,7 @@ func (o *RolesRemoveRoleRequest) GetDomainType() AuthorizationDomainType {
 
 // GetDomainTypeOk returns a tuple with the DomainType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesRemoveRoleRequest) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
+func (o *RolesAssignRoleBody) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
 	if o == nil || IsNil(o.DomainType) {
 		return nil, false
 	}
@@ -67,7 +66,7 @@ func (o *RolesRemoveRoleRequest) GetDomainTypeOk() (*AuthorizationDomainType, bo
 }
 
 // HasDomainType returns a boolean if a field has been set.
-func (o *RolesRemoveRoleRequest) HasDomainType() bool {
+func (o *RolesAssignRoleBody) HasDomainType() bool {
 	if o != nil && !IsNil(o.DomainType) {
 		return true
 	}
@@ -76,12 +75,12 @@ func (o *RolesRemoveRoleRequest) HasDomainType() bool {
 }
 
 // SetDomainType gets a reference to the given AuthorizationDomainType and assigns it to the DomainType field.
-func (o *RolesRemoveRoleRequest) SetDomainType(v AuthorizationDomainType) {
+func (o *RolesAssignRoleBody) SetDomainType(v AuthorizationDomainType) {
 	o.DomainType = &v
 }
 
 // GetDomainId returns the DomainId field value if set, zero value otherwise.
-func (o *RolesRemoveRoleRequest) GetDomainId() string {
+func (o *RolesAssignRoleBody) GetDomainId() string {
 	if o == nil || IsNil(o.DomainId) {
 		var ret string
 		return ret
@@ -91,7 +90,7 @@ func (o *RolesRemoveRoleRequest) GetDomainId() string {
 
 // GetDomainIdOk returns a tuple with the DomainId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesRemoveRoleRequest) GetDomainIdOk() (*string, bool) {
+func (o *RolesAssignRoleBody) GetDomainIdOk() (*string, bool) {
 	if o == nil || IsNil(o.DomainId) {
 		return nil, false
 	}
@@ -99,7 +98,7 @@ func (o *RolesRemoveRoleRequest) GetDomainIdOk() (*string, bool) {
 }
 
 // HasDomainId returns a boolean if a field has been set.
-func (o *RolesRemoveRoleRequest) HasDomainId() bool {
+func (o *RolesAssignRoleBody) HasDomainId() bool {
 	if o != nil && !IsNil(o.DomainId) {
 		return true
 	}
@@ -108,44 +107,12 @@ func (o *RolesRemoveRoleRequest) HasDomainId() bool {
 }
 
 // SetDomainId gets a reference to the given string and assigns it to the DomainId field.
-func (o *RolesRemoveRoleRequest) SetDomainId(v string) {
+func (o *RolesAssignRoleBody) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
-// GetRoleName returns the RoleName field value if set, zero value otherwise.
-func (o *RolesRemoveRoleRequest) GetRoleName() string {
-	if o == nil || IsNil(o.RoleName) {
-		var ret string
-		return ret
-	}
-	return *o.RoleName
-}
-
-// GetRoleNameOk returns a tuple with the RoleName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesRemoveRoleRequest) GetRoleNameOk() (*string, bool) {
-	if o == nil || IsNil(o.RoleName) {
-		return nil, false
-	}
-	return o.RoleName, true
-}
-
-// HasRoleName returns a boolean if a field has been set.
-func (o *RolesRemoveRoleRequest) HasRoleName() bool {
-	if o != nil && !IsNil(o.RoleName) {
-		return true
-	}
-
-	return false
-}
-
-// SetRoleName gets a reference to the given string and assigns it to the RoleName field.
-func (o *RolesRemoveRoleRequest) SetRoleName(v string) {
-	o.RoleName = &v
-}
-
 // GetUserId returns the UserId field value if set, zero value otherwise.
-func (o *RolesRemoveRoleRequest) GetUserId() string {
+func (o *RolesAssignRoleBody) GetUserId() string {
 	if o == nil || IsNil(o.UserId) {
 		var ret string
 		return ret
@@ -155,7 +122,7 @@ func (o *RolesRemoveRoleRequest) GetUserId() string {
 
 // GetUserIdOk returns a tuple with the UserId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesRemoveRoleRequest) GetUserIdOk() (*string, bool) {
+func (o *RolesAssignRoleBody) GetUserIdOk() (*string, bool) {
 	if o == nil || IsNil(o.UserId) {
 		return nil, false
 	}
@@ -163,7 +130,7 @@ func (o *RolesRemoveRoleRequest) GetUserIdOk() (*string, bool) {
 }
 
 // HasUserId returns a boolean if a field has been set.
-func (o *RolesRemoveRoleRequest) HasUserId() bool {
+func (o *RolesAssignRoleBody) HasUserId() bool {
 	if o != nil && !IsNil(o.UserId) {
 		return true
 	}
@@ -172,12 +139,12 @@ func (o *RolesRemoveRoleRequest) HasUserId() bool {
 }
 
 // SetUserId gets a reference to the given string and assigns it to the UserId field.
-func (o *RolesRemoveRoleRequest) SetUserId(v string) {
+func (o *RolesAssignRoleBody) SetUserId(v string) {
 	o.UserId = &v
 }
 
 // GetUserEmail returns the UserEmail field value if set, zero value otherwise.
-func (o *RolesRemoveRoleRequest) GetUserEmail() string {
+func (o *RolesAssignRoleBody) GetUserEmail() string {
 	if o == nil || IsNil(o.UserEmail) {
 		var ret string
 		return ret
@@ -187,7 +154,7 @@ func (o *RolesRemoveRoleRequest) GetUserEmail() string {
 
 // GetUserEmailOk returns a tuple with the UserEmail field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesRemoveRoleRequest) GetUserEmailOk() (*string, bool) {
+func (o *RolesAssignRoleBody) GetUserEmailOk() (*string, bool) {
 	if o == nil || IsNil(o.UserEmail) {
 		return nil, false
 	}
@@ -195,7 +162,7 @@ func (o *RolesRemoveRoleRequest) GetUserEmailOk() (*string, bool) {
 }
 
 // HasUserEmail returns a boolean if a field has been set.
-func (o *RolesRemoveRoleRequest) HasUserEmail() bool {
+func (o *RolesAssignRoleBody) HasUserEmail() bool {
 	if o != nil && !IsNil(o.UserEmail) {
 		return true
 	}
@@ -204,11 +171,11 @@ func (o *RolesRemoveRoleRequest) HasUserEmail() bool {
 }
 
 // SetUserEmail gets a reference to the given string and assigns it to the UserEmail field.
-func (o *RolesRemoveRoleRequest) SetUserEmail(v string) {
+func (o *RolesAssignRoleBody) SetUserEmail(v string) {
 	o.UserEmail = &v
 }
 
-func (o RolesRemoveRoleRequest) MarshalJSON() ([]byte, error) {
+func (o RolesAssignRoleBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -216,16 +183,13 @@ func (o RolesRemoveRoleRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o RolesRemoveRoleRequest) ToMap() (map[string]interface{}, error) {
+func (o RolesAssignRoleBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.DomainType) {
 		toSerialize["domainType"] = o.DomainType
 	}
 	if !IsNil(o.DomainId) {
 		toSerialize["domainId"] = o.DomainId
-	}
-	if !IsNil(o.RoleName) {
-		toSerialize["roleName"] = o.RoleName
 	}
 	if !IsNil(o.UserId) {
 		toSerialize["userId"] = o.UserId
@@ -236,38 +200,38 @@ func (o RolesRemoveRoleRequest) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableRolesRemoveRoleRequest struct {
-	value *RolesRemoveRoleRequest
+type NullableRolesAssignRoleBody struct {
+	value *RolesAssignRoleBody
 	isSet bool
 }
 
-func (v NullableRolesRemoveRoleRequest) Get() *RolesRemoveRoleRequest {
+func (v NullableRolesAssignRoleBody) Get() *RolesAssignRoleBody {
 	return v.value
 }
 
-func (v *NullableRolesRemoveRoleRequest) Set(val *RolesRemoveRoleRequest) {
+func (v *NullableRolesAssignRoleBody) Set(val *RolesAssignRoleBody) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableRolesRemoveRoleRequest) IsSet() bool {
+func (v NullableRolesAssignRoleBody) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableRolesRemoveRoleRequest) Unset() {
+func (v *NullableRolesAssignRoleBody) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableRolesRemoveRoleRequest(val *RolesRemoveRoleRequest) *NullableRolesRemoveRoleRequest {
-	return &NullableRolesRemoveRoleRequest{value: val, isSet: true}
+func NewNullableRolesAssignRoleBody(val *RolesAssignRoleBody) *NullableRolesAssignRoleBody {
+	return &NullableRolesAssignRoleBody{value: val, isSet: true}
 }
 
-func (v NullableRolesRemoveRoleRequest) MarshalJSON() ([]byte, error) {
+func (v NullableRolesAssignRoleBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableRolesRemoveRoleRequest) UnmarshalJSON(src []byte) error {
+func (v *NullableRolesAssignRoleBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

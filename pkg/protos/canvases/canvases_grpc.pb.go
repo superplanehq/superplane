@@ -38,6 +38,8 @@ const (
 	Superplane_UpdateStage_FullMethodName                  = "/Superplane.Superplane/UpdateStage"
 	Superplane_UpdateConnectionGroup_FullMethodName        = "/Superplane.Superplane/UpdateConnectionGroup"
 	Superplane_ApproveStageEvent_FullMethodName            = "/Superplane.Superplane/ApproveStageEvent"
+	Superplane_AddUser_FullMethodName                      = "/Superplane.Superplane/AddUser"
+	Superplane_RemoveUser_FullMethodName                   = "/Superplane.Superplane/RemoveUser"
 )
 
 // SuperplaneClient is the client API for Superplane service.
@@ -63,6 +65,8 @@ type SuperplaneClient interface {
 	UpdateStage(ctx context.Context, in *UpdateStageRequest, opts ...grpc.CallOption) (*UpdateStageResponse, error)
 	UpdateConnectionGroup(ctx context.Context, in *UpdateConnectionGroupRequest, opts ...grpc.CallOption) (*UpdateConnectionGroupResponse, error)
 	ApproveStageEvent(ctx context.Context, in *ApproveStageEventRequest, opts ...grpc.CallOption) (*ApproveStageEventResponse, error)
+	AddUser(ctx context.Context, in *AddUserRequest, opts ...grpc.CallOption) (*AddUserResponse, error)
+	RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error)
 }
 
 type superplaneClient struct {
@@ -263,6 +267,26 @@ func (c *superplaneClient) ApproveStageEvent(ctx context.Context, in *ApproveSta
 	return out, nil
 }
 
+func (c *superplaneClient) AddUser(ctx context.Context, in *AddUserRequest, opts ...grpc.CallOption) (*AddUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddUserResponse)
+	err := c.cc.Invoke(ctx, Superplane_AddUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *superplaneClient) RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveUserResponse)
+	err := c.cc.Invoke(ctx, Superplane_RemoveUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SuperplaneServer is the server API for Superplane service.
 // All implementations should embed UnimplementedSuperplaneServer
 // for forward compatibility.
@@ -286,6 +310,8 @@ type SuperplaneServer interface {
 	UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error)
 	UpdateConnectionGroup(context.Context, *UpdateConnectionGroupRequest) (*UpdateConnectionGroupResponse, error)
 	ApproveStageEvent(context.Context, *ApproveStageEventRequest) (*ApproveStageEventResponse, error)
+	AddUser(context.Context, *AddUserRequest) (*AddUserResponse, error)
+	RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error)
 }
 
 // UnimplementedSuperplaneServer should be embedded to have
@@ -351,6 +377,12 @@ func (UnimplementedSuperplaneServer) UpdateConnectionGroup(context.Context, *Upd
 }
 func (UnimplementedSuperplaneServer) ApproveStageEvent(context.Context, *ApproveStageEventRequest) (*ApproveStageEventResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ApproveStageEvent not implemented")
+}
+func (UnimplementedSuperplaneServer) AddUser(context.Context, *AddUserRequest) (*AddUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddUser not implemented")
+}
+func (UnimplementedSuperplaneServer) RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveUser not implemented")
 }
 func (UnimplementedSuperplaneServer) testEmbeddedByValue() {}
 
@@ -714,6 +746,42 @@ func _Superplane_ApproveStageEvent_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_AddUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).AddUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_AddUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).AddUser(ctx, req.(*AddUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Superplane_RemoveUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).RemoveUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_RemoveUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).RemoveUser(ctx, req.(*RemoveUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Superplane_ServiceDesc is the grpc.ServiceDesc for Superplane service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -796,6 +864,14 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ApproveStageEvent",
 			Handler:    _Superplane_ApproveStageEvent_Handler,
+		},
+		{
+			MethodName: "AddUser",
+			Handler:    _Superplane_AddUser_Handler,
+		},
+		{
+			MethodName: "RemoveUser",
+			Handler:    _Superplane_RemoveUser_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

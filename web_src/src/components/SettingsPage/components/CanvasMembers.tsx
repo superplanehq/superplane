@@ -24,7 +24,7 @@ import {
   useCanvasRoles,
   useCanvasUsers,
   useAssignCanvasRole,
-  useRemoveCanvasRole
+  useRemoveCanvasUser
 } from '../../../hooks/useCanvasData'
 
 interface CanvasMembersProps {
@@ -55,7 +55,7 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
 
   // Mutations
   const assignRoleMutation = useAssignCanvasRole(canvasId)
-  const removeRoleMutation = useRemoveCanvasRole(canvasId)
+  const removeUserMutation = useRemoveCanvasUser(canvasId)
 
   const error = usersError || rolesError
 
@@ -142,11 +142,10 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
     }
   }
 
-  const handleRemoveMember = async (userId: string, roleName: string) => {
+  const handleRemoveMember = async (userId: string) => {
     try {
-      await removeRoleMutation.mutateAsync({
+      await removeUserMutation.mutateAsync({
         userId,
-        role: roleName,
       })
     } catch (err) {
       console.error('Error removing member:', err)
@@ -281,8 +280,8 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
                           </DropdownButton>
                           <DropdownMenu>
                             <DropdownItem
-                              onClick={() => handleRemoveMember(member.id, member.roleName)}
-                              disabled={removeRoleMutation.isPending}
+                              onClick={() => handleRemoveMember(member.id)}
+                              disabled={removeUserMutation.isPending}
                             >
                               <MaterialSymbol name="delete" />
                               Remove

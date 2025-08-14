@@ -728,6 +728,84 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/users": {
+      "post": {
+        "summary": "Add a user to a canvas",
+        "description": "Adds a user to a canvas (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_AddUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneAddUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneAddUserBody"
+            }
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/users/{userId}": {
+      "delete": {
+        "summary": "Add a user to a canvas",
+        "description": "Adds a user to a canvas (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_RemoveUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneRemoveUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
     "/api/v1/canvases/{idOrName}": {
       "delete": {
         "summary": "Delete a canvas",
@@ -1446,6 +1524,44 @@
         ]
       }
     },
+    "/api/v1/organizations/{id}/users/{userId}": {
+      "delete": {
+        "summary": "Remove a user from an organization",
+        "description": "Removes a user from an organization (can be referenced by ID or name)",
+        "operationId": "Organizations_RemoveUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneOrganizationsRemoveUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "summary": "List roles",
@@ -1522,41 +1638,7 @@
         ]
       }
     },
-    "/api/v1/roles/assign": {
-      "patch": {
-        "summary": "Assign role",
-        "description": "Assigns a role to a user within a domain",
-        "operationId": "Roles_AssignRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/RolesAssignRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/RolesAssignRoleRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Roles"
-        ]
-      }
-    },
-    "/api/v1/roles/describe": {
+    "/api/v1/roles/{roleName}": {
       "get": {
         "summary": "Describe role",
         "description": "Returns detailed information about a specific role including permissions and inheritance",
@@ -1577,6 +1659,12 @@
         },
         "parameters": [
           {
+            "name": "roleName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
             "name": "domainType",
             "in": "query",
             "required": false,
@@ -1593,54 +1681,12 @@
             "in": "query",
             "required": false,
             "type": "string"
-          },
-          {
-            "name": "role",
-            "in": "query",
-            "required": false,
-            "type": "string"
           }
         ],
         "tags": [
           "Roles"
         ]
-      }
-    },
-    "/api/v1/roles/remove": {
-      "patch": {
-        "summary": "Remove role",
-        "description": "Removes a role from a user within a domain",
-        "operationId": "Roles_RemoveRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/RolesRemoveRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/RolesRemoveRoleRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Roles"
-        ]
-      }
-    },
-    "/api/v1/roles/{roleName}": {
+      },
       "delete": {
         "summary": "Delete role",
         "description": "Deletes an existing custom role",
@@ -1720,6 +1766,46 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/RolesUpdateRoleBody"
+            }
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/api/v1/roles/{roleName}/users": {
+      "post": {
+        "summary": "Assign role",
+        "description": "Assigns a role to a user within a domain",
+        "operationId": "Roles_AssignRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/RolesAssignRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roleName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RolesAssignRoleBody"
             }
           }
         ],
@@ -2596,16 +2682,13 @@
         }
       }
     },
-    "RolesAssignRoleRequest": {
+    "RolesAssignRoleBody": {
       "type": "object",
       "properties": {
         "domainType": {
           "$ref": "#/definitions/AuthorizationDomainType"
         },
         "domainId": {
-          "type": "string"
-        },
-        "roleName": {
           "type": "string"
         },
         "userId": {
@@ -2663,29 +2746,6 @@
           }
         }
       }
-    },
-    "RolesRemoveRoleRequest": {
-      "type": "object",
-      "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "roleName": {
-          "type": "string"
-        },
-        "userId": {
-          "type": "string"
-        },
-        "userEmail": {
-          "type": "string"
-        }
-      }
-    },
-    "RolesRemoveRoleResponse": {
-      "type": "object"
     },
     "RolesRole": {
       "type": "object",
@@ -2913,6 +2973,17 @@
         "TIMEOUT_BEHAVIOR_EMIT"
       ],
       "default": "TIMEOUT_BEHAVIOR_NONE"
+    },
+    "SuperplaneAddUserBody": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneAddUserResponse": {
+      "type": "object"
     },
     "SuperplaneApproveStageEventBody": {
       "type": "object"
@@ -3587,6 +3658,9 @@
         }
       }
     },
+    "SuperplaneOrganizationsRemoveUserResponse": {
+      "type": "object"
+    },
     "SuperplaneOutputDefinition": {
       "type": "object",
       "properties": {
@@ -3611,6 +3685,9 @@
           "type": "string"
         }
       }
+    },
+    "SuperplaneRemoveUserResponse": {
+      "type": "object"
     },
     "SuperplaneResetEventSourceKeyBody": {
       "type": "object"

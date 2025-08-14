@@ -19,40 +19,36 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Roles_AssignRole_FullMethodName   = "/Superplane.Roles.Roles/AssignRole"
-	Roles_RemoveRole_FullMethodName   = "/Superplane.Roles.Roles/RemoveRole"
 	Roles_ListRoles_FullMethodName    = "/Superplane.Roles.Roles/ListRoles"
-	Roles_DescribeRole_FullMethodName = "/Superplane.Roles.Roles/DescribeRole"
 	Roles_CreateRole_FullMethodName   = "/Superplane.Roles.Roles/CreateRole"
+	Roles_DescribeRole_FullMethodName = "/Superplane.Roles.Roles/DescribeRole"
 	Roles_UpdateRole_FullMethodName   = "/Superplane.Roles.Roles/UpdateRole"
 	Roles_DeleteRole_FullMethodName   = "/Superplane.Roles.Roles/DeleteRole"
+	Roles_AssignRole_FullMethodName   = "/Superplane.Roles.Roles/AssignRole"
 )
 
 // RolesClient is the client API for Roles service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RolesClient interface {
-	// Endpoint for assigning a role to a user in a domain
-	// Operation is synchronous and idempotent.
-	AssignRole(ctx context.Context, in *AssignRoleRequest, opts ...grpc.CallOption) (*AssignRoleResponse, error)
-	// Endpoint for removing a role from a user in a domain
-	// Operation is synchronous and idempotent.
-	RemoveRole(ctx context.Context, in *RemoveRoleRequest, opts ...grpc.CallOption) (*RemoveRoleResponse, error)
 	// Endpoint for listing available roles within a domain
 	// Operation is synchronous and idempotent.
 	ListRoles(ctx context.Context, in *ListRolesRequest, opts ...grpc.CallOption) (*ListRolesResponse, error)
-	// Endpoint for describing a specific role
-	// Operation is synchronous and idempotent.
-	DescribeRole(ctx context.Context, in *DescribeRoleRequest, opts ...grpc.CallOption) (*DescribeRoleResponse, error)
 	// Endpoint for creating a custom role
 	// Operation is synchronous and idempotent.
 	CreateRole(ctx context.Context, in *CreateRoleRequest, opts ...grpc.CallOption) (*CreateRoleResponse, error)
+	// Endpoint for describing a specific role
+	// Operation is synchronous and idempotent.
+	DescribeRole(ctx context.Context, in *DescribeRoleRequest, opts ...grpc.CallOption) (*DescribeRoleResponse, error)
 	// Endpoint for updating a custom role
 	// Operation is synchronous and idempotent.
 	UpdateRole(ctx context.Context, in *UpdateRoleRequest, opts ...grpc.CallOption) (*UpdateRoleResponse, error)
 	// Endpoint for deleting a custom role
 	// Operation is synchronous and idempotent.
 	DeleteRole(ctx context.Context, in *DeleteRoleRequest, opts ...grpc.CallOption) (*DeleteRoleResponse, error)
+	// Endpoint for assigning a role to a user in a domain
+	// Operation is synchronous and idempotent.
+	AssignRole(ctx context.Context, in *AssignRoleRequest, opts ...grpc.CallOption) (*AssignRoleResponse, error)
 }
 
 type rolesClient struct {
@@ -61,26 +57,6 @@ type rolesClient struct {
 
 func NewRolesClient(cc grpc.ClientConnInterface) RolesClient {
 	return &rolesClient{cc}
-}
-
-func (c *rolesClient) AssignRole(ctx context.Context, in *AssignRoleRequest, opts ...grpc.CallOption) (*AssignRoleResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AssignRoleResponse)
-	err := c.cc.Invoke(ctx, Roles_AssignRole_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *rolesClient) RemoveRole(ctx context.Context, in *RemoveRoleRequest, opts ...grpc.CallOption) (*RemoveRoleResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RemoveRoleResponse)
-	err := c.cc.Invoke(ctx, Roles_RemoveRole_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *rolesClient) ListRoles(ctx context.Context, in *ListRolesRequest, opts ...grpc.CallOption) (*ListRolesResponse, error) {
@@ -93,20 +69,20 @@ func (c *rolesClient) ListRoles(ctx context.Context, in *ListRolesRequest, opts 
 	return out, nil
 }
 
-func (c *rolesClient) DescribeRole(ctx context.Context, in *DescribeRoleRequest, opts ...grpc.CallOption) (*DescribeRoleResponse, error) {
+func (c *rolesClient) CreateRole(ctx context.Context, in *CreateRoleRequest, opts ...grpc.CallOption) (*CreateRoleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DescribeRoleResponse)
-	err := c.cc.Invoke(ctx, Roles_DescribeRole_FullMethodName, in, out, cOpts...)
+	out := new(CreateRoleResponse)
+	err := c.cc.Invoke(ctx, Roles_CreateRole_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *rolesClient) CreateRole(ctx context.Context, in *CreateRoleRequest, opts ...grpc.CallOption) (*CreateRoleResponse, error) {
+func (c *rolesClient) DescribeRole(ctx context.Context, in *DescribeRoleRequest, opts ...grpc.CallOption) (*DescribeRoleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateRoleResponse)
-	err := c.cc.Invoke(ctx, Roles_CreateRole_FullMethodName, in, out, cOpts...)
+	out := new(DescribeRoleResponse)
+	err := c.cc.Invoke(ctx, Roles_DescribeRole_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -133,31 +109,38 @@ func (c *rolesClient) DeleteRole(ctx context.Context, in *DeleteRoleRequest, opt
 	return out, nil
 }
 
+func (c *rolesClient) AssignRole(ctx context.Context, in *AssignRoleRequest, opts ...grpc.CallOption) (*AssignRoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssignRoleResponse)
+	err := c.cc.Invoke(ctx, Roles_AssignRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RolesServer is the server API for Roles service.
 // All implementations should embed UnimplementedRolesServer
 // for forward compatibility.
 type RolesServer interface {
-	// Endpoint for assigning a role to a user in a domain
-	// Operation is synchronous and idempotent.
-	AssignRole(context.Context, *AssignRoleRequest) (*AssignRoleResponse, error)
-	// Endpoint for removing a role from a user in a domain
-	// Operation is synchronous and idempotent.
-	RemoveRole(context.Context, *RemoveRoleRequest) (*RemoveRoleResponse, error)
 	// Endpoint for listing available roles within a domain
 	// Operation is synchronous and idempotent.
 	ListRoles(context.Context, *ListRolesRequest) (*ListRolesResponse, error)
-	// Endpoint for describing a specific role
-	// Operation is synchronous and idempotent.
-	DescribeRole(context.Context, *DescribeRoleRequest) (*DescribeRoleResponse, error)
 	// Endpoint for creating a custom role
 	// Operation is synchronous and idempotent.
 	CreateRole(context.Context, *CreateRoleRequest) (*CreateRoleResponse, error)
+	// Endpoint for describing a specific role
+	// Operation is synchronous and idempotent.
+	DescribeRole(context.Context, *DescribeRoleRequest) (*DescribeRoleResponse, error)
 	// Endpoint for updating a custom role
 	// Operation is synchronous and idempotent.
 	UpdateRole(context.Context, *UpdateRoleRequest) (*UpdateRoleResponse, error)
 	// Endpoint for deleting a custom role
 	// Operation is synchronous and idempotent.
 	DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error)
+	// Endpoint for assigning a role to a user in a domain
+	// Operation is synchronous and idempotent.
+	AssignRole(context.Context, *AssignRoleRequest) (*AssignRoleResponse, error)
 }
 
 // UnimplementedRolesServer should be embedded to have
@@ -167,26 +150,23 @@ type RolesServer interface {
 // pointer dereference when methods are called.
 type UnimplementedRolesServer struct{}
 
-func (UnimplementedRolesServer) AssignRole(context.Context, *AssignRoleRequest) (*AssignRoleResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AssignRole not implemented")
-}
-func (UnimplementedRolesServer) RemoveRole(context.Context, *RemoveRoleRequest) (*RemoveRoleResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveRole not implemented")
-}
 func (UnimplementedRolesServer) ListRoles(context.Context, *ListRolesRequest) (*ListRolesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListRoles not implemented")
 }
-func (UnimplementedRolesServer) DescribeRole(context.Context, *DescribeRoleRequest) (*DescribeRoleResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DescribeRole not implemented")
-}
 func (UnimplementedRolesServer) CreateRole(context.Context, *CreateRoleRequest) (*CreateRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateRole not implemented")
+}
+func (UnimplementedRolesServer) DescribeRole(context.Context, *DescribeRoleRequest) (*DescribeRoleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DescribeRole not implemented")
 }
 func (UnimplementedRolesServer) UpdateRole(context.Context, *UpdateRoleRequest) (*UpdateRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateRole not implemented")
 }
 func (UnimplementedRolesServer) DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteRole not implemented")
+}
+func (UnimplementedRolesServer) AssignRole(context.Context, *AssignRoleRequest) (*AssignRoleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AssignRole not implemented")
 }
 func (UnimplementedRolesServer) testEmbeddedByValue() {}
 
@@ -208,42 +188,6 @@ func RegisterRolesServer(s grpc.ServiceRegistrar, srv RolesServer) {
 	s.RegisterService(&Roles_ServiceDesc, srv)
 }
 
-func _Roles_AssignRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AssignRoleRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RolesServer).AssignRole(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Roles_AssignRole_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RolesServer).AssignRole(ctx, req.(*AssignRoleRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Roles_RemoveRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveRoleRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RolesServer).RemoveRole(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Roles_RemoveRole_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RolesServer).RemoveRole(ctx, req.(*RemoveRoleRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Roles_ListRoles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListRolesRequest)
 	if err := dec(in); err != nil {
@@ -262,24 +206,6 @@ func _Roles_ListRoles_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Roles_DescribeRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DescribeRoleRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RolesServer).DescribeRole(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Roles_DescribeRole_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RolesServer).DescribeRole(ctx, req.(*DescribeRoleRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Roles_CreateRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateRoleRequest)
 	if err := dec(in); err != nil {
@@ -294,6 +220,24 @@ func _Roles_CreateRole_Handler(srv interface{}, ctx context.Context, dec func(in
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(RolesServer).CreateRole(ctx, req.(*CreateRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Roles_DescribeRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RolesServer).DescribeRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Roles_DescribeRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RolesServer).DescribeRole(ctx, req.(*DescribeRoleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -334,6 +278,24 @@ func _Roles_DeleteRole_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Roles_AssignRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssignRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RolesServer).AssignRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Roles_AssignRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RolesServer).AssignRole(ctx, req.(*AssignRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Roles_ServiceDesc is the grpc.ServiceDesc for Roles service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -342,24 +304,16 @@ var Roles_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*RolesServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "AssignRole",
-			Handler:    _Roles_AssignRole_Handler,
-		},
-		{
-			MethodName: "RemoveRole",
-			Handler:    _Roles_RemoveRole_Handler,
-		},
-		{
 			MethodName: "ListRoles",
 			Handler:    _Roles_ListRoles_Handler,
 		},
 		{
-			MethodName: "DescribeRole",
-			Handler:    _Roles_DescribeRole_Handler,
-		},
-		{
 			MethodName: "CreateRole",
 			Handler:    _Roles_CreateRole_Handler,
+		},
+		{
+			MethodName: "DescribeRole",
+			Handler:    _Roles_DescribeRole_Handler,
 		},
 		{
 			MethodName: "UpdateRole",
@@ -368,6 +322,10 @@ var Roles_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteRole",
 			Handler:    _Roles_DeleteRole_Handler,
+		},
+		{
+			MethodName: "AssignRole",
+			Handler:    _Roles_AssignRole_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
