@@ -63,6 +63,9 @@ export function EventSourceWorkflowNodeReactFlow({
   // Check URL parameter for event filters version (defaults to 1)
   const eventFiltersVersion = urlParams.get('eventFiltersVersion') === '2' ? 2 : 1;
   
+  // Check URL parameter for compact event display (defaults to true)
+  const compactEvent = urlParams.get('compactEvent') !== 'false';
+  
   // Integration modal state
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
   const [integrationData, setIntegrationData] = useState({
@@ -582,10 +585,15 @@ export function EventSourceWorkflowNodeReactFlow({
           
           
           {displayEvents.length > 0 ? (
-            /* Compact implementation - show events list with minimal status indicators */
-            <div className="space-y-1 p-3">
-              <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
-                EVENTS
+            /* Events list with compact/expanded mode support */
+            <div className={compactEvent ? "space-y-1 p-3" : "space-y-2 p-4"}>
+              <div className='flex items-center justify-between w-full mb-3'>
+                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide">
+                 Recent events
+                </div>
+                <Link href="#" className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200">
+                  View all
+                </Link>
               </div>
               {displayEvents.map((event, index) => {
                 const getStatusConfig = (status: string) => {
@@ -594,72 +602,177 @@ export function EventSourceWorkflowNodeReactFlow({
                       return {
                         icon: 'schedule',
                         color: 'text-yellow-600 dark:text-yellow-400',
-                        dotColor: 'bg-yellow-500',
+                        bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
+                        borderColor: 'border-yellow-200 dark:border-yellow-800',
+                        dotColor: 'bg-yellow-500 animate-pulse',
                         label: 'Pending',
-                        shortLabel: 'P'
+                        shortLabel: 'P',
+                        description: 'Processing...'
                       };
                     case 'discarded':
                       return {
                         icon: 'block',
                         color: 'text-zinc-600 dark:text-zinc-400',
+                        bgColor: 'bg-zinc-50 dark:bg-zinc-900/20',
+                        borderColor: 'border-zinc-200 dark:border-zinc-800',
                         dotColor: 'bg-zinc-500',
                         label: 'Discarded',
-                        shortLabel: 'D'
+                        shortLabel: 'D',
+                        description: 'Filtered out'
                       };
                     case 'processed':
                       return {
                         icon: 'check_circle',
                         color: 'text-green-600 dark:text-green-400',
+                        bgColor: 'bg-green-50 dark:bg-green-900/20',
+                        borderColor: 'border-green-200 dark:border-green-800',
                         dotColor: 'bg-green-500',
                         label: 'Processed',
-                        shortLabel: 'C'
+                        shortLabel: 'C',
+                        description: event.processingTime ? `${event.processingTime}ms` : 'Completed'
                       };
                     default:
                       return {
                         icon: 'bolt',
                         color: 'text-zinc-600 dark:text-zinc-400',
+                        bgColor: 'bg-zinc-50 dark:bg-zinc-800',
+                        borderColor: 'border-zinc-200 dark:border-zinc-700',
                         dotColor: 'bg-zinc-500',
                         label: 'Unknown',
-                        shortLabel: '?'
+                        shortLabel: '?',
+                        description: ''
                       };
                   }
                 };
 
                 const statusConfig = getStatusConfig(event.status);
-                const timeAgo = `${index * 1}m`;
+                const timeAgo = compactEvent ? `${index * 1}m` : `${index * 1}m ago`;
 
-                return (
-                  
-                    <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-zinc-800 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors duration-150 cursor-pointer">
-                      {/* Compact Status Indicator */}
-                      <div className={`w-1.5 h-1.5 ${statusConfig.dotColor} rounded-full flex-shrink-0`}></div>
-                      
-                      {/* Event URL */}
-                      <span className={event.status === 'discarded' ? 'text-xs font-mono text-gray-800 dark:text-zinc-200 truncate flex-1 line-through' : "text-xs font-mono text-gray-800 dark:text-zinc-200 truncate flex-1"}>
-                        {truncateUrl(event.url, 22)}
-                      </span>
-                      
-                     
-                  <Tippy
-                    key={event.id}
-                    content={
-                      <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 min-w-[260px]">
-                        {event.timestamp}
+                if (compactEvent) {
+                  // Compact mode - single line with minimal info
+                  return (
+                    
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-zinc-800 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors duration-150 cursor-pointer">
+                        {/* Compact Status Indicator */}
+                        <div className={`w-1.5 h-1.5 ${statusConfig.dotColor} rounded-full flex-shrink-0`}></div>
+                        
+                        {/* Event URL */}
+                        <span className={event.status === 'discarded' ? 'text-sm font-mono text-gray-800 dark:text-zinc-200 truncate flex-1 line-through opacity-60' : "text-sm font-mono text-gray-800 dark:text-zinc-200 truncate flex-1"}>
+                          {truncateUrl(event.url, 22)}
+                        </span>
+                        
+                        <Tippy
+                          key={event.id}
+                          content={
+                            <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 min-w-[260px]">
+                              {event.timestamp}
+                            </div>
+                          }
+                          placement="top"
+                          trigger="mouseenter"
+                          delay={[200, 100]}
+                          className="z-50"
+                        >    
+                        {/* Time */}
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0 w-6 text-right">
+                            {timeAgo}
+                          </span>
+                        </Tippy>
                       </div>
-                    }
-                    placement="top"
-                    trigger="mouseenter"
-                    delay={[200, 100]}
-                    className="z-50"
-                  >    
-                      {/* Time */}
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0 w-6 text-right">
-                        {timeAgo}
-                      </span>
+                    
+                  );
+                } else {
+                  // Expanded mode - multi-line with detailed status info
+                  return (
+                    <Tippy
+                      key={event.id}
+                      content={
+                        <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[280px]">
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="flex-1">
+                              <div className="text-sm font-semibold text-zinc-900 dark:text-white">
+                                Event {statusConfig.label}
+                              </div>
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                {timeAgo}
+                              </div>
+                            </div>
+                            <div className={`w-2 h-2 ${statusConfig.dotColor} rounded-full mt-2`}></div>
+                          </div>
+                          
+                          <div className="space-y-2 mb-3">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-zinc-500 dark:text-zinc-400">URL:</span>
+                              <span className="font-mono text-zinc-700 dark:text-zinc-300 truncate max-w-48" title={event.url}>
+                                {event.url}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-zinc-500 dark:text-zinc-400">Status:</span>
+                              <span className={`${statusConfig.color} font-medium`}>
+                                {statusConfig.label} - {statusConfig.description}
+                              </span>
+                            </div>
+                            {event.type && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-zinc-500 dark:text-zinc-400">Type:</span>
+                                <span className="text-zinc-700 dark:text-zinc-300 font-mono">
+                                  {event.type}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700 text-xs text-zinc-500 dark:text-zinc-400">
+                            {event.status === 'pending' && 'Event is being processed and will trigger workflows when complete'}
+                            {event.status === 'discarded' && 'Event was filtered out and did not trigger any workflows'}
+                            {event.status === 'processed' && 'Event successfully triggered workflow execution'}
+                          </div>
+                        </div>
+                      }
+                      interactive={true}
+                      placement="bottom"
+                      trigger="mouseenter"
+                      delay={[200, 100]}
+                      className="z-50"
+                    >
+                      <div className={`border bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-md hover:shadow-sm transition-all duration-200 cursor-pointer`}>
+                        {/* Main event row */}
+                        <div className="flex items-center justify-between px-3 pt-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 ${statusConfig.dotColor} rounded-full flex-shrink-0`}></div>
+                            <span className={`text-xs font-medium ${statusConfig.color}`}>
+                              {statusConfig.label}
+                            </span>
+                            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                              • {statusConfig.description}
+                            </span>
+                           
+                          </div>
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0">
+                            {timeAgo}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 p-3">
+                          
+                          
+                          {/* Event URL */}
+                          <div className="flex-1 min-w-0">
+                            <span className={event.status === 'discarded' ? 'text-sm font-mono text-gray-800 dark:text-zinc-200 truncate block line-through opacity-60' : "text-sm font-mono text-gray-800 dark:text-zinc-200 truncate block"}>
+                              {truncateUrl(event.url, 35)}
+                            </span>
+                          </div>
+                          
+                          {/* Time */}
+                          
+                        </div>
+                        
+                        {/* Status information row */}
+                        
+                      </div>
                     </Tippy>
-                    </div>
-                  
-                );
+                  );
+                }
               })}
             </div>
           ) : (
