@@ -3357,7 +3357,7 @@
           "type": "string"
         },
         "state": {
-          "type": "string"
+          "$ref": "#/definitions/SuperplaneEventState"
         },
         "receivedAt": {
           "type": "string",
@@ -3434,6 +3434,16 @@
         "EVENT_SOURCE_TYPE_CONNECTION_GROUP"
       ],
       "default": "EVENT_SOURCE_TYPE_UNKNOWN"
+    },
+    "SuperplaneEventState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_DISCARDED",
+        "STATE_PROCESSED"
+      ],
+      "default": "STATE_UNKNOWN"
     },
     "SuperplaneExecution": {
       "type": "object",

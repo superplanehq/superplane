@@ -519,7 +519,7 @@ export type SuperplaneEvent = {
     sourceName?: string;
     sourceType?: SuperplaneEventSourceType;
     type?: string;
-    state?: string;
+    state?: SuperplaneEventState;
     receivedAt?: string;
     raw?: {
         [key: string]: unknown;
@@ -550,6 +550,8 @@ export type SuperplaneEventSourceSpec = {
 };
 
 export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
+
+export type SuperplaneEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_DISCARDED' | 'STATE_PROCESSED';
 
 export type SuperplaneExecution = {
     id?: string;

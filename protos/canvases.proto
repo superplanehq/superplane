@@ -775,12 +775,19 @@ message ListEventsResponse {
 }
 
 message Event {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_DISCARDED = 2;
+    STATE_PROCESSED = 3;
+  }
+
   string id = 1;
   string source_id = 2;
   string source_name = 3;
   EventSourceType source_type = 4;
   string type = 5;
-  string state = 6;
+  State state = 6;
   google.protobuf.Timestamp received_at = 7;
   google.protobuf.Struct raw = 8;
   google.protobuf.Struct headers = 9;
