@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
@@ -141,6 +141,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
     setEventSourceName(props.data.name);
     setEventSourceDescription(props.data.description || '');
+
+    if (eventSourceKey) {
+      resetEventSourceKey(props.id);
+    }
   };
 
   const handleDiscardEventSource = () => {
@@ -209,6 +213,14 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return "webhook";
   }, [canvasIntegrations, props.data.eventSourceType, props.data.integration?.name]);
 
+  // Auto-enter edit mode for webhook with key
+  useEffect(() => {
+    if (eventSourceKey && eventSourceType === 'webhook' && !isNewNode) {
+      setIsEditMode(true);
+      setEditingEventSource(props.id);
+    }
+  }, [eventSourceKey, eventSourceType, isNewNode, props.id, setEditingEventSource]);
+
   const handleNodeClick = () => {
     if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {
       selectEventSourceId(currentEventSource.metadata.id);
@@ -264,6 +276,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                   isEditMode ? 'text-sm' : '')}
                 onKeyDown={() => isNewNode && setDirtyByUser(true)}
                 isEditMode={isEditMode}
+                autoFocus={isEditMode && eventSourceType === "webhook"}
                 dataTestId="event-source-name-input"
               />
               {nameError && isEditMode && (
@@ -301,6 +314,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           canvasId={canvasId}
           organizationId={organizationId!}
           eventSourceType={eventSourceType}
+          eventSourceKey={eventSourceKey}
           onDataChange={({ spec }) => {
             if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) {
               setCurrentFormData(prev => ({ ...prev!, spec }));
@@ -324,19 +338,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         />
       ) : (
         <>
-          {
-            eventSourceKey && eventSourceType === "webhook" && (
-              <div className="px-3 py-3 w-full text-left bg-amber-50 dark:bg-amber-700">
-                <p className="text-sm text-amber-600 dark:text-amber-400">The Webhook Event Source has been created. Save this webhook signature, it will be displayed only once:</p>
-                <div className="flex items-center justify-between gap-2 mt-2">
-                  <input type="text" value={eventSourceKey} readOnly className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-zinc-700 dark:text-zinc-200" />
-                  <button className='font-bold bg-gray-100 text-gray-700 p-2 rounded' onClick={() => resetEventSourceKey(props.id)}>
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            )}
-
           <div className="px-3 py-3 w-full">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-sm my-2 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Events</div>

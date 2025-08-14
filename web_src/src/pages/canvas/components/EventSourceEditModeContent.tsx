@@ -3,15 +3,21 @@ import { EventSourceNodeType } from '@/canvas/types/flow';
 import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef } from '@/api-client/types.gen';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
+import { useResetEventSourceKey } from '@/hooks/useCanvasData';
 import { EditableAccordionSection } from './shared/EditableAccordionSection';
 import { ValidationField } from './shared/ValidationField';
+import { Button } from '@/components/Button/button';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { ConfirmDialog } from './ConfirmDialog';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
+import { useCanvasStore } from '../store/canvasStore';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
   canvasId: string;
   organizationId: string;
   eventSourceType?: string;
+  eventSourceKey?: string;
   onDataChange?: (data: {
     spec: SuperplaneEventSourceSpec
   }) => void;
@@ -26,6 +32,7 @@ export function EventSourceEditModeContent({
   canvasId,
   organizationId,
   eventSourceType = 'webhook',
+  eventSourceKey,
   onDataChange,
   onDelete,
   apiError,
@@ -36,8 +43,30 @@ export function EventSourceEditModeContent({
   const [resourceType, setResourceType] = useState(data.resource?.type);
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
   const [apiValidationErrors, setApiValidationErrors] = useState<Record<string, string>>({});
+  const [isKeyRevealed, setIsKeyRevealed] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const resourceNameRef = useRef<HTMLInputElement | null>(null);
+  const updateEventSourceKey = useCanvasStore(state => state.updateEventSourceKey)
 
+  const resetKeyMutation = useResetEventSourceKey(canvasId);
+
+  const handleCopyKey = async () => {
+    if (eventSourceKey) {
+      await navigator.clipboard.writeText(eventSourceKey);
+    }
+  };
+
+  const handleRegenerateKey = async () => {
+    if (data.id) {
+      try {
+        const { data: { key } } = await resetKeyMutation.mutateAsync(data.id);
+        setShowRegenerateConfirm(false);
+        updateEventSourceKey(data.id, key!);
+      } catch (error) {
+        console.error('Failed to regenerate key:', error);
+      }
+    }
+  };
 
   const handleResourceNameChange = (value: string) => {
     setResourceName(value);
@@ -412,26 +441,94 @@ export function EventSourceEditModeContent({
             isModified={false}
             onRevert={revertSection}
           >
-            <div className="space-y-3">
+            <div className="space-y-4">
               {!Number.isNaN(Number(data.id)) ? (
                 <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md">
-                  Save this event source to generate the webhook endpoint and signing key.
+                  Save the component to get the webhook parameters (URL and Key)
                 </div>
               ) : (
-                <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md">
-                  This event source has been saved. Register the webhook at:
-                  <input
-                    type="text"
-                    value={`https://superplane.io/api/v1/sources/${data.id}/${data.name}`}
-                    readOnly
-                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                <>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Webhook URL
+                      </label>
+                      <div className="flex">
+                        <input
+                          type="text"
+                          value={`https://superplane.sxmoon.com/api/v1/sources/${data.id}`}
+                          readOnly
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none"
+                        />
+                        <Button
+                          outline
+                          onClick={() => navigator.clipboard.writeText(`https://superplane.sxmoon.com/api/v1/sources/${data.id}`)}
+                          className="rounded-l-none border-l-0 px-3 py-2 text-sm flex items-center"
+                        >
+                          <MaterialSymbol name="content_copy" size="sm" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {eventSourceKey && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Signing Key
+                        </label>
+                        <div className="flex">
+                          <input
+                            type={isKeyRevealed ? "text" : "password"}
+                            value={eventSourceKey}
+                            readOnly
+                            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none"
+                          />
+                          <Button
+                            outline
+                            onClick={() => setIsKeyRevealed(!isKeyRevealed)}
+                            className="rounded-none border-l-0 border-r-0 px-3 py-2 text-sm flex items-center"
+                          >
+                            <MaterialSymbol name={isKeyRevealed ? "visibility_off" : "visibility"} size="sm" />
+                          </Button>
+                          <Button
+                            outline
+                            onClick={handleCopyKey}
+                            className="rounded-l-none border-l-0 px-3 py-2 text-sm flex items-center"
+                          >
+                            <MaterialSymbol name="content_copy" size="sm" />
+                          </Button>
+                        </div>
+
+
+                      </div>
+                    )}
+                    <div className="mt-3">
+                      <Button
+                        outline
+                        onClick={() => setShowRegenerateConfirm(true)}
+                        className="text-orange-600 border-orange-300 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-600 dark:hover:bg-orange-900/20 px-3 py-2 text-sm flex items-center"
+                      >
+                        <MaterialSymbol name="refresh" size="sm" className="mr-2" />
+                        Regenerate Signing Key
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </EditableAccordionSection>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={showRegenerateConfirm}
+        title="Regenerate Signing Key"
+        message="Are you sure you want to regenerate the signing key? This will invalidate the current key and any webhooks using it will need to be updated."
+        confirmText="Regenerate Key"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleRegenerateKey}
+        onCancel={() => setShowRegenerateConfirm(false)}
+      />
     </div>
   );
 }
