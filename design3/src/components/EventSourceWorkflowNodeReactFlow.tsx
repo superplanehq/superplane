@@ -12,6 +12,7 @@ import { Dropdown, DropdownButton, DropdownMenu, DropdownItem, DropdownLabel } f
 import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
 import Tippy from '@tippyjs/react';
 import { Text } from './lib/Text/text';
+import { EmptyState } from './lib/EmptyState/empty-state';
 
 export interface EventSourceWorkflowNodeReactFlowData {
   id: string;
@@ -43,6 +44,9 @@ export function EventSourceWorkflowNodeReactFlow({
     cluster: data.cluster || '',
     events: [...data.events]
   });
+  
+  // Local state for events to persist changes in read-only mode
+  const [displayEvents, setDisplayEvents] = useState([...data.events]);
   
   // Check URL parameter for inline integration mode
   const urlParams = new URLSearchParams(window.location.search);
@@ -123,8 +127,26 @@ export function EventSourceWorkflowNodeReactFlow({
   }, [isEditMode]);
 
   const handleSave = useCallback(() => {
+    // Save as Draft: preserve current editData.events in displayEvents
+    setDisplayEvents([...editData.events]);
+    
     // Here you would typically save the data to your backend or state management
     setIsEditMode(false);
+  }, [editData.events]);
+
+  const handleSaveAndCommit = useCallback(() => {
+    // Save & Commit: transition to read-mode without events to show noEvents variant
+    setIsEditMode(false);
+    
+    // Clear events to demonstrate the noEvents variant
+    setDisplayEvents([]);
+    setEditData(prev => ({
+      ...prev,
+      events: []
+    }));
+    
+    // Here you would typically commit the changes to your backend or state management
+    console.log('Save & Commit: Transitioning to read-mode without events');
   }, []);
 
   const handleCancel = useCallback(() => {
@@ -270,32 +292,43 @@ export function EventSourceWorkflowNodeReactFlow({
         )}
 
         {/* Events Section */}
-        <div className="p-4">
-          <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
-            EVENTS
-          </div>
-          <div className="space-y-2">
-            {data.events.map((event) => (
-              <div
-                key={event.id}
-                className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-zinc-800 rounded-lg"
-              >
-                <MaterialSymbol 
-                  name="bolt" 
-                  size="sm" 
-                  className="text-zinc-800 dark:text-zinc-400 flex-shrink-0" 
-                />
-                <span className="text-sm text-gray-800 dark:text-zinc-200 truncate font-mono">
-                  {truncateUrl(event.url)}
-                </span>
+        <div className="">
+          
+          
+          {displayEvents.length > 0 ? (
+            /* Current implementation - show events list */
+            <div className="space-y-2 p-4">
+              <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                EVENTS
               </div>
-            ))}
-            {data.events.length === 0 && (
-              <div className="text-sm text-gray-500 dark:text-zinc-400 italic">
-                No events configured
-              </div>
-            )}
-          </div>
+              {displayEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-zinc-800 rounded-lg"
+                >
+                  <MaterialSymbol 
+                    name="bolt" 
+                    size="sm" 
+                    className="text-zinc-800 dark:text-zinc-400 flex-shrink-0" 
+                  />
+                  <span className="text-sm text-gray-800 dark:text-zinc-200 truncate font-mono">
+                    {truncateUrl(event.url)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* noEvents variant - empty state */
+            <EmptyState
+              size="xs"
+              icon="sensors"
+              animated={true}
+              animationType="pulse"
+              title='Waiting for events'
+              body="Listening to activities in your semaphore project."
+              className="pt-6 bg-zinc-50 dark:bg-zinc-800 px-4 rounded-lg"
+            />
+          )}
         </div>
 
         {/* React Flow Handles */}
@@ -351,8 +384,8 @@ export function EventSourceWorkflowNodeReactFlow({
                 <MaterialSymbol name="expand_more" size="md"/>
               </DropdownButton>
               <DropdownMenu anchor="bottom start">
-                <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save & Commit</DropdownLabel></DropdownItem>
-                <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save as Draft</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2' onClick={handleSaveAndCommit}><DropdownLabel>Save & Commit</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2' onClick={handleSave}><DropdownLabel>Save as Draft</DropdownLabel></DropdownItem>
                
               </DropdownMenu>
             </Dropdown>

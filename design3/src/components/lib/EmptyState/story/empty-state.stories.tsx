@@ -21,6 +21,13 @@ const meta: Meta<typeof EmptyState> = {
     icon: {
       control: 'text'
     },
+    animated: {
+      control: 'boolean'
+    },
+    animationType: {
+      control: 'select',
+      options: ['pulse', 'bounce', 'spin', 'ping']
+    },
     primaryAction: {
       control: 'object'
     },
@@ -171,4 +178,127 @@ export const SuccessState: Story = {
       label: 'View completed tasks'
     }
   }
+};
+
+// Animated variants
+export const AnimatedPulse: Story = {
+  args: {
+    icon: 'hearing',
+    animated: true,
+    animationType: 'pulse',
+    title: 'Listening for events',
+    body: 'Your event source is ready to receive webhooks and trigger workflows. Events will appear here once received.',
+    primaryAction: {
+      label: 'Test webhook',
+      color: 'blue'
+    }
+  }
+};
+
+export const AnimatedBounce: Story = {
+  args: {
+    icon: 'refresh',
+    animated: true,
+    animationType: 'bounce',
+    title: 'Syncing data',
+    body: 'We\'re fetching the latest information from your connected services. This usually takes a few moments.',
+    secondaryAction: {
+      label: 'Learn about sync process'
+    }
+  }
+};
+
+export const AnimatedSpin: Story = {
+  args: {
+    icon: 'settings',
+    animated: true,
+    animationType: 'spin',
+    title: 'Processing configuration',
+    body: 'Your settings are being applied and synchronized across all services. Please wait a moment.',
+    primaryAction: {
+      label: 'View progress',
+      color: 'blue'
+    }
+  }
+};
+
+export const AnimatedPing: Story = {
+  args: {
+    icon: 'notifications',
+    animated: true,
+    animationType: 'ping',
+    title: 'Waiting for notifications',
+    body: 'You\'ll receive alerts and updates here when important events occur in your workflows.',
+    primaryAction: {
+      label: 'Configure alerts',
+      color: 'green'
+    },
+    secondaryAction: {
+      label: 'Notification settings'
+    }
+  }
+};
+
+// Animated with custom image
+export const AnimatedCustomImage: Story = {
+  args: {
+    animated: true,
+    animationType: 'pulse',
+    image: (
+      <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-full flex items-center justify-center">
+        <MaterialSymbol name="cloud_sync" size={48} className="text-blue-600 dark:text-blue-400" />
+      </div>
+    ),
+    title: 'Syncing with cloud',
+    body: 'Your data is being synchronized with cloud services. This ensures all your information is up to date.',
+    primaryAction: {
+      label: 'View sync status',
+      color: 'blue'
+    }
+  }
+};
+
+// Large size showcase
+export const LargeSize: Story = {
+  args: {
+    size: 'lg',
+    icon: 'analytics',
+    title: 'No analytics data',
+    body: 'Your analytics dashboard will populate with data as users interact with your application.',
+    primaryAction: {
+      label: 'Learn about analytics',
+      color: 'blue'
+    }
+  }
+};
+
+// Custom large icon sizes
+export const CustomIconSizes: Story = {
+  render: () => (
+    <div className="space-y-8">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold mb-4">Custom Large Icon Sizes</h3>
+        <div className="space-y-6">
+          <EmptyState
+            size="sm"
+            icon="favorite"
+            title="Small (48px icon)"
+            body="Perfect for inline empty states and small containers."
+          />
+          <EmptyState
+            size="md" 
+            icon="star"
+            title="Medium (64px icon)"
+            body="Great for standard empty states and main content areas."
+          />
+          <EmptyState
+            size="lg"
+            icon="celebration"
+            title="Large (80px icon)"
+            body="Ideal for prominent empty states and hero sections."
+          />
+        </div>
+      </div>
+    </div>
+  )
 };

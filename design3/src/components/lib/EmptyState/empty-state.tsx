@@ -10,6 +10,10 @@ export interface EmptyStateProps {
   image?: React.ReactNode;
   /** Optional icon name for MaterialSymbol when no custom image provided */
   icon?: string;
+  /** Enable animated illustration - shows pulsing animation */
+  animated?: boolean;
+  /** Animation type when animated is true */
+  animationType?: 'pulse' | 'bounce' | 'spin' | 'ping';
   /** Short, concise title - preferably written as positive statement */
   title: string;
   /** Body text explaining next action to populate space */
@@ -30,12 +34,14 @@ export interface EmptyStateProps {
   /** Additional CSS classes */
   className?: string;
   /** Size variant for spacing */
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 export function EmptyState({
   image,
-  icon,
+  icon = 'inbox',
+  animated = false,
+  animationType = 'pulse',
   title,
   body,
   primaryAction,
@@ -44,47 +50,91 @@ export function EmptyState({
   size = 'md'
 }: EmptyStateProps) {
   const sizeClasses = {
+    xs: 'py-4',
     sm: 'py-8',
     md: 'py-12',
     lg: 'py-16'
   };
 
-  const iconSizeClasses = {
-    sm: 'text-4xl mb-3',
-    md: 'text-5xl mb-4', 
-    lg: 'text-6xl mb-6'
+  const getIconSize = () => {
+    switch (size) {
+      case 'xs':
+        return 48;
+      case 'sm':
+        return 64;
+      case 'md':
+        return 80;
+      case 'lg':
+        return 128;
+      default:
+        return 64;
+    }
+  };
+
+  const iconMarginClasses = {
+    xs: 'mb-2',
+    sm: 'mb-3',
+    md: 'mb-4', 
+    lg: 'mb-6'
   };
 
   const titleSizeClasses = {
+    xs: 'text-sm',
     sm: 'text-lg',
     md: 'text-xl',
     lg: 'text-2xl'
+  };
+
+  const bodySizeClasses = {
+    xs: 'text-xs',
+    sm: 'text-sm',
+    md: 'text-base',
+    lg: 'text-lg'
+  };
+
+  // Animation classes based on type
+  const getAnimationClasses = () => {
+    if (!animated) return '';
+    
+    switch (animationType) {
+      case 'pulse':
+        return 'animate-pulse';
+      case 'bounce':
+        return 'animate-bounce';
+      case 'spin':
+        return 'animate-spin';
+      case 'ping':
+        return 'animate-ping';
+      default:
+        return 'animate-pulse';
+    }
   };
 
   return (
     <div className={`text-center ${sizeClasses[size]} ${className}`}>
       {/* Image or Icon */}
       {image ? (
-        <div className="flex justify-center mb-4">
+        <div className={`flex justify-center mb-4 ${getAnimationClasses()}`}>
           {image}
         </div>
       ) : (
         <MaterialSymbol 
           name={icon} 
-          className={`mx-auto text-zinc-400 dark:text-zinc-500 ${iconSizeClasses[size]}`}
+          size={getIconSize()}
+          className={`mx-auto text-zinc-400 dark:text-zinc-500 ${iconMarginClasses[size]} ${getAnimationClasses()}`}
         />
       )}
 
       {/* Title */}
       <Heading 
         level={3} 
-        className={`font-semibold text-zinc-900 dark:text-white mb-2 ${titleSizeClasses[size]}`}
+        className={`font-semibold text-zinc-900 dark:text-white mb-2 !${titleSizeClasses[size]}`}
       >
         {title}
       </Heading>
 
       {/* Body */}
-      <Text className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6">
+      <Text className={`text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !${bodySizeClasses[size]}`}>
         {body}
       </Text>
 

@@ -9,12 +9,17 @@ export interface EmptyStatePrimaryAction extends EmptyStateAction {
 }
 
 export type EmptyStateSize = 'sm' | 'md' | 'lg';
+export type EmptyStateAnimationType = 'pulse' | 'bounce' | 'spin' | 'ping';
 
 export interface EmptyStateProps {
   /** Optional image element (can be img, svg, or MaterialSymbol) */
   image?: React.ReactNode;
   /** Optional icon name for MaterialSymbol when no custom image provided */
   icon?: string;
+  /** Enable animated illustration - shows animation */
+  animated?: boolean;
+  /** Animation type when animated is true */
+  animationType?: EmptyStateAnimationType;
   /** Short, concise title - preferably written as positive statement */
   title: string;
   /** Body text explaining next action to populate space */
