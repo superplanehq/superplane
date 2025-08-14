@@ -79,6 +79,32 @@ func StringToEventSourceType(sourceType string) pb.EventSourceType {
 	}
 }
 
+func EventStateProtoToString(state pb.Event_State) string {
+	switch state {
+	case pb.Event_STATE_PROCESSED:
+		return models.EventStateProcessed
+	case pb.Event_STATE_PENDING:
+		return models.EventStatePending
+	case pb.Event_STATE_DISCARDED:
+		return models.EventStateDiscarded
+	default:
+		return ""
+	}
+}
+
+func StringToEventStateProto(state string) pb.Event_State {
+	switch state {
+	case models.EventStateProcessed:
+		return pb.Event_STATE_PROCESSED
+	case models.EventStatePending:
+		return pb.Event_STATE_PENDING
+	case models.EventStateDiscarded:
+		return pb.Event_STATE_DISCARDED
+	default:
+		return pb.Event_STATE_UNKNOWN
+	}
+}
+
 func serializeEvents(in []models.Event) ([]*pb.Event, error) {
 	out := []*pb.Event{}
 	for _, event := range in {
@@ -114,7 +140,7 @@ func serializeEvent(in models.Event) (*pb.Event, error) {
 		SourceName: in.SourceName,
 		SourceType: StringToEventSourceType(in.SourceType),
 		Type:       in.Type,
-		State:      in.State,
+		State:      StringToEventStateProto(in.State),
 		ReceivedAt: timestamppb.New(*in.ReceivedAt),
 		Raw:        rawStruct,
 		Headers:    headersStruct,

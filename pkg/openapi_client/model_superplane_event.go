@@ -26,7 +26,7 @@ type SuperplaneEvent struct {
 	SourceName *string `json:"sourceName,omitempty"`
 	SourceType *SuperplaneEventSourceType `json:"sourceType,omitempty"`
 	Type *string `json:"type,omitempty"`
-	State *string `json:"state,omitempty"`
+	State *SuperplaneEventState `json:"state,omitempty"`
 	ReceivedAt *time.Time `json:"receivedAt,omitempty"`
 	Raw map[string]interface{} `json:"raw,omitempty"`
 	Headers map[string]interface{} `json:"headers,omitempty"`
@@ -40,6 +40,8 @@ func NewSuperplaneEvent() *SuperplaneEvent {
 	this := SuperplaneEvent{}
 	var sourceType SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_EVENT_SOURCE_TYPE_UNKNOWN
 	this.SourceType = &sourceType
+	var state SuperplaneEventState = SUPERPLANEEVENTSTATE_STATE_UNKNOWN
+	this.State = &state
 	return &this
 }
 
@@ -50,6 +52,8 @@ func NewSuperplaneEventWithDefaults() *SuperplaneEvent {
 	this := SuperplaneEvent{}
 	var sourceType SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_EVENT_SOURCE_TYPE_UNKNOWN
 	this.SourceType = &sourceType
+	var state SuperplaneEventState = SUPERPLANEEVENTSTATE_STATE_UNKNOWN
+	this.State = &state
 	return &this
 }
 
@@ -214,9 +218,9 @@ func (o *SuperplaneEvent) SetType(v string) {
 }
 
 // GetState returns the State field value if set, zero value otherwise.
-func (o *SuperplaneEvent) GetState() string {
+func (o *SuperplaneEvent) GetState() SuperplaneEventState {
 	if o == nil || IsNil(o.State) {
-		var ret string
+		var ret SuperplaneEventState
 		return ret
 	}
 	return *o.State
@@ -224,7 +228,7 @@ func (o *SuperplaneEvent) GetState() string {
 
 // GetStateOk returns a tuple with the State field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEvent) GetStateOk() (*string, bool) {
+func (o *SuperplaneEvent) GetStateOk() (*SuperplaneEventState, bool) {
 	if o == nil || IsNil(o.State) {
 		return nil, false
 	}
@@ -240,8 +244,8 @@ func (o *SuperplaneEvent) HasState() bool {
 	return false
 }
 
-// SetState gets a reference to the given string and assigns it to the State field.
-func (o *SuperplaneEvent) SetState(v string) {
+// SetState gets a reference to the given SuperplaneEventState and assigns it to the State field.
+func (o *SuperplaneEvent) SetState(v SuperplaneEventState) {
 	o.State = &v
 }
 

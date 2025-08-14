@@ -128,6 +128,7 @@ docs/SuperplaneEventSource.md
 docs/SuperplaneEventSourceMetadata.md
 docs/SuperplaneEventSourceSpec.md
 docs/SuperplaneEventSourceType.md
+docs/SuperplaneEventState.md
 docs/SuperplaneExecution.md
 docs/SuperplaneExecutionResource.md
 docs/SuperplaneExecutionState.md
@@ -280,6 +281,7 @@ model_superplane_event_source.go
 model_superplane_event_source_metadata.go
 model_superplane_event_source_spec.go
 model_superplane_event_source_type.go
+model_superplane_event_state.go
 model_superplane_execution.go
 model_superplane_execution_resource.go
 model_superplane_execution_state.go
