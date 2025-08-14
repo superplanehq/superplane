@@ -5,6 +5,7 @@ README.md
 api/openapi.yaml
 api_canvas.go
 api_connection_group.go
+api_event.go
 api_event_source.go
 api_groups.go
 api_integration.go
@@ -20,6 +21,7 @@ docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
 docs/CanvasAPI.md
 docs/ConnectionGroupAPI.md
+docs/EventAPI.md
 docs/EventSourceAPI.md
 docs/EventSourceEventType.md
 docs/ExecutionResult.md
@@ -121,9 +123,11 @@ docs/SuperplaneDescribeCanvasResponse.md
 docs/SuperplaneDescribeConnectionGroupResponse.md
 docs/SuperplaneDescribeEventSourceResponse.md
 docs/SuperplaneDescribeStageResponse.md
+docs/SuperplaneEvent.md
 docs/SuperplaneEventSource.md
 docs/SuperplaneEventSourceMetadata.md
 docs/SuperplaneEventSourceSpec.md
+docs/SuperplaneEventSourceType.md
 docs/SuperplaneExecution.md
 docs/SuperplaneExecutionResource.md
 docs/SuperplaneExecutionState.md
@@ -141,6 +145,7 @@ docs/SuperplaneListCanvasesResponse.md
 docs/SuperplaneListConnectionGroupFieldSetsResponse.md
 docs/SuperplaneListConnectionGroupsResponse.md
 docs/SuperplaneListEventSourcesResponse.md
+docs/SuperplaneListEventsResponse.md
 docs/SuperplaneListStageEventsResponse.md
 docs/SuperplaneListStagesResponse.md
 docs/SuperplaneOutputDefinition.md
@@ -270,9 +275,11 @@ model_superplane_describe_canvas_response.go
 model_superplane_describe_connection_group_response.go
 model_superplane_describe_event_source_response.go
 model_superplane_describe_stage_response.go
+model_superplane_event.go
 model_superplane_event_source.go
 model_superplane_event_source_metadata.go
 model_superplane_event_source_spec.go
+model_superplane_event_source_type.go
 model_superplane_execution.go
 model_superplane_execution_resource.go
 model_superplane_execution_state.go
@@ -290,6 +297,7 @@ model_superplane_list_canvases_response.go
 model_superplane_list_connection_group_field_sets_response.go
 model_superplane_list_connection_groups_response.go
 model_superplane_list_event_sources_response.go
+model_superplane_list_events_response.go
 model_superplane_list_stage_events_response.go
 model_superplane_list_stages_response.go
 model_superplane_output_definition.go
@@ -324,6 +332,7 @@ response.go
 test/api_canvas_test.go
 test/api_connection_group_test.go
 test/api_event_source_test.go
+test/api_event_test.go
 test/api_groups_test.go
 test/api_integration_test.go
 test/api_organization_test.go

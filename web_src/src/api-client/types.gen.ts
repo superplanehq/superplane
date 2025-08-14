@@ -513,6 +513,22 @@ export type SuperplaneDescribeStageResponse = {
     stage?: SuperplaneStage;
 };
 
+export type SuperplaneEvent = {
+    id?: string;
+    sourceId?: string;
+    sourceName?: string;
+    sourceType?: SuperplaneEventSourceType;
+    type?: string;
+    state?: string;
+    receivedAt?: string;
+    raw?: {
+        [key: string]: unknown;
+    };
+    headers?: {
+        [key: string]: unknown;
+    };
+};
+
 export type SuperplaneEventSource = {
     metadata?: SuperplaneEventSourceMetadata;
     spec?: SuperplaneEventSourceSpec;
@@ -532,6 +548,8 @@ export type SuperplaneEventSourceSpec = {
     resource?: IntegrationsResourceRef;
     events?: Array<EventSourceEventType>;
 };
+
+export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
 
 export type SuperplaneExecution = {
     id?: string;
@@ -612,6 +630,10 @@ export type SuperplaneListConnectionGroupsResponse = {
 
 export type SuperplaneListEventSourcesResponse = {
     eventSources?: Array<SuperplaneEventSource>;
+};
+
+export type SuperplaneListEventsResponse = {
+    events?: Array<SuperplaneEvent>;
 };
 
 export type SuperplaneListStageEventsResponse = {
@@ -1108,6 +1130,36 @@ export type SuperplaneResetEventSourceKeyResponses = {
 };
 
 export type SuperplaneResetEventSourceKeyResponse2 = SuperplaneResetEventSourceKeyResponses[keyof SuperplaneResetEventSourceKeyResponses];
+
+export type SuperplaneListEventsData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+    };
+    query?: {
+        sourceType?: 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
+        sourceId?: string;
+    };
+    url: '/api/v1/canvases/{canvasIdOrName}/events';
+};
+
+export type SuperplaneListEventsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneListEventsError = SuperplaneListEventsErrors[keyof SuperplaneListEventsErrors];
+
+export type SuperplaneListEventsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListEventsResponse;
+};
+
+export type SuperplaneListEventsResponse2 = SuperplaneListEventsResponses[keyof SuperplaneListEventsResponses];
 
 export type SuperplaneListStagesData = {
     body?: never;

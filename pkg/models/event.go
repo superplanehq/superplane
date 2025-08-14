@@ -267,6 +267,38 @@ func FindLastEventBySourceID(sourceID uuid.UUID) (map[string]any, error) {
 	return m, nil
 }
 
+func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr string) ([]Event, error) {
+	var events []Event
+	
+	query := database.Conn().Table("events")
+	
+	query = query.Joins("LEFT JOIN event_sources ON events.source_id = event_sources.id AND events.source_type = ?", SourceTypeEventSource).
+		Joins("LEFT JOIN stages ON events.source_id = stages.id AND events.source_type = ?", SourceTypeStage).
+		Joins("LEFT JOIN connection_groups ON events.source_id = connection_groups.id AND events.source_type = ?", SourceTypeConnectionGroup).
+		Where("event_sources.canvas_id = ? OR stages.canvas_id = ? OR connection_groups.canvas_id = ?", canvasID, canvasID, canvasID)
+
+	if sourceType != "" {
+		query = query.Where("events.source_type = ?", sourceType)
+	}
+
+	if sourceIDStr != "" {
+		sourceID, err := uuid.Parse(sourceIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source ID: %v", err)
+		}
+		query = query.Where("events.source_id = ?", sourceID)
+	}
+
+	query = query.Order("events.received_at DESC")
+
+	err := query.Find(&events).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
 // CompileBooleanExpression compiles a boolean expression.
 //
 // variables: the variables to be used in the expression.
