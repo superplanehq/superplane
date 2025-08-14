@@ -1,18 +1,27 @@
 import React, { useState } from 'react';
-import { formatRelativeTime, formatFullTimestamp } from '../utils/stageEventUtils';
+import { formatRelativeTime } from '../utils/stageEventUtils';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { PayloadModal } from './PayloadModal';
 import { Button } from '@/components/Button/button';
-import Tippy from '@tippyjs/react';
 
 interface EventItemProps {
   eventId: string;
   timestamp: string;
+  state?: string;
+  eventType?: string;
+  sourceName?: string;
+  headers?: { [key: string]: unknown };
+  payload?: { [key: string]: unknown };
 }
 
 export const EventItem: React.FC<EventItemProps> = React.memo(({
   eventId,
   timestamp,
+  state,
+  eventType,
+  sourceName,
+  headers,
+  payload,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [showPayloadModal, setShowPayloadModal] = useState<boolean>(false);
@@ -22,55 +31,64 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
     setIsExpanded(!isExpanded);
   };
 
-  const mockHeaders = {
-    'Content-Type': 'application/json',
-    'User-Agent': 'GitHub-Hookshot/123abc',
-    'X-GitHub-Event': 'push',
-    'X-GitHub-Delivery': 'abc123-def456-ghi789'
+  const displayHeaders = headers || {};
+  const displayPayload = payload || {};
+
+  const renderStateIcon = () => {
+    switch (state) {
+      case 'processed':
+        return (
+          <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
+            <MaterialSymbol name="check_circle" size='lg' className="text-green-600 dark:text-green-400" />
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
+            <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 dark:text-orange-400" />
+          </div>
+        );
+      case 'discarded':
+        return (
+          <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
+            <MaterialSymbol name="cancel" size='lg' className="text-red-600 dark:text-red-400" />
+          </div>
+        );
+      default:
+        return (
+          <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
+            <MaterialSymbol name="bolt" size='lg' className="text-blue-600 dark:text-blue-400" />
+          </div>
+        );
+    }
   };
 
-  const mockPayload = {
-    ref: 'refs/heads/main',
-    before: 'abc123def456',
-    after: 'def456ghi789',
-    repository: {
-      name: 'my-repo',
-      full_name: 'user/my-repo',
-      private: false
-    },
-    pusher: {
-      name: 'john-doe',
-      email: 'john@example.com'
-    },
-    commits: [
-      {
-        id: 'def456ghi789',
-        message: 'Add new feature',
-        author: {
-          name: 'John Doe',
-          email: 'john@example.com'
-        }
-      }
-    ]
+  const getBackgroundClass = () => {
+    switch (state) {
+      case 'processed':
+        return 'bg-green-50 dark:bg-green-900/50 border-t-1 border-green-500 dark:border-green-700';
+      case 'pending':
+        return 'bg-yellow-50 dark:bg-yellow-900/50 border-t-1 border-yellow-500 dark:border-yellow-700';
+      case 'discarded':
+        return 'bg-red-50 dark:bg-red-900/50 border-t-1 border-red-500 dark:border-red-700';
+      default:
+        return 'bg-blue-50 dark:bg-blue-900/50 border-t-1 border-blue-500 dark:border-blue-700';
+    }
   };
 
   return (
     <>
-      <div className="mb-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 overflow-hidden rounded-lg">
-        <div className="flex w-full items-start p-3">
+      <div className="mb-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 overflow-hidden">
+        <div className={`flex w-full items-start p-2 ${getBackgroundClass()}`}>
           <div className='w-full cursor-pointer' onClick={toggleExpand}>
             <div className="flex justify-between items-center">
               <div className="flex items-center min-w-0 flex-1">
-                <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-                  <MaterialSymbol name="bolt" size='lg' className="text-blue-600 dark:text-blue-400" />
-                </div>
+                {renderStateIcon()}
                 <span className="font-semibold text-sm text-gray-900 dark:text-zinc-100 truncate">{eventId}</span>
               </div>
               <div className="flex items-center gap-2">
                 {!isExpanded && (
-                  <Tippy content={formatFullTimestamp(timestamp)} placement="top">
-                    <div className="text-xs text-gray-500 dark:text-zinc-400">{formatRelativeTime(timestamp)}</div>
-                  </Tippy>
+                  <div className="text-xs text-gray-500 dark:text-zinc-400">{formatRelativeTime(timestamp)}</div>
                 )}
               </div>
               <button
@@ -83,12 +101,24 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
 
             {isExpanded && (
               <div className="mt-3 space-y-3 text-left">
-                <div className="grid grid-cols-1 gap-4 text-xs p-4 rounded-md bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+                <div className="grid grid-cols-2 gap-4 text-xs p-4 rounded-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+                  <div>
+                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">State</div>
+                    <div className="font-semibold text-blue-600 dark:text-blue-400">{state?.toUpperCase() || 'UNKNOWN'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Type</div>
+                    <div className="font-semibold text-blue-600 dark:text-blue-400">{eventType || 'UNKNOWN'}</div>
+                  </div>
                   <div>
                     <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Event ID</div>
                     <div className="font-medium text-gray-900 dark:text-zinc-300 font-mono">{eventId}</div>
                   </div>
                   <div>
+                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Source</div>
+                    <div className="font-medium text-gray-900 dark:text-zinc-300">{sourceName || 'Unknown'}</div>
+                  </div>
+                  <div className="col-span-2">
                     <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Received on</div>
                     <div className="font-medium text-gray-900 dark:text-zinc-300">
                       {new Date(timestamp).toLocaleDateString('en-US', {
@@ -137,14 +167,14 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
         isOpen={showHeadersModal}
         onClose={() => setShowHeadersModal(false)}
         title="Event Headers"
-        content={mockHeaders}
+        content={displayHeaders}
       />
 
       <PayloadModal
         isOpen={showPayloadModal}
         onClose={() => setShowPayloadModal(false)}
         title="Event Payload"
-        content={mockPayload}
+        content={displayPayload}
       />
     </>
   );

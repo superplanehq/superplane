@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, EventSourceWithEvents } from './types';
 import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneStage } from "@/api-client/types.gen";
-import { superplaneApproveStageEvent, superplaneListStageEvents } from '@/api-client';
+import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
@@ -210,6 +210,30 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         ...updatingStage,
         queue: stageEventsResponse.data?.events || []
       } : s)
+    }));
+  },
+
+  syncEventSourceEvents: async (canvasId: string, eventSourceId: string) => {
+    const { eventSources } = get();
+    const updatingEventSource = eventSources.find(es => es.metadata!.id === eventSourceId);
+
+    if (!updatingEventSource) {
+      return;
+    }
+
+    const eventsResponse = await superplaneListEvents(withOrganizationHeader({
+      path: { canvasIdOrName: canvasId },
+      query: { 
+        sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
+        sourceId: eventSourceId 
+      }
+    }));
+
+    set((state) => ({
+      eventSources: state.eventSources.map((es) => es.metadata!.id === eventSourceId ? {
+        ...updatingEventSource,
+        events: eventsResponse.data?.events || []
+      } : es)
     }));
   },
 

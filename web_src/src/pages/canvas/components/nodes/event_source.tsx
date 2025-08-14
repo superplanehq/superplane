@@ -344,8 +344,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             </div>
 
             <div className="space-y-2">
-              {props.data.events?.length ? (
-                props.data.events.map((event) => (
+              {currentEventSource?.events?.length ? (
+                currentEventSource.events.slice(0, 3).map((event) => (
                   <div key={event.id} className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-2">
                     <div className="flex justify-between items-center gap-3 overflow-hidden">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -354,9 +354,9 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                         </span>
                         <span className="truncate dark:text-zinc-200 font-medium">{event.id!}</span>
                       </div>
-                      <Tippy content={formatFullTimestamp(event.createdAt)} placement="top">
+                      <Tippy content={formatFullTimestamp(event.receivedAt)} placement="top">
                         <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                          {formatRelativeTime(event.createdAt)}
+                          {formatRelativeTime(event.receivedAt)}
                         </span>
                       </Tippy>
                     </div>

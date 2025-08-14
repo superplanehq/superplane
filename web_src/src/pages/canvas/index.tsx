@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups } from "@/api-client";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneListEvents } from "@/api-client";
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { EventSourceSidebar } from "./components/EventSourceSidebar";
@@ -154,23 +154,24 @@ export function Canvas() {
           });
         }
 
-        // Group events by source ID
-        const eventsBySourceId = Object.values(allEvents).reduce((acc, event) => {
-          const sourceId = event.sourceId;
-          if (sourceId) {
-            if (!acc[sourceId]) {
-              acc[sourceId] = [];
-            }
-            acc[sourceId].push(event);
-          }
-          return acc;
-        }, {} as Record<string, SuperplaneStageEvent[]>);
+        // Fetch events for each event source using the new ListEvents API
+        const eventSourcesWithEvents: EventSourceWithEvents[] = [];
+        for (const eventSource of (eventSourcesResponse.data?.eventSources || [])) {
+          const eventsResponse = await superplaneListEvents(
+            withOrganizationHeader({
+              path: { canvasIdOrName: canvasId! },
+              query: { 
+                sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
+                sourceId: eventSource.metadata?.id 
+              }
+            })
+          );
 
-        // Assign events to their corresponding event sources
-        const eventSourcesWithEvents: EventSourceWithEvents[] = (eventSourcesResponse.data?.eventSources || []).map(eventSource => ({
-          ...eventSource,
-          events: eventSource.metadata?.id ? eventsBySourceId[eventSource.metadata.id] : []
-        }));
+          eventSourcesWithEvents.push({
+            ...eventSource,
+            events: eventsResponse.data?.events || []
+          });
+        }
 
         // Initialize the store with the mapped data
         const initialData = {

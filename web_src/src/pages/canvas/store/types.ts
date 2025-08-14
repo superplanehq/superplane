@@ -1,5 +1,5 @@
 import { CanvasData } from "../types";
-import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEventSource, SuperplaneExecution, SuperplaneStage, SuperplaneStageEvent } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEventSource, SuperplaneExecution, SuperplaneStage, SuperplaneStageEvent, SuperplaneEvent } from "@/api-client/types.gen";
 import { ReadyState } from "react-use-websocket";
 import { AllNodeType, EdgeType } from "../types/flow";
 import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
@@ -46,6 +46,7 @@ export interface CanvasState {
   setEditingConnectionGroup: (connectionGroupId: string | null) => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
   syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
+  syncEventSourceEvents: (canvasId: string, eventSourceId: string) => Promise<void>;
 
   // flow fields
   nodes: AllNodeType[];
@@ -89,5 +90,5 @@ export interface CanvasState {
 }
 
 export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; isDraft?: boolean}
-export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneStageEvent>; eventSourceType?: string}
+export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneEvent>; eventSourceType?: string}
 export type ExecutionWithEvent = SuperplaneExecution & {event: SuperplaneStageEvent}

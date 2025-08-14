@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { SuperplaneEventSource } from "@/api-client";
+import { SuperplaneEventSource, SuperplaneEvent } from "@/api-client";
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { SidebarHeader } from "./SidebarHeader";
 import { ResizeHandle } from "./ResizeHandle";
@@ -18,7 +18,7 @@ const EventSourceImageMap = {
 
 interface EventSourceSidebarProps {
   selectedEventSource: SuperplaneEventSource & {
-    events?: Array<{ id?: string; createdAt?: string }>;
+    events?: Array<SuperplaneEvent>;
     eventSourceType?: string;
   };
   onClose: () => void;
@@ -97,7 +97,12 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
                 <EventItem
                   key={event.id}
                   eventId={event.id!}
-                  timestamp={event.createdAt!}
+                  timestamp={event.receivedAt!}
+                  state={event.state}
+                  eventType={event.type}
+                  sourceName={event.sourceName}
+                  headers={event.headers}
+                  payload={event.raw}
                 />
               ))
             ) : (
