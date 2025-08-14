@@ -14,6 +14,7 @@ export interface TabsProps {
   defaultTab?: string
   onTabChange?: (tabId: string) => void
   className?: string
+  size?: 'xs' | 'sm'
   variant?: 'default' | 'pills' | 'underline'
 }
 
@@ -43,6 +44,7 @@ export function Tabs({
   defaultTab, 
   onTabChange, 
   className,
+  size = 'sm',
   variant = 'default'
 }: TabsProps) {
   const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id || '')
@@ -67,7 +69,7 @@ export function Tabs({
     {
       'gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg': variant === 'pills',
       'gap-6': variant === 'default',
-      'gap-4': variant === 'underline',
+      'gap-0': variant === 'underline',
     }
   )
 
@@ -81,6 +83,7 @@ export function Tabs({
             activeTab={activeTab} 
             onClick={handleTabClick}
             variant={variant}
+            size={size}
           />
         ))}
       </nav>
@@ -93,12 +96,14 @@ function TabItem({
   tab, 
   activeTab, 
   onClick, 
-  variant 
+  variant,
+  size 
 }: { 
   tab: Tab
   activeTab: string
   onClick: (tabId: string) => void
   variant: 'default' | 'pills' | 'underline'
+  size?: 'xs' | 'sm'
 }) {
   const isActive = activeTab === tab.id
   const isDisabled = tab.disabled
@@ -110,8 +115,9 @@ function TabItem({
   }, [tab.id, onClick, isDisabled])
 
   const buttonClasses = clsx(
-    'relative flex items-center gap-2 font-medium text-sm transition-all duration-200 ease-in-out focus:outline-hidden',
+    'relative flex items-center gap-2 font-medium transition-all duration-200 ease-in-out focus:outline-hidden',
     {
+      [size==="sm" ? 'text-sm' : 'text-xs']: true,
       // Default variant
       'px-1 py-3 border-b-2 border-transparent text-zinc-500 dark:text-zinc-400': variant === 'default',
       'text-blue-600 dark:text-blue-400 border-blue-500': variant === 'default' && isActive,
@@ -225,7 +231,7 @@ export function ControlledTabs({
     {
       'gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg': variant === 'pills',
       'gap-6': variant === 'default',
-      'gap-4': variant === 'underline',
+      'gap-0': variant === 'underline',
     }
   )
 

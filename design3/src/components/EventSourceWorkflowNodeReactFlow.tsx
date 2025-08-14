@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import clsx from 'clsx';
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
@@ -13,6 +13,7 @@ import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
 import Tippy from '@tippyjs/react';
 import { Text } from './lib/Text/text';
 import { EmptyState } from './lib/EmptyState/empty-state';
+import { EventSourceSidebar } from './EventSourceSidebar';
 
 export interface EventSourceWorkflowNodeReactFlowData {
   id: string;
@@ -50,7 +51,7 @@ export function EventSourceWorkflowNodeReactFlow({
   const [displayEvents, setDisplayEvents] = useState(
     data.events.map((event, index) => ({
       ...event,
-      status: index === 0 ? 'pending' : index === 1 ? 'discarded' : 'processed',
+      status: (index === 0 ? 'pending' : index === 1 ? 'discarded' : 'forwarded') as 'pending' | 'discarded' | 'forwarded',
       timestamp: new Date(Date.now() - (index * 60 * 1000)).toISOString(),
       processingTime: index === 2 ? 245 : undefined
     }))
@@ -96,7 +97,6 @@ export function EventSourceWorkflowNodeReactFlow({
       keys: [{ key: 'API_TOKEN', value: 'hidden' }]
     }
   ]);
-  const [showAddSecret, setShowAddSecret] = useState(false);
   const [newSecret, setNewSecret] = useState({
     name: '',
     key: '',
@@ -115,6 +115,9 @@ export function EventSourceWorkflowNodeReactFlow({
   
   // Selected integration state
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
+  
+  // Sidebar state for event details
+  const [showSidebar, setShowSidebar] = useState(false);
   
   // No state needed for hover-triggered popovers
   
@@ -154,13 +157,16 @@ export function EventSourceWorkflowNodeReactFlow({
     }
   ];
 
-  const handleEditToggle = useCallback(() => {
-    setIsEditMode(!isEditMode);
-  }, [isEditMode]);
 
   const handleSave = useCallback(() => {
-    // Save as Draft: preserve current editData.events in displayEvents
-    setDisplayEvents([...editData.events]);
+    // Save as Draft: preserve current editData.events in displayEvents with enhanced properties
+    const enhancedEvents = editData.events.map((event, index) => ({
+      ...event,
+      status: (index === 0 ? 'pending' : index === 1 ? 'discarded' : 'forwarded') as 'pending' | 'discarded' | 'forwarded',
+      timestamp: new Date(Date.now() - (index * 60 * 1000)).toISOString(),
+      processingTime: index === 2 ? 245 : undefined
+    }));
+    setDisplayEvents(enhancedEvents);
     
     // Here you would typically save the data to your backend or state management
     setIsEditMode(false);
@@ -190,53 +196,11 @@ export function EventSourceWorkflowNodeReactFlow({
     setIsEditMode(false);
   }, [data]);
 
-  const handleAddEvent = useCallback(() => {
-    setEditData(prev => ({
-      ...prev,
-      events: [...prev.events, {
-        id: `event-${prev.events.length + 1}`,
-        url: '',
-        type: 'webhook',
-        enabled: true
-      }]
-    }));
-  }, []);
-
-  const handleRemoveEvent = useCallback((eventId: string) => {
-    setEditData(prev => ({
-      ...prev,
-      events: prev.events.filter(event => event.id !== eventId)
-    }));
-  }, []);
-
-  const handleEventChange = useCallback((eventId: string, field: string, value: string) => {
-    setEditData(prev => ({
-      ...prev,
-      events: prev.events.map(event =>
-        event.id === eventId ? { ...event, [field]: value } : event
-      )
-    }));
-  }, []);
 
   const handleCreateIntegration = useCallback(() => {
     setShowIntegrationModal(true);
   }, []);
 
-  const handleAddSecret = useCallback(() => {
-    if (newSecret.name && newSecret.key && newSecret.value) {
-      const secretId = `secret-${Date.now()}`;
-      setSecrets(prev => [
-        ...prev,
-        {
-          id: secretId,
-          name: newSecret.name,
-          keys: [{ key: newSecret.key, value: newSecret.value }]
-        }
-      ]);
-      setNewSecret({ name: '', key: '', value: '' });
-      setShowAddSecret(false);
-    }
-  }, [newSecret]);
 
   const handleSaveIntegration = useCallback(() => {
     // Create new integration
@@ -278,57 +242,43 @@ export function EventSourceWorkflowNodeReactFlow({
     return url.substring(0, maxLength) + '...';
   };
 
+
+  // Watch for node selection to open sidebar
+  useEffect(() => {
+    console.log('Selected prop changed:', selected);
+    if (selected && !isEditMode) {
+      console.log('Node is selected and not in edit mode, opening sidebar');
+      setShowSidebar(true);
+    } else if (!selected) {
+      console.log('Node is not selected, closing sidebar');
+      setShowSidebar(false);
+    }
+  }, [selected, isEditMode]);
+
+  // Handle sidebar close - also deselect the node
+  const handleSidebarClose = useCallback(() => {
+    console.log('Closing sidebar');
+    setShowSidebar(false);
+    // Note: We don't deselect the node here as React Flow manages that
+  }, []);
+
   // Preview Mode
+  console.log('EventSourceWorkflowNode render:', { isEditMode, showSidebar, selected }); // Debug log
+  
   if (!isEditMode) {
+    console.log('Rendering preview mode'); // Debug log
     return (
-      <div 
-        className={clsx(
-          'bg-white dark:bg-zinc-800 rounded-lg border-2 relative transition-all duration-200 hover:shadow-lg min-w-[320px]',
-          selected ? 'border-blue-600 dark:border-zinc-200 ring-2 ring-blue-200 dark:ring-white' : 'border-gray-200 dark:border-zinc-700'
-        )}
-        style={{ width: 320, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
-        role="article"
-      >
-        {/* Edit Header */}
-      <div 
-          className="action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50"
-          onClick={(e) => e.stopPropagation()}
+      <>
+        <div 
+          className={clsx(
+            'bg-white dark:bg-zinc-800 rounded-lg border-2 relative transition-all duration-200 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 min-w-[320px] cursor-pointer',
+            selected ? 'border-blue-600 dark:border-zinc-200 ring-2 ring-blue-200 dark:ring-white' : 'border-gray-200 dark:border-zinc-700'
+          )}
+          style={{ width: 320, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
+          role="article"
         >
-         
-
-            <Button
-              type="button"
-              plain
-              className="flex items-center gap-2"
-            >
-              <MaterialSymbol name="edit" size="md"/>
-              Edit
-            </Button>
-            
-          
-            
-            
-            
-           
-            
-            <Tippy content="More options" placement="top">
-            <Dropdown>
-              <DropdownButton plain>
-                <MaterialSymbol name="more_vert" size="md"/>
-              </DropdownButton>
-              <DropdownMenu anchor="bottom start">
-                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="play_arrow" size="md"/><DropdownLabel>Run</DropdownLabel></DropdownItem>
-                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="tune" size="md"/><DropdownLabel>Advanced configuration</DropdownLabel></DropdownItem>
-                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="menu_book" size="md"/><DropdownLabel>Documentation</DropdownLabel></DropdownItem>
-                <DropdownItem className='flex items-center gap-2 text-red-600 dark:text-red-200' color='red'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
-
-              </DropdownMenu>
-            </Dropdown>
-          </Tippy>
-         
-          
-          
-        </div>
+        
+        
         {/* Header */}
         <div className="flex flex-col p-4 border-b border-gray-200 dark:border-zinc-700">
           <div className='flex items-start flex-row justify-between w-full'>
@@ -336,11 +286,11 @@ export function EventSourceWorkflowNodeReactFlow({
             <div className="flex items-center flex-grow-1 gap-3">
               <div className='flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10'>
                 {data.icon === 'semaphore' ? (
-                  <img width={24} height={24} className='margin-auto' src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
+                  <img width={24} height={24} className='m-auto' src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
                 ) : data.icon === 'github' ? (
-                  <img width={24} height={24} className='margin-auto' src='/images/github-logo.svg' alt="GitHub" />
+                  <img width={24} height={24} className='m-auto' src='/images/github-logo.svg' alt="GitHub" />
                 ) : (
-                  <img width={24} height={24} className='margin-auto' src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
+                  <img width={24} height={24} className='m-auto' src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
                 )}
               </div>
            
@@ -589,11 +539,11 @@ export function EventSourceWorkflowNodeReactFlow({
             <div className={compactEvent ? "space-y-1 p-3" : "space-y-2 p-4"}>
               <div className='flex items-center justify-between w-full mb-3'>
                 <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide">
-                 Recent events
+                 LATEST EVENTS (3)
                 </div>
-                <Link href="#" className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200">
-                  View all
-                </Link>
+                <Link href="#" className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-300 transition-colors duration-200">
+                View more
+              </Link>
               </div>
               {displayEvents.map((event, index) => {
                 const getStatusConfig = (status: string) => {
@@ -603,6 +553,7 @@ export function EventSourceWorkflowNodeReactFlow({
                         icon: 'schedule',
                         color: 'text-yellow-600 dark:text-yellow-400',
                         bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
+                        labelColor: 'yellow',
                         borderColor: 'border-yellow-200 dark:border-yellow-800',
                         dotColor: 'bg-yellow-500 animate-pulse',
                         label: 'Pending',
@@ -614,20 +565,22 @@ export function EventSourceWorkflowNodeReactFlow({
                         icon: 'block',
                         color: 'text-zinc-600 dark:text-zinc-400',
                         bgColor: 'bg-zinc-50 dark:bg-zinc-900/20',
+                        labelColor: 'zinc',
                         borderColor: 'border-zinc-200 dark:border-zinc-800',
                         dotColor: 'bg-zinc-500',
                         label: 'Discarded',
                         shortLabel: 'D',
                         description: 'Filtered out'
                       };
-                    case 'processed':
+                    case 'forwarded':
                       return {
                         icon: 'check_circle',
                         color: 'text-green-600 dark:text-green-400',
                         bgColor: 'bg-green-50 dark:bg-green-900/20',
+                        labelColor: 'green',
                         borderColor: 'border-green-200 dark:border-green-800',
                         dotColor: 'bg-green-500',
-                        label: 'Processed',
+                        label: 'Forwarded',
                         shortLabel: 'C',
                         description: event.processingTime ? `${event.processingTime}ms` : 'Completed'
                       };
@@ -636,6 +589,7 @@ export function EventSourceWorkflowNodeReactFlow({
                         icon: 'bolt',
                         color: 'text-zinc-600 dark:text-zinc-400',
                         bgColor: 'bg-zinc-50 dark:bg-zinc-800',
+                        labelColor: 'zinc',
                         borderColor: 'border-zinc-200 dark:border-zinc-700',
                         dotColor: 'bg-zinc-500',
                         label: 'Unknown',
@@ -654,7 +608,12 @@ export function EventSourceWorkflowNodeReactFlow({
                     
                       <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-zinc-800 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors duration-150 cursor-pointer">
                         {/* Compact Status Indicator */}
-                        <div className={`w-1.5 h-1.5 ${statusConfig.dotColor} rounded-full flex-shrink-0`}></div>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 ${statusConfig.dotColor} rounded-full flex-shrink-0`}></div>
+                          <span className={`text-xs font-medium hidden ${statusConfig.color}`}>
+                            {statusConfig.label}
+                          </span>
+                        </div>
                         
                         {/* Event URL */}
                         <span className={event.status === 'discarded' ? 'text-sm font-mono text-gray-800 dark:text-zinc-200 truncate flex-1 line-through opacity-60' : "text-sm font-mono text-gray-800 dark:text-zinc-200 truncate flex-1"}>
@@ -726,7 +685,7 @@ export function EventSourceWorkflowNodeReactFlow({
                           <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700 text-xs text-zinc-500 dark:text-zinc-400">
                             {event.status === 'pending' && 'Event is being processed and will trigger workflows when complete'}
                             {event.status === 'discarded' && 'Event was filtered out and did not trigger any workflows'}
-                            {event.status === 'processed' && 'Event successfully triggered workflow execution'}
+                            {event.status === 'forwarded' && 'Event successfully triggered workflow execution'}
                           </div>
                         </div>
                       }
@@ -774,6 +733,7 @@ export function EventSourceWorkflowNodeReactFlow({
                   );
                 }
               })}
+              
             </div>
           ) : (
             /* noEvents variant - empty state */
@@ -807,13 +767,15 @@ export function EventSourceWorkflowNodeReactFlow({
           className="!w-1 !h-12 !bg-blue-500 dark:!bg-zinc-300 !border-none !border-white dark:!border-zinc-50 z-50 !rounded-md"
           aria-label="Output connection point"
         />
-      </div>
+        </div>
+      </>
     );
   }
 
   // Edit Mode
   return (
-    <div 
+    <>
+      <div 
       className={clsx(
         'bg-white dark:bg-zinc-800 relative transition-all duration-200 hover:shadow-lg min-w-[320px]',
         
@@ -1210,6 +1172,26 @@ export function EventSourceWorkflowNodeReactFlow({
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+
+      </div>
+
+      {/* Backdrop overlay */}
+      {showSidebar && (
+        <div 
+          className="fixed inset-0 bg-black/20 dark:bg-black/40 z-40 transition-opacity duration-300"
+          onClick={handleSidebarClose}
+        />
+      )}
+      
+      {/* Event Source Sidebar - Fixed right panel for both modes */}
+      <EventSourceSidebar 
+        nodeId={data.id}
+        nodeTitle={data.title}
+        nodeIcon={data.icon}
+        isOpen={showSidebar}
+        onClose={handleSidebarClose}
+        events={displayEvents}
+      />
+    </>
   );
 }

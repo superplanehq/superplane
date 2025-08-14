@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol';
 import { getStatusConfig } from '../../../utils/status-config';
 import { Button } from '../Button/button';
 import { ControlledTabs, type Tab } from '../Tabs/tabs';
 import { Text } from '../Text/text';
-import { Subheading } from '../Heading/heading';
 import { Link } from '../Link/link';
 import { Badge } from '../Badge/badge';
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from '../Dropdown/dropdown';
 import clsx from 'clsx';
-import { Divider } from '../Divider/divider';
 import { EmptyState } from '../EmptyState';
 
 interface RunData {
@@ -41,6 +39,17 @@ interface QueueItem {
   blockedReason?: string;
 }
 
+interface EventData {
+  id: string;
+  url: string;
+  status: 'pending' | 'discarded' | 'forwarded';
+  timestamp: string;
+  processingTime?: number;
+  type?: string;
+  payload?: Record<string, any>;
+  headers?: Record<string, string>;
+}
+
 interface NodeDetailsSidebarProps {
   nodeId?: string;
   nodeTitle?: string;
@@ -48,6 +57,16 @@ interface NodeDetailsSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   className?: string;
+  source?: 'workflow' | 'eventSource';
+  events?: Array<{
+    id: string;
+    url: string;
+    type?: string;
+    enabled?: boolean;
+    status?: 'pending' | 'discarded' | 'forwarded';
+    timestamp?: string;
+    processingTime?: number;
+  }>;
 }
 
 const mockRuns2: RunData[] = [
@@ -493,13 +512,201 @@ const mockHistoryRuns: RunData[] = [
   }
 ];
 
+// Mock event data for EventSource nodes
+const mockEventSourceEvents: EventData[] = [
+  {
+    id: 'event-1',
+    url: 'https://hooks.semaphoreci.com/api/v1/webhooks/b8f2c4d1-9e3a-4f7b-8c1d-5e9a3f7b2c4d',
+    status: 'forwarded',
+    timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    type: 'pipeline_done',
+    processingTime: 156,
+    payload: {
+      pipeline_id: 'pipeline_123',
+      status: 'passed',
+      branch: 'main',
+      commit: 'a1b2c3d4e5f6',
+      author: 'john.doe@example.com'
+    },
+    headers: {
+      'x-semaphore-event': 'pipeline_done',
+      'content-type': 'application/json',
+      'user-agent': 'Semaphore-Webhook/1.0'
+    }
+  },
+  {
+    id: 'event-2',
+    url: 'https://github.com/zawkey/superplane/push',
+    status: 'pending',
+    timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
+    type: 'push',
+    payload: {
+      ref: 'refs/heads/feature/auth',
+      before: 'd6fde92930d4715a2b49857d24b940956b26d243',
+      after: '6dcb09b5b57875f334f61aebed695e2e4193db5e',
+      repository: {
+        name: 'superplane',
+        full_name: 'zawkey/superplane'
+      }
+    },
+    headers: {
+      'x-github-event': 'push',
+      'x-github-delivery': 'f2ca3bc6-e8ea-11e3-ac10-0800200c9a66',
+      'user-agent': 'GitHub-Hookshot/760256b'
+    }
+  },
+  {
+    id: 'event-3',
+    url: 'https://gitlab.com/api/v4/projects/42/hooks/webhook',
+    status: 'discarded',
+    timestamp: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
+    type: 'merge_request',
+    payload: {
+      object_kind: 'merge_request',
+      action: 'open',
+      merge_request: {
+        id: 99,
+        title: 'MS-viewport meta tag',
+        source_branch: 'ms-viewport',
+        target_branch: 'master'
+      }
+    },
+    headers: {
+      'x-gitlab-event': 'Merge Request Hook',
+      'x-gitlab-token': 'secret-token',
+      'content-type': 'application/json'
+    }
+  },
+  {
+    id: 'event-4',
+    url: 'https://hooks.semaphoreci.com/api/v1/webhooks/c9a3e5f7-1b4d-4a8c-9f2e-6d7b4c3e1a5f',
+    status: 'forwarded',
+    timestamp: new Date(Date.now() - 28 * 60 * 1000).toISOString(),
+    type: 'deployment_done',
+    processingTime: 234,
+    payload: {
+      deployment_id: 'dep_456',
+      environment: 'production',
+      status: 'passed',
+      commit: 'f8e7d6c5b4a3',
+      deployed_by: 'alice.wilson@example.com'
+    },
+    headers: {
+      'x-semaphore-event': 'deployment_done',
+      'content-type': 'application/json',
+      'user-agent': 'Semaphore-Webhook/1.0'
+    }
+  },
+  {
+    id: 'event-5',
+    url: 'https://bitbucket.org/zawkey/superplane/webhooks/repo:push',
+    status: 'pending',
+    timestamp: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+    type: 'repo:push',
+    payload: {
+      repository: {
+        name: 'superplane',
+        full_name: 'zawkey/superplane'
+      },
+      push: {
+        changes: [{
+          new: {
+            name: 'feature/ui-improvements',
+            target: {
+              hash: 'b8f2c4d19e3a'
+            }
+          }
+        }]
+      }
+    },
+    headers: {
+      'x-event-key': 'repo:push',
+      'x-request-uuid': 'b8f2c4d1-9e3a-4f7b-8c1d-5e9a3f7b2c4d',
+      'user-agent': 'Bitbucket-Webhooks/2.0'
+    }
+  },
+  {
+    id: 'event-6',
+    url: 'https://jenkins.internal.com/webhook/build-complete',
+    status: 'discarded',
+    timestamp: new Date(Date.now() - 42 * 60 * 1000).toISOString(),
+    type: 'build_complete',
+    payload: {
+      job_name: 'superplane-ci',
+      build_number: 128,
+      result: 'FAILURE',
+      branch: 'develop',
+      duration: 180000
+    },
+    headers: {
+      'x-jenkins-event': 'build_complete',
+      'content-type': 'application/json',
+      'x-jenkins-cli-port': '50000'
+    }
+  }
+];
+
+// Mock historical event data for EventSource nodes
+const mockHistoryEvents: EventData[] = [
+  {
+    id: 'hist-event-1',
+    url: 'https://github.com/owner/repo/push',
+    status: 'forwarded',
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    processingTime: 156,
+    type: 'push',
+    payload: {
+      branch: 'main',
+      commit: 'f5g6h7i',
+      author: 'alice.wilson'
+    },
+    headers: {
+      'x-github-event': 'push',
+      'user-agent': 'GitHub-Hookshot'
+    }
+  },
+  {
+    id: 'hist-event-2',
+    url: 'https://github.com/owner/repo/release',
+    status: 'forwarded',
+    timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    processingTime: 89,
+    type: 'release',
+    payload: {
+      tag: 'v2.1.0',
+      name: 'Version 2.1.0',
+      author: 'release-bot'
+    },
+    headers: {
+      'x-github-event': 'release',
+      'user-agent': 'GitHub-Hookshot'
+    }
+  },
+  {
+    id: 'hist-event-3',
+    url: 'https://github.com/owner/repo/issues',
+    status: 'discarded',
+    timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+    type: 'issues',
+    payload: {
+      action: 'opened',
+      number: 123,
+      title: 'Bug report'
+    },
+    headers: {
+      'x-github-event': 'issues',
+      'user-agent': 'GitHub-Hookshot'
+    }
+  }
+];
+
 export function NodeDetailsSidebar({
-  nodeId,
   nodeTitle = 'Sync Cluster',
-  nodeIcon = 'semaphore',
   isOpen = false,
   onClose,
-  className
+  className,
+  source = 'workflow',
+  events = []
 }: NodeDetailsSidebarProps) {
   // Check for showIcons URL parameter
   const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
@@ -510,26 +717,16 @@ export function NodeDetailsSidebar({
   const [expandedHistoryRuns, setExpandedHistoryRuns] = useState<Set<string>>(new Set());
   const [isManagingQueue, setIsManagingQueue] = useState(false);
   const [queueItems, setQueueItems] = useState(mockQueue);
+  
+  // Event Source specific state  
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
+  const [expandedHistoryEvents, setExpandedHistoryEvents] = useState<Set<string>>(new Set());
 
   const tabs: Tab[] = [
     { id: 'activity', label: 'Activity' },
     { id: 'history', label: 'History' },
     { id: 'settings', label: 'Settings' }
   ];
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success':
-        return { icon: 'check_circle', color: 'text-green-500' };
-      case 'running':
-        return { icon: 'sync', color: 'text-blue-500 animate-spin' };
-      case 'failed':
-        return { icon: 'error', color: 'text-red-500' };
-      case 'pending':
-        return { icon: 'schedule', color: 'text-orange-500' };
-      default:
-        return { icon: 'help', color: 'text-gray-500' };
-    }
-  };
 
   const toggleRunExpansion = (runId: string) => {
     setExpandedRuns(prev => {
@@ -585,45 +782,300 @@ export function NodeDetailsSidebar({
     setQueueItems(prev => prev.filter(item => item.id !== id));
   };
 
-  const renderInputsOutputs = (inputs?: Record<string, string>, outputs?: Record<string, string>) => (
-    <div className="mt-3 space-y-3">
-      {inputs && (
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span  className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
-              INPUTS
-            </span>
+  // Event Source specific functions
+  const getEventStatusConfig = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return {
+          icon: 'schedule',
+          color: 'text-yellow-700 dark:text-yellow-400',
+          bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
+          labelColor: 'text-yellow-700 dark:text-yellow-400',
+          borderColor: 'border-yellow-200 dark:border-yellow-800',
+          dotColor: 'bg-yellow-500 animate-pulse',
+          label: 'Pending',
+          shortLabel: 'P',
+          description: 'Processing...'
+        };
+      case 'discarded':
+        return {
+          icon: 'block',
+          color: 'text-zinc-600 dark:text-zinc-400',
+          bgColor: 'bg-zinc-50 dark:bg-zinc-900/20',
+          labelColor: 'text-zinc-600 dark:text-zinc-400',
+          borderColor: 'border-zinc-200 dark:border-zinc-800',
+          dotColor: 'bg-zinc-500',
+          label: 'Discarded',
+          shortLabel: 'D',
+          description: 'Filtered out'
+        };
+      case 'forwarded':
+        return {
+          icon: 'check_circle',
+          color: 'text-green-600 dark:text-green-400',
+          bgColor: 'bg-green-50 dark:bg-green-900/20',
+          labelColor: 'text-green-600 dark:text-green-400',
+          borderColor: 'border-green-200 dark:border-green-800',
+          dotColor: 'bg-green-500',
+          label: 'Forwarded',
+          shortLabel: 'C',
+          description: 'Completed'
+        };
+      default:
+        return {
+          icon: 'bolt',
+          color: 'text-zinc-600 dark:text-zinc-400',
+          bgColor: 'bg-zinc-50 dark:bg-zinc-800',
+          labelColor: 'text-zinc-600 dark:text-zinc-400',
+          borderColor: 'border-zinc-200 dark:border-zinc-700',
+          dotColor: 'bg-zinc-500',
+          label: 'Unknown',
+          shortLabel: '?',
+          description: ''
+        };
+    }
+  };  
+
+  const toggleEventExpansion = (eventId: string) => {
+    setExpandedEvents(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(eventId)) {
+        newSet.delete(eventId);
+      } else {
+        newSet.add(eventId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleHistoryEventExpansion = (eventId: string) => {
+    setExpandedHistoryEvents(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(eventId)) {
+        newSet.delete(eventId);
+      } else {
+        newSet.add(eventId);
+      }
+      return newSet;
+    });
+  };
+
+  const formatEventTimestamp = (timestamp: string) => {
+    const now = new Date();
+    const eventTime = new Date(timestamp);
+    const diffMs = now.getTime() - eventTime.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return eventTime.toLocaleDateString();
+  };
+
+  const truncateEventUrl = (url: string, maxLength: number = 30) => {
+    if (url.length <= maxLength) return url;
+    return url.substring(0, maxLength) + '...';
+  };
+
+  // Convert passed events to EventData format with randomized statuses
+  const convertedEvents: EventData[] = events.length > 0 
+    ? events.map((event, index) => {
+        // Randomize status if not provided
+        const statuses: ('pending' | 'forwarded' | 'discarded')[] = ['pending', 'forwarded', 'discarded'];
+        const randomStatus = event.status || statuses[index % statuses.length];
+        
+        return {
+          id: event.id,
+          url: event.url,
+          status: randomStatus,
+          timestamp: event.timestamp || new Date().toISOString(),
+          processingTime: event.processingTime,
+          type: event.type || 'webhook',
+          payload: {
+            source: 'event-source-node',
+            index: index
+          },
+          headers: {
+            'content-type': 'application/json'
+          }
+        };
+      })
+    : mockEventSourceEvents;
+
+  // State for event detail tabs
+  const [eventDetailTabs, setEventDetailTabs] = useState<Record<string, 'details' | 'headers' | 'payload'>>({});
+
+  // Render event details for expanded events
+  const renderEventDetails = (event: EventData) => {
+    const statusConfig = getEventStatusConfig(event.status);
+    const activeDetailTab = eventDetailTabs[event.id] || 'details';
+    
+    const setActiveDetailTab = (tab: 'details' | 'headers' | 'payload') => {
+      setEventDetailTabs(prev => ({
+        ...prev,
+        [event.id]: tab
+      }));
+    };
+
+    // Count headers
+    const headerCount = event.headers ? Object.keys(event.headers).length : 0;
+    
+    // Define tabs for this event
+    const eventTabs: Tab[] = [
+      { id: 'details', label: 'Details' },
+      { id: 'headers', label: 'Headers' },
+      { id: 'payload', label: 'Payload' }
+    ];
+    
+    return (
+      <div className="mt-3 space-y-4">
+        {/* Event Overview */}
+        <div className="border border-gray-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900">
+          {/* Tabs */}
+          <div className="border-b border-gray-200 dark:border-zinc-700">
+            <ControlledTabs
+              tabs={eventTabs}
+              activeTab={activeDetailTab}
+              size="xs"
+              onTabChange={(tabId) => setActiveDetailTab(tabId as 'details' | 'headers' | 'payload')}
+              variant="underline"
+            />
           </div>
-          <div className="space-y-1 text-xs">
-            {Object.entries(inputs).map(([key, value]) => (
-              <div key={key} className="flex justify-between">
-                <span className="text-gray-600">{key}</span>
-                <Badge className="text-gray-900 font-mono !text-xs">{value}</Badge>
+
+          {/* Tab Content */}
+          <div className="px-4 py-3">
+            {activeDetailTab === 'details' && (
+              <div className="space-y-4">
+                {/* Event ID - Full Width */}
+                
+
+                {/* Two Column Layout */}
+                <div className="grid grid-cols-2 gap-6 text-sm">
+                  {/* Left Column */}
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+                      STATE
+                    </div> 
+                    <div className="text-blue-600 dark:text-blue-400 text-xs font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 ${statusConfig.dotColor} rounded-full flex-shrink-0`}></div>
+                        <span className={`text-xs font-medium ${statusConfig.labelColor}`}>
+                          {statusConfig.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+                      RECEIVED ON
+                    </div>
+                    <div className="text-xs text-gray-900 dark:text-zinc-200">
+                      {event.id === 'event-3' ? 'Aug 14, 2025 19:03:12' : new Date(event.timestamp).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      })}
+                    </div>
+                  </div>
+                  
+                  
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+                      SOURCE
+                    </div>
+                    <div className="text-xs text-gray-900 dark:text-zinc-200">
+                      {event.id === 'event-3' ? 'Zawkey semaphore org' : 
+                        event.url.includes('github.com') ? 'GitHub Webhook' : 
+                        event.url.includes('gitlab.com') ? 'GitLab Webhook' :
+                        event.url.includes('bitbucket.org') ? 'Bitbucket Webhook' :
+                        'External Webhook'}
+                    </div>
+                  </div>
+                  
+                  
+
+                 
+                  
+                  <div>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+                      TYPE
+                    </div>
+                    <div className="text-xs font-medium">
+                      {event.id === 'event-3' ? 'pipeline_done' : event.type || 'webhook'}
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+                        EVENT ID
+                      </div>
+                      <div className="font-mono text-xs text-gray-900 dark:text-zinc-200 break-all">
+                        {event.id === 'event-3' ? '423ae53e-f67a-43f4-9bea-8e90d5db3a27' : event.id}
+                      </div>
+                    </div>
+                  </div>  
+                    
+                  
+
+                </div>
               </div>
-            ))}
+            )}
+
+            {activeDetailTab === 'headers' && (
+              <div>
+                {event.headers && Object.keys(event.headers).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(event.headers).map(([key, value]) => (
+                      <div key={key} className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 h-60 max-h-60">
+                        <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium pr-2">{key}</span>
+                        <span className="text-xs font-mono text-gray-900 dark:text-zinc-200 text-right break-all">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
+                    No headers available
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeDetailTab === 'payload' && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Request Body</span>
+                  <div className="flex items-center">
+                    <Link className="!text-xs flex items-center" href="#">
+                      <MaterialSymbol name="content_copy" size="sm" className="mr-1" />
+                      Copy
+                    </Link>
+                  </div>
+                </div>
+                {event.payload ? (
+                  <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 h-60 max-h-60 overflow-y-auto">
+                    <pre className="text-xs font-mono text-gray-900 dark:text-zinc-200 whitespace-pre-wrap">
+                      {JSON.stringify(event.payload, null, 2)}
+                    </pre>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 dark:bg-zinc-800 rounded border p-3">
+                    <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
+                      No payload data available
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      )}
-      
-      {outputs && (
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span  className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
-              OUTPUTS
-            </span>
-          </div>
-          <div className="space-y-1 text-xs font-mono">
-            {Object.entries(outputs).map(([key, value]) => (
-              <div key={key} className="flex justify-between">
-                <span className="text-gray-600">{key}</span>
-                <Badge className="text-gray-900 font-mono !text-xs">{value}</Badge>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  };
+
 
   const renderInputsOutputs2 = (inputs?: Record<string, string>, outputs?: Record<string, string>) => (
     <div className="mt-3 space-y-3">
@@ -681,98 +1133,12 @@ export function NodeDetailsSidebar({
     </div>
   );
 
-  const renderExecutionMethod = (item: QueueItem) => {
-    const getExecutionMethodConfig = (method: string) => {
-      switch (method) {
-        case 'manual':
-          return {
-            icon: 'person',
-            title: 'Manual Approval',
-            description: 'Requires manual approval before execution',
-            bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-            iconColor: 'text-orange-600 dark:text-orange-400',
-            textColor: 'text-orange-800 dark:text-orange-300'
-          };
-        case 'timed':
-          return {
-            icon: 'schedule',
-            title: 'Timed Execution',
-            description: `Scheduled to run ${item.delayTime ? `in ${item.delayTime}` : 'at specified time'}`,
-            bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-            iconColor: 'text-blue-600 dark:text-blue-400',
-            textColor: 'text-blue-800 dark:text-blue-300'
-          };
-        case 'queued':
-          return {
-            icon: 'queue',
-            title: 'Queue Execution',
-            description: 'Waiting in queue for execution order',
-            bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-            iconColor: 'text-purple-600 dark:text-purple-400',
-            textColor: 'text-purple-800 dark:text-purple-300'
-          };
-        case 'blocked':
-          return {
-            icon: 'block',
-            title: 'Blocked',
-            description: item.blockedReason || 'Execution is blocked/paused',
-            bgColor: 'bg-red-50 dark:bg-red-900/20',
-            iconColor: 'text-red-600 dark:text-red-400',
-            textColor: 'text-red-800 dark:text-red-300'
-          };
-        default:
-          return {
-            icon: 'help',
-            title: 'Unknown',
-            description: 'Execution method not specified',
-            bgColor: 'bg-gray-50 dark:bg-gray-900/20',
-            iconColor: 'text-gray-600 dark:text-gray-400',
-            textColor: 'text-gray-800 dark:text-gray-300'
-          };
-      }
-    };
-
-    const config = getExecutionMethodConfig(item.executionMethod);
-    
-    return (
-      item.executionMethod != 'queued' && (
-        <div className={`p-3 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700`}>
-          {item.executionMethod === 'manual' && (
-            <div className='flex justify-between items-center'>
-              <div className='flex items-center'>
-                <MaterialSymbol name="how_to_reg" size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
-                <span className="text-xs text-gray-700 dark:text-zinc-400"><a href="#" className="black underline">1 person</a> approved, 2 more needed</span>
-              </div>
-              <Link href="#" className="text-xs text-gray-700 dark:text-zinc-300  flex items-center">
-                <MaterialSymbol name="check" size="sm" className="text-gray-500 dark:text-zinc-400 mr-1" /> 
-                <span className='underline'>Approve</span>
-              </Link>
-            </div>
-          )}
-          {item.executionMethod === 'timed' && (
-            <div className='flex items-center'>
-                <MaterialSymbol name={config.icon} size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
-                <span className='text-xs text-gray-700 dark:text-zinc-400'>{config.description}</span>
-            </div>
-          )}
-          {item.executionMethod === 'blocked' && (
-            <div className='flex items-center'>
-                <MaterialSymbol name="pause" size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
-                <span className='text-xs text-gray-700 dark:text-zinc-400'>Freezed by <Link href="#" className="underline text-zinc-600 dark:text-zinc-400">1 person</Link></span>
-            </div>
-          )}
-        
-          
-        </div>
-      )
-    );
-  };
 
   if (!isOpen) return null;
 
   return (
     <div className={clsx(
-      'absolute right-0 top-0 h-full w-96 bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700 shadow-lg z-50 flex flex-col',
+      'absolute right-0 top-0 h-full w-110 bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700 shadow-lg z-50 flex flex-col',
       className
     )}>
       {/* Header */}
@@ -803,10 +1169,64 @@ export function NodeDetailsSidebar({
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'activity' && (
           <div className="p-4 space-y-6">
-            {/* Recent Runs */}
-            <div className="flex items-center justify-between mb-4">
-              <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
-                RECENT RUNS
+            {source === 'eventSource' ? (
+              /* LATEST EVENTS for EventSource */
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                    LATEST EVENTS
+                  </Text>
+                  <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                    View all
+                  </Link>
+                </div>
+                
+                <div className="space-y-3">
+                  {convertedEvents.map((event) => {
+                    const statusConfig = getEventStatusConfig(event.status);
+                    const isExpanded = expandedEvents.has(event.id);
+                    
+                    return (
+                      <div key={event.id} className={`border bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-lg`}>
+                        <div 
+                          className="p-3"
+                          
+                        >
+                          <div className="cursor-pointer flex items-center justify-between" onClick={() => toggleEventExpansion(event.id)}>
+                            <div className="flex items-center gap-2 truncate pr-2">
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusConfig.dotColor}`}></div>
+                              
+                              <span className="font-medium truncate text-sm dark:text-white font-mono">
+                                {truncateEventUrl(event.url)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {!isExpanded && (
+                                <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
+                                  {formatEventTimestamp(event.timestamp)}
+                                </span>
+                              )}
+                              <MaterialSymbol 
+                                name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                size="lg" 
+                                className="text-gray-600 dark:text-zinc-400" 
+                              />
+                            </div>
+                          </div>
+                          
+                          {isExpanded && renderEventDetails(event)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* Recent Runs for workflow nodes */
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                    RECENT RUNS
               </Text>
               
             </div>
@@ -923,7 +1343,8 @@ export function NodeDetailsSidebar({
               </div>
             </div>
 
-            {/* Queue */}
+            {/* Queue - only show for workflow nodes */}
+            {source == 'workflow' && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
@@ -1069,21 +1490,74 @@ export function NodeDetailsSidebar({
                            
               </div>
             </div>
+            )}
+            </>
+            )}
           </div>
         )}
         
         {activeTab === 'history' && (
           <div className="p-4 space-y-6">
-            {/* Historical Runs */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
-                  HISTORICAL RUNS ({mockHistoryRuns.length})
-                </Text>
+            {source === 'eventSource' ? (
+              /* Historical Events for EventSource */
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                    EVENT HISTORY ({mockHistoryEvents.length})
+                  </Text>
+                </div>
+                
+                <div className="space-y-3">
+                  {mockHistoryEvents.map((event) => {
+                    const statusConfig = getEventStatusConfig(event.status);
+                    const isExpanded = expandedHistoryEvents.has(event.id);
+                    
+                    return (
+                      <div key={event.id} className={`border bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-lg`}>
+                        <div 
+                          className="p-3"
+                          
+                        >
+                          <div className="cursor-pointer flex items-center justify-between" onClick={() => toggleHistoryEventExpansion(event.id)}>
+                            <div className="flex items-center gap-2 truncate pr-2">
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusConfig.dotColor}`}></div>
+                              
+                              <span className="font-medium truncate text-sm dark:text-white font-mono">
+                                {truncateEventUrl(event.url)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {!isExpanded && (
+                                <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
+                                  {formatEventTimestamp(event.timestamp)}
+                                </span>
+                              )}
+                              <MaterialSymbol 
+                                name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                size="lg" 
+                                className="text-gray-600 dark:text-zinc-400" 
+                              />
+                            </div>
+                          </div>
+                          
+                          {isExpanded && renderEventDetails(event)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              
-              <div className="space-y-3">
-                {mockHistoryRuns.map((run) => {
+            ) : (
+              /* Historical Runs for workflow nodes */
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                    HISTORICAL RUNS ({mockHistoryRuns.length})
+                  </Text>
+                </div>
+                
+                <div className="space-y-3">
+                  {mockHistoryRuns.map((run) => {
                   const statusConfig = getStatusConfig(run.status);
                   const isExpanded = expandedHistoryRuns.has(run.id);
                   
@@ -1164,7 +1638,8 @@ export function NodeDetailsSidebar({
                   );
                 })}
               </div>
-            </div>
+              </div>
+            )}
           </div>
         )}
         

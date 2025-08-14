@@ -1374,6 +1374,9 @@ const computedEdges = edges.map(edge => {
                 nodeTitle={nodes.find(n => n.id === selectedNode)?.data?.workflowNodeData?.title || 'Node Details'}
                 nodeIcon={nodes.find(n => n.id === selectedNode)?.data?.workflowNodeData?.type === 'stage' ? 'sync' : 'account_tree'}
                 isOpen={showNodeDetails}
+                source={nodes.find(n => n.id === selectedNode)?.type === 'eventSource' ? 'eventSource' : 'workflow'}
+                events={nodes.find(n => n.id === selectedNode)?.type === 'eventSource' ? 
+                  nodes.find(n => n.id === selectedNode)?.data?.events || [] : []}
                 onClose={() => {
                   setShowNodeDetails(false);
                   setSelectedNode(null);
