@@ -11,10 +11,12 @@ import { HistoryTab } from "./tabs/HistoryTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+import GithubLogo from '@/assets/github-mark.svg';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
-  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-8 h-8 p-1 rounded dark:bg-white dark:rounded-lg" />
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-8 h-8 object-contain p-1 rounded dark:bg-white dark:rounded-lg" />,
+  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
 }
 
 interface SidebarProps {
