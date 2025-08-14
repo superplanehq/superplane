@@ -89,10 +89,10 @@ export const useAssignCanvasRole = (canvasId: string) => {
       role: string,
     }) => {
       return await rolesAssignRole(withOrganizationHeader({
+        path: { roleName: params.role },
         body: {
           userId: params.userId,
           userEmail: params.userEmail,
-          roleName: params.role,
           domainId: canvasId,
           domainType: 'DOMAIN_TYPE_CANVAS'
         }

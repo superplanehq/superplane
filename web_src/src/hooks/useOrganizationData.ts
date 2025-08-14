@@ -173,10 +173,12 @@ export const useAssignRole = (organizationId: string) => {
     }) => {
       return await rolesAssignRole(
         withOrganizationHeader({
+          path: {
+            roleName: params.roleName,
+          },
           body: {
             userId: params.userId,
             userEmail: params.userEmail,
-            roleName: params.roleName,
             domainType: 'DOMAIN_TYPE_ORGANIZATION',
             domainId: organizationId
           },

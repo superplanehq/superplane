@@ -16,7 +16,7 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
 
-	roles, err := authService.GetUserRolesForCanvas(orgID, canvasID)
+	roles, err := authService.GetUserRolesForCanvas(userID, canvasID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to determine user roles")
 	}

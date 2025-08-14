@@ -38,12 +38,10 @@ func Test_RemoveUser(t *testing.T) {
 		_, err := RemoveUser(ctx, r.AuthService, orgID, newUser.ID.String())
 		require.NoError(t, err)
 
-		// Verify the user no longer exists
+		// Verify the user no longer exists and no roles for it exist too
 		_, err = models.FindUserByID(orgID, newUser.ID.String())
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
-
-		// Verify the user no longer has organization roles
-		roles, err := r.AuthService.GetUserRolesForOrg(orgID, newUser.ID.String())
+		roles, err := r.AuthService.GetUserRolesForOrg(newUser.ID.String(), orgID)
 		require.NoError(t, err)
 		require.Len(t, roles, 0)
 	})

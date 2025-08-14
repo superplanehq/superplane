@@ -41,7 +41,7 @@ func Test_RemoveUser(t *testing.T) {
 		require.NotNil(t, response)
 
 		// Verify the user no longer has canvas roles
-		roles, err := r.AuthService.GetUserRolesForCanvas(orgID, canvasID)
+		roles, err := r.AuthService.GetUserRolesForCanvas(newUser.ID.String(), canvasID)
 		require.NoError(t, err)
 		require.Empty(t, roles)
 	})
