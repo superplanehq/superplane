@@ -13,8 +13,15 @@ type User struct {
 	AccountID      uuid.UUID
 	Email          string
 	Name           string
+	TokenHash      string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+func (u *User) UpdateTokenHash(tokenHash string) error {
+	u.UpdatedAt = time.Now()
+	u.TokenHash = tokenHash
+	return database.Conn().Save(u).Error
 }
 
 func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
@@ -68,6 +75,16 @@ func FindUserByEmail(orgID, email string) (*User, error) {
 	return &user, err
 }
 
+func FindUserByTokenHash(tokenHash string) (*User, error) {
+	var user User
+
+	err := database.Conn().
+		Where("token_hash = ?", tokenHash).
+		First(&user).
+		Error
+
+	return &user, err
+}
 func FindUserOrganizationsByEmail(email string) ([]Organization, error) {
 	var organizations []Organization
 

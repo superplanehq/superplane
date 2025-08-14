@@ -25,6 +25,7 @@ By default, the CLI points to the local SuperPlane application, running at `http
 
 ```bash
 /build/cli config set api_url <API_URL>
+/build/cli config set api_token <API_TOKEN>
 ```
 
 ### Create and update resources

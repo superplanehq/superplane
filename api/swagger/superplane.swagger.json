@@ -62,14 +62,6 @@
             }
           }
         },
-        "parameters": [
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
         "tags": [
           "Canvas"
         ]
@@ -753,12 +745,6 @@
             "in": "path",
             "required": true,
             "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
           }
         ],
         "tags": [
@@ -794,12 +780,6 @@
           },
           {
             "name": "name",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
             "in": "query",
             "required": false,
             "type": "string"
@@ -2083,6 +2063,38 @@
           "Users"
         ]
       }
+    },
+    "/api/v1/users/{userId}/token": {
+      "post": {
+        "summary": "Regenerate API token",
+        "description": "Regenerates a user's API token",
+        "operationId": "Users_RegenerateToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/UsersRegenerateTokenResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Users"
+        ]
+      }
     }
   },
   "definitions": {
@@ -3179,9 +3191,6 @@
       "properties": {
         "canvas": {
           "$ref": "#/definitions/SuperplaneCanvas"
-        },
-        "organizationId": {
-          "type": "string"
         }
       }
     },
@@ -3959,6 +3968,14 @@
             "type": "object",
             "$ref": "#/definitions/UsersUser"
           }
+        }
+      }
+    },
+    "UsersRegenerateTokenResponse": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
         }
       }
     },

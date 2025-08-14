@@ -167,6 +167,7 @@ docs/UsersAccountProvider.md
 docs/UsersListUserPermissionsResponse.md
 docs/UsersListUserRolesResponse.md
 docs/UsersListUsersResponse.md
+docs/UsersRegenerateTokenResponse.md
 docs/UsersUser.md
 docs/UsersUserMetadata.md
 docs/UsersUserRoleAssignment.md
@@ -315,6 +316,7 @@ model_users_account_provider.go
 model_users_list_user_permissions_response.go
 model_users_list_user_roles_response.go
 model_users_list_users_response.go
+model_users_regenerate_token_response.go
 model_users_user.go
 model_users_user_metadata.go
 model_users_user_role_assignment.go

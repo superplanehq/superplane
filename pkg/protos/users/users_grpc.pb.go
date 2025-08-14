@@ -22,6 +22,7 @@ const (
 	Users_ListUserPermissions_FullMethodName = "/Superplane.Users.Users/ListUserPermissions"
 	Users_ListUserRoles_FullMethodName       = "/Superplane.Users.Users/ListUserRoles"
 	Users_ListUsers_FullMethodName           = "/Superplane.Users.Users/ListUsers"
+	Users_RegenerateToken_FullMethodName     = "/Superplane.Users.Users/RegenerateToken"
 )
 
 // UsersClient is the client API for Users service.
@@ -37,6 +38,9 @@ type UsersClient interface {
 	// Endpoint for getting all users in a domain
 	// Operation is synchronous and idempotent.
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
+	// Endpoint for regenerating a user's API token
+	// Operation is synchronous and idempotent.
+	RegenerateToken(ctx context.Context, in *RegenerateTokenRequest, opts ...grpc.CallOption) (*RegenerateTokenResponse, error)
 }
 
 type usersClient struct {
@@ -77,6 +81,16 @@ func (c *usersClient) ListUsers(ctx context.Context, in *ListUsersRequest, opts 
 	return out, nil
 }
 
+func (c *usersClient) RegenerateToken(ctx context.Context, in *RegenerateTokenRequest, opts ...grpc.CallOption) (*RegenerateTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegenerateTokenResponse)
+	err := c.cc.Invoke(ctx, Users_RegenerateToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UsersServer is the server API for Users service.
 // All implementations should embed UnimplementedUsersServer
 // for forward compatibility.
@@ -90,6 +104,9 @@ type UsersServer interface {
 	// Endpoint for getting all users in a domain
 	// Operation is synchronous and idempotent.
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
+	// Endpoint for regenerating a user's API token
+	// Operation is synchronous and idempotent.
+	RegenerateToken(context.Context, *RegenerateTokenRequest) (*RegenerateTokenResponse, error)
 }
 
 // UnimplementedUsersServer should be embedded to have
@@ -107,6 +124,9 @@ func (UnimplementedUsersServer) ListUserRoles(context.Context, *ListUserRolesReq
 }
 func (UnimplementedUsersServer) ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUsers not implemented")
+}
+func (UnimplementedUsersServer) RegenerateToken(context.Context, *RegenerateTokenRequest) (*RegenerateTokenResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegenerateToken not implemented")
 }
 func (UnimplementedUsersServer) testEmbeddedByValue() {}
 
@@ -182,6 +202,24 @@ func _Users_ListUsers_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Users_RegenerateToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegenerateTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UsersServer).RegenerateToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Users_RegenerateToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UsersServer).RegenerateToken(ctx, req.(*RegenerateTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Users_ServiceDesc is the grpc.ServiceDesc for Users service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -200,6 +238,10 @@ var Users_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListUsers",
 			Handler:    _Users_ListUsers_Handler,
+		},
+		{
+			MethodName: "RegenerateToken",
+			Handler:    _Users_RegenerateToken_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

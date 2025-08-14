@@ -457,7 +457,6 @@ export type SuperplaneConnectionType = 'TYPE_UNKNOWN' | 'TYPE_EVENT_SOURCE' | 'T
 
 export type SuperplaneCreateCanvasRequest = {
     canvas?: SuperplaneCanvas;
-    organizationId?: string;
 };
 
 export type SuperplaneCreateCanvasResponse = {
@@ -757,6 +756,10 @@ export type UsersListUsersResponse = {
     users?: Array<UsersUser>;
 };
 
+export type UsersRegenerateTokenResponse = {
+    token?: string;
+};
+
 export type UsersUser = {
     metadata?: UsersUserMetadata;
     spec?: UsersUserSpec;
@@ -812,9 +815,7 @@ export type ProtobufNullValue = 'NULL_VALUE';
 export type SuperplaneListCanvasesData = {
     body?: never;
     path?: never;
-    query?: {
-        organizationId?: string;
-    };
+    query?: never;
     url: '/api/v1/canvases';
 };
 
@@ -1284,9 +1285,7 @@ export type SuperplaneDeleteCanvasData = {
     path: {
         idOrName: string;
     };
-    query?: {
-        organizationId?: string;
-    };
+    query?: never;
     url: '/api/v1/canvases/{idOrName}';
 };
 
@@ -1315,7 +1314,6 @@ export type SuperplaneDescribeCanvasData = {
     };
     query?: {
         name?: string;
-        organizationId?: string;
     };
     url: '/api/v1/canvases/{id}';
 };
@@ -2196,6 +2194,33 @@ export type UsersListUserRolesResponses = {
 };
 
 export type UsersListUserRolesResponse2 = UsersListUserRolesResponses[keyof UsersListUserRolesResponses];
+
+export type UsersRegenerateTokenData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{userId}/token';
+};
+
+export type UsersRegenerateTokenErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type UsersRegenerateTokenError = UsersRegenerateTokenErrors[keyof UsersRegenerateTokenErrors];
+
+export type UsersRegenerateTokenResponses = {
+    /**
+     * A successful response.
+     */
+    200: UsersRegenerateTokenResponse;
+};
+
+export type UsersRegenerateTokenResponse2 = UsersRegenerateTokenResponses[keyof UsersRegenerateTokenResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

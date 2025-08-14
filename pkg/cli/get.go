@@ -205,11 +205,9 @@ func init() {
 	getCmd.AddCommand(getSecretCmd)
 	getSecretCmd.Flags().String("canvas-id", "", "ID of the canvas, for canvas-level secrets")
 	getSecretCmd.Flags().String("canvas-name", "", "Name of the canvas, for canvas-level secrets")
-	getSecretCmd.Flags().String("organization-id", "", "ID of the organization, for organization-level secrets")
 
 	// Integration command
 	getCmd.AddCommand(getIntegrationCmd)
 	getIntegrationCmd.Flags().String("canvas-id", "", "ID of the canvas, for canvas-level integrations")
 	getIntegrationCmd.Flags().String("canvas-name", "", "Name of the canvas, for canvas-level integrations")
-	getIntegrationCmd.Flags().String("organization-id", "", "ID of the organization, for organization-level integrations")
 }
