@@ -35,7 +35,7 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 		return nil, err
 	}
 
-	sourceTypeStr := eventSourceTypeToString(sourceType)
+	sourceTypeStr := EventSourceTypeToString(sourceType)
 	events, err := models.ListEventsByCanvasID(canvasUUID, sourceTypeStr, sourceID)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 	return response, nil
 }
 
-func eventSourceTypeToString(sourceType pb.EventSourceType) string {
+func EventSourceTypeToString(sourceType pb.EventSourceType) string {
 	switch sourceType {
 	case pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE:
 		return models.SourceTypeEventSource
@@ -66,7 +66,7 @@ func eventSourceTypeToString(sourceType pb.EventSourceType) string {
 	}
 }
 
-func stringToEventSourceType(sourceType string) pb.EventSourceType {
+func StringToEventSourceType(sourceType string) pb.EventSourceType {
 	switch sourceType {
 	case models.SourceTypeEventSource:
 		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
@@ -109,15 +109,15 @@ func serializeEvent(in models.Event) (*pb.Event, error) {
 	}
 
 	event := &pb.Event{
-		Id:          in.ID.String(),
-		SourceId:    in.SourceID.String(),
-		SourceName:  in.SourceName,
-		SourceType:  stringToEventSourceType(in.SourceType),
-		Type:        in.Type,
-		State:       in.State,
-		ReceivedAt:  timestamppb.New(*in.ReceivedAt),
-		Raw:         rawStruct,
-		Headers:     headersStruct,
+		Id:         in.ID.String(),
+		SourceId:   in.SourceID.String(),
+		SourceName: in.SourceName,
+		SourceType: StringToEventSourceType(in.SourceType),
+		Type:       in.Type,
+		State:      in.State,
+		ReceivedAt: timestamppb.New(*in.ReceivedAt),
+		Raw:        rawStruct,
+		Headers:    headersStruct,
 	}
 
 	return event, nil

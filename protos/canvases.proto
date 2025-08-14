@@ -818,6 +818,14 @@ message StageEventCreated {
   google.protobuf.Timestamp timestamp = 5;
 }
 
+message EventCreated {
+  string canvas_id = 1;
+  string source_id = 2;
+  string event_id = 3;
+  EventSourceType source_type = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
 message StageEventApproved {
   string canvas_id = 1;
   string stage_id = 2;

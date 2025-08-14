@@ -374,7 +374,8 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	//
 	// Emit and verify the structure of the outgoing event created.
 	//
-	require.NoError(t, connectionGroup.Emit(v1AuthfieldSet, ConnectionGroupFieldSetStateReasonOK, []Connection{}))
+	_, err = connectionGroup.Emit(v1AuthfieldSet, ConnectionGroupFieldSetStateReasonOK, []Connection{})
+	require.NoError(t, err)
 	rawEvent, err := FindLastEventBySourceID(connectionGroup.ID)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
