@@ -1175,23 +1175,7 @@ export function EventSourceWorkflowNodeReactFlow({
 
       </div>
 
-      {/* Backdrop overlay */}
-      {showSidebar && (
-        <div 
-          className="fixed inset-0 bg-black/20 dark:bg-black/40 z-40 transition-opacity duration-300"
-          onClick={handleSidebarClose}
-        />
-      )}
       
-      {/* Event Source Sidebar - Fixed right panel for both modes */}
-      <EventSourceSidebar 
-        nodeId={data.id}
-        nodeTitle={data.title}
-        nodeIcon={data.icon}
-        isOpen={showSidebar}
-        onClose={handleSidebarClose}
-        events={displayEvents}
-      />
     </>
   );
 }
