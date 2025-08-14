@@ -45,12 +45,23 @@ export function EventSourceWorkflowNodeReactFlow({
     events: [...data.events]
   });
   
-  // Local state for events to persist changes in read-only mode
-  const [displayEvents, setDisplayEvents] = useState([...data.events]);
+  // Local state for events to persist changes in read-only mode  
+  // Enhanced events with status indicators for preview mode
+  const [displayEvents, setDisplayEvents] = useState(
+    data.events.map((event, index) => ({
+      ...event,
+      status: index === 0 ? 'pending' : index === 1 ? 'discarded' : 'processed',
+      timestamp: new Date(Date.now() - (index * 60 * 1000)).toISOString(),
+      processingTime: index === 2 ? 245 : undefined
+    }))
+  );
   
   // Check URL parameter for inline integration mode
   const urlParams = new URLSearchParams(window.location.search);
   const inlineIntegration = urlParams.get('inlineIntegration') === 'true';
+  
+  // Check URL parameter for event filters version (defaults to 1)
+  const eventFiltersVersion = urlParams.get('eventFiltersVersion') === '2' ? 2 : 1;
   
   // Integration modal state
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
@@ -275,25 +286,74 @@ export function EventSourceWorkflowNodeReactFlow({
         style={{ width: 320, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
         role="article"
       >
+        {/* Edit Header */}
+      <div 
+          className="action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
+         
+
+            <Button
+              type="button"
+              plain
+              className="flex items-center gap-2"
+            >
+              <MaterialSymbol name="edit" size="md"/>
+              Edit
+            </Button>
+            
+          
+            
+            
+            
+           
+            
+            <Tippy content="More options" placement="top">
+            <Dropdown>
+              <DropdownButton plain>
+                <MaterialSymbol name="more_vert" size="md"/>
+              </DropdownButton>
+              <DropdownMenu anchor="bottom start">
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="play_arrow" size="md"/><DropdownLabel>Run</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="tune" size="md"/><DropdownLabel>Advanced configuration</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="menu_book" size="md"/><DropdownLabel>Documentation</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2 text-red-600 dark:text-red-200' color='red'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
+
+              </DropdownMenu>
+            </Dropdown>
+          </Tippy>
+         
+          
+          
+        </div>
         {/* Header */}
         <div className="flex flex-col p-4 border-b border-gray-200 dark:border-zinc-700">
-          <div className="flex items-center gap-3">
+          <div className='flex items-start flex-row justify-between w-full'>
+
+            <div className="flex items-center flex-grow-1 gap-3">
+              <div className='flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10'>
+                {data.icon === 'semaphore' ? (
+                  <img width={24} height={24} className='margin-auto' src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
+                ) : data.icon === 'github' ? (
+                  <img width={24} height={24} className='margin-auto' src='/images/github-logo.svg' alt="GitHub" />
+                ) : (
+                  <img width={24} height={24} className='margin-auto' src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
+                )}
+              </div>
            
-              {data.icon === 'semaphore' ? (
-                <img width={24} height={24} src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
-              ) : data.icon === 'github' ? (
-                <img width={24} height={24} src='/images/github-logo.svg' alt="GitHub" />
-              ) : (
-                <img width={24} height={24} src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
-              )}
-         
-            <div className="flex items-center w-full">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-md font-semibold text-gray-900 dark:text-white truncate">
                 {data.title}
               </h3>
-              {/* Configuration indicator - only show when properly configured (no events but saved) */}
-            </div>
-            
+              
+           
+           
+          </div>
+           {/* Configuration indicator - only show when properly configured (no events but saved) */}
+           <span className='hidden'>
+           <BadgeButton color='green'>
+            <MaterialSymbol name="check" size="sm" />
+           </BadgeButton>
+          </span>
           </div>
           <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300 mt-4'>
               <Tippy
@@ -339,44 +399,171 @@ export function EventSourceWorkflowNodeReactFlow({
                   <MaterialSymbol name="assignment" size="md"/> semaphore-project
                 </BadgeButton>
               </Tippy>
-              <Tippy
-                content={
-                  <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[280px]">
-                    <div className="space-y-3">
-                      {appliedFilters.map((filter) => (
-                        <div key={filter.id} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                              {filter.type}
-                            </span>
+              
+              {/* Event Filters Display - Version 1 (Default) */}
+              {eventFiltersVersion === 1 && (
+                appliedFilters.length > 0 ? (
+                <Tippy
+                  content={
+                    <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[280px]">
+                      <div className="space-y-3">
+                        {appliedFilters.map((filter) => (
+                          <div key={filter.id} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                                {filter.type}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-zinc-500 dark:text-zinc-400">
+                                {filter.operator}
+                              </span>
+                              <span className="bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
+                                {filter.value}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="text-zinc-500 dark:text-zinc-400">
-                              {filter.operator}
-                            </span>
-                            <span className="bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
-                              {filter.value}
-                            </span>
+                        ))}
+                      </div>
+                    </div>
+                  }
+                  interactive={true}
+                  placement="bottom"
+                  trigger="mouseenter"
+                  delay={[200, 100]}
+                  className="z-50"
+                >
+                  <BadgeButton 
+                    color='zinc' 
+                    href='#' 
+                    className='!text-xs'
+                  >
+                    <MaterialSymbol name="filter_list" size="md"/>
+                    {appliedFilters.length} Event filters
+                  </BadgeButton>
+                </Tippy>
+                ) : (
+                  <BadgeButton 
+                    color='zinc' 
+                    href='#' 
+                    className='!text-xs'
+                  >
+                    <MaterialSymbol name="podcasts" size="md"/>
+                    All events
+                  </BadgeButton>
+                )
+              )}
+
+              {/* Event Filters Display - Version 2 (Enhanced Card Layout) */}
+              {eventFiltersVersion === 2 && (
+                <div className="flex flex-wrap gap-2 max-w-full">
+                  {appliedFilters.map((filter) => (
+                    <Tippy
+                      key={filter.id}
+                      content={
+                        <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg p-4 min-w-[280px]">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/40 dark:to-purple-900/40 rounded-lg flex items-center justify-center">
+                                <MaterialSymbol name="filter_alt" size="sm" className="text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-zinc-900 dark:text-white">
+                                  {filter.type} Filter
+                                </div>
+                                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  Active condition
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded transition-colors">
+                                <MaterialSymbol name="edit" size="sm" className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" />
+                              </button>
+                              <button className="p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
+                                <MaterialSymbol name="close" size="sm" className="text-zinc-400 hover:text-red-600 dark:hover:text-red-400" />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2 mb-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Condition</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-700 dark:text-zinc-300">
+                                  {filter.operator}
+                                </span>
+                                <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded text-blue-700 dark:text-blue-300 font-semibold">
+                                  "{filter.value}"
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Status</span>
+                              <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span className="text-xs text-green-600 dark:text-green-400 font-medium">Active</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                              Events matching this filter will trigger the workflow
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                }
-                interactive={true}
-                placement="bottom"
-                trigger="mouseenter"
-                delay={[200, 100]}
-                className="z-50"
-              >
-                <BadgeButton 
-                  color='zinc' 
-                  href='#' 
-                  className='!text-xs'
-                >
-                 {appliedFilters.length} Filters
-                </BadgeButton>
-              </Tippy>
+                      }
+                      interactive={true}
+                      placement="bottom"
+                      trigger="mouseenter"
+                      delay={[200, 100]}
+                      className="z-50"
+                      maxWidth={320}
+                    >
+                      <div className="group flex items-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 hover:from-blue-100 hover:to-purple-100 dark:hover:from-blue-900/30 dark:hover:to-purple-900/30 text-blue-800 dark:text-blue-200 px-3 py-2 rounded-lg text-xs border border-blue-200/50 dark:border-blue-800/50 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md min-w-0">
+                        <div className="w-4 h-4 bg-blue-600 dark:bg-blue-400 rounded-full flex items-center justify-center flex-shrink-0">
+                          <MaterialSymbol name="filter_alt" size={12} className="text-white dark:text-blue-900" />
+                        </div>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="font-semibold truncate">{filter.type}</span>
+                          <span className="text-blue-600 dark:text-blue-400 flex-shrink-0">:</span>
+                          <span className="font-mono font-medium truncate max-w-20" title={filter.value}>
+                            {filter.value.length > 8 ? `${filter.value.substring(0, 8)}...` : filter.value}
+                          </span>
+                        </div>
+                        <MaterialSymbol 
+                          name="info" 
+                          size="sm" 
+                          className="text-blue-500 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" 
+                        />
+                      </div>
+                    </Tippy>
+                  ))}
+                  
+                  {/* Add Filter Button */}
+                  <Tippy
+                    content={
+                      <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-3">
+                        <div className="text-xs font-medium text-zinc-900 dark:text-white">
+                          Add Event Filter
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                          Filter events based on branches, types, or custom conditions
+                        </div>
+                      </div>
+                    }
+                    placement="bottom"
+                    trigger="mouseenter"
+                    delay={[200, 100]}
+                  >
+                    <button className="flex items-center gap-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 px-3 py-2 rounded-lg text-xs border border-dashed border-zinc-300 dark:border-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500 transition-all duration-200">
+                      <MaterialSymbol name="add" size="sm" />
+                      <span className="font-medium">Add Filter</span>
+                    </button>
+                  </Tippy>
+                </div>
+              )}
               
             </div>
         </div>
@@ -395,26 +582,85 @@ export function EventSourceWorkflowNodeReactFlow({
           
           
           {displayEvents.length > 0 ? (
-            /* Current implementation - show events list */
-            <div className="space-y-2 p-4">
-              <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+            /* Compact implementation - show events list with minimal status indicators */
+            <div className="space-y-1 p-3">
+              <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
                 EVENTS
               </div>
-              {displayEvents.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-zinc-800 rounded-lg"
-                >
-                  <MaterialSymbol 
-                    name="bolt" 
-                    size="sm" 
-                    className="text-zinc-800 dark:text-zinc-400 flex-shrink-0" 
-                  />
-                  <span className="text-sm text-gray-800 dark:text-zinc-200 truncate font-mono">
-                    {truncateUrl(event.url)}
-                  </span>
-                </div>
-              ))}
+              {displayEvents.map((event, index) => {
+                const getStatusConfig = (status: string) => {
+                  switch (status) {
+                    case 'pending':
+                      return {
+                        icon: 'schedule',
+                        color: 'text-yellow-600 dark:text-yellow-400',
+                        dotColor: 'bg-yellow-500',
+                        label: 'Pending',
+                        shortLabel: 'P'
+                      };
+                    case 'discarded':
+                      return {
+                        icon: 'block',
+                        color: 'text-zinc-600 dark:text-zinc-400',
+                        dotColor: 'bg-zinc-500',
+                        label: 'Discarded',
+                        shortLabel: 'D'
+                      };
+                    case 'processed':
+                      return {
+                        icon: 'check_circle',
+                        color: 'text-green-600 dark:text-green-400',
+                        dotColor: 'bg-green-500',
+                        label: 'Processed',
+                        shortLabel: 'C'
+                      };
+                    default:
+                      return {
+                        icon: 'bolt',
+                        color: 'text-zinc-600 dark:text-zinc-400',
+                        dotColor: 'bg-zinc-500',
+                        label: 'Unknown',
+                        shortLabel: '?'
+                      };
+                  }
+                };
+
+                const statusConfig = getStatusConfig(event.status);
+                const timeAgo = `${index * 1}m`;
+
+                return (
+                  
+                    <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-zinc-800 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors duration-150 cursor-pointer">
+                      {/* Compact Status Indicator */}
+                      <div className={`w-1.5 h-1.5 ${statusConfig.dotColor} rounded-full flex-shrink-0`}></div>
+                      
+                      {/* Event URL */}
+                      <span className={event.status === 'discarded' ? 'text-xs font-mono text-gray-800 dark:text-zinc-200 truncate flex-1 line-through' : "text-xs font-mono text-gray-800 dark:text-zinc-200 truncate flex-1"}>
+                        {truncateUrl(event.url, 22)}
+                      </span>
+                      
+                     
+                  <Tippy
+                    key={event.id}
+                    content={
+                      <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 min-w-[260px]">
+                        {event.timestamp}
+                      </div>
+                    }
+                    placement="top"
+                    trigger="mouseenter"
+                    delay={[200, 100]}
+                    className="z-50"
+                  >    
+                      {/* Time */}
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0 w-6 text-right">
+                        {timeAgo}
+                      </span>
+                    </Tippy>
+                    </div>
+                  
+                );
+              })}
             </div>
           ) : (
             /* noEvents variant - empty state */
