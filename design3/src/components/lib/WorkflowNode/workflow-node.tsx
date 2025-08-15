@@ -27,6 +27,8 @@ export interface WorkflowNodeData {
   queueIcon?: string
   queueTitle?: string
   runName?: string
+  triggeredBy?: string  // Name of the previous node that triggered this run
+  eventId?: string      // Event ID from the previous node
   // YAML configuration properties
   yamlConfig?: {
     apiVersion: string

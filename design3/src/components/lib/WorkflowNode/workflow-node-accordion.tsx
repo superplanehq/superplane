@@ -2572,7 +2572,9 @@ export function WorkflowNodeAccordion({
           <span className="text-xs font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
             Last Run
           </span>
-          <span className="text-xs text-gray-500 dark:text-zinc-300">2 hours ago</span>
+          <span className="text-xs text-gray-500 dark:text-zinc-300 flex items-center">
+            <MaterialSymbol name="timer" size="sm" className="mr-1"/> 14s | 2h ago
+          </span>
         </div>
 
         <div className="flex items-center mb-3">
@@ -2586,9 +2588,41 @@ export function WorkflowNodeAccordion({
           </span>
         </div>
 
+        {/* Trigger information */}
+        <div className="text-xs text-gray-600 dark:text-zinc-400">
+          <span>Triggered by: </span>
+          <span className="font-medium text-gray-800 dark:text-zinc-300">
+            {data.triggeredBy || 'Semaphore Event Source'}
+          </span>
+        </div>
+        <div className="text-xs text-gray-600 dark:text-zinc-400 mb-3">
+          <span>Event: </span>
+          <span className="font-mono font-medium text-gray-800 dark:text-zinc-300">
+            {data.eventId || 'evt_abc123def456'}
+          </span>
+        </div>
         {/* Executor and connection info */}
         <div className="flex flex-wrap gap-2">
-         
+          <Tippy content={
+            <div  className='bg-white dark:bg-zinc-800 p-2 rounded-lg border border-gray-200 dark:border-zinc-700'>
+              <div className="text-xs text-gray-600 dark:text-zinc-400">
+                <span>Triggered by: </span>
+                <span className="font-medium text-gray-800 dark:text-zinc-300">
+                  {data.triggeredBy || 'Semaphore Event Source'}
+                </span>
+              </div>
+              <div className="text-xs text-gray-600 dark:text-zinc-400">
+                <span>Event: </span>
+                <span className="font-mono font-medium text-gray-800 dark:text-zinc-300">
+                  {data.eventId || '423423-423423-423423'}
+                </span>
+              </div>
+            </div>
+          } placement='top' interactive={true}>
+              <BadgeButton className="text-xs" href="#">
+                <MaterialSymbol name="bolt" size="md"/> Event 423423....
+              </BadgeButton>
+            </Tippy>
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
             <Tippy content={renderInputsTooltip(false, yamlConfig.spec.inputs)} placement='top' interactive={true}>
               <BadgeButton className="text-xs" href="#">

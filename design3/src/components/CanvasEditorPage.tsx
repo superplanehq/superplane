@@ -91,6 +91,8 @@ const initialNodesData = [
       queueIcon: 'how_to_reg',
       queueTitle: 'asfh7x9wa4-7fb2d9ke3m-9n4p8q2v',
       runName: 'mk8j3n6q9-rt2u5x8a1-dg4h7k0m',
+      triggeredBy: 'Semaphore Event Source',
+      eventId: 'evt_abc123def456',
       yamlConfig: {
         apiVersion: 'v1',
         kind: 'Stage',
@@ -134,6 +136,8 @@ const initialNodesData = [
       queueIcon: 'how_to_reg',
       queueTitle: 'xk9m2n5p8-qr4t7w1z6-bv3c8f2j',
       runName: 'pl7s4v9y2-we6z3b8c5-fj2k5n8r',
+      triggeredBy: 'Sync Cluster',
+      eventId: 'run_completed_mk8j3n6q9',
       yamlConfig: {
         apiVersion: 'v1',
         kind: 'Stage',
@@ -179,6 +183,8 @@ const initialNodesData = [
       queueIcon: 'timer',
       queueTitle: 'lk4g7h9j2-mn6p3q8r5-vw2y5z8b',
       runName: 'Update Semaphore configuration',
+      triggeredBy: 'AI Agent triage',
+      eventId: 'approval_granted_pl7s4v9y2',
       yamlConfig: {
         apiVersion: 'v1',
         kind: 'Stage',
