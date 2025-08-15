@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react'
 import { LoginPage } from './components/LoginPage'
-import { OrganizationApp } from './components/OrganizationApp'
 import { HomePage } from './components/HomePage'
 import { SettingsPage } from './components/SettingsPage'
 import { MainLandingPage } from './components/MainLandingPage'
 import { CanvasesPage } from './components/CanvasesPage'
 import { CanvasEditorPage } from './components/CanvasEditorPage'
 import { WorkflowEditor } from './components/WorkflowEditor'
-import { CanvasEditorPage2 } from './components/CanvasEditorPage2'
 import { CanvasEditorPage3 } from './components/CanvasEditorPage3'
 import { CanvasEditorPage4 } from './components/CanvasEditorPage4'
 import { CanvasMembersPage } from './components/CanvasMembersPage'
@@ -62,6 +60,17 @@ function App() {
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+
+  const getCanvasName = (id: string) => {
+    const canvasNames: Record<string, string> = {
+      '1': 'Production Deployment Pipeline',
+      '2': 'Development Workflow',
+      '3': 'Testing Environment Setup',
+      '4': 'Staging Release Process',
+      'new': 'New Canvas'
+    }
+    return canvasNames[id] || `Canvas ${id}`
+  }
 
   const handleWorkspaceSelect = (workspaceId: string) => {
     // Navigate to organization page when workspace is selected

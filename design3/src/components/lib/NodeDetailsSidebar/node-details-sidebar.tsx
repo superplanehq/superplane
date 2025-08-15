@@ -5,7 +5,7 @@ import { Button } from '../Button/button';
 import { ControlledTabs, type Tab } from '../Tabs/tabs';
 import { Text } from '../Text/text';
 import { Link } from '../Link/link';
-import { Badge } from '../Badge/badge';
+import { Badge, BadgeButton } from '../Badge/badge';
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from '../Dropdown/dropdown';
 import clsx from 'clsx';
 import { EmptyState } from '../EmptyState';
@@ -88,7 +88,7 @@ const mockRuns2: RunData[] = [
   },
   {
     id: 'run-332',
-    name: '0234riefkjjsfgd-srlfksdj3r-sdlfkjwer',
+    name: 'Install Semaphore update',
     status: 'failed',
     timestamp: 'Jan 16, 2022 10:23:45',
     duration: '00h 10m 35s',
@@ -102,7 +102,7 @@ const mockRuns2: RunData[] = [
   },
   {
     id: 'run-1',
-    name: '23rsdf322ertf-srlfksdj3r-sdlfkjwer',
+    name: 'Install Semaphore update',
     status: 'success',
     timestamp: 'Jan 16, 2022 10:23:45',
     duration: '00h 00m 25s',
@@ -1320,61 +1320,37 @@ export function NodeDetailsSidebar({
                         
                         {isExpanded && (
                           <div className="mt-3 space-y-3">
-                            <div className="grid grid-cols-2 gap-4 text-xs p-4 rounded-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
-                              <div className="col-span-2">
-                                <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Label</div>
-                                <Link href="#" className="font-medium text-blue-600 dark:text-blue-400">https://semaphoreci.com</Link>
-                              </div>
-                              <div>
-                                <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Project</div>
-                                <Link href="#" className="font-medium text-blue-600 dark:text-blue-400">semaphore-project</Link>
-                              </div>
-                              <div>
-                                <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Pipeline</div>
-                                <Link href="#" className="font-medium text-blue-600 dark:text-blue-400">.semaphore.yml</Link>
-                              </div>
-                              <div>
-                                <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Duration</div>
-                                <div className="font-medium text-gray-900 dark:text-zinc-300 font-mono">00h 00m 25s</div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Started on</div>
-                                <div className="font-medium text-gray-900 dark:text-zinc-300">Jan 16 2022 10:23:45</div>
-                              </div>
-                            </div>
-                            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900 hidden">
-                              <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
-                                  <MaterialSymbol name="timer" size="md" className="text-gray-700 dark:text-zinc-400" />
-                                </div>
+                            {/* Run details */}
+                            <div className='bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-4 text-xs gap-2'>
+                              <div className='flex items-center gap-2 mb-2'>
+                              <BadgeButton color='red' className='!flex !items-center'>
+                                   <MaterialSymbol name='cancel' size='sm'/>
+                                  <span className='uppercase'>{run.status}</span>
+                                </BadgeButton>
+                                <Link href="#" className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1">{run.name} 
+                                <MaterialSymbol name='arrow_outward' size='sm'/>
+                                </Link>
                                 
-                                <div className="flex-1">
-                                  <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Execution Details</div>
-                                  <div className="space-y-1 flex flex-col text-xs">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Project</span>
-                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
-                                      Semaphore/project
-                                    </div>
-                                  </div>
+                              </div>
+                             
+                              
+                              <div className='flex items-center gap-4 mb-1'>
+                                <div className='flex items-center gap-1'>
+                                  <MaterialSymbol name='timer' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">{run.duration}</span>
+                                </div>
+                                <div className='flex items-center gap-1'>
                                   
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Started on</span>
-                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
-                                      {run.timestamp}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Duration</span>
-                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
-                                      {run.duration}
-                                    </div>
-                                  </div>
-                                  </div>
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">Finished on {run.timestamp}</span>
                                 </div>
                               </div>
+                              <div className='flex items-center gap-1'>
+                                <MaterialSymbol name='bolt' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap"><Link href="#" className="text-blue-600 dark:text-blue-400">AI Agent triade</Link> &bull; Event ID: <Link href="#" className="text-blue-600 dark:text-blue-400">324234234-23423424-23423</Link></span>
+                              </div>
+                            
                             </div>
-                          
+              
                             {renderInputsOutputs2(run.inputs, run.outputs)}
                           </div>
                         )}

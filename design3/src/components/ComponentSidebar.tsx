@@ -7,9 +7,8 @@ import { Input } from './lib/Input/input';
 import { InputGroup } from './lib/Input/input';
 import { Text } from './lib/Text/text';
 import { Badge } from './lib/Badge/badge';
-import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from './lib/Dropdown/dropdown';
 import { Switch } from './lib/Switch/switch';
-import { Field, Label } from './lib/Fieldset/fieldset';
+import { Field } from './lib/Fieldset/fieldset';
 /**
  * ComponentSidebar component following SaaS guidelines
  * - Uses TypeScript with proper interfaces

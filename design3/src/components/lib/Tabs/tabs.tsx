@@ -212,6 +212,7 @@ export function ControlledTabs({
   activeTab: string
   onTabChange: (tabId: string) => void
   className?: string
+  size?: 'xs' | 'sm'
   variant?: 'default' | 'pills' | 'underline'
 }) {
   const handleTabClick = useCallback((tabId: string) => {

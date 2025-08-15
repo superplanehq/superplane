@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import Tippy from '@tippyjs/react';
-import { DeploymentCardStageProps } from '../types/index';
+import { DeploymentCardStageProps, WorkflowData } from '../types/index';
 
 /**
  * OverlayModal component for displaying code or other content
@@ -52,7 +52,7 @@ const OverlayModal: React.FC<{
  * - Uses Tailwind utility classes
  * - Includes proper error handling
  */
-export const DeploymentCardStage: React.FC<NodeProps<DeploymentCardStageProps['data']>> = ({
+export const DeploymentCardStage: React.FC<NodeProps<WorkflowData>> = ({
   data,
   selected,
   id,

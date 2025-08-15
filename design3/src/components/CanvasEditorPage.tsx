@@ -13,17 +13,16 @@ import {
   ConnectionLineType,
   Connection,
   Edge,
-  Handle,
   Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { NavigationOrg, type User, type Organization } from './lib/Navigation/navigation-org';
+import { type User, type Organization } from './lib/Navigation/navigation-org';
 import { WorkflowNode, WorkflowEdge } from '../types';
 import { DeploymentCardStage } from './DeploymentCardStage';
 import { ComponentSidebar } from './ComponentSidebar';
-import { WorkflowNodeReactFlow, type WorkflowNodeReactFlowData } from './WorkflowNodeReactFlow';
-import { WorkflowNodeAccordionReactFlow, type WorkflowNodeAccordionReactFlowData } from './WorkflowNodeAccordionReactFlow';
-import { EventSourceWorkflowNodeReactFlow, type EventSourceWorkflowNodeReactFlowData } from './EventSourceWorkflowNodeReactFlow';
+import { WorkflowNodeReactFlow } from './WorkflowNodeReactFlow';
+import { WorkflowNodeAccordionReactFlow } from './WorkflowNodeAccordionReactFlow';
+import { EventSourceWorkflowNodeReactFlow } from './EventSourceWorkflowNodeReactFlow';
 import { type WorkflowNodeData } from './lib/WorkflowNode/workflow-node';
 import { Button } from './lib/Button/button';
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
@@ -59,7 +58,6 @@ import { Link } from './lib/Link/link';
 import { Field, Label } from './lib/Fieldset/fieldset';
 import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
 import { NodeDetailsSidebar } from './lib/NodeDetailsSidebar/node-details-sidebar';
-import Tippy from '@tippyjs/react';
 
 
 // Node types for React Flow
@@ -91,7 +89,7 @@ const initialNodesData = [
       queueIcon: 'how_to_reg',
       queueTitle: 'asfh7x9wa4-7fb2d9ke3m-9n4p8q2v',
       runName: 'mk8j3n6q9-rt2u5x8a1-dg4h7k0m',
-      triggeredBy: 'Semaphore Event Source',
+      triggeredBy: 'Event Source',
       eventId: 'evt_abc123def456',
       yamlConfig: {
         apiVersion: 'v1',

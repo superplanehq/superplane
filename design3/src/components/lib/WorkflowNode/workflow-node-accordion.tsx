@@ -15,10 +15,8 @@ import {
 } from '../Dropdown/dropdown'
 import { 
   Dialog, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogBody, 
-  DialogActions 
+  DialogTitle,
+  DialogBody
 } from '../Dialog/dialog'
 import { ControlledAccordion, type AccordionItem } from '../Accordion/accordion'
 import { type WorkflowNodeData, type WorkflowNodeProps } from './workflow-node'
@@ -693,33 +691,33 @@ export function WorkflowNodeAccordion({
 
   // Helper function to render the event trigger chain
   const renderEventChainTooltip = (nodeData: WorkflowNodeData) => {
-    // Mock event chain data - in a real app, this would come from the backend
+    // Mock event chain data with real workflow node names
     const eventChain = [
       {
-        nodeId: 'webhook-event-source',
-        nodeName: 'Webhook Event Source',
+        nodeId: 'event-source',
+        nodeName: 'Event Source',
         eventId: 'evt_webhook_received_abc123',
         timestamp: '2024-01-15 14:32:15',
         type: 'webhook_received',
-        description: 'Incoming webhook from GitHub'
+        description: 'Incoming event trigger'
       },
       {
-        nodeId: 'validation-stage',
-        nodeName: 'Validation Stage',
-        eventId: 'run_completed_def456',
+        nodeId: 'stage-1',
+        nodeName: 'Sync Cluster',
+        eventId: 'run_completed_sync456',
         timestamp: '2024-01-15 14:33:02',
         type: 'run_completed',
-        description: 'Code validation completed successfully',
-        triggeredBy: 'webhook-event-source'
+        description: 'Cluster sync completed successfully',
+        triggeredBy: 'event-source'
       },
       {
-        nodeId: 'build-stage',
-        nodeName: 'Build Stage', 
-        eventId: 'run_completed_ghi789',
+        nodeId: 'stage-2',
+        nodeName: 'AI Agent triage', 
+        eventId: 'run_completed_triage789',
         timestamp: '2024-01-15 14:35:18',
         type: 'run_completed',
-        description: 'Build process completed',
-        triggeredBy: 'validation-stage'
+        description: 'AI triage process completed',
+        triggeredBy: 'stage-1'
       },
       {
         nodeId: nodeData.id,
@@ -728,7 +726,7 @@ export function WorkflowNodeAccordion({
         timestamp: '2024-01-15 14:37:45',
         type: 'run_started',
         description: 'Current workflow execution',
-        triggeredBy: 'build-stage'
+        triggeredBy: nodeData.id === 'stage-2' ? 'stage-1' : nodeData.id === 'stage-3' ? 'stage-2' : nodeData.id === 'stage-4' ? 'stage-3' : 'stage-2'
       }
     ];
 
@@ -2690,24 +2688,28 @@ export function WorkflowNodeAccordion({
             size='lg'
             className={clsx('mr-2', statusConfig.iconColor)}
           />
-          <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
-            {data.runName || '2348932urejhwejkhr2304958ru2ioefwjh20389ruie'}
-          </span>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
+              {data.runName || '2348932urejhwejkhr2304958ru2ioefwjh20389ruie'}
+            </div>
+            
+          </div>
         </div>
-
-        {/* Trigger information */}
-        <div className="text-xs text-gray-600 dark:text-zinc-400">
-          <span>Triggered by: </span>
-          <span className="font-medium text-gray-800 dark:text-zinc-300">
-            {data.triggeredBy || 'Semaphore Event Source'}
-          </span>
-        </div>
-        <div className="text-xs text-gray-600 dark:text-zinc-400 mb-3">
-          <span>Event: </span>
-          <span className="font-mono font-medium text-gray-800 dark:text-zinc-300">
-            {data.eventId || 'evt_abc123def456'}
-          </span>
-        </div>
+        {/* Compact trigger information */}
+        <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-zinc-400">
+                Triggered by 
+                <span className="font-medium text-gray-700 dark:text-zinc-300 truncate max-w-24" title={data.triggeredBy}>
+                  {data.triggeredBy || 'No trigger data'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-zinc-400 hidden">
+                Event ID
+                <span className="font-mono text-gray-700 dark:text-zinc-300" title={data.eventId}>
+                  {data.eventId?.slice(-8) || 'abc123def456'.slice(-8)}
+                </span>
+              </div>
+            </div>
         {/* Executor and connection info */}
         <div className="flex flex-wrap gap-2">
           <Tippy content={renderEventChainTooltip(data)} placement='top' interactive={true}>

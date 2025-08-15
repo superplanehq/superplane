@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import clsx from 'clsx';
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
@@ -13,7 +13,6 @@ import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
 import Tippy from '@tippyjs/react';
 import { Text } from './lib/Text/text';
 import { EmptyState } from './lib/EmptyState/empty-state';
-import { EventSourceSidebar } from './EventSourceSidebar';
 
 export interface EventSourceWorkflowNodeReactFlowData {
   id: string;
