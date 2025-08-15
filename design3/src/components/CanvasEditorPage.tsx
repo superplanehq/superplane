@@ -222,10 +222,10 @@ const initialNodesData = [
     workflowNodeData: {
       id: 'stage-4',
       title: 'Production - US',
-      description: 'Deploy application to production environment',
+      description: '',
       type: 'stage',
       status: 'failed',
-      icon: 'semaphore',
+      icon: 'github',
       nodeNumber: 11,
       queueIcon: 'pause',
       queueTitle: 'df8e2m4n7-st3u9w6x1-cd5f8k2m',

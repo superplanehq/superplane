@@ -2629,8 +2629,9 @@ export function WorkflowNodeAccordion({
       {/* Header section */}
       {!executorInHeader && (
         <div className="p-4 flex flex-col border-b border-gray-200 dark:border-zinc-700">
-          <div className="flex items-center gap-3">
-           <div className='rounded-lg dark:bg-white !p-1'>
+          <div className="flex items-center gap-3 mb-4">
+           <div className='rounded-lg bg-zinc-100 dark:bg-white !p-2'>
+            {data.icon == 'github' && <img width={24} src="/images/github-logo.svg" alt="" />}
             {data.icon == 'semaphore' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />}
             {data.icon == 'openAI' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAAAAABXZoBIAAABEElEQVR4AbTJIWyDQACG0d+rWsxENQ6Jwi0YFLIWRTKFxecc6pIzJzF4QTKDT23lSby5BPUt6ZJe2i1ze/aJP/x/+ly5/z2PU7ne1rIYm4/tR9YDsNeaFqP3l9wFx6AJgPLylLN6rrpEcBaiQko6dR/YDq4659po55SL8D1ujI0MLGpbl/K84nr8SWbSCBj5lNrvWewQCy1wU0gZsDV+ABi603nHtI9sJ0KW9d/paCxBjwy6wawyQiwdg2VPiZeBY5S10j3XjJRNoxWMqn20DB4tKeeWTUWhDfqJsX9rSRl0gLUQe20McpCSSwWAUxdBgaek0rQ6lQEwFS/JZ1cNebWFrVaElInLlNmv0TNpYgIAMy6KDbFgKo8AAAAASUVORK5CYII=" alt="" />}
           </div>
@@ -2642,11 +2643,22 @@ export function WorkflowNodeAccordion({
             </div>
           </div>
 
-          <h4 className="text-xs text-gray-600 dark:text-zinc-300 mt-4">{data.description}</h4>
-          <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300 mt-2'>
-          <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="assignment" size="md"/> semaphore-project</BadgeButton>
-          <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="code" size="md"/> semaphore.yml</BadgeButton>
+          {data.description && (
+            <h4 className="text-xs text-gray-600 dark:text-zinc-300 mb-4">{data.description}</h4>
+          )}
+          { data.icon == 'semaphore' && (
+            <div className='flex items-center gap-3 text-blue-600 dark:text-blue-300'>
+              <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="assignment" size="md"/> semaphore-project</BadgeButton>
+              <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="code" size="md"/> semaphore.yml</BadgeButton>
             </div>
+          )}
+          { data.icon == 'github' && (
+          <div className='flex items-center gap-3 text-blue-600 dark:text-blue-300'>
+            <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="book" size="md"/> superplane</BadgeButton>
+            <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="code" size="md"/> terraform.yml</BadgeButton>
+            <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="graph_1" size="md"/> main</BadgeButton>
+          </div>
+          )}
         </div>
       )}
       {executorInHeader && (
@@ -2696,7 +2708,7 @@ export function WorkflowNodeAccordion({
           </div>
         </div>
         {/* Compact trigger information */}
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 mb-3 hidden">
               <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-zinc-400">
                 Triggered by 
                 <span className="font-medium text-gray-700 dark:text-zinc-300 truncate max-w-24" title={data.triggeredBy}>
@@ -2742,21 +2754,38 @@ export function WorkflowNodeAccordion({
         </h4>
         <div className="space-y-2">
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
-            <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
-              <div className="flex items-center gap-2 truncate pr-2">
+            <div className={data.queueIcon == 'how_to_reg' ? "flex items-center p-2 border bg-amber-50 dark:bg-amber-900/30 border-amber-400 dark:border-amber-800 rounded-md gap-2 justify-between" : "flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between"}>
+              <div className="flex items-center gap-2 truncate">
                 { showIcons && (
                   <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400' />
                 )}
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
+                  <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
+                    {data.queueIcon == 'how_to_reg' ? 'Action required' : 'Pending'}
+                  </span>
+                </div>
                 <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">
                   {data.queueTitle}
                 </span>
               </div>
-              { !showIcons && (
-              <Tippy content={<span className='text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-zinc-700 p-2'>Need manual approval</span>} placement='top'>
+              { !showIcons && data.queueIcon == 'how_to_reg' && (
+               
+                <div className='flex items-center'>
                 <Button plain>
-                <MaterialSymbol name={data.queueIcon || 'pending'} size="md" className='text-orange-700 dark:text-orange-400' />
+                <MaterialSymbol name="close" size="sm" className='text-black-700 dark:text-black-400' />
                 </Button>
-              </Tippy>
+                <Button color='white'>
+                <MaterialSymbol name="check" size="sm" className='text-black-700 dark:text-black-400' />
+                </Button>
+                </div>
+              )}
+              { !showIcons && data.queueIcon != 'how_to_reg' && (
+                <div className='flex items-center'>
+                
+                <MaterialSymbol name={data.queueIcon || 'how_to_reg'} size="lg" className='text-orange-700 dark:text-orange-600 px-2' />
+                
+                </div>
               )}
             </div>
           )}
