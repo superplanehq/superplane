@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
+-- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg130+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -451,7 +451,8 @@ CREATE TABLE public.users (
     email character varying(255),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    organization_id uuid NOT NULL
+    organization_id uuid NOT NULL,
+    token_hash character varying(250)
 );
 
 
@@ -1083,9 +1084,8 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump
 --
 
-
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
+-- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg130+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1104,13 +1104,11 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250804194751	f
+20250813203041	f
 \.
 
 
 --
 -- PostgreSQL database dump complete
 --
-
-\unrestrict ELPfjAhMmI8g3MuxCo0WePJjHigHx7AphCRtI9ALtibWbfI8HqfJ4Vhx8IAmUzg
 

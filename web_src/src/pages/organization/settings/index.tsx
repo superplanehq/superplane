@@ -85,12 +85,7 @@ export function OrganizationSettings() {
               </div>
               <SidebarItem className={`${currentSection === 'profile' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate(`/${organizationId}/settings/profile`)}>
                 <span className='px-7'>
-                  <SidebarLabel>My Profile</SidebarLabel>
-                </span>
-              </SidebarItem>
-              <SidebarItem className={`${currentSection === 'api_token' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate(`/${organizationId}/settings/api_token`)}>
-                <span className='px-7'>
-                  <SidebarLabel>API Token</SidebarLabel>
+                  <SidebarLabel>Profile</SidebarLabel>
                 </span>
               </SidebarItem>
             </SidebarSection>
@@ -142,7 +137,6 @@ export function OrganizationSettings() {
               <Route path="create-role" element={<CreateRolePage />} />
               <Route path="create-role/:roleName" element={<CreateRolePage />} />
               <Route path="profile" element={<Profile />} />
-              <Route path="api_token" element={<div className="pt-6"><h1 className="text-2xl font-semibold">API Token</h1><p>API token management coming soon...</p></div>} />
               <Route path="billing" element={<div className="pt-6"><h1 className="text-2xl font-semibold">Billing & Plans</h1><p>Billing management coming soon...</p></div>} />
             </Routes>
           </div>

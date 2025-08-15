@@ -20,7 +20,7 @@ var _ MappedNullable = &UsersListUsersResponse{}
 
 // UsersListUsersResponse struct for UsersListUsersResponse
 type UsersListUsersResponse struct {
-	Users []UsersUser `json:"users,omitempty"`
+	Users []SuperplaneUsersUser `json:"users,omitempty"`
 }
 
 // NewUsersListUsersResponse instantiates a new UsersListUsersResponse object
@@ -41,9 +41,9 @@ func NewUsersListUsersResponseWithDefaults() *UsersListUsersResponse {
 }
 
 // GetUsers returns the Users field value if set, zero value otherwise.
-func (o *UsersListUsersResponse) GetUsers() []UsersUser {
+func (o *UsersListUsersResponse) GetUsers() []SuperplaneUsersUser {
 	if o == nil || IsNil(o.Users) {
-		var ret []UsersUser
+		var ret []SuperplaneUsersUser
 		return ret
 	}
 	return o.Users
@@ -51,7 +51,7 @@ func (o *UsersListUsersResponse) GetUsers() []UsersUser {
 
 // GetUsersOk returns a tuple with the Users field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersListUsersResponse) GetUsersOk() ([]UsersUser, bool) {
+func (o *UsersListUsersResponse) GetUsersOk() ([]SuperplaneUsersUser, bool) {
 	if o == nil || IsNil(o.Users) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *UsersListUsersResponse) HasUsers() bool {
 	return false
 }
 
-// SetUsers gets a reference to the given []UsersUser and assigns it to the Users field.
-func (o *UsersListUsersResponse) SetUsers(v []UsersUser) {
+// SetUsers gets a reference to the given []SuperplaneUsersUser and assigns it to the Users field.
+func (o *UsersListUsersResponse) SetUsers(v []SuperplaneUsersUser) {
 	o.Users = v
 }
 

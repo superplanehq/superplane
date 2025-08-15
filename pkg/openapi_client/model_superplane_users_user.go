@@ -15,35 +15,35 @@ import (
 	"encoding/json"
 )
 
-// checks if the UsersUser type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &UsersUser{}
+// checks if the SuperplaneUsersUser type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneUsersUser{}
 
-// UsersUser struct for UsersUser
-type UsersUser struct {
+// SuperplaneUsersUser struct for SuperplaneUsersUser
+type SuperplaneUsersUser struct {
 	Metadata *UsersUserMetadata `json:"metadata,omitempty"`
 	Spec *UsersUserSpec `json:"spec,omitempty"`
 	Status *UsersUserStatus `json:"status,omitempty"`
 }
 
-// NewUsersUser instantiates a new UsersUser object
+// NewSuperplaneUsersUser instantiates a new SuperplaneUsersUser object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewUsersUser() *UsersUser {
-	this := UsersUser{}
+func NewSuperplaneUsersUser() *SuperplaneUsersUser {
+	this := SuperplaneUsersUser{}
 	return &this
 }
 
-// NewUsersUserWithDefaults instantiates a new UsersUser object
+// NewSuperplaneUsersUserWithDefaults instantiates a new SuperplaneUsersUser object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewUsersUserWithDefaults() *UsersUser {
-	this := UsersUser{}
+func NewSuperplaneUsersUserWithDefaults() *SuperplaneUsersUser {
+	this := SuperplaneUsersUser{}
 	return &this
 }
 
 // GetMetadata returns the Metadata field value if set, zero value otherwise.
-func (o *UsersUser) GetMetadata() UsersUserMetadata {
+func (o *SuperplaneUsersUser) GetMetadata() UsersUserMetadata {
 	if o == nil || IsNil(o.Metadata) {
 		var ret UsersUserMetadata
 		return ret
@@ -53,7 +53,7 @@ func (o *UsersUser) GetMetadata() UsersUserMetadata {
 
 // GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUser) GetMetadataOk() (*UsersUserMetadata, bool) {
+func (o *SuperplaneUsersUser) GetMetadataOk() (*UsersUserMetadata, bool) {
 	if o == nil || IsNil(o.Metadata) {
 		return nil, false
 	}
@@ -61,7 +61,7 @@ func (o *UsersUser) GetMetadataOk() (*UsersUserMetadata, bool) {
 }
 
 // HasMetadata returns a boolean if a field has been set.
-func (o *UsersUser) HasMetadata() bool {
+func (o *SuperplaneUsersUser) HasMetadata() bool {
 	if o != nil && !IsNil(o.Metadata) {
 		return true
 	}
@@ -70,12 +70,12 @@ func (o *UsersUser) HasMetadata() bool {
 }
 
 // SetMetadata gets a reference to the given UsersUserMetadata and assigns it to the Metadata field.
-func (o *UsersUser) SetMetadata(v UsersUserMetadata) {
+func (o *SuperplaneUsersUser) SetMetadata(v UsersUserMetadata) {
 	o.Metadata = &v
 }
 
 // GetSpec returns the Spec field value if set, zero value otherwise.
-func (o *UsersUser) GetSpec() UsersUserSpec {
+func (o *SuperplaneUsersUser) GetSpec() UsersUserSpec {
 	if o == nil || IsNil(o.Spec) {
 		var ret UsersUserSpec
 		return ret
@@ -85,7 +85,7 @@ func (o *UsersUser) GetSpec() UsersUserSpec {
 
 // GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUser) GetSpecOk() (*UsersUserSpec, bool) {
+func (o *SuperplaneUsersUser) GetSpecOk() (*UsersUserSpec, bool) {
 	if o == nil || IsNil(o.Spec) {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (o *UsersUser) GetSpecOk() (*UsersUserSpec, bool) {
 }
 
 // HasSpec returns a boolean if a field has been set.
-func (o *UsersUser) HasSpec() bool {
+func (o *SuperplaneUsersUser) HasSpec() bool {
 	if o != nil && !IsNil(o.Spec) {
 		return true
 	}
@@ -102,12 +102,12 @@ func (o *UsersUser) HasSpec() bool {
 }
 
 // SetSpec gets a reference to the given UsersUserSpec and assigns it to the Spec field.
-func (o *UsersUser) SetSpec(v UsersUserSpec) {
+func (o *SuperplaneUsersUser) SetSpec(v UsersUserSpec) {
 	o.Spec = &v
 }
 
 // GetStatus returns the Status field value if set, zero value otherwise.
-func (o *UsersUser) GetStatus() UsersUserStatus {
+func (o *SuperplaneUsersUser) GetStatus() UsersUserStatus {
 	if o == nil || IsNil(o.Status) {
 		var ret UsersUserStatus
 		return ret
@@ -117,7 +117,7 @@ func (o *UsersUser) GetStatus() UsersUserStatus {
 
 // GetStatusOk returns a tuple with the Status field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUser) GetStatusOk() (*UsersUserStatus, bool) {
+func (o *SuperplaneUsersUser) GetStatusOk() (*UsersUserStatus, bool) {
 	if o == nil || IsNil(o.Status) {
 		return nil, false
 	}
@@ -125,7 +125,7 @@ func (o *UsersUser) GetStatusOk() (*UsersUserStatus, bool) {
 }
 
 // HasStatus returns a boolean if a field has been set.
-func (o *UsersUser) HasStatus() bool {
+func (o *SuperplaneUsersUser) HasStatus() bool {
 	if o != nil && !IsNil(o.Status) {
 		return true
 	}
@@ -134,11 +134,11 @@ func (o *UsersUser) HasStatus() bool {
 }
 
 // SetStatus gets a reference to the given UsersUserStatus and assigns it to the Status field.
-func (o *UsersUser) SetStatus(v UsersUserStatus) {
+func (o *SuperplaneUsersUser) SetStatus(v UsersUserStatus) {
 	o.Status = &v
 }
 
-func (o UsersUser) MarshalJSON() ([]byte, error) {
+func (o SuperplaneUsersUser) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -146,7 +146,7 @@ func (o UsersUser) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o UsersUser) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneUsersUser) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
@@ -160,38 +160,38 @@ func (o UsersUser) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableUsersUser struct {
-	value *UsersUser
+type NullableSuperplaneUsersUser struct {
+	value *SuperplaneUsersUser
 	isSet bool
 }
 
-func (v NullableUsersUser) Get() *UsersUser {
+func (v NullableSuperplaneUsersUser) Get() *SuperplaneUsersUser {
 	return v.value
 }
 
-func (v *NullableUsersUser) Set(val *UsersUser) {
+func (v *NullableSuperplaneUsersUser) Set(val *SuperplaneUsersUser) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableUsersUser) IsSet() bool {
+func (v NullableSuperplaneUsersUser) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableUsersUser) Unset() {
+func (v *NullableSuperplaneUsersUser) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableUsersUser(val *UsersUser) *NullableUsersUser {
-	return &NullableUsersUser{value: val, isSet: true}
+func NewNullableSuperplaneUsersUser(val *SuperplaneUsersUser) *NullableSuperplaneUsersUser {
+	return &NullableSuperplaneUsersUser{value: val, isSet: true}
 }
 
-func (v NullableUsersUser) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneUsersUser) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableUsersUser) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneUsersUser) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
