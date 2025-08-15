@@ -2754,14 +2754,14 @@ export function WorkflowNodeAccordion({
         </h4>
         <div className="space-y-2">
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
-            <div className={data.queueIcon == 'how_to_reg' ? "flex items-center p-2 border bg-amber-50 dark:bg-amber-900/30 border-amber-400 dark:border-amber-800 rounded-md gap-2 justify-between" : "flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between"}>
+            <div className={data.queueIcon == 'how_to_reg' ? "flex items-center p-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-800 rounded-sm gap-2 justify-between" : "flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between"}>
               <div className="flex items-center gap-2 truncate">
                 { showIcons && (
                   <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400' />
                 )}
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
-                  <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse`}></div>
+                  <span className={`text-xs font-medium text-orange-700 dark:text-orange-500`}>
                     {data.queueIcon == 'how_to_reg' ? 'Action required' : 'Pending'}
                   </span>
                 </div>

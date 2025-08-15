@@ -940,7 +940,7 @@ export function EventSourceWorkflowNodeReactFlow({
                 >
                   <div className="m-auto relative">
                     {renderIcon(currentIcon)}
-                    {currentIcon != 'webhook' && ( <MaterialSymbol name="webhook" size="sm" className="absolute bottom-[-16px] right-[-16px]" />)}
+                    {currentIcon != 'webhook' && ( <div className='absolute bottom-[-12px] right-[-12px] bg-white dark:bg-zinc-700 rounded-full w-5 h-5 flex items-center justify-center border border-gray-400 dark:border-zinc-600'><MaterialSymbol name="webhook" size="sm" className="" /></div>)}
                   </div>
                 </button>
               ) : (

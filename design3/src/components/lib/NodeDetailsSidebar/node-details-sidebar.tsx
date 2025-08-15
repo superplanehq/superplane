@@ -32,7 +32,7 @@ interface QueueItem {
   timestamp: string;
   icon: string;
   status: 'pending' | 'approved' | 'waiting';
-  executionMethod: 'manual' | 'timed' | 'queued' | 'blocked';
+  executionMethod: 'manual' | 'timed' | 'queued' | 'blocked' | 'auto';
   approvalInfo?: {
     approvedBy?: number;
     waitingFor?: number;
@@ -215,7 +215,7 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-6',
-    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
+    name: '2asdf324-asdf-rfewlkjsdf234r-sdf3244424',
     timestamp: 'Yesterday 4:30 PM',
     status: 'pending',
     executionMethod: 'timed',
@@ -1134,7 +1134,7 @@ export function NodeDetailsSidebar({
   const renderInputsOutputs2 = (inputs?: Record<string, string>, outputs?: Record<string, string>) => (
     <div className="mt-3 space-y-3">
       {inputs && (
-       <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+       <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
        <div className="flex items-start gap-3">
          <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
            <MaterialSymbol name="input" size="md" className="text-gray-700 dark:text-zinc-400" />
@@ -1160,7 +1160,7 @@ export function NodeDetailsSidebar({
      </div>
       )}
       {outputs && (
-        <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+        <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
               <MaterialSymbol name="output" size="md" className="text-gray-700 dark:text-zinc-400" />
@@ -1307,7 +1307,7 @@ export function NodeDetailsSidebar({
                   const isExpanded = expandedRuns.has(run.id);
                   
                   return (
-                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 "+statusConfig.bgColor + " " + statusConfig.borderColor } >
+                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 " + statusConfig.borderColor } >
                       <div 
                         className="p-3"
                         
@@ -1376,7 +1376,7 @@ export function NodeDetailsSidebar({
               
                             {renderInputsOutputs2(run.inputs, run.outputs)}
                             {/* Queue Information */}
-                            <div className='bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-4 text-xs'>
+                            <div className='bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs'>
                               <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
                                 Queue Information
                               </div>
@@ -1405,7 +1405,7 @@ export function NodeDetailsSidebar({
                             </div>
 
                             {/* Queue Information 2 - Grid Layout */}
-                            <div className='bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-4'>
+                            <div className='bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4'>
                               
                               <div className="grid grid-cols-2 gap-6 text-sm">
                                 {/* Left Column */}
@@ -1511,6 +1511,31 @@ export function NodeDetailsSidebar({
                                 className="text-orange-600 dark:text-orange-400"
                               />
                             )}
+                            { }
+                            {item.executionMethod === 'manual' && (
+                             <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
+                                <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
+                                  Action requred
+                                </span>
+                              </div>
+                            )}
+                            {item.executionMethod === 'timed' && (
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
+                                <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
+                                 Pending
+                                </span>
+                              </div>
+                            )}
+                             {item.executionMethod === 'queued' && (
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
+                                <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
+                                 To be executed
+                                </span>
+                              </div>
+                            )}
                             <span className="font-medium truncate text-sm dark:text-white">{item.name}</span>
                           </div>
                           <div className="flex items-center gap-3">
@@ -1556,19 +1581,24 @@ export function NodeDetailsSidebar({
                         )}
                       </div>
                       {!isManagingQueue && item.executionMethod != 'queued' && (
-                          <div className={`px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700`}>
+                          <div className={item.executionMethod==='manual' ? `px-3 py-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-700` :`px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700`}>
                           {item.executionMethod === 'manual' && (
                             <div className='flex justify-between items-center'>
                               <div className='flex items-center'>
                               { !showIcons && (
                                 <MaterialSymbol name="how_to_reg" size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
                               )}
+                             
                                 <span className="text-xs text-gray-700 dark:text-zinc-400"><a href="#" className="black underline">1 person</a> approved, 2 more needed</span>
                               </div>
-                              <Link href="#" className="text-xs text-gray-700 dark:text-zinc-300  flex items-center">
-                                <MaterialSymbol name="check" size="sm" className="text-gray-500 dark:text-zinc-400 mr-1" /> 
-                                <span className='underline'>Approve</span>
-                              </Link>
+                              <div className='flex items-center'>
+                              <Button plain>
+                              <MaterialSymbol name="close" size="sm" className='text-black-700 dark:text-black-400' />
+                              </Button>
+                              <Button color='white'>
+                              <MaterialSymbol name="check" size="sm" className='text-black-700 dark:text-black-400' />
+                              </Button>
+                              </div>
                             </div>
                           )}
                           {item.executionMethod === 'timed' && (
