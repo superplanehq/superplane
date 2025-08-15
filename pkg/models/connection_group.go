@@ -77,29 +77,34 @@ func (g *ConnectionGroup) CalculateFieldSet(event *Event) (map[string]string, st
 	return fieldSet, hash, nil
 }
 
-func (g *ConnectionGroup) Emit(fieldSet *ConnectionGroupFieldSet, stateReason string, missingConnections []Connection) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		return g.EmitInTransaction(tx, fieldSet, stateReason, missingConnections)
+func (g *ConnectionGroup) Emit(fieldSet *ConnectionGroupFieldSet, stateReason string, missingConnections []Connection) (*Event, error) {
+	var event *Event
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		event, err = g.EmitInTransaction(tx, fieldSet, stateReason, missingConnections)
+		return err
 	})
+
+	return event, err
 }
 
-func (g *ConnectionGroup) EmitInTransaction(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet, stateReason string, missingConnections []Connection) error {
+func (g *ConnectionGroup) EmitInTransaction(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet, stateReason string, missingConnections []Connection) (*Event, error) {
 	event, err := fieldSet.BuildEvent(tx, stateReason, missingConnections)
 	if err != nil {
-		return fmt.Errorf("error building connection group event: %v", err)
+		return nil, fmt.Errorf("error building connection group event: %v", err)
 	}
 
 	eventData, err := json.Marshal(event)
 	if err != nil {
-		return fmt.Errorf("error marshaling connection group event: %v", err)
+		return nil, fmt.Errorf("error marshaling connection group event: %v", err)
 	}
 
-	_, err = CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, event.Type, eventData, []byte(`{}`))
+	createdEvent, err := CreateEventInTransaction(tx, g.ID, g.CanvasID, g.Name, SourceTypeConnectionGroup, event.Type, eventData, []byte(`{}`))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return fieldSet.UpdateState(tx, ConnectionGroupFieldSetStateProcessed, stateReason)
+	return createdEvent, fieldSet.UpdateState(tx, ConnectionGroupFieldSetStateProcessed, stateReason)
 }
 
 func (g *ConnectionGroup) ListFieldSets() ([]ConnectionGroupFieldSet, error) {

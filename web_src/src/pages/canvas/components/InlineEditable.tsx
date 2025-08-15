@@ -9,6 +9,7 @@ interface InlineEditableProps {
   isEditMode?: boolean;
   autoFocus?: boolean;
   dataTestId?: string;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
 }
 
 export function InlineEditable({
@@ -19,7 +20,8 @@ export function InlineEditable({
   multiline = false,
   isEditMode = false,
   autoFocus = false,
-  dataTestId
+  dataTestId,
+  onKeyDown
 }: InlineEditableProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
@@ -64,6 +66,11 @@ export function InlineEditable({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    // Call the external onKeyDown handler if provided
+    if (onKeyDown) {
+      onKeyDown(e);
+    }
+
     if (e.key === 'Enter' && !multiline) {
       e.preventDefault();
       handleSave();
@@ -117,7 +124,7 @@ export function InlineEditable({
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`${className} ${showHoverEffect ? 'bg-gray-100 dark:bg-zinc-700 rounded py-1' : ''} ${isEditMode ? 'cursor-pointer' : ''} transition-colors duration-200`}
+      className={`${className} ${showHoverEffect ? 'bg-gray-100 dark:bg-zinc-700 rounded py-1' : ''} ${isEditMode ? 'cursor-pointer' : ''} transition-colors duration-200 truncate`}
       title={isEditMode ? 'Click to edit' : undefined}
     >
       {displayValue}

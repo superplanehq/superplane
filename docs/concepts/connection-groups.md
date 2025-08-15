@@ -29,7 +29,7 @@ spec:
   groupBy:
     fields:
       - name: version
-        expression: outputs.version
+        expression: $.outputs.version
 
   #
   # How long to wait, in seconds, for all the connections
@@ -104,5 +104,5 @@ spec:
           valueFrom:
             eventData:
               connection: preprod
-              expression: fields.version
+              expression: $.fields.version
 ```

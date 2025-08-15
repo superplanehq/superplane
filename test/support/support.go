@@ -228,7 +228,7 @@ func CreateFieldSet(t *testing.T, fields map[string]string, connectionGroup *mod
 	fieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
 	require.NoError(t, err)
 
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
+	event, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
 	require.NoError(t, err)
 	fieldSet.AttachEvent(database.Conn(), event)
 	return fieldSet
@@ -245,7 +245,7 @@ func CreateStageEventWithData(t *testing.T,
 	headers []byte,
 	inputs map[string]any,
 ) *models.StageEvent {
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "push", data, headers)
+	event, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, "push", data, headers)
 	require.NoError(t, err)
 	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", inputs)
 	require.NoError(t, err)

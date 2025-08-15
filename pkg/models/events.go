@@ -18,6 +18,7 @@ type ExecutionFinishedEvent struct {
 	Type      string            `json:"type"`
 	Stage     *StageInEvent     `json:"stage,omitempty"`
 	Execution *ExecutionInEvent `json:"execution,omitempty"`
+	Inputs    map[string]any    `json:"inputs,omitempty"`
 	Outputs   map[string]any    `json:"outputs,omitempty"`
 }
 
@@ -44,7 +45,7 @@ type FieldSetCompletedEvent struct {
 	Missing []string          `json:"missing,omitempty"`
 }
 
-func NewExecutionCompletionEvent(execution *StageExecution, outputs map[string]any) (*ExecutionFinishedEvent, error) {
+func NewExecutionCompletionEvent(execution *StageExecution, inputs map[string]any, outputs map[string]any) (*ExecutionFinishedEvent, error) {
 	return &ExecutionFinishedEvent{
 		Type: ExecutionFinishedEventType,
 		Stage: &StageInEvent{
@@ -57,6 +58,7 @@ func NewExecutionCompletionEvent(execution *StageExecution, outputs map[string]a
 			StartedAt:  execution.StartedAt,
 			FinishedAt: execution.FinishedAt,
 		},
+		Inputs:  inputs,
 		Outputs: outputs,
 	}, nil
 }

@@ -3,6 +3,7 @@ g,role:canvas_admin,role:canvas_viewer,canvas:{CANVAS_ID},
 p,role:canvas_viewer,canvas:{CANVAS_ID},eventsource,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},stage,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},stageevent,read
+p,role:canvas_viewer,canvas:{CANVAS_ID},event,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},connectiongroup,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},connectiongroupfieldset,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},secret,read

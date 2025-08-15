@@ -1,6 +1,7 @@
 import { Node, Edge } from "@xyflow/react";
 import { 
   SuperplaneStageEvent,
+  SuperplaneEvent,
   SuperplaneStageEventState,
   SuperplaneConnection,
   SuperplaneFilterOperator,
@@ -35,7 +36,7 @@ export type EventSourceNodeData = {
   id: string;
   name: string;
   description?: string;
-  events: SuperplaneStageEvent[];
+  events: SuperplaneEvent[];
   integration: IntegrationsIntegrationRef | null;
   resource: IntegrationsResourceRef | null;
   eventSourceType?: string;

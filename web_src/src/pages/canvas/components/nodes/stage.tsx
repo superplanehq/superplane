@@ -401,7 +401,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         )}
 
         {/* Header Section */}
-        <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
+        <div className={twMerge('mt-1 px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>
           <div className="flex items-start flex-1 min-w-0">
             <div className='max-w-8 mt-1 flex items-center justify-center'>
               {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
@@ -429,7 +429,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 {isEditMode && <InlineEditable
                   value={stageDescription}
                   onSave={handleStageDescriptionChange}
-                  placeholder={isEditMode ? "Add description..." : "No description available"}
+                  placeholder={isEditMode ? "Add description..." : ""}
                   className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
                   isEditMode={isEditMode}
                 />}
@@ -437,7 +437,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             </div>
           </div>
           {!isEditMode && (
-            <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{stageDescription || 'No description available'}</div>
+            <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{stageDescription || ''}</div>
           )}
         </div>
 

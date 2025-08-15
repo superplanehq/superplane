@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/events"
 	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
@@ -151,4 +152,9 @@ func (s *CanvasService) ListConnectionGroups(ctx context.Context, req *pb.ListCo
 func (s *CanvasService) ListConnectionGroupFieldSets(ctx context.Context, req *pb.ListConnectionGroupFieldSetsRequest) (*pb.ListConnectionGroupFieldSetsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return groups.ListConnectionGroupFieldSets(ctx, canvasID, req.IdOrName)
+}
+
+func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsRequest) (*pb.ListEventsResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return events.ListEvents(ctx, canvasID, req.SourceType, req.SourceId)
 }

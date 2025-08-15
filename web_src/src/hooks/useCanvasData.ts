@@ -9,6 +9,7 @@ import {
   superplaneDescribeStage,
   superplaneCreateEventSource,
   superplaneDescribeEventSource,
+  superplaneResetEventSourceKey,
   superplaneListConnectionGroups,
   superplaneCreateConnectionGroup,
   superplaneUpdateConnectionGroup,
@@ -359,6 +360,24 @@ export const useCreateEventSource = (canvasId: string) => {
               spec: eventSourceData.spec
             }
           }
+        })
+      )
+    },
+    onSuccess: () => {
+      // Invalidate and refetch canvas event sources
+      queryClient.invalidateQueries({ queryKey: canvasKeys.eventSources(canvasId) })
+    }
+  })
+}
+
+export const useResetEventSourceKey = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (eventSourceId: string) => {
+      return await superplaneResetEventSourceKey(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: eventSourceId },
         })
       )
     },

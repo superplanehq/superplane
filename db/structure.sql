@@ -213,6 +213,7 @@ CREATE TABLE public.event_sources (
 CREATE TABLE public.events (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     source_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
     source_name character varying(128) NOT NULL,
     source_type character varying(64) NOT NULL,
     received_at timestamp without time zone NOT NULL,
@@ -856,6 +857,13 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 --
 
 CREATE INDEX uix_event_sources_canvas ON public.event_sources USING btree (canvas_id);
+
+
+--
+-- Name: uix_events_canvas; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX uix_events_canvas ON public.events USING btree (canvas_id);
 
 
 --

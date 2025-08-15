@@ -82,6 +82,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		result = models.ResultFailed
 	}
 
+	var event *models.Event
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		outputs := execution.Outputs.Data()
 
@@ -95,7 +96,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 			result = models.ResultFailed
 		}
 
-		if err := execution.FinishInTransaction(tx, stage, result); err != nil {
+		if event, err = execution.FinishInTransaction(tx, stage, result); err != nil {
 			logger.Errorf("Error updating execution state: %v", err)
 			return err
 		}
@@ -112,6 +113,11 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), execution).Publish()
 	if err != nil {
 		logger.Errorf("Error publishing execution finished message: %v", err)
+	}
+
+	err = messages.NewEventCreatedMessage(stage.CanvasID.String(), event).Publish()
+	if err != nil {
+		logger.Errorf("Error publishing event created message: %v", err)
 	}
 
 	return nil

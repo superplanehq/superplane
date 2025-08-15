@@ -145,7 +145,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
               </div>
             </div>
 
-
             {loadingMembers ? (
               <div className="flex justify-center items-center h-32">
                 <p className="text-zinc-500 dark:text-zinc-400">Loading members...</p>
