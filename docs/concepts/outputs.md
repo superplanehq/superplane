@@ -23,6 +23,8 @@ If a required output is not pushed from the execution, the execution is marked a
 
 ### Using outputs from one stage as input on another
 
+When a stage finishes, it emits an event with its outputs on an `outputs` field. The stages that are connected to it will receive this event and can use the outputs as inputs for themselves:
+
 ```yaml
 apiVersion: v1
 kind: Stage
@@ -41,7 +43,7 @@ spec:
           valueFrom:
             eventData:
               connection: stage-1
-              expression: outputs.VERSION
+              expression: $.outputs.VERSION
   executor:
     type: semaphore
     integration:

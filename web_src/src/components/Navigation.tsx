@@ -58,17 +58,10 @@ const Navigation: React.FC = () => {
 
               {/* User Actions */}
               <DropdownSection>
-                <DropdownItem onClick={() => { }}>
+                <DropdownItem href={`/${organizationId}/settings/profile`}>
                   <span className="flex items-center gap-x-2">
                     <MaterialSymbol name="person" data-slot="icon" size='sm' />
-                    <DropdownLabel>Your Profile</DropdownLabel>
-                  </span>
-                </DropdownItem>
-
-                <DropdownItem onClick={() => { }}>
-                  <span className="flex items-center gap-x-2">
-                    <MaterialSymbol name="settings" data-slot="icon" size='sm' />
-                    <DropdownLabel>Account Settings</DropdownLabel>
+                    <DropdownLabel>Profile</DropdownLabel>
                   </span>
                 </DropdownItem>
               </DropdownSection>

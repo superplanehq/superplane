@@ -257,9 +257,7 @@ service Superplane {
   }
 }
 
-message ListCanvasesRequest {
-  string organization_id = 1;
-}
+message ListCanvasesRequest {}
 
 message ListCanvasesResponse {
   repeated Canvas canvases = 1;
@@ -280,7 +278,6 @@ message Canvas {
 
 message CreateCanvasRequest {
   Canvas canvas = 1;
-  string organization_id = 2;
 }
 
 message CreateCanvasResponse {
@@ -289,7 +286,6 @@ message CreateCanvasResponse {
 
 message DeleteCanvasRequest {
   string id_or_name = 1;
-  string organization_id = 2;
 }
 
 message DeleteCanvasResponse {}
@@ -297,7 +293,6 @@ message DeleteCanvasResponse {}
 message DescribeCanvasRequest {
   string id = 1;
   string name = 2;
-  string organization_id = 3;
 }
 
 message DescribeCanvasResponse {

@@ -47,6 +47,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
     ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
   );
+  const [payloadDisplay, setPayloadDisplay] = useState(
+    JSON.stringify(executor.spec?.payload || {}, null, 2)
+  );
   const [semaphoreExecutionType, setSemaphoreExecutionType] = useState<'workflow' | 'task'>(
     (executor.spec?.task as string) ? 'task' : 'workflow'
   );
@@ -453,6 +456,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         setInputMappings(incomingData.inputMappings);
         setResponsePolicyStatusCodesDisplay(
           ((incomingData.executor?.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
+        );
+        setPayloadDisplay(
+          JSON.stringify(incomingData.executor?.spec?.payload || {}, null, 2)
         );
       }
     );
@@ -1758,13 +1764,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                           <ValidationField label="Payload (JSON)">
                             <textarea
-                              value={JSON.stringify(executor.spec?.payload || {}, null, 2)}
+                              value={payloadDisplay}
                               onChange={(e) => {
+                                setPayloadDisplay(e.target.value);
                                 try {
                                   const parsed = JSON.parse(e.target.value);
                                   updateExecutorField('payload', parsed);
                                 } catch {
-                                  updateExecutorField('payload', e.target.value);
+                                  // Keep the display value but don't update payload until valid JSON
                                 }
                               }}
                               placeholder='{\n  "key1": "value1",\n  "key2": "{{ inputs.KEY2 }}"\n}'

@@ -33,11 +33,7 @@ func Test__CreateCanvas(t *testing.T) {
 			},
 		}
 
-		response, err := CreateCanvas(ctx, &protos.CreateCanvasRequest{
-			Canvas:         canvas,
-			OrganizationId: org.ID.String(),
-		}, authService)
-
+		response, err := CreateCanvas(ctx, authService, org.ID.String(), canvas)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
@@ -54,11 +50,7 @@ func Test__CreateCanvas(t *testing.T) {
 			},
 		}
 
-		_, err := CreateCanvas(ctx, &protos.CreateCanvasRequest{
-			Canvas:         canvas,
-			OrganizationId: org.ID.String(),
-		}, authService)
-
+		_, err := CreateCanvas(ctx, authService, org.ID.String(), canvas)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
