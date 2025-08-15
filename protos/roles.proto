@@ -27,38 +27,6 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 
 service Roles {
   //
-  // Endpoint for assigning a role to a user in a domain
-  // Operation is synchronous and idempotent.
-  //
-  rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/roles/assign"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Assign role";
-      description: "Assigns a role to a user within a domain";
-      tags: "Roles";
-    };
-  }
-
-  //
-  // Endpoint for removing a role from a user in a domain
-  // Operation is synchronous and idempotent.
-  //
-  rpc RemoveRole(RemoveRoleRequest) returns (RemoveRoleResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/roles/remove"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Remove role";
-      description: "Removes a role from a user within a domain";
-      tags: "Roles";
-    };
-  }
-
-  //
   // Endpoint for listing available roles within a domain
   // Operation is synchronous and idempotent.
   //
@@ -69,21 +37,6 @@ service Roles {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List roles";
       description: "Returns available roles for a specific domain type with their permissions and inheritance";
-      tags: "Roles";
-    };
-  }
-
-  //
-  // Endpoint for describing a specific role
-  // Operation is synchronous and idempotent.
-  //
-  rpc DescribeRole(DescribeRoleRequest) returns (DescribeRoleResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/roles/describe"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe role";
-      description: "Returns detailed information about a specific role including permissions and inheritance";
       tags: "Roles";
     };
   }
@@ -100,6 +53,21 @@ service Roles {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create role";
       description: "Creates a new custom role with specified permissions";
+      tags: "Roles";
+    };
+  }
+
+  //
+  // Endpoint for describing a specific role
+  // Operation is synchronous and idempotent.
+  //
+  rpc DescribeRole(DescribeRoleRequest) returns (DescribeRoleResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/roles/{role_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe role";
+      description: "Returns detailed information about a specific role including permissions and inheritance";
       tags: "Roles";
     };
   }
@@ -131,6 +99,22 @@ service Roles {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete role";
       description: "Deletes an existing custom role";
+      tags: "Roles";
+    };
+  }
+
+  //
+  // Endpoint for assigning a role to a user in a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/roles/{role_name}/users"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Assign role";
+      description: "Assigns a role to a user within a domain";
       tags: "Roles";
     };
   }
@@ -168,7 +152,7 @@ message ListRolesResponse {
 message DescribeRoleRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
-  string role = 3;
+  string role_name = 3;
 }
 
 message DescribeRoleResponse {

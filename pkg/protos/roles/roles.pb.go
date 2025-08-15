@@ -349,7 +349,7 @@ type DescribeRoleRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	Role          string                   `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	RoleName      string                   `protobuf:"bytes,3,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -398,9 +398,9 @@ func (x *DescribeRoleRequest) GetDomainId() string {
 	return ""
 }
 
-func (x *DescribeRoleRequest) GetRole() string {
+func (x *DescribeRoleRequest) GetRoleName() string {
 	if x != nil {
-		return x.Role
+		return x.RoleName
 	}
 	return ""
 }
@@ -985,12 +985,12 @@ const file_roles_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\"A\n" +
 	"\x11ListRolesResponse\x12,\n" +
-	"\x05roles\x18\x01 \x03(\v2\x16.Superplane.Roles.RoleR\x05roles\"\x8d\x01\n" +
+	"\x05roles\x18\x01 \x03(\v2\x16.Superplane.Roles.RoleR\x05roles\"\x96\x01\n" +
 	"\x13DescribeRoleRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x12\n" +
-	"\x04role\x18\x03 \x01(\tR\x04role\"B\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1b\n" +
+	"\trole_name\x18\x03 \x01(\tR\broleName\"B\n" +
 	"\x14DescribeRoleResponse\x12*\n" +
 	"\x04role\x18\x01 \x01(\v2\x16.Superplane.Roles.RoleR\x04role\"\xa3\x01\n" +
 	"\x11CreateRoleRequest\x12E\n" +
@@ -1030,28 +1030,25 @@ const file_roles_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12F\n" +
 	"\vpermissions\x18\x03 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12=\n" +
-	"\x0einherited_role\x18\x04 \x01(\v2\x16.Superplane.Roles.RoleR\rinheritedRole2\x98\v\n" +
-	"\x05Roles\x12\xb9\x01\n" +
-	"\n" +
-	"AssignRole\x12#.Superplane.Roles.AssignRoleRequest\x1a$.Superplane.Roles.AssignRoleResponse\"`\x92A>\n" +
-	"\x05Roles\x12\vAssign role\x1a(Assigns a role to a user within a domain\x82\xd3\xe4\x93\x02\x19:\x01*2\x14/api/v1/roles/assign\x12\xbb\x01\n" +
-	"\n" +
-	"RemoveRole\x12#.Superplane.Roles.RemoveRoleRequest\x1a$.Superplane.Roles.RemoveRoleResponse\"b\x92A@\n" +
-	"\x05Roles\x12\vRemove role\x1a*Removes a role from a user within a domain\x82\xd3\xe4\x93\x02\x19:\x01*2\x14/api/v1/roles/remove\x12\xdd\x01\n" +
+	"\x0einherited_role\x18\x04 \x01(\v2\x16.Superplane.Roles.RoleR\rinheritedRole2\xe8\t\n" +
+	"\x05Roles\x12\xdd\x01\n" +
 	"\tListRoles\x12\".Superplane.Roles.ListRolesRequest\x1a#.Superplane.Roles.ListRolesResponse\"\x86\x01\x92An\n" +
 	"\x05Roles\x12\n" +
-	"List roles\x1aYReturns available roles for a specific domain type with their permissions and inheritance\x82\xd3\xe4\x93\x02\x0f\x12\r/api/v1/roles\x12\xf1\x01\n" +
-	"\fDescribeRole\x12%.Superplane.Roles.DescribeRoleRequest\x1a&.Superplane.Roles.DescribeRoleResponse\"\x91\x01\x92Ap\n" +
-	"\x05Roles\x12\rDescribe role\x1aXReturns detailed information about a specific role including permissions and inheritance\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/roles/describe\x12\xbe\x01\n" +
+	"List roles\x1aYReturns available roles for a specific domain type with their permissions and inheritance\x82\xd3\xe4\x93\x02\x0f\x12\r/api/v1/roles\x12\xbe\x01\n" +
 	"\n" +
 	"CreateRole\x12#.Superplane.Roles.CreateRoleRequest\x1a$.Superplane.Roles.CreateRoleResponse\"e\x92AJ\n" +
-	"\x05Roles\x12\vCreate role\x1a4Creates a new custom role with specified permissions\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/api/v1/roles\x12\xca\x01\n" +
+	"\x05Roles\x12\vCreate role\x1a4Creates a new custom role with specified permissions\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/api/v1/roles\x12\xf4\x01\n" +
+	"\fDescribeRole\x12%.Superplane.Roles.DescribeRoleRequest\x1a&.Superplane.Roles.DescribeRoleResponse\"\x94\x01\x92Ap\n" +
+	"\x05Roles\x12\rDescribe role\x1aXReturns detailed information about a specific role including permissions and inheritance\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/roles/{role_name}\x12\xca\x01\n" +
 	"\n" +
 	"UpdateRole\x12#.Superplane.Roles.UpdateRoleRequest\x1a$.Superplane.Roles.UpdateRoleResponse\"q\x92AJ\n" +
 	"\x05Roles\x12\vUpdate role\x1a4Updates an existing custom role with new permissions\x82\xd3\xe4\x93\x02\x1e:\x01*\x1a\x19/api/v1/roles/{role_name}\x12\xb2\x01\n" +
 	"\n" +
 	"DeleteRole\x12#.Superplane.Roles.DeleteRoleRequest\x1a$.Superplane.Roles.DeleteRoleResponse\"Y\x92A5\n" +
-	"\x05Roles\x12\vDelete role\x1a\x1fDeletes an existing custom role\x82\xd3\xe4\x93\x02\x1b*\x19/api/v1/roles/{role_name}B\xbf\x01\x92A\x86\x01\x12\\\n" +
+	"\x05Roles\x12\vDelete role\x1a\x1fDeletes an existing custom role\x82\xd3\xe4\x93\x02\x1b*\x19/api/v1/roles/{role_name}\x12\xc4\x01\n" +
+	"\n" +
+	"AssignRole\x12#.Superplane.Roles.AssignRoleRequest\x1a$.Superplane.Roles.AssignRoleResponse\"k\x92A>\n" +
+	"\x05Roles\x12\vAssign role\x1a(Assigns a role to a user within a domain\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/roles/{role_name}/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
 	"\x14Superplane Roles API\x12\x18API for Superplane Roles\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ3github.com/superplanehq/superplane/pkg/protos/rolesb\x06proto3"
 
@@ -1111,22 +1108,20 @@ var file_roles_proto_depIdxs = []int32{
 	18, // 17: Superplane.Roles.Role.Metadata.updated_at:type_name -> google.protobuf.Timestamp
 	19, // 18: Superplane.Roles.Role.Spec.permissions:type_name -> Superplane.Authorization.Permission
 	14, // 19: Superplane.Roles.Role.Spec.inherited_role:type_name -> Superplane.Roles.Role
-	0,  // 20: Superplane.Roles.Roles.AssignRole:input_type -> Superplane.Roles.AssignRoleRequest
-	2,  // 21: Superplane.Roles.Roles.RemoveRole:input_type -> Superplane.Roles.RemoveRoleRequest
-	4,  // 22: Superplane.Roles.Roles.ListRoles:input_type -> Superplane.Roles.ListRolesRequest
-	6,  // 23: Superplane.Roles.Roles.DescribeRole:input_type -> Superplane.Roles.DescribeRoleRequest
-	8,  // 24: Superplane.Roles.Roles.CreateRole:input_type -> Superplane.Roles.CreateRoleRequest
-	10, // 25: Superplane.Roles.Roles.UpdateRole:input_type -> Superplane.Roles.UpdateRoleRequest
-	12, // 26: Superplane.Roles.Roles.DeleteRole:input_type -> Superplane.Roles.DeleteRoleRequest
-	1,  // 27: Superplane.Roles.Roles.AssignRole:output_type -> Superplane.Roles.AssignRoleResponse
-	3,  // 28: Superplane.Roles.Roles.RemoveRole:output_type -> Superplane.Roles.RemoveRoleResponse
-	5,  // 29: Superplane.Roles.Roles.ListRoles:output_type -> Superplane.Roles.ListRolesResponse
-	7,  // 30: Superplane.Roles.Roles.DescribeRole:output_type -> Superplane.Roles.DescribeRoleResponse
-	9,  // 31: Superplane.Roles.Roles.CreateRole:output_type -> Superplane.Roles.CreateRoleResponse
-	11, // 32: Superplane.Roles.Roles.UpdateRole:output_type -> Superplane.Roles.UpdateRoleResponse
-	13, // 33: Superplane.Roles.Roles.DeleteRole:output_type -> Superplane.Roles.DeleteRoleResponse
-	27, // [27:34] is the sub-list for method output_type
-	20, // [20:27] is the sub-list for method input_type
+	4,  // 20: Superplane.Roles.Roles.ListRoles:input_type -> Superplane.Roles.ListRolesRequest
+	8,  // 21: Superplane.Roles.Roles.CreateRole:input_type -> Superplane.Roles.CreateRoleRequest
+	6,  // 22: Superplane.Roles.Roles.DescribeRole:input_type -> Superplane.Roles.DescribeRoleRequest
+	10, // 23: Superplane.Roles.Roles.UpdateRole:input_type -> Superplane.Roles.UpdateRoleRequest
+	12, // 24: Superplane.Roles.Roles.DeleteRole:input_type -> Superplane.Roles.DeleteRoleRequest
+	0,  // 25: Superplane.Roles.Roles.AssignRole:input_type -> Superplane.Roles.AssignRoleRequest
+	5,  // 26: Superplane.Roles.Roles.ListRoles:output_type -> Superplane.Roles.ListRolesResponse
+	9,  // 27: Superplane.Roles.Roles.CreateRole:output_type -> Superplane.Roles.CreateRoleResponse
+	7,  // 28: Superplane.Roles.Roles.DescribeRole:output_type -> Superplane.Roles.DescribeRoleResponse
+	11, // 29: Superplane.Roles.Roles.UpdateRole:output_type -> Superplane.Roles.UpdateRoleResponse
+	13, // 30: Superplane.Roles.Roles.DeleteRole:output_type -> Superplane.Roles.DeleteRoleResponse
+	1,  // 31: Superplane.Roles.Roles.AssignRole:output_type -> Superplane.Roles.AssignRoleResponse
+	26, // [26:32] is the sub-list for method output_type
+	20, // [20:26] is the sub-list for method input_type
 	20, // [20:20] is the sub-list for extension type_name
 	20, // [20:20] is the sub-list for extension extendee
 	0,  // [0:20] is the sub-list for field type_name

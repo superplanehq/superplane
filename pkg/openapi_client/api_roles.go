@@ -27,10 +27,11 @@ type RolesAPIService service
 type ApiRolesAssignRoleRequest struct {
 	ctx context.Context
 	ApiService *RolesAPIService
-	body *RolesAssignRoleRequest
+	roleName string
+	body *RolesAssignRoleBody
 }
 
-func (r ApiRolesAssignRoleRequest) Body(body RolesAssignRoleRequest) ApiRolesAssignRoleRequest {
+func (r ApiRolesAssignRoleRequest) Body(body RolesAssignRoleBody) ApiRolesAssignRoleRequest {
 	r.body = &body
 	return r
 }
@@ -45,12 +46,14 @@ RolesAssignRole Assign role
 Assigns a role to a user within a domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param roleName
  @return ApiRolesAssignRoleRequest
 */
-func (a *RolesAPIService) RolesAssignRole(ctx context.Context) ApiRolesAssignRoleRequest {
+func (a *RolesAPIService) RolesAssignRole(ctx context.Context, roleName string) ApiRolesAssignRoleRequest {
 	return ApiRolesAssignRoleRequest{
 		ApiService: a,
 		ctx: ctx,
+		roleName: roleName,
 	}
 }
 
@@ -58,7 +61,7 @@ func (a *RolesAPIService) RolesAssignRole(ctx context.Context) ApiRolesAssignRol
 //  @return map[string]interface{}
 func (a *RolesAPIService) RolesAssignRoleExecute(r ApiRolesAssignRoleRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
+		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
 		localVarReturnValue  map[string]interface{}
@@ -69,7 +72,8 @@ func (a *RolesAPIService) RolesAssignRoleExecute(r ApiRolesAssignRoleRequest) (m
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles/assign"
+	localVarPath := localBasePath + "/api/v1/roles/{roleName}/users"
+	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -395,9 +399,9 @@ func (a *RolesAPIService) RolesDeleteRoleExecute(r ApiRolesDeleteRoleRequest) (m
 type ApiRolesDescribeRoleRequest struct {
 	ctx context.Context
 	ApiService *RolesAPIService
+	roleName string
 	domainType *string
 	domainId *string
-	role *string
 }
 
 func (r ApiRolesDescribeRoleRequest) DomainType(domainType string) ApiRolesDescribeRoleRequest {
@@ -407,11 +411,6 @@ func (r ApiRolesDescribeRoleRequest) DomainType(domainType string) ApiRolesDescr
 
 func (r ApiRolesDescribeRoleRequest) DomainId(domainId string) ApiRolesDescribeRoleRequest {
 	r.domainId = &domainId
-	return r
-}
-
-func (r ApiRolesDescribeRoleRequest) Role(role string) ApiRolesDescribeRoleRequest {
-	r.role = &role
 	return r
 }
 
@@ -425,12 +424,14 @@ RolesDescribeRole Describe role
 Returns detailed information about a specific role including permissions and inheritance
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param roleName
  @return ApiRolesDescribeRoleRequest
 */
-func (a *RolesAPIService) RolesDescribeRole(ctx context.Context) ApiRolesDescribeRoleRequest {
+func (a *RolesAPIService) RolesDescribeRole(ctx context.Context, roleName string) ApiRolesDescribeRoleRequest {
 	return ApiRolesDescribeRoleRequest{
 		ApiService: a,
 		ctx: ctx,
+		roleName: roleName,
 	}
 }
 
@@ -449,7 +450,8 @@ func (a *RolesAPIService) RolesDescribeRoleExecute(r ApiRolesDescribeRoleRequest
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles/describe"
+	localVarPath := localBasePath + "/api/v1/roles/{roleName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -463,9 +465,6 @@ func (a *RolesAPIService) RolesDescribeRoleExecute(r ApiRolesDescribeRoleRequest
 	}
 	if r.domainId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
-	}
-	if r.role != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "role", r.role, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -612,124 +611,6 @@ func (a *RolesAPIService) RolesListRolesExecute(r ApiRolesListRolesRequest) (*Ro
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-type ApiRolesRemoveRoleRequest struct {
-	ctx context.Context
-	ApiService *RolesAPIService
-	body *RolesRemoveRoleRequest
-}
-
-func (r ApiRolesRemoveRoleRequest) Body(body RolesRemoveRoleRequest) ApiRolesRemoveRoleRequest {
-	r.body = &body
-	return r
-}
-
-func (r ApiRolesRemoveRoleRequest) Execute() (map[string]interface{}, *http.Response, error) {
-	return r.ApiService.RolesRemoveRoleExecute(r)
-}
-
-/*
-RolesRemoveRole Remove role
-
-Removes a role from a user within a domain
-
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @return ApiRolesRemoveRoleRequest
-*/
-func (a *RolesAPIService) RolesRemoveRole(ctx context.Context) ApiRolesRemoveRoleRequest {
-	return ApiRolesRemoveRoleRequest{
-		ApiService: a,
-		ctx: ctx,
-	}
-}
-
-// Execute executes the request
-//  @return map[string]interface{}
-func (a *RolesAPIService) RolesRemoveRoleExecute(r ApiRolesRemoveRoleRequest) (map[string]interface{}, *http.Response, error) {
-	var (
-		localVarHTTPMethod   = http.MethodPatch
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "RolesAPIService.RolesRemoveRole")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/api/v1/roles/remove"
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.body == nil {
-		return localVarReturnValue, nil, reportError("body is required and must be specified")
-	}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	// body params
-	localVarPostBody = r.body
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err

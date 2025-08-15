@@ -189,7 +189,7 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 			return err
 		}
 
-		invitation.Status = models.InvitationStatusAccepted
+		invitation.State = models.InvitationStateAccepted
 		invitation.UpdatedAt = time.Now()
 		err = tx.Save(&invitation).Error
 		if err != nil {

@@ -103,7 +103,7 @@ func (a *Account) FindPendingInvitations() ([]OrganizationInvitation, error) {
 
 	err := database.Conn().
 		Where("email = ?", a.Email).
-		Where("status = ?", InvitationStatusPending).
+		Where("state = ?", InvitationStatePending).
 		Find(&invitations).
 		Error
 

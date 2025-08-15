@@ -472,7 +472,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		Description string `json:"description"`
 	}
 
-	organizations, err := models.FindUserOrganizationsByEmail(account.Email)
+	organizations, err := models.FindOrganizationsForAccount(account.Email)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

@@ -59,6 +59,17 @@ service Organizations {
     };
   }
 
+  rpc RemoveUser(RemoveUserRequest) returns (RemoveUserResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/organizations/{id}/users/{user_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove a user from an organization";
+      description: "Removes a user from an organization (can be referenced by ID or name)";
+      tags: "Organization";
+    };
+  }
+
   rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
     option (google.api.http) = {
       post: "/api/v1/organizations/{id}/invitations"
@@ -81,7 +92,6 @@ service Organizations {
       tags: "Organization";
     };
   }
-
 }
 
 message Organization {
@@ -124,7 +134,7 @@ message Invitation {
   string id = 1;
   string organization_id = 2;
   string email = 3;
-  string status = 4;
+  string state = 4;
   google.protobuf.Timestamp created_at = 5;
 }
 
@@ -145,6 +155,12 @@ message ListInvitationsResponse {
   repeated Invitation invitations = 1;
 }
 
+message RemoveUserRequest {
+  string id = 1;
+  string user_id = 2;
+}
+
+message RemoveUserResponse {}
 
 // Event messages for organization lifecycle events
 message OrganizationCreated {

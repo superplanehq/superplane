@@ -89,7 +89,7 @@ func authenticateUserByToken(r *http.Request) (*models.User, error) {
 	}
 
 	hashedToken := crypto.HashToken(headerParts[1])
-	return models.FindUserByTokenHash(hashedToken)
+	return models.FindActiveUserByTokenHash(hashedToken)
 }
 
 func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.User, error) {
@@ -108,7 +108,7 @@ func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.U
 		return nil, err
 	}
 
-	return models.FindUserByEmail(organizationID, account.Email)
+	return models.FindActiveUserByEmail(organizationID, account.Email)
 }
 
 func findOrganizationID(r *http.Request) string {

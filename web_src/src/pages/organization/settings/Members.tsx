@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableCell
 } from '../../../components/Table/table'
-import { useOrganizationUsers, useOrganizationRoles, useAssignRole, useRemoveRole } from '../../../hooks/useOrganizationData'
+import { useOrganizationUsers, useOrganizationRoles, useAssignRole, useRemoveOrganizationUser } from '../../../hooks/useOrganizationData'
 
 interface Member {
   id: string
@@ -46,9 +46,9 @@ export function Members({ organizationId }: MembersProps) {
   const { data: users = [], isLoading: loadingMembers, error: usersError } = useOrganizationUsers(organizationId)
   const { data: organizationRoles = [], isLoading: loadingRoles, error: rolesError } = useOrganizationRoles(organizationId)
 
-  // Mutations for role assignment
+  // Mutations for role assignment and user removal
   const assignRoleMutation = useAssignRole(organizationId)
-  const removeRoleMutation = useRemoveRole(organizationId)
+  const removeUserMutation = useRemoveOrganizationUser(organizationId)
 
   const error = usersError || rolesError
 
@@ -134,15 +134,8 @@ export function Members({ organizationId }: MembersProps) {
 
   const handleMemberRemove = async (memberId: string) => {
     try {
-      // Find the member to get their current role
-      const member = members.find(m => m.id === memberId)
-      if (!member) {
-        return
-      }
-
-      await removeRoleMutation.mutateAsync({
+      await removeUserMutation.mutateAsync({
         userId: memberId,
-        roleName: member.roleName,
       })
     } catch (err) {
       console.error('Error removing member:', err)

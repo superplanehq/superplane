@@ -22,7 +22,7 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	user, err := models.FindUserByID(orgID, userID)
+	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}

@@ -88,10 +88,10 @@ func FindUser(org, id, email string) (*models.User, error) {
 			return nil, fmt.Errorf("invalid user ID: %v", err)
 		}
 
-		return models.FindUserByID(orgID.String(), userID.String())
+		return models.FindActiveUserByID(orgID.String(), userID.String())
 	}
 
-	return models.FindUserByEmail(orgID.String(), email)
+	return models.FindActiveUserByEmail(orgID.String(), email)
 }
 
 func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {

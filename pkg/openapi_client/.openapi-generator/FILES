@@ -71,12 +71,11 @@ docs/OrganizationsUpdateOrganizationResponse.md
 docs/ProtobufAny.md
 docs/ProtobufNullValue.md
 docs/RolesAPI.md
-docs/RolesAssignRoleRequest.md
+docs/RolesAssignRoleBody.md
 docs/RolesCreateRoleRequest.md
 docs/RolesCreateRoleResponse.md
 docs/RolesDescribeRoleResponse.md
 docs/RolesListRolesResponse.md
-docs/RolesRemoveRoleRequest.md
 docs/RolesRole.md
 docs/RolesRoleMetadata.md
 docs/RolesRoleSpec.md
@@ -97,6 +96,7 @@ docs/SecretsUpdateSecretResponse.md
 docs/SpecGroupBy.md
 docs/SpecTimeoutBehavior.md
 docs/StageAPI.md
+docs/SuperplaneAddUserBody.md
 docs/SuperplaneApproveStageEventResponse.md
 docs/SuperplaneCanvas.md
 docs/SuperplaneCanvasMetadata.md
@@ -228,12 +228,11 @@ model_organizations_update_organization_body.go
 model_organizations_update_organization_response.go
 model_protobuf_any.go
 model_protobuf_null_value.go
-model_roles_assign_role_request.go
+model_roles_assign_role_body.go
 model_roles_create_role_request.go
 model_roles_create_role_response.go
 model_roles_describe_role_response.go
 model_roles_list_roles_response.go
-model_roles_remove_role_request.go
 model_roles_role.go
 model_roles_role_metadata.go
 model_roles_role_spec.go
@@ -252,6 +251,7 @@ model_secrets_update_secret_body.go
 model_secrets_update_secret_response.go
 model_spec_group_by.go
 model_spec_timeout_behavior.go
+model_superplane_add_user_body.go
 model_superplane_approve_stage_event_response.go
 model_superplane_canvas.go
 model_superplane_canvas_metadata.go

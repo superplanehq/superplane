@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
+\restrict HgwL9cehz8gA1JiuMUhC8deOrcvkCtf5RfRLqKbsKj4jP129YqkgERCk8lZXKdb
+
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
--- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -286,7 +288,7 @@ CREATE TABLE public.organization_invitations (
     organization_id uuid NOT NULL,
     email character varying(255) NOT NULL,
     invited_by uuid NOT NULL,
-    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -451,6 +453,7 @@ CREATE TABLE public.users (
     email character varying(255),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    deleted_at timestamp without time zone,
     organization_id uuid NOT NULL,
     token_hash character varying(250)
 );
@@ -621,14 +624,6 @@ ALTER TABLE ONLY public.integrations
 
 ALTER TABLE ONLY public.integrations
     ADD CONSTRAINT integrations_pkey PRIMARY KEY (id);
-
-
---
--- Name: organization_invitations organization_invitations_organization_id_email_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_invitations
-    ADD CONSTRAINT organization_invitations_organization_id_email_key UNIQUE (organization_id, email);
 
 
 --
@@ -1080,12 +1075,16 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
+\unrestrict HgwL9cehz8gA1JiuMUhC8deOrcvkCtf5RfRLqKbsKj4jP129YqkgERCk8lZXKdb
+
 --
 -- PostgreSQL database dump
 --
 
+\restrict 5DoteuaSQTfujuqsGCa61ber016id0Nt1VO4kQkZcf7LgKv35s8BGDtjTTeaga3
+
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
--- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1111,4 +1110,6 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 5DoteuaSQTfujuqsGCa61ber016id0Nt1VO4kQkZcf7LgKv35s8BGDtjTTeaga3
 

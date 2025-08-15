@@ -24,7 +24,7 @@ func Test_AddUserToGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("add user to group with user ID", func(t *testing.T) {
-		newUser := support.CreateUser(t, r.Organization.ID)
+		newUser := support.CreateUser(t, r, r.Organization.ID)
 		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, newUser.ID.String(), "", groupName, r.AuthService)
 		require.NoError(t, err)
 
@@ -36,7 +36,7 @@ func Test_AddUserToGroup(t *testing.T) {
 	})
 
 	t.Run("add user to organization group with email", func(t *testing.T) {
-		newUser := support.CreateUser(t, r.Organization.ID)
+		newUser := support.CreateUser(t, r, r.Organization.ID)
 		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "", newUser.Email, groupName, r.AuthService)
 		require.NoError(t, err)
 
@@ -72,7 +72,7 @@ func Test_AddUserToGroup(t *testing.T) {
 	})
 
 	t.Run("canvas group does not exist -> error", func(t *testing.T) {
-		newUser := support.CreateUser(t, r.Organization.ID)
+		newUser := support.CreateUser(t, r, r.Organization.ID)
 		_, err = AddUserToGroup(ctx, orgID, models.DomainTypeCanvas, r.Canvas.ID.String(), newUser.ID.String(), "", "non-existent-group", r.AuthService)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
@@ -86,7 +86,7 @@ func Test_AddUserToGroup(t *testing.T) {
 		err = r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, groupName, models.RoleCanvasAdmin, "", "")
 		require.NoError(t, err)
 
-		newUser := support.CreateUser(t, r.Organization.ID)
+		newUser := support.CreateUser(t, r, r.Organization.ID)
 		_, err = AddUserToGroup(ctx, orgID, models.DomainTypeCanvas, r.Canvas.ID.String(), newUser.ID.String(), "", groupName, r.AuthService)
 		require.NoError(t, err)
 

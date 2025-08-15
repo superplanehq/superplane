@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
@@ -21,6 +22,7 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 
 	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)
 	if err != nil {
+		log.Errorf("Error assigning role %s to %s: %v", roleName, user.ID.String(), err)
 		return nil, status.Error(codes.Internal, "failed to assign role")
 	}
 

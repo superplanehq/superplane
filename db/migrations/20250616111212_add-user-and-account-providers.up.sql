@@ -17,6 +17,7 @@ CREATE TABLE users (
   email           VARCHAR(255),
   created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  deleted_at      TIMESTAMP,
 
   UNIQUE(account_id, email),
   FOREIGN KEY (account_id) REFERENCES accounts(id)

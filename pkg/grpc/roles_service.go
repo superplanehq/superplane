@@ -28,13 +28,6 @@ func (s *RoleService) AssignRole(ctx context.Context, req *pb.AssignRoleRequest)
 	return auth.AssignRole(ctx, orgID, domainType, domainID, req.RoleName, req.UserId, req.UserEmail, s.authService)
 }
 
-func (s *RoleService) RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest) (*pb.RemoveRoleResponse, error) {
-	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.RemoveRole(ctx, orgID, domainType, domainID, req.RoleName, req.UserId, req.UserEmail, s.authService)
-}
-
 func (s *RoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequest) (*pb.ListRolesResponse, error) {
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
@@ -44,7 +37,7 @@ func (s *RoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequest) (
 func (s *RoleService) DescribeRole(ctx context.Context, req *pb.DescribeRoleRequest) (*pb.DescribeRoleResponse, error) {
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.DescribeRole(ctx, domainType, domainID, req.Role, s.authService)
+	return auth.DescribeRole(ctx, domainType, domainID, req.RoleName, s.authService)
 }
 
 func (s *RoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb.CreateRoleResponse, error) {

@@ -6,7 +6,7 @@ import {
   groupsDescribeGroup,
   groupsListGroupUsers,
   rolesAssignRole,
-  rolesRemoveRole,
+  organizationsRemoveUser,
   groupsCreateGroup,
   groupsUpdateGroup,
   groupsDeleteGroup,
@@ -173,10 +173,12 @@ export const useAssignRole = (organizationId: string) => {
     }) => {
       return await rolesAssignRole(
         withOrganizationHeader({
+          path: {
+            roleName: params.roleName,
+          },
           body: {
             userId: params.userId,
             userEmail: params.userEmail,
-            roleName: params.roleName,
             domainType: 'DOMAIN_TYPE_ORGANIZATION',
             domainId: organizationId
           },
@@ -189,21 +191,18 @@ export const useAssignRole = (organizationId: string) => {
   })
 }
 
-export const useRemoveRole = (organizationId: string) => {
+export const useRemoveOrganizationUser = (organizationId: string) => {
   const queryClient = useQueryClient()
   
   return useMutation({
     mutationFn: async (params: { 
-      userId: string, 
-      roleName: string,
+      userId: string,
     }) => {
-      return await rolesRemoveRole(
+      return await organizationsRemoveUser(
         withOrganizationHeader({
-          body: {
-            userId: params.userId,
-            roleName: params.roleName,
-            domainType: 'DOMAIN_TYPE_ORGANIZATION',
-            domainId: organizationId
+          path: {
+            id: organizationId,
+            userId: params.userId
           }
         })
       )

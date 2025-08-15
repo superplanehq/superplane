@@ -1,23 +1,14 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react'
+import { useState, forwardRef, useImperativeHandle, useMemo } from 'react'
 import { Button } from '../../Button/button'
 import { Input, InputGroup } from '../../Input/input'
 import { Avatar } from '../../Avatar/avatar'
 import { Checkbox } from '../../Checkbox/checkbox'
-import {
-  Dropdown,
-  DropdownButton,
-  DropdownMenu,
-  DropdownItem,
-  DropdownLabel,
-  DropdownDescription
-} from '../../Dropdown/dropdown'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Text } from '../../Text/text'
 import {
-  useCanvasRoles,
   useCanvasUsers,
   useOrganizationUsersForCanvas,
-  useAssignCanvasRole
+  useAddCanvasUser
 } from '../../../hooks/useCanvasData'
 
 interface AddCanvasMembersSectionProps {
@@ -33,20 +24,16 @@ export interface AddCanvasMembersSectionRef {
 
 const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, AddCanvasMembersSectionProps>(
   ({ canvasId, organizationId, onMemberAdded, className }, ref) => {
-    const [bulkUserRole, setBulkUserRole] = useState('')
     const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
     const [memberSearchTerm, setMemberSearchTerm] = useState('')
 
-
-    const { data: canvasRoles = [], isLoading: loadingRoles, error: rolesError } = useCanvasRoles(canvasId)
     const { data: canvasUsers = [] } = useCanvasUsers(canvasId)
     const { data: orgUsers = [], isLoading: loadingOrgUsers, error: orgUsersError } = useOrganizationUsersForCanvas(organizationId)
 
+    const addUserMutation = useAddCanvasUser(canvasId)
 
-    const assignRoleMutation = useAssignCanvasRole(canvasId)
-
-    const isInviting = assignRoleMutation.isPending
-    const error = rolesError || orgUsersError
+    const isInviting = addUserMutation.isPending
+    const error = orgUsersError
 
 
 
@@ -56,15 +43,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
     }, [orgUsers, canvasUsers])
 
     const loadingMembers = loadingOrgUsers
-
-
-    useEffect(() => {
-      if (canvasRoles.length > 0) {
-        const canvasMemberRole = canvasRoles.find(role => role.metadata?.name?.includes('member'))
-        const defaultRole = canvasMemberRole?.metadata?.name || canvasRoles[0]?.metadata?.name || ''
-        setBulkUserRole(defaultRole)
-      }
-    }, [canvasRoles])
 
 
     useImperativeHandle(ref, () => ({
@@ -79,27 +57,11 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
 
       try {
         const selectedUsers = existingMembers.filter(member => selectedMembers.has(member.metadata!.id!))
-        const roleToAssign = bulkUserRole
-
 
         for (const member of selectedUsers) {
-
-          try {
-            await assignRoleMutation.mutateAsync({
-              userId: member.metadata?.id,
-              role: roleToAssign
-            })
-          } catch (err) {
-
-            if (member.metadata?.email) {
-              await assignRoleMutation.mutateAsync({
-                userEmail: member.metadata?.email,
-                role: roleToAssign
-              })
-            } else {
-              throw err
-            }
-          }
+          await addUserMutation.mutateAsync({
+            userId: member.metadata?.id!,
+          })
         }
 
         setSelectedMembers(new Set())
@@ -149,17 +111,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
           </div>
         )}
 
-        {(loadingRoles) && (
-          <div className="flex justify-center items-center h-20">
-            <p className="text-zinc-500 dark:text-zinc-400">
-              {loadingRoles && 'Loading roles...'}
-            </p>
-          </div>
-        )}
-
-        {!loadingRoles && (
-
-          <div className="space-y-4">
+        <div className="space-y-4">
             <div className="flex items-center justify-between">
               <InputGroup>
                 <Input
@@ -191,27 +143,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                   {isInviting ? 'Adding...' : `Add ${selectedMembers.size} member${selectedMembers.size === 1 ? '' : 's'}`}
                 </Button>
               </div>
-            </div>
-
-            {/* Role Selection for Existing Members */}
-            <div className="flex items-center gap-2">
-              <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                Role for selected members:
-              </Text>
-              <Dropdown>
-                <DropdownButton outline className="flex items-center gap-2 text-sm">
-                  {bulkUserRole ? canvasRoles.find(r => r.metadata?.name === bulkUserRole)?.spec?.displayName || bulkUserRole : 'Select Role'}
-                  <MaterialSymbol name="keyboard_arrow_down" />
-                </DropdownButton>
-                <DropdownMenu>
-                  {canvasRoles.map((role) => (
-                    <DropdownItem key={role.metadata?.name} onClick={() => setBulkUserRole(role.metadata?.name || '')}>
-                      <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
-                      <DropdownDescription>{role.spec?.description || ''}</DropdownDescription>
-                    </DropdownItem>
-                  ))}
-                </DropdownMenu>
-              </Dropdown>
             </div>
 
             {loadingMembers ? (
@@ -263,8 +194,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                 )}
               </div>
             )}
-          </div>
-        )}
+        </div>
       </div>
     )
   })

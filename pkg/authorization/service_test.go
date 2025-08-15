@@ -69,11 +69,15 @@ func Test__AuthService_BasicPermissions(t *testing.T) {
 		assert.True(t, allowed)
 
 		// Test member permissions
-		allowed, err = r.AuthService.CheckCanvasPermission(userID, canvasID, "member", "invite")
+		allowed, err = r.AuthService.CheckCanvasPermission(userID, canvasID, "member", "create")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
-		allowed, err = r.AuthService.CheckCanvasPermission(userID, canvasID, "member", "remove")
+		allowed, err = r.AuthService.CheckCanvasPermission(userID, canvasID, "member", "update")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+
+		allowed, err = r.AuthService.CheckCanvasPermission(userID, canvasID, "member", "delete")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 	})
@@ -138,14 +142,14 @@ func Test__AuthService_BasicPermissions(t *testing.T) {
 		assert.True(t, allowed)
 
 		// Should have member invite permission
-		allowed, err = r.AuthService.CheckCanvasPermission(adminID, canvasID, "member", "invite")
+		allowed, err = r.AuthService.CheckCanvasPermission(adminID, canvasID, "member", "create")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
-		// Should not have member remove permission (owner only)
-		allowed, err = r.AuthService.CheckCanvasPermission(adminID, canvasID, "member", "remove")
+		// Should have member remove permission (owner only)
+		allowed, err = r.AuthService.CheckCanvasPermission(adminID, canvasID, "member", "delete")
 		require.NoError(t, err)
-		assert.False(t, allowed)
+		assert.True(t, allowed)
 	})
 }
 
@@ -167,11 +171,15 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		}
 
 		// Should have user management permissions (inherited from admin)
-		allowed, err := r.AuthService.CheckOrganizationPermission(userID, orgID, "user", "invite")
+		allowed, err := r.AuthService.CheckOrganizationPermission(userID, orgID, "member", "create")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
-		allowed, err = r.AuthService.CheckOrganizationPermission(userID, orgID, "user", "remove")
+		allowed, err = r.AuthService.CheckOrganizationPermission(userID, orgID, "member", "update")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+
+		allowed, err = r.AuthService.CheckOrganizationPermission(userID, orgID, "member", "delete")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
@@ -199,11 +207,15 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		}
 
 		// Should have user management permissions
-		allowed, err := r.AuthService.CheckOrganizationPermission(adminID, orgID, "user", "invite")
+		allowed, err := r.AuthService.CheckOrganizationPermission(adminID, orgID, "member", "create")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
-		allowed, err = r.AuthService.CheckOrganizationPermission(adminID, orgID, "user", "remove")
+		allowed, err = r.AuthService.CheckOrganizationPermission(adminID, orgID, "member", "update")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+
+		allowed, err = r.AuthService.CheckOrganizationPermission(adminID, orgID, "member", "delete")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
@@ -236,7 +248,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		}
 
 		// Should not have user management permissions
-		allowed, err = r.AuthService.CheckOrganizationPermission(viewerID, orgID, "user", "invite")
+		allowed, err = r.AuthService.CheckOrganizationPermission(viewerID, orgID, "member", "create")
 		require.NoError(t, err)
 		assert.False(t, allowed)
 	})
@@ -575,17 +587,17 @@ func Test__AuthService_PermissionBoundaries(t *testing.T) {
 		require.NoError(t, err)
 
 		// Viewer should not have member remove permission
-		allowed, err := r.AuthService.CheckCanvasPermission(viewerID, canvasID, "member", "remove")
+		allowed, err := r.AuthService.CheckCanvasPermission(viewerID, canvasID, "member", "delete")
 		require.NoError(t, err)
 		assert.False(t, allowed)
 
-		// Admin should not have member remove permission
-		allowed, err = r.AuthService.CheckCanvasPermission(adminID, canvasID, "member", "remove")
+		// Admin should have member remove permission
+		allowed, err = r.AuthService.CheckCanvasPermission(adminID, canvasID, "member", "delete")
 		require.NoError(t, err)
-		assert.False(t, allowed)
+		assert.True(t, allowed)
 
 		// Owner should have member remove permission
-		allowed, err = r.AuthService.CheckCanvasPermission(r.User.String(), canvasID, "member", "remove")
+		allowed, err = r.AuthService.CheckCanvasPermission(r.User.String(), canvasID, "member", "delete")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 	})
