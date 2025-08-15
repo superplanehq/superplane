@@ -122,6 +122,7 @@ export function EventSourceWorkflowNodeReactFlow({
   // Webhook icon picker state
   const [currentIcon, setCurrentIcon] = useState<string>(data.icon || 'webhook');
   const [showIconModal, setShowIconModal] = useState(false);
+  const [iconSearchQuery, setIconSearchQuery] = useState('');
   
   // Available Material Symbol icons for webhook nodes
   const materialIconOptions = [
@@ -158,15 +159,33 @@ export function EventSourceWorkflowNodeReactFlow({
   // Combined icon options
   const allIconOptions = [...materialIconOptions, ...devopsIconOptions];
   
+  // Filter icons based on search query
+  const filteredMaterialIcons = materialIconOptions.filter(icon => 
+    icon.name.toLowerCase().includes(iconSearchQuery.toLowerCase()) ||
+    icon.label.toLowerCase().includes(iconSearchQuery.toLowerCase())
+  );
+  
+  const filteredDevopsIcons = devopsIconOptions.filter(icon => 
+    icon.name.toLowerCase().includes(iconSearchQuery.toLowerCase()) ||
+    icon.label.toLowerCase().includes(iconSearchQuery.toLowerCase())
+  );
+  
   // Handle icon change for webhook nodes
   const handleIconChange = useCallback((newIcon: string) => {
     setCurrentIcon(newIcon);
     setShowIconModal(false);
+    setIconSearchQuery(''); // Reset search when selecting an icon
     // Update the node data immediately so it shows in both edit and read mode
     if (data) {
       data.icon = newIcon;
     }
   }, [data]);
+
+  // Handle modal close to reset search
+  const handleIconModalClose = useCallback(() => {
+    setShowIconModal(false);
+    setIconSearchQuery(''); // Reset search when closing modal
+  }, []);
 
   // Helper function to render icon (Material Symbol or DevOps image)
   const renderIcon = useCallback((iconName: string, size: 'sm' | 'md' | 'lg' = 'lg') => {
@@ -1279,73 +1298,101 @@ export function EventSourceWorkflowNodeReactFlow({
       {/* Icon Selection Modal */}
       <Dialog
         open={showIconModal}
-        onClose={() => setShowIconModal(false)}
+        onClose={handleIconModalClose}
         className="relative z-50"
-        size="lg"
+        size="md"
       >
         <DialogTitle>Choose Icon</DialogTitle>
         <DialogDescription>
           Select an icon to represent your webhook event source
         </DialogDescription>
         
-        <DialogBody className="space-y-6">
-          {/* Material Symbol Icons */}
+        <DialogBody className="space-y-4">
+          {/* Search Input */}
           <div>
-            <div className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-             Icons
-            </div>
-            <div className="grid grid-cols-8 gap-3">
-              {materialIconOptions.map((iconOption) => (
-                <button
-                  key={iconOption.name}
-                  onClick={() => handleIconChange(iconOption.name)}
-                  className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${
-                    currentIcon === iconOption.name
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-md'
-                      : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-gray-100 dark:hover:bg-zinc-700'
-                  }`}
-                  title={iconOption.label}
-                >
-                  <MaterialSymbol name={iconOption.name} size="lg" />
-                </button>
-              ))}
-            </div>
+            <Field>
+              
+              <Input
+                type="text"
+                value={iconSearchQuery}
+                onChange={(e) => setIconSearchQuery(e.target.value)}
+                placeholder="Search by name or type (e.g., webhook, docker, github...)"
+                className="w-full"
+                autoFocus
+              />
+            </Field>
           </div>
 
+          {/* Material Symbol Icons */}
+          {filteredMaterialIcons.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                Icons ({filteredMaterialIcons.length})
+              </div>
+              <div className="grid grid-cols-6 gap-3">
+                {filteredMaterialIcons.map((iconOption) => (
+                  <button
+                    key={iconOption.name}
+                    onClick={() => handleIconChange(iconOption.name)}
+                    className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                      currentIcon === iconOption.name
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-md'
+                        : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-gray-100 dark:hover:bg-zinc-700'
+                    }`}
+                    title={iconOption.label}
+                  >
+                    <MaterialSymbol name={iconOption.name} size="lg" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* DevOps Tool Icons */}
-          <div>
-            <div className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-              DevOps Tools
+          {filteredDevopsIcons.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                DevOps Tools ({filteredDevopsIcons.length})
+              </div>
+              <div className="grid grid-cols-6 gap-3">
+                {filteredDevopsIcons.map((iconOption) => (
+                  <button
+                    key={iconOption.name}
+                    onClick={() => handleIconChange(iconOption.name)}
+                    className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                      currentIcon === iconOption.name
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                        : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-gray-100 dark:hover:bg-zinc-700'
+                    }`}
+                    title={iconOption.label}
+                  >
+                    <img 
+                      width={24} 
+                      height={24} 
+                      src={iconOption.icon} 
+                      alt={iconOption.label} 
+                      className="flex-shrink-0"
+                    />
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-8 gap-3">
-              {devopsIconOptions.map((iconOption) => (
-                <button
-                  key={iconOption.name}
-                  onClick={() => handleIconChange(iconOption.name)}
-                  className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${
-                    currentIcon === iconOption.name
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
-                      : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-gray-100 dark:hover:bg-zinc-700'
-                  }`}
-                  title={iconOption.label}
-                >
-                  <img 
-                    width={24} 
-                    height={24} 
-                    src={iconOption.icon} 
-                    alt={iconOption.label} 
-                    className="flex-shrink-0"
-                  />
-                </button>
-              ))}
+          )}
+
+          {/* No Results */}
+          {iconSearchQuery && filteredMaterialIcons.length === 0 && filteredDevopsIcons.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-zinc-400">
+              <MaterialSymbol name="search_off" size="lg" className="mb-2" />
+              <div className="text-sm">No icons found for "{iconSearchQuery}"</div>
+              <div className="text-xs mt-1">Try searching for a different term</div>
             </div>
-          </div>
+          )}
         </DialogBody>
 
         <DialogActions>
           <Button
             color='white'
-            onClick={() => setShowIconModal(false)}
+            onClick={handleIconModalClose}
           >
             Cancel
           </Button>
