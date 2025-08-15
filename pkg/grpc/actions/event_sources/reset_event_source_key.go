@@ -23,7 +23,7 @@ func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvas
 		return nil, err
 	}
 
-	plainKey, encryptedKey, err := crypto.NewRandomKey(ctx, encryptor, source.Name)
+	plainKey, encryptedKey, err := crypto.NewRandomKey(ctx, encryptor, source.ID.String())
 	if err != nil {
 		log.Errorf("Error generating new key for event source %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, status.Error(codes.Internal, "error generating key")
