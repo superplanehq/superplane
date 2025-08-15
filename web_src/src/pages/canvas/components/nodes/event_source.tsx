@@ -49,7 +49,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
-  const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
@@ -83,7 +83,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setEditingEventSource(props.id);
     setEventSourceName(props.data.name);
     setEventSourceDescription(props.data.description || '');
-    
+
     // Initialize currentFormData with existing event source data for editing
     if (currentEventSource?.spec) {
       setCurrentFormData({
@@ -230,8 +230,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     if (eventSourceKey && eventSourceType === 'webhook' && !isNewNode) {
       setIsEditMode(true);
       setEditingEventSource(props.id);
+      setFocusedNodeId(props.id);
+      setTimeout(() => {
+        const currentNodes = useCanvasStore.getState().nodes;
+        const updatedNodes = currentNodes.map(node => ({
+          ...node,
+          selected: node.id === props.id
+        }));
+        setNodes(updatedNodes);
+      }, 100);
     }
-  }, [eventSourceKey, eventSourceType, isNewNode, props.id, setEditingEventSource]);
+  }, [eventSourceKey, eventSourceType, isNewNode, props.id, setEditingEventSource, setNodes, setFocusedNodeId]);
 
   const handleNodeClick = () => {
     if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {

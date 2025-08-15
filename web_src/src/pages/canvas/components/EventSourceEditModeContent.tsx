@@ -45,6 +45,7 @@ export function EventSourceEditModeContent({
   const [eventTypes, setEventTypes] = useState<EventSourceEventType[]>(data.events || []);
   const [apiValidationErrors, setApiValidationErrors] = useState<Record<string, string>>({});
   const [isKeyRevealed, setIsKeyRevealed] = useState(false);
+  const [showWebhookInstructions, setShowWebhookInstructions] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const resourceNameRef = useRef<HTMLInputElement | null>(null);
   const updateEventSourceKey = useCanvasStore(state => state.updateEventSourceKey)
@@ -301,6 +302,23 @@ export function EventSourceEditModeContent({
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
   const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+
+  const webhookUrl = useMemo(() => {
+    return `https://superplane.sxmoon.com/api/v1/sources/${data.id}`;
+  }, [data.id]);
+
+  const webhookExampleCode = useMemo(() => {
+    return `export SOURCE_KEY="${eventSourceKey || 'SOURCE_KEY'}"
+export URL="${webhookUrl || 'WEBHOOK_URL'}"
+export EVENT='{"ref":"v1.0","ref_type":"tag"}'
+export SIGNATURE=$(echo -n "$EVENT" | openssl dgst -sha256 -hmac "$SOURCE_KEY" | awk '{print $2}')
+
+curl -X POST \\
+  -H "X-Signature-256: sha256=$SIGNATURE" \\
+  -H "Content-Type: application/json" \\
+  --data "$EVENT" \\
+  $URL`;
+  }, [eventSourceKey, webhookUrl]);
 
   const allIntegrations = [...canvasIntegrations, ...orgIntegrations];
   const availableIntegrations = allIntegrations.filter(int => int.spec?.type === eventSourceType);
@@ -572,13 +590,13 @@ export function EventSourceEditModeContent({
                       <div className="flex">
                         <input
                           type="text"
-                          value={`https://superplane.sxmoon.com/api/v1/sources/${data.id}`}
+                          value={webhookUrl}
                           readOnly
                           className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none"
                         />
                         <Button
                           outline
-                          onClick={() => navigator.clipboard.writeText(`https://superplane.sxmoon.com/api/v1/sources/${data.id}`)}
+                          onClick={() => navigator.clipboard.writeText(webhookUrl)}
                           className="rounded-l-none border-l-0 px-3 py-2 text-sm flex items-center"
                         >
                           <MaterialSymbol name="content_copy" size="sm" />
@@ -617,6 +635,40 @@ export function EventSourceEditModeContent({
 
                       </div>
                     )}
+
+                    <div className="nodrag rounded-md border border-gray-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-4 relative">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">You will need to sign the webhook payload for events to be delivered.</div>
+                          <button
+                            type="button"
+                            className="mt-2 text-sm text-blue-600 dark:text-blue-300 hover:underline"
+                            onClick={() => setShowWebhookInstructions(!showWebhookInstructions)}
+                          >
+                            See how to use this
+                          </button>
+                          {showWebhookInstructions && (
+                            <div className="relative mt-3">
+                              <textarea
+                                readOnly
+                                value={webhookExampleCode}
+                                className="nodrag w-full text-xs text-zinc-700 dark:text-zinc-300 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 p-2 pr-10 rounded font-mono resize-none focus:outline-none overflow-scroll"
+                                style={{ height: '370px' }}
+                              />
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(webhookExampleCode);
+                                }}
+                                className="absolute top-2 right-2 p-1 text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 bg-white dark:bg-zinc-700 rounded border border-gray-200 dark:border-gray-600 h-6 w-6 flex items-center"
+                              >
+                                <MaterialSymbol name="content_copy" size="sm" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="mt-3">
                       <Button
                         outline
@@ -635,7 +687,7 @@ export function EventSourceEditModeContent({
         )}
 
         {/* Event Types and Filters Section */}
-        <EditableAccordionSection
+        {!requireIntegration || availableIntegrations.length > 0 && <EditableAccordionSection
           id="filters"
           title="Filters"
           isOpen={openSections.includes('filters')}
@@ -767,7 +819,7 @@ export function EventSourceEditModeContent({
               Add Event Type
             </button>
           </div>
-        </EditableAccordionSection>
+        </EditableAccordionSection>}
       </div>
 
       <ConfirmDialog

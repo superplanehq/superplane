@@ -63,14 +63,14 @@ export function CanvasNavigation({
       </div>
 
       {/* Canvas Dropdown */}
-      <div className='flex px-2 hover:bg-zinc-300 dark:hover:bg-zinc-800'>
+      <div className='flex px-2 hover:bg-zinc-300 dark:hover:bg-zinc-800 h-full'>
         <Dropdown>
           <Headless.MenuButton
-            className="flex items-center gap-3 rounded-xl border border-transparent p-1 data-active:border-zinc-200 data-hover:border-zinc-200 dark:data-active:border-zinc-700 dark:data-hover:border-zinc-700"
+            className="h-full flex items-center gap-3 rounded-xl p-1 data-active:border-zinc-200 data-hover:border-zinc-200 dark:data-active:border-zinc-700 dark:data-hover:border-zinc-700"
             aria-label="Canvas options"
           >
             <span className="block text-left">
-              <span className="block text-md font-bold text-zinc-950 dark:text-white">
+              <span className="block text-md font-bold text-zinc-950 dark:text-white truncate">
                 {canvasName}
               </span>
             </span>
@@ -94,7 +94,7 @@ export function CanvasNavigation({
       <div className="flex items-center justify-between w-full h-full">
         <ControlledTabs
           tabs={navigationTabs}
-          activeTab={activeView === 'delete' ? 'secrets' : activeView}
+          activeTab={activeView === 'delete' ? '' : activeView}
           variant='dark-underline'
           onTabChange={(tabId) => onViewChange(tabId as CanvasView)}
         />
