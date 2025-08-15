@@ -1128,10 +1128,10 @@ export function NodeDetailsSidebar({
            <div className="space-y-1">
              {Object.entries(inputs || {}).map(([key, value]) => (
                <div key={key} className="flex items-center justify-between">
-                 <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
+                 <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono">Node_name.{key}</span>
                  <div className="flex items-center gap-2 truncate">
-                   <Badge color='blue'></Badge>
-                   <Badge className='font-mono !text-xs truncate'>
+                   
+                   <Badge color='zinc' className='font-mono !text-xs truncate'>
                      {value}
                    </Badge>
                  
@@ -1291,12 +1291,12 @@ export function NodeDetailsSidebar({
                   const isExpanded = expandedRuns.has(run.id);
                   
                   return (
-                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 cursor-pointer "+statusConfig.bgColor + " " + statusConfig.borderColor } >
+                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 "+statusConfig.bgColor + " " + statusConfig.borderColor } >
                       <div 
                         className="p-3"
-                        onClick={() => toggleRunExpansion(run.id)}
+                        
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleRunExpansion(run.id)}>
                           <div className="flex items-center gap-2 truncate pr-2">
                               
                               <MaterialSymbol 
@@ -1338,7 +1338,7 @@ export function NodeDetailsSidebar({
                                 )}
                                 {run.status == 'running' && (
                                 <BadgeButton color='blue' className='!flex !items-center'>
-                                   <span className='animate-spin'><MaterialSymbol name='sync' size='sm'/></span>
+                                  <MaterialSymbol name='sync' size='sm' className='animate-spin'/>
                                   <span className='uppercase'>{run.status}</span>
                                 </BadgeButton>
                                 )}
@@ -1350,14 +1350,16 @@ export function NodeDetailsSidebar({
                              
                               
                               <div className='flex items-center gap-4 mb-1'>
+                              <div className='flex items-center gap-1'>
+                                  <MaterialSymbol name='calendar_today' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
+                                    {run.status == 'running' ? 'Started on ' + run.timestamp : 'Finished on ' + run.timestamp}</span>
+                                </div>
                                 <div className='flex items-center gap-1'>
                                   <MaterialSymbol name='timer' size='md' className='text-gray-600 dark:text-zinc-400'/>
                                   <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">{run.duration}</span>
                                 </div>
-                                <div className='flex items-center gap-1'>
-                                  
-                                  <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">Finished on {run.timestamp}</span>
-                                </div>
+                               
                               </div>
                               <div className='flex items-center gap-1'>
                                 <MaterialSymbol name='bolt' size='md' className='text-gray-600 dark:text-zinc-400'/>
