@@ -691,6 +691,113 @@ export function WorkflowNodeAccordion({
   }
 
 
+  // Helper function to render the event trigger chain
+  const renderEventChainTooltip = (nodeData: WorkflowNodeData) => {
+    // Mock event chain data - in a real app, this would come from the backend
+    const eventChain = [
+      {
+        nodeId: 'webhook-event-source',
+        nodeName: 'Webhook Event Source',
+        eventId: 'evt_webhook_received_abc123',
+        timestamp: '2024-01-15 14:32:15',
+        type: 'webhook_received',
+        description: 'Incoming webhook from GitHub'
+      },
+      {
+        nodeId: 'validation-stage',
+        nodeName: 'Validation Stage',
+        eventId: 'run_completed_def456',
+        timestamp: '2024-01-15 14:33:02',
+        type: 'run_completed',
+        description: 'Code validation completed successfully',
+        triggeredBy: 'webhook-event-source'
+      },
+      {
+        nodeId: 'build-stage',
+        nodeName: 'Build Stage', 
+        eventId: 'run_completed_ghi789',
+        timestamp: '2024-01-15 14:35:18',
+        type: 'run_completed',
+        description: 'Build process completed',
+        triggeredBy: 'validation-stage'
+      },
+      {
+        nodeId: nodeData.id,
+        nodeName: nodeData.title,
+        eventId: nodeData.eventId || 'current_event',
+        timestamp: '2024-01-15 14:37:45',
+        type: 'run_started',
+        description: 'Current workflow execution',
+        triggeredBy: 'build-stage'
+      }
+    ];
+
+    return (
+      <div className="bg-white dark:bg-zinc-800 p-4 rounded-lg border border-gray-200 dark:border-zinc-700 max-w-sm">
+        <div className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+          Event Trigger Chain
+        </div>
+        <div className="space-y-3">
+          {eventChain.map((event, index) => {
+            const isCurrentNode = event.nodeId === nodeData.id;
+            const isLastEvent = index === eventChain.length - 1;
+            
+            return (
+              <div key={event.eventId} className="relative">
+                {/* Event item */}
+                <div className={`flex items-start gap-3 ${isCurrentNode ? 'bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-200 dark:border-blue-800' : ''}`}>
+                  {/* Timeline dot */}
+                  <div className="relative flex-shrink-0 mt-1">
+                    <div className={`w-2 h-2 rounded-full ${isCurrentNode ? 'bg-blue-500' : 'bg-gray-400 dark:bg-zinc-500'}`}></div>
+                    {!isLastEvent && (
+                      <div className="absolute top-2 left-1 w-px h-6 bg-gray-300 dark:bg-zinc-600"></div>
+                    )}
+                  </div>
+                  
+                  {/* Event details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-medium truncate ${isCurrentNode ? 'text-blue-900 dark:text-blue-100' : 'text-gray-900 dark:text-white'}`}>
+                        {event.nodeName}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 flex-shrink-0 ml-2">
+                        {new Date(event.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+                      {event.description}
+                    </div>
+                    <div className="text-xs font-mono text-gray-500 dark:text-zinc-500 mt-1">
+                      {event.eventId}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Arrow connecting events */}
+                {!isLastEvent && event.triggeredBy && (
+                  <div className="flex items-center ml-4 mt-1 mb-1 text-xs text-gray-500 dark:text-zinc-400">
+                    <MaterialSymbol name="arrow_downward" size="sm" className="mr-1" />
+                    <span>triggered</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Summary */}
+        <div className="mt-4 pt-3 border-t border-gray-200 dark:border-zinc-700">
+          <div className="text-xs text-gray-600 dark:text-zinc-400">
+            <span className="font-medium">Current trigger:</span> {nodeData.triggeredBy || 'Unknown'}
+          </div>
+          <div className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+            <span className="font-medium">Event ID:</span> <span className="font-mono">{nodeData.eventId || 'N/A'}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Helper function to render inputs in tooltip format
   const renderInputsTooltip = (outputs = false, inputs: Array<{name: string, type: string, required?: boolean, defaultValue?: any}>) => {
     if (!inputs || inputs.length === 0) return null;
@@ -2603,24 +2710,9 @@ export function WorkflowNodeAccordion({
         </div>
         {/* Executor and connection info */}
         <div className="flex flex-wrap gap-2">
-          <Tippy content={
-            <div  className='bg-white dark:bg-zinc-800 p-2 rounded-lg border border-gray-200 dark:border-zinc-700'>
-              <div className="text-xs text-gray-600 dark:text-zinc-400">
-                <span>Triggered by: </span>
-                <span className="font-medium text-gray-800 dark:text-zinc-300">
-                  {data.triggeredBy || 'Semaphore Event Source'}
-                </span>
-              </div>
-              <div className="text-xs text-gray-600 dark:text-zinc-400">
-                <span>Event: </span>
-                <span className="font-mono font-medium text-gray-800 dark:text-zinc-300">
-                  {data.eventId || '423423-423423-423423'}
-                </span>
-              </div>
-            </div>
-          } placement='top' interactive={true}>
-              <BadgeButton className="text-xs" href="#">
-                <MaterialSymbol name="bolt" size="md"/> Event 423423....
+          <Tippy content={renderEventChainTooltip(data)} placement='top' interactive={true}>
+              <BadgeButton className="text-xs event-trigger" href="#">
+                <MaterialSymbol name="bolt" size="md"/> Event {data.eventId || '423423....'}
               </BadgeButton>
             </Tippy>
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
