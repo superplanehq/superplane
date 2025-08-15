@@ -150,9 +150,8 @@ var getIntegrationCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		idOrName := args[0]
-		domainType, domainID := getDomainOrExit(cmd)
-
 		c := DefaultClient()
+		domainType, domainID := getDomainOrExit(c, cmd)
 		response, httpResponse, err := c.IntegrationAPI.
 			IntegrationsDescribeIntegration(context.Background(), idOrName).
 			DomainId(domainID).

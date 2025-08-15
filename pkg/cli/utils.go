@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -33,11 +34,14 @@ func getOneOrAnotherFlag(cmd *cobra.Command, flag1, flag2 string, required bool)
 	return ""
 }
 
-func getDomainOrExit(cmd *cobra.Command) (string, string) {
+func getDomainOrExit(client *openapi_client.APIClient, cmd *cobra.Command) (string, string) {
 	canvasIdOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", false)
 	if canvasIdOrName != "" {
 		return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_CANVAS), canvasIdOrName
 	}
 
-	return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION), ""
+	response, _, err := client.MeAPI.MeMe(context.Background()).Execute()
+	Check(err)
+
+	return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION), *response.OrganizationId
 }

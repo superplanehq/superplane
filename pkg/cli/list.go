@@ -146,9 +146,9 @@ var listSecretsCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		domainType, domainID := getDomainOrExit(cmd)
-
 		c := DefaultClient()
+		domainType, domainID := getDomainOrExit(c, cmd)
+
 		response, httpResponse, err := c.SecretAPI.
 			SecretsListSecrets(context.Background()).
 			DomainId(domainID).
@@ -196,9 +196,8 @@ var listIntegrationsCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		domainType, domainID := getDomainOrExit(cmd)
-
 		c := DefaultClient()
+		domainType, domainID := getDomainOrExit(c, cmd)
 		response, httpResponse, err := c.IntegrationAPI.
 			IntegrationsListIntegrations(context.Background()).
 			DomainId(domainID).
