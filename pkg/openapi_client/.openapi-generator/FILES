@@ -9,6 +9,7 @@ api_event.go
 api_event_source.go
 api_groups.go
 api_integration.go
+api_me.go
 api_organization.go
 api_roles.go
 api_secret.go
@@ -55,6 +56,8 @@ docs/IntegrationsIntegrationRef.md
 docs/IntegrationsIntegrationSpec.md
 docs/IntegrationsListIntegrationsResponse.md
 docs/IntegrationsResourceRef.md
+docs/MeAPI.md
+docs/MeRegenerateTokenResponse.md
 docs/OrganizationAPI.md
 docs/OrganizationsCreateInvitationBody.md
 docs/OrganizationsCreateInvitationResponse.md
@@ -149,6 +152,7 @@ docs/SuperplaneListEventSourcesResponse.md
 docs/SuperplaneListEventsResponse.md
 docs/SuperplaneListStageEventsResponse.md
 docs/SuperplaneListStagesResponse.md
+docs/SuperplaneMeUser.md
 docs/SuperplaneOutputDefinition.md
 docs/SuperplaneOutputValue.md
 docs/SuperplaneResetEventSourceKeyResponse.md
@@ -163,6 +167,7 @@ docs/SuperplaneUpdateConnectionGroupBody.md
 docs/SuperplaneUpdateConnectionGroupResponse.md
 docs/SuperplaneUpdateStageBody.md
 docs/SuperplaneUpdateStageResponse.md
+docs/SuperplaneUsersUser.md
 docs/SuperplaneValueDefinition.md
 docs/SuperplaneValueFrom.md
 docs/SuperplaneValueFromEventData.md
@@ -173,7 +178,6 @@ docs/UsersAccountProvider.md
 docs/UsersListUserPermissionsResponse.md
 docs/UsersListUserRolesResponse.md
 docs/UsersListUsersResponse.md
-docs/UsersUser.md
 docs/UsersUserMetadata.md
 docs/UsersUserRoleAssignment.md
 docs/UsersUserSpec.md
@@ -212,6 +216,7 @@ model_integrations_integration_ref.go
 model_integrations_integration_spec.go
 model_integrations_list_integrations_response.go
 model_integrations_resource_ref.go
+model_me_regenerate_token_response.go
 model_organizations_create_invitation_body.go
 model_organizations_create_invitation_response.go
 model_organizations_describe_organization_response.go
@@ -302,6 +307,7 @@ model_superplane_list_event_sources_response.go
 model_superplane_list_events_response.go
 model_superplane_list_stage_events_response.go
 model_superplane_list_stages_response.go
+model_superplane_me_user.go
 model_superplane_output_definition.go
 model_superplane_output_value.go
 model_superplane_reset_event_source_key_response.go
@@ -316,6 +322,7 @@ model_superplane_update_connection_group_body.go
 model_superplane_update_connection_group_response.go
 model_superplane_update_stage_body.go
 model_superplane_update_stage_response.go
+model_superplane_users_user.go
 model_superplane_value_definition.go
 model_superplane_value_from.go
 model_superplane_value_from_event_data.go
@@ -325,7 +332,6 @@ model_users_account_provider.go
 model_users_list_user_permissions_response.go
 model_users_list_user_roles_response.go
 model_users_list_users_response.go
-model_users_user.go
 model_users_user_metadata.go
 model_users_user_role_assignment.go
 model_users_user_spec.go
@@ -337,6 +343,7 @@ test/api_event_source_test.go
 test/api_event_test.go
 test/api_groups_test.go
 test/api_integration_test.go
+test/api_me_test.go
 test/api_organization_test.go
 test/api_roles_test.go
 test/api_secret_test.go

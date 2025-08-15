@@ -150,9 +150,8 @@ var getIntegrationCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		idOrName := args[0]
-		domainType, domainID := getDomainOrExit(cmd)
-
 		c := DefaultClient()
+		domainType, domainID := getDomainOrExit(c, cmd)
 		response, httpResponse, err := c.IntegrationAPI.
 			IntegrationsDescribeIntegration(context.Background(), idOrName).
 			DomainId(domainID).
@@ -205,11 +204,9 @@ func init() {
 	getCmd.AddCommand(getSecretCmd)
 	getSecretCmd.Flags().String("canvas-id", "", "ID of the canvas, for canvas-level secrets")
 	getSecretCmd.Flags().String("canvas-name", "", "Name of the canvas, for canvas-level secrets")
-	getSecretCmd.Flags().String("organization-id", "", "ID of the organization, for organization-level secrets")
 
 	// Integration command
 	getCmd.AddCommand(getIntegrationCmd)
 	getIntegrationCmd.Flags().String("canvas-id", "", "ID of the canvas, for canvas-level integrations")
 	getIntegrationCmd.Flags().String("canvas-name", "", "Name of the canvas, for canvas-level integrations")
-	getIntegrationCmd.Flags().String("organization-id", "", "ID of the organization, for organization-level integrations")
 }

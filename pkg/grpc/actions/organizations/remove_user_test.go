@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -36,13 +37,16 @@ func Test_RemoveUser(t *testing.T) {
 		// Add new user to organization, and create new canvases for it.
 		//
 		newUser := support.CreateUser(t, r, r.Organization.ID)
+		plainToken, err := crypto.Base64String(64)
+		require.NoError(t, err)
+		require.NoError(t, newUser.UpdateTokenHash(crypto.HashToken(plainToken)))
 		canvas1 := support.CreateCanvas(t, r, r.Organization.ID, newUser.ID)
 		canvas2 := support.CreateCanvas(t, r, r.Organization.ID, newUser.ID)
 
 		//
 		// Remove the user from the organization
 		//
-		_, err := RemoveUser(ctx, r.AuthService, orgID, newUser.ID.String())
+		_, err = RemoveUser(ctx, r.AuthService, orgID, newUser.ID.String())
 		require.NoError(t, err)
 
 		//
@@ -55,6 +59,9 @@ func Test_RemoveUser(t *testing.T) {
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 		_, err = models.FindActiveUserByEmail(orgID, newUser.Email)
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindActiveUserByTokenHash(newUser.TokenHash)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		require.Empty(t, user.TokenHash)
 
 		//
 		// Verify no organization roles exist anymore for that user anymore

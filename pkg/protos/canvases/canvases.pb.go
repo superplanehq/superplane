@@ -695,10 +695,9 @@ func (Event_State) EnumDescriptor() ([]byte, []int) {
 }
 
 type ListCanvasesRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListCanvasesRequest) Reset() {
@@ -729,13 +728,6 @@ func (x *ListCanvasesRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListCanvasesRequest.ProtoReflect.Descriptor instead.
 func (*ListCanvasesRequest) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *ListCanvasesRequest) GetOrganizationId() string {
-	if x != nil {
-		return x.OrganizationId
-	}
-	return ""
 }
 
 type ListCanvasesResponse struct {
@@ -827,11 +819,10 @@ func (x *Canvas) GetMetadata() *Canvas_Metadata {
 }
 
 type CreateCanvasRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Canvas         *Canvas                `protobuf:"bytes,1,opt,name=canvas,proto3" json:"canvas,omitempty"`
-	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Canvas        *Canvas                `protobuf:"bytes,1,opt,name=canvas,proto3" json:"canvas,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateCanvasRequest) Reset() {
@@ -869,13 +860,6 @@ func (x *CreateCanvasRequest) GetCanvas() *Canvas {
 		return x.Canvas
 	}
 	return nil
-}
-
-func (x *CreateCanvasRequest) GetOrganizationId() string {
-	if x != nil {
-		return x.OrganizationId
-	}
-	return ""
 }
 
 type CreateCanvasResponse struct {
@@ -923,11 +907,10 @@ func (x *CreateCanvasResponse) GetCanvas() *Canvas {
 }
 
 type DeleteCanvasRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	IdOrName       string                 `protobuf:"bytes,1,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
-	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IdOrName      string                 `protobuf:"bytes,1,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeleteCanvasRequest) Reset() {
@@ -963,13 +946,6 @@ func (*DeleteCanvasRequest) Descriptor() ([]byte, []int) {
 func (x *DeleteCanvasRequest) GetIdOrName() string {
 	if x != nil {
 		return x.IdOrName
-	}
-	return ""
-}
-
-func (x *DeleteCanvasRequest) GetOrganizationId() string {
-	if x != nil {
-		return x.OrganizationId
 	}
 	return ""
 }
@@ -1011,12 +987,11 @@ func (*DeleteCanvasResponse) Descriptor() ([]byte, []int) {
 }
 
 type DescribeCanvasRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	OrganizationId string                 `protobuf:"bytes,3,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DescribeCanvasRequest) Reset() {
@@ -1059,13 +1034,6 @@ func (x *DescribeCanvasRequest) GetId() string {
 func (x *DescribeCanvasRequest) GetName() string {
 	if x != nil {
 		return x.Name
-	}
-	return ""
-}
-
-func (x *DescribeCanvasRequest) GetOrganizationId() string {
-	if x != nil {
-		return x.OrganizationId
 	}
 	return ""
 }
@@ -6095,9 +6063,8 @@ var File_canvases_proto protoreflect.FileDescriptor
 const file_canvases_proto_rawDesc = "" +
 	"\n" +
 	"\x0ecanvases.proto\x12\n" +
-	"Superplane\x1a\x13authorization.proto\x1a\x12integrations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\">\n" +
-	"\x13ListCanvasesRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"F\n" +
+	"Superplane\x1a\x13authorization.proto\x1a\x12integrations.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x15\n" +
+	"\x13ListCanvasesRequest\"F\n" +
 	"\x14ListCanvasesResponse\x12.\n" +
 	"\bcanvases\x18\x01 \x03(\v2\x12.Superplane.CanvasR\bcanvases\"\xee\x01\n" +
 	"\x06Canvas\x127\n" +
@@ -6109,21 +6076,18 @@ const file_canvases_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\x04 \x01(\tR\tcreatedBy\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"j\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"A\n" +
 	"\x13CreateCanvasRequest\x12*\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\"B\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"B\n" +
 	"\x14CreateCanvasResponse\x12*\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\\\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"3\n" +
 	"\x13DeleteCanvasRequest\x12\x1c\n" +
 	"\n" +
-	"id_or_name\x18\x01 \x01(\tR\bidOrName\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\"\x16\n" +
-	"\x14DeleteCanvasResponse\"d\n" +
+	"id_or_name\x18\x01 \x01(\tR\bidOrName\"\x16\n" +
+	"\x14DeleteCanvasResponse\";\n" +
 	"\x15DescribeCanvasRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
-	"\x0forganization_id\x18\x03 \x01(\tR\x0eorganizationId\"D\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"D\n" +
 	"\x16DescribeCanvasResponse\x12*\n" +
 	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\xc9\x05\n" +
 	"\vEventSource\x12<\n" +

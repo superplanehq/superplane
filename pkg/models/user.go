@@ -14,13 +14,20 @@ type User struct {
 	AccountID      uuid.UUID
 	Email          string
 	Name           string
+	TokenHash      string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      gorm.DeletedAt
 }
 
 func (u *User) Delete() error {
-	return database.Conn().Delete(u).Error
+	now := time.Now()
+	return database.Conn().Unscoped().
+		Model(u).
+		Update("deleted_at", now).
+		Update("updated_at", now).
+		Update("token_hash", nil).
+		Error
 }
 
 func (u *User) Restore() error {
@@ -28,6 +35,12 @@ func (u *User) Restore() error {
 		Model(u).
 		Update("deleted_at", nil).
 		Error
+}
+
+func (u *User) UpdateTokenHash(tokenHash string) error {
+	u.UpdatedAt = time.Now()
+	u.TokenHash = tokenHash
+	return database.Conn().Save(u).Error
 }
 
 func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
@@ -106,6 +119,17 @@ func FindMaybeDeletedUserByEmail(orgID, email string) (*User, error) {
 	err := database.Conn().Unscoped().
 		Where("organization_id = ?", orgID).
 		Where("email = ?", email).
+		First(&user).
+		Error
+
+	return &user, err
+}
+
+func FindActiveUserByTokenHash(tokenHash string) (*User, error) {
+	var user User
+
+	err := database.Conn().
+		Where("token_hash = ?", tokenHash).
 		First(&user).
 		Error
 
