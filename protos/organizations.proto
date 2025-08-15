@@ -134,7 +134,7 @@ message Invitation {
   string id = 1;
   string organization_id = 2;
   string email = 3;
-  string status = 4;
+  string state = 4;
   google.protobuf.Timestamp created_at = 5;
 }
 

@@ -2663,7 +2663,7 @@
         "email": {
           "type": "string"
         },
-        "status": {
+        "state": {
           "type": "string"
         },
         "createdAt": {

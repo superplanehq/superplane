@@ -61,7 +61,7 @@ export function Invitations({ organizationId }: InvitationsProps) {
       
       // If the invitation was already accepted, which means that the email being invited already has an account,
       // and was already added to the organization, we redirect to members page.
-      if (data.invitation?.status === 'accepted') {
+      if (data.invitation?.state === 'accepted') {
         // Invalidate members list to ensure it gets reloaded when navigating to members page
         queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
         navigate(`/${organizationId}/settings/members`)
@@ -103,14 +103,14 @@ export function Invitations({ organizationId }: InvitationsProps) {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStateBadge = (state: string) => {
+    switch (state) {
       case 'pending':
         return <Badge color="yellow">Pending</Badge>
       case 'accepted':
         return <Badge color="green">Accepted</Badge>
       default:
-        return <Badge color="gray">{status}</Badge>
+        return <Badge color="gray">{state}</Badge>
     }
   }
 
@@ -138,7 +138,7 @@ export function Invitations({ organizationId }: InvitationsProps) {
     
     return invitations.filter(invitation =>
       invitation.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invitation.status?.toLowerCase().includes(searchTerm.toLowerCase())
+      invitation.state?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }
 
@@ -232,7 +232,7 @@ export function Invitations({ organizationId }: InvitationsProps) {
                       <Text className="font-medium">{invitation.email}</Text>
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(invitation.status || 'unknown')}
+                      {getStateBadge(invitation.state || 'unknown')}
                     </TableCell>
                     <TableCell>
                       <Text className="text-sm text-zinc-600 dark:text-zinc-400">

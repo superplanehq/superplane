@@ -19,11 +19,9 @@ CREATE TABLE organization_invitations (
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   email           VARCHAR(255) NOT NULL,
   invited_by      UUID NOT NULL,
-  status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+  state           VARCHAR(20) NOT NULL DEFAULT 'pending',
   created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  UNIQUE(organization_id, email)
+  updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 ALTER TABLE users ADD COLUMN organization_id UUID REFERENCES organizations(id) NOT NULL;

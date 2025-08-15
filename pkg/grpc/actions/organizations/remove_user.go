@@ -12,12 +12,13 @@ import (
 )
 
 func RemoveUser(ctx context.Context, authService authorization.Authorization, orgID, userID string) (*pb.RemoveUserResponse, error) {
-	user, err := models.FindUserByID(orgID, userID)
+	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
 
 	//
+	// TODO: this should all be inside of a transaction
 	// Remove the access to all the canvases first
 	//
 	canvases, err := authService.GetAccessibleCanvasesForUser(userID)

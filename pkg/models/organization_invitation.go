@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	InvitationStatusPending  = "pending"
-	InvitationStatusAccepted = "accepted"
+	InvitationStatePending  = "pending"
+	InvitationStateAccepted = "accepted"
 )
 
 type OrganizationInvitation struct {
@@ -19,7 +19,7 @@ type OrganizationInvitation struct {
 	OrganizationID uuid.UUID
 	Email          string
 	InvitedBy      uuid.UUID
-	Status         string
+	State          string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -34,19 +34,19 @@ func FindPendingInvitationInTransaction(tx *gorm.DB, email, organizationID strin
 	err := tx.
 		Where("email = ?", email).
 		Where("organization_id = ?", organizationID).
-		Where("status = ?", InvitationStatusPending).
+		Where("state = ?", InvitationStatePending).
 		First(&invitation).
 		Error
 
 	return &invitation, err
 }
 
-func ListPendingInvitations(organizationID string) ([]OrganizationInvitation, error) {
+func ListInvitationsInState(organizationID string, state string) ([]OrganizationInvitation, error) {
 	var invitations []OrganizationInvitation
 
 	err := database.Conn().
 		Where("organization_id = ?", organizationID).
-		Where("status = ?", InvitationStatusPending).
+		Where("state = ?", state).
 		Order("created_at DESC").
 		Find(&invitations).
 		Error
@@ -54,11 +54,11 @@ func ListPendingInvitations(organizationID string) ([]OrganizationInvitation, er
 	return invitations, err
 }
 
-func CreateInvitation(organizationID, invitedBy uuid.UUID, email, status string) (*OrganizationInvitation, error) {
-	return CreateInvitationInTransaction(database.Conn(), organizationID, invitedBy, email, status)
+func CreateInvitation(organizationID, invitedBy uuid.UUID, email, state string) (*OrganizationInvitation, error) {
+	return CreateInvitationInTransaction(database.Conn(), organizationID, invitedBy, email, state)
 }
 
-func CreateInvitationInTransaction(tx *gorm.DB, organizationID, invitedBy uuid.UUID, email, status string) (*OrganizationInvitation, error) {
+func CreateInvitationInTransaction(tx *gorm.DB, organizationID, invitedBy uuid.UUID, email, state string) (*OrganizationInvitation, error) {
 	_, err := FindPendingInvitationInTransaction(tx, email, organizationID.String())
 	if err == nil {
 		return nil, fmt.Errorf("invitation already exists for %s", email)
@@ -68,7 +68,7 @@ func CreateInvitationInTransaction(tx *gorm.DB, organizationID, invitedBy uuid.U
 		OrganizationID: organizationID,
 		Email:          email,
 		InvitedBy:      invitedBy,
-		Status:         status,
+		State:          state,
 	}
 
 	err = tx.Create(invitation).Error

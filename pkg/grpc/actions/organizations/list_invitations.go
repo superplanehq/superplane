@@ -11,7 +11,7 @@ import (
 )
 
 func ListInvitations(ctx context.Context, orgID string) (*pb.ListInvitationsResponse, error) {
-	invitations, err := models.ListPendingInvitations(orgID)
+	invitations, err := models.ListInvitationsInState(orgID, models.InvitationStatePending)
 	if err != nil {
 		log.Errorf("error listing invitations for %s: %v", orgID, err)
 		return nil, status.Error(codes.Internal, "error listing invitations")

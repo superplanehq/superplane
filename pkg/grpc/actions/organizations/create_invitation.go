@@ -16,7 +16,7 @@ import (
 )
 
 func CreateInvitation(ctx context.Context, authService authorization.Authorization, orgID string, email string) (*pb.CreateInvitationResponse, error) {
-	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+	authenticatedUserID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
@@ -25,17 +25,58 @@ func CreateInvitation(ctx context.Context, authService authorization.Authorizati
 		return nil, status.Error(codes.InvalidArgument, "email is required")
 	}
 
+	org := uuid.MustParse(orgID)
+	authenticatedUser := uuid.MustParse(authenticatedUserID)
+
 	//
-	// Check if user already exists in organization
+	// Handle case where user already exists in organization,
+	// either as an active user or as a deleted user (added and removed before)
 	//
-	_, err := models.FindUserByEmail(orgID, email)
+	user, err := models.FindMaybeDeletedUserByEmail(orgID, email)
 	if err == nil {
-		return nil, status.Error(codes.AlreadyExists, "user is already a member of the organization")
+		return handleExistingUser(authService, authenticatedUser, org, user)
 	}
 
-	org := uuid.MustParse(orgID)
-	user := uuid.MustParse(userID)
+	//
+	// Otherwise, handle case where user has never been invited to this organization.
+	//
+	return handleNewUser(authService, org, authenticatedUser, email)
+}
 
+func handleExistingUser(authService authorization.Authorization, authenticatedUserID, orgID uuid.UUID, user *models.User) (*pb.CreateInvitationResponse, error) {
+	if !user.DeletedAt.Valid {
+		return nil, status.Errorf(codes.InvalidArgument, "user %s is already an active member of organization", user.Email)
+	}
+
+	var invitation *models.OrganizationInvitation
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		i, err := models.CreateInvitationInTransaction(tx, orgID, authenticatedUserID, user.Email, models.InvitationStateAccepted)
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
+		}
+
+		invitation = i
+		err = user.Restore()
+		if err != nil {
+			return status.Error(codes.InvalidArgument, "Failed to restore user")
+		}
+
+		//
+		// TODO: this is not using the transaction properly
+		//
+		return authService.AssignRole(user.ID.String(), models.RoleOrgViewer, orgID.String(), models.DomainTypeOrganization)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.CreateInvitationResponse{
+		Invitation: serializeInvitation(invitation),
+	}, nil
+}
+
+func handleNewUser(authService authorization.Authorization, orgID, userID uuid.UUID, email string) (*pb.CreateInvitationResponse, error) {
 	//
 	// Check if account already exists.
 	// If it doesn't, we will create a pending invitation,
@@ -43,7 +84,7 @@ func CreateInvitation(ctx context.Context, authService authorization.Authorizati
 	//
 	account, err := models.FindAccountByEmail(email)
 	if err != nil {
-		invitation, err := models.CreateInvitation(org, user, email, models.InvitationStatusPending)
+		invitation, err := models.CreateInvitation(orgID, userID, email, models.InvitationStatePending)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
 		}
@@ -59,7 +100,7 @@ func CreateInvitation(ctx context.Context, authService authorization.Authorizati
 	//
 	var invitation *models.OrganizationInvitation
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		i, err := models.CreateInvitationInTransaction(tx, org, user, email, models.InvitationStatusAccepted)
+		i, err := models.CreateInvitationInTransaction(tx, orgID, userID, email, models.InvitationStateAccepted)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
 		}
@@ -73,7 +114,7 @@ func CreateInvitation(ctx context.Context, authService authorization.Authorizati
 		//
 		// TODO: this is not using the transaction properly
 		//
-		return authService.AssignRole(user.ID.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
+		return authService.AssignRole(user.ID.String(), models.RoleOrgViewer, orgID.String(), models.DomainTypeOrganization)
 	})
 
 	if err != nil {
@@ -100,7 +141,7 @@ func serializeInvitation(invitation *models.OrganizationInvitation) *pb.Invitati
 		Id:             invitation.ID.String(),
 		OrganizationId: invitation.OrganizationID.String(),
 		Email:          invitation.Email,
-		Status:         string(invitation.Status),
+		State:          string(invitation.State),
 		CreatedAt:      timestamppb.New(invitation.CreatedAt),
 	}
 

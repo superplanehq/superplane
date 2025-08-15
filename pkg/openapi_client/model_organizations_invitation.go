@@ -24,7 +24,7 @@ type OrganizationsInvitation struct {
 	Id *string `json:"id,omitempty"`
 	OrganizationId *string `json:"organizationId,omitempty"`
 	Email *string `json:"email,omitempty"`
-	Status *string `json:"status,omitempty"`
+	State *string `json:"state,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
 
@@ -141,36 +141,36 @@ func (o *OrganizationsInvitation) SetEmail(v string) {
 	o.Email = &v
 }
 
-// GetStatus returns the Status field value if set, zero value otherwise.
-func (o *OrganizationsInvitation) GetStatus() string {
-	if o == nil || IsNil(o.Status) {
+// GetState returns the State field value if set, zero value otherwise.
+func (o *OrganizationsInvitation) GetState() string {
+	if o == nil || IsNil(o.State) {
 		var ret string
 		return ret
 	}
-	return *o.Status
+	return *o.State
 }
 
-// GetStatusOk returns a tuple with the Status field value if set, nil otherwise
+// GetStateOk returns a tuple with the State field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsInvitation) GetStatusOk() (*string, bool) {
-	if o == nil || IsNil(o.Status) {
+func (o *OrganizationsInvitation) GetStateOk() (*string, bool) {
+	if o == nil || IsNil(o.State) {
 		return nil, false
 	}
-	return o.Status, true
+	return o.State, true
 }
 
-// HasStatus returns a boolean if a field has been set.
-func (o *OrganizationsInvitation) HasStatus() bool {
-	if o != nil && !IsNil(o.Status) {
+// HasState returns a boolean if a field has been set.
+func (o *OrganizationsInvitation) HasState() bool {
+	if o != nil && !IsNil(o.State) {
 		return true
 	}
 
 	return false
 }
 
-// SetStatus gets a reference to the given string and assigns it to the Status field.
-func (o *OrganizationsInvitation) SetStatus(v string) {
-	o.Status = &v
+// SetState gets a reference to the given string and assigns it to the State field.
+func (o *OrganizationsInvitation) SetState(v string) {
+	o.State = &v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
@@ -224,8 +224,8 @@ func (o OrganizationsInvitation) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Email) {
 		toSerialize["email"] = o.Email
 	}
-	if !IsNil(o.Status) {
-		toSerialize["status"] = o.Status
+	if !IsNil(o.State) {
+		toSerialize["state"] = o.State
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt

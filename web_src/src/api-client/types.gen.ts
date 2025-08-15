@@ -191,7 +191,7 @@ export type OrganizationsInvitation = {
     id?: string;
     organizationId?: string;
     email?: string;
-    status?: string;
+    state?: string;
     createdAt?: string;
 };
 

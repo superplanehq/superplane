@@ -58,7 +58,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				return
 			}
 
-			user, err := models.FindUserByEmail(organizationID, account.Email)
+			user, err := models.FindActiveUserByEmail(organizationID, account.Email)
 			if err != nil {
 				http.Error(w, "", http.StatusNotFound)
 				return

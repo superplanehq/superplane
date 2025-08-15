@@ -31,7 +31,7 @@ func Test_RemoveUser(t *testing.T) {
 		assert.Equal(t, "user not found", s.Message())
 	})
 
-	t.Run("user found with roles -> successfully removes user from organization", func(t *testing.T) {
+	t.Run("user found -> removes user from organization", func(t *testing.T) {
 		//
 		// Add new user to organization, and create new canvases for it.
 		//
@@ -46,13 +46,18 @@ func Test_RemoveUser(t *testing.T) {
 		require.NoError(t, err)
 
 		//
-		// Verify the user no longer exists,
+		// Verify the user is soft deleted, and no longer active.
 		//
-		_, err = models.FindUserByID(orgID, newUser.ID.String())
+		user, err := models.FindMaybeDeletedUserByID(orgID, newUser.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, user.DeletedAt)
+		_, err = models.FindActiveUserByID(orgID, newUser.ID.String())
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindActiveUserByEmail(orgID, newUser.Email)
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
 		//
-		// Verify the no organization roles exist anymore
+		// Verify no organization roles exist anymore for that user anymore
 		//
 		roles, err := r.AuthService.GetUserRolesForOrg(newUser.ID.String(), orgID)
 		require.NoError(t, err)

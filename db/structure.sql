@@ -286,7 +286,7 @@ CREATE TABLE public.organization_invitations (
     organization_id uuid NOT NULL,
     email character varying(255) NOT NULL,
     invited_by uuid NOT NULL,
-    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -451,6 +451,7 @@ CREATE TABLE public.users (
     email character varying(255),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    deleted_at timestamp without time zone,
     organization_id uuid NOT NULL
 );
 
@@ -620,14 +621,6 @@ ALTER TABLE ONLY public.integrations
 
 ALTER TABLE ONLY public.integrations
     ADD CONSTRAINT integrations_pkey PRIMARY KEY (id);
-
-
---
--- Name: organization_invitations organization_invitations_organization_id_email_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_invitations
-    ADD CONSTRAINT organization_invitations_organization_id_email_key UNIQUE (organization_id, email);
 
 
 --

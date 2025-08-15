@@ -11,7 +11,7 @@ import (
 )
 
 func RemoveUser(ctx context.Context, authService authorization.Authorization, orgID string, canvasID string, userID string) (*pb.RemoveUserResponse, error) {
-	user, err := models.FindUserByID(orgID, userID)
+	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
