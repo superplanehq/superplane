@@ -18,6 +18,7 @@ p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,create
 p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,update
 p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},connectiongroup,create
+p,role:canvas_admin,canvas:{CANVAS_ID},connectiongroup,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},stage,create
 p,role:canvas_admin,canvas:{CANVAS_ID},stage,update
 p,role:canvas_admin,canvas:{CANVAS_ID},stage,delete
