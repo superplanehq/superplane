@@ -165,6 +165,14 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       category: 'Event Sources',
       category_description: 'Emit events that can be used to trigger executions',
     },
+    {
+      id: 'http-event',
+      name: 'HTTP Event Source',
+      description: 'Trigger workflows from HTTP endpoint events',
+      icon: 'http',
+      category: 'Event Sources',
+      category_description: 'Emit events that can be used to trigger executions',
+    },
     // Groups
     {
       id: 'connection-group',

@@ -26,6 +26,7 @@ export interface EventSourceWorkflowNodeReactFlowData {
     enabled?: boolean;
   }>;
   icon?: string;
+  eventSourceType?: 'semaphore' | 'webhook' | 'http';
   selected?: boolean;
   isEditMode?: boolean;
 }
@@ -119,6 +120,66 @@ export function EventSourceWorkflowNodeReactFlow({
   // Sidebar state for event details
   const [showSidebar, setShowSidebar] = useState(false);
   
+  // Webhook icon picker state
+  const [currentIcon, setCurrentIcon] = useState<string>(data.icon || 'webhook');
+  const [showIconModal, setShowIconModal] = useState(false);
+  
+  // Available Material Symbol icons for webhook nodes
+  const materialIconOptions = [
+    { name: 'webhook', label: 'Webhook', type: 'material' },
+    { name: 'api', label: 'API', type: 'material' },
+    { name: 'integration_instructions', label: 'Integration', type: 'material' },
+    { name: 'http', label: 'HTTP', type: 'material' },
+    { name: 'sync', label: 'Sync', type: 'material' },
+    { name: 'cloud', label: 'Cloud', type: 'material' },
+    { name: 'settings', label: 'Settings', type: 'material' },
+    { name: 'code', label: 'Code', type: 'material' },
+    { name: 'build', label: 'Build', type: 'material' },
+    { name: 'send', label: 'Send', type: 'material' },
+    { name: 'link', label: 'Link', type: 'material' },
+    { name: 'bolt', label: 'Bolt', type: 'material' },
+  ];
+
+  // Available DevOps tool icons (similar to component sidebar)
+  const devopsIconOptions = [
+    { name: 'docker', label: 'Docker', icon: '/images/docker-logo.svg', type: 'devops' },
+    { name: 'kubernetes', label: 'Kubernetes', icon: '/images/kubernetes-logo.svg', type: 'devops' },
+    { name: 'terraform', label: 'Terraform', icon: '/images/terraform-logo.svg', type: 'devops' },
+    { name: 'aws', label: 'AWS', icon: '/images/aws-logo.svg', type: 'devops' },
+    { name: 'git', label: 'Git', icon: '/images/git-logo.svg', type: 'devops' },
+    { name: 'github', label: 'GitHub', icon: '/images/github-logo.svg', type: 'devops' },
+    { name: 'npm', label: 'NPM', icon: '/images/npm-logo.svg', type: 'devops' },
+    { name: 'python', label: 'Python', icon: '/images/python-logo.svg', type: 'devops' },
+    { name: 'helm', label: 'Helm', icon: '/images/helm-logo.svg', type: 'devops' },
+    { name: 'ansible', label: 'Ansible', icon: '/images/ansible-logo.svg', type: 'devops' },
+    { name: 'sonarqube', label: 'SonarQube', icon: '/images/sonarqube-logo.svg', type: 'devops' },
+    { name: 'semaphore', label: 'Semaphore', icon: '/images/semaphore-logo-sign-black.svg', type: 'devops' },
+  ];
+  
+  // Combined icon options
+  const allIconOptions = [...materialIconOptions, ...devopsIconOptions];
+  
+  // Handle icon change for webhook nodes
+  const handleIconChange = useCallback((newIcon: string) => {
+    setCurrentIcon(newIcon);
+    setShowIconModal(false);
+    // Update the node data immediately so it shows in both edit and read mode
+    if (data) {
+      data.icon = newIcon;
+    }
+  }, [data]);
+
+  // Helper function to render icon (Material Symbol or DevOps image)
+  const renderIcon = useCallback((iconName: string, size: 'sm' | 'md' | 'lg' = 'lg') => {
+    const devopsIcon = devopsIconOptions.find(icon => icon.name === iconName);
+    if (devopsIcon) {
+      const iconSize = size === 'sm' ? 16 : size === 'md' ? 20 : 24;
+      return <img width={iconSize} height={iconSize} src={devopsIcon.icon} alt={devopsIcon.label} className="flex-shrink-0" />;
+    }
+    // Default to Material Symbol
+    return <MaterialSymbol name={iconName} size={size} className="text-gray-700 dark:text-zinc-300" />;
+  }, [devopsIconOptions]);
+  
   // No state needed for hover-triggered popovers
   
   // Mock filters data
@@ -126,14 +187,14 @@ export function EventSourceWorkflowNodeReactFlow({
     {
       id: 'filter-1',
       type: 'Branch',
-      value: 'main',
-      operator: 'equals'
+      value: 'Head',
+      operator: 'contains'
     },
     {
       id: 'filter-2', 
       type: 'Event Type',
-      value: 'push',
-      operator: 'equals'
+      value: 'Data',
+      operator: 'contains'
     }
   ];
   
@@ -284,15 +345,32 @@ export function EventSourceWorkflowNodeReactFlow({
           <div className='flex items-start flex-row justify-between w-full'>
 
             <div className="flex items-center flex-grow-1 gap-3">
-              <div className='flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10'>
-                {data.icon === 'semaphore' ? (
-                  <img width={24} height={24} className='m-auto' src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
-                ) : data.icon === 'github' ? (
-                  <img width={24} height={24} className='m-auto' src='/images/github-logo.svg' alt="GitHub" />
-                ) : (
-                  <img width={24} height={24} className='m-auto' src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
-                )}
-              </div>
+              {data.eventSourceType === 'webhook' ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowIconModal(true);
+                  }}
+                  className="flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10 hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors cursor-pointer"
+                  title="Click to change icon"
+                >
+                  <div className="m-auto">
+                    {renderIcon(data.icon || 'webhook')}
+                  </div>
+                </button>
+              ) : (
+                <div className='flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10'>
+                  {data.eventSourceType === 'http' ? (
+                    <MaterialSymbol name="rocket_launch" size="lg" className="text-gray-700 dark:text-zinc-300 m-auto" />
+                  ) : data.icon === 'semaphore' ? (
+                    <img width={24} height={24} className='m-auto' src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
+                  ) : data.icon === 'github' ? (
+                    <img width={24} height={24} className='m-auto' src='/images/github-logo.svg' alt="GitHub" />
+                  ) : (
+                    <img width={24} height={24} className='m-auto' src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
+                  )}
+                </div>
+              )}
            
               <h3 className="text-md font-semibold text-gray-900 dark:text-white truncate">
                 {data.title}
@@ -359,29 +437,34 @@ export function EventSourceWorkflowNodeReactFlow({
                 <Tippy
                   content={
                     <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[280px]">
-                      <div className="space-y-3">
+                      <div className="space-y-1">
                         {appliedFilters.map((filter) => (
-                          <div key={filter.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                                {filter.type}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-zinc-500 dark:text-zinc-400">
-                                {filter.operator}
-                              </span>
-                              <span className="bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
-                                {filter.value}
-                              </span>
-                            </div>
+                          <div>
+                            <div key={filter.id} className="flex items-center justify-between">
+                              <div className="flex items-center gap-1 text-xs bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded">
+                                <span className="text-xs bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
+                                  {filter.value}
+
+                                </span>
+                                <span className="text-zinc-500 dark:text-zinc-400">
+                                    {filter.operator}
+                                </span>
+                              
+                                
+                                <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                                  filter expression
+                                </span>
+                              </div>
+                              </div>
+                              {filter.id !== appliedFilters[appliedFilters.length - 1].id && <span className="mt-1 text-xs block text-center text-zinc-500 dark:text-zinc-400">AND</span>}
                           </div>
+                          
                         ))}
                       </div>
                     </div>
                   }
                   interactive={true}
-                  placement="bottom"
+                  placement="top"
                   trigger="mouseenter"
                   delay={[200, 100]}
                   className="z-50"
@@ -610,7 +693,7 @@ export function EventSourceWorkflowNodeReactFlow({
                         {/* Compact Status Indicator */}
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 ${statusConfig.dotColor} rounded-full flex-shrink-0`}></div>
-                          <span className={`text-xs font-medium hidden ${statusConfig.color}`}>
+                          <span className={`text-xs font-medium ${statusConfig.color}`}>
                             {statusConfig.label}
                           </span>
                         </div>
@@ -850,9 +933,30 @@ export function EventSourceWorkflowNodeReactFlow({
           {/* Header with icon and title */}
           <div className='flex flex-col p-4'>
             <div className="flex items-center gap-2 mb-2">
-              <div className="flex items-center">
-              <img width="24" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt=""/>
-              </div>
+              {data.eventSourceType === 'webhook' ? (
+                <button
+                  onClick={() => setShowIconModal(true)}
+                  className="flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10 hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors cursor-pointer border border-gray-400 dark:border-zinc-600 border-dashed"
+                  title="Click to change icon"
+                >
+                  <div className="m-auto relative">
+                    {renderIcon(currentIcon)}
+                    {currentIcon != 'webhook' && ( <MaterialSymbol name="webhook" size="sm" className="absolute bottom-[-16px] right-[-16px]" />)}
+                  </div>
+                </button>
+              ) : (
+                <div className="flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10">
+                  {data.eventSourceType === 'http' ? (
+                    <MaterialSymbol name="rocket_launch" size="lg" className="text-gray-700 dark:text-zinc-300 m-auto" />
+                  ) : data.icon === 'semaphore' ? (
+                    <img width={24} height={24} className='m-auto' src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
+                  ) : data.icon === 'github' ? (
+                    <img width={24} height={24} className='m-auto' src='/images/github-logo.svg' alt="GitHub" />
+                  ) : (
+                    <img width="24" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt=""/>
+                  )}
+                </div>
+              )}
               
                 <h2 className="text-md font-semibold text-gray-900 dark:text-white">
                   {data.title}
@@ -1169,6 +1273,82 @@ export function EventSourceWorkflowNodeReactFlow({
             disabled={!integrationData.name || !integrationData.orgUrl || !integrationData.apiToken.secretName || !integrationData.apiToken.secretKey}
           >
             Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Icon Selection Modal */}
+      <Dialog
+        open={showIconModal}
+        onClose={() => setShowIconModal(false)}
+        className="relative z-50"
+        size="lg"
+      >
+        <DialogTitle>Choose Icon</DialogTitle>
+        <DialogDescription>
+          Select an icon to represent your webhook event source
+        </DialogDescription>
+        
+        <DialogBody className="space-y-6">
+          {/* Material Symbol Icons */}
+          <div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+             Icons
+            </div>
+            <div className="grid grid-cols-8 gap-3">
+              {materialIconOptions.map((iconOption) => (
+                <button
+                  key={iconOption.name}
+                  onClick={() => handleIconChange(iconOption.name)}
+                  className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                    currentIcon === iconOption.name
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-md'
+                      : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-gray-100 dark:hover:bg-zinc-700'
+                  }`}
+                  title={iconOption.label}
+                >
+                  <MaterialSymbol name={iconOption.name} size="lg" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* DevOps Tool Icons */}
+          <div>
+            <div className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+              DevOps Tools
+            </div>
+            <div className="grid grid-cols-8 gap-3">
+              {devopsIconOptions.map((iconOption) => (
+                <button
+                  key={iconOption.name}
+                  onClick={() => handleIconChange(iconOption.name)}
+                  className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md ${
+                    currentIcon === iconOption.name
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
+                      : 'border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-gray-100 dark:hover:bg-zinc-700'
+                  }`}
+                  title={iconOption.label}
+                >
+                  <img 
+                    width={24} 
+                    height={24} 
+                    src={iconOption.icon} 
+                    alt={iconOption.label} 
+                    className="flex-shrink-0"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogBody>
+
+        <DialogActions>
+          <Button
+            color='white'
+            onClick={() => setShowIconModal(false)}
+          >
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>

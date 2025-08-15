@@ -110,3 +110,60 @@ export const WithNewInputsOutputsStyle: Story = {
     },
   },
 };
+
+export const EventSourceSemaphore: Story = {
+  args: {
+    nodeId: 'semaphore-1',
+    nodeTitle: 'Semaphore Event Source',
+    nodeIcon: 'sensors',
+    isOpen: true,
+    source: 'eventSource',
+    eventSourceType: 'semaphore',
+    onClose: () => console.log('Sidebar closed'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Event source sidebar for Semaphore integration with event activity and history.',
+      },
+    },
+  },
+};
+
+export const EventSourceWebhook: Story = {
+  args: {
+    nodeId: 'webhook-1',
+    nodeTitle: 'Webhook Event Source',
+    nodeIcon: 'webhook',
+    isOpen: true,
+    source: 'eventSource',
+    eventSourceType: 'webhook',
+    onClose: () => console.log('Sidebar closed'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Event source sidebar for webhook integration with URL and secret key configuration.',
+      },
+    },
+  },
+};
+
+export const EventSourceHTTP: Story = {
+  args: {
+    nodeId: 'http-1',
+    nodeTitle: 'HTTP Event Source',
+    nodeIcon: 'http',
+    isOpen: true,
+    source: 'eventSource',
+    eventSourceType: 'http',
+    onClose: () => console.log('Sidebar closed'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Event source sidebar for HTTP endpoint integration with API key configuration.',
+      },
+    },
+  },
+};

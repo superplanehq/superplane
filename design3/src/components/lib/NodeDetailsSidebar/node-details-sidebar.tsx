@@ -58,6 +58,8 @@ interface NodeDetailsSidebarProps {
   onClose?: () => void;
   className?: string;
   source?: 'workflow' | 'eventSource';
+  eventSourceType?: 'semaphore' | 'webhook' | 'http';
+  onNodeUpdate?: (nodeId: string, updates: { icon?: string; eventSourceType?: string }) => void;
   events?: Array<{
     id: string;
     url: string;
@@ -701,11 +703,15 @@ const mockHistoryEvents: EventData[] = [
 ];
 
 export function NodeDetailsSidebar({
+  nodeId,
   nodeTitle = 'Sync Cluster',
+  nodeIcon,
   isOpen = false,
   onClose,
   className,
   source = 'workflow',
+  eventSourceType = 'semaphore',
+  onNodeUpdate,
   events = []
 }: NodeDetailsSidebarProps) {
   // Check for showIcons URL parameter
@@ -878,6 +884,34 @@ export function NodeDetailsSidebar({
     return url.substring(0, maxLength) + '...';
   };
 
+  // Get icon and content based on event source type
+  const getEventSourceConfig = (type: 'semaphore' | 'webhook' | 'http') => {
+    switch (type) {
+      case 'semaphore':
+        return {
+          icon: (
+            <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="Semaphore" />
+          ),
+          title: 'Semaphore Integration'
+        };
+      case 'webhook':
+        return {
+          icon: <MaterialSymbol name={currentIcon} size="md" className="text-gray-700 dark:text-zinc-300" />,
+          title: 'Webhook Endpoint'
+        };
+      case 'http':
+        return {
+          icon: <MaterialSymbol name="http" size="md" className="text-gray-700 dark:text-zinc-300" />,
+          title: 'HTTP Endpoint'
+        };
+      default:
+        return {
+          icon: <MaterialSymbol name="sensors" size="md" className="text-gray-700 dark:text-zinc-300" />,
+          title: 'Event Source'
+        };
+    }
+  };
+
   // Convert passed events to EventData format with randomized statuses
   const convertedEvents: EventData[] = events.length > 0 
     ? events.map((event, index) => {
@@ -905,6 +939,10 @@ export function NodeDetailsSidebar({
 
   // State for event detail tabs
   const [eventDetailTabs, setEventDetailTabs] = useState<Record<string, 'details' | 'headers' | 'payload'>>({});
+  
+  // State for current icon (for webhook nodes)
+  const [currentIcon, setCurrentIcon] = useState<string>(nodeIcon || 'webhook');
+  
 
   // Render event details for expanded events
   const renderEventDetails = (event: EventData) => {
@@ -1144,10 +1182,14 @@ export function NodeDetailsSidebar({
       {/* Header */}
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-3">
-        <div className='rounded-lg dark:bg-white !p-1'>
-          <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
+        <div className='rounded-lg bg-zinc-100 dark:bg-zinc-700 p-2'>
+          {source === 'eventSource' ? getEventSourceConfig(eventSourceType).icon : (
+            <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
+          )}
         </div>
-        <h3 className="font-semibold text-gray-900 dark:text-white">{nodeTitle}</h3>
+        <h3 className="font-semibold text-gray-900 dark:text-white">
+          {source === 'eventSource' ? getEventSourceConfig(eventSourceType).title : nodeTitle}
+        </h3>
 
         </div>
         <Button plain onClick={onClose}>
@@ -1645,7 +1687,113 @@ export function NodeDetailsSidebar({
         
         {activeTab === 'settings' && (
           <div className="p-4">
-            <Text className="text-gray-500 dark:text-zinc-400">Settings view coming soon...</Text>
+            {source === 'eventSource' ? (
+              <div className="space-y-6">
+                {eventSourceType === 'semaphore' && (
+                  <div className="space-y-4">
+                    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
+                      <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
+                        Semaphore Configuration
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Integration</div>
+                          <div className="text-sm text-gray-900 dark:text-zinc-200">Semaphore CI/CD Integration</div>
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Project</div>
+                          <div className="text-sm text-gray-900 dark:text-zinc-200">Zawkey semaphore org</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {eventSourceType === 'webhook' && (
+                  <div className="space-y-4">
+
+                    {/* Webhook Configuration */}
+                    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
+                      <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
+                        Webhook Configuration
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Webhook URL</div>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 text-sm font-mono bg-gray-50 dark:bg-zinc-800 px-3 py-2 rounded border text-gray-900 dark:text-zinc-200">
+                              https://hooks.superplane.com/webhook/abc123def456
+                            </code>
+                            <Button plain className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                              <MaterialSymbol name="content_copy" size="sm" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Secret Key</div>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 text-sm font-mono bg-gray-50 dark:bg-zinc-800 px-3 py-2 rounded border text-gray-900 dark:text-zinc-200">
+                              wh_sec_789xyz012abc345def678ghi901jkl
+                            </code>
+                            <Button plain className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                              <MaterialSymbol name="content_copy" size="sm" />
+                            </Button>
+                            <Button plain className="text-gray-600 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-300">
+                              <MaterialSymbol name="refresh" size="sm" />
+                            </Button>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                            Use this key to validate webhook authenticity
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {eventSourceType === 'http' && (
+                  <div className="space-y-4">
+                    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
+                      <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
+                        HTTP Endpoint Configuration
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Endpoint URL</div>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 text-sm font-mono bg-gray-50 dark:bg-zinc-800 px-3 py-2 rounded border text-gray-900 dark:text-zinc-200">
+                              https://api.superplane.com/events/http/xyz789abc123
+                            </code>
+                            <Button plain className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                              <MaterialSymbol name="content_copy" size="sm" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">API Key</div>
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 text-sm font-mono bg-gray-50 dark:bg-zinc-800 px-3 py-2 rounded border text-gray-900 dark:text-zinc-200">
+                              sp_key_456def789ghi012abc345jkl678mno901
+                            </code>
+                            <Button plain className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                              <MaterialSymbol name="content_copy" size="sm" />
+                            </Button>
+                            <Button plain className="text-gray-600 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-300">
+                              <MaterialSymbol name="refresh" size="sm" />
+                            </Button>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                            Include this key in Authorization header
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Text className="text-gray-500 dark:text-zinc-400">Settings view coming soon...</Text>
+            )}
           </div>
         )}
       </div>

@@ -178,7 +178,7 @@ const initialNodesData = [
       nodeNumber: 5,
       queueIcon: 'timer',
       queueTitle: 'lk4g7h9j2-mn6p3q8r5-vw2y5z8b',
-      runName: 'tq8n1k4m7-xr9s2v6w3-bg5h8j1l',
+      runName: 'Update Semaphore configuration',
       yamlConfig: {
         apiVersion: 'v1',
         kind: 'Stage',
@@ -946,8 +946,8 @@ const computedEdges = edges.map(edge => {
       const isSelecting = selectedNode !== node.id;
       setSelectedNode(isSelecting ? node.id : null);
       
-      // Don't show sidebar if it's an EventSource node in edit mode
-      const isEventSourceInEditMode = node.type === 'eventSource' && node.data?.isEditMode === true;
+      // Don't show sidebar if it's an EventSource node in edit mode, except for webhook nodes
+      const isEventSourceInEditMode = node.type === 'eventSource' && node.data?.isEditMode === true && node.data?.eventSourceType !== 'webhook';
       setShowNodeDetails(isSelecting && !isEventSourceInEditMode);
       
       // Update node selection state
@@ -1017,6 +1017,7 @@ const computedEdges = edges.map(edge => {
             title: 'Semaphore Event Source',
             cluster: 'semaphore-cluster',
             icon: 'semaphore',
+            eventSourceType: 'semaphore',
             events: [
               {
                 id: 'event-1',
@@ -1049,11 +1050,78 @@ const computedEdges = edges.map(edge => {
             title: 'GitHub Event Source',
             cluster: 'github-cluster',
             icon: 'github',
+            eventSourceType: 'webhook',
             events: [
               {
                 id: 'event-1',
                 url: 'https://github.com/owner/repo/settings/hooks',
                 type: 'webhook',
+                enabled: true
+              }
+            ],
+            selected: false,
+            isEditMode: true
+          }
+        };
+        
+        setNodes((nds) => {
+          const updatedNodes = [...nds, newNode];
+          return updatedNodes;
+        });
+        setSidebarOpen(false);
+        return;
+      }
+
+      // Special handling for webhook-event - create EventSourceWorkflowNode in edit mode
+      if (nodeType === 'webhook-event') {
+        const newNode: WorkflowNode = {
+          id: nodeId,
+          type: 'eventSource',
+          position: { x: 300, y: 300 },
+          data: {
+            id: nodeId,
+            title: 'Webhook Event Source',
+            cluster: 'webhook-cluster',
+            icon: 'webhook',
+            eventSourceType: 'webhook',
+            events: [
+              {
+                id: 'event-1',
+                url: 'https://hooks.superplane.com/webhook/abc123def456',
+                type: 'webhook',
+                enabled: true
+              }
+            ],
+            selected: false,
+            isEditMode: true
+          }
+        };
+        
+        setNodes((nds) => {
+          const updatedNodes = [...nds, newNode];
+          return updatedNodes;
+        });
+        setSidebarOpen(false);
+        return;
+      }
+
+      // Special handling for http-event - create EventSourceWorkflowNode in edit mode
+      if (nodeType === 'http-event') {
+        const newNode: WorkflowNode = {
+          id: nodeId,
+          type: 'eventSource',
+          position: { x: 300, y: 300 },
+          data: {
+            id: nodeId,
+            title: 'HTTP Event Source',
+            cluster: 'http-cluster',
+            icon: 'http',
+            eventSourceType: 'http',
+            events: [
+              {
+                id: 'event-1',
+                url: 'https://api.superplane.com/events/http/xyz789abc123',
+                type: 'http',
                 enabled: true
               }
             ],
@@ -1226,6 +1294,28 @@ const computedEdges = edges.map(edge => {
   );
 
   /**
+   * Handle node updates (icon changes, etc.)
+   */
+  const handleNodeUpdate = useCallback(
+    (nodeId: string, updates: { icon?: string; eventSourceType?: string }) => {
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...(node.data as any),
+                  ...updates
+                }
+              }
+            : node
+        )
+      );
+    },
+    [setNodes]
+  );
+
+  /**
    * Handle canvas star toggle
    * Updates the local state and could sync with backend
    */
@@ -1372,9 +1462,11 @@ const computedEdges = edges.map(edge => {
               <NodeDetailsSidebar
                 nodeId={selectedNode}
                 nodeTitle={nodes.find(n => n.id === selectedNode)?.data?.workflowNodeData?.title || 'Node Details'}
-                nodeIcon={nodes.find(n => n.id === selectedNode)?.data?.workflowNodeData?.type === 'stage' ? 'sync' : 'account_tree'}
+                nodeIcon={nodes.find(n => n.id === selectedNode)?.data?.icon || nodes.find(n => n.id === selectedNode)?.data?.workflowNodeData?.type === 'stage' ? 'sync' : 'webhook'}
                 isOpen={showNodeDetails}
                 source={nodes.find(n => n.id === selectedNode)?.type === 'eventSource' ? 'eventSource' : 'workflow'}
+                eventSourceType={nodes.find(n => n.id === selectedNode)?.data?.eventSourceType || 'semaphore'}
+                onNodeUpdate={handleNodeUpdate}
                 events={nodes.find(n => n.id === selectedNode)?.type === 'eventSource' ? 
                   nodes.find(n => n.id === selectedNode)?.data?.events || [] : []}
                 onClose={() => {
