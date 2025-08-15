@@ -635,7 +635,7 @@ export function EventSourceEditModeContent({
         )}
 
         {/* Event Types and Filters Section */}
-        <EditableAccordionSection
+        {!requireIntegration || availableIntegrations.length > 0 && <EditableAccordionSection
           id="filters"
           title="Filters"
           isOpen={openSections.includes('filters')}
@@ -767,7 +767,7 @@ export function EventSourceEditModeContent({
               Add Event Type
             </button>
           </div>
-        </EditableAccordionSection>
+        </EditableAccordionSection>}
       </div>
 
       <ConfirmDialog
