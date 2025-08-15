@@ -1130,6 +1130,7 @@ export function NodeDetailsSidebar({
                <div key={key} className="flex items-center justify-between">
                  <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
                  <div className="flex items-center gap-2 truncate">
+                   <Badge color='blue'></Badge>
                    <Badge className='font-mono !text-xs truncate'>
                      {value}
                    </Badge>
@@ -1323,10 +1324,24 @@ export function NodeDetailsSidebar({
                             {/* Run details */}
                             <div className='bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-4 text-xs gap-2'>
                               <div className='flex items-center gap-2 mb-2'>
-                              <BadgeButton color='red' className='!flex !items-center'>
+                                {run.status == 'success' && (
+                                <BadgeButton color='green' className='!flex !items-center'>
+                                   <MaterialSymbol name='check_circle' size='sm'/>
+                                  <span className='uppercase'>Passed</span>
+                                </BadgeButton>
+                                )}
+                                {run.status == 'failed' && (
+                                <BadgeButton color='red' className='!flex !items-center'>
                                    <MaterialSymbol name='cancel' size='sm'/>
                                   <span className='uppercase'>{run.status}</span>
                                 </BadgeButton>
+                                )}
+                                {run.status == 'running' && (
+                                <BadgeButton color='blue' className='!flex !items-center'>
+                                   <span className='animate-spin'><MaterialSymbol name='sync' size='sm'/></span>
+                                  <span className='uppercase'>{run.status}</span>
+                                </BadgeButton>
+                                )}
                                 <Link href="#" className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1">{run.name} 
                                 <MaterialSymbol name='arrow_outward' size='sm'/>
                                 </Link>
