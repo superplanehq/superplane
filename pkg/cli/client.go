@@ -7,24 +7,22 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-// ClientConfig contains configuration for the API client
 type ClientConfig struct {
 	BaseURL    string
-	AuthToken  string
+	APIToken   string
 	HTTPClient *http.Client
 }
 
 func NewClientConfig() *ClientConfig {
 	return &ClientConfig{
-		BaseURL:   GetAPIURL(),
-		AuthToken: GetAuthToken(),
+		BaseURL:  GetAPIURL(),
+		APIToken: GetAPIToken(),
 		HTTPClient: &http.Client{
 			Timeout: time.Second * 30,
 		},
 	}
 }
 
-// NewAPIClient creates a new OpenAPI client with the given configuration
 func NewAPIClient(config *ClientConfig) *openapi_client.APIClient {
 	apiConfig := openapi_client.NewConfiguration()
 
@@ -34,8 +32,8 @@ func NewAPIClient(config *ClientConfig) *openapi_client.APIClient {
 		},
 	}
 
-	if config.AuthToken != "" {
-		apiConfig.DefaultHeader["Authorization"] = "Bearer " + config.AuthToken
+	if config.APIToken != "" {
+		apiConfig.DefaultHeader["Authorization"] = "Bearer " + config.APIToken
 	}
 
 	if config.HTTPClient != nil {

@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+func HashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return fmt.Sprintf("%x", hash)
+}
+
 func SHA256ForMap(m map[string]string) (string, error) {
 	//
 	// Maps are not ordered, so we need to sort the key/value

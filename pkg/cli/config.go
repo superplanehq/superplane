@@ -14,9 +14,9 @@ const (
 
 // Configuration keys
 const (
-	ConfigKeyAPIURL    = "api_url"
-	ConfigKeyAuthToken = "auth_token"
-	ConfigKeyFormat    = "output_format"
+	ConfigKeyAPIURL   = "api_url"
+	ConfigKeyAPIToken = "api_token"
+	ConfigKeyFormat   = "output_format"
 )
 
 var configCmd = &cobra.Command{
@@ -79,20 +79,18 @@ var configViewCmd = &cobra.Command{
 	},
 }
 
-// GetAPIURL returns the configured API URL or the default if not set
 func GetAPIURL() string {
 	if viper.IsSet(ConfigKeyAPIURL) {
 		return viper.GetString(ConfigKeyAPIURL)
 	}
+
 	return DefaultAPIURL
 }
 
-// GetAuthToken returns the configured authentication token or empty string if not set
-func GetAuthToken() string {
-	return viper.GetString(ConfigKeyAuthToken)
+func GetAPIToken() string {
+	return viper.GetString(ConfigKeyAPIToken)
 }
 
-// GetOutputFormat returns the configured output format or "text" if not set
 func GetOutputFormat() string {
 	if viper.IsSet(ConfigKeyFormat) {
 		return viper.GetString(ConfigKeyFormat)

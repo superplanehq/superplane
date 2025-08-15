@@ -79,7 +79,7 @@ export type GroupsGroupStatus = {
 };
 
 export type GroupsListGroupUsersResponse = {
-    users?: Array<UsersUser>;
+    users?: Array<SuperplaneUsersUser>;
     group?: GroupsGroup;
 };
 
@@ -169,6 +169,10 @@ export type IntegrationsListIntegrationsResponse = {
 export type IntegrationsResourceRef = {
     type?: string;
     name?: string;
+};
+
+export type MeRegenerateTokenResponse = {
+    token?: string;
 };
 
 export type OrganizationsCreateInvitationBody = {
@@ -457,7 +461,6 @@ export type SuperplaneConnectionType = 'TYPE_UNKNOWN' | 'TYPE_EVENT_SOURCE' | 'T
 
 export type SuperplaneCreateCanvasRequest = {
     canvas?: SuperplaneCanvas;
-    organizationId?: string;
 };
 
 export type SuperplaneCreateCanvasResponse = {
@@ -646,6 +649,14 @@ export type SuperplaneListStagesResponse = {
     stages?: Array<SuperplaneStage>;
 };
 
+export type SuperplaneMeUser = {
+    id?: string;
+    email?: string;
+    organizationId?: string;
+    createdAt?: string;
+    hasToken?: boolean;
+};
+
 export type SuperplaneOutputDefinition = {
     name?: string;
     description?: string;
@@ -726,6 +737,12 @@ export type SuperplaneUpdateStageResponse = {
     stage?: SuperplaneStage;
 };
 
+export type SuperplaneUsersUser = {
+    metadata?: UsersUserMetadata;
+    spec?: UsersUserSpec;
+    status?: UsersUserStatus;
+};
+
 export type SuperplaneValueDefinition = {
     name?: string;
     valueFrom?: SuperplaneValueFrom;
@@ -778,13 +795,7 @@ export type UsersListUserRolesResponse = {
 };
 
 export type UsersListUsersResponse = {
-    users?: Array<UsersUser>;
-};
-
-export type UsersUser = {
-    metadata?: UsersUserMetadata;
-    spec?: UsersUserSpec;
-    status?: UsersUserStatus;
+    users?: Array<SuperplaneUsersUser>;
 };
 
 export type UsersUserMetadata = {
@@ -836,9 +847,7 @@ export type ProtobufNullValue = 'NULL_VALUE';
 export type SuperplaneListCanvasesData = {
     body?: never;
     path?: never;
-    query?: {
-        organizationId?: string;
-    };
+    query?: never;
     url: '/api/v1/canvases';
 };
 
@@ -1338,9 +1347,7 @@ export type SuperplaneDeleteCanvasData = {
     path: {
         idOrName: string;
     };
-    query?: {
-        organizationId?: string;
-    };
+    query?: never;
     url: '/api/v1/canvases/{idOrName}';
 };
 
@@ -1369,7 +1376,6 @@ export type SuperplaneDescribeCanvasData = {
     };
     query?: {
         name?: string;
-        organizationId?: string;
     };
     url: '/api/v1/canvases/{id}';
 };
@@ -1698,6 +1704,56 @@ export type IntegrationsDescribeIntegrationResponses = {
 };
 
 export type IntegrationsDescribeIntegrationResponse2 = IntegrationsDescribeIntegrationResponses[keyof IntegrationsDescribeIntegrationResponses];
+
+export type MeMeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me';
+};
+
+export type MeMeErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type MeMeError = MeMeErrors[keyof MeMeErrors];
+
+export type MeMeResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneMeUser;
+};
+
+export type MeMeResponse = MeMeResponses[keyof MeMeResponses];
+
+export type MeRegenerateTokenData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/me/token';
+};
+
+export type MeRegenerateTokenErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type MeRegenerateTokenError = MeRegenerateTokenErrors[keyof MeRegenerateTokenErrors];
+
+export type MeRegenerateTokenResponses = {
+    /**
+     * A successful response.
+     */
+    200: MeRegenerateTokenResponse;
+};
+
+export type MeRegenerateTokenResponse2 = MeRegenerateTokenResponses[keyof MeRegenerateTokenResponses];
 
 export type OrganizationsDeleteOrganizationData = {
     body?: never;

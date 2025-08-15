@@ -30,6 +30,7 @@ import (
 	pbSup "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
+	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
@@ -177,6 +178,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbMe.RegisterMeHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -193,6 +199,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
 
 	return nil
 }
@@ -214,18 +221,12 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 			return
 		}
 
-		orgID := r.Header.Get("x-organization-id")
-		if orgID == "" {
-			http.Error(w, "Organization ID not found in headers", http.StatusInternalServerError)
-			return
-		}
-
 		r2 := new(http.Request)
 		*r2 = *r
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
 		r2.Header.Set("x-User-id", user.ID.String())
-		r2.Header.Set("x-Organization-id", orgID)
+		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
 		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }

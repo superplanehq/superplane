@@ -145,7 +145,7 @@ func Test__CanvasWebSocket(t *testing.T) {
 
 		response := httptest.NewRecorder()
 		server.Router.ServeHTTP(response, req)
-		assert.Equal(t, http.StatusNotFound, response.Code)
+		assert.Equal(t, http.StatusUnauthorized, response.Code)
 	})
 
 	t.Run("canvas that does not exist", func(t *testing.T) {
