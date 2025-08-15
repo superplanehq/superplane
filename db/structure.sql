@@ -451,7 +451,8 @@ CREATE TABLE public.users (
     email character varying(255),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    organization_id uuid NOT NULL
+    organization_id uuid NOT NULL,
+    token_hash character varying(250)
 );
 
 
@@ -1103,7 +1104,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250804194751	f
+20250813203041	f
 \.
 
 

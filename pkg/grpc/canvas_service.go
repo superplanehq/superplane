@@ -34,7 +34,8 @@ func NewCanvasService(encryptor crypto.Encryptor, authService authorization.Auth
 //
 
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
-	return canvases.CreateCanvas(ctx, req, s.authorizationService)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return canvases.CreateCanvas(ctx, s.authorizationService, orgID, req.Canvas)
 }
 
 func (s *CanvasService) DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest) (*pb.DeleteCanvasResponse, error) {

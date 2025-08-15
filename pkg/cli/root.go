@@ -13,26 +13,14 @@ import (
 
 var cfgFile string
 var Verbose bool
-var apiURL string
-var authToken string
 
-// RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "superplane",
 	Short: "Superplane command line interface",
-	Long: `Superplane CLI - Command line interface for the Superplane API.
-	
-Allows you to manage Canvases, Event Sources, and Stages.`,
+	Long:  `Superplane CLI - Command line interface for the Superplane API`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if !Verbose {
 			log.SetOutput(io.Discard)
-		}
-
-		if apiURL != "" {
-			viper.Set(ConfigKeyAPIURL, apiURL)
-		}
-		if authToken != "" {
-			viper.Set(ConfigKeyAuthToken, authToken)
 		}
 	},
 }
@@ -42,11 +30,8 @@ func init() {
 
 	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.superplane.yaml)")
-	RootCmd.PersistentFlags().StringVar(&apiURL, "api-url", "", "API URL (overrides config file)")
-	RootCmd.PersistentFlags().StringVar(&authToken, "token", "", "authentication token (overrides config file)")
 }
 
-// initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -74,7 +59,4 @@ func initConfig() {
 			fmt.Println("Using config file:", viper.ConfigFileUsed())
 		}
 	}
-
-	viper.SetDefault(ConfigKeyAPIURL, DefaultAPIURL)
-	viper.SetDefault(ConfigKeyFormat, "text")
 }

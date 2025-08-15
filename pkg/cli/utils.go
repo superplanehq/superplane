@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -33,19 +34,14 @@ func getOneOrAnotherFlag(cmd *cobra.Command, flag1, flag2 string, required bool)
 	return ""
 }
 
-func getDomainOrExit(cmd *cobra.Command) (string, string) {
-	organizationId, _ := cmd.Flags().GetString("organization-id")
+func getDomainOrExit(client *openapi_client.APIClient, cmd *cobra.Command) (string, string) {
 	canvasIdOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", false)
-
-	if organizationId != "" {
-		return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION), organizationId
-	}
-
 	if canvasIdOrName != "" {
 		return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_CANVAS), canvasIdOrName
 	}
 
-	fmt.Println("Either organization-id or canvas-id / canvas-name flags must be provided")
-	os.Exit(1)
-	return "", ""
+	response, _, err := client.MeAPI.MeMe(context.Background()).Execute()
+	Check(err)
+
+	return string(openapi_client.AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_ORGANIZATION), *response.OrganizationId
 }

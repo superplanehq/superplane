@@ -31,7 +31,7 @@ import {
   useDeleteGroup,
   useRemoveUserFromGroup
 } from '../../../hooks/useOrganizationData'
-import { UsersUser } from '@/api-client'
+import { SuperplaneUsersUser } from '@/api-client'
 
 export function GroupMembersPage() {
   const { groupName: encodedGroupName } = useParams<{ groupName: string }>()
@@ -138,12 +138,12 @@ export function GroupMembersPage() {
     }))
   }
 
-  const getSortedData = (data: UsersUser[]) => {
+  const getSortedData = (data: SuperplaneUsersUser[]) => {
     if (!sortConfig.key) return data
 
     return [...data].sort((a, b) => {
-      const aValue = a[sortConfig.key as keyof UsersUser]
-      const bValue = b[sortConfig.key as keyof UsersUser]
+      const aValue = a[sortConfig.key as keyof SuperplaneUsersUser]
+      const bValue = b[sortConfig.key as keyof SuperplaneUsersUser]
 
       if (aValue && bValue && aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1
