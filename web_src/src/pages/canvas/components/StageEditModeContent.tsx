@@ -304,9 +304,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       if (mapping.values) {
         mapping.values.forEach((value) => {
           const hasStaticValue = value.value !== undefined && value.value !== '';
-          const hasDynamicValue = value.valueFrom?.eventData?.expression !== undefined && value.valueFrom.eventData.expression !== '';
+          const hasEventDataValue = value.valueFrom?.eventData?.expression !== undefined && value.valueFrom.eventData.expression !== '';
+          const hasLastExecutionValue = value.valueFrom?.lastExecution?.results !== undefined && value.valueFrom.lastExecution.results.length > 0;
 
-          if (!hasStaticValue && !hasDynamicValue) {
+          if (!hasStaticValue && !hasEventDataValue && !hasLastExecutionValue) {
             const inputIndex = inputs.findIndex(inp => inp.name === value.name);
             if (inputIndex !== -1) {
               const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
@@ -1066,17 +1067,44 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                                       {/* Value Mode Toggle */}
                                       <div className="mb-3">
-                                        <label className="flex items-center gap-2 text-sm">
-                                          <input
-                                            type="checkbox"
-                                            checked={!!inputValue?.valueFrom?.eventData}
-                                            onChange={(e) => {
-                                              const newMappings = [...inputMappings];
-                                              const values = [...(newMappings[actualMappingIndex].values || [])];
-                                              const valueIndex = values.findIndex(v => v.name === input.name);
+                                        <div className="space-y-2">
+                                          <label className="flex items-center gap-2 text-sm">
+                                            <input
+                                              type="radio"
+                                              name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                              checked={!inputValue?.valueFrom}
+                                              onChange={() => {
+                                                const newMappings = [...inputMappings];
+                                                const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                const valueIndex = values.findIndex(v => v.name === input.name);
 
-                                              if (valueIndex !== -1) {
-                                                if (e.target.checked) {
+                                                if (valueIndex !== -1) {
+                                                  values[valueIndex] = {
+                                                    ...values[valueIndex],
+                                                    value: values[valueIndex]?.valueFrom?.eventData?.expression || 
+                                                           values[valueIndex]?.value || '',
+                                                    valueFrom: undefined
+                                                  };
+                                                  newMappings[actualMappingIndex].values = values;
+                                                  setInputMappings(newMappings);
+                                                }
+                                              }}
+                                              className="w-4 h-4"
+                                            />
+                                            Static Value
+                                          </label>
+                                          
+                                          <label className="flex items-center gap-2 text-sm">
+                                            <input
+                                              type="radio"
+                                              name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                              checked={!!inputValue?.valueFrom?.eventData}
+                                              onChange={() => {
+                                                const newMappings = [...inputMappings];
+                                                const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                if (valueIndex !== -1) {
                                                   values[valueIndex] = {
                                                     ...values[valueIndex],
                                                     value: undefined,
@@ -1087,25 +1115,48 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                       }
                                                     }
                                                   };
-                                                } else {
+                                                  newMappings[actualMappingIndex].values = values;
+                                                  setInputMappings(newMappings);
+                                                }
+                                              }}
+                                              className="w-4 h-4"
+                                            />
+                                            From Event Data
+                                          </label>
+                                          
+                                          <label className="flex items-center gap-2 text-sm">
+                                            <input
+                                              type="radio"
+                                              name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                              checked={!!inputValue?.valueFrom?.lastExecution}
+                                              onChange={() => {
+                                                const newMappings = [...inputMappings];
+                                                const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                if (valueIndex !== -1) {
                                                   values[valueIndex] = {
                                                     ...values[valueIndex],
-                                                    value: values[valueIndex]?.valueFrom?.eventData?.expression || '',
-                                                    valueFrom: undefined
+                                                    value: undefined,
+                                                    valueFrom: {
+                                                      lastExecution: {
+                                                        results: []
+                                                      }
+                                                    }
                                                   };
+                                                  newMappings[actualMappingIndex].values = values;
+                                                  setInputMappings(newMappings);
                                                 }
-                                                newMappings[actualMappingIndex].values = values;
-                                                setInputMappings(newMappings);
-                                              }
-                                            }}
-                                            className="w-4 h-4"
-                                          />
-                                          Use expression (dynamic value)
-                                        </label>
+                                              }}
+                                              className="w-4 h-4"
+                                            />
+                                            From Last Execution
+                                          </label>
+                                        </div>
                                       </div>
 
                                       {inputValue?.valueFrom?.eventData ? (
-                                        /* Expression Mode */
+                                        /* Event Data Mode */
                                         <div className="space-y-2">
                                           <div>
                                             <label className="block text-xs font-medium mb-1">Data Source Connection</label>
@@ -1164,6 +1215,49 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                               placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
                                               className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                             />
+                                          </div>
+                                        </div>
+                                      ) : inputValue?.valueFrom?.lastExecution ? (
+                                        /* Last Execution Mode */
+                                        <div className="space-y-2">
+                                          <div>
+                                            <label className="block text-xs font-medium mb-1">Required Execution Results</label>
+                                            <div className="space-y-2">
+                                              {(['RESULT_PASSED', 'RESULT_FAILED'] as const).map((result) => (
+                                                <label key={result} className="flex items-center gap-2 text-xs">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={inputValue.valueFrom?.lastExecution?.results?.includes(result) || false}
+                                                    onChange={(e) => {
+                                                      const newMappings = [...inputMappings];
+                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                      const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                      if (valueIndex !== -1) {
+                                                        const currentResults = values[valueIndex]?.valueFrom?.lastExecution?.results || [];
+                                                        const newResults = e.target.checked
+                                                          ? [...currentResults, result]
+                                                          : currentResults.filter(r => r !== result);
+
+                                                        values[valueIndex] = {
+                                                          ...values[valueIndex],
+                                                          valueFrom: {
+                                                            lastExecution: {
+                                                              ...values[valueIndex]?.valueFrom?.lastExecution,
+                                                              results: newResults
+                                                            }
+                                                          }
+                                                        };
+                                                        newMappings[actualMappingIndex].values = values;
+                                                        setInputMappings(newMappings);
+                                                      }
+                                                    }}
+                                                    className="w-3 h-3"
+                                                  />
+                                                  {result.replace('RESULT_', '').toLowerCase()}
+                                                </label>
+                                              ))}
+                                            </div>
                                           </div>
                                         </div>
                                       ) : (
