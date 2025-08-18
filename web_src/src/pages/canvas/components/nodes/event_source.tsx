@@ -250,7 +250,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   return (
     <div
-      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative cursor-pointer`}
+      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative cursor-pointer`}
       style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
       onClick={handleNodeClick}
     >

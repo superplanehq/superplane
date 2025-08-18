@@ -352,7 +352,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
-      className={`p-[2px] bg-transparent rounded-xl border-2 ${props.selected ? 'border-blue-400 dark:border-gray-200' : 'border-transparent dark:border-transparent'} relative `}
+      className={`p-[2px] bg-transparent rounded-xl border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400 dark:border-gray-200' : 'border-transparent dark:border-transparent'} relative `}
     >
       <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 rounded-xl"
         style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
