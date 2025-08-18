@@ -130,6 +130,26 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   const getAllIntegrations = () => [...canvasIntegrations, ...orgIntegrations];
 
+  // Helper function to ensure all inputs are included in input mappings
+  const ensureAllInputsInMappings = useCallback((mappings: SuperplaneInputMapping[], allInputs: SuperplaneInputDefinition[]) => {
+    return mappings.map(mapping => {
+      const existingValues = mapping.values || [];
+      const missingInputs = allInputs.filter(inp => 
+        inp.name && !existingValues.some(v => v.name === inp.name)
+      );
+      
+      const additionalValues = missingInputs.map(inp => ({
+        name: inp.name,
+        value: ''
+      }));
+      
+      return {
+        ...mapping,
+        values: [...existingValues, ...additionalValues]
+      };
+    });
+  }, []);
+
 
   const getSecretKeys = (secretName: string) => {
     const allSecrets = getAllSecrets();
@@ -251,15 +271,63 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       }
     });
 
-    // Validate input mappings
+    // Validate input mappings and track input-specific errors
+    const inputMappingErrors = new Map<string, string[]>();
+    
     inputMappings.forEach((mapping, index) => {
       const mappingErrors: string[] = [];
       if (!mapping.when?.triggeredBy?.connection) {
         mappingErrors.push('Trigger connection is required');
       }
+      
+      // Check if all inputs are included in the mapping
+      if (inputs.length > 0) {
+        const mappingInputNames = mapping.values?.map(v => v.name) || [];
+        const missingInputs = inputs
+          .map(input => input.name)
+          .filter(inputName => inputName && !mappingInputNames.includes(inputName));
+        
+        // Add missing input errors to individual inputs
+        missingInputs.forEach(inputName => {
+          if (inputName) {
+            const inputIndex = inputs.findIndex(inp => inp.name === inputName);
+            if (inputIndex !== -1) {
+              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
+              currentErrors.push(`Missing in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
+              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
+            }
+          }
+        });
+      }
+      
+      // Check if all mapping values have either value or valueFrom defined
+      if (mapping.values) {
+        mapping.values.forEach((value) => {
+          const hasStaticValue = value.value !== undefined && value.value !== '';
+          const hasDynamicValue = value.valueFrom?.eventData?.expression !== undefined && value.valueFrom.eventData.expression !== '';
+          
+          if (!hasStaticValue && !hasDynamicValue) {
+            const inputIndex = inputs.findIndex(inp => inp.name === value.name);
+            if (inputIndex !== -1) {
+              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
+              currentErrors.push(`No value defined in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
+              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
+            }
+          }
+        });
+      }
+      
+      // Only add mapping-level errors for connection issues
       if (mappingErrors.length > 0) {
         errors[`inputMapping_${index}`] = mappingErrors.join(', ');
       }
+    });
+    
+    // Add input-specific mapping errors to the validation errors
+    inputMappingErrors.forEach((errorList, inputKey) => {
+      const existingErrors = errors[inputKey];
+      const newErrors = errorList.join(', ');
+      errors[inputKey] = existingErrors ? `${existingErrors}, ${newErrors}` : newErrors;
     });
 
     // Comprehensive executor validation
@@ -464,6 +532,20 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
+
+  // Auto-update input mappings when inputs change
+  useEffect(() => {
+    if (inputMappings.length > 0) {
+      const updatedMappings = ensureAllInputsInMappings(inputMappings, inputs);
+      // Only update if there are actual changes to prevent infinite loops
+      const hasChanges = updatedMappings.some((mapping, index) => 
+        mapping.values?.length !== inputMappings[index]?.values?.length
+      );
+      if (hasChanges) {
+        setInputMappings(updatedMappings);
+      }
+    }
+  }, [inputs, inputMappings, ensureAllInputsInMappings]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -805,11 +887,24 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         }
                       }}
                       displayName={input.name || `Input ${index + 1}`}
-                      badge={inputMappingsForInput.length > 0 ? (
-                        <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
-                          {inputMappingsForInput.length} mapping{inputMappingsForInput.length !== 1 ? 's' : ''}
-                        </span>
-                      ) : null}
+                      badge={
+                        <div className="flex items-center gap-2">
+                          {inputMappingsForInput.length > 0 && (
+                            <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
+                              {inputMappingsForInput.length} mapping{inputMappingsForInput.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {validationErrors[`input_${index}`] && (
+                            <span 
+                              className="text-xs bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 px-2 py-0.5 rounded flex items-center gap-1" 
+                              title={validationErrors[`input_${index}`]}
+                            >
+                              <MaterialSymbol name="error" size="sm" />
+                              Mapping Error
+                            </span>
+                          )}
+                        </div>
+                      }
                       editForm={
                         <div className="space-y-4">
                           <ValidationField
@@ -879,14 +974,82 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                         <select
                                           value={mapping.when?.triggeredBy?.connection || ''}
                                           onChange={(e) => {
+                                            const selectedConnection = e.target.value;
                                             const newMappings = [...inputMappings];
-                                            newMappings[actualMappingIndex] = {
-                                              ...newMappings[actualMappingIndex],
-                                              when: {
-                                                ...newMappings[actualMappingIndex].when,
-                                                triggeredBy: { connection: e.target.value }
+                                            const currentInputValue = mapping.values?.find(v => v.name === input.name);
+                                            
+                                            if (!currentInputValue) return;
+                                            
+                                            // Check if there's already a mapping with this connection
+                                            const existingMappingIndex = newMappings.findIndex((m, idx) => 
+                                              idx !== actualMappingIndex && 
+                                              m.when?.triggeredBy?.connection === selectedConnection && 
+                                              selectedConnection !== ''
+                                            );
+                                            
+                                            if (existingMappingIndex !== -1 && selectedConnection !== '') {
+                                              // Move only the current input's value to the existing mapping
+                                              const existingValues = newMappings[existingMappingIndex].values || [];
+                                              const valueExists = existingValues.some(v => v.name === input.name);
+                                              
+                                              if (!valueExists) {
+                                                // Add the current input's value to the existing mapping
+                                                newMappings[existingMappingIndex].values = [...existingValues, currentInputValue];
+                                              } else {
+                                                // Replace the existing value with the current one
+                                                newMappings[existingMappingIndex].values = existingValues.map(v => 
+                                                  v.name === input.name ? currentInputValue : v
+                                                );
                                               }
-                                            };
+                                              
+                                              // Remove the current input's value from the original mapping
+                                              const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
+                                              
+                                              if (updatedOriginalValues.length === 0) {
+                                                // Remove the original mapping if no values left
+                                                newMappings.splice(actualMappingIndex, 1);
+                                              } else {
+                                                // Keep the original mapping with remaining values
+                                                newMappings[actualMappingIndex].values = updatedOriginalValues;
+                                              }
+                                            } else {
+                                              // Create new mapping or update existing one for this connection
+                                              if (selectedConnection === '') {
+                                                // Just update the connection to empty
+                                                newMappings[actualMappingIndex] = {
+                                                  ...newMappings[actualMappingIndex],
+                                                  when: {
+                                                    ...newMappings[actualMappingIndex].when,
+                                                    triggeredBy: { connection: selectedConnection }
+                                                  }
+                                                };
+                                              } else {
+                                                // Remove current input from original mapping
+                                                const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
+                                                
+                                                if (updatedOriginalValues.length === 0) {
+                                                  // Update the entire mapping to the new connection if this was the only value
+                                                  newMappings[actualMappingIndex] = {
+                                                    ...newMappings[actualMappingIndex],
+                                                    when: {
+                                                      ...newMappings[actualMappingIndex].when,
+                                                      triggeredBy: { connection: selectedConnection }
+                                                    }
+                                                  };
+                                                } else {
+                                                  // Keep the original mapping and create a new one for this input
+                                                  newMappings[actualMappingIndex].values = updatedOriginalValues;
+                                                  
+                                                  // Create new mapping for the current input
+                                                  const newMapping = {
+                                                    when: { triggeredBy: { connection: selectedConnection } },
+                                                    values: [currentInputValue]
+                                                  };
+                                                  newMappings.push(newMapping);
+                                                }
+                                              }
+                                            }
+                                            
                                             setInputMappings(newMappings);
                                           }}
                                           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${actualMappingIndex}`]
@@ -1026,16 +1189,32 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                         </div>
                                       )}
 
-                                      {/* Remove Mapping Button */}
+                                      {/* Remove Input from Mapping Button */}
                                       <div className="flex justify-end">
                                         <button
                                           onClick={() => {
-                                            const newMappings = inputMappings.filter((_, i) => i !== actualMappingIndex);
+                                            const newMappings = [...inputMappings];
+                                            const currentMapping = newMappings[actualMappingIndex];
+                                            
+                                            // Remove only the current input's value from this mapping
+                                            const updatedValues = (currentMapping.values || []).filter(v => v.name !== input.name);
+                                            
+                                            if (updatedValues.length === 0) {
+                                              // If no values left, remove the entire mapping
+                                              newMappings.splice(actualMappingIndex, 1);
+                                            } else {
+                                              // Otherwise, just update the values
+                                              newMappings[actualMappingIndex] = {
+                                                ...currentMapping,
+                                                values: updatedValues
+                                              };
+                                            }
+                                            
                                             setInputMappings(newMappings);
                                           }}
                                           className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs"
                                         >
-                                          Remove Mapping
+                                          Remove from Mapping
                                         </button>
                                       </div>
                                     </div>
@@ -1046,12 +1225,37 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                           </div>
                           <button
                             onClick={() => {
-                              // Add a new mapping for this specific input
-                              const newMapping = {
-                                when: { triggeredBy: { connection: '' } },
-                                values: [{ name: input.name, value: '' }]
-                              };
-                              setInputMappings(prev => [...prev, newMapping]);
+                              // Check if there's already an empty mapping (no connection selected)
+                              const existingEmptyMappingIndex = inputMappings.findIndex(mapping => 
+                                !mapping.when?.triggeredBy?.connection || mapping.when.triggeredBy.connection === ''
+                              );
+                              
+                              if (existingEmptyMappingIndex !== -1) {
+                                // Add to existing empty mapping
+                                const newMappings = [...inputMappings];
+                                const existingValues = newMappings[existingEmptyMappingIndex].values || [];
+                                const inputAlreadyExists = existingValues.some(v => v.name === input.name);
+                                
+                                if (!inputAlreadyExists) {
+                                  newMappings[existingEmptyMappingIndex].values = [
+                                    ...existingValues,
+                                    { name: input.name, value: '' }
+                                  ];
+                                  setInputMappings(newMappings);
+                                }
+                              } else {
+                                // Create new mapping with ALL inputs (API requirement)
+                                const allInputValues = inputs.map(inp => ({
+                                  name: inp.name,
+                                  value: inp.name === input.name ? '' : '' // All start with empty values
+                                }));
+                                
+                                const newMapping = {
+                                  when: { triggeredBy: { connection: '' } },
+                                  values: allInputValues
+                                };
+                                setInputMappings(prev => [...prev, newMapping]);
+                              }
                             }}
                             className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                           >
