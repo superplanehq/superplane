@@ -15,8 +15,8 @@ import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 
 import { formatRelativeTime } from '../../utils/stageEventUtils';
+import { IOTooltip } from './IOTooltip';
 import Tippy from '@tippyjs/react';
-import 'tippy.js/dist/tippy.css';
 import { twMerge } from 'tailwind-merge';
 
 const StageImageMap = {
@@ -499,8 +499,22 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   </a>
                 </div>
                 <div className="flex items-center gap-2 font-semibold">
-                  {lastInputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}</span>}
-                  {lastOutputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}</span>}
+                  {lastInputsCount > 0 && (
+                    <IOTooltip
+                      type="inputs"
+                      data={lastExecutionEvent?.inputs?.map(input => ({ name: input.name, value: input.value })) || []}
+                    >
+                      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}</span>
+                    </IOTooltip>
+                  )}
+                  {lastOutputsCount > 0 && (
+                    <IOTooltip
+                      type="outputs"
+                      data={lastFinishedExecution?.outputs?.map(output => ({ name: output.name, value: output.value })) || []}
+                    >
+                      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}</span>
+                    </IOTooltip>
+                  )}
                 </div>
               </div>
             </div>
