@@ -134,15 +134,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const ensureAllInputsInMappings = useCallback((mappings: SuperplaneInputMapping[], allInputs: SuperplaneInputDefinition[]) => {
     return mappings.map(mapping => {
       const existingValues = mapping.values || [];
-      const missingInputs = allInputs.filter(inp => 
+      const missingInputs = allInputs.filter(inp =>
         inp.name && !existingValues.some(v => v.name === inp.name)
       );
-      
+
       const additionalValues = missingInputs.map(inp => ({
         name: inp.name,
         value: ''
       }));
-      
+
       return {
         ...mapping,
         values: [...existingValues, ...additionalValues]
@@ -273,20 +273,20 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     // Validate input mappings and track input-specific errors
     const inputMappingErrors = new Map<string, string[]>();
-    
+
     inputMappings.forEach((mapping, index) => {
       const mappingErrors: string[] = [];
       if (!mapping.when?.triggeredBy?.connection) {
         mappingErrors.push('Trigger connection is required');
       }
-      
+
       // Check if all inputs are included in the mapping
       if (inputs.length > 0) {
         const mappingInputNames = mapping.values?.map(v => v.name) || [];
         const missingInputs = inputs
           .map(input => input.name)
           .filter(inputName => inputName && !mappingInputNames.includes(inputName));
-        
+
         // Add missing input errors to individual inputs
         missingInputs.forEach(inputName => {
           if (inputName) {
@@ -299,13 +299,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           }
         });
       }
-      
+
       // Check if all mapping values have either value or valueFrom defined
       if (mapping.values) {
         mapping.values.forEach((value) => {
           const hasStaticValue = value.value !== undefined && value.value !== '';
           const hasDynamicValue = value.valueFrom?.eventData?.expression !== undefined && value.valueFrom.eventData.expression !== '';
-          
+
           if (!hasStaticValue && !hasDynamicValue) {
             const inputIndex = inputs.findIndex(inp => inp.name === value.name);
             if (inputIndex !== -1) {
@@ -316,13 +316,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           }
         });
       }
-      
+
       // Only add mapping-level errors for connection issues
       if (mappingErrors.length > 0) {
         errors[`inputMapping_${index}`] = mappingErrors.join(', ');
       }
     });
-    
+
     // Add input-specific mapping errors to the validation errors
     inputMappingErrors.forEach((errorList, inputKey) => {
       const existingErrors = errors[inputKey];
@@ -538,7 +538,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     if (inputMappings.length > 0) {
       const updatedMappings = ensureAllInputsInMappings(inputMappings, inputs);
       // Only update if there are actual changes to prevent infinite loops
-      const hasChanges = updatedMappings.some((mapping, index) => 
+      const hasChanges = updatedMappings.some((mapping, index) =>
         mapping.values?.length !== inputMappings[index]?.values?.length
       );
       if (hasChanges) {
@@ -750,9 +750,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       <div className="">
         {/* Show zero state if executor type requires integrations but none are available */}
         {requireIntegration && !hasRequiredIntegrations && (
-          <IntegrationZeroState 
-            integrationType={executor?.type || ''} 
-            label={getZeroStateLabel()} 
+          <IntegrationZeroState
+            integrationType={executor?.type || ''}
+            label={getZeroStateLabel()}
             canvasId={canvasId}
             organizationId={organizationId}
           />
@@ -895,8 +895,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             </span>
                           )}
                           {validationErrors[`input_${index}`] && (
-                            <span 
-                              className="text-xs bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 px-2 py-0.5 rounded flex items-center gap-1" 
+                            <span
+                              className="text-xs bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 px-2 py-0.5 rounded flex items-center gap-1"
                               title={validationErrors[`input_${index}`]}
                             >
                               <MaterialSymbol name="error" size="sm" />
@@ -977,34 +977,34 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                             const selectedConnection = e.target.value;
                                             const newMappings = [...inputMappings];
                                             const currentInputValue = mapping.values?.find(v => v.name === input.name);
-                                            
+
                                             if (!currentInputValue) return;
-                                            
+
                                             // Check if there's already a mapping with this connection
-                                            const existingMappingIndex = newMappings.findIndex((m, idx) => 
-                                              idx !== actualMappingIndex && 
-                                              m.when?.triggeredBy?.connection === selectedConnection && 
+                                            const existingMappingIndex = newMappings.findIndex((m, idx) =>
+                                              idx !== actualMappingIndex &&
+                                              m.when?.triggeredBy?.connection === selectedConnection &&
                                               selectedConnection !== ''
                                             );
-                                            
+
                                             if (existingMappingIndex !== -1 && selectedConnection !== '') {
                                               // Move only the current input's value to the existing mapping
                                               const existingValues = newMappings[existingMappingIndex].values || [];
                                               const valueExists = existingValues.some(v => v.name === input.name);
-                                              
+
                                               if (!valueExists) {
                                                 // Add the current input's value to the existing mapping
                                                 newMappings[existingMappingIndex].values = [...existingValues, currentInputValue];
                                               } else {
                                                 // Replace the existing value with the current one
-                                                newMappings[existingMappingIndex].values = existingValues.map(v => 
+                                                newMappings[existingMappingIndex].values = existingValues.map(v =>
                                                   v.name === input.name ? currentInputValue : v
                                                 );
                                               }
-                                              
+
                                               // Remove the current input's value from the original mapping
                                               const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
-                                              
+
                                               if (updatedOriginalValues.length === 0) {
                                                 // Remove the original mapping if no values left
                                                 newMappings.splice(actualMappingIndex, 1);
@@ -1026,7 +1026,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                               } else {
                                                 // Remove current input from original mapping
                                                 const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
-                                                
+
                                                 if (updatedOriginalValues.length === 0) {
                                                   // Update the entire mapping to the new connection if this was the only value
                                                   newMappings[actualMappingIndex] = {
@@ -1039,7 +1039,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                 } else {
                                                   // Keep the original mapping and create a new one for this input
                                                   newMappings[actualMappingIndex].values = updatedOriginalValues;
-                                                  
+
                                                   // Create new mapping for the current input
                                                   const newMapping = {
                                                     when: { triggeredBy: { connection: selectedConnection } },
@@ -1049,7 +1049,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                 }
                                               }
                                             }
-                                            
+
                                             setInputMappings(newMappings);
                                           }}
                                           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${actualMappingIndex}`]
@@ -1195,10 +1195,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                           onClick={() => {
                                             const newMappings = [...inputMappings];
                                             const currentMapping = newMappings[actualMappingIndex];
-                                            
+
                                             // Remove only the current input's value from this mapping
                                             const updatedValues = (currentMapping.values || []).filter(v => v.name !== input.name);
-                                            
+
                                             if (updatedValues.length === 0) {
                                               // If no values left, remove the entire mapping
                                               newMappings.splice(actualMappingIndex, 1);
@@ -1209,7 +1209,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                 values: updatedValues
                                               };
                                             }
-                                            
+
                                             setInputMappings(newMappings);
                                           }}
                                           className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs"
@@ -1226,16 +1226,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                           <button
                             onClick={() => {
                               // Check if there's already an empty mapping (no connection selected)
-                              const existingEmptyMappingIndex = inputMappings.findIndex(mapping => 
+                              const existingEmptyMappingIndex = inputMappings.findIndex(mapping =>
                                 !mapping.when?.triggeredBy?.connection || mapping.when.triggeredBy.connection === ''
                               );
-                              
+
                               if (existingEmptyMappingIndex !== -1) {
                                 // Add to existing empty mapping
                                 const newMappings = [...inputMappings];
                                 const existingValues = newMappings[existingEmptyMappingIndex].values || [];
                                 const inputAlreadyExists = existingValues.some(v => v.name === input.name);
-                                
+
                                 if (!inputAlreadyExists) {
                                   newMappings[existingEmptyMappingIndex].values = [
                                     ...existingValues,
@@ -1249,7 +1249,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                   name: inp.name,
                                   value: inp.name === input.name ? '' : '' // All start with empty values
                                 }));
-                                
+
                                 const newMapping = {
                                   when: { triggeredBy: { connection: '' } },
                                   values: allInputValues
@@ -1821,8 +1821,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                           <ValidationField label="Parameters">
                             <div className="space-y-2">
-                              {Object.entries((executor.spec?.parameters as Record<string, string>) || {}).map(([key, value]) => (
-                                <div key={key} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                              {Object.entries((executor.spec?.parameters as Record<string, string>) || {}).map(([key, value], index) => (
+                                <div key={`parameter-${index}`} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
                                   <input
                                     type="text"
                                     value={key}
