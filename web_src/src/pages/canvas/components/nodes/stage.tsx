@@ -17,6 +17,7 @@ import GithubLogo from '@/assets/github-mark.svg';
 import { formatRelativeTime, formatExecutionDuration } from '../../utils/stageEventUtils';
 import { IOTooltip } from './IOTooltip';
 import { twMerge } from 'tailwind-merge';
+import { StageQueueSection } from '../StageQueueSection';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
@@ -70,7 +71,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     [currentStage?.queue]
   );
   const lastPendingEvent = useMemo(() =>
-    pendingEvents.at(-1),
+    pendingEvents.at(-1) || null,
     [pendingEvents]
   );
 
@@ -542,125 +543,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             </div>
 
             {/* Queue Section */}
-            <div className="px-3 pt-2 pb-2 w-full">
-              <div className="w-full text-left flex justify-between text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide mb-1">
-                Next in queue
-                {
-                  eventsMoreCount > 0 && (
-                    <span className="text-xs text-gray-400 font-medium">+{eventsMoreCount} more</span>
-                  )
-                }
-              </div>
-
-              {
-                lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_APPROVAL" && (
-                  <div className="space-y-2 mb-2">
-                    <div className="flex items-center p-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-800 rounded-sm gap-2 justify-between">
-                      <div className="flex items-center gap-2 truncate">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
-                          <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Action required</span>
-                        </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{lastWaitingEvent?.id}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {/*
-                        TODO: Add dismiss button when this feature is implemented
-                        <button
-                          className="relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border text-base/6 font-semibold px-[calc(theme(spacing[3.5])-1px)] py-[calc(theme(spacing[2.5])-1px)] sm:px-[calc(theme(spacing[3])-1px)] sm:py-[calc(theme(spacing[1.5])-1px)] sm:text-sm/6 focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 border-transparent text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/10 cursor-pointer"
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Handle close/dismiss action
-                          }}
-                        >
-                          <MaterialSymbol name="close" size="sm" className="text-gray-700 dark:text-gray-400" />
-                        </button>
-                        */}
-                        <button
-                          className="relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border text-base/6 font-semibold px-[calc(theme(spacing[3.5])-1px)] py-[calc(theme(spacing[2.5])-1px)] sm:px-[calc(theme(spacing[3])-1px)] sm:py-[calc(theme(spacing[1.5])-1px)] sm:text-sm/6 focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 border-transparent bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer shadow-sm"
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (lastWaitingEvent?.id && currentStage?.metadata?.id) {
-                              approveStageEvent(lastWaitingEvent.id, currentStage.metadata.id);
-                            }
-                          }}
-                        >
-                          <MaterialSymbol name="check" size="sm" className="text-gray-700 dark:text-gray-400" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              {
-                lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_TIME_WINDOW" && (
-                  <div className="space-y-2 mb-2">
-                    <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
-                      <div className="flex items-center gap-2 truncate">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
-                          <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Waiting</span>
-                        </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{lastWaitingEvent?.id}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <MaterialSymbol name="timer" size="lg" className="text-orange-700 dark:text-orange-600 px-2" />
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              {
-                lastWaitingEvent && !["STATE_REASON_APPROVAL", "STATE_REASON_TIME_WINDOW"].includes(lastWaitingEvent.stateReason || '') && (
-                  <div className="space-y-2 mb-2">
-                    <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
-                      <div className="flex items-center gap-2 truncate">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
-                          <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Waiting</span>
-                        </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{lastWaitingEvent?.id}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <MaterialSymbol name="timer" size="lg" className="text-orange-700 dark:text-orange-600 px-2" />
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              {
-                lastPendingEvent && (
-                  <div className="space-y-2">
-                    <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
-                      <div className="flex items-center gap-2 truncate">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
-                          <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Pending</span>
-                        </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{lastPendingEvent?.id}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <MaterialSymbol name="timer" size="lg" className="text-orange-700 dark:text-orange-600 px-2" />
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              {
-                !lastPendingEvent && !lastWaitingEvent && (
-                  <div className="flex justify-between w-full mb-2 px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                    <span className='font-semibold text-gray-500 dark:text-gray-400 text-sm truncate mt-[2px]'>No events in queue..</span>
-                  </div>
-                )
-              }
-
-            </div>
+            <StageQueueSection
+              lastWaitingEvent={lastWaitingEvent}
+              lastPendingEvent={lastPendingEvent}
+              eventsMoreCount={eventsMoreCount}
+              onApproveEvent={approveStageEvent}
+              stageId={currentStage?.metadata?.id || ''}
+            />
           </>
         )}
 
