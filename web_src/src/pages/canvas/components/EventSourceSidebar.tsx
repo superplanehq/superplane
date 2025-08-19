@@ -9,12 +9,15 @@ import { useIntegrations } from "../hooks/useIntegrations";
 import { useCanvasStore } from "../store/canvasStore";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
+import { SidebarTabs } from './SidebarTabs';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
   'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
 }
+
+type TabType = 'activity' | 'history' | 'settings';
 
 interface EventSourceSidebarProps {
   selectedEventSource: SuperplaneEventSource & {
@@ -26,7 +29,7 @@ interface EventSourceSidebarProps {
 
 export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSourceSidebarProps) => {
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<TabType>('activity');
   const canvasId = useCanvasStore(state => state.canvasId) || '';
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
@@ -43,11 +46,9 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
     return "webhook";
   }, [canvasIntegrations, selectedEventSource.eventSourceType, selectedEventSource.spec?.integration?.name]);
   const events = selectedEventSource.events || [];
-  const limitedEvents = events.slice(0, 20);
+  const latestEvents = events.slice(0, 6);
+  const allEvents = events.slice(0, 20);
 
-  const filteredEvents = limitedEvents.filter(event =>
-    event.id?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <aside
@@ -66,60 +67,133 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
         onClose={onClose}
       />
 
-      <div className="p-4 border-b border-gray-200 dark:border-zinc-700">
-        <div className="relative">
-          <MaterialSymbol
-            name="search"
-            size="md"
-            className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-zinc-500"
-          />
-          <input
-            type="text"
-            placeholder="Search events..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 placeholder-gray-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
+      {/* Tab Navigation */}
+      <SidebarTabs
+        tabs={[
+          { key: 'activity', label: 'Activity' },
+          { key: 'history', label: 'History' },
+          { key: 'settings', label: 'Settings' }
+        ]}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as TabType)}
+      />
 
       <div className="flex-1 overflow-y-auto">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
-              Event History ({filteredEvents.length})
-            </h3>
-          </div>
+        {activeTab === 'activity' && (
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
+                Latest Events ({latestEvents.length})
+              </h3>
+              <button
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                onClick={() => setActiveTab('history')}
+              >
+                View all
+              </button>
+            </div>
 
-          <div className="space-y-2">
-            {filteredEvents.length > 0 ? (
-              filteredEvents.map((event) => (
-                <EventItem
-                  key={event.id}
-                  eventId={event.id!}
-                  timestamp={event.receivedAt!}
-                  state={event.state}
-                  eventType={event.type}
-                  sourceName={event.sourceName}
-                  headers={event.headers}
-                  payload={event.raw}
-                />
-              ))
-            ) : (
-              <div className="text-sm text-gray-500 dark:text-gray-400 italic py-8 text-center">
-                {searchQuery ? 'No events match your search' : 'No events received'}
+            <div className="space-y-2">
+              {latestEvents.length > 0 ? (
+                latestEvents.map((event) => (
+                  <EventItem
+                    key={event.id}
+                    eventId={event.id!}
+                    timestamp={event.receivedAt!}
+                    state={event.state}
+                    eventType={event.type}
+                    sourceName={event.sourceName}
+                    headers={event.headers}
+                    payload={event.raw}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+                  <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3 " aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>inbox</span>
+                  <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No recent events</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
+                Event History ({allEvents.length})
+              </h3>
+            </div>
+
+            <div className="space-y-2">
+              {allEvents.length > 0 ? (
+                allEvents.map((event) => (
+                  <EventItem
+                    key={event.id}
+                    eventId={event.id!}
+                    timestamp={event.receivedAt!}
+                    state={event.state}
+                    eventType={event.type}
+                    sourceName={event.sourceName}
+                    headers={event.headers}
+                    payload={event.raw}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+                  <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3 " aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>inbox</span>
+                  <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No events received</p>
+                </div>
+              )}
+            </div>
+
+            {events.length > 20 && (
+              <div className="mt-4 text-center">
+                <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                  Load more events
+                </button>
               </div>
             )}
           </div>
+        )}
 
-          {events.length > 20 && (
-            <div className="mt-4 text-center">
-              <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                Load more events
-              </button>
+        {activeTab === 'settings' && (
+          <div className="p-4 text-left">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                {eventSourceType !== 'webhook' ? (
+                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
+                    <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
+                      {eventSourceType.charAt(0).toUpperCase() + eventSourceType.slice(1)} Configuration
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Integration</div>
+                        <div className="text-sm text-gray-900 dark:text-zinc-200">{selectedEventSource.spec?.integration?.name || `${eventSourceType.charAt(0).toUpperCase() + eventSourceType.slice(1)} Integration`}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Project</div>
+                        <div className="text-sm text-gray-900 dark:text-zinc-200">{selectedEventSource.metadata?.name || 'Unknown Project'}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
+                    <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
+                      Integration Configuration
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Integration</div>
+                        <div className="text-sm text-gray-900 dark:text-zinc-200">Direct Webhook</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <ResizeHandle
