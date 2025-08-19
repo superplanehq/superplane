@@ -15,8 +15,7 @@ import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { twMerge } from 'tailwind-merge';
 import { useIntegrations } from '../../hooks/useIntegrations';
-import Tippy from '@tippyjs/react';
-import { formatRelativeTime, formatFullTimestamp } from '../../utils/stageEventUtils';
+import { EventStateItem, EventState } from '../EventStateItem';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -372,28 +371,29 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         <>
           <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-sm my-2 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Events</div>
+              <div className="text-sm my-2 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.events?.length || 0})</div>
             </div>
 
             <div className="space-y-2">
               {currentEventSource?.events?.length ? (
-                currentEventSource.events.slice(0, 3).map((event) => (
-                  <div key={event.id} className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-2">
-                    <div className="flex justify-between items-center gap-3 overflow-hidden">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          <MaterialSymbol name="bolt" size="md" />
-                        </span>
-                        <span className="truncate dark:text-zinc-200 font-medium">{event.id!}</span>
-                      </div>
-                      <Tippy content={formatFullTimestamp(event.receivedAt)} placement="top">
-                        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                          {formatRelativeTime(event.receivedAt)}
-                        </span>
-                      </Tippy>
-                    </div>
-                  </div>
-                ))
+                currentEventSource.events.slice(0, 3).map((event) => {
+                  // Map event states to our EventState type
+                  let eventState: EventState = 'pending';
+                  if (event.state === 'STATE_DISCARDED') {
+                    eventState = 'discarded';
+                  } else if (event.state === 'STATE_PROCESSED') {
+                    eventState = 'processed';
+                  }
+
+                  return (
+                    <EventStateItem
+                      key={event.id}
+                      eventId={event.id!}
+                      state={eventState}
+                      receivedAt={event.receivedAt}
+                    />
+                  );
+                })
               ) : (
                 <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No events received</div>
               )}
