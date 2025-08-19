@@ -51,7 +51,7 @@ func Test__DeleteCanvas(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, roles)
 
-		deletedCanvas, err := models.FindUnscopedCanvasByID(canvas.ID.String())
+		deletedCanvas, err := models.FindUnscopedSoftDeletedCanvasByID(canvas.ID.String())
 		require.NoError(t, err)
 		assert.Contains(t, deletedCanvas.Name, "deleted-")
 	})

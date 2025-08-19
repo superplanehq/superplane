@@ -199,6 +199,22 @@ func FindUnscopedCanvasByID(id string) (*Canvas, error) {
 	return &canvas, nil
 }
 
+func FindUnscopedSoftDeletedCanvasByID(id string) (*Canvas, error) {
+	canvas := Canvas{}
+
+	err := database.Conn().
+		Unscoped().
+		Where("id = ?", id).
+		First(&canvas).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &canvas, nil
+}
+
 func FindCanvasByID(id string, organizationID uuid.UUID) (*Canvas, error) {
 	canvas := Canvas{}
 
