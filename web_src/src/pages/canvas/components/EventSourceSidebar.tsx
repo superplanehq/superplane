@@ -25,7 +25,7 @@ interface EventSourceSidebarProps {
 }
 
 export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSourceSidebarProps) => {
-  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(400);
+  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
   const [searchQuery, setSearchQuery] = useState('');
   const canvasId = useCanvasStore(state => state.canvasId) || '';
 
