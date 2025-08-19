@@ -14,10 +14,10 @@ import { EditModeActionButtons } from '../EditModeActionButtons';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 
-import { formatRelativeTime } from '../../utils/stageEventUtils';
-import Tippy from '@tippyjs/react';
-import 'tippy.js/dist/tippy.css';
+import { formatRelativeTime, formatExecutionDuration } from '../../utils/stageEventUtils';
+import { IOTooltip } from './IOTooltip';
 import { twMerge } from 'tailwind-merge';
+import { StageQueueSection } from '../StageQueueSection';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
@@ -34,7 +34,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [stageName, setStageName] = useState(props.data.label || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage } = useCanvasStore();
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
   const currentStage = useCanvasStore(state =>
     state.stages.find(stage => stage.metadata?.id === props.id)
@@ -66,25 +66,25 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const pendingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_PENDING')
+      ?.filter(event => event.state === 'STATE_PENDING' && !event.execution)
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
   const lastPendingEvent = useMemo(() =>
-    pendingEvents.at(-1),
+    pendingEvents.at(-1) || null,
     [pendingEvents]
   );
 
   const waitingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_WAITING')
+      ?.filter(event => event.state === 'STATE_WAITING' && !event.execution)
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
 
   const lastWaitingEvent = useMemo(() => {
     const event = waitingEvents.at(-1);
-    if (!event || event.stateReason !== 'STATE_REASON_APPROVAL') {
+    if (!event) {
       return null;
     }
     return event;
@@ -343,6 +343,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     if (lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_APPROVAL")
       total -= 1
 
+    if (lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_TIME_WINDOW")
+      total -= 1
+
     if (lastPendingEvent)
       total -= 1
 
@@ -352,7 +355,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
-      className={`p-[2px] bg-transparent rounded-xl border-2 ${props.selected ? 'border-blue-400 dark:border-gray-200' : 'border-transparent dark:border-transparent'} relative `}
+      className={`p-[2px] bg-transparent rounded-xl border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400 dark:border-gray-200' : 'border-transparent dark:border-transparent'} relative `}
     >
       <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 rounded-xl"
         style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
@@ -477,12 +480,32 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 </div>
               </div>
             )}
+
+            {props.data.executor?.type === 'github' && (
+              <div className="flex items-center w-full gap-2 mx-4 font-semibold">
+                <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                  <MaterialSymbol name="assignment" size="md" />
+                  <span>{(props.data.executor?.resource?.name as string)}</span>
+                </div>
+                <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                  <MaterialSymbol name="code" size="md" />
+                  <span>{(props.data.executor?.spec?.['workflow'] as string)?.replace('.github/workflows/', '')}</span>
+                </div>
+              </div>
+            )}
             {/* Last Run Section */}
             <div className={`mt-4 px-3 py-3 border-t-2 w-full ${getBackgroundColorClass()}`}>
               <div className="flex items-center w-full justify-between mb-2">
                 <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last run</div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {isRunning ? 'Running...' : lastFinishedExecution ? formatRelativeTime(lastFinishedExecution?.finishedAt) : 'No recent runs'}
+                  {isRunning ? 'Running...' : lastFinishedExecution ? (
+                    <div className="flex items-center gap-1 font-semibold text-gray-500 dark:text-gray-400">
+                      <MaterialSymbol name="timer" size="md" />
+                      <span>{formatExecutionDuration(lastFinishedExecution?.createdAt, lastFinishedExecution?.finishedAt)}</span>
+                      <span>|</span>
+                      <span>{formatRelativeTime(lastFinishedExecution?.finishedAt, true)}</span>
+                    </div>
+                  ) : 'No recent runs'}
                 </div>
               </div>
 
@@ -499,54 +522,34 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   </a>
                 </div>
                 <div className="flex items-center gap-2 font-semibold">
-                  {lastInputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}</span>}
-                  {lastOutputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}</span>}
+                  {lastInputsCount > 0 && (
+                    <IOTooltip
+                      type="inputs"
+                      data={lastExecutionEvent?.inputs?.map(input => ({ name: input.name, value: input.value })) || []}
+                    >
+                      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}</span>
+                    </IOTooltip>
+                  )}
+                  {lastOutputsCount > 0 && (
+                    <IOTooltip
+                      type="outputs"
+                      data={lastFinishedExecution?.outputs?.map(output => ({ name: output.name, value: output.value })) || []}
+                    >
+                      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}</span>
+                    </IOTooltip>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Queue Section */}
-            <div className="px-3 pt-2 pb-2 w-full">
-              <div className="w-full text-left flex justify-between text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide mb-1">
-                Next in queue
-                {
-                  eventsMoreCount > 0 && (
-                    <span className="text-xs text-gray-400 font-medium">+{eventsMoreCount} more</span>
-                  )
-                }
-              </div>
-
-              {
-                lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_APPROVAL" && (
-                  <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 mb-2">
-                    <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
-                    <Tippy content="Manual approval required" placement="top">
-                      <MaterialSymbol name="how_to_reg" size="md" className='text-orange-700' />
-                    </Tippy>
-                  </div>
-                )
-              }
-
-              {
-                lastPendingEvent && (
-                  <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                    <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastPendingEvent?.id}</span>
-                    <Tippy content="Waiting For the current execution to finish" placement="top">
-                      <MaterialSymbol name="timer" size="md" className='text-orange-700' />
-                    </Tippy>
-                  </div>
-                )
-              }
-
-              {
-                !lastPendingEvent && !lastWaitingEvent && (
-                  <div className="flex justify-between w-full mb-2 px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                    <span className='font-semibold text-gray-500 dark:text-gray-400 text-sm truncate mt-[2px]'>No events in queue..</span>
-                  </div>
-                )
-              }
-
-            </div>
+            <StageQueueSection
+              lastWaitingEvent={lastWaitingEvent}
+              lastPendingEvent={lastPendingEvent}
+              eventsMoreCount={eventsMoreCount}
+              onApproveEvent={approveStageEvent}
+              stageId={currentStage?.metadata?.id || ''}
+            />
           </>
         )}
 

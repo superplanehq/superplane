@@ -160,7 +160,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                             <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
                             <div className="flex items-center gap-2 truncate">
                               <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-                                {value}
+                                {value || '-'}
                               </span>
                             </div>
                           </div>
@@ -182,7 +182,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                             <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
                             <div className="flex items-center gap-2 truncate">
                               <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-                                {value}
+                                {value || '-'}
                               </span>
                             </div>
                           </div>
