@@ -16,7 +16,6 @@ import GithubLogo from '@/assets/github-mark.svg';
 
 import { formatRelativeTime, formatExecutionDuration } from '../../utils/stageEventUtils';
 import { IOTooltip } from './IOTooltip';
-import Tippy from '@tippyjs/react';
 import { twMerge } from 'tailwind-merge';
 
 const StageImageMap = {
@@ -34,7 +33,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [stageName, setStageName] = useState(props.data.label || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage } = useCanvasStore();
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
   const currentStage = useCanvasStore(state =>
     state.stages.find(stage => stage.metadata?.id === props.id)
@@ -542,44 +541,100 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
               {
                 lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_APPROVAL" && (
-                  <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 mb-2">
-                    <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
-                    <Tippy content="Manual approval required" placement="top">
-                      <MaterialSymbol name="how_to_reg" size="md" className='text-orange-700' />
-                    </Tippy>
+                  <div className="space-y-2 mb-2">
+                    <div className="flex items-center p-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-800 rounded-sm gap-2 justify-between">
+                      <div className="flex items-center gap-2 truncate">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
+                          <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Action required</span>
+                        </div>
+                        <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{lastWaitingEvent?.id}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {/*
+                        TODO: Add dismiss button when this feature is implemented
+                        <button
+                          className="relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border text-base/6 font-semibold px-[calc(theme(spacing[3.5])-1px)] py-[calc(theme(spacing[2.5])-1px)] sm:px-[calc(theme(spacing[3])-1px)] sm:py-[calc(theme(spacing[1.5])-1px)] sm:text-sm/6 focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 border-transparent text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/10 cursor-pointer"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Handle close/dismiss action
+                          }}
+                        >
+                          <MaterialSymbol name="close" size="sm" className="text-gray-700 dark:text-gray-400" />
+                        </button>
+                        */}
+                        <button
+                          className="relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border text-base/6 font-semibold px-[calc(theme(spacing[3.5])-1px)] py-[calc(theme(spacing[2.5])-1px)] sm:px-[calc(theme(spacing[3])-1px)] sm:py-[calc(theme(spacing[1.5])-1px)] sm:text-sm/6 focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 border-transparent bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer shadow-sm"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (lastWaitingEvent?.id && currentStage?.metadata?.id) {
+                              approveStageEvent(lastWaitingEvent.id, currentStage.metadata.id);
+                            }
+                          }}
+                        >
+                          <MaterialSymbol name="check" size="sm" className="text-gray-700 dark:text-gray-400" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )
               }
 
               {
                 lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_TIME_WINDOW" && (
-                  <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 mb-2">
-                    <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
-                    <Tippy content="Waiting for time window to pass" placement="top">
-                      <MaterialSymbol name="timer" size="md" className='text-orange-700' />
-                    </Tippy>
+                  <div className="space-y-2 mb-2">
+                    <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
+                      <div className="flex items-center gap-2 truncate">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
+                          <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Waiting</span>
+                        </div>
+                        <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{lastWaitingEvent?.id}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <MaterialSymbol name="timer" size="lg" className="text-orange-700 dark:text-orange-600 px-2" />
+                      </div>
+                    </div>
                   </div>
                 )
               }
 
               {
                 lastWaitingEvent && !["STATE_REASON_APPROVAL", "STATE_REASON_TIME_WINDOW"].includes(lastWaitingEvent.stateReason || '') && (
-                  <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 mb-2">
-                    <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
-                    <Tippy content="Waiting for conditions to be met" placement="top">
-                      <MaterialSymbol name="timer" size="md" className='text-orange-700' />
-                    </Tippy>
+                  <div className="space-y-2 mb-2">
+                    <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
+                      <div className="flex items-center gap-2 truncate">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
+                          <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Waiting</span>
+                        </div>
+                        <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{lastWaitingEvent?.id}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <MaterialSymbol name="timer" size="lg" className="text-orange-700 dark:text-orange-600 px-2" />
+                      </div>
+                    </div>
                   </div>
                 )
               }
 
               {
                 lastPendingEvent && (
-                  <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                    <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastPendingEvent?.id}</span>
-                    <Tippy content="Waiting For the current execution to finish" placement="top">
-                      <MaterialSymbol name="timer" size="md" className='text-orange-700' />
-                    </Tippy>
+                  <div className="space-y-2">
+                    <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
+                      <div className="flex items-center gap-2 truncate">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
+                          <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Pending</span>
+                        </div>
+                        <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{lastPendingEvent?.id}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <MaterialSymbol name="timer" size="lg" className="text-orange-700 dark:text-orange-600 px-2" />
+                      </div>
+                    </div>
                   </div>
                 )
               }
