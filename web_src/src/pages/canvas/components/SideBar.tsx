@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useParams } from 'react-router-dom';
 import { ExecutionWithEvent, StageWithEventQueue } from "../store/types";
 
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
@@ -27,7 +28,8 @@ interface SidebarProps {
 
 export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState('activity');
-  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(400);
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
 
   // Sidebar tab definitions - memoized to prevent unnecessary re-renders
   const tabs = useMemo(() => [
@@ -73,11 +75,12 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
             allExecutions={allExecutions}
             approveStageEvent={approveStageEvent}
             executionRunning={executionRunning}
+            organizationId={organizationId!}
           />
         );
 
       case 'history':
-        return <HistoryTab allExecutions={allExecutions} />;
+        return <HistoryTab allExecutions={allExecutions} organizationId={organizationId!} />;
 
       case 'settings':
         return <SettingsTab selectedStage={selectedStage} />;

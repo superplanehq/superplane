@@ -11,6 +11,7 @@ interface ActivityTabProps {
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
+  organizationId: string;
 }
 
 export const ActivityTab = ({
@@ -20,7 +21,8 @@ export const ActivityTab = ({
   allExecutions,
   approveStageEvent,
   executionRunning,
-  onChangeTab
+  onChangeTab,
+  organizationId
 }: ActivityTabProps) => {
   const queueCount = pendingEvents.length + waitingEvents.length;
 
@@ -38,6 +40,7 @@ export const ActivityTab = ({
         </div>
         <ExecutionTimeline
           executions={allExecutions.slice(0, 3)}
+          organizationId={organizationId}
         />
       </div>
 

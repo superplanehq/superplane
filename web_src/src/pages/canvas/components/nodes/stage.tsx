@@ -132,8 +132,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         if (result === 'RESULT_FAILED') {
           return <MaterialSymbol name="cancel" size="lg" className="text-red-600 mr-2" />;
         }
-        return <span className="material-icons text-green-600 text-2xl mr-2">check_circle</span>;
-      case 'STATE_PENDING':
+        return <MaterialSymbol name="check_circle" size="lg" className="text-green-600 mr-2" />; case 'STATE_PENDING':
         return (
           <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 mr-2 animate-spin" />
         );
