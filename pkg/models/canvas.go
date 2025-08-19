@@ -124,17 +124,10 @@ func (c *Canvas) CreateStageInTransaction(
 func (c *Canvas) DeleteInTransaction(tx *gorm.DB) error {
 	deletedName := fmt.Sprintf("%s-deleted-%d", c.Name, time.Now().Unix())
 
-	err := tx.Model(c).
+	return tx.Model(c).
 		Where("id = ?", c.ID).
 		Update("name", deletedName).
-		Error
-	if err != nil {
-		return err
-	}
-
-	return tx.
-		Where("id = ?", c.ID).
-		Delete(&Canvas{}).
+		Update("deleted_at", time.Now()).
 		Error
 }
 
