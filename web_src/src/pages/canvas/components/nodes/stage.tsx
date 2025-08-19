@@ -14,7 +14,7 @@ import { EditModeActionButtons } from '../EditModeActionButtons';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 
-import { formatRelativeTime } from '../../utils/stageEventUtils';
+import { formatRelativeTime, formatExecutionDuration } from '../../utils/stageEventUtils';
 import { IOTooltip } from './IOTooltip';
 import Tippy from '@tippyjs/react';
 import { twMerge } from 'tailwind-merge';
@@ -485,7 +485,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               <div className="flex items-center w-full justify-between mb-2">
                 <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last run</div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {isRunning ? 'Running...' : lastFinishedExecution ? formatRelativeTime(lastFinishedExecution?.finishedAt) : 'No recent runs'}
+                  {isRunning ? 'Running...' : lastFinishedExecution ? (
+                    <div className="flex items-center gap-1 font-semibold text-gray-500 dark:text-gray-400">
+                      <MaterialSymbol name="timer" size="md" />
+                      <span>{formatExecutionDuration(lastFinishedExecution?.createdAt, lastFinishedExecution?.finishedAt)}</span>
+                      <span>|</span>
+                      <span>{formatRelativeTime(lastFinishedExecution?.finishedAt, true)}</span>
+                    </div>
+                  ) : 'No recent runs'}
                 </div>
               </div>
 

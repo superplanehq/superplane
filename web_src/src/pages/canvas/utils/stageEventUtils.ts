@@ -1,25 +1,37 @@
-export const formatRelativeTime = (dateString: string | undefined) => {
+export const formatRelativeTime = (dateString: string | undefined, abbreviated?: boolean) => {
   if (!dateString) return 'N/A'
 
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   
-  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-  
   const diffSeconds = Math.floor(diffMs / 1000);
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   
-  if (Math.abs(diffSeconds) < 60) {
-    return rtf.format(-diffSeconds, 'second');
-  } else if (Math.abs(diffMinutes) < 60) {
-    return rtf.format(-diffMinutes, 'minute');
-  } else if (Math.abs(diffHours) < 24) {
-    return rtf.format(-diffHours, 'hour');
+  if (abbreviated) {
+    if (Math.abs(diffSeconds) < 60) {
+      return `${Math.abs(diffSeconds)}s ago`;
+    } else if (Math.abs(diffMinutes) < 60) {
+      return `${Math.abs(diffMinutes)}m ago`;
+    } else if (Math.abs(diffHours) < 24) {
+      return `${Math.abs(diffHours)}h ago`;
+    } else {
+      return `${Math.abs(diffDays)}d ago`;
+    }
   } else {
-    return rtf.format(-diffDays, 'day');
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+    
+    if (Math.abs(diffSeconds) < 60) {
+      return rtf.format(-diffSeconds, 'second');
+    } else if (Math.abs(diffMinutes) < 60) {
+      return rtf.format(-diffMinutes, 'minute');
+    } else if (Math.abs(diffHours) < 24) {
+      return rtf.format(-diffHours, 'hour');
+    } else {
+      return rtf.format(-diffDays, 'day');
+    }
   }
 };
 
@@ -57,5 +69,30 @@ export const getExecutionStatusColor = (state: string, result?: string) => {
       return result === 'RESULT_PASSED' ? 'text-green-600 bg-green-50' : 
               result === 'RESULT_FAILED' ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50';
     default: return 'text-gray-600 bg-gray-50';
+  }
+};
+
+export const formatExecutionDuration = (startDate: string | undefined, endDate: string | undefined) => {
+  if (!startDate || !endDate) return 'N/A';
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffMs = end.getTime() - start.getTime();
+
+  if (diffMs < 0) return 'N/A';
+
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays > 0) {
+    return `${diffDays}d`;
+  } else if (diffHours > 0) {
+    return `${diffHours}h`;
+  } else if (diffMinutes > 0) {
+    return `${diffMinutes}m`;
+  } else {
+    return `${diffSeconds}s`;
   }
 };
