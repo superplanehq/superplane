@@ -14,6 +14,7 @@ import { ConnectionSelector } from './shared/ConnectionSelector';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
+import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -58,6 +59,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   // Validation
   const { validateName } = useValidation();
 
+  // Input mapping handlers
+  const inputMappingHandlers = createInputMappingHandlers({
+    inputMappings,
+    setInputMappings,
+    inputs
+  });
 
   // Fetch secrets and integrations
   const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId!, "DOMAIN_TYPE_CANVAS");
@@ -1130,25 +1137,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                   <label className="block text-xs font-medium mb-1">Data Source Connection</label>
                                                   <select
                                                     value={inputValue.valueFrom.eventData.connection || ''}
-                                                    onChange={(e) => {
-                                                      const newMappings = [...inputMappings];
-                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                      const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                      if (valueIndex !== -1) {
-                                                        values[valueIndex] = {
-                                                          ...values[valueIndex],
-                                                          valueFrom: {
-                                                            eventData: {
-                                                              ...values[valueIndex]?.valueFrom?.eventData,
-                                                              connection: e.target.value
-                                                            }
-                                                          }
-                                                        };
-                                                        newMappings[actualMappingIndex].values = values;
-                                                        setInputMappings(newMappings);
-                                                      }
-                                                    }}
+                                                    onChange={(e) => inputMappingHandlers.handleEventDataConnectionChange(e.target.value, actualMappingIndex, input.name)}
                                                     className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                                   >
                                                     <option value="">Select data source</option>
@@ -1161,25 +1150,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                   <label className="block text-xs font-medium mb-1">Expression</label>
                                                   <input
                                                     value={inputValue.valueFrom.eventData.expression || ''}
-                                                    onChange={(e) => {
-                                                      const newMappings = [...inputMappings];
-                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                      const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                      if (valueIndex !== -1) {
-                                                        values[valueIndex] = {
-                                                          ...values[valueIndex],
-                                                          valueFrom: {
-                                                            eventData: {
-                                                              ...values[valueIndex]?.valueFrom?.eventData,
-                                                              expression: e.target.value
-                                                            }
-                                                          }
-                                                        };
-                                                        newMappings[actualMappingIndex].values = values;
-                                                        setInputMappings(newMappings);
-                                                      }
-                                                    }}
+                                                    onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
                                                     placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
                                                     className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                                   />
@@ -1196,30 +1167,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                         <input
                                                           type="checkbox"
                                                           checked={inputValue.valueFrom?.lastExecution?.results?.includes(result) || false}
-                                                          onChange={(e) => {
-                                                            const newMappings = [...inputMappings];
-                                                            const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                            const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                            if (valueIndex !== -1) {
-                                                              const currentResults = values[valueIndex]?.valueFrom?.lastExecution?.results || [];
-                                                              const newResults = e.target.checked
-                                                                ? [...currentResults, result]
-                                                                : currentResults.filter(r => r !== result);
-
-                                                              values[valueIndex] = {
-                                                                ...values[valueIndex],
-                                                                valueFrom: {
-                                                                  lastExecution: {
-                                                                    ...values[valueIndex]?.valueFrom?.lastExecution,
-                                                                    results: newResults
-                                                                  }
-                                                                }
-                                                              };
-                                                              newMappings[actualMappingIndex].values = values;
-                                                              setInputMappings(newMappings);
-                                                            }
-                                                          }}
+                                                          onChange={(e) => inputMappingHandlers.handleLastExecutionChange(result, e.target.checked, actualMappingIndex, input.name)}
                                                           className="w-3 h-3"
                                                         />
                                                         {result.replace('RESULT_', '').toLowerCase()}
@@ -1234,17 +1182,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                 <label className="block text-xs font-medium mb-1">Static Value</label>
                                                 <input
                                                   value={inputValue?.value || ''}
-                                                  onChange={(e) => {
-                                                    const newMappings = [...inputMappings];
-                                                    const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                    const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                    if (valueIndex !== -1) {
-                                                      values[valueIndex] = { ...values[valueIndex], value: e.target.value };
-                                                      newMappings[actualMappingIndex].values = values;
-                                                      setInputMappings(newMappings);
-                                                    }
-                                                  }}
+                                                  onChange={(e) => inputMappingHandlers.handleStaticValueChange(e.target.value, actualMappingIndex, input.name)}
                                                   placeholder="e.g., production, staging"
                                                   className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                                 />
@@ -1256,11 +1194,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                       {/* Remove Input from Mapping Button */}
                                       <div className="flex justify-end">
                                         <button
-                                          onClick={() => {
-                                            const newMappings = [...inputMappings];
-                                            newMappings.splice(actualMappingIndex, 1);
-                                            setInputMappings(newMappings);
-                                          }}
+                                          onClick={() => inputMappingHandlers.handleRemoveMapping(actualMappingIndex)}
                                           className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs"
                                         >
                                           Remove from Mapping
@@ -1273,37 +1207,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             </div>
                           </div>
                           <button
-                            onClick={() => {
-                              const existingEmptyMappingIndex = inputMappings.findIndex(mapping =>
-                                !mapping.when?.triggeredBy?.connection || mapping.when.triggeredBy.connection === ''
-                              );
-
-                              if (existingEmptyMappingIndex !== -1) {
-                                const newMappings = [...inputMappings];
-                                const existingValues = newMappings[existingEmptyMappingIndex].values || [];
-                                const inputAlreadyExists = existingValues.some(v => v.name === input.name);
-
-                                if (!inputAlreadyExists) {
-                                  newMappings[existingEmptyMappingIndex].values = [
-                                    ...existingValues,
-                                    { name: input.name, value: '' }
-                                  ];
-                                  setInputMappings(newMappings);
-                                }
-                              } else {
-                                // Create new mapping with ALL inputs (API requirement)
-                                const allInputValues = inputs.map(inp => ({
-                                  name: inp.name,
-                                  value: inp.name === input.name ? '' : ''
-                                }));
-
-                                const newMapping = {
-                                  when: { triggeredBy: { connection: '' } },
-                                  values: allInputValues
-                                };
-                                setInputMappings(prev => [...prev, newMapping]);
-                              }
-                            }}
+                            onClick={() => inputMappingHandlers.handleAddMapping(input)}
                             className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                           >
                             <MaterialSymbol name="add" size="sm" />
