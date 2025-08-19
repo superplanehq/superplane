@@ -132,8 +132,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         if (result === 'RESULT_FAILED') {
           return <MaterialSymbol name="cancel" size="lg" className="text-red-600 mr-2" />;
         }
-        return <span className="material-icons text-green-600 text-2xl mr-2">check_circle</span>;
-      case 'STATE_PENDING':
+        return <MaterialSymbol name="check_circle" size="lg" className="text-green-600 mr-2" />; case 'STATE_PENDING':
         return (
           <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 mr-2 animate-spin" />
         );
@@ -355,9 +354,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
-      className={`p-[2px] bg-transparent rounded-xl border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400 dark:border-gray-200' : 'border-transparent dark:border-transparent'} relative `}
+      className={`bg-transparent rounded-xl border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400 dark:border-gray-200' : 'border-transparent dark:border-transparent'} relative `}
     >
-      <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-gray-700 rounded-xl"
+      <div className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-gray-700 rounded-xl"
         style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
       >
 
@@ -404,7 +403,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         )}
 
         {/* Header Section */}
-        <div className={twMerge('mt-1 px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>
+        <div className={twMerge('px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>
           <div className="flex items-start flex-1 min-w-0">
             <div className='max-w-8 mt-1 flex items-center justify-center'>
               {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
