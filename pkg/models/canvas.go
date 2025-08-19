@@ -122,9 +122,12 @@ func (c *Canvas) CreateStageInTransaction(
 }
 
 func (c *Canvas) DeleteInTransaction(tx *gorm.DB) error {
-	return tx.
+	deletedName := fmt.Sprintf("%s-deleted-%d", c.Name, time.Now().Unix())
+
+	return tx.Model(c).
 		Where("id = ?", c.ID).
-		Delete(&Canvas{}).
+		Update("name", deletedName).
+		Update("deleted_at", time.Now()).
 		Error
 }
 
@@ -178,6 +181,22 @@ func FindUnscopedCanvasByID(id string) (*Canvas, error) {
 	canvas := Canvas{}
 
 	err := database.Conn().
+		Where("id = ?", id).
+		First(&canvas).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &canvas, nil
+}
+
+func FindUnscopedSoftDeletedCanvasByID(id string) (*Canvas, error) {
+	canvas := Canvas{}
+
+	err := database.Conn().
+		Unscoped().
 		Where("id = ?", id).
 		First(&canvas).
 		Error
