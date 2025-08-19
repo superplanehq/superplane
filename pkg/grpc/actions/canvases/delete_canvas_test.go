@@ -50,5 +50,9 @@ func Test__DeleteCanvas(t *testing.T) {
 		roles, err := authService.GetAllRoleDefinitions(models.DomainTypeCanvas, canvas.ID.String())
 		require.NoError(t, err)
 		require.Empty(t, roles)
+
+		deletedCanvas, err := models.FindUnscopedCanvasByID(canvas.ID.String())
+		require.NoError(t, err)
+		assert.Contains(t, deletedCanvas.Name, "deleted-")
 	})
 }
