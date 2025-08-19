@@ -55,8 +55,6 @@ var configSetCmd = &cobra.Command{
 		viper.Set(key, value)
 		err := viper.WriteConfig()
 		CheckWithMessage(err, "Failed to write configuration")
-
-		fmt.Printf("Configuration '%s' set to '%s'\n", key, value)
 	},
 }
 
