@@ -987,8 +987,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                               m.when?.triggeredBy?.connection === selectedConnection &&
                                               selectedConnection !== ''
                                             );
+                                            const mappingExists = existingMappingIndex !== -1 && selectedConnection !== '';
 
-                                            if (existingMappingIndex !== -1 && selectedConnection !== '') {
+                                            if (mappingExists) {
                                               // Move only the current input's value to the existing mapping
                                               const existingValues = newMappings[existingMappingIndex].values || [];
                                               const valueExists = existingValues.some(v => v.name === input.name);
@@ -1025,29 +1026,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                   }
                                                 };
                                               } else {
-                                                // Remove current input from original mapping
-                                                const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
+                                                newMappings[actualMappingIndex].when = {
+                                                  triggeredBy: { connection: selectedConnection }
+                                                };
 
-                                                if (updatedOriginalValues.length === 0) {
-                                                  // Update the entire mapping to the new connection if this was the only value
-                                                  newMappings[actualMappingIndex] = {
-                                                    ...newMappings[actualMappingIndex],
-                                                    when: {
-                                                      ...newMappings[actualMappingIndex].when,
-                                                      triggeredBy: { connection: selectedConnection }
-                                                    }
-                                                  };
-                                                } else {
-                                                  // Keep the original mapping and create a new one for this input
-                                                  newMappings[actualMappingIndex].values = updatedOriginalValues;
-
-                                                  // Create new mapping for the current input
-                                                  const newMapping = {
-                                                    when: { triggeredBy: { connection: selectedConnection } },
-                                                    values: [currentInputValue]
-                                                  };
-                                                  newMappings.push(newMapping);
-                                                }
+                                                newMappings[actualMappingIndex].values = inputs.map(input => ({
+                                                  name: input.name,
+                                                  value: ''
+                                                }));
                                               }
                                             }
 
@@ -1059,192 +1045,64 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                             }`}
                                         >
                                           <option value="">Select trigger connection</option>
-                                          {connections.map((conn, connIndex) => (
-                                            <option key={connIndex} value={conn.name}>{conn.name}</option>
-                                          ))}
+                                          {connections
+                                            .filter(conn => mapping.when?.triggeredBy?.connection === conn.name || !inputMappings.some(mapping => mapping.when?.triggeredBy?.connection === conn.name))
+                                            .map((conn, connIndex) => (
+                                              <option key={connIndex} value={conn.name}>{conn.name}</option>
+                                            ))}
                                         </select>
                                       </ValidationField>
 
                                       {/* Value Mode Toggle */}
-                                      <div className="mb-3">
-                                        <div className="space-y-2">
-                                          <label className="flex items-center gap-2 text-sm">
-                                            <input
-                                              type="radio"
-                                              name={`value-mode-${actualMappingIndex}-${input.name}`}
-                                              checked={!inputValue?.valueFrom}
-                                              onChange={() => {
-                                                const newMappings = [...inputMappings];
-                                                const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                if (valueIndex !== -1) {
-                                                  values[valueIndex] = {
-                                                    ...values[valueIndex],
-                                                    value: values[valueIndex]?.valueFrom?.eventData?.expression || 
-                                                           values[valueIndex]?.value || '',
-                                                    valueFrom: undefined
-                                                  };
-                                                  newMappings[actualMappingIndex].values = values;
-                                                  setInputMappings(newMappings);
-                                                }
-                                              }}
-                                              className="w-4 h-4"
-                                            />
-                                            Static Value
-                                          </label>
-                                          
-                                          <label className="flex items-center gap-2 text-sm">
-                                            <input
-                                              type="radio"
-                                              name={`value-mode-${actualMappingIndex}-${input.name}`}
-                                              checked={!!inputValue?.valueFrom?.eventData}
-                                              onChange={() => {
-                                                const newMappings = [...inputMappings];
-                                                const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                if (valueIndex !== -1) {
-                                                  values[valueIndex] = {
-                                                    ...values[valueIndex],
-                                                    value: undefined,
-                                                    valueFrom: {
-                                                      eventData: {
-                                                        connection: '',
-                                                        expression: values[valueIndex]?.value || ''
-                                                      }
-                                                    }
-                                                  };
-                                                  newMappings[actualMappingIndex].values = values;
-                                                  setInputMappings(newMappings);
-                                                }
-                                              }}
-                                              className="w-4 h-4"
-                                            />
-                                            From Event Data
-                                          </label>
-                                          
-                                          <label className="flex items-center gap-2 text-sm">
-                                            <input
-                                              type="radio"
-                                              name={`value-mode-${actualMappingIndex}-${input.name}`}
-                                              checked={!!inputValue?.valueFrom?.lastExecution}
-                                              onChange={() => {
-                                                const newMappings = [...inputMappings];
-                                                const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                if (valueIndex !== -1) {
-                                                  values[valueIndex] = {
-                                                    ...values[valueIndex],
-                                                    value: undefined,
-                                                    valueFrom: {
-                                                      lastExecution: {
-                                                        results: []
-                                                      }
-                                                    }
-                                                  };
-                                                  newMappings[actualMappingIndex].values = values;
-                                                  setInputMappings(newMappings);
-                                                }
-                                              }}
-                                              className="w-4 h-4"
-                                            />
-                                            From Last Execution
-                                          </label>
-                                        </div>
-                                      </div>
-
-                                      {inputValue?.valueFrom?.eventData ? (
-                                        /* Event Data Mode */
-                                        <div className="space-y-2">
-                                          <div>
-                                            <label className="block text-xs font-medium mb-1">Data Source Connection</label>
-                                            <select
-                                              value={inputValue.valueFrom.eventData.connection || ''}
-                                              onChange={(e) => {
-                                                const newMappings = [...inputMappings];
-                                                const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                if (valueIndex !== -1) {
-                                                  values[valueIndex] = {
-                                                    ...values[valueIndex],
-                                                    valueFrom: {
-                                                      eventData: {
-                                                        ...values[valueIndex]?.valueFrom?.eventData,
-                                                        connection: e.target.value
-                                                      }
-                                                    }
-                                                  };
-                                                  newMappings[actualMappingIndex].values = values;
-                                                  setInputMappings(newMappings);
-                                                }
-                                              }}
-                                              className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                            >
-                                              <option value="">Select data source</option>
-                                              {connections.map((conn, connIndex) => (
-                                                <option key={connIndex} value={conn.name}>{conn.name}</option>
-                                              ))}
-                                            </select>
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-medium mb-1">Expression</label>
-                                            <input
-                                              value={inputValue.valueFrom.eventData.expression || ''}
-                                              onChange={(e) => {
-                                                const newMappings = [...inputMappings];
-                                                const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                if (valueIndex !== -1) {
-                                                  values[valueIndex] = {
-                                                    ...values[valueIndex],
-                                                    valueFrom: {
-                                                      eventData: {
-                                                        ...values[valueIndex]?.valueFrom?.eventData,
-                                                        expression: e.target.value
-                                                      }
-                                                    }
-                                                  };
-                                                  newMappings[actualMappingIndex].values = values;
-                                                  setInputMappings(newMappings);
-                                                }
-                                              }}
-                                              placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
-                                              className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                            />
-                                          </div>
-                                        </div>
-                                      ) : inputValue?.valueFrom?.lastExecution ? (
-                                        /* Last Execution Mode */
-                                        <div className="space-y-2">
-                                          <div>
-                                            <label className="block text-xs font-medium mb-1">Required Execution Results</label>
-                                            <div className="space-y-2">
-                                              {(['RESULT_PASSED', 'RESULT_FAILED'] as const).map((result) => (
-                                                <label key={result} className="flex items-center gap-2 text-xs">
+                                      {
+                                        mapping.when?.triggeredBy?.connection && (
+                                          <>
+                                            <div className="mb-3">
+                                              <div className="space-y-2">
+                                                <label className="flex items-center gap-2 text-sm">
                                                   <input
-                                                    type="checkbox"
-                                                    checked={inputValue.valueFrom?.lastExecution?.results?.includes(result) || false}
-                                                    onChange={(e) => {
+                                                    type="radio"
+                                                    name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                                    checked={!inputValue?.valueFrom}
+                                                    onChange={() => {
                                                       const newMappings = [...inputMappings];
                                                       const values = [...(newMappings[actualMappingIndex].values || [])];
                                                       const valueIndex = values.findIndex(v => v.name === input.name);
 
                                                       if (valueIndex !== -1) {
-                                                        const currentResults = values[valueIndex]?.valueFrom?.lastExecution?.results || [];
-                                                        const newResults = e.target.checked
-                                                          ? [...currentResults, result]
-                                                          : currentResults.filter(r => r !== result);
-
                                                         values[valueIndex] = {
                                                           ...values[valueIndex],
+                                                          value: values[valueIndex]?.valueFrom?.eventData?.expression ||
+                                                            values[valueIndex]?.value || '',
+                                                          valueFrom: undefined
+                                                        };
+                                                        newMappings[actualMappingIndex].values = values;
+                                                        setInputMappings(newMappings);
+                                                      }
+                                                    }}
+                                                    className="w-4 h-4"
+                                                  />
+                                                  Static Value
+                                                </label>
+
+                                                <label className="flex items-center gap-2 text-sm">
+                                                  <input
+                                                    type="radio"
+                                                    name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                                    checked={!!inputValue?.valueFrom?.eventData}
+                                                    onChange={() => {
+                                                      const newMappings = [...inputMappings];
+                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                      const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                      if (valueIndex !== -1) {
+                                                        values[valueIndex] = {
+                                                          ...values[valueIndex],
+                                                          value: undefined,
                                                           valueFrom: {
-                                                            lastExecution: {
-                                                              ...values[valueIndex]?.valueFrom?.lastExecution,
-                                                              results: newResults
+                                                            eventData: {
+                                                              connection: '',
+                                                              expression: values[valueIndex]?.value || ''
                                                             }
                                                           }
                                                         };
@@ -1252,58 +1110,177 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                         setInputMappings(newMappings);
                                                       }
                                                     }}
-                                                    className="w-3 h-3"
+                                                    className="w-4 h-4"
                                                   />
-                                                  {result.replace('RESULT_', '').toLowerCase()}
+                                                  From Event Data
                                                 </label>
-                                              ))}
+
+                                                <label className="flex items-center gap-2 text-sm">
+                                                  <input
+                                                    type="radio"
+                                                    name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                                    checked={!!inputValue?.valueFrom?.lastExecution}
+                                                    onChange={() => {
+                                                      const newMappings = [...inputMappings];
+                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                      const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                      if (valueIndex !== -1) {
+                                                        values[valueIndex] = {
+                                                          ...values[valueIndex],
+                                                          value: undefined,
+                                                          valueFrom: {
+                                                            lastExecution: {
+                                                              results: []
+                                                            }
+                                                          }
+                                                        };
+                                                        newMappings[actualMappingIndex].values = values;
+                                                        setInputMappings(newMappings);
+                                                      }
+                                                    }}
+                                                    className="w-4 h-4"
+                                                  />
+                                                  From Last Execution
+                                                </label>
+                                              </div>
                                             </div>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        /* Static Value Mode */
-                                        <div>
-                                          <label className="block text-xs font-medium mb-1">Static Value</label>
-                                          <input
-                                            value={inputValue?.value || ''}
-                                            onChange={(e) => {
-                                              const newMappings = [...inputMappings];
-                                              const values = [...(newMappings[actualMappingIndex].values || [])];
-                                              const valueIndex = values.findIndex(v => v.name === input.name);
+                                            {inputValue?.valueFrom?.eventData ? (
+                                              /* Event Data Mode */
+                                              <div className="space-y-2">
+                                                <div>
+                                                  <label className="block text-xs font-medium mb-1">Data Source Connection</label>
+                                                  <select
+                                                    value={inputValue.valueFrom.eventData.connection || ''}
+                                                    onChange={(e) => {
+                                                      const newMappings = [...inputMappings];
+                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                      const valueIndex = values.findIndex(v => v.name === input.name);
 
-                                              if (valueIndex !== -1) {
-                                                values[valueIndex] = { ...values[valueIndex], value: e.target.value };
-                                                newMappings[actualMappingIndex].values = values;
-                                                setInputMappings(newMappings);
-                                              }
-                                            }}
-                                            placeholder="e.g., production, staging"
-                                            className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                          />
-                                        </div>
-                                      )}
+                                                      if (valueIndex !== -1) {
+                                                        values[valueIndex] = {
+                                                          ...values[valueIndex],
+                                                          valueFrom: {
+                                                            eventData: {
+                                                              ...values[valueIndex]?.valueFrom?.eventData,
+                                                              connection: e.target.value
+                                                            }
+                                                          }
+                                                        };
+                                                        newMappings[actualMappingIndex].values = values;
+                                                        setInputMappings(newMappings);
+                                                      }
+                                                    }}
+                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                                  >
+                                                    <option value="">Select data source</option>
+                                                    {connections.map((conn, connIndex) => (
+                                                      <option key={connIndex} value={conn.name}>{conn.name}</option>
+                                                    ))}
+                                                  </select>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-xs font-medium mb-1">Expression</label>
+                                                  <input
+                                                    value={inputValue.valueFrom.eventData.expression || ''}
+                                                    onChange={(e) => {
+                                                      const newMappings = [...inputMappings];
+                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                      const valueIndex = values.findIndex(v => v.name === input.name);
 
+                                                      if (valueIndex !== -1) {
+                                                        values[valueIndex] = {
+                                                          ...values[valueIndex],
+                                                          valueFrom: {
+                                                            eventData: {
+                                                              ...values[valueIndex]?.valueFrom?.eventData,
+                                                              expression: e.target.value
+                                                            }
+                                                          }
+                                                        };
+                                                        newMappings[actualMappingIndex].values = values;
+                                                        setInputMappings(newMappings);
+                                                      }
+                                                    }}
+                                                    placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
+                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                                  />
+                                                </div>
+                                              </div>
+                                            ) : inputValue?.valueFrom?.lastExecution ? (
+                                              /* Last Execution Mode */
+                                              <div className="space-y-2">
+                                                <div>
+                                                  <label className="block text-xs font-medium mb-1">Required Execution Results</label>
+                                                  <div className="space-y-2">
+                                                    {(['RESULT_PASSED', 'RESULT_FAILED'] as const).map((result) => (
+                                                      <label key={result} className="flex items-center gap-2 text-xs">
+                                                        <input
+                                                          type="checkbox"
+                                                          checked={inputValue.valueFrom?.lastExecution?.results?.includes(result) || false}
+                                                          onChange={(e) => {
+                                                            const newMappings = [...inputMappings];
+                                                            const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                            const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                            if (valueIndex !== -1) {
+                                                              const currentResults = values[valueIndex]?.valueFrom?.lastExecution?.results || [];
+                                                              const newResults = e.target.checked
+                                                                ? [...currentResults, result]
+                                                                : currentResults.filter(r => r !== result);
+
+                                                              values[valueIndex] = {
+                                                                ...values[valueIndex],
+                                                                valueFrom: {
+                                                                  lastExecution: {
+                                                                    ...values[valueIndex]?.valueFrom?.lastExecution,
+                                                                    results: newResults
+                                                                  }
+                                                                }
+                                                              };
+                                                              newMappings[actualMappingIndex].values = values;
+                                                              setInputMappings(newMappings);
+                                                            }
+                                                          }}
+                                                          className="w-3 h-3"
+                                                        />
+                                                        {result.replace('RESULT_', '').toLowerCase()}
+                                                      </label>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              /* Static Value Mode */
+                                              <div>
+                                                <label className="block text-xs font-medium mb-1">Static Value</label>
+                                                <input
+                                                  value={inputValue?.value || ''}
+                                                  onChange={(e) => {
+                                                    const newMappings = [...inputMappings];
+                                                    const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                    const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                    if (valueIndex !== -1) {
+                                                      values[valueIndex] = { ...values[valueIndex], value: e.target.value };
+                                                      newMappings[actualMappingIndex].values = values;
+                                                      setInputMappings(newMappings);
+                                                    }
+                                                  }}
+                                                  placeholder="e.g., production, staging"
+                                                  className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                                />
+                                              </div>
+                                            )}
+                                          </>
+                                        )
+                                      }
                                       {/* Remove Input from Mapping Button */}
                                       <div className="flex justify-end">
                                         <button
                                           onClick={() => {
                                             const newMappings = [...inputMappings];
-                                            const currentMapping = newMappings[actualMappingIndex];
-
-                                            // Remove only the current input's value from this mapping
-                                            const updatedValues = (currentMapping.values || []).filter(v => v.name !== input.name);
-
-                                            if (updatedValues.length === 0) {
-                                              // If no values left, remove the entire mapping
-                                              newMappings.splice(actualMappingIndex, 1);
-                                            } else {
-                                              // Otherwise, just update the values
-                                              newMappings[actualMappingIndex] = {
-                                                ...currentMapping,
-                                                values: updatedValues
-                                              };
-                                            }
-
+                                            newMappings.splice(actualMappingIndex, 1);
                                             setInputMappings(newMappings);
                                           }}
                                           className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs"
@@ -1319,13 +1296,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                           </div>
                           <button
                             onClick={() => {
-                              // Check if there's already an empty mapping (no connection selected)
                               const existingEmptyMappingIndex = inputMappings.findIndex(mapping =>
                                 !mapping.when?.triggeredBy?.connection || mapping.when.triggeredBy.connection === ''
                               );
 
                               if (existingEmptyMappingIndex !== -1) {
-                                // Add to existing empty mapping
                                 const newMappings = [...inputMappings];
                                 const existingValues = newMappings[existingEmptyMappingIndex].values || [];
                                 const inputAlreadyExists = existingValues.some(v => v.name === input.name);
@@ -1341,7 +1316,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 // Create new mapping with ALL inputs (API requirement)
                                 const allInputValues = inputs.map(inp => ({
                                   name: inp.name,
-                                  value: inp.name === input.name ? '' : '' // All start with empty values
+                                  value: inp.name === input.name ? '' : ''
                                 }));
 
                                 const newMapping = {
