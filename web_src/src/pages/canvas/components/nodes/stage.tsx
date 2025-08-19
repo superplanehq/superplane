@@ -479,6 +479,19 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 </div>
               </div>
             )}
+
+            {props.data.executor?.type === 'github' && (
+              <div className="flex items-center w-full gap-2 mx-4 font-semibold">
+                <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                  <MaterialSymbol name="assignment" size="md" />
+                  <span>{(props.data.executor?.resource?.name as string)}</span>
+                </div>
+                <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                  <MaterialSymbol name="code" size="md" />
+                  <span>{(props.data.executor?.spec?.['workflow'] as string)?.replace('.github/workflows/', '')}</span>
+                </div>
+              </div>
+            )}
             {/* Last Run Section */}
             <div className={`mt-4 px-3 py-3 border-t-2 w-full ${getBackgroundColorClass()}`}>
               <div className="flex items-center w-full justify-between mb-2">
