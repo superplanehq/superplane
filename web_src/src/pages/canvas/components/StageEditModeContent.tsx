@@ -785,28 +785,31 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       } else {
         newMappings[actualMappingIndex].values = updatedOriginalValues;
       }
-    } else {
-      if (selectedConnection === '') {
-        newMappings[actualMappingIndex] = {
-          ...newMappings[actualMappingIndex],
-          when: {
-            ...newMappings[actualMappingIndex].when,
-            triggeredBy: { connection: selectedConnection }
-          }
-        };
-      } else {
-        newMappings[actualMappingIndex].when = {
-          triggeredBy: { connection: selectedConnection }
-        };
-
-        newMappings[actualMappingIndex].values = inputs.map(input => ({
-          name: input.name,
-          value: ''
-        }));
-      }
+      setInputMappings(newMappings);
+      return;
     }
 
+
+    if (selectedConnection === '') {
+      newMappings[actualMappingIndex] = {
+        ...newMappings[actualMappingIndex],
+        when: {
+          ...newMappings[actualMappingIndex].when,
+          triggeredBy: { connection: selectedConnection }
+        }
+      };
+    } else {
+      newMappings[actualMappingIndex].when = {
+        triggeredBy: { connection: selectedConnection }
+      };
+
+      newMappings[actualMappingIndex].values = inputs.map(input => ({
+        name: input.name,
+        value: ''
+      }));
+    }
     setInputMappings(newMappings);
+
   };
 
   const handleInputNameChange = (newName: string, index: number, input: SuperplaneInputDefinition) => {
@@ -831,15 +834,20 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     const values = [...(newMappings[actualMappingIndex].values || [])];
     const valueIndex = values.findIndex(v => v.name === input.name);
 
-    if (valueIndex !== -1) {
-      if (mode === 'static') {
+    if (valueIndex === -1) {
+      return;
+    }
+
+    switch (mode) {
+      case 'static':
         values[valueIndex] = {
           ...values[valueIndex],
           value: values[valueIndex]?.valueFrom?.eventData?.expression ||
             values[valueIndex]?.value || '',
           valueFrom: undefined
         };
-      } else if (mode === 'eventData') {
+        break;
+      case 'eventData':
         values[valueIndex] = {
           ...values[valueIndex],
           value: undefined,
@@ -850,7 +858,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             }
           }
         };
-      } else if (mode === 'lastExecution') {
+        break;
+      case 'lastExecution':
         values[valueIndex] = {
           ...values[valueIndex],
           value: undefined,
@@ -860,10 +869,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             }
           }
         };
-      }
-      newMappings[actualMappingIndex].values = values;
-      setInputMappings(newMappings);
+        break;
     }
+    newMappings[actualMappingIndex].values = values;
+    setInputMappings(newMappings);
   };
 
   return (
