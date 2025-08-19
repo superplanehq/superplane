@@ -746,6 +746,119 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
   };
 
+  const handleTriggerConnectionChange = (selectedConnection: string, actualMappingIndex: number, input: SuperplaneInputDefinition, mapping: SuperplaneInputMapping) => {
+    const newMappings = [...inputMappings];
+    const currentInputValue = mapping.values?.find(v => v.name === input.name);
+
+    if (!currentInputValue) return;
+
+    const existingMappingIndex = newMappings.findIndex((m, idx) =>
+      idx !== actualMappingIndex &&
+      m.when?.triggeredBy?.connection === selectedConnection &&
+      selectedConnection !== ''
+    );
+    const mappingExists = existingMappingIndex !== -1 && selectedConnection !== '';
+
+    if (mappingExists) {
+      const existingValues = newMappings[existingMappingIndex].values || [];
+      const valueExists = existingValues.some(v => v.name === input.name);
+
+      if (!valueExists) {
+        newMappings[existingMappingIndex].values = [...existingValues, currentInputValue];
+      } else {
+        newMappings[existingMappingIndex].values = existingValues.map(v =>
+          v.name === input.name ? currentInputValue : v
+        );
+      }
+
+      const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
+
+      if (updatedOriginalValues.length === 0) {
+        newMappings.splice(actualMappingIndex, 1);
+      } else {
+        newMappings[actualMappingIndex].values = updatedOriginalValues;
+      }
+    } else {
+      if (selectedConnection === '') {
+        newMappings[actualMappingIndex] = {
+          ...newMappings[actualMappingIndex],
+          when: {
+            ...newMappings[actualMappingIndex].when,
+            triggeredBy: { connection: selectedConnection }
+          }
+        };
+      } else {
+        newMappings[actualMappingIndex].when = {
+          triggeredBy: { connection: selectedConnection }
+        };
+
+        newMappings[actualMappingIndex].values = inputs.map(input => ({
+          name: input.name,
+          value: ''
+        }));
+      }
+    }
+
+    setInputMappings(newMappings);
+  };
+
+  const handleInputNameChange = (newName: string, index: number, input: SuperplaneInputDefinition) => {
+    const oldName = input.name;
+    inputsEditor.updateItem(index, 'name', newName);
+
+    if (oldName && newName !== oldName) {
+      const updatedMappings = inputMappings.map(mapping => ({
+        ...mapping,
+        values: mapping.values?.map(value =>
+          value.name === oldName
+            ? { ...value, name: newName }
+            : value
+        ) || []
+      }));
+      setInputMappings(updatedMappings);
+    }
+  };
+
+  const handleValueModeChange = (mode: 'static' | 'eventData' | 'lastExecution', actualMappingIndex: number, input: SuperplaneInputDefinition) => {
+    const newMappings = [...inputMappings];
+    const values = [...(newMappings[actualMappingIndex].values || [])];
+    const valueIndex = values.findIndex(v => v.name === input.name);
+
+    if (valueIndex !== -1) {
+      if (mode === 'static') {
+        values[valueIndex] = {
+          ...values[valueIndex],
+          value: values[valueIndex]?.valueFrom?.eventData?.expression ||
+            values[valueIndex]?.value || '',
+          valueFrom: undefined
+        };
+      } else if (mode === 'eventData') {
+        values[valueIndex] = {
+          ...values[valueIndex],
+          value: undefined,
+          valueFrom: {
+            eventData: {
+              connection: '',
+              expression: values[valueIndex]?.value || ''
+            }
+          }
+        };
+      } else if (mode === 'lastExecution') {
+        values[valueIndex] = {
+          ...values[valueIndex],
+          value: undefined,
+          valueFrom: {
+            lastExecution: {
+              results: []
+            }
+          }
+        };
+      }
+      newMappings[actualMappingIndex].values = values;
+      setInputMappings(newMappings);
+    }
+  };
+
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
       <div className="">
@@ -915,26 +1028,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             <input
                               type="text"
                               value={input.name || ''}
-                              onChange={(e) => {
-                                const oldName = input.name;
-                                const newName = e.target.value;
-
-                                // Update the input name
-                                inputsEditor.updateItem(index, 'name', newName);
-
-                                // Update input mappings that reference this input
-                                if (oldName && newName !== oldName) {
-                                  const updatedMappings = inputMappings.map(mapping => ({
-                                    ...mapping,
-                                    values: mapping.values?.map(value =>
-                                      value.name === oldName
-                                        ? { ...value, name: newName }
-                                        : value
-                                    ) || []
-                                  }));
-                                  setInputMappings(updatedMappings);
-                                }
-                              }}
+                              onChange={(e) => handleInputNameChange(e.target.value, index, input)}
                               placeholder="Input name"
                               className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
                                 ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
@@ -974,71 +1068,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                       >
                                         <select
                                           value={mapping.when?.triggeredBy?.connection || ''}
-                                          onChange={(e) => {
-                                            const selectedConnection = e.target.value;
-                                            const newMappings = [...inputMappings];
-                                            const currentInputValue = mapping.values?.find(v => v.name === input.name);
-
-                                            if (!currentInputValue) return;
-
-                                            // Check if there's already a mapping with this connection
-                                            const existingMappingIndex = newMappings.findIndex((m, idx) =>
-                                              idx !== actualMappingIndex &&
-                                              m.when?.triggeredBy?.connection === selectedConnection &&
-                                              selectedConnection !== ''
-                                            );
-                                            const mappingExists = existingMappingIndex !== -1 && selectedConnection !== '';
-
-                                            if (mappingExists) {
-                                              // Move only the current input's value to the existing mapping
-                                              const existingValues = newMappings[existingMappingIndex].values || [];
-                                              const valueExists = existingValues.some(v => v.name === input.name);
-
-                                              if (!valueExists) {
-                                                // Add the current input's value to the existing mapping
-                                                newMappings[existingMappingIndex].values = [...existingValues, currentInputValue];
-                                              } else {
-                                                // Replace the existing value with the current one
-                                                newMappings[existingMappingIndex].values = existingValues.map(v =>
-                                                  v.name === input.name ? currentInputValue : v
-                                                );
-                                              }
-
-                                              // Remove the current input's value from the original mapping
-                                              const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
-
-                                              if (updatedOriginalValues.length === 0) {
-                                                // Remove the original mapping if no values left
-                                                newMappings.splice(actualMappingIndex, 1);
-                                              } else {
-                                                // Keep the original mapping with remaining values
-                                                newMappings[actualMappingIndex].values = updatedOriginalValues;
-                                              }
-                                            } else {
-                                              // Create new mapping or update existing one for this connection
-                                              if (selectedConnection === '') {
-                                                // Just update the connection to empty
-                                                newMappings[actualMappingIndex] = {
-                                                  ...newMappings[actualMappingIndex],
-                                                  when: {
-                                                    ...newMappings[actualMappingIndex].when,
-                                                    triggeredBy: { connection: selectedConnection }
-                                                  }
-                                                };
-                                              } else {
-                                                newMappings[actualMappingIndex].when = {
-                                                  triggeredBy: { connection: selectedConnection }
-                                                };
-
-                                                newMappings[actualMappingIndex].values = inputs.map(input => ({
-                                                  name: input.name,
-                                                  value: ''
-                                                }));
-                                              }
-                                            }
-
-                                            setInputMappings(newMappings);
-                                          }}
+                                          onChange={(e) => handleTriggerConnectionChange(e.target.value, actualMappingIndex, input, mapping)}
                                           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${actualMappingIndex}`]
                                             ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                                             : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
@@ -1064,22 +1094,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     type="radio"
                                                     name={`value-mode-${actualMappingIndex}-${input.name}`}
                                                     checked={!inputValue?.valueFrom}
-                                                    onChange={() => {
-                                                      const newMappings = [...inputMappings];
-                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                      const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                      if (valueIndex !== -1) {
-                                                        values[valueIndex] = {
-                                                          ...values[valueIndex],
-                                                          value: values[valueIndex]?.valueFrom?.eventData?.expression ||
-                                                            values[valueIndex]?.value || '',
-                                                          valueFrom: undefined
-                                                        };
-                                                        newMappings[actualMappingIndex].values = values;
-                                                        setInputMappings(newMappings);
-                                                      }
-                                                    }}
+                                                    onChange={() => handleValueModeChange('static', actualMappingIndex, input)}
                                                     className="w-4 h-4"
                                                   />
                                                   Static Value
@@ -1090,26 +1105,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     type="radio"
                                                     name={`value-mode-${actualMappingIndex}-${input.name}`}
                                                     checked={!!inputValue?.valueFrom?.eventData}
-                                                    onChange={() => {
-                                                      const newMappings = [...inputMappings];
-                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                      const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                      if (valueIndex !== -1) {
-                                                        values[valueIndex] = {
-                                                          ...values[valueIndex],
-                                                          value: undefined,
-                                                          valueFrom: {
-                                                            eventData: {
-                                                              connection: '',
-                                                              expression: values[valueIndex]?.value || ''
-                                                            }
-                                                          }
-                                                        };
-                                                        newMappings[actualMappingIndex].values = values;
-                                                        setInputMappings(newMappings);
-                                                      }
-                                                    }}
+                                                    onChange={() => handleValueModeChange('eventData', actualMappingIndex, input)}
                                                     className="w-4 h-4"
                                                   />
                                                   From Event Data
@@ -1120,25 +1116,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     type="radio"
                                                     name={`value-mode-${actualMappingIndex}-${input.name}`}
                                                     checked={!!inputValue?.valueFrom?.lastExecution}
-                                                    onChange={() => {
-                                                      const newMappings = [...inputMappings];
-                                                      const values = [...(newMappings[actualMappingIndex].values || [])];
-                                                      const valueIndex = values.findIndex(v => v.name === input.name);
-
-                                                      if (valueIndex !== -1) {
-                                                        values[valueIndex] = {
-                                                          ...values[valueIndex],
-                                                          value: undefined,
-                                                          valueFrom: {
-                                                            lastExecution: {
-                                                              results: []
-                                                            }
-                                                          }
-                                                        };
-                                                        newMappings[actualMappingIndex].values = values;
-                                                        setInputMappings(newMappings);
-                                                      }
-                                                    }}
+                                                    onChange={() => handleValueModeChange('lastExecution', actualMappingIndex, input)}
                                                     className="w-4 h-4"
                                                   />
                                                   From Last Execution
