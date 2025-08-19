@@ -49,12 +49,9 @@ export const ExecutionTimeline = ({
 
   if (executions.length === 0) {
     return (
-      <div className="bg-gray-50 rounded-lg">
-        <div className="p-4">
-          <div className="text-center py-6 text-gray-500">
-            <div className="text-sm">No recent activity</div>
-          </div>
-        </div>
+      <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+        <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3 " aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>inbox</span>
+        <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No recent runs</p>
       </div>
     );
   }
