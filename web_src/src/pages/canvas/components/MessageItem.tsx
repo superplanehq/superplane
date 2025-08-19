@@ -1,5 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { SuperplaneStageEvent, SuperplaneStage } from '@/api-client';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { formatRelativeTime } from '../utils/stageEventUtils';
 
 interface MessageItemProps {
   event: SuperplaneStageEvent;
@@ -79,36 +81,71 @@ const MessageItem = React.memo(({
       ?.find(condition => condition.type === "CONDITION_TYPE_TIME_WINDOW"),
     [selectedStage]);
 
+  const getStatusLabel = useCallback(() => {
+    if (event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL') {
+      return 'Waiting';
+    } else if (event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW') {
+      return 'Waiting';
+    } else if (event.state === 'STATE_PENDING') {
+      return 'Pending';
+    }
+    return 'Pending';
+  }, [event.state, event.stateReason]);
+
+  const formatTimeWindow = useCallback(() => {
+    if (timeWindowCondition?.timeWindow?.start && timeWindowCondition?.timeWindow?.end) {
+      // Simple formatting - you can enhance this based on your needs
+      return `Run between ${timeWindowCondition.timeWindow.start} and ${timeWindowCondition.timeWindow.end} on ${timeWindowCondition.timeWindow.weekDays?.join(', ')}`;
+    }
+    return 'Run at scheduled time';
+  }, [timeWindowCondition]);
+
+  const getRelativeTime = useCallback(() => {
+    if (!event.createdAt) return 'now';
+    return formatRelativeTime(event.createdAt, true);
+  }, [event.createdAt]);
+
   return (
     <div className="queueItem">
       <div className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer" onClick={toggleExpand}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse"></div>
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-500">{getStatusLabel()}</span>
+            </div>
             <span className="font-medium truncate text-sm dark:text-white">
               {event.id || 'Unknown'}
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined select-none !text-xl text-gray-600 dark:text-zinc-400">
-              {isExpanded ? 'expand_less' : 'expand_more'}
-            </span>
+            {!isExpanded && (
+              <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
+                {getRelativeTime()}
+              </span>
+            )}
+            <MaterialSymbol
+              name={isExpanded ? 'expand_less' : 'expand_more'}
+              size="xl"
+              className="text-gray-600 dark:text-zinc-400"
+            />
           </div>
         </div>
 
         {isExpanded && (
-          <div className="mt-3 space-y-3 text-left">
+          <div className="mt-3 space-y-3">
             <div className="mt-3 space-y-3">
               {Object.keys(inputsRecord).length > 0 ? (
-                <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+                <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
                       <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
                       <div className="space-y-1">
                         {Object.entries(inputsRecord).map(([key, value]) => (
-                          <div key={key} className="flex items-center justify-between">
-                            <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
-                            <div className="flex items-center gap-2 truncate">
-                              <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                          <div key={key} className="flex items-center justify-between gap-2 min-w-0">
+                            <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
                                 {value}
                               </span>
                             </div>
@@ -119,7 +156,7 @@ const MessageItem = React.memo(({
                   </div>
                 </div>
               ) : (
-                <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+                <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
                       <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
@@ -137,13 +174,12 @@ const MessageItem = React.memo(({
         )}
       </div>
 
+      {/* Approval Footer */}
       {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' && (
-        <div className="px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700">
+        <div className="px-3 py-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-700">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <span className="material-symbols-outlined select-none !text-base text-orange-700 dark:text-orange-200 mr-2">
-                how_to_reg
-              </span>
+              <MaterialSymbol name="how_to_reg" size="md" className="text-orange-700 dark:text-orange-200 mr-2" />
               <span className="text-xs text-gray-700 dark:text-zinc-400">
                 {event.approvals && event.approvals.length > 0 ? (
                   <>
@@ -158,42 +194,34 @@ const MessageItem = React.memo(({
                 )}
               </span>
             </div>
-            {onApprove && (
-              <a
-                href="#"
-                className="text-xs text-gray-700 dark:text-zinc-300 flex items-center"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleApprove();
-                }}
-              >
-                <span className="material-symbols-outlined select-none !text-sm text-gray-500 dark:text-zinc-400 mr-1">
-                  check
-                </span>
-                <span className="underline">Approve</span>
-              </a>
-            )}
+            <div className="flex items-center">
+
+              {/* Approve Button */}
+              {onApprove && (
+                <button
+                  className="relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border text-base/6 font-semibold px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6 focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-blue-500 data-disabled:opacity-50 border-transparent bg-white dark:bg-zinc-800 before:absolute before:inset-0 before:-z-10 before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm dark:before:hidden dark:border-white/5 after:absolute after:inset-0 after:-z-10 after:rounded-[calc(var(--radius-lg)-1px)] after:shadow-[inset_0_1px_theme(colors.white/15%)] text-zinc-950 cursor-default"
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleApprove();
+                  }}
+                >
+                  <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+                  <MaterialSymbol name="check" size="sm" className="text-black-700 dark:text-black-400" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
 
+      {/* Time Window Footer */}
       {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' && (
-        <div className="px-3 py-2 border border-t-0 bg-blue-50 dark:bg-blue-900/20 border-zinc-200 dark:border-zinc-700">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              <span className="material-symbols-outlined select-none !text-base text-blue-700 dark:text-blue-200 mr-2">
-                schedule
-              </span>
-              <span className="text-xs text-gray-700 dark:text-zinc-400">
-                Waiting for time window condition
-                {timeWindowCondition?.timeWindow?.start && timeWindowCondition?.timeWindow?.end && (
-                  <span className="ml-1">
-                    ({timeWindowCondition?.timeWindow?.start} - {timeWindowCondition?.timeWindow?.end})
-                  </span>
-                )}
-              </span>
-            </div>
+        <div className="px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center">
+            <MaterialSymbol name="schedule" size="md" className="text-orange-700 dark:text-orange-200 mr-2" />
+            <span className="text-xs text-gray-700 dark:text-zinc-400">{formatTimeWindow()}</span>
           </div>
         </div>
       )}
