@@ -66,7 +66,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const pendingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_PENDING')
+      ?.filter(event => event.state === 'STATE_PENDING' && !event.execution)
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
@@ -77,14 +77,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const waitingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_WAITING')
+      ?.filter(event => event.state === 'STATE_WAITING' && !event.execution)
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
 
   const lastWaitingEvent = useMemo(() => {
     const event = waitingEvents.at(-1);
-    if (!event || event.stateReason !== 'STATE_REASON_APPROVAL') {
+    if (!event) {
       return null;
     }
     return event;
@@ -343,6 +343,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     if (lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_APPROVAL")
       total -= 1
 
+    if (lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_TIME_WINDOW")
+      total -= 1
+
     if (lastPendingEvent)
       total -= 1
 
@@ -536,6 +539,28 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                     <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
                     <Tippy content="Manual approval required" placement="top">
                       <MaterialSymbol name="how_to_reg" size="md" className='text-orange-700' />
+                    </Tippy>
+                  </div>
+                )
+              }
+
+              {
+                lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_TIME_WINDOW" && (
+                  <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 mb-2">
+                    <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
+                    <Tippy content="Waiting for time window to pass" placement="top">
+                      <MaterialSymbol name="timer" size="md" className='text-orange-700' />
+                    </Tippy>
+                  </div>
+                )
+              }
+
+              {
+                lastWaitingEvent && !["STATE_REASON_APPROVAL", "STATE_REASON_TIME_WINDOW"].includes(lastWaitingEvent.stateReason || '') && (
+                  <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 mb-2">
+                    <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
+                    <Tippy content="Waiting for conditions to be met" placement="top">
+                      <MaterialSymbol name="timer" size="md" className='text-orange-700' />
                     </Tippy>
                   </div>
                 )

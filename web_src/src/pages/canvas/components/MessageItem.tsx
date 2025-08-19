@@ -74,6 +74,11 @@ const MessageItem = React.memo(({
       ?.approval?.count || 0,
     [selectedStage]);
 
+  const timeWindowCondition = useMemo(() =>
+    selectedStage.spec?.conditions
+      ?.find(condition => condition.type === "CONDITION_TYPE_TIME_WINDOW"),
+    [selectedStage]);
+
   return (
     <div className="queueItem">
       <div className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer" onClick={toggleExpand}>
@@ -169,6 +174,26 @@ const MessageItem = React.memo(({
                 <span className="underline">Approve</span>
               </a>
             )}
+          </div>
+        </div>
+      )}
+
+      {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' && (
+        <div className="px-3 py-2 border border-t-0 bg-blue-50 dark:bg-blue-900/20 border-zinc-200 dark:border-zinc-700">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <span className="material-symbols-outlined select-none !text-base text-blue-700 dark:text-blue-200 mr-2">
+                schedule
+              </span>
+              <span className="text-xs text-gray-700 dark:text-zinc-400">
+                Waiting for time window condition
+                {timeWindowCondition?.timeWindow?.start && timeWindowCondition?.timeWindow?.end && (
+                  <span className="ml-1">
+                    ({timeWindowCondition?.timeWindow?.start} - {timeWindowCondition?.timeWindow?.end})
+                  </span>
+                )}
+              </span>
+            </div>
           </div>
         </div>
       )}

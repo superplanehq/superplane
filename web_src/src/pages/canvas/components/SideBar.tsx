@@ -51,12 +51,12 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
 
   // Filter events by their state
   const pendingEvents = useMemo(() =>
-    selectedStage.queue?.filter(event => event.state === 'STATE_PENDING') || [],
+    selectedStage.queue?.filter(event => event.state === 'STATE_PENDING' && !event.execution) || [],
     [selectedStage.queue]
   );
 
   const waitingEvents = useMemo(() =>
-    selectedStage.queue?.filter(event => event.state === 'STATE_WAITING') || [],
+    selectedStage.queue?.filter(event => event.state === 'STATE_WAITING' && !event.execution) || [],
     [selectedStage.queue]
   );
 
