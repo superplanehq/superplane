@@ -387,14 +387,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                   }
 
                   return (
-
                     <EventStateItem
                       key={event.id}
                       eventId={event.id!}
                       state={eventState}
                       receivedAt={event.receivedAt}
                     />
-
                   );
                 })}
               </div>
