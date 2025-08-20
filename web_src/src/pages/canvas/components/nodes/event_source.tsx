@@ -250,7 +250,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative cursor-pointer`}
-      style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+      style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
       onClick={handleNodeClick}
     >
       {focusedNodeId === props.id && (
@@ -369,14 +369,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         />
       ) : (
         <>
-          <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-sm my-2 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.events?.length || 0})</div>
-            </div>
 
-            <div className="space-y-2">
-              {currentEventSource?.events?.length ? (
-                currentEventSource.events.slice(0, 3).map((event) => {
+          {currentEventSource?.events?.length ? (
+            <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center w-full justify-between mb-2 py-2">
+                <div className="text-sm  font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.events?.length || 0})</div>
+              </div>
+
+              <div className="space-y-2">
+                {currentEventSource.events.slice(0, 3).map((event) => {
                   // Map event states to our EventState type
                   let eventState: EventState = 'pending';
                   if (event.state === 'STATE_DISCARDED') {
@@ -386,19 +387,28 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                   }
 
                   return (
+
                     <EventStateItem
                       key={event.id}
                       eventId={event.id!}
                       state={eventState}
                       receivedAt={event.receivedAt}
                     />
+
                   );
-                })
-              ) : (
-                <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No events received</div>
-              )}
+                })}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-zinc-50 dark:bg-zinc-800 px-4 rounded-b-lg  border-t border-gray-200 dark:border-gray-700">
+              <div className="text-center py-4 pt-6 pb-4">
+                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-12 !h-12 !text-[48px] !leading-12 mx-auto text-zinc-400 dark:text-zinc-500 mb-2 animate-pulse" aria-hidden="true" style={{ fontVariationSettings: '"FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24' }}>sensors</span>
+                <h3 className="font-semibold text-zinc-900 dark:text-white mb-2 !text-sm text-2xl/8 font-semibold text-zinc-950 sm:text-xl/8 dark:text-white">Ready to receive events</h3>
+                <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-xs text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">Listening to changes in your Semaphore project</p>
+              </div>
+            </div>
+          )}
+
         </>
       )}
 
