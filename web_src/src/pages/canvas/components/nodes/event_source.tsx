@@ -16,6 +16,7 @@ import GithubLogo from '@/assets/github-mark.svg';
 import { twMerge } from 'tailwind-merge';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { EventStateItem, EventState } from '../EventStateItem';
+import { EventSourceBadges } from '../EventSourceBadges';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -212,17 +213,20 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
+  const integration = useMemo(() => {
+    const integrationName = props.data.integration?.name;
+    return canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
+  }, [canvasIntegrations, props.data.integration?.name]);
+
   const eventSourceType = useMemo(() => {
     if (props.data.eventSourceType)
       return props.data.eventSourceType;
 
-    const integrationName = props.data.integration?.name;
-    const integration = canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
-    if (integration && integration.spec?.type) {
-      return integration.spec?.type;
+    if (integration?.spec?.type) {
+      return integration.spec.type;
     }
     return "webhook";
-  }, [canvasIntegrations, props.data.eventSourceType, props.data.integration?.name]);
+  }, [integration, props.data.eventSourceType]);
 
   // Auto-enter edit mode for webhook with key
   useEffect(() => {
@@ -321,13 +325,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         )}
 
       </div>
-      {!isEditMode && props.data.resource?.name &&
-        <div className="flex items-center w-full gap-2 px-4 pb-4 font-semibold">
-          <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-            <MaterialSymbol name="assignment" size="md" />
-            <span>{(props.data.resource?.name as string)?.replace('.semaphore/', '')}</span>
-          </div>
-        </div>}
+
+      {!isEditMode && (
+        <EventSourceBadges
+          resourceName={props.data.resource?.name}
+          currentEventSource={currentEventSource}
+          eventSourceType={eventSourceType}
+          integration={integration}
+        />
+      )}
 
       {isEditMode ? (
         <EventSourceEditModeContent
@@ -339,7 +345,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             ...(currentFormData?.spec && {
               integration: currentFormData.spec.integration,
               resource: currentFormData.spec.resource,
-              events: currentFormData.spec.events
+              events: currentFormData.spec.events,
             })
           }}
           canvasId={canvasId}

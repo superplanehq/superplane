@@ -687,7 +687,7 @@ curl -X POST \\
         )}
 
         {/* Event Types and Filters Section */}
-        {!requireIntegration || availableIntegrations.length > 0 && <EditableAccordionSection
+        {(!requireIntegration || availableIntegrations.length > 0) && <EditableAccordionSection
           id="filters"
           title="Filters"
           isOpen={openSections.includes('filters')}
