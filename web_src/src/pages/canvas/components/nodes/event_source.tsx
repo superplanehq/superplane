@@ -233,7 +233,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     if (eventSourceKey && eventSourceType === 'webhook' && !isNewNode) {
       setIsEditMode(true);
       setEditingEventSource(props.id);
+      setEventSourceName(props.data.name);
+      setEventSourceDescription(props.data.description || '');
       setFocusedNodeId(props.id);
+      
+      // Initialize currentFormData with existing event source data
+      if (currentEventSource?.spec) {
+        setCurrentFormData({
+          name: props.data.name || '',
+          description: props.data.description || '',
+          spec: currentEventSource.spec
+        });
+      }
+      
       setTimeout(() => {
         const currentNodes = useCanvasStore.getState().nodes;
         const updatedNodes = currentNodes.map(node => ({
@@ -243,7 +255,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         setNodes(updatedNodes);
       }, 100);
     }
-  }, [eventSourceKey, eventSourceType, isNewNode, props.id, setEditingEventSource, setNodes, setFocusedNodeId]);
+  }, [eventSourceKey, eventSourceType, isNewNode, props.id, currentEventSource, props.data.name, props.data.description, setEditingEventSource, setNodes, setFocusedNodeId]);
 
   const handleNodeClick = () => {
     if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {

@@ -41,6 +41,8 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
 
   const cleanResourceName = resourceName?.replace('.semaphore/', '') || '';
 
+  if (!resourceName && totalFilters === 0) return null;
+
   return (
     <div className="flex items-center w-full gap-2 px-4 pb-4 font-semibold">
       {resourceName && (
