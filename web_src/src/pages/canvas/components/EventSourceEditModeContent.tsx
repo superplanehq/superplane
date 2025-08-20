@@ -209,9 +209,9 @@ export function EventSourceEditModeContent({
 
         if (emptyFilters.length > 0) {
           if (emptyFilters.length === 1) {
-            errors[`eventType_${index}_filters`] = `Filter ${emptyFilters[0]} is incomplete - all filter fields must be filled`;
+            errors[`eventType_${index}_filters`] = `Filter ${emptyFilters[0]} is incomplete - please fill all fields`;
           } else {
-            errors[`eventType_${index}_filters`] = `Filters ${emptyFilters.join(', ')} are incomplete - all filter fields must be filled`;
+            errors[`eventType_${index}_filters`] = `Filters ${emptyFilters.join(', ')} are incomplete - please fill all fields`;
           }
         }
       }
@@ -721,9 +721,9 @@ curl -X POST \\
                   </div>
                   <button
                     onClick={() => removeEventType(eventTypeIndex)}
-                    className="ml-4 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                    className="ml-4 text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   >
-                    <MaterialSymbol name="delete" size="sm" />
+                    <MaterialSymbol name="close" size="sm" />
                   </button>
                 </div>
 
@@ -750,7 +750,7 @@ curl -X POST \\
                               }
                               updateFilter(eventTypeIndex, filterIndex, updates);
                             }}
-                            className="px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100"
+                            className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100"
                           >
                             <option value="FILTER_TYPE_DATA">Data</option>
                             <option value="FILTER_TYPE_HEADER">Header</option>
@@ -773,13 +773,13 @@ curl -X POST \\
                               updateFilter(eventTypeIndex, filterIndex, updates);
                             }}
                             placeholder="Filter expression"
-                            className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100"
+                            className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100"
                           />
                           <button
                             onClick={() => removeFilter(eventTypeIndex, filterIndex)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                            className="text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                           >
-                            <MaterialSymbol name="delete" size="sm" />
+                            <MaterialSymbol name="close" size="sm" />
                           </button>
                         </div>
                         {/* OR/AND toggle between filters */}

@@ -30,7 +30,7 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
   const getFilterTypeLabel = (filter: SuperplaneFilter) => {
     if (filter.type === 'FILTER_TYPE_DATA') return 'Data';
     if (filter.type === 'FILTER_TYPE_HEADER') return 'Header';
-    return filter?.type?.replace('FILTER_TYPE_', '') || 'Unknown';
+    return 'Unknown';
   };
 
   const getFilterExpression = (filter: SuperplaneFilter) => {
