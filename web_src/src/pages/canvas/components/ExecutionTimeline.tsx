@@ -26,14 +26,17 @@ export const ExecutionTimeline = ({
     return map;
   }, [orgUsers]);
 
-  const minApprovedAt = useMemo(() => {
-    return executions.reduce((min, execution) => {
-      if (execution.event.approvals?.[0]?.approvedAt && new Date(execution.event.approvals[0].approvedAt).getTime() < new Date(min).getTime()) {
-        return execution.event.approvals[0].approvedAt;
+  const getMinApprovedAt = (execution: ExecutionWithEvent) => {
+    if (!execution.event.approvals?.length)
+      return undefined;
+
+    return execution.event.approvals.reduce((min, approval) => {
+      if (approval.approvedAt && new Date(approval.approvedAt).getTime() < new Date(min).getTime()) {
+        return approval.approvedAt;
       }
       return min;
-    }, new Date().toISOString());
-  }, [executions]);
+    }, execution.event.approvals[0].approvedAt!);
+  }
 
 
   const getApprovalsNames = (execution: ExecutionWithEvent) => {
@@ -112,7 +115,7 @@ export const ExecutionTimeline = ({
             result={execution.result || 'RESULT_UNKNOWN'}
             timestamp={execution.createdAt || new Date().toISOString()}
             executionDuration={formatDuration(execution.startedAt, execution.finishedAt)}
-            approvedOn={minApprovedAt}
+            approvedOn={getMinApprovedAt(execution)}
             approvedBy={getApprovalsNames(execution)}
             queuedOn={execution.event.createdAt}
             eventId={execution.event.id}
