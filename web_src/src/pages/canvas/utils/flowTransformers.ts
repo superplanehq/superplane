@@ -31,6 +31,7 @@ export const transformEventSourcesToNodes = (
         id: es.metadata?.id || '',
         name: es.metadata?.name,
         description: es.metadata?.description,
+        eventFilters: es.eventFilters,
         events: lastEvents,
         integration: es.spec?.integration,
         resource: es.spec?.resource,

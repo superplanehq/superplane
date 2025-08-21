@@ -17,7 +17,7 @@ const EventSourceImageMap = {
   'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
 }
 
-type TabType = 'activity' | 'history' | 'settings';
+type TabType = 'history' | 'settings';
 
 interface EventSourceSidebarProps {
   selectedEventSource: SuperplaneEventSource & {
@@ -29,7 +29,7 @@ interface EventSourceSidebarProps {
 
 export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSourceSidebarProps) => {
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
-  const [activeTab, setActiveTab] = useState<TabType>('activity');
+  const [activeTab, setActiveTab] = useState<TabType>('history');
   const canvasId = useCanvasStore(state => state.canvasId) || '';
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
@@ -46,7 +46,6 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
     return "webhook";
   }, [canvasIntegrations, selectedEventSource.eventSourceType, selectedEventSource.spec?.integration?.name]);
   const events = selectedEventSource.events || [];
-  const latestEvents = events.slice(0, 6);
   const allEvents = events.slice(0, 20);
 
 
@@ -70,7 +69,6 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
       {/* Tab Navigation */}
       <SidebarTabs
         tabs={[
-          { key: 'activity', label: 'Activity' },
           { key: 'history', label: 'History' },
           { key: 'settings', label: 'Settings' }
         ]}
@@ -79,44 +77,6 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
       />
 
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'activity' && (
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
-                Latest Events ({latestEvents.length})
-              </h3>
-              <button
-                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-                onClick={() => setActiveTab('history')}
-              >
-                View all
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {latestEvents.length > 0 ? (
-                latestEvents.map((event) => (
-                  <EventItem
-                    key={event.id}
-                    eventId={event.id!}
-                    timestamp={event.receivedAt!}
-                    state={event.state}
-                    eventType={event.type}
-                    sourceName={event.sourceName}
-                    headers={event.headers}
-                    payload={event.raw}
-                  />
-                ))
-              ) : (
-                <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
-                  <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3 " aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>inbox</span>
-                  <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No recent events</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {activeTab === 'history' && (
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">

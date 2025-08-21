@@ -14,7 +14,8 @@ import {
   SuperplaneInputMapping,
   SpecGroupBy,
   IntegrationsIntegrationRef,
-  IntegrationsResourceRef
+  IntegrationsResourceRef,
+  EventSourceEventType
 } from "@/api-client/types.gen";
 
 export type AllNodeType = EventSourceNodeType | StageNodeType | ConnectionGroupNodeType;
@@ -37,6 +38,7 @@ export type EventSourceNodeData = {
   name: string;
   description?: string;
   events: SuperplaneEvent[];
+  eventFilters?: EventSourceEventType[];
   integration: IntegrationsIntegrationRef | null;
   resource: IntegrationsResourceRef | null;
   eventSourceType?: string;
