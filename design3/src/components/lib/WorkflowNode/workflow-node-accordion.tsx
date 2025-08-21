@@ -2723,23 +2723,28 @@ export function WorkflowNodeAccordion({
               </div>
             </div>
         {/* Executor and connection info */}
-        <div className="flex flex-wrap gap-2">
-          <Tippy content={renderEventChainTooltip(data)} placement='top' interactive={true}>
-              <BadgeButton className="text-xs event-trigger" href="#">
-                <MaterialSymbol name="bolt" size="md"/> Event {data.eventId || '423423....'}
-              </BadgeButton>
-            </Tippy>
+        <div className="flex gap-2">
+          
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
             <Tippy content={renderInputsTooltip(false, yamlConfig.spec.inputs)} placement='top' interactive={true}>
-              <BadgeButton className="text-xs" href="#">
+              <BadgeButton className="text-xs flex-grow-1 whitespace-nowrap" href="#">
+                <MaterialSymbol name="input" size="md"/>
                 {yamlConfig.spec.inputs?.length} input{yamlConfig.spec.inputs?.length !== 1 ? 's' : ''}
               </BadgeButton>
             </Tippy>
           )}
+          <Tippy content={renderEventChainTooltip(data)} placement='top' interactive={true}>
+              <BadgeButton className="text-xs event-trigger min-w-0 flex-grow-0 truncate flex items-center" href="#">
+                <MaterialSymbol name="bolt" size="md"/> 
+                <span className="truncate flex-grow-1">Event {data.eventId || '423...'}</span>
+              </BadgeButton>
+            </Tippy>
           {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
             <Tippy content={renderInputsTooltip(true, yamlConfig.spec.outputs || [])} placement='top' interactive={true}>
-              <BadgeButton className="text-xs" href="#">
+              <BadgeButton className="text-xs flex-grow-1 whitespace-nowrap" href="#">
+              <MaterialSymbol name="output" size="md"/>
                 {yamlConfig.spec.outputs?.length} output {yamlConfig.spec.outputs?.length !== 1 ? 's' : ''}
+               
               </BadgeButton>
             </Tippy>
           )}
