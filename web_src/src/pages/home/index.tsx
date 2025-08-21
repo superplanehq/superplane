@@ -182,12 +182,12 @@ const HomePage = () => {
                             {/* Header */}
                             <div className="flex items-start mb-4">
                               <div className="flex items-start justify-between space-x-3 flex-1">
-                                <div className='flex flex-col flex-1'>
+                                <div className='flex flex-col flex-1 min-w-0'>
                                   <Link
                                     to={`/${organizationId}/canvas/${canvas.id}`}
                                     className="block text-left w-full"
                                   >
-                                    <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6">
+                                    <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate">
                                       {canvas.name}
                                     </Heading>
                                   </Link>
@@ -241,7 +241,7 @@ const HomePage = () => {
                                     to={`/${organizationId}/canvas/${canvas.id}`}
                                     className="block text-left"
                                   >
-                                    <Heading level={3} className="text-base font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate">
+                                    <Heading level={3} className="text-base font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate max-w-[40vw]">
                                       {canvas.name}
                                     </Heading>
                                   </Link>

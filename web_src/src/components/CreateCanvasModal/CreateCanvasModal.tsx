@@ -19,6 +19,9 @@ interface CreateCanvasModalProps {
   isLoading?: boolean
 }
 
+const MAX_CANVAS_NAME_LENGTH = 50
+const MAX_CANVAS_DESCRIPTION_LENGTH = 200
+
 export function CreateCanvasModal({
   isOpen,
   onClose,
@@ -72,11 +75,19 @@ export function CreateCanvasModal({
             <Input
               type="text"
               value={canvasName}
-              onChange={(e) => setCanvasName(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
+                  setCanvasName(e.target.value)
+                }
+              }}
               placeholder="Enter canvas name"
               className="w-full"
               autoFocus
+              maxLength={MAX_CANVAS_NAME_LENGTH}
             />
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              {canvasName.length}/{MAX_CANVAS_NAME_LENGTH} characters
+            </div>
           </Field>
 
           {/* Canvas Description */}
@@ -86,11 +97,19 @@ export function CreateCanvasModal({
             </Label>
             <Textarea
               value={canvasDescription}
-              onChange={(e) => setCanvasDescription(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
+                  setCanvasDescription(e.target.value)
+                }
+              }}
               placeholder="Describe what this canvas will be used for (optional)"
               rows={3}
               className="w-full"
+              maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
             />
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              {canvasDescription.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
+            </div>
           </Field>
         </div>
       </DialogBody>

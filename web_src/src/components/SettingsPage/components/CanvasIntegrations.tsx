@@ -247,7 +247,7 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
                       <div className={`w-8 h-8 ${integration.spec?.type === 'semaphore' ? 'bg-gray-200' : 'bg-orange-500'} rounded flex items-center justify-center`}>
                         <img className="w-8 h-8 p-2 object-contain" src={integration.spec?.type === 'semaphore' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
                       </div>
-                      <Heading level={3}>
+                      <Heading level={3} className="max-w-50 truncate">
                         {integration.metadata?.name}
                       </Heading>
                     </div>
