@@ -15,6 +15,7 @@ import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
+import { twMerge } from 'tailwind-merge';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -877,7 +878,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
-      <div className="">
+      <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-2')}>
         {/* Show zero state if executor type requires integrations but none are available */}
         {requireIntegration && !hasRequiredIntegrations && (
           <IntegrationZeroState
