@@ -19,14 +19,16 @@ import { Link } from './lib/Link/link'
 interface AddMembersSectionProps {
   className?: string
   showRoleSelection?: boolean
+  onAddMembers?: (emails: string, role: string) => number
 }
 
-export function AddMembersSection({ className, showRoleSelection = true }: AddMembersSectionProps) {
+export function AddMembersSection({ className, showRoleSelection = true, onAddMembers }: AddMembersSectionProps) {
   // Add members tabs state
   const [addMembersTab, setAddMembersTab] = useState<'emails' | 'upload'>('emails')
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [bulkUserRole, setBulkUserRole] = useState('Member')
   const [emailRole, setEmailRole] = useState('Member')
+  const [emailInput, setEmailInput] = useState('')
   
   // Add members tabs configuration
   const addMembersTabs: Tab[] = [
@@ -70,12 +72,17 @@ export function AddMembersSection({ className, showRoleSelection = true }: AddMe
   }
 
   const handleEmailsSubmit = () => {
-    // TODO: Handle email submission
+    if (!emailInput.trim() || !onAddMembers) return
+    
     const roleToAssign = showRoleSelection ? emailRole : 'Member'
-    console.log('Adding members by email with role:', roleToAssign)
-    // Reset email role after submission if role selection is enabled
-    if (showRoleSelection) {
-      setEmailRole('Member')
+    const addedCount = onAddMembers(emailInput, roleToAssign)
+    
+    if (addedCount > 0) {
+      // Reset form
+      setEmailInput('')
+      if (showRoleSelection) {
+        setEmailRole('Member')
+      }
     }
   }
 
@@ -108,15 +115,17 @@ export function AddMembersSection({ className, showRoleSelection = true }: AddMe
               rows={1}
               placeholder="Email addresses, separated by commas"
               className="flex-1"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
             />
             
             {showRoleSelection && (
               <Dropdown>
                 <DropdownButton outline className="flex items-center gap-2 text-sm">
                   {emailRole}
-                  <MaterialSymbol name="keyboard_arrow_down" />
+                  <MaterialSymbol name="expand_more" size="md" />
                 </DropdownButton>
-                <DropdownMenu>
+                <DropdownMenu anchor="bottom end">
                   <DropdownItem onClick={() => setEmailRole('Owner')}>
                     <DropdownLabel>Owner</DropdownLabel>
                     <DropdownDescription>Full access to organization settings</DropdownDescription>
@@ -164,7 +173,7 @@ export function AddMembersSection({ className, showRoleSelection = true }: AddMe
                 <Button outline className='flex items-center text-sm gap-2'>
                 <MaterialSymbol name="folder_open" size="sm" />
                 Browse
-                </Button>
+                </Button> 
                 
               </div>
               

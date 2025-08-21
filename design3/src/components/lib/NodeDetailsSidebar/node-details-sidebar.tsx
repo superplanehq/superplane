@@ -730,8 +730,9 @@ export function NodeDetailsSidebar({
   onNodeUpdate,
   events = []
 }: NodeDetailsSidebarProps) {
-  // Check for showIcons URL parameter
+  // Check for URL parameters
   const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
+  const consistentStatuses = new URLSearchParams(window.location.search).get('consistentStatuses') === 'true';
   
   const [activeTab, setActiveTab] = useState<'activity' | 'history' | 'settings'>('activity');
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
@@ -743,6 +744,9 @@ export function NodeDetailsSidebar({
   // Event Source specific state  
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const [expandedHistoryEvents, setExpandedHistoryEvents] = useState<Set<string>>(new Set());
+  
+  // Inputs/Outputs tabs state
+  const [inputsOutputsTabs, setInputsOutputsTabs] = useState<Record<string, 'details' | 'payload'>>({});
 
   const tabs: Tab[] = [
     { id: 'activity', label: 'Activity' },
@@ -998,7 +1002,7 @@ export function NodeDetailsSidebar({
           </div>
 
           {/* Tab Content */}
-          <div className="px-4 py-3">
+          <div className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
             {activeDetailTab === 'details' && (
               <div className="space-y-4">
                 {/* Event ID - Full Width */}
@@ -1131,63 +1135,141 @@ export function NodeDetailsSidebar({
   };
 
 
-  const renderInputsOutputs2 = (inputs?: Record<string, string>, outputs?: Record<string, string>) => (
-    <div className="mt-3 space-y-3">
-      {inputs && (
-       <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-       <div className="flex items-start gap-3">
-         <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
-           <MaterialSymbol name="input" size="md" className="text-gray-700 dark:text-zinc-400" />
-         </div>
-         <div className="flex-1">
-         <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
-           <div className="space-y-1">
-             {Object.entries(inputs || {}).map(([key, value]) => (
-               <div key={key} className="flex items-center justify-between">
-                 <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono">Node_name.{key}</span>
-                 <div className="flex items-center gap-2 truncate">
-                   
-                   <Badge color='zinc' className='font-mono !text-xs truncate'>
-                     {value}
-                   </Badge>
-                 
-                 </div>
-               </div>
-             ))}
-           </div>
-         </div>
-       </div>
-     </div>
-      )}
-      {outputs && (
-        <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
-              <MaterialSymbol name="output" size="md" className="text-gray-700 dark:text-zinc-400" />
-            </div>
-            <div className="flex-1">
-              <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Outputs</div>
-              <div className="space-y-1">
-                {Object.entries(outputs).map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge className='font-mono !text-xs'>
-                        {value}
-                      </Badge>
-                    
+  const renderInputsOutputs2 = (inputs?: Record<string, string>, outputs?: Record<string, string>, runId?: string) => {
+    // Don't render if no inputs or outputs
+    if (!inputs && !outputs) return null;
+    
+    // Generate a unique key for this inputs/outputs instance
+    const tabKey = runId || 'default';
+    const activeTab = inputsOutputsTabs[tabKey] || 'details';
+    
+    const setActiveTab = (tab: 'details' | 'payload') => {
+      setInputsOutputsTabs(prev => ({
+        ...prev,
+        [tabKey]: tab
+      }));
+    };
+
+    // Define tabs
+    const inputOutputTabs: Tab[] = [
+      { id: 'details', label: 'Details' },
+      { id: 'payload', label: 'Payload' }
+    ];
+
+    return (
+      <div className="mt-3">
+        <div className="border border-gray-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900" onClick={(e) => e.stopPropagation()}>
+          {/* Tabs */}
+          <div className="" onClick={(e) => e.stopPropagation()}>
+            <ControlledTabs
+              tabs={inputOutputTabs}
+              activeTab={activeTab}
+              size="xs"
+              onTabChange={(tabId) => setActiveTab(tabId as 'details' | 'payload')}
+              variant="underline"
+            />
+          </div>
+
+          {/* Tab Content */}
+          <div className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+            {activeTab === 'details' && inputs && (
+              <div>
+                {/* Inputs Section */}
+                <div className="flex-1">
+                <div className='mb-4 flex items-center justify-between'>
+                    <div className="flex items-center gap-1">
+                      <MaterialSymbol name="calendar_today" size="sm" />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">Received on Jan 16, 2022 10:23:45</span>
                     </div>
+                </div>
+                  <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">Inputs</div>
+                  <div className="space-y-1">
+                    {Object.entries(inputs || {}).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono">Node_name.{key}</span>
+                        <div className="flex items-center gap-2 truncate">
+                          <Badge color='zinc' className='font-mono !text-xs truncate'>
+                            {value}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {activeTab === 'payload' && (
+              <div>
+               <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">Request body</span>
+                  <div className="flex items-center">
+                    <Link className="!text-xs flex items-center" href="#">
+                      <MaterialSymbol name="content_copy" size="sm" className="mr-1" />
+                      Copy
+                    </Link>
+                  </div>
+                </div>
+                <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
+                  <div className="space-y-1">
+                    {Object.entries(outputs || {}).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono">{key}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge className='font-mono !text-xs'>
+                            {value}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Show message if no content for active tab */}
+            {activeTab === 'details' && !inputs && (
+              <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
+                No input data available
+              </div>
+            )}
+            
+           
           </div>
         </div>
-      )}
-    
-    </div>
-  );
+      </div>
+    );
+  };
 
+  const renderInputsOutputs = (inputs?: Record<string, string>, outputs?: Record<string, string>, runId?: string) => {
+    // Don't render if no inputs or outputs
+    if (!inputs && !outputs) return null;
+    
+
+    return (
+      <div className="mt-3">
+       <div className='bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs'>
+            <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+              Inputs
+            </div>
+        
+            <div className="space-y-1">
+              {Object.entries(inputs || {}).map(([key, value]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono">Node_name.{key}</span>
+                  <div className="flex items-center gap-2 truncate">
+                    <Badge color='zinc' className='font-mono !text-xs truncate'>
+                      {value}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+         
+        </div>
+      </div>
+    );
+  };
 
   if (!isOpen) return null;
 
@@ -1215,7 +1297,7 @@ export function NodeDetailsSidebar({
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-zinc-700">
+      <div className="">
         <ControlledTabs
           tabs={tabs}
           activeTab={activeTab}
@@ -1318,19 +1400,19 @@ export function NodeDetailsSidebar({
                                 {run.status == 'success' && (
                                 <BadgeButton color='green' className='!flex !items-center'>
                                    <MaterialSymbol name='check_circle' size='sm'/>
-                                  <span className='uppercase'>Passed</span>
+                                  <span className={consistentStatuses ? '' : 'uppercase'}>Passed</span>
                                 </BadgeButton>
                                 )}
                                 {run.status == 'failed' && (
                                 <BadgeButton color='red' className='!flex !items-center'>
                                    <MaterialSymbol name='cancel' size='sm'/>
-                                  <span className='uppercase'>{run.status}</span>
+                                  <span className={consistentStatuses ? '' : 'uppercase'}>Failed</span>
                                 </BadgeButton>
                                 )}
                                 {run.status == 'running' && (
                                 <BadgeButton color='blue' className='!flex !items-center'>
                                   <MaterialSymbol name='sync' size='sm' className='animate-spin'/>
-                                  <span className='uppercase'>{run.status}</span>
+                                  <span className={consistentStatuses ? '' : 'uppercase'}>Running</span>
                                 </BadgeButton>
                                 )}
                                 <Link href="#" className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm">{run.name} 
@@ -1373,8 +1455,8 @@ export function NodeDetailsSidebar({
                             
 
                             
-              
-                            {renderInputsOutputs2(run.inputs, run.outputs)}
+
+                            {renderInputsOutputs(run.inputs, run.outputs, run.id)}
                             {/* Queue Information */}
                             <div className='bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs'>
                               <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
@@ -1513,27 +1595,51 @@ export function NodeDetailsSidebar({
                             )}
                             { }
                             {item.executionMethod === 'manual' && (
-                             <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
-                                <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
-                                  Action requred
-                                </span>
+                              <div>
+                                <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                  <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
+                                    <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
+                                      Action requred
+                                    </span>
+                                  </div>
+                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
+                                    <Badge color="amber">
+                                      <MaterialSymbol name="pending" size="sm" className="animate-pulse"/>
+                                      Action requred
+                                    </Badge>
+                                  </div>
                               </div>
                             )}
                             {item.executionMethod === 'timed' && (
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
-                                <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
-                                 Pending
-                                </span>
+                              <div>
+                                <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
+                                    <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
+                                     Pending
+                                    </span>
+                                  </div>
+                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
+                                    <Badge color="amber">
+                                      <MaterialSymbol name="pending" size="sm" className="animate-pulse"/>
+                                      Pending
+                                    </Badge>
+                                  </div>
                               </div>
                             )}
                              {item.executionMethod === 'queued' && (
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
-                                <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
-                                 To be executed
-                                </span>
+                              <div>
+                                <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
+                                    <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
+                                     To be executed
+                                    </span>
+                                  </div>
+                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
+                                    <Badge color="amber">
+                                      <MaterialSymbol name="pending" size="sm" className="animate-pulse"/>
+                                      To be executed
+                                    </Badge>
+                                  </div>
                               </div>
                             )}
                             <span className="font-medium truncate text-sm dark:text-white">{item.name}</span>
@@ -1574,7 +1680,7 @@ export function NodeDetailsSidebar({
                         {!isManagingQueue && isExpanded && (
                           <div className="mt-3 space-y-3">
                             
-                            {renderInputsOutputs2(item.inputs)}
+                            {renderInputsOutputs2(item.inputs, undefined, item.id)}
                           
                            
                           </div>
@@ -1768,7 +1874,7 @@ export function NodeDetailsSidebar({
                               </div>
                             </div>
                           
-                            {renderInputsOutputs2(run.inputs, run.outputs)}
+                            {renderInputsOutputs(run.inputs, run.outputs, run.id)}
                           </div>
                         )}
                       </div>

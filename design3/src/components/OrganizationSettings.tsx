@@ -37,6 +37,7 @@ import {
   DialogActions 
 } from './lib/Dialog/dialog'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarHeader, SidebarItem, SidebarLabel, SidebarSection, SidebarSpacer } from './lib/Sidebar/sidebar'
+import { useToast, ToastProvider } from './lib/Toasts/toast'
 
 interface OrganizationSettingsProps {
   onBack?: () => void
@@ -44,11 +45,12 @@ interface OrganizationSettingsProps {
   onSwitchOrganization?: () => void
 }
 
-export function OrganizationSettings({ 
+function OrganizationSettingsInner({ 
   onBack, 
   onSignOut, 
   onSwitchOrganization 
 }: OrganizationSettingsProps) {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<'profile' | 'general' | 'members' | 'groups' | 'roles' | 'tokens' | 'integrations' | 'api_token' | 'security'>('general')
   const [selectedTeam, setSelectedTeam] = useState<{ id: string; name: string; description: string } | null>(null)
   const [isCreatingRole, setIsCreatingRole] = useState(false)
@@ -124,8 +126,8 @@ export function OrganizationSettings({
     }
   ]
 
-  // Mock data for members
-  const members = [
+  // Mock data for members - now stateful
+  const [members, setMembers] = useState([
     {
       id: '1',
       name: 'John Doe',
@@ -150,7 +152,7 @@ export function OrganizationSettings({
       name: 'Bob Wilson',
       email: 'bob@acme.com',
       role: 'Member',
-      status: 'Pending',
+      status: 'Invited',
       lastActive: 'Never',
       initials: 'BW'
     },
@@ -163,7 +165,44 @@ export function OrganizationSettings({
       lastActive: '3 days ago',
       initials: 'AJ'
     }
-  ]
+  ])
+
+  // Function to add new members
+  const handleAddMembers = (emails: string, role: string) => {
+    // Parse emails (split by comma, semicolon, space, or newline)
+    const emailList = emails
+      .split(/[,;\s\n]+/)
+      .map(email => email.trim())
+      .filter(email => email.length > 0 && email.includes('@'))
+
+    if (emailList.length === 0) {
+      addToast('error', 'Invalid emails', 'Please enter valid email addresses');
+      return 0;
+    }
+
+    // Create new member objects
+    const newMembers = emailList.map((email, index) => ({
+      id: `invited-${Date.now()}-${index}`,
+      name: email.split('@')[0], // Use part before @ as temporary name
+      email: email,
+      role: role,
+      status: 'Invited' as const,
+      lastActive: 'Never',
+      initials: email.charAt(0).toUpperCase() + (email.split('@')[0].charAt(1) || email.charAt(1)).toUpperCase()
+    }))
+
+    // Add new members to the existing list
+    setMembers(prevMembers => [...prevMembers, ...newMembers])
+    
+    // Show success toast
+    addToast(
+      'success', 
+      'Members invited successfully', 
+      `${newMembers.length} member${newMembers.length > 1 ? 's' : ''} invited with ${role} role`
+    );
+    
+    return newMembers.length // Return count of added members
+  }
 
   // Mock data for groups
   const groups = [
@@ -1048,15 +1087,32 @@ export function OrganizationSettings({
               Members
             </Heading>
             </div>
-            <AddMembersSection/>
+            <AddMembersSection onAddMembers={handleAddMembers}/>
 
             {/* Members List */}
             <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
               <div className="px-6 pt-6 pb-4 ">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center">
                   <InputGroup>
                     <Input name="search" placeholder="Search members…" aria-label="Search" className="w-xs" />
                   </InputGroup>
+                  <Dropdown>
+                    <DropdownButton color='white' className="d-flex items-center ml-2">
+                     Status 
+                     <MaterialSymbol name="expand_more" size="md" />
+                    </DropdownButton>
+                    <DropdownMenu anchor="bottom start">
+                      <DropdownItem>
+                        All
+                      </DropdownItem>
+                      <DropdownItem>
+                        Active
+                      </DropdownItem>
+                      <DropdownItem>
+                        Invited
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
                 </div>
               </div>
               <div className="px-6 pb-6">
@@ -1126,32 +1182,36 @@ export function OrganizationSettings({
                           {user.email}
                         </TableCell>
                         <TableCell>
-                          <Dropdown>
-                            <DropdownButton  outline className="flex items-center gap-2 text-sm">
-                              {user.role}
-                              <MaterialSymbol name="keyboard_arrow_down" />
-                            </DropdownButton>
-                            <DropdownMenu>
-                              <DropdownItem>
-                                <DropdownLabel>Owner</DropdownLabel>
-                                <DropdownDescription>Owner role description.</DropdownDescription>
-                              </DropdownItem>
-                              <DropdownItem>
-                                <DropdownLabel>Admin</DropdownLabel>
-                                <DropdownDescription>Admin role description.</DropdownDescription>
-                              </DropdownItem>
-                              <DropdownItem>
-                                <DropdownLabel>Member</DropdownLabel>
-                                <DropdownDescription>Member role description.</DropdownDescription>
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
+                     
+                            <Dropdown>
+                              <DropdownButton  outline className="flex items-center gap-2 text-sm" disabled={user.status === 'Invited'}>
+                                {user.role}
+                                <MaterialSymbol name="keyboard_arrow_down" />
+                              </DropdownButton>
+                              <DropdownMenu>
+                                <DropdownItem>
+                                  <DropdownLabel>Owner</DropdownLabel>
+                                  <DropdownDescription>Owner role description.</DropdownDescription>
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <DropdownLabel>Admin</DropdownLabel>
+                                  <DropdownDescription>Admin role description.</DropdownDescription>
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <DropdownLabel>Member</DropdownLabel>
+                                  <DropdownDescription>Member role description.</DropdownDescription>
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                             user.status === 'Active'
                               ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                              : user.status === 'Invited'
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
                           }`}>
                             {user.status}
                           </span>
@@ -1952,4 +2012,13 @@ export function OrganizationSettings({
 
     </div>
   )
+}
+
+// Wrapper component that provides toast context
+export function OrganizationSettings(props: OrganizationSettingsProps) {
+  return (
+    <ToastProvider>
+      <OrganizationSettingsInner {...props} />
+    </ToastProvider>
+  );
 }

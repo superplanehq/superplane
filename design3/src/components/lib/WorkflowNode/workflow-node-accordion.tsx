@@ -250,6 +250,7 @@ export function WorkflowNodeAccordion({
   const [selectedGitHubProject, setSelectedGitHubProject] = useState<string>('')
   const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
   const executorInHeader = new URLSearchParams(window.location.search).get('executorInHeader') === 'true';
+  const consistentStatuses = new URLSearchParams(window.location.search).get('consistentStatuses') === 'true';
   
   // Generate YAML preview
   const generateYamlPreview = () => {
@@ -2695,11 +2696,36 @@ export function WorkflowNodeAccordion({
         </div>
 
         <div className="flex items-center mb-3">
-          <MaterialSymbol 
-            name={statusConfig.icon} 
-            size='lg'
-            className={clsx('mr-2', statusConfig.iconColor)}
-          />
+          <div className={`flex items-center gap-2 ${consistentStatuses ? 'visible' : 'hidden'}`}>
+            {data.status == 'success' && (
+            <BadgeButton color='green' className='!flex !items-center mr-2'>
+                <MaterialSymbol name='check_circle' size='sm'/>
+              <span >Passed</span>
+            </BadgeButton>
+            )}
+            {data.status == 'failed' && (
+            <BadgeButton color='red' className='!flex !items-center mr-2'>
+                <MaterialSymbol name='cancel' size='sm'/>
+              <span >Failed</span>
+            </BadgeButton>
+            )}
+            {data.status == 'running' && (
+            <BadgeButton color='blue' className='!flex !items-center mr-2'>
+              <MaterialSymbol name='sync' size='sm' className='animate-spin'/>
+              <span >Running</span>
+            </BadgeButton>
+            )}
+            
+            
+         
+          </div>
+          <div className={`flex items-center gap-2 ${consistentStatuses ? 'hidden' : 'visible'}`}>
+            <MaterialSymbol 
+              name={statusConfig.icon} 
+              size='lg'
+              className={clsx('mr-2', statusConfig.iconColor)}
+            />
+          </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
               {data.runName || '2348932urejhwejkhr2304958ru2ioefwjh20389ruie'}
@@ -2764,7 +2790,14 @@ export function WorkflowNodeAccordion({
                 { showIcons && (
                   <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400' />
                 )}
-                <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 ${consistentStatuses ? 'visible' : 'hidden'}`}>
+                  <Badge color='amber' className='!text-xs'>
+                    <MaterialSymbol name="pending" size="sm" className='text-orange-600 dark:text-orange-400 animate-pulse' />
+                    {data.queueIcon == 'how_to_reg' ? 'Action required' : 'Pending'}
+                  </Badge>
+                  
+                </div>
+                <div className={`flex items-center gap-2 ${consistentStatuses ? 'hidden' : 'visible'}`}>
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse`}></div>
                   <span className={`text-xs font-medium text-orange-700 dark:text-orange-500`}>
                     {data.queueIcon == 'how_to_reg' ? 'Action required' : 'Pending'}
