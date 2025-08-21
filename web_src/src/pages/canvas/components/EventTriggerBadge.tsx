@@ -72,9 +72,9 @@ export const EventTriggerBadge: React.FC<EventTriggerBadgeProps> = ({
       )}
       placement="top"
     >
-      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-28">
         <MaterialSymbol name="bolt" size="md" />
-        <span className="truncate">Event {lastExecutionEvent?.id?.slice(-6) || 'N/A'}</span>
+        <span className="truncate">Event {lastExecutionEvent?.id || 'N/A'}</span>
       </span>
     </Tippy>
   );
