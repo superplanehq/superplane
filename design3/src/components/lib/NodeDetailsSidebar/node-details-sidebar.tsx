@@ -1004,7 +1004,7 @@ export function NodeDetailsSidebar({
           {/* Tab Content */}
           <div className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
             {activeDetailTab === 'details' && (
-              <div className="space-y-4">
+              <div className="space-y-4 ">
                 {/* Event ID - Full Width */}
                 
 
@@ -1211,17 +1211,8 @@ export function NodeDetailsSidebar({
                   </div>
                 </div>
                 <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
-                  <div className="space-y-1">
-                    {Object.entries(outputs || {}).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between">
-                        <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono">{key}</span>
-                        <div className="flex items-center gap-2">
-                          <Badge className='font-mono !text-xs'>
-                            {value}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="text-xs font-mono text-gray-900 dark:text-zinc-200 whitespace-pre-wrap">
+                    Payload data
                   </div>
                 </div>
               </div>
