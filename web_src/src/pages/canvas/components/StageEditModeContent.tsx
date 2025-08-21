@@ -23,7 +23,7 @@ interface StageEditModeContentProps {
   canvasId: string;
   organizationId: string;
   onDataChange?: (data: {
-    label: string;
+    name: string;
     description?: string;
     inputs: SuperplaneInputDefinition[];
     outputs: SuperplaneOutputDefinition[];
@@ -400,7 +400,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     syncWithIncomingData
   } = useEditModeState({
     initialData: {
-      label: data.label,
+      name: data.name,
       description: data.description,
       inputs: data.inputs || [],
       outputs: data.outputs || [],
@@ -512,7 +512,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   useEffect(() => {
     syncWithIncomingData(
       {
-        label: data.label,
+        name: data.name,
         description: data.description,
         inputs: data.inputs || [],
         outputs: data.outputs || [],
@@ -560,7 +560,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   useEffect(() => {
     if (onDataChange) {
       handleDataChange({
-        label: data.label,
+        name: data.name,
         description: data.description,
         inputs,
         outputs,
@@ -571,7 +571,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         inputMappings
       });
     }// eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, onDataChange]);
+  }, [data.name, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, onDataChange]);
 
   // Revert function for each section
   const revertSection = (section: string) => {

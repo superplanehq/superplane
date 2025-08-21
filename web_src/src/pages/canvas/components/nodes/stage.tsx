@@ -19,6 +19,7 @@ import { formatRelativeTime, formatExecutionDuration } from '../../utils/stageEv
 import { IOTooltip } from './IOTooltip';
 import { twMerge } from 'tailwind-merge';
 import { StageQueueSection } from '../StageQueueSection';
+import { EventTriggerBadge } from '../EventTriggerBadge';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
@@ -31,8 +32,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const isNewNode = Boolean(props.data.isDraft) || (props.id && /^\d+$/.test(props.id));
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
-  const [stageName, setStageName] = useState(props.data.label || '');
+  const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
+  const [stageName, setStageName] = useState(props.data.name || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
   const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
@@ -151,7 +152,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setIsEditMode(true);
     setEditingStage(props.id);
 
-    setStageName(props.data.label);
+    setStageName(props.data.name);
     setStageDescription(props.data.description || '');
   };
 
@@ -224,7 +225,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           }
         });
 
-        props.data.label = stageName;
+        props.data.name = stageName;
         props.data.description = stageDescription;
       }
     } catch (error) {
@@ -251,7 +252,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setIsEditMode(false);
     setEditingStage(null);
     setCurrentFormData(null);
-    setStageName(props.data.label);
+    setStageName(props.data.name);
     setStageDescription(props.data.description || '');
   };
 
@@ -268,7 +269,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     if (currentFormData) {
       setCurrentFormData({
         ...currentFormData,
-        label: newName
+        name: newName
       });
     }
   };
@@ -296,7 +297,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     if (yamlData.spec && currentFormData) {
       setCurrentFormData({
         ...currentFormData,
-        label: yamlData.metadata?.name || stageName,
+        name: yamlData.metadata?.name || stageName,
         description: yamlData.metadata?.description || stageDescription,
         inputs: yamlData.spec.inputs || currentFormData.inputs,
         outputs: yamlData.spec.outputs || currentFormData.outputs,
@@ -371,7 +372,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
       if (resourceName) badges.push({ icon: 'assignment', text: resourceName })
       if (workflow) badges.push({ icon: 'code', text: workflow })
-      if (ref) badges.push({ icon: 'code', text: ref })
+      if (ref) badges.push({ icon: 'graph_1', text: ref })
     }
 
     return badges
@@ -473,7 +474,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           <StageEditModeContent
             data={{
               ...props.data,
-              label: stageName,
+              name: stageName,
               description: stageDescription,
               ...(currentFormData && {
                 inputs: currentFormData.inputs,
@@ -533,7 +534,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                     className="min-w-0 font-semibold text-sm flex items-center hover:underline truncate text-gray-900 dark:text-gray-100"
                     onClick={() => selectStageId(props.id)}
                   >
-                    {props.data.label || 'Stage execution'}
+                    {props.data.name || 'Stage execution'}
                   </a>
                 </div>
                 <div className="flex items-center gap-2 font-semibold">
@@ -542,17 +543,29 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                       type="inputs"
                       data={lastExecutionEvent?.inputs?.map(input => ({ name: input.name, value: input.value })) || []}
                     >
-                      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}</span>
+                      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                        <MaterialSymbol name="input" size="md" />
+                        {lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}
+                      </span>
                     </IOTooltip>
                   )}
+                  <EventTriggerBadge
+                    lastExecutionEvent={lastExecutionEvent}
+                    lastExecution={lastExecution}
+                    stageName={props.data.name}
+                  />
                   {lastOutputsCount > 0 && (
                     <IOTooltip
                       type="outputs"
                       data={lastExecution?.outputs?.map(output => ({ name: output.name, value: output.value })) || []}
                     >
-                      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}</span>
+                      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                        <MaterialSymbol name="output" size="md" />
+                        {lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}
+                      </span>
                     </IOTooltip>
                   )}
+
                 </div>
               </div>
             </div>
