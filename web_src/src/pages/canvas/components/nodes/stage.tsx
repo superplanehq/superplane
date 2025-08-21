@@ -105,15 +105,16 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     , [allExecutions]
   );
 
-  const executionRunning = useMemo(() =>
-    allExecutions.some(execution => execution.state === 'STATE_STARTED'),
+  const runningExecution = useMemo(() =>
+    allExecutions.find(execution => execution.state === 'STATE_STARTED'),
     [allExecutions]
   );
 
-  const lastFinishedExecution = allFinishedExecutions.at(0);
-  const lastExecutionEvent = currentStage?.queue?.find(event => event.execution?.id === lastFinishedExecution?.id);
+  // If there is a running execution, use it as the last execution
+  const lastExecution = runningExecution || allFinishedExecutions.at(0);
+  const lastExecutionEvent = currentStage?.queue?.find(event => event.execution?.id === lastExecution?.id);
   const lastInputsCount = lastExecutionEvent?.inputs?.length || 0;
-  const lastOutputsCount = lastFinishedExecution?.outputs?.length || 0;
+  const lastOutputsCount = lastExecution?.outputs?.length || 0;
 
   const getStatusIcon = () => {
     const latestExecution = allExecutions.at(0);
@@ -143,7 +144,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
-  const isRunning = executionRunning || props.data.status?.toLowerCase() === 'running';
+  const isRunning = !!runningExecution || props.data.status?.toLowerCase() === 'running';
   const handleEditClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation?.();
     setIsEditMode(true);
@@ -497,12 +498,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               <div className="flex items-center w-full justify-between mb-2">
                 <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last run</div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {isRunning ? 'Running...' : lastFinishedExecution ? (
+                  {isRunning ? 'Running...' : lastExecution ? (
                     <div className="flex items-center gap-1 font-semibold text-gray-500 dark:text-gray-400">
                       <MaterialSymbol name="timer" size="md" />
-                      <span>{formatExecutionDuration(lastFinishedExecution?.createdAt, lastFinishedExecution?.finishedAt)}</span>
+                      <span>{formatExecutionDuration(lastExecution?.createdAt, lastExecution?.finishedAt)}</span>
                       <span>|</span>
-                      <span>{formatRelativeTime(lastFinishedExecution?.finishedAt, true)}</span>
+                      <span>{formatRelativeTime(lastExecution?.finishedAt, true)}</span>
                     </div>
                   ) : 'No recent runs'}
                 </div>
@@ -532,7 +533,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   {lastOutputsCount > 0 && (
                     <IOTooltip
                       type="outputs"
-                      data={lastFinishedExecution?.outputs?.map(output => ({ name: output.name, value: output.value })) || []}
+                      data={lastExecution?.outputs?.map(output => ({ name: output.name, value: output.value })) || []}
                     >
                       <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}</span>
                     </IOTooltip>
