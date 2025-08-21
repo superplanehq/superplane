@@ -10,6 +10,7 @@ import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { Badge } from '@/components/Badge/badge';
 import { EditModeActionButtons } from '../EditModeActionButtons';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
@@ -352,6 +353,30 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     return total
   }, [lastPendingEvent, lastWaitingEvent, pendingEvents?.length, waitingEvents?.length])
 
+  const executorBadges = useMemo(() => {
+    const badges: Array<{ icon: string; text: string }> = []
+
+    if (props.data.executor?.type === 'semaphore') {
+      const resourceName = (props.data.executor?.resource?.name as string)?.replace('.semaphore/', '')
+      const pipelineFile = (props.data.executor?.spec?.['pipelineFile'] as string)?.replace('.semaphore/', '')
+
+      if (resourceName) badges.push({ icon: 'assignment', text: resourceName })
+      if (pipelineFile) badges.push({ icon: 'code', text: pipelineFile })
+    }
+
+    if (props.data.executor?.type === 'github') {
+      const resourceName = props.data.executor?.resource?.name as string
+      const workflow = (props.data.executor?.spec?.['workflow'] as string)?.replace('.github/workflows/', '')
+      const ref = props.data.executor?.spec?.['ref'] as string
+
+      if (resourceName) badges.push({ icon: 'assignment', text: resourceName })
+      if (workflow) badges.push({ icon: 'code', text: workflow })
+      if (ref) badges.push({ icon: 'code', text: ref })
+    }
+
+    return badges
+  }, [props.data.executor])
+
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
@@ -468,29 +493,19 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         ) : (
           <>
 
-            {props.data.executor?.type === 'semaphore' && (
-              <div className="flex items-center w-full gap-2 mx-4 font-semibold">
-                <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-                  <MaterialSymbol name="assignment" size="md" />
-                  <span>{(props.data.executor?.resource?.name as string)?.replace('.semaphore/', '')}</span>
-                </div>
-                <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-                  <MaterialSymbol name="code" size="md" />
-                  <span>{(props.data.executor?.spec?.['pipelineFile'] as string)?.replace('.semaphore/', '')}</span>
-                </div>
-              </div>
-            )}
-
-            {props.data.executor?.type === 'github' && (
-              <div className="flex items-center w-full gap-2 mx-4 font-semibold">
-                <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-                  <MaterialSymbol name="assignment" size="md" />
-                  <span>{(props.data.executor?.resource?.name as string)}</span>
-                </div>
-                <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-                  <MaterialSymbol name="code" size="md" />
-                  <span>{(props.data.executor?.spec?.['workflow'] as string)?.replace('.github/workflows/', '')}</span>
-                </div>
+            {executorBadges.length > 0 && (
+              <div className="flex items-center w-full gap-2 px-4 font-semibold min-w-0 overflow-hidden">
+                {executorBadges.map((badge, index) => (
+                  <Badge
+                    key={`${badge.icon}-${index}`}
+                    color="zinc"
+                    icon={badge.icon}
+                    truncate
+                    className="flex-shrink min-w-0 max-w-full"
+                  >
+                    {badge.text}
+                  </Badge>
+                ))}
               </div>
             )}
             {/* Last Run Section */}
