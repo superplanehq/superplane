@@ -1389,25 +1389,25 @@ export function NodeDetailsSidebar({
                         <div className='text-xs gap-2'>
                               <div className='flex items-center gap-2 mb-2'>
                                 {run.status == 'success' && (
-                                <BadgeButton color='green' className='!flex !items-center'>
-                                   <MaterialSymbol name='check_circle' size='sm'/>
-                                  <span className={consistentStatuses ? '' : 'uppercase'}>Passed</span>
-                                </BadgeButton>
+                                <Badge color='green' className='!flex !items-center'>
+                                   <MaterialSymbol name='check_circle' size='md'/>
+                                  <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Passed</span>
+                                </Badge>
                                 )}
                                 {run.status == 'failed' && (
-                                <BadgeButton color='red' className='!flex !items-center'>
-                                   <MaterialSymbol name='cancel' size='sm'/>
-                                  <span className={consistentStatuses ? '' : 'uppercase'}>Failed</span>
-                                </BadgeButton>
+                                <Badge color='red' className='!flex !items-center'>
+                                   <MaterialSymbol name='cancel' size='md'/>
+                                  <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Failed</span>
+                                </Badge>
                                 )}
                                 {run.status == 'running' && (
-                                <BadgeButton color='blue' className='!flex !items-center'>
-                                  <MaterialSymbol name='sync' size='sm' className='animate-spin'/>
-                                  <span className={consistentStatuses ? '' : 'uppercase'}>Running</span>
-                                </BadgeButton>
+                                <Badge color='blue' className='!flex !items-center'>
+                                  <MaterialSymbol name='sync' size='md' className='animate-spin'/>
+                                  <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Running</span>
+                                </Badge>
                                 )}
                                 <Link href="#" className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm">{run.name} 
-                                <MaterialSymbol name='arrow_outward' size='sm'/>
+                                <MaterialSymbol name='arrow_outward' size='md'/>
                                 </Link>
                                 
                               </div>
@@ -1595,8 +1595,8 @@ export function NodeDetailsSidebar({
                                   </div>
                                   <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
                                     <Badge color="amber">
-                                      <MaterialSymbol name="how_to_reg" size="sm" className="animate-pulse"/>
-                                      Action requred
+                                      <MaterialSymbol name="how_to_reg" size="md" className="animate-pulse"/>
+                                      <span className='uppercase'>PENDING approval</span>
                                     </Badge>
                                   </div>
                               </div>
@@ -1611,8 +1611,8 @@ export function NodeDetailsSidebar({
                                   </div>
                                   <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
                                     <Badge color="zinc">
-                                      <MaterialSymbol name="schedule" size="sm" className="animate-pulse"/>
-                                      Pending
+                                      <MaterialSymbol name="schedule" size="md" className="animate-pulse"/>
+                                      <span className='uppercase'>Scheduled</span>
                                     </Badge>
                                   </div>
                               </div>
@@ -1627,8 +1627,8 @@ export function NodeDetailsSidebar({
                                   </div>
                                   <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
                                     <Badge color="orange">
-                                      <MaterialSymbol name="pending" size="sm" className="animate-pulse"/>
-                                      To be executed
+                                      <MaterialSymbol name="pending" size="md" className="animate-pulse"/>
+                                      <span className='uppercase'>To be executed</span>
                                     </Badge>
                                   </div>
                               </div>

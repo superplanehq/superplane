@@ -2568,7 +2568,7 @@ export function WorkflowNodeAccordion({
         selected ? 'border-blue-600 dark:border-zinc-200 ring-2 ring-blue-200 dark:ring-white' : 'border-gray-200 dark:border-zinc-700',
         className
       )}
-      style={{ width: 320, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
+      style={{ width: 340, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
       role="article"
       aria-label={`Workflow stage: ${data.title}`}
       onClick={onSelect}
@@ -2698,22 +2698,22 @@ export function WorkflowNodeAccordion({
         <div className="flex items-center mb-3">
           <div className={`flex items-center gap-2 ${consistentStatuses ? 'visible' : 'hidden'}`}>
             {data.status == 'success' && (
-            <BadgeButton color='green' className='!flex !items-center mr-2'>
-                <MaterialSymbol name='check_circle' size='sm'/>
-              <span >Passed</span>
-            </BadgeButton>
+            <Badge color='green' className='!flex !items-center mr-2'>
+                <MaterialSymbol name='check_circle' size='md'/>
+              <span className='uppercase'>Passed</span>
+            </Badge>
             )}
             {data.status == 'failed' && (
-            <BadgeButton color='red' className='!flex !items-center mr-2'>
-                <MaterialSymbol name='cancel' size='sm'/>
-              <span >Failed</span>
-            </BadgeButton>
+            <Badge color='red' className='!flex !items-center mr-2'>
+                <MaterialSymbol name='cancel' size='md'/>
+              <span className='uppercase'>Failed</span>
+            </Badge>
             )}
             {data.status == 'running' && (
-            <BadgeButton color='blue' className='!flex !items-center mr-2'>
-              <MaterialSymbol name='sync' size='sm' className='animate-spin'/>
-              <span >Running</span>
-            </BadgeButton>
+            <Badge color='blue' className='!flex !items-center mr-2'>
+              <MaterialSymbol name='sync' size='md' className='animate-spin'/>
+              <span className='uppercase'>Running</span>
+            </Badge>
             )}
             
             
@@ -2785,22 +2785,22 @@ export function WorkflowNodeAccordion({
         </h4>
         <div className="space-y-2">
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
-            <div className={data.queueIcon == 'how_to_reg' ? "flex items-center p-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-800 rounded-sm gap-2 justify-between" : "flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between"}>
+            <div className={data.queueIcon == 'how_to_reg' ? "flex items-center p-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-800 rounded-sm justify-between" : "flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between"}>
               <div className="flex items-center gap-2 truncate">
                 { showIcons && (
                   <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400' />
                 )}
-                <div className={`flex items-center gap-2 ${consistentStatuses ? 'visible' : 'hidden'}`}>
+                <div className={`flex items-center ${consistentStatuses ? 'visible' : 'hidden'}`}>
                   {data.queueIcon == 'how_to_reg' && (
                   <Badge color='amber' className='!text-xs'>
-                    <MaterialSymbol name="pending" size="sm" className='animate-pulse' />
-                    Action required
+                    <MaterialSymbol name="how_to_reg" size="md" className='animate-pulse' />
+                    PENDING APPROVAL
                   </Badge>
                   )}
                   {data.queueIcon != 'how_to_reg' && (
                   <Badge color='zinc' className='!text-xs'>
-                    <MaterialSymbol name="schedule" size="sm" className='animate-pulse' />
-                    Pending
+                    <MaterialSymbol name="schedule" size="md" className='animate-pulse' />
+                    SHEDULED
                   </Badge>
                   )}
                   
