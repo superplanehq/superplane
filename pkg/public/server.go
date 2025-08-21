@@ -183,11 +183,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	// Public health check
-	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}).Methods("GET")
-
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
@@ -307,7 +302,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute := r.Methods(http.MethodGet, http.MethodPost).Subrouter()
 
 	// Health check
-	publicRoute.HandleFunc("/", s.HealthCheck).Methods("GET")
+	publicRoute.HandleFunc("/is_alive", s.HealthCheck).Methods("GET")
 
 	//
 	// Webhook endpoints for integrations (they have their own authentication).
