@@ -360,9 +360,11 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     if (props.data.executor?.type === 'semaphore') {
       const resourceName = (props.data.executor?.resource?.name as string)?.replace('.semaphore/', '')
       const pipelineFile = (props.data.executor?.spec?.['pipelineFile'] as string)?.replace('.semaphore/', '')
+      const ref = props.data.executor?.spec?.['branch'] as string
 
       if (resourceName) badges.push({ icon: 'assignment', text: resourceName })
       if (pipelineFile) badges.push({ icon: 'code', text: pipelineFile })
+      if (ref) badges.push({ icon: 'graph_1', text: ref })
     }
 
     if (props.data.executor?.type === 'github') {
@@ -503,6 +505,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                     icon={badge.icon}
                     truncate
                     className="flex-shrink min-w-0 max-w-full"
+                    title={badge.text}
                   >
                     {badge.text}
                   </Badge>
@@ -527,15 +530,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
               {/* Current Execution Display */}
               <div>
-                <div className="flex items-center mb-1">
+                <div className="flex items-center mb-1 py-2">
                   {getStatusIcon()}
-                  <a
-                    href="#"
-                    className="min-w-0 font-semibold text-sm flex items-center hover:underline truncate text-gray-900 dark:text-gray-100"
+                  <span
+                    className="text-left w-full font-semibold text-sm hover:underline truncate text-gray-900 dark:text-gray-100"
                     onClick={() => selectStageId(props.id)}
                   >
-                    {props.data.name || 'Stage execution'}
-                  </a>
+                    {lastExecution?.id || 'No recent runs'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 font-semibold">
                   {lastInputsCount > 0 && (
@@ -545,7 +547,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                     >
                       <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
                         <MaterialSymbol name="input" size="md" />
-                        {lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}
+                        <span className="whitespace-nowrap">{lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}</span>
                       </span>
                     </IOTooltip>
                   )}
@@ -561,7 +563,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                     >
                       <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
                         <MaterialSymbol name="output" size="md" />
-                        {lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}
+                        <span className="whitespace-nowrap">{lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}</span>
                       </span>
                     </IOTooltip>
                   )}

@@ -36,11 +36,10 @@ export const EventTriggerBadge: React.FC<EventTriggerBadgeProps> = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium truncate text-gray-900 dark:text-white">Source</span>
+                    <span className="text-sm font-medium truncate text-gray-900 dark:text-white">{eventSourceNode?.data?.name || 'Unknown'}</span>
                     <span className="text-xs text-gray-500 dark:text-zinc-400 flex-shrink-0 ml-2">{formatRelativeTime(lastExecutionEvent?.createdAt)}</span>
                   </div>
                   <div className="text-xs text-gray-600 dark:text-zinc-400 mt-1">Incoming event trigger</div>
-                  <div className="text-xs font-mono text-gray-500 dark:text-zinc-500 mt-1">{eventSourceNode?.data?.name || 'Unknown'}</div>
                 </div>
               </div>
             </div>
@@ -55,7 +54,6 @@ export const EventTriggerBadge: React.FC<EventTriggerBadgeProps> = ({
                     <span className="text-xs text-gray-500 dark:text-zinc-400 flex-shrink-0 ml-2">{formatRelativeTime(lastExecution?.createdAt)}</span>
                   </div>
                   <div className="text-xs text-gray-600 dark:text-zinc-400 mt-1">Current workflow execution</div>
-                  <div className="text-xs font-mono text-gray-500 dark:text-zinc-500 mt-1">current_event</div>
                 </div>
               </div>
             </div>
@@ -72,7 +70,7 @@ export const EventTriggerBadge: React.FC<EventTriggerBadgeProps> = ({
       )}
       placement="top"
     >
-      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-28">
+      <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 truncate">
         <MaterialSymbol name="bolt" size="md" />
         <span className="truncate">Event {lastExecutionEvent?.id || 'N/A'}</span>
       </span>

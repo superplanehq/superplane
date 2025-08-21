@@ -7,9 +7,10 @@ interface BadgeProps {
   className?: string;
   icon?: string;
   truncate?: boolean;
+  title?: string;
 }
 
-export function Badge({ children, color = 'gray', className = '', icon, truncate = false }: BadgeProps) {
+export function Badge({ children, color = 'gray', className = '', icon, truncate = false, title }: BadgeProps) {
   const colorClasses = {
     indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400',
     gray: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400',
@@ -21,7 +22,8 @@ export function Badge({ children, color = 'gray', className = '', icon, truncate
   };
 
   return (
-    <span className={`inline-flex items-center gap-x-1.5 px-1.5 py-0.5 rounded-md text-sm/5 font-medium sm:text-xs/5 forced-colors:outline ${colorClasses[color]} ${className}`}>
+
+    <span title={title} className={`inline-flex items-center gap-x-1.5 px-1.5 py-0.5 rounded-md text-sm/5 font-medium sm:text-xs/5 forced-colors:outline ${colorClasses[color]} ${className}`}>
       {icon && <MaterialSymbol name={icon} size="md" className="flex-shrink-0" />}
       <span className={truncate ? 'truncate' : ''}>{children}</span>
     </span>
