@@ -878,7 +878,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
-      <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-2')}>
+      <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-1')}>
         {/* Show zero state if executor type requires integrations but none are available */}
         {requireIntegration && !hasRequiredIntegrations && (
           <IntegrationZeroState
