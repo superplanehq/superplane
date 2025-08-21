@@ -160,16 +160,17 @@ export function Canvas() {
           const eventsResponse = await superplaneListEvents(
             withOrganizationHeader({
               path: { canvasIdOrName: canvasId! },
-              query: { 
+              query: {
                 sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
-                sourceId: eventSource.metadata?.id 
+                sourceId: eventSource.metadata?.id
               }
             })
           );
 
           eventSourcesWithEvents.push({
             ...eventSource,
-            events: eventsResponse.data?.events || []
+            events: eventsResponse.data?.events || [],
+            eventFilters: eventsResponse.data?.events || []
           });
         }
 

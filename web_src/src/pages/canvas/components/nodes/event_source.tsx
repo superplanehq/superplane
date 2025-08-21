@@ -16,6 +16,7 @@ import GithubLogo from '@/assets/github-mark.svg';
 import { twMerge } from 'tailwind-merge';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { EventStateItem, EventState } from '../EventStateItem';
+import { EventSourceBadges } from '../EventSourceBadges';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -212,24 +213,39 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
+  const integration = useMemo(() => {
+    const integrationName = props.data.integration?.name;
+    return canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
+  }, [canvasIntegrations, props.data.integration?.name]);
+
   const eventSourceType = useMemo(() => {
     if (props.data.eventSourceType)
       return props.data.eventSourceType;
 
-    const integrationName = props.data.integration?.name;
-    const integration = canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
-    if (integration && integration.spec?.type) {
-      return integration.spec?.type;
+    if (integration?.spec?.type) {
+      return integration.spec.type;
     }
     return "webhook";
-  }, [canvasIntegrations, props.data.eventSourceType, props.data.integration?.name]);
+  }, [integration, props.data.eventSourceType]);
 
   // Auto-enter edit mode for webhook with key
   useEffect(() => {
     if (eventSourceKey && eventSourceType === 'webhook' && !isNewNode) {
       setIsEditMode(true);
       setEditingEventSource(props.id);
+      setEventSourceName(props.data.name);
+      setEventSourceDescription(props.data.description || '');
       setFocusedNodeId(props.id);
+      
+      // Initialize currentFormData with existing event source data
+      if (currentEventSource?.spec) {
+        setCurrentFormData({
+          name: props.data.name || '',
+          description: props.data.description || '',
+          spec: currentEventSource.spec
+        });
+      }
+      
       setTimeout(() => {
         const currentNodes = useCanvasStore.getState().nodes;
         const updatedNodes = currentNodes.map(node => ({
@@ -239,7 +255,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         setNodes(updatedNodes);
       }, 100);
     }
-  }, [eventSourceKey, eventSourceType, isNewNode, props.id, setEditingEventSource, setNodes, setFocusedNodeId]);
+  }, [eventSourceKey, eventSourceType, isNewNode, props.id, currentEventSource, props.data.name, props.data.description, setEditingEventSource, setNodes, setFocusedNodeId]);
 
   const handleNodeClick = () => {
     if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {
@@ -250,7 +266,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative cursor-pointer`}
-      style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+      style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
       onClick={handleNodeClick}
     >
       {focusedNodeId === props.id && (
@@ -321,13 +337,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         )}
 
       </div>
-      {!isEditMode && props.data.resource?.name &&
-        <div className="flex items-center w-full gap-2 px-4 pb-4 font-semibold">
-          <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-            <MaterialSymbol name="assignment" size="md" />
-            <span>{(props.data.resource?.name as string)?.replace('.semaphore/', '')}</span>
-          </div>
-        </div>}
+
+      {!isEditMode && (
+        <EventSourceBadges
+          resourceName={props.data.resource?.name}
+          currentEventSource={currentEventSource}
+          eventSourceType={eventSourceType}
+          integration={integration}
+        />
+      )}
 
       {isEditMode ? (
         <EventSourceEditModeContent
@@ -339,7 +357,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             ...(currentFormData?.spec && {
               integration: currentFormData.spec.integration,
               resource: currentFormData.spec.resource,
-              events: currentFormData.spec.events
+              events: currentFormData.spec.events,
             })
           }}
           canvasId={canvasId}
@@ -369,14 +387,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         />
       ) : (
         <>
-          <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-sm my-2 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.events?.length || 0})</div>
-            </div>
 
-            <div className="space-y-2">
-              {currentEventSource?.events?.length ? (
-                currentEventSource.events.slice(0, 3).map((event) => {
+          {currentEventSource?.events?.length ? (
+            <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center w-full justify-between mb-2 py-2">
+                <div className="text-sm  font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.events?.length || 0})</div>
+              </div>
+
+              <div className="space-y-2">
+                {currentEventSource.events.slice(0, 3).map((event) => {
                   // Map event states to our EventState type
                   let eventState: EventState = 'pending';
                   if (event.state === 'STATE_DISCARDED') {
@@ -393,12 +412,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                       receivedAt={event.receivedAt}
                     />
                   );
-                })
-              ) : (
-                <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No events received</div>
-              )}
+                })}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-zinc-50 dark:bg-zinc-800 px-4 rounded-b-lg  border-t border-gray-200 dark:border-gray-700">
+              <div className="text-center py-4 pt-6 pb-4">
+                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-12 !h-12 !text-[48px] !leading-12 mx-auto text-zinc-400 dark:text-zinc-500 mb-2 animate-pulse" aria-hidden="true" style={{ fontVariationSettings: '"FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24' }}>sensors</span>
+                <h3 className="font-semibold text-zinc-900 dark:text-white mb-2 !text-sm text-2xl/8 font-semibold text-zinc-950 sm:text-xl/8 dark:text-white">Ready to receive events</h3>
+                <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-xs text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">Listening to changes in your Semaphore project</p>
+              </div>
+            </div>
+          )}
+
         </>
       )}
 

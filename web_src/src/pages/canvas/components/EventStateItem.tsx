@@ -1,5 +1,7 @@
 import React from 'react';
-import { formatRelativeTime } from '../utils/stageEventUtils';
+import { formatFullTimestamp, formatRelativeTime } from '../utils/stageEventUtils';
+import Tippy from '@tippyjs/react/headless';
+import 'tippy.js/dist/tippy.css';
 
 export type EventState = 'pending' | 'discarded' | 'processed';
 
@@ -61,9 +63,18 @@ export const EventStateItem: React.FC<EventStateItemProps> = ({
         {eventId}
       </span>
       {timeAgo && (
-        <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0 w-6 text-right">
-          {timeAgo.replace(' ago', '')}
-        </span>
+        <Tippy
+          render={attrs => (
+            <div className="bg-white text-center dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-3" {...attrs}>
+              {formatFullTimestamp(receivedAt)}
+            </div>
+          )}
+          placement="top"
+        >
+          <span className="text-xs text-zinc-500 dark:text-zinc-400 flex-shrink-0 w-6 text-right">
+            {timeAgo.replace(' ago', '')}
+          </span>
+        </Tippy>
       )}
     </div>
   );
