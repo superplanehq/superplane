@@ -36,10 +36,11 @@ type StageEvent struct {
 	SourceID    uuid.UUID
 	SourceName  string
 	SourceType  string
-	State       string
-	StateReason string
-	CreatedAt   *time.Time
-	Inputs      datatypes.JSONType[map[string]any]
+	State         string
+	StateReason   string
+	CreatedAt     *time.Time
+	Inputs        datatypes.JSONType[map[string]any]
+	ExecutorLabel string
 }
 
 func (e *StageEvent) UpdateState(state, reason string) error {
@@ -113,22 +114,23 @@ func FindStageEventByID(id, stageID string) (*StageEvent, error) {
 	return &event, nil
 }
 
-func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any) (*StageEvent, error) {
-	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, inputs)
+func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any, executorLabel string) (*StageEvent, error) {
+	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, inputs, executorLabel)
 }
 
-func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any) (*StageEvent, error) {
+func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any, executorLabel string) (*StageEvent, error) {
 	now := time.Now()
 	stageEvent := StageEvent{
-		StageID:     stageID,
-		EventID:     event.ID,
-		SourceID:    event.SourceID,
-		SourceName:  event.SourceName,
-		SourceType:  event.SourceType,
-		State:       state,
-		StateReason: stateReason,
-		CreatedAt:   &now,
-		Inputs:      datatypes.NewJSONType(inputs),
+		StageID:       stageID,
+		EventID:       event.ID,
+		SourceID:      event.SourceID,
+		SourceName:    event.SourceName,
+		SourceType:    event.SourceType,
+		State:         state,
+		StateReason:   stateReason,
+		CreatedAt:     &now,
+		Inputs:        datatypes.NewJSONType(inputs),
+		ExecutorLabel: executorLabel,
 	}
 
 	err := tx.Create(&stageEvent).

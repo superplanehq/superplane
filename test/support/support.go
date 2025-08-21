@@ -247,7 +247,7 @@ func CreateStageEventWithData(t *testing.T,
 ) *models.StageEvent {
 	event, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, "push", data, headers)
 	require.NoError(t, err)
-	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", inputs)
+	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", inputs, "")
 	require.NoError(t, err)
 	return stageEvent
 }

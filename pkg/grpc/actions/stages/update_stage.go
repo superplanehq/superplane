@@ -134,6 +134,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		WithSecrets(secrets).
 		WithExecutorType(newStage.Spec.Executor.Type).
 		WithExecutorSpec(executorSpec).
+		WithExecutorLabel(newStage.Spec.Executor.Label).
 		ForResource(resource).
 		ForIntegration(integration).
 		Update()

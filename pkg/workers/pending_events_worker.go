@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -276,7 +277,12 @@ func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Eve
 		return err
 	}
 
-	stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs)
+	executorLabel, err := w.buildExecutorLabel(inputs, *stage)
+	if err != nil {
+		return err
+	}
+
+	stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs, executorLabel)
 	if err != nil {
 		return err
 	}
@@ -359,6 +365,24 @@ func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stag
 	}
 
 	return inputs, nil
+}
+
+func (w *PendingEventsWorker) buildExecutorLabel(inputs map[string]any, stage models.Stage) (string, error) {
+	if stage.ExecutorLabel == "" {
+		return "", nil
+	}
+
+	specBuilder := &executors.SpecBuilder{}
+	resolvedLabel, err := specBuilder.ResolveExpression(stage.ExecutorLabel, inputs, map[string]string{})
+	if err != nil {
+		return "", fmt.Errorf("error resolving executor label template: %v", err)
+	}
+
+	if labelStr, ok := resolvedLabel.(string); ok {
+		return labelStr, nil
+	}
+
+	return fmt.Sprintf("%v", resolvedLabel), nil
 }
 
 func sourceNamesFromConnections(connections []models.Connection) []string {
