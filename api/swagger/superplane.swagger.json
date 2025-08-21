@@ -3624,6 +3624,9 @@
         },
         "spec": {
           "type": "object"
+        },
+        "label": {
+          "type": "string"
         }
       }
     },
@@ -3925,6 +3928,9 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneKeyValuePair"
           }
+        },
+        "label": {
+          "type": "string"
         }
       }
     },

@@ -24,6 +24,7 @@ type SuperplaneExecutor struct {
 	Integration *IntegrationsIntegrationRef `json:"integration,omitempty"`
 	Resource *IntegrationsResourceRef `json:"resource,omitempty"`
 	Spec map[string]interface{} `json:"spec,omitempty"`
+	Label *string `json:"label,omitempty"`
 }
 
 // NewSuperplaneExecutor instantiates a new SuperplaneExecutor object
@@ -171,6 +172,38 @@ func (o *SuperplaneExecutor) SetSpec(v map[string]interface{}) {
 	o.Spec = v
 }
 
+// GetLabel returns the Label field value if set, zero value otherwise.
+func (o *SuperplaneExecutor) GetLabel() string {
+	if o == nil || IsNil(o.Label) {
+		var ret string
+		return ret
+	}
+	return *o.Label
+}
+
+// GetLabelOk returns a tuple with the Label field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecutor) GetLabelOk() (*string, bool) {
+	if o == nil || IsNil(o.Label) {
+		return nil, false
+	}
+	return o.Label, true
+}
+
+// HasLabel returns a boolean if a field has been set.
+func (o *SuperplaneExecutor) HasLabel() bool {
+	if o != nil && !IsNil(o.Label) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabel gets a reference to the given string and assigns it to the Label field.
+func (o *SuperplaneExecutor) SetLabel(v string) {
+	o.Label = &v
+}
+
 func (o SuperplaneExecutor) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -192,6 +225,9 @@ func (o SuperplaneExecutor) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Spec) {
 		toSerialize["spec"] = o.Spec
+	}
+	if !IsNil(o.Label) {
+		toSerialize["label"] = o.Label
 	}
 	return toSerialize, nil
 }

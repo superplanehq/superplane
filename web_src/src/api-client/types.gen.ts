@@ -575,6 +575,7 @@ export type SuperplaneExecutor = {
     spec?: {
         [key: string]: unknown;
     };
+    label?: string;
 };
 
 export type SuperplaneFilter = {
@@ -695,6 +696,7 @@ export type SuperplaneStageEvent = {
     approvals?: Array<SuperplaneStageEventApproval>;
     execution?: SuperplaneExecution;
     inputs?: Array<SuperplaneKeyValuePair>;
+    label?: string;
 };
 
 export type SuperplaneStageEventApproval = {
