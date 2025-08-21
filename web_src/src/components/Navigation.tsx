@@ -28,7 +28,7 @@ const Navigation: React.FC = () => {
               className="flex items-center justify-between gap-x-4 rounded-md border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
             >
               {/* Organization Avatar with User Avatar Overlay */}
-              <Text className="text-sm font-medium flex-1 text-left">{organization?.metadata?.displayName || organization?.metadata?.name || account?.name}</Text>
+              <Text className="text-sm font-medium flex-1 text-left max-w-[150px] truncate">{organization?.metadata?.displayName || organization?.metadata?.name || account?.name}</Text>
 
               {/* User Avatar (smaller, overlapping in bottom-right) */}
               <Avatar
@@ -78,7 +78,7 @@ const Navigation: React.FC = () => {
                       className="size-8"
                     />
                     <div className="flex-1 min-w-0">
-                      <Text className="font-medium truncate">{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</Text>
+                      <Text className="font-medium truncate max-w-[150px] truncate-ellipsis">{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</Text>
                     </div>
                   </div>
                 </DropdownHeader>

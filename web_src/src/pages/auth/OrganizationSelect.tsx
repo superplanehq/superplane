@@ -23,7 +23,7 @@ const OrganizationSelect: React.FC = () => {
 
   const fetchOrganizations = async () => {
     if (!account) return;
-    
+
     try {
       const orgsResponse = await fetch('/organizations', {
         credentials: 'include',
@@ -35,7 +35,7 @@ const OrganizationSelect: React.FC = () => {
       } else {
         setError('Failed to load organizations');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load organizations');
     } finally {
       setLoading(false);
@@ -74,59 +74,59 @@ const OrganizationSelect: React.FC = () => {
             )}
           </div>
 
-        {error && (
-          <div className="mb-6 p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-            <Text className="text-red-700 dark:text-red-400 text-sm">
-              {error}
-            </Text>
-          </div>
-        )}
-
-        {organizations.length === 0 && (
-          <div className="text-left py-2 mb-4">
-            <Text className="text-gray-600 dark:text-gray-400">
-              You're not a member of any organizations yet.
-            </Text>
-            <Text className="text-gray-600 dark:text-gray-400">
-              Create a new organization to get started!
-            </Text>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {organizations.map((org) => (
-            <div
-              key={org.id}
-              className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer"
-              onClick={() => handleOrganizationSelect(org)}
-            >
-              <div className="flex items-center mb-2">
-                <span className="text-md mr-2">🏢</span>
-                <h4 className="text-md font-semibold text-gray-900 dark:text-white">
-                  {org.display_name}
-                </h4>
-              </div>
-              <Text className="text-sm text-left text-gray-600 dark:text-gray-400">
-                {org.description}
+          {error && (
+            <div className="mb-6 p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <Text className="text-red-700 dark:text-red-400 text-sm">
+                {error}
               </Text>
             </div>
-          ))}
-          
-          <div
-            className="bg-blue-50 dark:bg-blue-900/20 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-6 flex flex-col items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
-            onClick={() => navigate('/create')}
-          >
-            <div className="flex items-center mb-1">
-              <div className="text-2xl mb-3 mr-2 text-blue-600 dark:text-blue-400">+</div>
-              <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2 text-center">
-                Create New
-              </h4>
+          )}
+
+          {organizations.length === 0 && (
+            <div className="text-left py-2 mb-4">
+              <Text className="text-gray-600 dark:text-gray-400">
+                You're not a member of any organizations yet.
+              </Text>
+              <Text className="text-gray-600 dark:text-gray-400">
+                Create a new organization to get started!
+              </Text>
             </div>
-            <Text className="text-sm text-blue-500 dark:text-blue-300 text-center">
-              Start fresh with a new organization
-            </Text>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {organizations.map((org) => (
+              <div
+                key={org.id}
+                className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer"
+                onClick={() => handleOrganizationSelect(org)}
+              >
+                <div className="flex items-center mb-2">
+                  <span className="text-md mr-2">🏢</span>
+                  <h4 className="text-md font-semibold text-gray-900 dark:text-white truncate">
+                    {org.display_name}
+                  </h4>
+                </div>
+                <Text className="text-sm text-left text-gray-600 dark:text-gray-400 truncate">
+                  {org.description}
+                </Text>
+              </div>
+            ))}
+
+            <div
+              className="bg-blue-50 dark:bg-blue-900/20 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-6 flex flex-col items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
+              onClick={() => navigate('/create')}
+            >
+              <div className="flex items-center mb-1">
+                <div className="text-2xl mb-3 mr-2 text-blue-600 dark:text-blue-400">+</div>
+                <h4 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2 text-center">
+                  Create New
+                </h4>
+              </div>
+              <Text className="text-sm text-blue-500 dark:text-blue-300 text-center">
+                Start fresh with a new organization
+              </Text>
+            </div>
           </div>
-        </div>
         </div>
       </div>
     </div>
