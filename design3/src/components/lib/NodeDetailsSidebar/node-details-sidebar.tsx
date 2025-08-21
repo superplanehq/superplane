@@ -1604,7 +1604,7 @@ export function NodeDetailsSidebar({
                                   </div>
                                   <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
                                     <Badge color="amber">
-                                      <MaterialSymbol name="pending" size="sm" className="animate-pulse"/>
+                                      <MaterialSymbol name="how_to_reg" size="sm" className="animate-pulse"/>
                                       Action requred
                                     </Badge>
                                   </div>
@@ -1619,8 +1619,8 @@ export function NodeDetailsSidebar({
                                     </span>
                                   </div>
                                   <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
-                                    <Badge color="amber">
-                                      <MaterialSymbol name="pending" size="sm" className="animate-pulse"/>
+                                    <Badge color="zinc">
+                                      <MaterialSymbol name="schedule" size="sm" className="animate-pulse"/>
                                       Pending
                                     </Badge>
                                   </div>
@@ -1635,7 +1635,7 @@ export function NodeDetailsSidebar({
                                     </span>
                                   </div>
                                   <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
-                                    <Badge color="amber">
+                                    <Badge color="orange">
                                       <MaterialSymbol name="pending" size="sm" className="animate-pulse"/>
                                       To be executed
                                     </Badge>
@@ -1691,8 +1691,8 @@ export function NodeDetailsSidebar({
                           {item.executionMethod === 'manual' && (
                             <div className='flex justify-between items-center'>
                               <div className='flex items-center'>
-                              { !showIcons && (
-                                <MaterialSymbol name="how_to_reg" size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
+                              { showIcons && (
+                                <MaterialSymbol name="how_to_reg" size="md" className="text-orange-700 dark:text-orange-200 mr-2 hidden" /> 
                               )}
                              
                                 <span className="text-xs text-gray-700 dark:text-zinc-400"><a href="#" className="black underline">1 person</a> approved, 2 more needed</span>
@@ -1709,7 +1709,7 @@ export function NodeDetailsSidebar({
                           )}
                           {item.executionMethod === 'timed' && (
                             <div className='flex items-center'>
-                              { !showIcons && (
+                              { showIcons && (
                                 <MaterialSymbol name={item.icon} size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
                               )}
                                 <span className='text-xs text-gray-700 dark:text-zinc-400'>{item.scheduledFor}</span>
@@ -1717,7 +1717,7 @@ export function NodeDetailsSidebar({
                           )}
                           {item.executionMethod === 'blocked' && (
                             <div className='flex items-center'>
-                              { !showIcons && (
+                              { showIcons && (
                                 <MaterialSymbol name="pause" size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
                               )}
                                 <span className='text-xs text-gray-700 dark:text-zinc-400'>Freezed by <Link href="#" className="underline text-zinc-600 dark:text-zinc-400">1 person</Link></span>

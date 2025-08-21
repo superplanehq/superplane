@@ -38,6 +38,7 @@ import {
 } from './lib/Dialog/dialog'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarHeader, SidebarItem, SidebarLabel, SidebarSection, SidebarSpacer } from './lib/Sidebar/sidebar'
 import { useToast, ToastProvider } from './lib/Toasts/toast'
+import { AddMembersSectionSimple } from './AddMembersSectionSimple'
 
 interface OrganizationSettingsProps {
   onBack?: () => void
@@ -1173,7 +1174,11 @@ function OrganizationSettingsInner({
                                 {user.name}
                               </div>
                               <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                                Last active: {user.lastActive}
+                                {user.status === 'Invited' ? (  
+                                  "Invited on Tue Aug 20 2025, 10:30 AM"
+                                ) : (
+                                  "Last active on Tue Aug 20 2025, 10:30 AM"
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1188,7 +1193,7 @@ function OrganizationSettingsInner({
                                 {user.role}
                                 <MaterialSymbol name="keyboard_arrow_down" />
                               </DropdownButton>
-                              <DropdownMenu>
+                              <DropdownMenu anchor="bottom start">
                                 <DropdownItem>
                                   <DropdownLabel>Owner</DropdownLabel>
                                   <DropdownDescription>Owner role description.</DropdownDescription>
@@ -1222,19 +1227,24 @@ function OrganizationSettingsInner({
                               <DropdownButton  plain className="flex items-center gap-2 text-sm">
                                 <MaterialSymbol name="more_vert" size="sm" />
                               </DropdownButton>
-                              <DropdownMenu>
-                                <DropdownItem>
-                                  <MaterialSymbol name="edit" />
-                                  Edit
-                                </DropdownItem>
-                                <DropdownItem>
-                                  <MaterialSymbol name="block" />
-                                  Suspend
-                                </DropdownItem>
-                                <DropdownItem>
+                              <DropdownMenu anchor="bottom-end">
+                                {user.status === 'Invited' ? (
+                                  <>
+                                  <DropdownItem className='flex items-center gap-2'>
+                                    <MaterialSymbol name="refresh " />
+                                    Resend invitation
+                                  </DropdownItem>
+                                  <DropdownItem className='!text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 flex items-center gap-2'>
+                                    <MaterialSymbol name="person_cancel" />
+                                    Revoke invitation
+                                  </DropdownItem>
+                                  </>
+                                ) : (
+                                <DropdownItem className='!text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 flex items-center gap-2'>
                                   <MaterialSymbol name="delete" />
                                   Remove
                                 </DropdownItem>
+                                )}
                               </DropdownMenu>
                             </Dropdown>
                           </div>
@@ -1354,7 +1364,7 @@ function OrganizationSettingsInner({
                     Admin
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
-                  <DropdownMenu>
+                  <DropdownMenu anchor="bottom start">
                     <DropdownItem>
                       <DropdownLabel>Admin</DropdownLabel>
                       <DropdownDescription>Admin role description.</DropdownDescription>
@@ -1376,7 +1386,7 @@ function OrganizationSettingsInner({
                 </div>
               </div>
               {/* Add Members Section */}
-              <AddMembersSection showRoleSelection={false}/>
+              <AddMembersSectionSimple  showRoleSelection={false}/>
               {/* Team members table */}
               <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                 <div className="px-6 pt-6 pb-4 ">

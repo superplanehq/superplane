@@ -2791,10 +2791,18 @@ export function WorkflowNodeAccordion({
                   <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400' />
                 )}
                 <div className={`flex items-center gap-2 ${consistentStatuses ? 'visible' : 'hidden'}`}>
+                  {data.queueIcon == 'how_to_reg' && (
                   <Badge color='amber' className='!text-xs'>
-                    <MaterialSymbol name="pending" size="sm" className='text-orange-600 dark:text-orange-400 animate-pulse' />
-                    {data.queueIcon == 'how_to_reg' ? 'Action required' : 'Pending'}
+                    <MaterialSymbol name="pending" size="sm" className='animate-pulse' />
+                    Action required
                   </Badge>
+                  )}
+                  {data.queueIcon != 'how_to_reg' && (
+                  <Badge color='zinc' className='!text-xs'>
+                    <MaterialSymbol name="schedule" size="sm" className='animate-pulse' />
+                    Pending
+                  </Badge>
+                  )}
                   
                 </div>
                 <div className={`flex items-center gap-2 ${consistentStatuses ? 'hidden' : 'visible'}`}>
@@ -2819,7 +2827,7 @@ export function WorkflowNodeAccordion({
                 </div>
               )}
               { !showIcons && data.queueIcon != 'how_to_reg' && (
-                <div className='flex items-center'>
+                <div className='flex items-center hidden'>
                 
                 <MaterialSymbol name={data.queueIcon || 'how_to_reg'} size="lg" className='text-orange-700 dark:text-orange-600 px-2' />
                 
