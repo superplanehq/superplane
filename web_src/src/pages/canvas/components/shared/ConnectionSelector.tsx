@@ -104,9 +104,15 @@ export function ConnectionSelector({
                       if (type === 'FILTER_TYPE_DATA') {
                         updates.data = { expression: filter.data?.expression || '' };
                         updates.header = undefined;
-                      } else {
+                        updates.expression = undefined;
+                      } else if (type === 'FILTER_TYPE_HEADER') {
                         updates.header = { expression: filter.header?.expression || '' };
                         updates.data = undefined;
+                        updates.expression = undefined;
+                      } else if (type === 'FILTER_TYPE_EXPRESSION') {
+                        updates.expression = { expression: filter.expression?.expression || '' };
+                        updates.data = undefined;
+                        updates.header = undefined;
                       }
                       onFilterUpdate(index, filterIndex, updates);
                     }}
@@ -114,25 +120,36 @@ export function ConnectionSelector({
                   >
                     <option value="FILTER_TYPE_DATA">Data</option>
                     <option value="FILTER_TYPE_HEADER">Header</option>
+                    <option value="FILTER_TYPE_EXPRESSION">Expression</option>
                   </select>
                   <input
                     type="text"
                     value={
                       filter.type === 'FILTER_TYPE_HEADER'
                         ? filter.header?.expression || ''
-                        : filter.data?.expression || ''
+                        : filter.type === 'FILTER_TYPE_EXPRESSION' 
+                          ? filter.expression?.expression || ''
+                          : filter.data?.expression || ''
                     }
                     onChange={(e) => {
                       const expression = e.target.value;
                       const updates: Partial<SuperplaneFilter> = {};
                       if (filter.type === 'FILTER_TYPE_HEADER') {
                         updates.header = { expression };
+                      } else if (filter.type === 'FILTER_TYPE_EXPRESSION') {
+                        updates.expression = { expression };
                       } else {
                         updates.data = { expression };
                       }
                       onFilterUpdate(index, filterIndex, updates);
                     }}
-                    placeholder="Filter expression"
+                    placeholder={
+                      filter.type === 'FILTER_TYPE_EXPRESSION' 
+                        ? "e.g., $.ref == 'refs/heads/main' && headers['X-GitHub-Event'] == 'push'"
+                        : filter.type === 'FILTER_TYPE_HEADER'
+                          ? "e.g., headers['Content-Type'] == 'application/json'"
+                          : "e.g., $.branch == 'main'"
+                    }
                     className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100"
                   />
                   <button
