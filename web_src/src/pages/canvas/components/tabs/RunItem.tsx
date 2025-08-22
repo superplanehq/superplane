@@ -6,6 +6,7 @@ interface RunItemProps {
   state: SuperplaneExecutionState;
   result: ExecutionResult;
   title: string;
+  runId?: string;
   inputs: Record<string, string>;
   outputs: Record<string, string>;
   timestamp: string;
@@ -20,6 +21,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   state,
   result,
   title,
+  runId,
   timestamp,
   executionDuration,
   inputs,
@@ -162,7 +164,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             <div className="flex items-center gap-1 min-w-0">
               <MaterialSymbol name="bolt" size="md" className="text-gray-600 dark:text-zinc-400 flex-shrink-0" />
               <span className="text-xs text-gray-500 dark:text-zinc-400 min-w-0 flex items-center">
-                <div className="text-blue-600 dark:text-blue-400 truncate">{title}</div>
+                <div className="text-blue-600 dark:text-blue-400 truncate">{runId}</div>
                 {eventId && (
                   <>
                     <span className="mx-1 flex-shrink-0"> • Event ID: </span>
