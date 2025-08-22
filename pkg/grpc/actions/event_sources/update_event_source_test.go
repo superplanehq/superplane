@@ -89,7 +89,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				},
 				Resource: &integrationPb.ResourceRef{
 					Type: "project",
-					Name: "demo-project-updated",
+					Name: "demo-project",
 				},
 				Events: []*protos.EventSource_EventType{
 					{
@@ -106,7 +106,7 @@ func Test__UpdateEventSource(t *testing.T) {
 		assert.Equal(t, "new-event-source-name", res.EventSource.Metadata.Name)
 		assert.Equal(t, "new-event-source-description", res.EventSource.Metadata.Description)
 		assert.Equal(t, r.Integration.Name, res.EventSource.Spec.Integration.Name)
-		assert.Equal(t, "demo-project-updated", res.EventSource.Spec.Resource.Name)
+		assert.Equal(t, "demo-project", res.EventSource.Spec.Resource.Name)
 		assert.Equal(t, "project", res.EventSource.Spec.Resource.Type)
 		require.Len(t, res.EventSource.Spec.Events, 1)
 		assert.Equal(t, "push", res.EventSource.Spec.Events[0].Type)
