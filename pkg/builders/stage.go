@@ -275,6 +275,14 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		}
 
 		//
+		// Clean up old webhooks if integration or resource is changing
+		//
+		err := b.cleanupOldWebhooks(tx)
+		if err != nil {
+			return fmt.Errorf("failed to cleanup old webhooks: %v", err)
+		}
+
+		//
 		// Find or create the event source for the executor
 		//
 		resourceID, err := b.findOrCreateEventSource(tx)
@@ -324,4 +332,66 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 	}
 
 	return b.existingStage, nil
+}
+
+func (b *StageBuilder) cleanupOldWebhooks(tx *gorm.DB) error {
+	if b.existingStage.ResourceID == nil {
+		return nil
+	}
+
+	oldResource, err := models.FindResourceByIDInTransaction(tx, *b.existingStage.ResourceID)
+	if err != nil {
+		return nil
+	}
+
+	oldIntegration, err := models.FindIntegrationByID(oldResource.IntegrationID)
+	if err != nil {
+		return nil
+	}
+
+	isIntegrationChanging := b.integration != nil && oldIntegration.ID != b.integration.ID
+	isResourceChanging := b.resource != nil && (oldResource.Name() != b.resource.Name() || oldResource.Type() != b.resource.Type())
+
+	if !isIntegrationChanging && !isResourceChanging {
+		return nil
+	}
+
+	oldResourceManager, err := b.registry.NewResourceManager(b.ctx, oldIntegration)
+	if err != nil {
+		return fmt.Errorf("failed to get resource manager for cleanup: %v", err)
+	}
+
+	oldParentResource, err := oldResourceManager.Get(oldResource.Type(), oldResource.Name())
+	if err != nil {
+		// If we can't get the parent resource, the webhook might already be gone
+		// This is not necessarily an error for cleanup
+		return nil
+	}
+
+	var childResources []models.Resource
+	err = tx.Where("parent_id = ?", oldResource.ID).Find(&childResources).Error
+	if err != nil {
+		return fmt.Errorf("failed to find child resources: %v", err)
+	}
+
+	for _, childResource := range childResources {
+		childIntegrationResource, err := oldResourceManager.Get(childResource.Type(), childResource.Name())
+		if err != nil {
+			// Log but don't fail if we can't get the child resource
+			continue
+		}
+
+		err = oldResourceManager.CleanupWebhook(oldParentResource, childIntegrationResource)
+		if err != nil {
+			// Log but don't fail webhook cleanup - the resource might already be deleted
+			continue
+		}
+
+		err = tx.Delete(&childResource).Error
+		if err != nil {
+			return fmt.Errorf("failed to delete child resource: %v", err)
+		}
+	}
+
+	return nil
 }

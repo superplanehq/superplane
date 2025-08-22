@@ -471,7 +471,7 @@ func (i *SemaphoreResourceManager) execRequest(method string, url string, body i
 		return nil, fmt.Errorf("error reading body: %v", err)
 	}
 
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent {
 		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
 	}
 
@@ -665,4 +665,30 @@ func (i *SemaphoreResourceManager) createSemaphoreNotification(name string, opti
 	}
 
 	return notification, nil
+}
+
+func (i *SemaphoreResourceManager) CleanupWebhook(parentResource integrations.Resource, webhook integrations.Resource) error {
+	// For Semaphore, we need to delete both the notification and the associated secret
+	// We'll use DELETE HTTP method to clean up the resources
+	
+	// Delete notification
+	if webhook.Type() == ResourceTypeNotification {
+		notificationURL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", i.URL, webhook.Id())
+		_, err := i.execRequest(http.MethodDelete, notificationURL, nil)
+		if err != nil {
+			return fmt.Errorf("error deleting notification: %v", err)
+		}
+	}
+
+	// For secrets, we can attempt to delete them by name pattern
+	// Since we created secrets with a specific naming convention
+	if webhook.Type() == ResourceTypeSecret {
+		secretURL := fmt.Sprintf("%s/api/v1beta/secrets/%s", i.URL, webhook.Name())
+		_, err := i.execRequest(http.MethodDelete, secretURL, nil)
+		if err != nil {
+			return fmt.Errorf("error deleting secret: %v", err)
+		}
+	}
+
+	return nil
 }
