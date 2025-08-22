@@ -309,10 +309,6 @@ func CompileBooleanExpression(variables map[string]any, expression string, filte
 		expr.Timezone(time.UTC.String()),
 	}
 
-	if filterType == FilterTypeHeader {
-		options = append(options, expr.Patch(&headerVisitor{}))
-	}
-
 	return expr.Compile(expression, options...)
 }
 
@@ -321,62 +317,34 @@ func parseExpressionVariables(ctx context.Context, e *Event, filterType string) 
 		"ctx": ctx,
 	}
 
-	var content map[string]any
-	headers := map[string]any{}
-	payload := map[string]any{}
-	var err error
-
-	switch filterType {
-	case FilterTypeData:
-		content, err = e.GetData()
-		if err != nil {
-			return nil, err
-		}
-
-	case FilterTypeHeader:
-		content, err = e.GetHeaders()
-		if err != nil {
-			return nil, err
-		}
-	case FilterTypeExpression:
-		// For expression filters, we need to provide both data and headers
-		dataContent, err := e.GetData()
-		if err != nil {
-			// If data parsing fails, use empty map
-			dataContent = make(map[string]any)
-		}
-		headerContent, err := e.GetHeaders()
-		if err != nil {
-			// If headers parsing fails, use empty map
-			headerContent = make(map[string]any)
-		}
-		
-		// Add data to payload
-		for key, value := range dataContent {
-			payload[key] = value
-		}
-		
-		// Add headers (case insensitive)
-		for key, value := range headerContent {
-			key = strings.ToLower(key)
-			headers[key] = value
-		}
-		
-		variables["$"] = payload
-		variables["headers"] = headers
-		
-		return variables, nil
-	default:
+	if filterType != FilterTypeExpression {
 		return nil, fmt.Errorf("invalid filter type: %s", filterType)
 	}
 
-	for key, value := range content {
-		if filterType == FilterTypeHeader {
-			key = strings.ToLower(key)
-			headers[key] = value
-		} else {
-			payload[key] = value
-		}
+	// For expression filters, we need to provide both data and headers
+	dataContent, err := e.GetData()
+	if err != nil {
+		// If data parsing fails, use empty map
+		dataContent = make(map[string]any)
+	}
+	headerContent, err := e.GetHeaders()
+	if err != nil {
+		// If headers parsing fails, use empty map
+		headerContent = make(map[string]any)
+	}
+
+	payload := map[string]any{}
+	headers := map[string]any{}
+
+	// Add data to payload
+	for key, value := range dataContent {
+		payload[key] = value
+	}
+
+	// Add headers (case insensitive)
+	for key, value := range headerContent {
+		key = strings.ToLower(key)
+		headers[key] = value
 	}
 
 	variables["$"] = payload

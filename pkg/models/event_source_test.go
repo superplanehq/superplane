@@ -60,8 +60,8 @@ func Test__EventSource__Accept(t *testing.T) {
 					FilterOperator: FilterOperatorAnd,
 					Filters: []Filter{
 						{
-							Type: FilterTypeData,
-							Data: &DataFilter{Expression: `$.ref == 'refs/heads/main'`},
+							Type:       FilterTypeExpression,
+							Expression: &ExpressionFilter{Expression: `$.ref == 'refs/heads/main'`},
 						},
 					},
 				},

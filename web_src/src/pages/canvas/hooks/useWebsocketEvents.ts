@@ -85,7 +85,7 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
         eventSource.spec?.events?.forEach(event => {
           event.filters?.forEach(filter => {
             if (typeof filter.type === 'number') {
-              const filterTypes = ['FILTER_TYPE_UNKNOWN', 'FILTER_TYPE_DATA', 'FILTER_TYPE_HEADER'];
+              const filterTypes = ['FILTER_TYPE_UNKNOWN', 'FILTER_TYPE_EXPRESSION'];
               filter.type = filterTypes[filter.type] as SuperplaneFilterType;
             }
           });

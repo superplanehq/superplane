@@ -103,8 +103,8 @@ export function EventSourceEditModeContent({
 
   const addFilter = useCallback((eventTypeIndex: number) => {
     const newFilter: SuperplaneFilter = {
-      type: 'FILTER_TYPE_DATA',
-      data: { expression: '' }
+      type: 'FILTER_TYPE_EXPRESSION',
+      expression: { expression: '' }
     };
 
     setEventTypes(prev => prev.map((eventType, i) =>
@@ -196,12 +196,8 @@ export function EventSourceEditModeContent({
         const emptyFilters: number[] = [];
 
         eventType.filters.forEach((filter, filterIndex) => {
-          if (filter.type === 'FILTER_TYPE_DATA') {
-            if (!filter.data?.expression || filter.data.expression.trim() === '') {
-              emptyFilters.push(filterIndex + 1);
-            }
-          } else if (filter.type === 'FILTER_TYPE_HEADER') {
-            if (!filter.header?.expression || filter.header.expression.trim() === '') {
+          if (filter.type === 'FILTER_TYPE_EXPRESSION') {
+            if (!filter.expression?.expression || filter.expression.expression.trim() === '') {
               emptyFilters.push(filterIndex + 1);
             }
           }
@@ -736,44 +732,22 @@ curl -X POST \\
                     {(eventType.filters || []).map((filter, filterIndex) => (
                       <div key={filterIndex}>
                         <div className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                          <select
-                            value={filter.type || 'FILTER_TYPE_DATA'}
-                            onChange={(e) => {
-                              const type = e.target.value as SuperplaneFilter['type'];
-                              const updates: Partial<SuperplaneFilter> = { type };
-                              if (type === 'FILTER_TYPE_DATA') {
-                                updates.data = { expression: filter.data?.expression || '' };
-                                updates.header = undefined;
-                              } else {
-                                updates.header = { expression: filter.header?.expression || '' };
-                                updates.data = undefined;
-                              }
-                              updateFilter(eventTypeIndex, filterIndex, updates);
-                            }}
-                            className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100"
-                          >
-                            <option value="FILTER_TYPE_DATA">Data</option>
-                            <option value="FILTER_TYPE_HEADER">Header</option>
-                          </select>
+                          <div className="px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-zinc-100 dark:bg-zinc-600 text-gray-700 dark:text-zinc-300">
+                            Expression
+                          </div>
                           <input
                             type="text"
-                            value={
-                              filter.type === 'FILTER_TYPE_HEADER'
-                                ? filter.header?.expression || ''
-                                : filter.data?.expression || ''
-                            }
+                            value={filter.expression?.expression || ''}
                             onChange={(e) => {
                               const expression = e.target.value;
-                              const updates: Partial<SuperplaneFilter> = {};
-                              if (filter.type === 'FILTER_TYPE_HEADER') {
-                                updates.header = { expression };
-                              } else {
-                                updates.data = { expression };
-                              }
+                              const updates: Partial<SuperplaneFilter> = {
+                                type: 'FILTER_TYPE_EXPRESSION',
+                                expression: { expression }
+                              };
                               updateFilter(eventTypeIndex, filterIndex, updates);
                             }}
-                            placeholder="Filter expression"
-                            className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100"
+                            placeholder="e.g., $.ref == 'refs/heads/main' && headers['X-GitHub-Event'] == 'push'"
+                            className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100"
                           />
                           <button
                             onClick={() => removeFilter(eventTypeIndex, filterIndex)}

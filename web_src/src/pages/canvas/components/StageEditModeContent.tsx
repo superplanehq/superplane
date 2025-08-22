@@ -914,11 +914,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                       if (item.filters && item.filters.length > 0) {
                         const hasIncompleteFilters = item.filters.some(filter => {
-                          if (filter.type === 'FILTER_TYPE_DATA') {
-                            return !filter.data?.expression || filter.data.expression.trim() === '';
-                          }
-                          if (filter.type === 'FILTER_TYPE_HEADER') {
-                            return !filter.header?.expression || filter.header.expression.trim() === '';
+                          if (filter.type === 'FILTER_TYPE_EXPRESSION') {
+                            return !filter.expression?.expression || filter.expression.expression.trim() === '';
                           }
                           return false;
                         });

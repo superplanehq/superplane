@@ -7,15 +7,11 @@ import (
 )
 
 func Test__Filters(t *testing.T) {
-	t.Run("single expression filters -> true", func(t *testing.T) {
+	t.Run("single expression filter with data and headers -> true", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.a == 1 && $.b == 2`},
-			},
-			{
-				Type:   FilterTypeHeader,
-				Header: &HeaderFilter{Expression: `headers.c == 3 && headers.d == 4`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a == 1 && $.b == 2 && headers.c == 3 && headers.d == 4`},
 			},
 		}
 
@@ -28,12 +24,8 @@ func Test__Filters(t *testing.T) {
 	t.Run("expression filter with case insensitive headers -> true", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.a == 1 && $.b == 2`},
-			},
-			{
-				Type:   FilterTypeHeader,
-				Header: &HeaderFilter{Expression: `headers["Content-Type"] == "application/json" && headers["X-ExAmPlE-HeAdEr"] == "value"`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a == 1 && $.b == 2 && headers["content-type"] == "application/json" && headers["x-example-header"] == "value"`},
 			},
 		}
 
@@ -46,8 +38,8 @@ func Test__Filters(t *testing.T) {
 	t.Run("single expression filter -> false", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.a == 1 && $.b == 2`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a == 1 && $.b == 2`},
 			},
 		}
 
@@ -60,8 +52,8 @@ func Test__Filters(t *testing.T) {
 	t.Run("expression filter with case insensitive headers -> false", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type:   FilterTypeHeader,
-				Header: &HeaderFilter{Expression: `headers["Content-Type"] == "text/plain" && headers["X-ExAmPlE-HeAdEr"] == "some-value"`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `headers["content-type"] == "text/plain" && headers["x-example-header"] == "some-value"`},
 			},
 		}
 
@@ -74,8 +66,8 @@ func Test__Filters(t *testing.T) {
 	t.Run("expression filter with dot syntax -> true", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.a.b == 2`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a.b == 2`},
 			},
 		}
 
@@ -88,8 +80,8 @@ func Test__Filters(t *testing.T) {
 	t.Run("expression filter with array syntax for array -> true", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `1 in $.a`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `1 in $.a`},
 			},
 		}
 
@@ -102,8 +94,8 @@ func Test__Filters(t *testing.T) {
 	t.Run("expression filter with improper dot syntax -> error", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.a.b == 2`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a.b == 2`},
 			},
 		}
 
@@ -115,12 +107,12 @@ func Test__Filters(t *testing.T) {
 	t.Run("multiple expression filters with AND", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.a == 1`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a == 1`},
 			},
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.b == 3`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.b == 3`},
 			},
 		}
 
@@ -133,12 +125,12 @@ func Test__Filters(t *testing.T) {
 	t.Run("multiple expression filters with OR", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.a == 1`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a == 1`},
 			},
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.b == 3`},
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.b == 3`},
 			},
 		}
 
@@ -210,11 +202,11 @@ func Test__Filters(t *testing.T) {
 		require.True(t, accept)
 	})
 
-	t.Run("mixed filter types with OR -> true", func(t *testing.T) {
+	t.Run("multiple expression filters with different conditions -> true", func(t *testing.T) {
 		filters := []Filter{
 			{
-				Type: FilterTypeData,
-				Data: &DataFilter{Expression: `$.a == 3`}, // This will be false
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a == 3`}, // This will be false
 			},
 			{
 				Type:       FilterTypeExpression,

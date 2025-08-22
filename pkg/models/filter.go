@@ -3,8 +3,6 @@ package models
 import "fmt"
 
 const (
-	FilterTypeData       = "data"
-	FilterTypeHeader     = "header"
 	FilterTypeExpression = "expression"
 	FilterOperatorAnd    = "and"
 	FilterOperatorOr     = "or"
@@ -12,17 +10,7 @@ const (
 
 type Filter struct {
 	Type       string            `json:"type"`
-	Data       *DataFilter       `json:"data,omitempty"`
-	Header     *HeaderFilter     `json:"header,omitempty"`
 	Expression *ExpressionFilter `json:"expression,omitempty"`
-}
-
-type DataFilter struct {
-	Expression string `json:"expression"`
-}
-
-type HeaderFilter struct {
-	Expression string `json:"expression"`
 }
 
 type ExpressionFilter struct {
@@ -77,28 +65,12 @@ func applyOrFilter(filters []Filter, event *Event) (bool, error) {
 }
 
 func (f *Filter) EvaluateExpression(event *Event) (bool, error) {
-	switch f.Type {
-	case FilterTypeData:
-		return event.EvaluateBoolExpression(f.Data.Expression, FilterTypeData)
-	case FilterTypeHeader:
-		return event.EvaluateBoolExpression(f.Header.Expression, FilterTypeHeader)
-	case FilterTypeExpression:
-		return event.EvaluateBoolExpression(f.Expression.Expression, FilterTypeExpression)
-	default:
-		return false, fmt.Errorf("invalid filter type: %s", f.Type)
-	}
+	return event.EvaluateBoolExpression(f.Expression.Expression, FilterTypeExpression)
 }
 
 func (f *Filter) Evaluate(event *Event) (bool, error) {
-	switch f.Type {
-	case FilterTypeData:
-		return f.EvaluateExpression(event)
-	case FilterTypeHeader:
-		return f.EvaluateExpression(event)
-	case FilterTypeExpression:
-		return f.EvaluateExpression(event)
-
-	default:
+	if f.Type != FilterTypeExpression {
 		return false, fmt.Errorf("invalid filter type: %s", f.Type)
 	}
+	return f.EvaluateExpression(event)
 }

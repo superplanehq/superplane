@@ -487,10 +487,6 @@ export type SuperplaneCreateStageResponse = {
     stage?: SuperplaneStage;
 };
 
-export type SuperplaneDataFilter = {
-    expression?: string;
-};
-
 export type SuperplaneDeleteCanvasResponse = {
     [key: string]: unknown;
 };
@@ -579,18 +575,12 @@ export type SuperplaneExecutor = {
 
 export type SuperplaneFilter = {
     type?: SuperplaneFilterType;
-    data?: SuperplaneDataFilter;
-    header?: SuperplaneHeaderFilter;
     expression?: SuperplaneExpressionFilter;
 };
 
 export type SuperplaneFilterOperator = 'FILTER_OPERATOR_AND' | 'FILTER_OPERATOR_OR';
 
-export type SuperplaneFilterType = 'FILTER_TYPE_UNKNOWN' | 'FILTER_TYPE_DATA' | 'FILTER_TYPE_HEADER' | 'FILTER_TYPE_EXPRESSION';
-
-export type SuperplaneHeaderFilter = {
-    expression?: string;
-};
+export type SuperplaneFilterType = 'FILTER_TYPE_UNKNOWN' | 'FILTER_TYPE_EXPRESSION';
 
 export type SuperplaneExpressionFilter = {
     expression?: string;
