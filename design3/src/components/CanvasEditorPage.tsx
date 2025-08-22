@@ -1583,7 +1583,7 @@ const computedEdges = edges.map(edge => {
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <Subheading>Members</Subheading>
+                <Heading level={2}>Members</Heading>
                 <Text>Manage canvas access and permissions.</Text>
               </div>
             </div>
@@ -1604,9 +1604,6 @@ const computedEdges = edges.map(edge => {
               <div className="px-6 pt-6 pb-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-sm font-medium text-zinc-900 dark:text-white">Canvas Members</h4>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Members with access to this canvas</p>
-                  </div>
                   <InputGroup>
                     <MaterialSymbol name="search" size="md" data-slot="icon" />
                     <Input
@@ -1615,6 +1612,8 @@ const computedEdges = edges.map(edge => {
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </InputGroup>
+                  </div>
+                 
                 </div>
               </div>
               <div className="px-6 pb-6">
