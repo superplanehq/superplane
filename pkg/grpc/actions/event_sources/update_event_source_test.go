@@ -109,7 +109,7 @@ func Test__UpdateEventSource(t *testing.T) {
 		assert.Equal(t, "demo-project", res.EventSource.Spec.Resource.Name)
 		assert.Equal(t, "project", res.EventSource.Spec.Resource.Type)
 		require.Len(t, res.EventSource.Spec.Events, 1)
-		assert.Equal(t, "push", res.EventSource.Spec.Events[0].Type)
+		assert.Equal(t, "pipeline_done", res.EventSource.Spec.Events[0].Type)
 		assert.NotEmpty(t, res.Key)
 	})
 
