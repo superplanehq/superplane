@@ -2794,22 +2794,28 @@ export function WorkflowNodeAccordion({
                 )}
                 <div className={`flex items-center ${consistentStatuses ? 'hidden' : 'visible'}`}>
                   {data.queueIcon == 'how_to_reg' && (
-                   <Badge color='amber' className='!text-xs'>
+                    <Tippy content={<div className='text-xs bg-white dark:bg-zinc-800 p-2 border border-zinc-200 dark:border-zinc-700 rounded-sm'>Pending approval</div>} placement='top' interactive={true}>  
+                   <BadgeButton color='amber' className='!text-xs'>
                     <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400 animate-pulse' />
-                    </Badge>
+                    </BadgeButton>
                   
+                  </Tippy>
                   )}
                   {data.queueIcon == 'pause' && (
-                  <Badge color='zinc' className='!text-xs'>
+                    <Tippy content={<div className='text-xs bg-white dark:bg-zinc-800 p-2 border border-zinc-200 dark:border-zinc-700 rounded-sm'>Yet to run</div>} placement='top' interactive={true}>  
+                  <BadgeButton color='zinc' className='!text-xs'>
                     <MaterialSymbol name="pending" size="lg" className='text-gray-600 dark:text-gray-400 animate-pulse' />
                     
-                  </Badge>
+                  </BadgeButton>
+                  </Tippy>
                   )}
                   {data.queueIcon == 'timer' && (
-                  <Badge color='zinc' className='!text-xs'>
-                    <MaterialSymbol name="schedule" size="lg" className='text-gray-600 dark:text-gray-400 animate-pulse' />
-                    
-                  </Badge>
+                    <Tippy content={<div className='text-xs bg-white dark:bg-zinc-800 p-2 border border-zinc-200 dark:border-zinc-700 rounded-sm'>Will run on Monday</div>} placement='top' interactive={true}>  
+                    <BadgeButton color='zinc' className='!text-xs'>
+                      <MaterialSymbol name="schedule" size="lg" className='text-gray-600 dark:text-gray-400 animate-pulse' />
+                      
+                    </BadgeButton>
+                  </Tippy>
                   )}
                 </div>
                 <div className={`flex items-center ${consistentStatuses ? 'visible' : 'hidden'}`}>
