@@ -18,8 +18,17 @@ interface CanvasIntegrationsProps {
 
 type IntegrationSection = 'list' | 'choose-type' | 'new' | 'edit'
 
-const INTEGRATION_TYPES = [
-  {
+interface IntegrationType {
+  value: string
+  label: string
+  description: string
+  icon: React.ReactNode | string
+  color: string
+  popular: boolean
+}
+
+const INTEGRATION_TYPES: Record<string, IntegrationType> = {
+  'semaphore': {
     value: 'semaphore' as const,
     label: 'Semaphore',
     description: 'Connect to Semaphore CI/CD pipelines for automated deployments and testing workflows',
@@ -27,15 +36,15 @@ const INTEGRATION_TYPES = [
     color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
     popular: true
   },
-  {
+  'github': {
     value: 'github' as const,
     label: 'GitHub',
     description: 'Connect to GitHub repositories for Actions running workflows',
     icon: GithubLogo,
     color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
     popular: true
-  },
-]
+  }
+}
 
 export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrationsProps) {
   const [section, setSection] = useState<IntegrationSection>('list')
@@ -183,8 +192,8 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
             <MaterialSymbol name="chevron_right" size="sm" />
             <span className="font-medium text-zinc-900 dark:text-zinc-100">
               {section === 'new'
-                ? `New ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`
-                : `Edit ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`
+                ? `New ${INTEGRATION_TYPES[selectedType]?.label} integration`
+                : `Edit ${INTEGRATION_TYPES[selectedType]?.label} integration`
               }
             </span>
           </>
@@ -240,24 +249,25 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
               {integrations.map((integration) => (
                 <div
                   key={integration.metadata?.id}
-                  className="bg-white dark:bg-zinc-800 p-6 rounded-lg border border-zinc-200 dark:border-zinc-700"
+                  className="flex flex-col justify-between bg-white dark:bg-zinc-800 p-6 rounded-lg border border-zinc-200 dark:border-zinc-700"
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 ${integration.spec?.type === 'semaphore' ? 'bg-gray-200' : 'bg-orange-500'} rounded flex items-center justify-center`}>
-                        <img className="w-8 h-8 p-2 object-contain" src={integration.spec?.type === 'semaphore' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
-                      </div>
-                      <Heading level={3} className="max-w-50 truncate">
-                        {integration.metadata?.name}
-                      </Heading>
-                    </div>
+                  <div>
 
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">
+                          <img className="w-8 h-8 p-2 object-contain" src={INTEGRATION_TYPES[integration.spec?.type || '']?.icon as string} alt={integration.metadata?.name} />
+                        </div>
+                        <Heading level={3} className="max-w-50 truncate">
+                          {integration.metadata?.name}
+                        </Heading>
+                      </div>
+
+                    </div>
+                    <Text className="text-zinc-600 dark:text-zinc-400 mb-4 text-left">
+                      {INTEGRATION_TYPES[integration.spec?.type || '']?.description}
+                    </Text>
                   </div>
-                  <Text className="text-zinc-600 dark:text-zinc-400 mb-4 text-left">
-                    {integration.spec?.type === 'semaphore'
-                      ? `Connected to ${integration.metadata?.name || 'Semaphore'} for CI/CD pipeline automation and deployment workflows.`
-                      : `Integration: ${integration.metadata?.name}`}
-                  </Text>
                   <div className="flex space-x-2 items-center">
                     <Button className="flex items-center gap-2" plain onClick={() => handleConfigureIntegration(integration)}>
                       <MaterialSymbol name="settings" />
@@ -284,14 +294,14 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
             </Text>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {INTEGRATION_TYPES.map((integrationType) => (
+              {Object.values(INTEGRATION_TYPES).map((integrationType) => (
                 <button
                   key={integrationType.value}
                   onClick={() => handleTypeSelection(integrationType.value)}
                   className="relative flex items-start gap-4 p-6 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left group"
                 >
                   <div className={`p-3 rounded-lg ${integrationType.color} flex items-center justify-center`}>
-                    <img className="w-8 h-8 object-contain" src={integrationType.icon} alt={integrationType.label} />
+                    <img className="w-8 h-8 object-contain" src={integrationType.icon as string} alt={integrationType.label} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -329,8 +339,8 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
           <div className="flex items-center justify-between">
             <Heading level={2}>
               {section === 'new'
-                ? `New ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`
-                : `Edit ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`
+                ? `New ${INTEGRATION_TYPES[selectedType]?.label} integration`
+                : `Edit ${INTEGRATION_TYPES[selectedType]?.label} integration`
               }
             </Heading>
           </div>
@@ -345,7 +355,7 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
                 <Input
                   id="integration-name"
                   type="text"
-                  placeholder={`Enter a name for this ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`}
+                  placeholder={`Enter a name for this ${INTEGRATION_TYPES[selectedType]?.label} integration`}
                   value={integrationName}
                   onChange={(e) => setIntegrationName(e.target.value)}
                   className="w-full"

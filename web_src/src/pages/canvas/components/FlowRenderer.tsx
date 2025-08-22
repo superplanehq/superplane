@@ -3,7 +3,7 @@ import { ReactFlow, Background, BackgroundVariant } from "@xyflow/react";
 import '@xyflow/react/dist/style.css';
 
 import StageNode from './nodes/stage';
-import GithubIntegration from './nodes/event_source';
+import EventSourceNode from './nodes/event_source';
 import ConnectionGroupNode from './nodes/connection_group';
 import { FlowDevTools } from './devtools';
 import { useCanvasStore } from "../store/canvasStore";
@@ -14,8 +14,8 @@ import { ConnectionStatus } from "./ConnectionStatus";
 
 export const nodeTypes = {
   connectionGroup: ConnectionGroupNode,
-  deploymentCard: StageNode,
-  githubIntegration: GithubIntegration,
+  stage: StageNode,
+  eventSource: EventSourceNode,
 };
 
 export const FlowRenderer: React.FC = () => {
