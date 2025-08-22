@@ -33,8 +33,8 @@ export function useConnectionManager({ connections, setConnections, currentEntit
 
   const addFilter = useCallback((connectionIndex: number) => {
     const newFilter: SuperplaneFilter = {
-      type: 'FILTER_TYPE_DATA',
-      data: { expression: '' }
+      type: 'FILTER_TYPE_EXPRESSION',
+      expression: { expression: '' }
     };
 
     setConnections(connections.map((conn, i) =>
@@ -88,12 +88,8 @@ export function useConnectionManager({ connections, setConnections, currentEntit
       const emptyFilters: number[] = [];
       
       connection.filters.forEach((filter, index) => {
-        if (filter.type === 'FILTER_TYPE_DATA') {
-          if (!filter.data?.expression || filter.data.expression.trim() === '') {
-            emptyFilters.push(index + 1);
-          }
-        } else if (filter.type === 'FILTER_TYPE_HEADER') {
-          if (!filter.header?.expression || filter.header.expression.trim() === '') {
+        if (filter.type === 'FILTER_TYPE_EXPRESSION') {
+          if (!filter.expression?.expression || filter.expression.expression.trim() === '') {
             emptyFilters.push(index + 1);
           }
         }
