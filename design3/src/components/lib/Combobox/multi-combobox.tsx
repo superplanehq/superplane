@@ -18,6 +18,10 @@ export function MultiCombobox<T extends { id: string }>({
   value = [],
   onChange,
   onRemove,
+  allowCustomValues = false,
+  createCustomValue,
+  validateValue,
+  validateInput,
   ...props
 }: {
   options: T[]
@@ -31,9 +35,14 @@ export function MultiCombobox<T extends { id: string }>({
   value?: T[]
   onChange?: (values: T[]) => void
   onRemove?: (value: T) => void
+  allowCustomValues?: boolean
+  createCustomValue?: (query: string) => T
+  validateValue?: (value: T) => boolean
+  validateInput?: (input: string) => boolean
 } & Omit<Headless.ComboboxProps<T, false>, 'as' | 'multiple' | 'children' | 'value' | 'onChange' | 'defaultValue' | 'by' | 'virtual'> & { anchor?: 'top' | 'bottom' }) {
   const [query, setQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
+  const [justAddedTag, setJustAddedTag] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -61,6 +70,25 @@ export function MultiCombobox<T extends { id: string }>({
           filter ? filter(option, query) : displayValue(option)?.toLowerCase().includes(query.toLowerCase())
         )
 
+  // Add custom email suggestion if query is a valid email and allowCustomValues is true
+  const customEmailSuggestion = allowCustomValues && 
+    query.trim() !== '' && 
+    validateInput && validateInput(query.trim()) && // Use proper email validation
+    createCustomValue &&
+    !options.some(option => displayValue(option).toLowerCase() === query.toLowerCase()) &&
+    !value.some(selected => displayValue(selected).toLowerCase() === query.toLowerCase())
+    ? [createCustomValue(query.trim())]
+    : []
+
+  const allOptions = [...filteredOptions, ...customEmailSuggestion]
+  const hasMatches = allOptions.length > 0
+  // Allow custom value creation for non-email inputs (like names) when no matches and no email suggestion
+  const canCreateCustomValue = allowCustomValues && 
+    query.trim() !== '' && 
+    !hasMatches && 
+    customEmailSuggestion.length === 0 && 
+    createCustomValue
+
   const handleSelect = (selectedOption: T) => {
     console.log('handleSelect called with:', selectedOption)
     console.log('current value:', value)
@@ -70,7 +98,30 @@ export function MultiCombobox<T extends { id: string }>({
     console.log('new values:', newValues)
     onChange?.(newValues)
     setQuery('')
-    // Keep dropdown open for continued selection
+    setJustAddedTag(true)
+    setIsOpen(false)
+    // Keep input focused
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 0)
+  }
+
+  const handleCreateCustomValue = () => {
+    if (!canCreateCustomValue) return
+    
+    // Validate input before creating custom value
+    if (validateInput && !validateInput(query.trim())) {
+      // Keep the text in input for user to correct
+      return
+    }
+    
+    const customValue = createCustomValue!(query.trim())
+    const newValues = [...value, customValue]
+    onChange?.(newValues)
+    setQuery('')
+    setJustAddedTag(true)
+    setIsOpen(false)
+    // Keep input focused
     setTimeout(() => {
       inputRef.current?.focus()
     }, 0)
@@ -87,12 +138,38 @@ export function MultiCombobox<T extends { id: string }>({
   }
 
   const handleInputFocus = () => {
-    setIsOpen(true)
+    // Show list immediately if no items selected, or if we haven't just added a tag
+    if (value.length === 0 || !justAddedTag) {
+      setIsOpen(true)
+    }
+    // Reset the flag after focus
+    setJustAddedTag(false)
+  }
+
+  const handleInputBlur = () => {
+    // Small delay to allow click events to register before blur
+    setTimeout(() => {
+      if (canCreateCustomValue && query.trim() !== '') {
+        // Only create custom value on blur if input is valid
+        if (!validateInput || validateInput(query.trim())) {
+          handleCreateCustomValue()
+        }
+        // If invalid, keep text in input (don't call handleCreateCustomValue)
+      }
+    }, 100)
   }
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Backspace' && query === '' && value.length > 0) {
       handleRemove(value[value.length - 1])
+    }
+    
+    if (event.key === 'Enter' && canCreateCustomValue) {
+      event.preventDefault()
+      // Only create if input passes validation
+      if (!validateInput || validateInput(query.trim())) {
+        handleCreateCustomValue()
+      }
     }
   }
 
@@ -154,28 +231,37 @@ export function MultiCombobox<T extends { id: string }>({
           onClick={handleInputClick}
         >
           {/* Selected Tags */}
-          {value.filter(option => option && option.id).map((option) => (
-            <span
-              key={option.id}
-              className={clsx(
-                'inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs',
-                'bg-zinc-50 text-zinc-700 border border-zinc-200',
-                'dark:bg-zinc-800/20 dark:text-zinc-300 dark:border-zinc-800'
-              )}
-            >
-              {children(option, true)}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleRemove(option)
-                }}
-                className="ml-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 rounded p-0.5 transition-colors"
+          {value.filter(option => option && option.id).map((option) => {
+            const isValid = validateValue ? validateValue(option) : true
+            return (
+              <span
+                key={option.id}
+                className={clsx(
+                  'inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs',
+                  isValid ? (
+                    'bg-zinc-50 text-zinc-700 border border-zinc-200 dark:bg-zinc-800/20 dark:text-zinc-300 dark:border-zinc-800'
+                  ) : (
+                    'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800'
+                  )
+                )}
               >
-                <MaterialSymbol name="close" size="sm" />
-              </button>
-            </span>
-          ))}
+                {children(option, true)}
+                {!isValid && (
+                  <MaterialSymbol name="warning" size="sm" className="text-red-500 dark:text-red-400" />
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleRemove(option)
+                  }}
+                  className="ml-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 rounded p-0.5 transition-colors"
+                >
+                  <MaterialSymbol name="close" size="sm" />
+                </button>
+              </span>
+            )
+          })}
 
           {/* Input */}
           <Headless.ComboboxInput
@@ -183,10 +269,18 @@ export function MultiCombobox<T extends { id: string }>({
             autoFocus={autoFocus}
             data-slot="control"
             aria-label={ariaLabel}
+            value={query}
             displayValue={() => ''}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              // Show dropdown when user starts typing
+              if (event.target.value.length > 0) {
+                setIsOpen(true)
+              }
+            }}
             onKeyDown={handleKeyDown}
             onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
             onClick={handleInputClick}
             placeholder={value.length === 0 ? placeholder : ''}
             className={clsx([
@@ -211,7 +305,7 @@ export function MultiCombobox<T extends { id: string }>({
         </Headless.ComboboxButton>
       </span>
 
-      {(isOpen || query !== '') && (
+      {isOpen && (query === '' || hasMatches) && (
         <Headless.ComboboxOptions
           static
           className={clsx(
@@ -231,7 +325,7 @@ export function MultiCombobox<T extends { id: string }>({
             'transition-opacity duration-100 ease-in'
           )}
         >
-          {filteredOptions.filter(option => option && option.id).map((option) => (
+          {allOptions.filter(option => option && option.id).map((option) => (
             <MultiComboboxOption key={option.id} value={option}>
               {children(option, false)}
             </MultiComboboxOption>

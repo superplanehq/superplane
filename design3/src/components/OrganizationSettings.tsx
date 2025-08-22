@@ -39,6 +39,7 @@ import {
 import { Sidebar, SidebarBody, SidebarDivider, SidebarHeader, SidebarItem, SidebarLabel, SidebarSection, SidebarSpacer } from './lib/Sidebar/sidebar'
 import { useToast, ToastProvider } from './lib/Toasts/toast'
 import { AddMembersSectionSimple } from './AddMembersSectionSimple'
+import { Badge } from './lib/Badge/badge'
 
 interface OrganizationSettingsProps {
   onBack?: () => void
@@ -168,7 +169,182 @@ function OrganizationSettingsInner({
     }
   ])
 
-  // Function to add new members
+
+  // State for group members - maps groupId to member list
+  const [groupMembers, setGroupMembers] = useState<Record<string, any[]>>({
+    '1': [ // Engineering
+      {
+        id: '1',
+        name: 'John Doe',
+        email: 'john@acme.com',
+        role: 'Team Lead',
+        status: 'Active',
+        joinedDate: '2024-01-15',
+        initials: 'JD',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
+      },
+      {
+        id: '2',
+        name: 'Jane Smith',
+        email: 'jane@acme.com',
+        role: 'Senior Developer',
+        status: 'Active',
+        joinedDate: '2024-02-01',
+        initials: 'JS'
+      },
+      {
+        id: '3',
+        name: 'Mike Johnson',
+        email: 'mike@acme.com',
+        role: 'Developer',
+        status: 'Active',
+        joinedDate: '2024-03-10',
+        initials: 'MJ'
+      }
+    ],
+    '2': [ // Design
+      {
+        id: '4',
+        name: 'Sarah Wilson',
+        email: 'sarah@acme.com',
+        role: 'Designer',
+        status: 'Active',
+        joinedDate: '2024-02-20',
+        initials: 'SW'
+      }
+    ],
+    '3': [ // Marketing
+      {
+        id: '2',
+        name: 'Jane Smith',
+        email: 'jane@acme.com',
+        role: 'Marketing Lead',
+        status: 'Active',
+        joinedDate: '2024-02-01',
+        initials: 'JS'
+      },
+      {
+        id: '3',
+        name: 'Mike Johnson',
+        email: 'mike@acme.com',
+        role: 'Content Creator',
+        status: 'Active',
+        joinedDate: '2024-03-10',
+        initials: 'MJ'
+      }
+    ],
+    '4': [ // DevOps
+      {
+        id: '5',
+        name: 'Tom Brown',
+        email: 'tom@acme.com',
+        role: 'DevOps Engineer',
+        status: 'Active',
+        joinedDate: '2024-03-01',
+        initials: 'TB'
+      },
+      {
+        id: '1',
+        name: 'John Doe',
+        email: 'john@acme.com',
+        role: 'Team Lead',
+        status: 'Active',
+        joinedDate: '2024-01-15',
+        initials: 'JD',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
+      }
+    ]
+  })
+
+  // Function to add new members from AddMembersSectionSimple (User[] interface)
+  const handleAddMembersFromSimple = (users: any[], role: string) => {
+    if (!users || users.length === 0) {
+      addToast('error', 'No users selected', 'Please select users to invite');
+      return 0;
+    }
+
+    // Mock users list from AddMembersSectionSimple for comparison
+    const mockUsersList = [
+      { id: '1', username: 'john_doe', name: 'John Doe', email: 'john@company.com' },
+      { id: '2', username: 'jane_smith', name: 'Jane Smith', email: 'jane@company.com' },
+      { id: '3', username: 'mike_wilson', name: 'Mike Wilson', email: 'mike@company.com' },
+      { id: '4', username: 'sarah_jones', name: 'Sarah Jones', email: 'sarah@company.com' },
+      { id: '5', username: 'pedro_leao', name: 'Pedro Foresti Leao', email: 'pforesti@semaphore.io' },
+      { id: '6', username: 'aleksandar_m', name: 'Aleksandar Mitrovic', email: 'amitrovic@renderedtext.com' },
+      { id: '7', username: 'svetlana_cs', name: 'Svetlana Cosovic Stajic', email: 'scosovic@renderedtext.com' },
+      { id: '8', username: 'tijana_b', name: 'Tijana Banovic', email: 'tbanovic@renderedtext.com' }
+    ]
+
+    // Create new member objects with proper status based on whether they're from the predefined list
+    const newMembers = users.map((user, index) => {
+      const isFromList = mockUsersList.some(mockUser => mockUser.id === user.id)
+      return {
+        id: user.id.startsWith('email_') || user.id.startsWith('custom_') 
+          ? `invited-${Date.now()}-${index}` 
+          : user.id,
+        name: user.name,
+        email: user.email,
+        role: role,
+        status: isFromList ? 'Active' : 'Invited' as const,
+        lastActive: isFromList ? '1 hour ago' : 'Never',
+        initials: user.initials || user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase(),
+        avatar: user.avatar || null
+      }
+    })
+
+    // Add new members to the existing list
+    setMembers(prevMembers => [...prevMembers, ...newMembers])
+    
+    // Show success toast with proper status messaging
+    const activeCount = newMembers.filter(m => m.status === 'Active').length
+    const invitedCount = newMembers.filter(m => m.status === 'Invited').length
+    
+    let message = ''
+    if (activeCount > 0 && invitedCount > 0) {
+      message = `${activeCount} member${activeCount > 1 ? 's' : ''} added as active, ${invitedCount} member${invitedCount > 1 ? 's' : ''} invited`
+    } else if (activeCount > 0) {
+      message = `${activeCount} member${activeCount > 1 ? 's' : ''} added as active`
+    } else {
+      message = `${invitedCount} member${invitedCount > 1 ? 's' : ''} invited`
+    }
+    
+    addToast(
+      'success', 
+      'Members processed successfully', 
+      message
+    );
+    
+    // If we're in a group context, add users from predefined list to group members
+    if (selectedTeam) {
+      // Only add users from predefined list to group members
+      // Custom emails are now handled by AddMembersSectionSimple internally
+      const usersFromList = users.filter(user => 
+        mockUsersList.some(mockUser => mockUser.id === user.id)
+      )
+      
+      if (usersFromList.length > 0) {
+        const groupNewMembers = usersFromList.map(user => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: 'Member',
+          status: 'Active' as const,
+          joinedDate: new Date().toISOString().split('T')[0],
+          initials: user.initials || user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase(),
+          avatar: user.avatar || null
+        }))
+
+        setGroupMembers(prev => ({
+          ...prev,
+          [selectedTeam.id]: [...(prev[selectedTeam.id] || []), ...groupNewMembers]
+        }))
+      }
+    }
+    
+    return newMembers.length // Return count of added members
+  }
+
+  // Function to add new members from AddMembersSection (emails string interface) 
   const handleAddMembers = (emails: string, role: string) => {
     // Parse emails (split by comma, semicolon, space, or newline)
     const emailList = emails
@@ -241,71 +417,11 @@ function OrganizationSettingsInner({
     }
   ]
 
-  // Mock data for team members
+  // Get team members from dynamic state
   const getTeamMembers = (teamId: string) => {
-    const allMembers = [
-      {
-        id: '1',
-        name: 'John Doe',
-        email: 'john@acme.com',
-        role: 'Team Lead',
-        status: 'Active',
-        joinedDate: '2024-01-15',
-        initials: 'JD',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
-      },
-      {
-        id: '2',
-        name: 'Jane Smith',
-        email: 'jane@acme.com',
-        role: 'Senior Developer',
-        status: 'Active',
-        joinedDate: '2024-02-01',
-        initials: 'JS'
-      },
-      {
-        id: '3',
-        name: 'Mike Johnson',
-        email: 'mike@acme.com',
-        role: 'Developer',
-        status: 'Active',
-        joinedDate: '2024-03-10',
-        initials: 'MJ'
-      },
-      {
-        id: '4',
-        name: 'Sarah Wilson',
-        email: 'sarah@acme.com',
-        role: 'Designer',
-        status: 'Active',
-        joinedDate: '2024-02-20',
-        initials: 'SW'
-      },
-      {
-        id: '5',
-        name: 'Tom Brown',
-        email: 'tom@acme.com',
-        role: 'DevOps Engineer',
-        status: 'Active',
-        joinedDate: '2024-03-01',
-        initials: 'TB'
-      }
-    ]
-
-    // Return different members based on team
-    switch (teamId) {
-      case '1': // Engineering
-        return allMembers.slice(0, 3)
-      case '2': // Design
-        return [allMembers[3]]
-      case '3': // Marketing
-        return allMembers.slice(1, 3)
-      case '4': // DevOps
-        return [allMembers[4], allMembers[0]]
-      default:
-        return []
-    }
+    return groupMembers[teamId] || []
   }
+
 
   const currentUser = {
     id: '1',
@@ -1277,7 +1393,7 @@ function OrganizationSettingsInner({
               <div className='flex items-start justify-between'>
                 <div className='flex items-start gap-3'>
                   <Avatar className='w-12 bg-blue-200 dark:bg-blue-800 border border-blue-300 dark:border-blue-700' square initials={selectedTeam.name.charAt(0)}/>
-                  <div className='flex flex-col space-y-2'>
+                  <div className='flex flex-col'>
                     {/* Group Name - Inline Edit */}
                     <div className="group">
                       {isEditingGroupName ? (
@@ -1386,7 +1502,8 @@ function OrganizationSettingsInner({
                 </div>
               </div>
               {/* Add Members Section */}
-              <AddMembersSectionSimple  showRoleSelection={false}/>
+              <AddMembersSectionSimple showRoleSelection={false} onAddMembers={handleAddMembersFromSimple}/>
+              
               {/* Team members table */}
               <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                 <div className="px-6 pt-6 pb-4 ">
@@ -1396,7 +1513,7 @@ function OrganizationSettingsInner({
                     </InputGroup>
                   </div>
                 </div>
-                <div className="px-6 pb-6">
+                <div className="px-6 pb-6" id="group-members-table">
                   <Table dense>
                     <TableHead>
                       <TableRow>
@@ -1456,9 +1573,12 @@ function OrganizationSettingsInner({
                           </TableCell>
                           
                           <TableCell>
-                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                              {member.status}
-                            </span>
+                            {member.status == 'Active' && (
+                              <Badge color='green' className='!text-xs'>{member.status}</Badge> 
+                            )}
+                            {member.status == 'Invited' && (
+                              <Badge color='amber' className='!text-xs'>{member.status}</Badge> 
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex justify-end">
@@ -1496,6 +1616,7 @@ function OrganizationSettingsInner({
                   </Table>
                 </div>
               </div>
+
             </div>
             </div>
           )

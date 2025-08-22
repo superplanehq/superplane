@@ -841,7 +841,7 @@ export function NodeDetailsSidebar({
   const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
   const consistentStatuses = new URLSearchParams(window.location.search).get('consistentStatuses') === 'true';
   const twoTabsParam = new URLSearchParams(window.location.search).get('twoTabs');
-  const twoTabs = twoTabsParam === null ? true : twoTabsParam === 'true';
+  const twoTabs = twoTabsParam === null ? false : twoTabsParam === 'false';
   
   const [activeTab, setActiveTab] = useState<'activity' | 'run-history' | 'queue-history' | 'history' | 'settings'>('activity');
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());

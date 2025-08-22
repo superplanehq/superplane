@@ -16,7 +16,8 @@ import {
   Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { type User, type Organization } from './lib/Navigation/navigation-org';
+import { UserOrgDropdown, type User, type Organization } from './lib/UserOrgDropdown';
+import { AddMembersSectionSimple } from './AddMembersSectionSimple';
 import { WorkflowNode, WorkflowEdge } from '../types';
 import { DeploymentCardStage } from './DeploymentCardStage';
 import { ComponentSidebar } from './ComponentSidebar';
@@ -44,7 +45,10 @@ import {
   DropdownMenu, 
   DropdownItem,
   DropdownLabel,
-  DropdownDescription
+  DropdownDescription,
+  DropdownDivider,
+  DropdownHeader,
+  DropdownSection
 } from './lib/Dropdown/dropdown';
 import { 
   Table, 
@@ -756,7 +760,7 @@ const computedEdges = edges.map(edge => {
     }
   }
 
-  const handleOrganizationMenuAction = (action: 'settings' | 'billing' | 'members') => {
+  const handleOrganizationMenuAction = (action: 'settings' | 'billing' | 'members' | 'groups' | 'roles') => {
     if (action === 'settings') {
       // Navigate to settings page
       window.history.pushState(null, '', '/settings')
@@ -887,7 +891,8 @@ const computedEdges = edges.map(edge => {
       permission: 'Can edit',
       lastActive: '2 hours ago',
       initials: 'JD',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face',
+      status: 'Active'
     },
     {
       id: '2',
@@ -896,7 +901,8 @@ const computedEdges = edges.map(edge => {
       role: 'Viewer',
       permission: 'Can view',
       lastActive: '1 day ago',
-      initials: 'JS'
+      initials: 'JS',
+      status: 'Invited'
     },
     {
       id: '3',
@@ -905,7 +911,8 @@ const computedEdges = edges.map(edge => {
       role: 'Editor',
       permission: 'Can edit',
       lastActive: '3 days ago',
-      initials: 'BW'
+      initials: 'BW',
+      status: 'Active'
     },
     {
       id: '4',
@@ -914,7 +921,8 @@ const computedEdges = edges.map(edge => {
       role: 'Owner',
       permission: 'Full access',
       lastActive: '5 minutes ago',
-      initials: 'AJ'
+      initials: 'AJ',
+      status: 'Active'
     }
   ];
 
@@ -1399,15 +1407,24 @@ const computedEdges = edges.map(edge => {
         
         </div>
         </div>
-        <div className=''>
-          <Dropdown> 
-            <DropdownButton plain aria-label="More options">
-              <MaterialSymbol size='lg' opticalSize={20} weight={400} name="more_vert" />
-            </DropdownButton>
-            <DropdownMenu className="min-w-(--button-width)">
-            <DropdownItem href="#">Delete</DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
+        <div className='flex items-center'>
+          <div className='border-r border-zinc-400 dark:border-zinc-600'>
+            <Dropdown> 
+              <DropdownButton plain aria-label="More options">
+                <MaterialSymbol size='lg' opticalSize={20} weight={400} name="more_vert" />
+              </DropdownButton>
+              <DropdownMenu className="min-w-(--button-width)">
+              <DropdownItem href="#">Delete</DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+         </div>
+         <UserOrgDropdown
+            user={currentUser}
+            organization={currentOrganization}
+            onUserMenuAction={handleUserMenuAction}
+            onOrganizationMenuAction={handleOrganizationMenuAction}
+            plain
+          />
         </div>
       </nav>
     );
@@ -1569,33 +1586,45 @@ const computedEdges = edges.map(edge => {
                 <Subheading>Members</Subheading>
                 <Text>Manage canvas access and permissions.</Text>
               </div>
-              <Button onClick={() => setShowMembersModal(true)}>
-                <MaterialSymbol name="person_add" size="md" />
-                Invite Member
-              </Button>
             </div>
-
-            {/* Search */}
-            <div className="mb-6">
-              <InputGroup>
-                <MaterialSymbol name="search" size="md" data-slot="icon" />
-                <Input
-                  placeholder="Search members..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </InputGroup>
+            <div className='mb-6'>
+            {/* Add Members Section */}
+            <AddMembersSectionSimple 
+              showRoleSelection={true}
+              onAddMembers={(users, role) => {
+                // Handle adding members to canvas
+                console.log('Adding members to canvas:', users, 'with role:', role)
+              }}
+            />
             </div>
+            
 
             {/* Members Table */}
-            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden px-6 py-2">
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              <div className="px-6 pt-6 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-900 dark:text-white">Canvas Members</h4>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Members with access to this canvas</p>
+                  </div>
+                  <InputGroup>
+                    <MaterialSymbol name="search" size="md" data-slot="icon" />
+                    <Input
+                      placeholder="Search members..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </InputGroup>
+                </div>
+              </div>
+              <div className="px-6 pb-6">
               <Table dense>
                 <TableHead>
                   <TableRow>
-                    <TableHeader>Member</TableHeader>
+                    <TableHeader>Name</TableHeader>
                     <TableHeader>Email</TableHeader>
                     <TableHeader>Role</TableHeader>
-                    <TableHeader>Last Active</TableHeader>
+                    <TableHeader>Status</TableHeader>
                     <TableHeader></TableHeader>
                   </TableRow>
                 </TableHead>
@@ -1611,50 +1640,81 @@ const computedEdges = edges.map(edge => {
                         <div className="flex items-center gap-3">
                           <Avatar
                             src={member.avatar}
+                            initials={member.name.split(' ').map(n => n[0]).join('')}
                             className="size-8"
-                            alt={member.name}
                           />
                           <div>
-                            <div className="font-medium text-zinc-900 dark:text-white text-sm">
+                            <div className="text-sm font-medium text-zinc-900 dark:text-white">
                               {member.name}
+                            </div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                              Last active {member.lastActive}
                             </div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {member.email}
-                        </span>
+                        {member.email}
                       </TableCell>
                       <TableCell>
                         <Dropdown>
                           <DropdownButton outline className="flex items-center gap-2 text-sm">
                             {member.role}
-                            <MaterialSymbol name="keyboard_arrow_down" size="sm" />
+                            <MaterialSymbol name="keyboard_arrow_down" />
                           </DropdownButton>
-                          <DropdownMenu>
-                            <DropdownItem onClick={() => console.log('Change to Owner')}>
-                              Owner
+                          <DropdownMenu anchor="bottom start">
+                            <DropdownItem>
+                              <DropdownLabel>Owner</DropdownLabel>
+                              <DropdownDescription>Full access to canvas settings</DropdownDescription>
                             </DropdownItem>
-                            <DropdownItem onClick={() => console.log('Change to Admin')}>
-                              Admin
+                            <DropdownItem>
+                              <DropdownLabel>Admin</DropdownLabel>
+                              <DropdownDescription>Can manage canvas and members</DropdownDescription>
                             </DropdownItem>
-                            <DropdownItem onClick={() => console.log('Change to Member')}>
-                              Member
+                            <DropdownItem>
+                              <DropdownLabel>Member</DropdownLabel>
+                              <DropdownDescription>Standard canvas access</DropdownDescription>
                             </DropdownItem>
                           </DropdownMenu>
                         </Dropdown>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                          {member.lastActive}
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          member.status === 'Active'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                            : member.status === 'Invited'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                        }`}>
+                          {member.status}
                         </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end">
-                          <Button plain onClick={() => console.log('Remove member', member.id)}>
-                            <MaterialSymbol name="close" size="md" />
-                          </Button>
+                          <Dropdown>
+                            <DropdownButton plain className="flex items-center gap-2 text-sm">
+                              <MaterialSymbol name="more_vert" size="sm" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              {member.status === 'Invited' ? (
+                                <>
+                                <DropdownItem className='flex items-center gap-2'>
+                                  <MaterialSymbol name="refresh" />
+                                  Resend invitation
+                                </DropdownItem>
+                                <DropdownItem className='!text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 flex items-center gap-2'>
+                                  <MaterialSymbol name="person_cancel" />
+                                  Revoke invitation
+                                </DropdownItem>
+                                </>
+                              ) : (
+                              <DropdownItem className='!text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 flex items-center gap-2'>
+                                <MaterialSymbol name="delete" />
+                                Remove
+                              </DropdownItem>
+                              )}
+                            </DropdownMenu>
+                          </Dropdown>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1662,6 +1722,7 @@ const computedEdges = edges.map(edge => {
                 </TableBody>
               </Table>
             </div>
+          </div>
           </div>
         </div>
       ) : activeView === 'integration-setup' ? (
@@ -1884,7 +1945,43 @@ const computedEdges = edges.map(edge => {
             </div>
           </div>
         </div>
-      ) : null}
+      ) : activeView === 'integrations' ? (
+        <div className="flex-1 p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6">
+              <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">Integrations</h1>
+              <p className="text-zinc-600 dark:text-zinc-400">Connect external services</p>
+            </div>
+          </div>
+        </div>
+      ) : activeView === 'members' ? (
+        <div className="flex-1 p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6">
+              <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">Canvas Members</h1>
+              <p className="text-zinc-600 dark:text-zinc-400">Manage member access</p>
+            </div>
+          </div>
+        </div>
+      ) : activeView === 'secrets' ? (
+        <div className="flex-1 p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6">
+              <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">Secrets</h1>
+              <p className="text-zinc-600 dark:text-zinc-400">Manage environment variables</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6">
+              <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">Other View</h1>
+              <p className="text-zinc-600 dark:text-zinc-400">Other views content</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Canvas Members Modal */}
       <Dialog 
@@ -2380,8 +2477,6 @@ const computedEdges = edges.map(edge => {
           <Button 
             color="blue" 
             onClick={() => {
-              console.log('Connection saved:', { type: connectionType, filters: connectionFilters });
-              
               // Add connection to the current editing node
               if (currentEditingNodeId) {
                 // Calculate the new connection index before updating nodes
@@ -2452,9 +2547,6 @@ const computedEdges = edges.map(edge => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      
-
     </div>
   );
 };
