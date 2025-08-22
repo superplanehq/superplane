@@ -580,52 +580,52 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 }
 
-func Test__PendingEventsWorker__buildExecutorLabel(t *testing.T) {
+func Test__PendingEventsWorker__buildExecutorName(t *testing.T) {
 	w := &PendingEventsWorker{}
 
 	t.Run("empty label returns empty string", func(t *testing.T) {
 		stage := models.Stage{
-			ExecutorLabel: "",
+			ExecutorName: "",
 		}
 		inputs := map[string]any{}
-		
-		result, err := w.buildExecutorLabel(inputs, stage)
+
+		result, err := w.buildExecutorName(inputs, stage)
 		require.NoError(t, err)
 		assert.Equal(t, "", result)
 	})
 
 	t.Run("static label returns static string", func(t *testing.T) {
 		stage := models.Stage{
-			ExecutorLabel: "Deploy to production",
+			ExecutorName: "Deploy to production",
 		}
 		inputs := map[string]any{}
-		
-		result, err := w.buildExecutorLabel(inputs, stage)
+
+		result, err := w.buildExecutorName(inputs, stage)
 		require.NoError(t, err)
 		assert.Equal(t, "Deploy to production", result)
 	})
 
 	t.Run("template with inputs resolves correctly", func(t *testing.T) {
 		stage := models.Stage{
-			ExecutorLabel: "Deploy ${{ inputs.VERSION }} to ${{ inputs.ENVIRONMENT }}",
+			ExecutorName: "Deploy ${{ inputs.VERSION }} to ${{ inputs.ENVIRONMENT }}",
 		}
 		inputs := map[string]any{
 			"VERSION":     "v1.2.3",
 			"ENVIRONMENT": "production",
 		}
-		
-		result, err := w.buildExecutorLabel(inputs, stage)
+
+		result, err := w.buildExecutorName(inputs, stage)
 		require.NoError(t, err)
 		assert.Equal(t, "Deploy v1.2.3 to production", result)
 	})
 
 	t.Run("template with missing input returns error", func(t *testing.T) {
 		stage := models.Stage{
-			ExecutorLabel: "Deploy ${{ inputs.VERSION }} to production",
+			ExecutorName: "Deploy ${{ inputs.VERSION }} to production",
 		}
 		inputs := map[string]any{}
-		
-		result, err := w.buildExecutorLabel(inputs, stage)
+
+		result, err := w.buildExecutorName(inputs, stage)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "input VERSION not found")
 		assert.Equal(t, "", result)
@@ -633,14 +633,14 @@ func Test__PendingEventsWorker__buildExecutorLabel(t *testing.T) {
 
 	t.Run("complex template with concatenation", func(t *testing.T) {
 		stage := models.Stage{
-			ExecutorLabel: "Release ${{ inputs.VERSION_A }}.0 + hotfix ${{ inputs.VERSION_B }}",
+			ExecutorName: "Release ${{ inputs.VERSION_A }}.0 + hotfix ${{ inputs.VERSION_B }}",
 		}
 		inputs := map[string]any{
 			"VERSION_A": "2",
 			"VERSION_B": "1",
 		}
-		
-		result, err := w.buildExecutorLabel(inputs, stage)
+
+		result, err := w.buildExecutorName(inputs, stage)
 		require.NoError(t, err)
 		assert.Equal(t, "Release 2.0 + hotfix 1", result)
 	})

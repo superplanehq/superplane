@@ -30,7 +30,7 @@ type SuperplaneStageEvent struct {
 	Approvals []SuperplaneStageEventApproval `json:"approvals,omitempty"`
 	Execution *SuperplaneExecution `json:"execution,omitempty"`
 	Inputs []SuperplaneKeyValuePair `json:"inputs,omitempty"`
-	Label *string `json:"label,omitempty"`
+	Name *string `json:"name,omitempty"`
 }
 
 // NewSuperplaneStageEvent instantiates a new SuperplaneStageEvent object
@@ -350,36 +350,36 @@ func (o *SuperplaneStageEvent) SetInputs(v []SuperplaneKeyValuePair) {
 	o.Inputs = v
 }
 
-// GetLabel returns the Label field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetLabel() string {
-	if o == nil || IsNil(o.Label) {
+// GetName returns the Name field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetName() string {
+	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
 	}
-	return *o.Label
+	return *o.Name
 }
 
-// GetLabelOk returns a tuple with the Label field value if set, nil otherwise
+// GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetLabelOk() (*string, bool) {
-	if o == nil || IsNil(o.Label) {
+func (o *SuperplaneStageEvent) GetNameOk() (*string, bool) {
+	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
-	return o.Label, true
+	return o.Name, true
 }
 
-// HasLabel returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasLabel() bool {
-	if o != nil && !IsNil(o.Label) {
+// HasName returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasName() bool {
+	if o != nil && !IsNil(o.Name) {
 		return true
 	}
 
 	return false
 }
 
-// SetLabel gets a reference to the given string and assigns it to the Label field.
-func (o *SuperplaneStageEvent) SetLabel(v string) {
-	o.Label = &v
+// SetName gets a reference to the given string and assigns it to the Name field.
+func (o *SuperplaneStageEvent) SetName(v string) {
+	o.Name = &v
 }
 
 func (o SuperplaneStageEvent) MarshalJSON() ([]byte, error) {
@@ -419,8 +419,8 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Inputs) {
 		toSerialize["inputs"] = o.Inputs
 	}
-	if !IsNil(o.Label) {
-		toSerialize["label"] = o.Label
+	if !IsNil(o.Name) {
+		toSerialize["name"] = o.Name
 	}
 	return toSerialize, nil
 }

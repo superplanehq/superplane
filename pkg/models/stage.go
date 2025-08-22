@@ -29,10 +29,10 @@ type Stage struct {
 	CreatedBy   uuid.UUID
 	UpdatedBy   uuid.UUID
 
-	ExecutorType  string
-	ExecutorSpec  datatypes.JSON
-	ExecutorLabel string
-	ResourceID    *uuid.UUID
+	ExecutorType string
+	ExecutorSpec datatypes.JSON
+	ExecutorName string
+	ResourceID   *uuid.UUID
 
 	Conditions    datatypes.JSONSlice[StageCondition]
 	Inputs        datatypes.JSONSlice[InputDefinition]

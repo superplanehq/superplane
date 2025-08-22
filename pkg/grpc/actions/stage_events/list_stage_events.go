@@ -116,7 +116,7 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
 		Inputs:      []*pb.KeyValuePair{},
-		Label:       in.ExecutorLabel,
+		Name:        in.Name,
 	}
 
 	//

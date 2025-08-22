@@ -277,12 +277,12 @@ func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Eve
 		return err
 	}
 
-	executorLabel, err := w.buildExecutorLabel(inputs, *stage)
+	executorName, err := w.buildExecutorName(inputs, *stage)
 	if err != nil {
 		return err
 	}
 
-	stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs, executorLabel)
+	stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs, executorName)
 	if err != nil {
 		return err
 	}
@@ -367,13 +367,13 @@ func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stag
 	return inputs, nil
 }
 
-func (w *PendingEventsWorker) buildExecutorLabel(inputs map[string]any, stage models.Stage) (string, error) {
-	if stage.ExecutorLabel == "" {
+func (w *PendingEventsWorker) buildExecutorName(inputs map[string]any, stage models.Stage) (string, error) {
+	if stage.ExecutorName == "" {
 		return "", nil
 	}
 
 	specBuilder := &executors.SpecBuilder{}
-	resolvedLabel, err := specBuilder.ResolveExpression(stage.ExecutorLabel, inputs, map[string]string{})
+	resolvedLabel, err := specBuilder.ResolveExpression(stage.ExecutorName, inputs, map[string]string{})
 	if err != nil {
 		return "", fmt.Errorf("error resolving executor label template: %v", err)
 	}

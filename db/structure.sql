@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict IadZUhKpc0SeXoqDTxhP4hDLytPZHxDGcZxBKNV2Rfc2MUWgCPC350Pid4TvZA2
+\restrict lx7SBo9hwCG2FMbbYbYYbRVCkmM9WfefZzzsjXnblsTdVZ3Nh7gK2sO8uhxWtru
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -396,7 +396,7 @@ CREATE TABLE public.stage_events (
     state_reason character varying(64),
     created_at timestamp without time zone NOT NULL,
     inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
-    executor_label text
+    name text
 );
 
 
@@ -440,7 +440,7 @@ CREATE TABLE public.stages (
     executor_type character varying(64) NOT NULL,
     resource_id uuid,
     description text,
-    executor_label text
+    executor_name text
 );
 
 
@@ -1077,13 +1077,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict IadZUhKpc0SeXoqDTxhP4hDLytPZHxDGcZxBKNV2Rfc2MUWgCPC350Pid4TvZA2
+\unrestrict lx7SBo9hwCG2FMbbYbYYbRVCkmM9WfefZzzsjXnblsTdVZ3Nh7gK2sO8uhxWtru
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict T3gXV6BUWxK80M1VdENSx5o9cVyzME0cEaXqAVx7GkaSiiQjy6eZxyDHiCWRXuX
+\restrict mJM5mKREsvlOGDGHORt7dGZ2NSx67NNcNSSp3aZYsPIuTWCyh1bcrbmO6L4mYXa
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1113,5 +1113,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict T3gXV6BUWxK80M1VdENSx5o9cVyzME0cEaXqAVx7GkaSiiQjy6eZxyDHiCWRXuX
+\unrestrict mJM5mKREsvlOGDGHORt7dGZ2NSx67NNcNSSp3aZYsPIuTWCyh1bcrbmO6L4mYXa
 

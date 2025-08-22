@@ -31,16 +31,16 @@ var (
 
 type StageEvent struct {
 	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name        string
 	StageID     uuid.UUID
 	EventID     uuid.UUID
 	SourceID    uuid.UUID
 	SourceName  string
 	SourceType  string
-	State         string
-	StateReason   string
-	CreatedAt     *time.Time
-	Inputs        datatypes.JSONType[map[string]any]
-	ExecutorLabel string
+	State       string
+	StateReason string
+	CreatedAt   *time.Time
+	Inputs      datatypes.JSONType[map[string]any]
 }
 
 func (e *StageEvent) UpdateState(state, reason string) error {
@@ -114,23 +114,23 @@ func FindStageEventByID(id, stageID string) (*StageEvent, error) {
 	return &event, nil
 }
 
-func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any, executorLabel string) (*StageEvent, error) {
-	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, inputs, executorLabel)
+func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any, name string) (*StageEvent, error) {
+	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, inputs, name)
 }
 
-func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any, executorLabel string) (*StageEvent, error) {
+func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any, name string) (*StageEvent, error) {
 	now := time.Now()
 	stageEvent := StageEvent{
-		StageID:       stageID,
-		EventID:       event.ID,
-		SourceID:      event.SourceID,
-		SourceName:    event.SourceName,
-		SourceType:    event.SourceType,
-		State:         state,
-		StateReason:   stateReason,
-		CreatedAt:     &now,
-		Inputs:        datatypes.NewJSONType(inputs),
-		ExecutorLabel: executorLabel,
+		StageID:     stageID,
+		EventID:     event.ID,
+		SourceID:    event.SourceID,
+		SourceName:  event.SourceName,
+		SourceType:  event.SourceType,
+		State:       state,
+		StateReason: stateReason,
+		CreatedAt:   &now,
+		Inputs:      datatypes.NewJSONType(inputs),
+		Name:        name,
 	}
 
 	err := tx.Create(&stageEvent).

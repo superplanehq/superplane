@@ -108,7 +108,7 @@ export const ExecutionTimeline = ({
         executions.map((execution) => (
           <RunItem
             key={execution.id!}
-            title={execution.event.label || execution.id || 'Execution'}
+            title={execution.event.name || execution.id || 'Execution'}
             runId={execution.id}
             inputs={mapExecutionEventInputs(execution)}
             outputs={mapExecutionOutputs(execution)}

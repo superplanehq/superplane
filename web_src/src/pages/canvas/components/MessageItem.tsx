@@ -115,7 +115,7 @@ const MessageItem = React.memo(({
               <span className="text-xs font-medium text-amber-700 dark:text-amber-500">{getStatusLabel()}</span>
             </div>
             <span className="font-medium truncate text-sm dark:text-white">
-              {event.label || event.id || 'Unknown'}
+              {event.name || event.id || 'Unknown'}
             </span>
           </div>
           <div className="flex items-center gap-3">

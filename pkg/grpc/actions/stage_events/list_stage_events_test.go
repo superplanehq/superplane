@@ -97,7 +97,7 @@ func Test__ListStageEvents(t *testing.T) {
 		require.Len(t, e.Execution.Outputs, 2)
 		assert.Contains(t, e.Execution.Outputs, &protos.OutputValue{Name: "VERSION", Value: "v1"})
 		assert.Contains(t, e.Execution.Outputs, &protos.OutputValue{Name: "VALUE_1", Value: "value1"})
-		assert.Equal(t, "", e.Label)
+		assert.Equal(t, "", e.Name)
 
 		// event with approvals
 		e = res.Events[1]
@@ -114,7 +114,7 @@ func Test__ListStageEvents(t *testing.T) {
 		require.Len(t, e.Inputs, 1)
 		assert.Equal(t, "VERSION", e.Inputs[0].Name)
 		assert.Equal(t, "v1", e.Inputs[0].Value)
-		assert.Equal(t, "", e.Label)
+		assert.Equal(t, "", e.Name)
 
 		// event with no approvals
 		e = res.Events[2]
@@ -127,6 +127,6 @@ func Test__ListStageEvents(t *testing.T) {
 		require.Len(t, e.Approvals, 0)
 		require.Nil(t, e.Execution)
 		require.Len(t, e.Inputs, 0)
-		assert.Equal(t, "", e.Label)
+		assert.Equal(t, "", e.Name)
 	})
 }

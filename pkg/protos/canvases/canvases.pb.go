@@ -2900,7 +2900,7 @@ type Executor struct {
 	Integration   *integrations.IntegrationRef `protobuf:"bytes,2,opt,name=integration,proto3" json:"integration,omitempty"`
 	Resource      *integrations.ResourceRef    `protobuf:"bytes,3,opt,name=resource,proto3" json:"resource,omitempty"`
 	Spec          *_struct.Struct              `protobuf:"bytes,4,opt,name=spec,proto3" json:"spec,omitempty"`
-	Label         string                       `protobuf:"bytes,5,opt,name=label,proto3" json:"label,omitempty"`
+	Name          string                       `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2963,9 +2963,9 @@ func (x *Executor) GetSpec() *_struct.Struct {
 	return nil
 }
 
-func (x *Executor) GetLabel() string {
+func (x *Executor) GetName() string {
 	if x != nil {
-		return x.Label
+		return x.Name
 	}
 	return ""
 }
@@ -3681,7 +3681,7 @@ type StageEvent struct {
 	Approvals     []*StageEventApproval  `protobuf:"bytes,7,rep,name=approvals,proto3" json:"approvals,omitempty"`
 	Execution     *Execution             `protobuf:"bytes,8,opt,name=execution,proto3" json:"execution,omitempty"`
 	Inputs        []*KeyValuePair        `protobuf:"bytes,9,rep,name=inputs,proto3" json:"inputs,omitempty"`
-	Label         string                 `protobuf:"bytes,10,opt,name=label,proto3" json:"label,omitempty"`
+	Name          string                 `protobuf:"bytes,10,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3779,9 +3779,9 @@ func (x *StageEvent) GetInputs() []*KeyValuePair {
 	return nil
 }
 
-func (x *StageEvent) GetLabel() string {
+func (x *StageEvent) GetName() string {
 	if x != nil {
-		return x.Label
+		return x.Name
 	}
 	return ""
 }
@@ -6307,13 +6307,13 @@ const file_canvases_proto_rawDesc = "" +
 	"\tweek_days\x18\x03 \x03(\tR\bweekDays\"h\n" +
 	"\x12CreateStageRequest\x12'\n" +
 	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\x12)\n" +
-	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"\xee\x01\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"\xec\x01\n" +
 	"\bExecutor\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12I\n" +
 	"\vintegration\x18\x02 \x01(\v2'.Superplane.Integrations.IntegrationRefR\vintegration\x12@\n" +
 	"\bresource\x18\x03 \x01(\v2$.Superplane.Integrations.ResourceRefR\bresource\x12+\n" +
-	"\x04spec\x18\x04 \x01(\v2\x17.google.protobuf.StructR\x04spec\x12\x14\n" +
-	"\x05label\x18\x05 \x01(\tR\x05label\">\n" +
+	"\x04spec\x18\x04 \x01(\v2\x17.google.protobuf.StructR\x04spec\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\">\n" +
 	"\x13CreateStageResponse\x12'\n" +
 	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\x86\x01\n" +
 	"\x12UpdateStageRequest\x12'\n" +
@@ -6371,7 +6371,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x06states\x18\x03 \x03(\x0e2\x1c.Superplane.StageEvent.StateR\x06states\x12G\n" +
 	"\rstate_reasons\x18\x04 \x03(\x0e2\".Superplane.StageEvent.StateReasonR\fstateReasons\"I\n" +
 	"\x17ListStageEventsResponse\x12.\n" +
-	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\x93\x06\n" +
+	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\x91\x06\n" +
 	"\n" +
 	"StageEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -6384,9 +6384,9 @@ const file_canvases_proto_rawDesc = "" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\tapprovals\x18\a \x03(\v2\x1e.Superplane.StageEventApprovalR\tapprovals\x123\n" +
 	"\texecution\x18\b \x01(\v2\x15.Superplane.ExecutionR\texecution\x120\n" +
-	"\x06inputs\x18\t \x03(\v2\x18.Superplane.KeyValuePairR\x06inputs\x12\x14\n" +
-	"\x05label\x18\n" +
-	" \x01(\tR\x05label\"U\n" +
+	"\x06inputs\x18\t \x03(\v2\x18.Superplane.KeyValuePairR\x06inputs\x12\x12\n" +
+	"\x04name\x18\n" +
+	" \x01(\tR\x04name\"U\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
