@@ -734,6 +734,15 @@ export type SuperplaneUpdateConnectionGroupResponse = {
     connectionGroup?: SuperplaneConnectionGroup;
 };
 
+export type SuperplaneUpdateEventSourceBody = {
+    eventSource?: SuperplaneEventSource;
+};
+
+export type SuperplaneUpdateEventSourceResponse = {
+    eventSource?: SuperplaneEventSource;
+    key?: string;
+};
+
 export type SuperplaneUpdateStageBody = {
     stage?: SuperplaneStage;
 };
@@ -1118,6 +1127,34 @@ export type SuperplaneDescribeEventSourceResponses = {
 };
 
 export type SuperplaneDescribeEventSourceResponse2 = SuperplaneDescribeEventSourceResponses[keyof SuperplaneDescribeEventSourceResponses];
+
+export type SuperplaneUpdateEventSourceData = {
+    body: SuperplaneUpdateEventSourceBody;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/event-sources/{idOrName}';
+};
+
+export type SuperplaneUpdateEventSourceErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneUpdateEventSourceError = SuperplaneUpdateEventSourceErrors[keyof SuperplaneUpdateEventSourceErrors];
+
+export type SuperplaneUpdateEventSourceResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneUpdateEventSourceResponse;
+};
+
+export type SuperplaneUpdateEventSourceResponse2 = SuperplaneUpdateEventSourceResponses[keyof SuperplaneUpdateEventSourceResponses];
 
 export type SuperplaneResetEventSourceKeyData = {
     body: SuperplaneResetEventSourceKeyBody;

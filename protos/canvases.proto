@@ -232,6 +232,18 @@ service Superplane {
     };
   }
   
+  rpc UpdateEventSource(UpdateEventSourceRequest) returns (UpdateEventSourceResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id_or_name}/event-sources/{id_or_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update an event source";
+      description: "Updates the specified event source (canvas can be referenced by ID or name)";
+      tags: "EventSource";
+    };
+  }
+
   rpc UpdateConnectionGroup(UpdateConnectionGroupRequest) returns (UpdateConnectionGroupResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}"
@@ -625,6 +637,17 @@ message UpdateStageRequest {
 
 message UpdateStageResponse {
   Stage stage = 1;
+}
+
+message UpdateEventSourceRequest {
+  EventSource event_source = 1;
+  string id_or_name = 2;
+  string canvas_id_or_name = 3;
+}
+
+message UpdateEventSourceResponse {
+  EventSource event_source = 1;
+  string key = 2;
 }
 
 message ListStagesRequest {
