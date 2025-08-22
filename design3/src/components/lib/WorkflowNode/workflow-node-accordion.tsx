@@ -2723,7 +2723,7 @@ export function WorkflowNodeAccordion({
           <Badge color={data.status == 'success' ? 'green' : data.status == 'failed' ? 'red' : 'blue'} className='!flex !items-center mr-2'>
             <MaterialSymbol 
               name={statusConfig.icon} 
-              size='xl'
+              size='lg'
               className={statusConfig.iconColor}
             />
             </Badge>
@@ -2795,19 +2795,19 @@ export function WorkflowNodeAccordion({
                 <div className={`flex items-center ${consistentStatuses ? 'hidden' : 'visible'}`}>
                   {data.queueIcon == 'how_to_reg' && (
                    <Badge color='amber' className='!text-xs'>
-                    <MaterialSymbol name="how_to_reg" size="xl" className='text-orange-600 dark:text-orange-400 animate-pulse' />
+                    <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400 animate-pulse' />
                     </Badge>
                   
                   )}
                   {data.queueIcon == 'pause' && (
                   <Badge color='zinc' className='!text-xs'>
-                    <MaterialSymbol name="pending" size="xl" className='text-gray-600 dark:text-gray-400 animate-pulse' />
+                    <MaterialSymbol name="pending" size="lg" className='text-gray-600 dark:text-gray-400 animate-pulse' />
                     
                   </Badge>
                   )}
                   {data.queueIcon == 'timer' && (
                   <Badge color='zinc' className='!text-xs'>
-                    <MaterialSymbol name="schedule" size="xl" className='text-gray-600 dark:text-gray-400 animate-pulse' />
+                    <MaterialSymbol name="schedule" size="lg" className='text-gray-600 dark:text-gray-400 animate-pulse' />
                     
                   </Badge>
                   )}

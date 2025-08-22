@@ -7,6 +7,7 @@ import { Text } from '../Text/text';
 import { Link } from '../Link/link';
 import { Badge, BadgeButton } from '../Badge/badge';
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from '../Dropdown/dropdown';
+import { Input, InputGroup } from '../Input/input';
 import clsx from 'clsx';
 import { EmptyState } from '../EmptyState';
 
@@ -839,8 +840,10 @@ export function NodeDetailsSidebar({
   // Check for URL parameters
   const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
   const consistentStatuses = new URLSearchParams(window.location.search).get('consistentStatuses') === 'true';
+  const twoTabsParam = new URLSearchParams(window.location.search).get('twoTabs');
+  const twoTabs = twoTabsParam === null ? true : twoTabsParam === 'true';
   
-  const [activeTab, setActiveTab] = useState<'activity' | 'run-history' | 'queue-history' | 'settings'>('activity');
+  const [activeTab, setActiveTab] = useState<'activity' | 'run-history' | 'queue-history' | 'history' | 'settings'>('activity');
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const [expandedQueue, setExpandedQueue] = useState<Set<string>>(new Set());
   const [expandedHistoryRuns, setExpandedHistoryRuns] = useState<Set<string>>(new Set());
@@ -855,10 +858,18 @@ export function NodeDetailsSidebar({
   // Inputs/Outputs tabs state
   const [inputsOutputsTabs, setInputsOutputsTabs] = useState<Record<string, 'details' | 'payload'>>({});
 
-  const tabs: Tab[] = [
+  // History search and filter state
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'runs' | 'queue'>('all');
+
+  const tabs: Tab[] = twoTabs ? [
     { id: 'activity', label: 'Activity' },
     { id: 'run-history', label: 'Run history' },
     { id: 'queue-history', label: 'Queue history' },
+    { id: 'settings', label: 'Settings' }
+  ] : [
+    { id: 'activity', label: 'Activity' },
+    { id: 'history', label: 'History' },
     { id: 'settings', label: 'Settings' }
   ];
 
@@ -1400,7 +1411,7 @@ export function NodeDetailsSidebar({
         <ControlledTabs
           tabs={tabs}
           activeTab={activeTab}
-          onTabChange={(tabId) => setActiveTab(tabId as 'activity' | 'run-history' | 'queue-history' | 'settings')}
+          onTabChange={(tabId) => setActiveTab(tabId as 'activity' | 'run-history' | 'queue-history' | 'history' | 'settings')}
           variant="underline"
         />
       </div>
@@ -1718,7 +1729,7 @@ export function NodeDetailsSidebar({
                                     </span>
                                   </div>
                                   <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
-                                    <Badge color="cyan">
+                                    <Badge color="zinc">
                                       <MaterialSymbol name="schedule" size="md" className="animate-pulse"/>
                                       <span className='uppercase'>Scheduled</span>
                                     </Badge>
@@ -1812,18 +1823,14 @@ export function NodeDetailsSidebar({
                                 <MaterialSymbol name={item.icon} size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
                               )}
                                 <span className='text-xs text-gray-700 dark:text-zinc-400'>{item.scheduledFor}</span>
-                                <Button plain className='bg-black/5 dark:bg-zinc-700/5'>
-                                <MaterialSymbol name="close" size="sm" className='text-black-700 dark:text-black-400' />
-                               </Button>
+                                <Link href="#" className="gray-400 dark:gray-400 underline text-xs">Cancel</Link>
                             </div>
                           )}
                            {item.executionMethod === 'queued' && (
                             <div className='flex items-center justify-between'>
                              
                                 <span className='text-xs text-gray-700 dark:text-zinc-400'>Waiting for execution</span>
-                               <Button plain className='bg-black/5 dark:bg-zinc-700/5'>
-                                <MaterialSymbol name="close" size="sm" className='text-black-700 dark:text-black-400' />
-                               </Button>
+                                <Link href="#" className="gray-400 dark:gray-400 underline text-xs">Cancel</Link>
                                
                             </div>
                           )}
@@ -2175,6 +2182,439 @@ export function NodeDetailsSidebar({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'queue-history' && (
+          <div className="p-4 space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                  QUEUE HISTORY ({queueItems.length})
+                </Text>
+              </div>
+              
+              <div className="space-y-3">
+                {queueItems2.map((item) => {
+                  const isExpanded = expandedQueue.has(item.id);
+                  
+                  // Get dot color based on status
+                  const getDotColor = (status: string) => {
+                    switch (status?.toLowerCase()) {
+                      case 'approved': return 'bg-green-500';
+                      case 'pending': return 'bg-yellow-500 animate-pulse';
+                      case 'cancelled': case 'rejected': return 'bg-red-500';
+                      default: return 'bg-zinc-500';
+                    }
+                  };
+                  
+                  return (
+                    <div key={item.id} className="queueItem" >
+                      <div 
+                        className={`p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 ${!isManagingQueue ? 'cursor-pointer' : ''}`}
+                        onClick={!isManagingQueue ? () => toggleQueueExpansion(item.id) : undefined}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 truncate">
+                            {isManagingQueue && (
+                              <MaterialSymbol 
+                                name="drag_indicator" 
+                                size="md" 
+                                className="text-gray-400 dark:text-zinc-500 cursor-grab active:cursor-grabbing"
+                              />
+                            )}
+                            { showIcons && (
+                              <MaterialSymbol 
+                                name={item.icon} 
+                                size="lg" 
+                                className="text-orange-600 dark:text-orange-400"
+                              />
+                            )}
+                     
+                            {(
+                              <div>
+                              
+                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                    <Badge color="zinc">
+                                      <MaterialSymbol name="cancel" size="md" className="animate-pulse"/>
+                                      <span className='uppercase'>Cancelled</span>
+                                    </Badge>
+                                  </div>
+                              </div>
+                            )}
+                           
+                            <span className="font-medium truncate text-sm dark:text-white">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {!isManagingQueue && !isExpanded && (
+                              <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">2 min ago</span>
+                            )}
+                            {isManagingQueue ? (
+                              <div className="flex items-center gap-2">
+                                
+                                <Dropdown>
+                                  <DropdownButton as={Button} plain className="p-2 rounded hover:bg-gray-100 dark:hover:bg-zinc-700">
+                                    <MaterialSymbol 
+                                      name="more_vert" 
+                                      size="md" 
+                                      className="text-gray-600 dark:text-zinc-400"
+                                    />
+                                  </DropdownButton>
+                                  <DropdownMenu className="w-48">
+                                    <DropdownItem onClick={() => handleRemoveQueueItem(item.id)}>
+                                      <MaterialSymbol name="delete" size="sm" className="mr-2" />
+                                      Remove from queue
+                                    </DropdownItem>
+                                  </DropdownMenu>
+                                </Dropdown>
+                              </div>
+                            ) : (
+                              <MaterialSymbol 
+                                name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                size="lg" 
+                                className="text-gray-600 dark:text-zinc-400" 
+                              />
+                            )}
+                          </div>
+                        </div>
+                
+                        {!isManagingQueue && isExpanded && (
+                          <div className="mt-3 space-y-3">
+                            
+                            {renderInputsOutputs2(item.inputs, undefined, item.id)}
+                          
+                           
+                          </div>
+                        )}
+                      </div>
+                     
+                      
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="p-4 space-y-6">
+            {/* Combined History - Show both runs and queue items mixed together */}
+            <div>
+             
+              {/* Search and Filter Controls */}
+              <div className="mb-4 space-y-3">
+                {/* Search Input */}
+                <div className='flex items-center gap-2'>
+                  <div className="flex-grow-1">
+                    <InputGroup>
+                      <MaterialSymbol name="search" size="md" data-slot="icon" />
+                      <Input
+                        type="search"
+                        placeholder="Search history..."
+                        value={historySearchQuery}
+                        onChange={(e) => setHistorySearchQuery(e.target.value)}
+                        className="text-sm"
+                      />
+                    </InputGroup>
+                  </div>
+                  <div className="flex-grow-0">
+                    <ControlledTabs
+                      tabs={[
+                        { id: 'all', label: 'All' },
+                        { id: 'runs', label: source === 'eventSource' ? 'Events' : 'Runs' },
+                        { id: 'queue', label: 'Queue' }
+                      ]}
+                      activeTab={historyFilter}
+                      onTabChange={(tabId) => setHistoryFilter(tabId as 'all' | 'runs' | 'queue')}
+                      variant="pills"
+                      size="xs"
+                      
+                    />
+                    </div>
+                </div>
+
+               
+              </div>
+              
+              <div className="space-y-3">
+                {/* Create mixed array of queue items and runs/events */}
+                {(() => {
+                  const mixedItems: Array<{type: 'queue' | 'run' | 'event', data: any, index: number}> = [];
+                  
+                  // Helper function to check if item matches search query
+                  const matchesSearch = (item: any, type: 'queue' | 'run' | 'event'): boolean => {
+                    if (!historySearchQuery.trim()) return true;
+                    
+                    const query = historySearchQuery.toLowerCase();
+                    const name = item.name?.toLowerCase() || '';
+                    
+                    if (type === 'event') {
+                      const url = item.url?.toLowerCase() || '';
+                      return name.includes(query) || url.includes(query);
+                    }
+                    
+                    return name.includes(query);
+                  };
+
+                  // Add queue items to mixed array (with filtering)
+                  if (historyFilter === 'all' || historyFilter === 'queue') {
+                    queueItems2.forEach((item, index) => {
+                      if (matchesSearch(item, 'queue')) {
+                        mixedItems.push({type: 'queue', data: item, index});
+                      }
+                    });
+                  }
+                  
+                  // Add runs/events to mixed array (with filtering)
+                  if (historyFilter === 'all' || historyFilter === 'runs') {
+                    if (source === 'eventSource') {
+                      mockHistoryEvents.forEach((event, index) => {
+                        if (matchesSearch(event, 'event')) {
+                          mixedItems.push({type: 'event', data: event, index});
+                        }
+                      });
+                    } else {
+                      mockHistoryRuns.forEach((run, index) => {
+                        if (matchesSearch(run, 'run')) {
+                          mixedItems.push({type: 'run', data: run, index});
+                        }
+                      });
+                    }
+                  }
+                  
+                  // Create a better mixed pattern: 2 runs, 1 queue, 1 run, 2 queue, 3 runs, etc.
+                  const betterMixedItems: typeof mixedItems = [];
+                  const queueItems = mixedItems.filter(item => item.type === 'queue');
+                  const otherItems = mixedItems.filter(item => item.type !== 'queue');
+                  
+                  let queueIndex = 0;
+                  let otherIndex = 0;
+                  let pattern = [2, 1, 1, 2, 3, 1]; // runs, queue, runs, queue, runs, queue
+                  let patternIndex = 0;
+                  let isQueue = false;
+                  
+                  while (queueIndex < queueItems.length || otherIndex < otherItems.length) {
+                    const count = pattern[patternIndex % pattern.length];
+                    
+                    if (isQueue) {
+                      // Add queue items
+                      for (let i = 0; i < count && queueIndex < queueItems.length; i++) {
+                        betterMixedItems.push(queueItems[queueIndex++]);
+                      }
+                    } else {
+                      // Add runs/events
+                      for (let i = 0; i < count && otherIndex < otherItems.length; i++) {
+                        betterMixedItems.push(otherItems[otherIndex++]);
+                      }
+                    }
+                    
+                    isQueue = !isQueue;
+                    patternIndex++;
+                  }
+                  
+                  // Show empty state if no items match filters
+                  if (betterMixedItems.length === 0) {
+                    const filterText = historyFilter === 'all' ? 'items' : 
+                                     historyFilter === 'runs' ? (source === 'eventSource' ? 'events' : 'runs') : 
+                                     'queue items';
+                    
+                    return (
+                      <div className="text-center py-8">
+                        <Text className="text-gray-500 dark:text-zinc-400 text-sm">
+                          {historySearchQuery.trim() ? 
+                            `No ${filterText} match "${historySearchQuery.trim()}"` : 
+                            `No ${filterText} found`
+                          }
+                        </Text>
+                      </div>
+                    );
+                  }
+
+                  return betterMixedItems.map((item) => {
+                    if (item.type === 'queue') {
+                      const queueItem = item.data;
+                      const isExpanded = expandedQueue.has(queueItem.id);
+                      
+                      return (
+                        <div key={`queue-${queueItem.id}`} className="queueItem" >
+                          <div 
+                            className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer"
+                            onClick={() => toggleQueueExpansion(queueItem.id)}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 truncate">
+                                { showIcons && (
+                                  <MaterialSymbol 
+                                    name={queueItem.icon} 
+                                    size="lg" 
+                                    className="text-orange-600 dark:text-orange-400"
+                                  />
+                                )}
+                         
+                                <div>
+                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                    <Badge color="zinc">
+                                      <MaterialSymbol name="schedule" size="md"/>
+                                      <span className='uppercase'>Queued</span>
+                                    </Badge>
+                                  </div>
+                                </div>
+                               
+                                <span className="font-medium truncate text-sm dark:text-white">{queueItem.name}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {!isExpanded && (
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">2 min ago</span>
+                                )}
+                                <MaterialSymbol 
+                                  name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                  size="lg" 
+                                  className="text-gray-600 dark:text-zinc-400" 
+                                />
+                              </div>
+                            </div>
+                    
+                            {isExpanded && (
+                              <div className="mt-3 space-y-3">
+                                {renderInputsOutputs2(queueItem.inputs, undefined, queueItem.id)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    } else if (item.type === 'event') {
+                      const event = item.data;
+                      const statusConfig = getEventStatusConfig(event.status);
+                      const isExpanded = expandedHistoryEvents.has(event.id);
+                      
+                      return (
+                        <div key={`event-${event.id}`} className={`border bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-lg`}>
+                          <div className="p-3">
+                            <div className="cursor-pointer flex items-center justify-between" onClick={() => toggleHistoryEventExpansion(event.id)}>
+                              <div className="flex items-center gap-2 truncate pr-2">
+                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusConfig.dotColor}`}></div>
+                                
+                                <span className="font-medium truncate text-sm dark:text-white font-mono">
+                                  {truncateEventUrl(event.url)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {!isExpanded && (
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
+                                    {formatEventTimestamp(event.timestamp)}
+                                  </span>
+                                )}
+                                <MaterialSymbol 
+                                  name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                  size="lg" 
+                                  className="text-gray-600 dark:text-zinc-400" 
+                                />
+                              </div>
+                            </div>
+                            
+                            {isExpanded && renderEventDetails(event)}
+                          </div>
+                        </div>
+                      );
+                    } else if (item.type === 'run') {
+                      const run = item.data;
+                      const statusConfig = getStatusConfig(run.status);
+                      const isExpanded = expandedHistoryRuns.has(run.id);
+                      
+                      return (
+                        <div key={`run-${run.id}`} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 " + statusConfig.borderColor } >
+                          <div className="p-3">
+                            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleHistoryRunExpansion(run.id)}>
+                              <div className='text-xs gap-2'>
+                                <div className='flex items-center gap-2 mb-2'>
+                                  {run.status == 'success' && (
+                                    <Badge color='green' className='!flex !items-center'>
+                                       <MaterialSymbol name='check_circle' size='md'/>
+                                      <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Passed</span>
+                                    </Badge>
+                                  )}
+                                  {run.status == 'failed' && (
+                                    <Badge color='red' className='!flex !items-center'>
+                                       <MaterialSymbol name='cancel' size='md'/>
+                                      <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Failed</span>
+                                    </Badge>
+                                  )}
+                                  {run.status == 'running' && (
+                                    <Badge color='blue' className='!flex !items-center'>
+                                      <MaterialSymbol name='sync' size='md' className='animate-spin'/>
+                                      <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Running</span>
+                                    </Badge>
+                                  )}
+                                  <Link href="#" className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm">{run.name} 
+                                  <MaterialSymbol name='arrow_outward' size='md'/>
+                                  </Link>
+                                </div>
+                                
+                                <div className='flex items-center gap-4 mb-1'>
+                                  <div className='flex items-center gap-1'>
+                                      <MaterialSymbol name='calendar_today' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                      <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
+                                        {run.status == 'running' ? 'Started on ' + run.timestamp : 'Finished on ' + run.timestamp}</span>
+                                    </div>
+                                    <div className='flex items-center gap-1'>
+                                      <MaterialSymbol name='timer' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                      <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">{run.duration}</span>
+                                    </div>
+                                </div>
+                                <div className='flex items-center gap-1'>
+                                  <MaterialSymbol name='bolt' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap"><Link href="#" className="text-blue-600 dark:text-blue-400">AI Agent triade</Link> &bull; Event ID: <Link href="#" className="text-blue-600 dark:text-blue-400">324234234-23423424-23423</Link></span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <MaterialSymbol 
+                                    name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                    size="lg" 
+                                    className="text-gray-600 dark:text-zinc-400" 
+                                  />
+                              </div>
+                            </div>
+                            
+                            {isExpanded && (
+                              <div className="mt-3 space-y-3">
+                                {renderInputsOutputs(run.inputs, run.outputs, run.id)}
+                                {/* Queue Information */}
+                                <div className='bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs'>
+                                  <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+                                    Queue Information
+                                  </div>
+                                  <div className='space-y-1'>
+                                    {run.queuedAt && (
+                                      <div className='flex items-center gap-1'>
+                                        <MaterialSymbol name='schedule' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                        <span className="text-xs text-gray-500 dark:text-zinc-400">Added to queue on {run.queuedAt}</span>
+                                      </div>
+                                    )}
+                                    {run.conditionMetAt && (
+                                      <div className='flex items-center gap-1'>
+                                        <MaterialSymbol name='check_circle' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                        <span className="text-xs text-gray-500 dark:text-zinc-400">Approved on {run.conditionMetAt}</span>
+                                      </div>
+                                    )}
+                                    {run.approvedBy && (
+                                      <div className='flex items-center gap-1'>
+                                        <MaterialSymbol name='person' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                        <span className="text-xs text-gray-500 dark:text-zinc-400">Approved by <Link href="#" className="text-blue-600 dark:text-blue-400">{run.approvedBy}</Link></span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                  });
+                })()}
               </div>
             </div>
           </div>
