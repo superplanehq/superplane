@@ -61,6 +61,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSuperplane.Superplane_RemoveUser_FullMethodName:                   {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_CreateEventSource_FullMethodName:            {Resource: "eventsource", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ResetEventSourceKey_FullMethodName:          {Resource: "eventsource", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_UpdateEventSource_FullMethodName:            {Resource: "eventsource", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_DescribeEventSource_FullMethodName:          {Resource: "eventsource", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListEventSources_FullMethodName:             {Resource: "eventsource", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_CreateStage_FullMethodName:                  {Resource: "stage", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
