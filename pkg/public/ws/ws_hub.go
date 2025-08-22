@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	writeWait  = 10 * time.Second // Time allowed to write a message
-	pongWait   = 20 * time.Second // Must receive pong within 20s
-	pingPeriod = 10 * time.Second // Ping every 10s
+    writeWait = 10 * time.Second       // Time allowed to write a message
+    pongWait  = 20 * time.Second       // Must receive pong within 20s
+    pingPeriod = 10 * time.Second      // Ping every 10s
 )
 
 // Client represents a connected websocket client
@@ -208,6 +208,11 @@ func (c *Client) readPump() {
 
 	c.conn.SetReadLimit(1024 * 1024) // 1MB max message size
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
 	// Process incoming messages
 	for {
 		_, message, err := c.conn.ReadMessage()
@@ -235,20 +240,9 @@ func (c *Client) readPump() {
 	}
 }
 
-func (c *Client) handlePing() {
-	select {
-	case c.send <- []byte("pong"):
-	default:
-	}
-}
-
 // handleMessage processes incoming messages from clients
 func (c *Client) handleMessage(message []byte) {
-	msgStr := string(message)
-
-	// Handle application-level ping (since browsers can't send WebSocket ping frames)
-	if msgStr == "ping" {
-		c.handlePing()
-		return
-	}
+	// Handle client messages
+	log.Infof("Received message: %s", string(message))
+	return
 }

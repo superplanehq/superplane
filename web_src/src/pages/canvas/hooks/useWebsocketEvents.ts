@@ -26,16 +26,13 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
   const syncToReactFlow = useCanvasStore((s) => s.syncToReactFlow);
   const lockedNodes = useCanvasStore((s) => s.lockedNodes);
 
-  // WebSocket setup  
+  // WebSocket setup
   const { lastJsonMessage, readyState } = useWebSocket<ServerEvent>(
     `${SOCKET_SERVER_URL}${canvasId}?organization_id=${organizationId}`,
     {
       shouldReconnect: () => true,
       reconnectAttempts: 10,
-      heartbeat: {
-        interval: 5000,
-        message: 'ping',
-      },
+      heartbeat: false,
       reconnectInterval: 3000,
       onOpen: () => {},
       onError: () => {},
