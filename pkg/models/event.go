@@ -338,6 +338,34 @@ func parseExpressionVariables(ctx context.Context, e *Event, filterType string) 
 		if err != nil {
 			return nil, err
 		}
+	case FilterTypeExpression:
+		// For expression filters, we need to provide both data and headers
+		dataContent, err := e.GetData()
+		if err != nil {
+			// If data parsing fails, use empty map
+			dataContent = make(map[string]any)
+		}
+		headerContent, err := e.GetHeaders()
+		if err != nil {
+			// If headers parsing fails, use empty map
+			headerContent = make(map[string]any)
+		}
+		
+		// Add data to payload
+		for key, value := range dataContent {
+			payload[key] = value
+		}
+		
+		// Add headers (case insensitive)
+		for key, value := range headerContent {
+			key = strings.ToLower(key)
+			headers[key] = value
+		}
+		
+		variables["$"] = payload
+		variables["headers"] = headers
+		
+		return variables, nil
 	default:
 		return nil, fmt.Errorf("invalid filter type: %s", filterType)
 	}

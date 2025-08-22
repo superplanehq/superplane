@@ -464,12 +464,14 @@ enum FilterType {
   FILTER_TYPE_UNKNOWN = 0;
   FILTER_TYPE_DATA = 1;
   FILTER_TYPE_HEADER = 2;
+  FILTER_TYPE_EXPRESSION = 3;
 }
 
 message Filter {
   FilterType type = 1;
   DataFilter data = 2;
   HeaderFilter header = 3;
+  ExpressionFilter expression = 4;
 }
 
 message DataFilter {
@@ -477,6 +479,10 @@ message DataFilter {
 }
 
 message HeaderFilter {
+  string expression = 1;
+}
+
+message ExpressionFilter {
   string expression = 1;
 }
 

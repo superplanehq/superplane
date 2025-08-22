@@ -147,4 +147,87 @@ func Test__Filters(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, accept)
 	})
+
+	t.Run("expression filter with data and headers -> true", func(t *testing.T) {
+		filters := []Filter{
+			{
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.ref == "refs/heads/main" && headers["x-github-event"] == "push"`},
+			},
+		}
+
+		event := &Event{
+			Raw:     []byte(`{"ref": "refs/heads/main", "repository": {"name": "test"}}`),
+			Headers: []byte(`{"X-GitHub-Event": "push", "Content-Type": "application/json"}`),
+		}
+		accept, err := ApplyFilters(filters, FilterOperatorAnd, event)
+		require.NoError(t, err)
+		require.True(t, accept)
+	})
+
+	t.Run("expression filter with data and headers -> false", func(t *testing.T) {
+		filters := []Filter{
+			{
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.ref == "refs/heads/main" && headers["x-github-event"] == "pull_request"`},
+			},
+		}
+
+		event := &Event{
+			Raw:     []byte(`{"ref": "refs/heads/main", "repository": {"name": "test"}}`),
+			Headers: []byte(`{"X-GitHub-Event": "push", "Content-Type": "application/json"}`),
+		}
+		accept, err := ApplyFilters(filters, FilterOperatorAnd, event)
+		require.NoError(t, err)
+		require.False(t, accept)
+	})
+
+	t.Run("expression filter with data only -> true", func(t *testing.T) {
+		filters := []Filter{
+			{
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a == 1 && $.b == 2`},
+			},
+		}
+
+		event := &Event{Raw: []byte(`{"a": 1, "b": 2}`), Headers: []byte(`{}`)}
+		accept, err := ApplyFilters(filters, FilterOperatorAnd, event)
+		require.NoError(t, err)
+		require.True(t, accept)
+	})
+
+	t.Run("expression filter with headers only -> true", func(t *testing.T) {
+		filters := []Filter{
+			{
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `headers["content-type"] == "application/json"`},
+			},
+		}
+
+		event := &Event{Raw: []byte(`{}`), Headers: []byte(`{"Content-Type": "application/json"}`)}
+		accept, err := ApplyFilters(filters, FilterOperatorAnd, event)
+		require.NoError(t, err)
+		require.True(t, accept)
+	})
+
+	t.Run("mixed filter types with OR -> true", func(t *testing.T) {
+		filters := []Filter{
+			{
+				Type: FilterTypeData,
+				Data: &DataFilter{Expression: `$.a == 3`}, // This will be false
+			},
+			{
+				Type:       FilterTypeExpression,
+				Expression: &ExpressionFilter{Expression: `$.a == 1 && headers["content-type"] == "application/json"`}, // This will be true
+			},
+		}
+
+		event := &Event{
+			Raw:     []byte(`{"a": 1, "b": 2}`),
+			Headers: []byte(`{"Content-Type": "application/json"}`),
+		}
+		accept, err := ApplyFilters(filters, FilterOperatorOr, event)
+		require.NoError(t, err)
+		require.True(t, accept)
+	})
 }
