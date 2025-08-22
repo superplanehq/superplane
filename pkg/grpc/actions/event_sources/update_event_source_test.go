@@ -93,7 +93,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				},
 				Events: []*protos.EventSource_EventType{
 					{
-						Type: "push",
+						Type: "pipeline_done",
 					},
 				},
 			},
