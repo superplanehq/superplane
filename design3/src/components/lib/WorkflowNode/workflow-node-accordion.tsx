@@ -2799,13 +2799,18 @@ export function WorkflowNodeAccordion({
                     </Badge>
                   
                   )}
-                  {data.queueIcon != 'how_to_reg' && (
+                  {data.queueIcon == 'pause' && (
                   <Badge color='zinc' className='!text-xs'>
                     <MaterialSymbol name="pending" size="xl" className='text-gray-600 dark:text-gray-400 animate-pulse' />
                     
                   </Badge>
                   )}
-                  
+                  {data.queueIcon == 'timer' && (
+                  <Badge color='zinc' className='!text-xs'>
+                    <MaterialSymbol name="schedule" size="xl" className='text-gray-600 dark:text-gray-400 animate-pulse' />
+                    
+                  </Badge>
+                  )}
                 </div>
                 <div className={`flex items-center ${consistentStatuses ? 'visible' : 'hidden'}`}>
                   {data.queueIcon == 'how_to_reg' && (

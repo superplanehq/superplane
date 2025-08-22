@@ -31,7 +31,7 @@ export function MultiCombobox<T extends { id: string }>({
   value?: T[]
   onChange?: (values: T[]) => void
   onRemove?: (value: T) => void
-} & Omit<Headless.ComboboxProps<T, false>, 'as' | 'multiple' | 'children' | 'value' | 'onChange' | 'defaultValue'> & { anchor?: 'top' | 'bottom' }) {
+} & Omit<Headless.ComboboxProps<T, false>, 'as' | 'multiple' | 'children' | 'value' | 'onChange' | 'defaultValue' | 'by' | 'virtual'> & { anchor?: 'top' | 'bottom' }) {
   const [query, setQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)

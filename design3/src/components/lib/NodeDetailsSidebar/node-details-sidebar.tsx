@@ -31,7 +31,7 @@ interface QueueItem {
   name: string;
   timestamp: string;
   icon: string;
-  status: 'pending' | 'approved' | 'waiting';
+  status: 'pending' | 'approved' | 'waiting' | 'cancelled';
   executionMethod: 'manual' | 'timed' | 'queued' | 'blocked' | 'auto';
   approvalInfo?: {
     approvedBy?: number;
@@ -262,7 +262,113 @@ const mockQueue: QueueItem[] = [
     }
   }
 ];
-
+const mockQueue2: QueueItem[] = [
+  {
+    id: 'msg-1',
+    name: 'laskdjf-a43re423-rfewlkjsdf234r-234234kl',
+    timestamp: 'Jan 16, 2022 10:23:45',
+    status: 'waiting',
+    executionMethod: 'timed',
+    icon: 'cancel',
+    scheduledFor: 'Pending approval',
+    approvalInfo: {
+      approvedBy: 1,
+      waitingFor: 2
+    },
+    inputs: {
+      Code: '1045a77',
+      Image: 'v.1.2.3',
+      Terraform: '32.32'
+    }
+  },
+  {
+    id: 'msg-2',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
+    timestamp: '11 minutes ago',
+    status: 'pending',
+    executionMethod: 'timed',
+    icon: 'schedule',
+    delayTime: '15 minutes',
+    scheduledFor: 'Run in 15 minutes',
+    inputs: {
+      code: '1045a77',
+      image: 'v.1.2.4'
+    }
+  },
+  {
+    id: 'msg-3',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
+    timestamp: '1 hour ago',
+    status: 'pending',
+    executionMethod: 'queued',
+    icon: 'input',
+    scheduledFor: 'Position #2 in queue',
+    inputs: {
+      Environment: 'staging',
+      Branch: 'feature/new-ui',
+      Version: '2.1.0'
+    }
+  },
+  {
+    id: 'msg-4',
+    name: 'sdfsdfdsf3324-asdf-rfewlkjsdf234r-sdf3244424',
+    timestamp: '3 hours ago',
+    status: 'waiting',
+    executionMethod: 'blocked',
+    icon: 'pause',
+    scheduledFor: 'Blocked - dependency failed',
+    blockedReason: 'Previous task "Build Infrastructure" failed',
+    inputs: {
+      TestSuite: 'integration',
+      Coverage: '85%',
+      Browser: 'chrome'
+    }
+  },
+  {
+    id: 'msg-5',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
+    timestamp: '5 hours ago',
+    status: 'pending',
+    executionMethod: 'queued',
+    icon: 'input',
+    scheduledFor: 'Position #5 in queue',
+    inputs: {
+      Docker: 'node:18-alpine',
+      Memory: '2GB',
+      CPU: '1 core'
+    }
+  },
+  {
+    id: 'msg-6',
+    name: '2asdf324-asdf-rfewlkjsdf234r-sdf3244424',
+    timestamp: 'Yesterday 4:30 PM',
+    status: 'pending',
+    executionMethod: 'timed',
+    icon: 'schedule',
+    scheduledFor: 'Run tomorrow 9:00 AM',
+    delayTime: 'until 9:00 AM tomorrow',
+    inputs: {
+      Tag: 'v3.0.0',
+      Changelog: 'Major release',
+      Distribution: 'all-regions'
+    }
+  },
+  {
+    id: 'msg-7',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
+    timestamp: '2 days ago',
+    status: 'waiting',
+    executionMethod: 'blocked',
+    icon: 'pause',
+    scheduledFor: 'Blocked - resource unavailable',
+    blockedReason: 'Database maintenance window not available',
+    inputs: {
+      Database: 'postgresql-14',
+      Backup: 'enabled',
+      Downtime: '15 minutes'
+    }
+  }
+];
 const mockHistoryRuns: RunData[] = [
   {
     id: 'hist-1',
@@ -734,12 +840,13 @@ export function NodeDetailsSidebar({
   const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
   const consistentStatuses = new URLSearchParams(window.location.search).get('consistentStatuses') === 'true';
   
-  const [activeTab, setActiveTab] = useState<'activity' | 'history' | 'settings'>('activity');
+  const [activeTab, setActiveTab] = useState<'activity' | 'run-history' | 'queue-history' | 'settings'>('activity');
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const [expandedQueue, setExpandedQueue] = useState<Set<string>>(new Set());
   const [expandedHistoryRuns, setExpandedHistoryRuns] = useState<Set<string>>(new Set());
   const [isManagingQueue, setIsManagingQueue] = useState(false);
   const [queueItems, setQueueItems] = useState(mockQueue);
+  const [queueItems2, setQueueItems2] = useState(mockQueue2);
   
   // Event Source specific state  
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
@@ -750,7 +857,8 @@ export function NodeDetailsSidebar({
 
   const tabs: Tab[] = [
     { id: 'activity', label: 'Activity' },
-    { id: 'history', label: 'History' },
+    { id: 'run-history', label: 'Run history' },
+    { id: 'queue-history', label: 'Queue history' },
     { id: 'settings', label: 'Settings' }
   ];
 
@@ -1292,7 +1400,7 @@ export function NodeDetailsSidebar({
         <ControlledTabs
           tabs={tabs}
           activeTab={activeTab}
-          onTabChange={(tabId) => setActiveTab(tabId as 'activity' | 'history' | 'settings')}
+          onTabChange={(tabId) => setActiveTab(tabId as 'activity' | 'run-history' | 'queue-history' | 'settings')}
           variant="underline"
         />
       </div>
@@ -1736,7 +1844,7 @@ export function NodeDetailsSidebar({
           </div>
         )}
         
-        {activeTab === 'history' && (
+        {activeTab === 'run-history' && (
           <div className="p-4 space-y-6">
             {source === 'eventSource' ? (
               /* Historical Events for EventSource */
@@ -1801,85 +1909,274 @@ export function NodeDetailsSidebar({
                   const statusConfig = getStatusConfig(run.status);
                   const isExpanded = expandedHistoryRuns.has(run.id);
                   
+                  // Get dot color based on status (matching activity tab pattern)
+                  const getDotColor = (status: string) => {
+                    switch (status?.toLowerCase()) {
+                      case 'success': case 'passed': return 'bg-green-500';
+                      case 'failed': case 'error': return 'bg-red-500';
+                      case 'running': return 'bg-blue-500 animate-pulse';
+                      case 'pending': case 'queued': return 'bg-yellow-500';
+                      default: return 'bg-zinc-500';
+                    }
+                  };
+                  
                   return (
-                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 cursor-pointer "+statusConfig.bgColor + " " + statusConfig.borderColor } >
-                      <div 
-                        className="p-3"
-                        onClick={() => toggleHistoryRunExpansion(run.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 truncate pr-2">
+                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 " + statusConfig.borderColor } >
+                    <div 
+                      className="p-3"
+                      
+                    >
+                      <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleRunExpansion(run.id)}>
+                      <div className='text-xs gap-2'>
+                            <div className='flex items-center gap-2 mb-2'>
+                              {run.status == 'success' && (
+                              <Badge color='green' className='!flex !items-center'>
+                                 <MaterialSymbol name='check_circle' size='md'/>
+                                <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Passed</span>
+                              </Badge>
+                              )}
+                              {run.status == 'failed' && (
+                              <Badge color='red' className='!flex !items-center'>
+                                 <MaterialSymbol name='cancel' size='md'/>
+                                <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Failed</span>
+                              </Badge>
+                              )}
+                              {run.status == 'running' && (
+                              <Badge color='blue' className='!flex !items-center'>
+                                <MaterialSymbol name='sync' size='md' className='animate-spin'/>
+                                <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Running</span>
+                              </Badge>
+                              )}
+                              <Link href="#" className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm">{run.name} 
+                              <MaterialSymbol name='arrow_outward' size='md'/>
+                              </Link>
                               
-                              <MaterialSymbol 
-                                name={statusConfig.icon} 
-                                size="lg" 
-                                className={statusConfig.iconColor}
-                              />
-                            <span className="font-medium truncate text-sm dark:text-white">{run.name}</span>
-                         
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {!isExpanded && (
-                              <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
-                                {run.timestamp.includes('Aug 1, 2025') ? 
-                                  run.timestamp.split(' ')[3] : 
-                                  run.timestamp.includes('Jul 31, 2025') ? 'Yesterday' : run.timestamp}
-                              </span>
-                            )}
-                            <MaterialSymbol 
-                                name={isExpanded ? 'expand_less' : 'expand_more'} 
-                                size="lg" 
-                                className="text-gray-600 dark:text-zinc-400" 
-                              />
-                          </div>
-                        </div>
-                        
-                        {isExpanded && (
-                          <div className="mt-3 space-y-3">
+                            </div>
+                           
                             
-                            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
-                              <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
-                                  <MaterialSymbol name="timer" size="md" className="text-gray-700 dark:text-zinc-400" />
-                                </div>
-                                <div className="flex-1">
-                                <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Execution Details</div>
-
-                                  <div className="space-y-1 flex flex-col text-xs">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Project</span>
-                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
-                                      {run.project}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Started on</span>
-                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
-                                      {run.timestamp}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Duration</span>
-                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
-                                      {run.duration}
-                                    </div>
-                                  </div>
-                                  </div>
-                                </div>
+                            <div className='flex items-center gap-4 mb-1'>
+                            <div className='flex items-center gap-1'>
+                                <MaterialSymbol name='calendar_today' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
+                                  {run.status == 'running' ? 'Started on ' + run.timestamp : 'Finished on ' + run.timestamp}</span>
                               </div>
+                              <div className='flex items-center gap-1'>
+                                <MaterialSymbol name='timer' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">{run.duration}</span>
+                              </div>
+                             
+                            </div>
+                            <div className='flex items-center gap-1'>
+                              <MaterialSymbol name='bolt' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                              <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap"><Link href="#" className="text-blue-600 dark:text-blue-400">AI Agent triade</Link> &bull; Event ID: <Link href="#" className="text-blue-600 dark:text-blue-400">324234234-23423424-23423</Link></span>
+                            </div>
+                          </div>
+                        <div className="flex items-center gap-3">
+                          
+                          <MaterialSymbol 
+                              name={isExpanded ? 'expand_less' : 'expand_more'} 
+                              size="lg" 
+                              className="text-gray-600 dark:text-zinc-400" 
+                            />
+                        </div>
+                      </div>
+                      
+                      {isExpanded && (
+                        <div className="mt-3 space-y-3">
+                          {/* Run details */}
+                          
+
+                          
+
+                          {renderInputsOutputs(run.inputs, run.outputs, run.id)}
+                          {/* Queue Information */}
+                          <div className='bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs'>
+                            <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+                              Queue Information
+                            </div>
+                            <div className='space-y-1'>
+                              {run.queuedAt && (
+                                <div className='flex items-center gap-1'>
+                                  <MaterialSymbol name='schedule' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400">Added to queue on {run.queuedAt}</span>
+                                </div>
+                              )}
+                              {run.conditionMetAt && (
+                                <div className='flex items-center gap-1'>
+                                  <MaterialSymbol name='check_circle' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400">Approved on {run.conditionMetAt}</span>
+                                </div>
+                              )}
+                              {run.approvedBy && (
+                                <div className='flex items-center gap-1'>
+                                  <MaterialSymbol name='person' size='md' className='text-gray-600 dark:text-zinc-400'/>
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400">Approved by <Link href="#" className="text-blue-600 dark:text-blue-400">{run.approvedBy}</Link></span>
+                                </div>
+                              )}
+                              
                             </div>
                           
-                            {renderInputsOutputs(run.inputs, run.outputs, run.id)}
                           </div>
-                        )}
-                      </div>
+
+                          {/* Queue Information 2 - Grid Layout */}
+                          <div className='bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4'>
+                            
+                            <div className="grid grid-cols-2 gap-6 text-sm">
+                              {/* Left Column */}
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+                                  QUEUED ON
+                                </div>
+                                <div className="text-xs text-gray-900 dark:text-zinc-200">
+                                  {run.queuedAt || 'N/A'}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+                                  APPROVED ON
+                                </div>
+                                <div className="text-xs text-gray-900 dark:text-zinc-200">
+                                  {run.conditionMetAt || 'N/A'}
+                                </div>
+                              </div>
+                              
+                              {/* Right Column */}
+                              <div>
+                                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+                                  APPROVED BY
+                                </div>
+                                <div className="text-xs text-gray-900 dark:text-zinc-200">
+                                  {run.approvedBy ? (
+                                    <Link href="#" className="text-blue-600 dark:text-blue-400">{run.approvedBy}</Link>
+                                  ) : 'N/A'}
+                                </div>
+                              </div>
+                              
+                              
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
+                  </div>
                   );
                 })}
               </div>
               </div>
             )}
+          </div>
+        )}
+        
+        {activeTab === 'queue-history' && (
+          <div className="p-4 space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                  QUEUE HISTORY ({queueItems.length})
+                </Text>
+              </div>
+              
+              <div className="space-y-3">
+                {queueItems2.map((item) => {
+                  const isExpanded = expandedQueue.has(item.id);
+                  
+                  // Get dot color based on status
+                  const getDotColor = (status: string) => {
+                    switch (status?.toLowerCase()) {
+                      case 'approved': return 'bg-green-500';
+                      case 'pending': return 'bg-yellow-500 animate-pulse';
+                      case 'cancelled': case 'rejected': return 'bg-red-500';
+                      default: return 'bg-zinc-500';
+                    }
+                  };
+                  
+                  return (
+                    <div key={item.id} className="queueItem" >
+                      <div 
+                        className={`p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 ${!isManagingQueue ? 'cursor-pointer' : ''}`}
+                        onClick={!isManagingQueue ? () => toggleQueueExpansion(item.id) : undefined}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 truncate">
+                            {isManagingQueue && (
+                              <MaterialSymbol 
+                                name="drag_indicator" 
+                                size="md" 
+                                className="text-gray-400 dark:text-zinc-500 cursor-grab active:cursor-grabbing"
+                              />
+                            )}
+                            { showIcons && (
+                              <MaterialSymbol 
+                                name={item.icon} 
+                                size="lg" 
+                                className="text-orange-600 dark:text-orange-400"
+                              />
+                            )}
+                     
+                            {(
+                              <div>
+                              
+                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                    <Badge color="zinc">
+                                      <MaterialSymbol name="cancel" size="md" className="animate-pulse"/>
+                                      <span className='uppercase'>Cancelled</span>
+                                    </Badge>
+                                  </div>
+                              </div>
+                            )}
+                           
+                            <span className="font-medium truncate text-sm dark:text-white">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {!isManagingQueue && !isExpanded && (
+                              <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">2 min ago</span>
+                            )}
+                            {isManagingQueue ? (
+                              <div className="flex items-center gap-2">
+                                
+                                <Dropdown>
+                                  <DropdownButton as={Button} plain className="p-2 rounded hover:bg-gray-100 dark:hover:bg-zinc-700">
+                                    <MaterialSymbol 
+                                      name="more_vert" 
+                                      size="md" 
+                                      className="text-gray-600 dark:text-zinc-400"
+                                    />
+                                  </DropdownButton>
+                                  <DropdownMenu className="w-48">
+                                    <DropdownItem onClick={() => handleRemoveQueueItem(item.id)}>
+                                      <MaterialSymbol name="delete" size="sm" className="mr-2" />
+                                      Remove from queue
+                                    </DropdownItem>
+                                  </DropdownMenu>
+                                </Dropdown>
+                              </div>
+                            ) : (
+                              <MaterialSymbol 
+                                name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                size="lg" 
+                                className="text-gray-600 dark:text-zinc-400" 
+                              />
+                            )}
+                          </div>
+                        </div>
+                
+                        {!isManagingQueue && isExpanded && (
+                          <div className="mt-3 space-y-3">
+                            
+                            {renderInputsOutputs2(item.inputs, undefined, item.id)}
+                          
+                           
+                          </div>
+                        )}
+                      </div>
+                     
+                      
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
         
