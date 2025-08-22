@@ -536,7 +536,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                     className="text-left w-full font-semibold text-sm hover:underline truncate text-gray-900 dark:text-gray-100"
                     onClick={() => selectStageId(props.id)}
                   >
-                    {lastExecution?.id || 'No recent runs'}
+                    {lastExecutionEvent?.label || lastExecution?.id || 'No recent runs'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 font-semibold">
