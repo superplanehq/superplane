@@ -2720,11 +2720,13 @@ export function WorkflowNodeAccordion({
          
           </div>
           <div className={`flex items-center gap-2 ${consistentStatuses ? 'hidden' : 'visible'}`}>
+          <Badge color={data.status == 'success' ? 'green' : data.status == 'failed' ? 'red' : 'blue'} className='!flex !items-center mr-2'>
             <MaterialSymbol 
               name={statusConfig.icon} 
-              size='lg'
-              className={clsx('mr-2', statusConfig.iconColor)}
+              size='xl'
+              className={statusConfig.iconColor}
             />
+            </Badge>
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
@@ -2790,22 +2792,38 @@ export function WorkflowNodeAccordion({
                 { showIcons && (
                   <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400' />
                 )}
-                <div className={`flex items-center ${consistentStatuses ? 'visible' : 'hidden'}`}>
+                <div className={`flex items-center ${consistentStatuses ? 'hidden' : 'visible'}`}>
                   {data.queueIcon == 'how_to_reg' && (
-                  <Badge color='amber' className='!text-xs'>
-                    <MaterialSymbol name="how_to_reg" size="md" className='animate-pulse' />
-                    PENDING APPROVAL
-                  </Badge>
+                   <Badge color='amber' className='!text-xs'>
+                    <MaterialSymbol name="how_to_reg" size="xl" className='text-orange-600 dark:text-orange-400 animate-pulse' />
+                    </Badge>
+                  
                   )}
                   {data.queueIcon != 'how_to_reg' && (
                   <Badge color='zinc' className='!text-xs'>
-                    <MaterialSymbol name="schedule" size="md" className='animate-pulse' />
-                    SHEDULED
+                    <MaterialSymbol name="pending" size="xl" className='text-gray-600 dark:text-gray-400 animate-pulse' />
+                    
                   </Badge>
                   )}
                   
                 </div>
-                <div className={`flex items-center gap-2 ${consistentStatuses ? 'hidden' : 'visible'}`}>
+                <div className={`flex items-center ${consistentStatuses ? 'visible' : 'hidden'}`}>
+                  {data.queueIcon == 'how_to_reg' && (
+                   <Badge color='amber' className='!text-xs'>
+                    <MaterialSymbol name="how_to_reg" size="md" className='text-orange-600 dark:text-orange-400 animate-pulse' />
+                    APPROVAL
+                    </Badge>
+                  
+                  )}
+                  {data.queueIcon != 'how_to_reg' && (
+                  <Badge color='zinc' className='!text-xs'>
+                    <MaterialSymbol name="pending" size="md" className='text-gray-600 dark:text-gray-400 animate-pulse' />
+                    PENDING
+                  </Badge>
+                  )}
+                  
+                </div>
+                <div className={`flex items-center gap-2 hidden`}>
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse`}></div>
                   <span className={`text-xs font-medium text-orange-700 dark:text-orange-500`}>
                     {data.queueIcon == 'how_to_reg' ? 'Action required' : 'Pending'}

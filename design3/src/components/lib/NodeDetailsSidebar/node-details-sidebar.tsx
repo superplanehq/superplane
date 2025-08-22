@@ -1535,7 +1535,7 @@ export function NodeDetailsSidebar({
                   <Link 
                     href="#" 
                     onClick={(e) => { e.preventDefault(); handleManageQueue(); }}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hidden"
                   >
                     Manage queue
                   </Link>
@@ -1587,30 +1587,30 @@ export function NodeDetailsSidebar({
                             { }
                             {item.executionMethod === 'manual' && (
                               <div>
-                                <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
                                   <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
                                     <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
                                       Action requred
                                     </span>
                                   </div>
-                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
+                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
                                     <Badge color="amber">
                                       <MaterialSymbol name="how_to_reg" size="md" className="animate-pulse"/>
-                                      <span className='uppercase'>PENDING approval</span>
+                                      <span className='uppercase'>Approval</span>
                                     </Badge>
                                   </div>
                               </div>
                             )}
                             {item.executionMethod === 'timed' && (
                               <div>
-                                <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
                                     <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
                                     <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
                                      Pending
                                     </span>
                                   </div>
-                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
-                                    <Badge color="zinc">
+                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                    <Badge color="cyan">
                                       <MaterialSymbol name="schedule" size="md" className="animate-pulse"/>
                                       <span className='uppercase'>Scheduled</span>
                                     </Badge>
@@ -1619,16 +1619,16 @@ export function NodeDetailsSidebar({
                             )}
                              {item.executionMethod === 'queued' && (
                               <div>
-                                <div className={`flex items-center gap-2 ${consistentStatuses ? "hidden" : "visible"}`}>
+                                <div className={`flex items-center gap-2 ${!consistentStatuses ? "hidden" : "visible"}`}>
                                     <div className={`w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse`}></div>
                                     <span className={`text-xs font-medium text-amber-700 dark:text-amber-500`}>
                                      To be executed
                                     </span>
                                   </div>
-                                  <div className={`flex items-center gap-2 ${consistentStatuses ? "visible" : "hidden"}`}>
-                                    <Badge color="orange">
+                                  <div className={`flex items-center gap-2 ${!consistentStatuses ? "visible" : "hidden"}`}>
+                                    <Badge color="zinc">
                                       <MaterialSymbol name="pending" size="md" className="animate-pulse"/>
-                                      <span className='uppercase'>To be executed</span>
+                                      <span className='uppercase'>Pending</span>
                                     </Badge>
                                   </div>
                               </div>
@@ -1677,7 +1677,7 @@ export function NodeDetailsSidebar({
                           </div>
                         )}
                       </div>
-                      {!isManagingQueue && item.executionMethod != 'queued' && (
+                      {!isManagingQueue && (
                           <div className={item.executionMethod==='manual' ? `px-3 py-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-700` :`px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700`}>
                           {item.executionMethod === 'manual' && (
                             <div className='flex justify-between items-center'>
@@ -1699,19 +1699,24 @@ export function NodeDetailsSidebar({
                             </div>
                           )}
                           {item.executionMethod === 'timed' && (
-                            <div className='flex items-center'>
+                            <div className='flex items-center justify-between'>
                               { showIcons && (
                                 <MaterialSymbol name={item.icon} size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
                               )}
                                 <span className='text-xs text-gray-700 dark:text-zinc-400'>{item.scheduledFor}</span>
+                                <Button plain className='bg-black/5 dark:bg-zinc-700/5'>
+                                <MaterialSymbol name="close" size="sm" className='text-black-700 dark:text-black-400' />
+                               </Button>
                             </div>
                           )}
-                          {item.executionMethod === 'blocked' && (
-                            <div className='flex items-center'>
-                              { showIcons && (
-                                <MaterialSymbol name="pause" size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
-                              )}
-                                <span className='text-xs text-gray-700 dark:text-zinc-400'>Freezed by <Link href="#" className="underline text-zinc-600 dark:text-zinc-400">1 person</Link></span>
+                           {item.executionMethod === 'queued' && (
+                            <div className='flex items-center justify-between'>
+                             
+                                <span className='text-xs text-gray-700 dark:text-zinc-400'>Waiting for execution</span>
+                               <Button plain className='bg-black/5 dark:bg-zinc-700/5'>
+                                <MaterialSymbol name="close" size="sm" className='text-black-700 dark:text-black-400' />
+                               </Button>
+                               
                             </div>
                           )}
                         
