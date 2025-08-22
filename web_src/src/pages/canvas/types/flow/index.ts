@@ -48,7 +48,7 @@ export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;
 
 // Stage node 
 export type StageData = {
-  label: string;
+  name: string;
   description?: string;
   labels: string[];
   status?: string;

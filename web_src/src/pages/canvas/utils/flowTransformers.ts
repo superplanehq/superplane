@@ -26,7 +26,7 @@ export const transformEventSourcesToNodes = (
     
     return ({
       id: es.metadata?.id || '',
-      type: 'githubIntegration',
+      type: 'eventSource',
       data: {
         id: es.metadata?.id || '',
         name: es.metadata?.name,
@@ -49,9 +49,9 @@ export const transformStagesToNodes = (
 ): AllNodeType[] => {
   return stages.map((st, idx) => ({
     id: st.metadata?.id || '',
-    type: 'deploymentCard',
+    type: 'stage',
     data: {
-      label: st.metadata?.name || '',
+      name: st.metadata?.name || '',
       labels: [],
       status: "",
       description: st.metadata?.description || '',
