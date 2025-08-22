@@ -31,6 +31,7 @@ var (
 
 type StageEvent struct {
 	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name        string
 	StageID     uuid.UUID
 	EventID     uuid.UUID
 	SourceID    uuid.UUID
@@ -113,11 +114,11 @@ func FindStageEventByID(id, stageID string) (*StageEvent, error) {
 	return &event, nil
 }
 
-func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any) (*StageEvent, error) {
-	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, inputs)
+func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any, name string) (*StageEvent, error) {
+	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, inputs, name)
 }
 
-func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any) (*StageEvent, error) {
+func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any, name string) (*StageEvent, error) {
 	now := time.Now()
 	stageEvent := StageEvent{
 		StageID:     stageID,
@@ -129,6 +130,7 @@ func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event,
 		StateReason: stateReason,
 		CreatedAt:   &now,
 		Inputs:      datatypes.NewJSONType(inputs),
+		Name:        name,
 	}
 
 	err := tx.Create(&stageEvent).

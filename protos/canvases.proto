@@ -610,6 +610,7 @@ message Executor {
   Integrations.IntegrationRef integration = 2;
   Integrations.ResourceRef resource = 3;
   google.protobuf.Struct spec = 4;
+  string name = 5;
 }
 
 message CreateStageResponse {
@@ -720,6 +721,7 @@ message StageEvent {
   repeated StageEventApproval approvals = 7;
   Execution execution = 8;
   repeated KeyValuePair inputs = 9;
+  string name = 10;
 }
 
 message KeyValuePair {

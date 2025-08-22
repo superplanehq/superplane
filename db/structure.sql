@@ -2,9 +2,9 @@
 -- PostgreSQL database dump
 --
 
-\restrict HgwL9cehz8gA1JiuMUhC8deOrcvkCtf5RfRLqKbsKj4jP129YqkgERCk8lZXKdb
+\restrict lx7SBo9hwCG2FMbbYbYYbRVCkmM9WfefZzzsjXnblsTdVZ3Nh7gK2sO8uhxWtru
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
@@ -395,7 +395,8 @@ CREATE TABLE public.stage_events (
     state character varying(64) NOT NULL,
     state_reason character varying(64),
     created_at timestamp without time zone NOT NULL,
-    inputs jsonb DEFAULT '{}'::jsonb NOT NULL
+    inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
+    name text
 );
 
 
@@ -438,7 +439,8 @@ CREATE TABLE public.stages (
     secrets jsonb DEFAULT '[]'::jsonb NOT NULL,
     executor_type character varying(64) NOT NULL,
     resource_id uuid,
-    description text
+    description text,
+    executor_name text
 );
 
 
@@ -1075,15 +1077,15 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HgwL9cehz8gA1JiuMUhC8deOrcvkCtf5RfRLqKbsKj4jP129YqkgERCk8lZXKdb
+\unrestrict lx7SBo9hwCG2FMbbYbYYbRVCkmM9WfefZzzsjXnblsTdVZ3Nh7gK2sO8uhxWtru
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 5DoteuaSQTfujuqsGCa61ber016id0Nt1VO4kQkZcf7LgKv35s8BGDtjTTeaga3
+\restrict mJM5mKREsvlOGDGHORt7dGZ2NSx67NNcNSSp3aZYsPIuTWCyh1bcrbmO6L4mYXa
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
@@ -1103,7 +1105,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250813203041	f
+20250821200205	f
 \.
 
 
@@ -1111,5 +1113,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 5DoteuaSQTfujuqsGCa61ber016id0Nt1VO4kQkZcf7LgKv35s8BGDtjTTeaga3
+\unrestrict mJM5mKREsvlOGDGHORt7dGZ2NSx67NNcNSSp3aZYsPIuTWCyh1bcrbmO6L4mYXa
 

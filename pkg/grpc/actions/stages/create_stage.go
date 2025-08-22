@@ -118,6 +118,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		WithSecrets(secrets).
 		WithExecutorType(stage.Spec.Executor.Type).
 		WithExecutorSpec(executorSpec).
+		WithExecutorName(stage.Spec.Executor.Name).
 		ForIntegration(integration).
 		ForResource(resource).
 		Create()
@@ -461,6 +462,7 @@ func serializeExecutor(stage models.Stage) (*pb.Executor, error) {
 		return &pb.Executor{
 			Type: stage.ExecutorType,
 			Spec: spec,
+			Name: stage.ExecutorName,
 		}, nil
 	}
 
@@ -472,6 +474,7 @@ func serializeExecutor(stage models.Stage) (*pb.Executor, error) {
 	return &pb.Executor{
 		Type: stage.ExecutorType,
 		Spec: spec,
+		Name: stage.ExecutorName,
 		Integration: &integrationpb.IntegrationRef{
 			Name:       integrationResource.IntegrationName,
 			DomainType: actions.DomainTypeToProto(integrationResource.DomainType),

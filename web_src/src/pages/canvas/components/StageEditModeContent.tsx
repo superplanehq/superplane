@@ -1684,6 +1684,18 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   )}
                   editForm={
                     <div className="space-y-4">
+                      {/* Executor Label - Universal field for all executor types */}
+                      <ValidationField label="Executor name">
+                        <input
+                          type="text"
+                          value={executor.name || ''}
+                          onChange={(e) => setExecutor(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="${{ inputs.VERSION }} deployment"
+                          className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        />
+
+                      </ValidationField>
+
                       {executor.type === 'semaphore' && (
                         <div className="space-y-4">
                           <ValidationField label="Integration">
@@ -1737,7 +1749,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                           </ValidationField>
 
                           <ValidationField label="Execution Type">
-                            <ControlledTabs className="text-left m-0 max-w-48"
+                            <ControlledTabs
+                              className="text-left m-0 w-full"
+                              buttonClasses='w-full'
                               tabs={[
                                 { id: 'workflow', label: 'Workflow' },
                                 { id: 'task', label: 'Task' },

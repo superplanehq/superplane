@@ -132,6 +132,11 @@ func (b *StageBuilder) WithExecutorSpec(spec []byte) *StageBuilder {
 	return b
 }
 
+func (b *StageBuilder) WithExecutorName(name string) *StageBuilder {
+	b.newStage.ExecutorName = name
+	return b
+}
+
 func (b *StageBuilder) Create() (*models.Stage, error) {
 	err := b.validateExecutorSpec()
 	if err != nil {
@@ -152,6 +157,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		Secrets:       b.newStage.Secrets,
 		ExecutorType:  b.executorType,
 		ExecutorSpec:  datatypes.JSON(b.executorSpec),
+		ExecutorName:  b.newStage.ExecutorName,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -292,6 +298,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 			Update("secrets", b.newStage.Secrets).
 			Update("executor_type", b.executorType).
 			Update("executor_spec", datatypes.JSON(b.executorSpec)).
+			Update("executor_name", b.newStage.ExecutorName).
 			Update("resource_id", resourceID).
 			Error
 

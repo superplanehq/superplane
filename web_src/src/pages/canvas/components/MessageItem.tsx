@@ -115,7 +115,7 @@ const MessageItem = React.memo(({
               <span className="text-xs font-medium text-amber-700 dark:text-amber-500">{getStatusLabel()}</span>
             </div>
             <span className="font-medium truncate text-sm dark:text-white">
-              {event.id || 'Unknown'}
+              {event.name || event.id || 'Unknown'}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -133,7 +133,7 @@ const MessageItem = React.memo(({
         </div>
 
         {isExpanded && (
-          <div className="mt-3 space-y-3">
+          <div className="text-left mt-3 space-y-3">
             <div className="mt-3 space-y-3">
               {Object.keys(inputsRecord).length > 0 ? (
                 <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">

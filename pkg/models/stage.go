@@ -31,6 +31,7 @@ type Stage struct {
 
 	ExecutorType string
 	ExecutorSpec datatypes.JSON
+	ExecutorName string
 	ResourceID   *uuid.UUID
 
 	Conditions    datatypes.JSONSlice[StageCondition]

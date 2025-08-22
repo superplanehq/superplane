@@ -17,7 +17,7 @@ export const ApprovalQueueItem: React.FC<ApprovalQueueItemProps> = ({ event, onA
             <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
             <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Action required</span>
           </div>
-          <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{event.id}</span>
+          <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{event.name || event.id}</span>
         </div>
         <div className="flex items-center gap-1">
           {/*
@@ -65,7 +65,7 @@ export const WaitingQueueItem: React.FC<WaitingQueueItemProps> = ({ event, label
             <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
             <span className="text-xs font-medium text-orange-700 dark:text-orange-500">{label}</span>
           </div>
-          <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{event.id}</span>
+          <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{event.name || event.id}</span>
         </div>
         <div className="flex items-center">
           <MaterialSymbol name="timer" size="lg" className="text-orange-700 dark:text-orange-600 px-2" />
@@ -88,7 +88,7 @@ export const PendingQueueItem: React.FC<PendingQueueItemProps> = ({ event }) => 
             <div className="w-2 h-2 rounded-full flex-shrink-0 bg-orange-600 dark:bg-orange-500 animate-pulse"></div>
             <span className="text-xs font-medium text-orange-700 dark:text-orange-500">Pending</span>
           </div>
-          <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{event.id}</span>
+          <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">{event.name || event.id}</span>
         </div>
         <div className="flex items-center">
           <MaterialSymbol name="timer" size="lg" className="text-orange-700 dark:text-orange-600 px-2" />
