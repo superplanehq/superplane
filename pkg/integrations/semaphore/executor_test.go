@@ -36,7 +36,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 
 		spec, err := json.Marshal(&semaphore.ExecutorSpec{
 			PipelineFile: ".semaphore/semaphore.yml",
-			Branch:       "main",
+			Ref:          "refs/heads/main",
 			Parameters:   map[string]string{"a": "b", "c": "d"},
 		})
 
@@ -78,7 +78,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		spec, err := json.Marshal(&semaphore.ExecutorSpec{
 			Task:         task,
 			PipelineFile: ".semaphore/semaphore.yml",
-			Branch:       "main",
+			Ref:          "refs/heads/main",
 			Parameters:   map[string]string{"a": "b", "c": "d"},
 		})
 
@@ -121,12 +121,12 @@ func Test_Semaphore__Validate(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, executor)
 
-	t.Run("branch is required", func(t *testing.T) {
+	t.Run("ref is required", func(t *testing.T) {
 		spec, err := json.Marshal(&semaphore.ExecutorSpec{
-			Branch: "",
+			Ref: "",
 		})
 
 		require.NoError(t, err)
-		require.ErrorContains(t, executor.Validate(context.Background(), spec), "branch is required")
+		require.ErrorContains(t, executor.Validate(context.Background(), spec), "ref is required")
 	})
 }
