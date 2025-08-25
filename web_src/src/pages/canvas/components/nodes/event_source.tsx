@@ -138,7 +138,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           removeEventSource(props.id);
         }
       } else {
-        // Update existing event source
         await updateEventSourceMutation.mutateAsync({
           eventSourceId: currentEventSource.metadata?.id || '',
           name: eventSourceName,
@@ -146,7 +145,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           spec: currentFormData.spec
         });
 
-        // Update the store with the new data
         updateEventSource({
           ...currentEventSource,
           metadata: {
@@ -260,7 +258,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       setEventSourceName(props.data.name);
       setEventSourceDescription(props.data.description || '');
       setFocusedNodeId(props.id);
-      
+
       // Initialize currentFormData with existing event source data
       if (currentEventSource?.spec) {
         setCurrentFormData({
@@ -269,7 +267,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           spec: currentEventSource.spec
         });
       }
-      
+
       setTimeout(() => {
         const currentNodes = useCanvasStore.getState().nodes;
         const updatedNodes = currentNodes.map(node => ({
