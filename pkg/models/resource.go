@@ -116,58 +116,40 @@ func FindResourceInTransaction(tx *gorm.DB, integrationID uuid.UUID, resourceTyp
 	return &resource, nil
 }
 
-func CountOtherEventSourcesUsingResource(resourceID, excludeEventSourceID uuid.UUID) (int64, error) {
+func CountExternalEventSourcesUsingResource(resourceID uuid.UUID) (int64, error) {
 	var count int64
 
-	// Count other event sources using this resource directly OR using any child of this resource
+	// Count external event sources using this resource directly OR using any child of this resource
 	err := database.Conn().
 		Model(&EventSource{}).
-		Where("resource_id = ? OR resource_id IN (SELECT id FROM resources WHERE parent_id = ?)", resourceID, resourceID).
-		Where("id != ?", excludeEventSourceID).
+		Where("resource_id = ? AND scope = ?", resourceID, EventSourceScopeExternal).
 		Count(&count).
 		Error
 
 	return count, err
 }
 
-func CountEventSourcesUsingResource(resourceID uuid.UUID) (int64, error) {
+// Count other stages using the same resource (excluding current stage)
+// This indicates how many other internal event sources exist for this resource
+func CountOtherStagesUsingResource(resourceID uuid.UUID, currentStageID uuid.UUID) (int64, error) {
 	var count int64
 
-	// Count event sources using this resource directly OR using any child of this resource
-	err := database.Conn().
-		Model(&EventSource{}).
-		Where("resource_id = ? OR resource_id IN (SELECT id FROM resources WHERE parent_id = ?)", resourceID, resourceID).
-		Count(&count).
-		Error
-
-	return count, err
-}
-
-func CountStagesUsingResource(resourceID uuid.UUID) (int64, error) {
-	var count int64
-
-	// Count stages using this resource directly OR using any child of this resource
-	err := database.Conn().
+	query := database.Conn().
 		Model(&Stage{}).
-		Where("resource_id = ? OR resource_id IN (SELECT id FROM resources WHERE parent_id = ?)", resourceID, resourceID).
-		Count(&count).
+		Where("resource_id = ?", resourceID)
+
+	if currentStageID != uuid.Nil {
+		query = query.Where("id != ?", currentStageID)
+	}
+
+	err := query.Count(&count).
 		Error
 
-	return count, err
-}
+	if err != nil {
+		return 0, err
+	}
 
-func CountOtherStagesUsingResource(resourceID, excludeStageID uuid.UUID) (int64, error) {
-	var count int64
-
-	// Count other stages using this resource directly OR using any child of this resource
-	err := database.Conn().
-		Model(&Stage{}).
-		Where("resource_id = ? OR resource_id IN (SELECT id FROM resources WHERE parent_id = ?)", resourceID, resourceID).
-		Where("id != ?", excludeStageID).
-		Count(&count).
-		Error
-
-	return count, err
+	return count, nil
 }
 
 // DeleteResourceWithChildren deletes a resource and all its child resources in a transaction
@@ -187,7 +169,23 @@ func DeleteResourceWithChildren(resourceID uuid.UUID) error {
 			return err
 		}
 
-		// Delete child resources first (to respect foreign key constraints)
+		// Delete internal event sources associated with child resources
+		for _, childResource := range childResources {
+			err = tx.Where("resource_id = ? AND scope = ?", childResource.ID, EventSourceScopeInternal).
+				Delete(&EventSource{}).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		// Delete internal event sources associated with the parent resource
+		err = tx.Where("resource_id = ? AND scope = ?", resourceID, EventSourceScopeInternal).
+			Delete(&EventSource{}).Error
+		if err != nil {
+			return err
+		}
+
+		// Delete child resources (after deleting their event sources)
 		if len(childResources) > 0 {
 			err = tx.Delete(&childResources).Error
 			if err != nil {

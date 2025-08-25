@@ -108,22 +108,22 @@ func (c *StageUpdatedConsumer) Consume(delivery tackle.Delivery) error {
 
 	logger := log.WithField("old_resource_id", oldResourceID)
 
-	eventSourceCount, err := models.CountEventSourcesUsingResource(oldResourceID)
+	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResource(oldResourceID)
 	if err != nil {
-		logger.Errorf("Error counting event sources using resource: %v", err)
+		logger.Errorf("Error counting external event sources using resource: %v", err)
 		return err
 	}
 
-	otherStageCount, err := models.CountOtherStagesUsingResource(oldResourceID, stageID)
+	otherStagesCount, err := models.CountOtherStagesUsingResource(oldResourceID, stageID)
 	if err != nil {
 		logger.Errorf("Error counting other stages using resource: %v", err)
 		return err
 	}
 
-	totalUsages := eventSourceCount + otherStageCount
+	totalUsages := externalEventSourceCount + otherStagesCount
 	if totalUsages > 0 {
-		logger.Infof("Resource is used by %d event sources and %d other stages, skipping cleanup",
-			eventSourceCount, otherStageCount)
+		logger.Infof("Resource is used by %d external event sources and %d other stages, skipping cleanup",
+			externalEventSourceCount, otherStagesCount)
 		return nil
 	}
 

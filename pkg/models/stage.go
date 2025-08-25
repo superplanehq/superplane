@@ -320,25 +320,6 @@ func (s *Stage) AddConnection(tx *gorm.DB, connection Connection) error {
 	return tx.Create(&connection).Error
 }
 
-func FindStagesByEventSource(canvasID, eventSourceID string) ([]Stage, error) {
-	var stages []Stage
-	
-	err := database.Conn().
-		Table("stages").
-		Joins("INNER JOIN connections ON connections.target_id = stages.id AND connections.target_type = ?", ConnectionTargetTypeStage).
-		Where("connections.canvas_id = ?", canvasID).
-		Where("connections.source_id = ?", eventSourceID).
-		Where("connections.source_type = ?", SourceTypeEventSource).
-		Find(&stages).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return stages, nil
-}
-
 func (s *Stage) ApprovalsRequired() int {
 	for _, condition := range s.Conditions {
 		if condition.Type == StageConditionTypeApproval {
