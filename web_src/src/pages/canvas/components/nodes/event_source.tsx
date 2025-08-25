@@ -51,7 +51,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
-  const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
@@ -145,6 +145,20 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           description: eventSourceDescription,
           spec: currentFormData.spec
         });
+
+        // Update the store with the new data
+        updateEventSource({
+          ...currentEventSource,
+          metadata: {
+            ...currentEventSource.metadata,
+            name: eventSourceName,
+            description: eventSourceDescription
+          },
+          spec: currentFormData.spec
+        });
+
+        props.data.name = eventSourceName;
+        props.data.description = eventSourceDescription;
       }
       setIsEditMode(false);
       setEditingEventSource(null);
