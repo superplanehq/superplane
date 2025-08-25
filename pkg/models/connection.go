@@ -38,6 +38,21 @@ func ListConnectionsForSource(sourceID uuid.UUID, connectionType string) ([]Conn
 	return connections, nil
 }
 
+func ListConnectionsForTarget(targetID uuid.UUID, targetType string) ([]Connection, error) {
+	var connections []Connection
+	err := database.Conn().
+		Where("target_id = ?", targetID).
+		Where("target_type = ?", targetType).
+		Find(&connections).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return connections, nil
+}
+
 func FindConnection(targetID uuid.UUID, targetType string, sourceName string) (*Connection, error) {
 	var connection Connection
 	err := database.Conn().

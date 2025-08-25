@@ -165,6 +165,8 @@ docs/SuperplaneStageMetadata.md
 docs/SuperplaneStageSpec.md
 docs/SuperplaneUpdateConnectionGroupBody.md
 docs/SuperplaneUpdateConnectionGroupResponse.md
+docs/SuperplaneUpdateEventSourceBody.md
+docs/SuperplaneUpdateEventSourceResponse.md
 docs/SuperplaneUpdateStageBody.md
 docs/SuperplaneUpdateStageResponse.md
 docs/SuperplaneUsersUser.md
@@ -320,6 +322,8 @@ model_superplane_stage_metadata.go
 model_superplane_stage_spec.go
 model_superplane_update_connection_group_body.go
 model_superplane_update_connection_group_response.go
+model_superplane_update_event_source_body.go
+model_superplane_update_event_source_response.go
 model_superplane_update_stage_body.go
 model_superplane_update_stage_response.go
 model_superplane_users_user.go

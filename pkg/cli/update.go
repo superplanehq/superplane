@@ -174,6 +174,49 @@ var updateCmd = &cobra.Command{
 			Check(err)
 			fmt.Printf("%s", string(out))
 
+		case "EventSource":
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			metadata, ok := yamlData["metadata"].(map[string]any)
+			if !ok {
+				Fail("Invalid EventSource YAML: metadata section missing")
+			}
+
+			canvasIDOrName, ok := metadata["canvasId"].(string)
+			if !ok {
+				canvasIDOrName, ok = metadata["canvasName"].(string)
+				if !ok {
+					Fail("Invalid EventSource YAML: canvasId or canvasName field missing")
+				}
+			}
+
+			eventSourceID, ok := metadata["id"].(string)
+			if !ok {
+				Fail("Invalid EventSource YAML: id field missing")
+			}
+
+			var eventSource openapi_client.SuperplaneEventSource
+			err = yaml.Unmarshal(data, &eventSource)
+			Check(err)
+
+			response, httpResponse, err := c.EventSourceAPI.SuperplaneUpdateEventSource(context.Background(), canvasIDOrName, eventSourceID).
+				Body(openapi_client.SuperplaneUpdateEventSourceBody{EventSource: &eventSource}).
+				Execute()
+
+			if err != nil {
+				body, err := io.ReadAll(httpResponse.Body)
+				Check(err)
+				fmt.Printf("Error: %v", err)
+				fmt.Printf("HTTP Response: %s", string(body))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.EventSource)
+			Check(err)
+			fmt.Printf("%s", string(out))
+
 		default:
 			Fail(fmt.Sprintf("Unsupported resource kind '%s' for update", kind))
 		}
@@ -250,6 +293,45 @@ var updateStageCmd = &cobra.Command{
 	},
 }
 
+var updateEventSourceCmd = &cobra.Command{
+	Use:   "event-source",
+	Short: "Update an event source's configuration",
+	Long:  `Update an event source's configuration, such as its integration, resource, and filters.`,
+	Args:  cobra.ExactArgs(0),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
+		eventSourceIDOrName := getOneOrAnotherFlag(cmd, "event-source-id", "event-source-name", true)
+		yamlFile, _ := cmd.Flags().GetString("file")
+
+		if yamlFile == "" {
+			fmt.Println("Error: You must specify a configuration file with --file")
+			os.Exit(1)
+		}
+
+		data, err := os.ReadFile(yamlFile)
+		CheckWithMessage(err, "Failed to read from event source configuration file.")
+
+		var eventSource openapi_client.SuperplaneEventSource
+		err = yaml.Unmarshal(data, &eventSource)
+		Check(err)
+
+		// Create update request
+		request := openapi_client.NewSuperplaneUpdateEventSourceBody()
+		request.SetEventSource(eventSource)
+
+		c := DefaultClient()
+		_, _, err = c.EventSourceAPI.SuperplaneUpdateEventSource(
+			context.Background(),
+			canvasIDOrName,
+			eventSourceIDOrName,
+		).Body(*request).Execute()
+		Check(err)
+
+		fmt.Printf("Event source '%s' updated successfully.\n", eventSourceIDOrName)
+	},
+}
+
 func init() {
 	RootCmd.AddCommand(updateCmd)
 
@@ -264,4 +346,12 @@ func init() {
 	updateStageCmd.Flags().String("stage-id", "", "Stage ID")
 	updateStageCmd.Flags().String("stage-name", "", "Stage name")
 	updateStageCmd.Flags().StringP("file", "f", "", "File containing stage configuration updates")
+
+	// Event Source command
+	updateCmd.AddCommand(updateEventSourceCmd)
+	updateEventSourceCmd.Flags().String("canvas-id", "", "Canvas ID")
+	updateEventSourceCmd.Flags().String("canvas-name", "", "Canvas name")
+	updateEventSourceCmd.Flags().String("event-source-id", "", "Event Source ID")
+	updateEventSourceCmd.Flags().String("event-source-name", "", "Event Source name")
+	updateEventSourceCmd.Flags().StringP("file", "f", "", "File containing event source configuration updates")
 }

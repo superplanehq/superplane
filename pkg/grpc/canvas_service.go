@@ -7,8 +7,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/events"
 	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/events"
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -73,6 +73,12 @@ func (s *CanvasService) CreateEventSource(ctx context.Context, req *pb.CreateEve
 	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return eventsources.CreateEventSource(ctx, s.encryptor, s.registry, orgID, canvasID, req.EventSource)
+}
+
+func (s *CanvasService) UpdateEventSource(ctx context.Context, req *pb.UpdateEventSourceRequest) (*pb.UpdateEventSourceResponse, error) {
+	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return eventsources.UpdateEventSource(ctx, s.encryptor, s.registry, orgID, canvasID, req.IdOrName, req.EventSource)
 }
 
 func (s *CanvasService) DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {

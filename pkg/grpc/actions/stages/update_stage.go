@@ -118,6 +118,8 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		return nil, status.Errorf(codes.InvalidArgument, "failed to marshal executor spec: %v", err)
 	}
 
+	oldResourceID := stage.ResourceID
+
 	stage, err = builders.NewStageBuilder(registry).
 		WithContext(ctx).
 		WithExistingStage(stage).
@@ -163,10 +165,9 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		Stage: serialized,
 	}
 
-	err = messages.NewStageCreatedMessage(stage).Publish()
-
+	err = messages.NewStageUpdatedMessage(stage, oldResourceID, stage.ResourceID).Publish()
 	if err != nil {
-		logging.ForStage(stage).Errorf("failed to publish stage created message: %v", err)
+		logging.ForStage(stage).Errorf("failed to publish stage updated message: %v", err)
 	}
 
 	return response, nil

@@ -50,10 +50,18 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start()
 	}
 
-	if os.Getenv("START_STAGE_EVENT_APPROVED_CONSUMER") == "yes" {
+	if os.Getenv("START_CONSUMERS") == "yes" {
 		log.Println("Starting Stage Event Approved Consumer")
-		w := workers.NewStageEventApprovedConsumer(rabbitMQURL)
-		go w.Start()
+		stageEventApprovedConsumer := workers.NewStageEventApprovedConsumer(rabbitMQURL)
+		go stageEventApprovedConsumer.Start()
+
+		log.Println("Starting Event Source Updated Consumer")
+		eventSourceUpdatedConsumer := workers.NewEventSourceUpdatedConsumer(registry, rabbitMQURL)
+		go eventSourceUpdatedConsumer.Start()
+
+		log.Println("Starting Stage Updated Consumer")
+		stageUpdatedConsumer := workers.NewStageUpdatedConsumer(registry, rabbitMQURL)
+		go stageUpdatedConsumer.Start()
 	}
 
 	if os.Getenv("START_EXECUTIONS_POLLER") == "yes" {

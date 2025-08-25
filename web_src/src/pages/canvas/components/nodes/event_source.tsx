@@ -3,7 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useCreateEventSource } from '@/hooks/useCanvasData';
+import { useCreateEventSource, useUpdateEventSource } from '@/hooks/useCanvasData';
 import { SuperplaneEventSource, SuperplaneEventSourceSpec } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -30,6 +30,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createEventSourceMutation = useCreateEventSource(canvasId);
+  const updateEventSourceMutation = useUpdateEventSource(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
   const allEventSources = useCanvasStore(state => state.eventSources);
   const currentEventSource = useCanvasStore(state =>
@@ -136,6 +137,14 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           updateEventSourceKey(newEventSource.metadata?.id || '', generatedKey || '');
           removeEventSource(props.id);
         }
+      } else {
+        // Update existing event source
+        await updateEventSourceMutation.mutateAsync({
+          eventSourceId: currentEventSource.metadata?.id || '',
+          name: eventSourceName,
+          description: eventSourceDescription,
+          spec: currentFormData.spec
+        });
       }
       setIsEditMode(false);
       setEditingEventSource(null);

@@ -142,6 +142,21 @@ func FindEventSource(id uuid.UUID) (*EventSource, error) {
 	return &eventSource, nil
 }
 
+func FindEventSourceByName(canvasID string, name string) (*EventSource, error) {
+	var eventSource EventSource
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Where("name = ?", name).
+		First(&eventSource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventSource, nil
+}
+
 func FindExternalEventSourceByID(canvasID string, id string) (*EventSource, error) {
 	var eventSource EventSource
 	err := database.Conn().
