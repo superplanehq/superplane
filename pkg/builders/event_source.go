@@ -364,13 +364,20 @@ func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSou
 	}
 
 	now := time.Now()
-	err = tx.Model(b.existingEventSource).
-		Update("name", b.name).
-		Update("description", b.description).
-		Update("updated_at", now).
-		Update("event_types", datatypes.NewJSONSlice(b.eventTypes)).
-		Update("resource_id", &resource.ID).
-		Error
+	updates := map[string]interface{}{
+		"name":        b.name,
+		"description": b.description,
+		"updated_at":  now,
+		"event_types": datatypes.NewJSONSlice(b.eventTypes),
+		"resource_id": &resource.ID,
+	}
+
+	// If resource changed, set to pending so webhook gets recreated
+	if b.existingEventSource.ResourceID == nil || *b.existingEventSource.ResourceID != resource.ID {
+		updates["state"] = models.EventSourceStatePending
+	}
+
+	err = tx.Model(b.existingEventSource).Updates(updates).Error
 
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to update event source: %v", err)
