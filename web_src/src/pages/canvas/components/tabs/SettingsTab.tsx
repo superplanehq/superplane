@@ -12,47 +12,47 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
   const convertToYaml = (obj: StageWithEventQueue): string => {
     const yamlify = (value: string | number | boolean | object | null | undefined, indent: number = 0): string => {
       const spaces = '  '.repeat(indent);
-      
+
       if (value === null || value === undefined) {
         return 'null';
       }
-      
+
       if (typeof value === 'string') {
-        return value.includes('\n') || value.includes(':') || value.includes('#') 
-          ? `"${value.replace(/"/g, '\\"')}"` 
+        return value.includes('\n') || value.includes(':') || value.includes('#')
+          ? `"${value.replace(/"/g, '\\"')}"`
           : value;
       }
-      
+
       if (typeof value === 'number' || typeof value === 'boolean') {
         return String(value);
       }
-      
+
       if (Array.isArray(value)) {
         if (value.length === 0) return '[]';
         return '\n' + value.map(item => `${spaces}- ${yamlify(item, indent + 1)}`).join('\n');
       }
-      
+
       if (typeof value === 'object') {
         const entries = Object.entries(value).filter(([, v]) => v !== undefined);
         if (entries.length === 0) return '{}';
-        
+
         return '\n' + entries.map(([key, val]) => {
           const yamlValue = yamlify(val, indent + 1);
-          return yamlValue.startsWith('\n') 
+          return yamlValue.startsWith('\n')
             ? `${spaces}${key}:${yamlValue}`
             : `${spaces}${key}: ${yamlValue}`;
         }).join('\n');
       }
-      
+
       return String(value);
     };
-    
+
     return yamlify(obj).trim();
   };
 
   const getAllInputMappings = (inputName: string) => {
     if (!selectedStage.spec!.inputMappings) return [];
-    
+
     const mappings = [];
     for (const mapping of selectedStage.spec!.inputMappings) {
       const valueMappings = mapping.values?.filter(v => v.name === inputName) || [];
@@ -74,7 +74,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
         icon: '📝'
       };
     }
-    
+
     if (mapping.valueFrom?.eventData?.connection) {
       return {
         type: 'From Connection',
@@ -82,7 +82,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
         icon: '🔗'
       };
     }
-    
+
     if (mapping.valueFrom?.lastExecution?.results) {
       return {
         type: 'From Last Execution',
@@ -90,7 +90,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
         icon: '⏮️'
       };
     }
-    
+
     return null;
   };
 
@@ -100,21 +100,19 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
       <div className="flex items-center justify-between border-b border-gray-200 dark:border-zinc-700 pb-2 px-3 pt-3">
         <div className="flex items-center">
           <button
-            className={`px-3 py-1 text-sm font-medium rounded-l border ${
-              viewMode === 'form' 
-                ? 'bg-gray-100 dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 border-gray-300 dark:border-zinc-600 shadow-inner' 
-                : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700'
-            }`}
+            className={`px-3 py-1 text-sm font-medium rounded-l border ${viewMode === 'form'
+              ? 'bg-gray-100 dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 border-gray-300 dark:border-zinc-600 shadow-inner'
+              : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700'
+              }`}
             onClick={() => setViewMode('form')}
           >
             Form
           </button>
           <button
-            className={`px-3 py-1 text-sm font-medium rounded-r border-l-0 border ${
-              viewMode === 'yaml' 
-                ? 'bg-gray-100 dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 border-gray-300 dark:border-zinc-600 shadow-inner' 
-                : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700'
-            }`}
+            className={`px-3 py-1 text-sm font-medium rounded-r border-l-0 border ${viewMode === 'yaml'
+              ? 'bg-gray-100 dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 border-gray-300 dark:border-zinc-600 shadow-inner'
+              : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700'
+              }`}
             onClick={() => setViewMode('yaml')}
           >
             Yaml
@@ -159,7 +157,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                         <div className="block w-full font-mono text-sm text-left text-gray-900 dark:text-zinc-100">{selectedStage.spec!.executor!.resource!.name || '—'}</div>
                       </div>
                       <div className="flex items-start w-full">
-                        <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>Branch</div>
+                        <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>Ref</div>
                         <div className="block w-full font-mono text-sm text-left text-gray-900 dark:text-zinc-100">{selectedStage.spec!.executor!.spec.branch as string || '—'}</div>
                       </div>
                       <div className="flex items-start w-full">
@@ -243,7 +241,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                 <div className="space-y-3">
                   {selectedStage.spec!.inputs.map((input, index) => {
                     const inputMappings = getAllInputMappings(input.name || '');
-                    
+
                     return (
                       <div key={`input_${input.name}_${index + 1}`}>
                         <div className="flex items-start w-full mb-2">
