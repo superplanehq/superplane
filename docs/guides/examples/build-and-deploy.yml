@@ -1,0 +1,257 @@
+#
+# Create a canvas, and replace all CANVAS_ID in this document with its ID.
+#
+---
+apiVersion: v1
+kind: EventSource
+metadata:
+  name: code
+  canvasId: "{{CANVAS_ID}}"
+---
+apiVersion: v1
+kind: EventSource
+metadata:
+  name: terraform
+  canvasId: "{{CANVAS_ID}}"
+---
+apiVersion: v1
+kind: Stage
+metadata:
+  name: build-test-release
+  canvasId: "{{CANVAS_ID}}"
+spec:
+  conditions: []
+
+  connections:
+    - type: TYPE_EVENT_SOURCE
+      name: code
+
+  inputs:
+    - name: VERSION
+
+  outputs:
+    - name: IMAGE
+      required: true
+
+  inputMappings:
+    - values:
+        - name: VERSION
+          valueFrom:
+            eventData:
+              connection: code
+              expression: ref
+
+  executor:
+    type: TYPE_HTTP
+    http:
+      url: https://rbaskets.in/b0a1w9p
+      payload:
+        version: ${{ inputs.VERSION }}
+      responsePolicy:
+        statusCodes: [200, 201, 202]
+---
+apiVersion: v1
+kind: Stage
+metadata:
+  name: deploy-devel
+  canvasId: "{{CANVAS_ID}}"
+spec:
+  conditions: []
+
+  connections:
+    - type: TYPE_EVENT_SOURCE
+      name: terraform
+    - type: TYPE_STAGE
+      name: build-test-release
+
+  inputs:
+    - name: TERRAFORM
+    - name: IMAGE
+
+  outputs:
+    - name: IMAGE
+    - name: TERRAFORM
+
+  inputMappings:
+    - when:
+        triggeredBy:
+          connection: terraform
+      values:
+        - name: TERRAFORM
+          valueFrom:
+            eventData:
+              connection: terraform
+              expression: ref
+        - name: IMAGE
+          valueFrom:
+            lastExecution:
+              results: [RESULT_PASSED]
+    - when:
+        triggeredBy:
+          connection: build-test-release
+      values:
+        - name: TERRAFORM
+          valueFrom:
+            lastExecution:
+              results: [RESULT_PASSED]
+        - name: IMAGE
+          valueFrom:
+            eventData:
+              connection: build-test-release
+              expression: outputs.IMAGE
+
+  executor:
+    type: TYPE_HTTP
+    http:
+      url: https://rbaskets.in/b0a1w9p
+      payload:
+        image: ${{ inputs.IMAGE }}
+        terraform: ${{ inputs.TERRAFORM }}
+      responsePolicy:
+        statusCodes: [200, 201, 202]
+---
+apiVersion: v1
+kind: Stage
+metadata:
+  name: security-scan
+  canvasId: "{{CANVAS_ID}}"
+spec:
+  conditions: []
+
+  connections:
+    - type: TYPE_STAGE
+      name: build-test-release
+
+  inputs:
+    - name: IMAGE
+
+  inputMappings:
+    - values:
+        - name: IMAGE
+          valueFrom:
+            eventData:
+              connection: build-test-release
+              expression: outputs.IMAGE
+
+  executor:
+    type: TYPE_HTTP
+    http:
+      url: https://rbaskets.in/b0a1w9p
+      payload:
+        image: ${{ inputs.IMAGE }}
+      responsePolicy:
+        statusCodes: [200, 201, 202]
+---
+apiVersion: v1
+kind: Stage
+metadata:
+  name: e2e-tests
+  canvasId: "{{CANVAS_ID}}"
+spec:
+  conditions: []
+
+  connections:
+    - type: TYPE_STAGE
+      name: deploy-devel
+      filters:
+        - type: FILTER_TYPE_DATA
+          data:
+            expression: outputs.IMAGE != ""
+
+  inputs:
+    - name: IMAGE
+
+  inputMappings:
+    - values:
+        - name: IMAGE
+          valueFrom:
+            eventData:
+              connection: deploy-devel
+              expression: outputs.IMAGE
+
+  executor:
+    type: TYPE_HTTP
+    http:
+      url: https://rbaskets.in/b0a1w9p
+      payload:
+        image: ${{ inputs.IMAGE }}
+      responsePolicy:
+        statusCodes: [200, 201, 202]
+---
+apiVersion: v1
+kind: Stage
+metadata:
+  name: deploy-prod
+  canvasId: "{{CANVAS_ID}}"
+spec:
+  conditions:
+    - type: CONDITION_TYPE_APPROVAL
+      approval:
+        count: 1
+
+  connections:
+    - type: TYPE_STAGE
+      name: deploy-devel
+      filters:
+        - type: FILTER_TYPE_DATA
+          data:
+            expression: outputs.TERRAFORM != ""
+    - type: TYPE_STAGE
+      name: security-scan
+    - type: TYPE_STAGE
+      name: e2e-tests
+
+  inputs:
+    - name: IMAGE
+    - name: TERRAFORM
+
+  inputMappings:
+    - when:
+        triggeredBy:
+          connection: deploy-devel
+      values:
+        - name: TERRAFORM
+          valueFrom:
+            eventData:
+              connection: deploy-devel
+              expression: outputs.TERRAFORM
+        - name: IMAGE
+          valueFrom:
+            lastExecution:
+              results: [RESULT_PASSED]
+    - when:
+        triggeredBy:
+          connection: security-scan
+      values:
+        - name: IMAGE
+          valueFrom:
+            eventData:
+              connection: security-scan
+              expression: outputs.IMAGE
+        - name: TERRAFORM
+          valueFrom:
+            lastExecution:
+              results: [RESULT_PASSED]
+    - when:
+        triggeredBy:
+          connection: e2e-tests
+      values:
+        - name: IMAGE
+          valueFrom:
+            eventData:
+              connection: e2e-tests
+              expression: outputs.IMAGE
+        - name: TERRAFORM
+          valueFrom:
+            lastExecution:
+              results: [RESULT_PASSED]
+
+  executor:
+    type: TYPE_HTTP
+    http:
+      url: https://rbaskets.in/b0a1w9p
+      payload:
+        image: ${{ inputs.IMAGE }}
+        terraform: ${{ inputs.TERRAFORM }}
+      responsePolicy:
+        statusCodes: [200, 201, 202]
