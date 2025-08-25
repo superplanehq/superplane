@@ -115,3 +115,92 @@ func FindResourceInTransaction(tx *gorm.DB, integrationID uuid.UUID, resourceTyp
 
 	return &resource, nil
 }
+
+func CountOtherEventSourcesUsingResource(resourceID, excludeEventSourceID uuid.UUID) (int64, error) {
+	var count int64
+
+	// Count other event sources using this resource directly OR using any child of this resource
+	err := database.Conn().
+		Model(&EventSource{}).
+		Where("resource_id = ? OR resource_id IN (SELECT id FROM resources WHERE parent_id = ?)", resourceID, resourceID).
+		Where("id != ?", excludeEventSourceID).
+		Count(&count).
+		Error
+
+	return count, err
+}
+
+func CountEventSourcesUsingResource(resourceID uuid.UUID) (int64, error) {
+	var count int64
+
+	// Count event sources using this resource directly OR using any child of this resource
+	err := database.Conn().
+		Model(&EventSource{}).
+		Where("resource_id = ? OR resource_id IN (SELECT id FROM resources WHERE parent_id = ?)", resourceID, resourceID).
+		Count(&count).
+		Error
+
+	return count, err
+}
+
+func CountStagesUsingResource(resourceID uuid.UUID) (int64, error) {
+	var count int64
+
+	// Count stages using this resource directly OR using any child of this resource
+	err := database.Conn().
+		Model(&Stage{}).
+		Where("resource_id = ? OR resource_id IN (SELECT id FROM resources WHERE parent_id = ?)", resourceID, resourceID).
+		Count(&count).
+		Error
+
+	return count, err
+}
+
+func CountOtherStagesUsingResource(resourceID, excludeStageID uuid.UUID) (int64, error) {
+	var count int64
+
+	// Count other stages using this resource directly OR using any child of this resource
+	err := database.Conn().
+		Model(&Stage{}).
+		Where("resource_id = ? OR resource_id IN (SELECT id FROM resources WHERE parent_id = ?)", resourceID, resourceID).
+		Where("id != ?", excludeStageID).
+		Count(&count).
+		Error
+
+	return count, err
+}
+
+// DeleteResourceWithChildren deletes a resource and all its child resources in a transaction
+func DeleteResourceWithChildren(resourceID uuid.UUID) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		// Find the resource to delete
+		var resource Resource
+		err := tx.Where("id = ?", resourceID).First(&resource).Error
+		if err != nil {
+			return err
+		}
+
+		// Find all child resources
+		var childResources []Resource
+		err = tx.Where("parent_id = ?", resourceID).Find(&childResources).Error
+		if err != nil {
+			return err
+		}
+
+		// Delete child resources first (to respect foreign key constraints)
+		if len(childResources) > 0 {
+			err = tx.Delete(&childResources).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		// Delete the parent resource
+		err = tx.Delete(&resource).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -81,6 +82,8 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, err
 	}
 
+	oldResourceID := eventSource.ResourceID
+
 	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor, registry).
 		WithContext(ctx).
 		WithExistingEventSource(eventSource).
@@ -110,6 +113,11 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	response := &pb.UpdateEventSourceResponse{
 		EventSource: serialized,
 		Key:         plainKey,
+	}
+
+	err = messages.NewEventSourceUpdatedMessage(eventSource, oldResourceID, eventSource.ResourceID).Publish()
+	if err != nil {
+		return nil, err
 	}
 
 	return response, nil

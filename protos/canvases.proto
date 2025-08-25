@@ -866,12 +866,22 @@ message StageUpdated {
   string canvas_id = 1;
   string stage_id = 2;
   google.protobuf.Timestamp timestamp = 3;
+  string old_resource_id = 4;
+  string new_resource_id = 5;
 }
 
 message EventSourceCreated {
   string canvas_id = 1;
   string source_id = 2;
   google.protobuf.Timestamp timestamp = 3;
+}
+
+message EventSourceUpdated {
+  string canvas_id = 1;
+  string source_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  string old_resource_id = 4;
+  string new_resource_id = 5;
 }
 
 message StageEventCreated {
