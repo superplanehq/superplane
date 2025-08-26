@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -190,6 +191,23 @@ func FindExternalEventSourceByName(canvasID string, name string) (*EventSource, 
 	return &eventSource, nil
 }
 
+func ListUnscopedSoftDeletedEventSources(limit int) ([]EventSource, error) {
+	var sources []EventSource
+
+	err := database.Conn().
+		Unscoped().
+		Where("deleted_at is not null").
+		Limit(limit).
+		Find(&sources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return sources, nil
+}
+
 func FindInternalEventSourceByName(canvasID string, name string) (*EventSource, error) {
 	var eventSource EventSource
 	err := database.Conn().
@@ -234,4 +252,18 @@ func ListPendingEventSources() ([]EventSource, error) {
 	}
 
 	return eventSources, nil
+}
+
+func (s *EventSource) Delete() error {
+	deletedName := fmt.Sprintf("%s-deleted-%d", s.Name, time.Now().Unix())
+
+	return database.Conn().Model(s).
+		Where("id = ?", s.ID).
+		Update("name", deletedName).
+		Update("deleted_at", time.Now()).
+		Error
+}
+
+func (s *EventSource) HardDeleteInTransaction(tx *gorm.DB) error {
+	return tx.Delete(s).Error
 }

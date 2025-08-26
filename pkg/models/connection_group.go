@@ -222,6 +222,23 @@ func ListConnectionGroups(canvasID string) ([]ConnectionGroup, error) {
 	return connectionGroups, nil
 }
 
+func ListUnscopedSoftDeletedConnectionGroups(limit int) ([]ConnectionGroup, error) {
+	var sources []ConnectionGroup
+
+	err := database.Conn().
+		Unscoped().
+		Where("deleted_at is not null").
+		Limit(limit).
+		Find(&sources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return sources, nil
+}
+
 func CreateConnectionGroup(
 	canvasID uuid.UUID,
 	name, description, createdBy string,
@@ -334,4 +351,18 @@ func FindConnectionGroupByIDInTransaction(tx *gorm.DB, canvasID string, id strin
 	}
 
 	return connectionGroup, nil
+}
+
+func (s *ConnectionGroup) Delete() error {
+	deletedName := fmt.Sprintf("%s-deleted-%d", s.Name, time.Now().Unix())
+
+	return database.Conn().Model(s).
+		Where("id = ?", s.ID).
+		Update("name", deletedName).
+		Update("deleted_at", time.Now()).
+		Error
+}
+
+func (s *ConnectionGroup) HardDeleteInTransaction(tx *gorm.DB) error {
+	return tx.Delete(s).Error
 }

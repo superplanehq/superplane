@@ -227,6 +227,23 @@ func FindUnscopedStage(id string) (*Stage, error) {
 	return &stage, nil
 }
 
+func ListUnscopedSoftDeletedStages(limit int) ([]Stage, error) {
+	var stages []Stage
+
+	err := database.Conn().
+		Unscoped().
+		Where("deleted_at is not null").
+		Limit(limit).
+		Find(&stages).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
+}
+
 func FindStageByID(canvasID string, id string) (*Stage, error) {
 	return FindStageByIDInTransaction(database.Conn(), canvasID, id)
 }
@@ -443,4 +460,18 @@ func ListStagesByIDs(ids []uuid.UUID) ([]Stage, error) {
 	}
 
 	return stages, nil
+}
+
+func (s *Stage) Delete() error {
+	deletedName := fmt.Sprintf("%s-deleted-%d", s.Name, time.Now().Unix())
+
+	return database.Conn().Model(s).
+		Where("id = ?", s.ID).
+		Update("name", deletedName).
+		Update("deleted_at", time.Now()).
+		Error
+}
+
+func (s *Stage) HardDeleteInTransaction(tx *gorm.DB) error {
+	return tx.Delete(s).Error
 }
