@@ -222,12 +222,13 @@ func ListConnectionGroups(canvasID string) ([]ConnectionGroup, error) {
 	return connectionGroups, nil
 }
 
-func ListUnscopedSoftDeletedConnectionGroups(limit int) ([]ConnectionGroup, error) {
+func ListUnscopedSoftDeletedConnectionGroups(limit int, cutoffTime time.Time) ([]ConnectionGroup, error) {
 	var sources []ConnectionGroup
 
 	err := database.Conn().
 		Unscoped().
 		Where("deleted_at is not null").
+		Where("deleted_at <= ?", cutoffTime).
 		Limit(limit).
 		Find(&sources).
 		Error
@@ -365,4 +366,36 @@ func (g *ConnectionGroup) Delete() error {
 
 func (g *ConnectionGroup) HardDeleteInTransaction(tx *gorm.DB) error {
 	return tx.Unscoped().Delete(g).Error
+}
+
+func (g *ConnectionGroup) DeleteFieldSetsInTransaction(tx *gorm.DB) error {
+	// Delete field set events for all field sets of this connection group
+	if err := tx.
+		Where("connection_group_set_id IN (SELECT id FROM connection_group_field_sets WHERE connection_group_id = ?)", g.ID).
+		Delete(&ConnectionGroupFieldSetEvent{}).Error; err != nil {
+		return fmt.Errorf("failed to delete field set events: %v", err)
+	}
+
+	if err := tx.Where("connection_group_id = ?", g.ID).Delete(&ConnectionGroupFieldSet{}).Error; err != nil {
+		return fmt.Errorf("failed to delete field sets: %v", err)
+	}
+
+	return nil
+}
+
+func (g *ConnectionGroup) DeleteConnectionsInTransaction(tx *gorm.DB) error {
+	if err := tx.Unscoped().Where("source_id = ? AND source_type = ?", g.ID, SourceTypeConnectionGroup).Delete(&Connection{}).Error; err != nil {
+		return fmt.Errorf("failed to delete source connections: %v", err)
+	}
+	if err := tx.Unscoped().Where("target_id = ? AND target_type = ?", g.ID, ConnectionTargetTypeConnectionGroup).Delete(&Connection{}).Error; err != nil {
+		return fmt.Errorf("failed to delete target connections: %v", err)
+	}
+	return nil
+}
+
+func (g *ConnectionGroup) DeleteEventsInTransaction(tx *gorm.DB) error {
+	if err := tx.Unscoped().Where("source_id = ? AND source_type = ?", g.ID, SourceTypeConnectionGroup).Delete(&Event{}).Error; err != nil {
+		return fmt.Errorf("failed to delete events: %v", err)
+	}
+	return nil
 }

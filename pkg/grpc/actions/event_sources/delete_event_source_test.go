@@ -3,6 +3,7 @@ package eventsources
 import (
 	"context"
 	"testing"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -53,7 +54,7 @@ func Test__DeleteEventSource(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, err == gorm.ErrRecordNotFound)
 
-		softDeletedSources, err := models.ListUnscopedSoftDeletedEventSources(10)
+		softDeletedSources, err := models.ListUnscopedSoftDeletedEventSources(10, time.Now().Add(time.Hour))
 		require.NoError(t, err)
 		found := false
 		for _, s := range softDeletedSources {

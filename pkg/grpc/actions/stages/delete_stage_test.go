@@ -3,6 +3,7 @@ package stages
 import (
 	"context"
 	"testing"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -76,7 +77,7 @@ func Test__DeleteStage(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, err == gorm.ErrRecordNotFound)
 
-		softDeletedStages, err := models.ListUnscopedSoftDeletedStages(10)
+		softDeletedStages, err := models.ListUnscopedSoftDeletedStages(10, time.Now().Add(time.Hour))
 		require.NoError(t, err)
 		found := false
 		for _, s := range softDeletedStages {

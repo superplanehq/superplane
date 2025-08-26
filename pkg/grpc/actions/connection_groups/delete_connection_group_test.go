@@ -3,6 +3,7 @@ package connectiongroups
 import (
 	"context"
 	"testing"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +83,7 @@ func Test__DeleteConnectionGroup(t *testing.T) {
 		assert.Error(t, err)
 		assert.True(t, err == gorm.ErrRecordNotFound)
 
-		softDeletedGroups, err := models.ListUnscopedSoftDeletedConnectionGroups(10)
+		softDeletedGroups, err := models.ListUnscopedSoftDeletedConnectionGroups(10, time.Now().Add(time.Hour))
 		require.NoError(t, err)
 		found := false
 		for _, g := range softDeletedGroups {

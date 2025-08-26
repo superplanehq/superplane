@@ -35,6 +35,7 @@ services:
       START_EVENT_DISTRIBUTER: "yes"
       START_PENDING_FIELD_SETS_WORKER: "yes"
       START_PENDING_EVENT_SOURCES_WORKER: "yes"
+      START_HARD_DELETION_WORKER: "yes"
       WEB_BASE_PATH: "/app"
       PUBLIC_API_BASE_PATH: /api/v1
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv

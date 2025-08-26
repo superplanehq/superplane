@@ -191,12 +191,13 @@ func FindExternalEventSourceByName(canvasID string, name string) (*EventSource, 
 	return &eventSource, nil
 }
 
-func ListUnscopedSoftDeletedEventSources(limit int) ([]EventSource, error) {
+func ListUnscopedSoftDeletedEventSources(limit int, cutoffTime time.Time) ([]EventSource, error) {
 	var sources []EventSource
 
 	err := database.Conn().
 		Unscoped().
 		Where("deleted_at is not null").
+		Where("deleted_at <= ?", cutoffTime).
 		Limit(limit).
 		Find(&sources).
 		Error
@@ -266,4 +267,33 @@ func (s *EventSource) Delete() error {
 
 func (s *EventSource) HardDeleteInTransaction(tx *gorm.DB) error {
 	return tx.Unscoped().Delete(s).Error
+}
+
+func (s *EventSource) DeleteStageEventsInTransaction(tx *gorm.DB) error {
+	// Delete events associated with stage events from this event source
+	if err := tx.Unscoped().
+		Where("id IN (SELECT event_id FROM stage_events WHERE source_id = ?)", s.ID).
+		Delete(&Event{}).Error; err != nil {
+		return fmt.Errorf("failed to delete events: %v", err)
+	}
+
+	if err := tx.Unscoped().Where("source_id = ?", s.ID).Delete(&StageEvent{}).Error; err != nil {
+		return fmt.Errorf("failed to delete stage events: %v", err)
+	}
+
+	return nil
+}
+
+func (s *EventSource) DeleteConnectionsInTransaction(tx *gorm.DB) error {
+	if err := tx.Unscoped().Where("source_id = ? AND source_type = ?", s.ID, SourceTypeEventSource).Delete(&Connection{}).Error; err != nil {
+		return fmt.Errorf("failed to delete connections: %v", err)
+	}
+	return nil
+}
+
+func (s *EventSource) DeleteEventsInTransaction(tx *gorm.DB) error {
+	if err := tx.Unscoped().Where("source_id = ? AND source_type = ?", s.ID, SourceTypeEventSource).Delete(&Event{}).Error; err != nil {
+		return fmt.Errorf("failed to delete events: %v", err)
+	}
+	return nil
 }
