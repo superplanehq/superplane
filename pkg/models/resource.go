@@ -171,7 +171,7 @@ func DeleteResourceWithChildren(resourceID uuid.UUID) error {
 
 		// Delete internal event sources associated with child resources
 		for _, childResource := range childResources {
-			err = tx.Where("resource_id = ? AND scope = ?", childResource.ID, EventSourceScopeInternal).
+			err = tx.Unscoped().Where("resource_id = ? AND scope = ?", childResource.ID, EventSourceScopeInternal).
 				Delete(&EventSource{}).Error
 			if err != nil {
 				return err
@@ -179,7 +179,7 @@ func DeleteResourceWithChildren(resourceID uuid.UUID) error {
 		}
 
 		// Delete internal event sources associated with the parent resource
-		err = tx.Where("resource_id = ? AND scope = ?", resourceID, EventSourceScopeInternal).
+		err = tx.Unscoped().Where("resource_id = ? AND scope = ?", resourceID, EventSourceScopeInternal).
 			Delete(&EventSource{}).Error
 		if err != nil {
 			return err

@@ -265,5 +265,5 @@ func (s *EventSource) Delete() error {
 }
 
 func (s *EventSource) HardDeleteInTransaction(tx *gorm.DB) error {
-	return tx.Delete(s).Error
+	return tx.Unscoped().Delete(s).Error
 }

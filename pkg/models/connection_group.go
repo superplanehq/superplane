@@ -364,5 +364,5 @@ func (s *ConnectionGroup) Delete() error {
 }
 
 func (s *ConnectionGroup) HardDeleteInTransaction(tx *gorm.DB) error {
-	return tx.Delete(s).Error
+	return tx.Unscoped().Delete(s).Error
 }
