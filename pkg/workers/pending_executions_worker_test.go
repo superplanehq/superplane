@@ -101,7 +101,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		executorType, _, resource := support.Executor(t, r)
 		executorSpec, err := json.Marshal(map[string]any{
-			"branch":       "main",
+			"ref":          "refs/heads/main",
 			"pipelineFile": ".semaphore/run.yml",
 			"parameters": map[string]string{
 				"REF":      "${{ inputs.REF }}",
