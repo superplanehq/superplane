@@ -56,7 +56,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 			WithName("test-stage").
 			WithRequester(r.User).
 			WithExecutorType("semaphore").
-			WithExecutorSpec([]byte(`{"branch":"main","pipelineFile":".semaphore/run.yml"}`)).
+			WithExecutorSpec([]byte(`{"ref":"refs/heads/main","pipelineFile":".semaphore/run.yml"}`)).
 			ForResource(resource).
 			ForIntegration(r.Integration).
 			Create()
@@ -80,7 +80,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 			WithName("test-stage-excluded").
 			WithRequester(r.User).
 			WithExecutorType("semaphore").
-			WithExecutorSpec([]byte(`{"branch":"main","pipelineFile":".semaphore/run.yml"}`)).
+			WithExecutorSpec([]byte(`{"ref":"refs/heads/main","pipelineFile":".semaphore/run.yml"}`)).
 			ForResource(resource).
 			ForIntegration(r.Integration).
 			Create()
@@ -125,7 +125,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 			WithName("test-stage-1").
 			WithRequester(r.User).
 			WithExecutorType("semaphore").
-			WithExecutorSpec([]byte(`{"branch":"main","pipelineFile":".semaphore/run.yml"}`)).
+			WithExecutorSpec([]byte(`{"ref":"refs/heads/main","pipelineFile":".semaphore/run.yml"}`)).
 			ForResource(resource).
 			ForIntegration(r.Integration).
 			Create()
@@ -137,7 +137,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 			WithName("test-stage-2").
 			WithRequester(r.User).
 			WithExecutorType("semaphore").
-			WithExecutorSpec([]byte(`{"branch":"main","pipelineFile":".semaphore/run.yml"}`)).
+			WithExecutorSpec([]byte(`{"ref":"refs/heads/main","pipelineFile":".semaphore/run.yml"}`)).
 			ForResource(resource).
 			ForIntegration(r.Integration).
 			Create()
