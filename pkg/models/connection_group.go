@@ -353,16 +353,16 @@ func FindConnectionGroupByIDInTransaction(tx *gorm.DB, canvasID string, id strin
 	return connectionGroup, nil
 }
 
-func (s *ConnectionGroup) Delete() error {
-	deletedName := fmt.Sprintf("%s-deleted-%d", s.Name, time.Now().Unix())
+func (g *ConnectionGroup) Delete() error {
+	deletedName := fmt.Sprintf("%s-deleted-%d", g.Name, time.Now().Unix())
 
-	return database.Conn().Model(s).
-		Where("id = ?", s.ID).
+	return database.Conn().Model(g).
+		Where("id = ?", g.ID).
 		Update("name", deletedName).
 		Update("deleted_at", time.Now()).
 		Error
 }
 
-func (s *ConnectionGroup) HardDeleteInTransaction(tx *gorm.DB) error {
-	return tx.Unscoped().Delete(s).Error
+func (g *ConnectionGroup) HardDeleteInTransaction(tx *gorm.DB) error {
+	return tx.Unscoped().Delete(g).Error
 }
