@@ -8,6 +8,7 @@ import {
   superplaneUpdateStage,
   superplaneDescribeStage,
   superplaneCreateEventSource,
+  superplaneUpdateEventSource,
   superplaneDescribeEventSource,
   superplaneResetEventSourceKey,
   superplaneListConnectionGroups,
@@ -378,6 +379,38 @@ export const useResetEventSourceKey = (canvasId: string) => {
       return await superplaneResetEventSourceKey(
         withOrganizationHeader({
           path: { canvasIdOrName: canvasId, idOrName: eventSourceId },
+        })
+      )
+    },
+    onSuccess: () => {
+      // Invalidate and refetch canvas event sources
+      queryClient.invalidateQueries({ queryKey: canvasKeys.eventSources(canvasId) })
+    }
+  })
+}
+
+export const useUpdateEventSource = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (params: { 
+      eventSourceId: string;
+      name: string;
+      description?: string;
+      spec: SuperplaneEventSourceSpec;
+    }) => {
+      return await superplaneUpdateEventSource(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: params.eventSourceId },
+          body: {
+            eventSource: {
+              metadata: {
+                name: params.name,
+                description: params.description
+              },
+              spec: params.spec
+            }
+          }
         })
       )
     },

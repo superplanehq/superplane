@@ -3,7 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useCreateEventSource } from '@/hooks/useCanvasData';
+import { useCreateEventSource, useUpdateEventSource } from '@/hooks/useCanvasData';
 import { SuperplaneEventSource, SuperplaneEventSourceSpec } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -30,6 +30,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createEventSourceMutation = useCreateEventSource(canvasId);
+  const updateEventSourceMutation = useUpdateEventSource(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
   const allEventSources = useCanvasStore(state => state.eventSources);
   const currentEventSource = useCanvasStore(state =>
@@ -50,7 +51,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
-  const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
@@ -136,6 +137,26 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           updateEventSourceKey(newEventSource.metadata?.id || '', generatedKey || '');
           removeEventSource(props.id);
         }
+      } else {
+        await updateEventSourceMutation.mutateAsync({
+          eventSourceId: currentEventSource.metadata?.id || '',
+          name: eventSourceName,
+          description: eventSourceDescription,
+          spec: currentFormData.spec
+        });
+
+        updateEventSource({
+          ...currentEventSource,
+          metadata: {
+            ...currentEventSource.metadata,
+            name: eventSourceName,
+            description: eventSourceDescription
+          },
+          spec: currentFormData.spec
+        });
+
+        props.data.name = eventSourceName;
+        props.data.description = eventSourceDescription;
       }
       setIsEditMode(false);
       setEditingEventSource(null);
@@ -237,7 +258,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       setEventSourceName(props.data.name);
       setEventSourceDescription(props.data.description || '');
       setFocusedNodeId(props.id);
-      
+
       // Initialize currentFormData with existing event source data
       if (currentEventSource?.spec) {
         setCurrentFormData({
@@ -246,7 +267,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           spec: currentEventSource.spec
         });
       }
-      
+
       setTimeout(() => {
         const currentNodes = useCanvasStore.getState().nodes;
         const updatedNodes = currentNodes.map(node => ({
