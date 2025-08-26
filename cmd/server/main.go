@@ -55,12 +55,14 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		stageEventApprovedConsumer := workers.NewStageEventApprovedConsumer(rabbitMQURL)
 		go stageEventApprovedConsumer.Start()
 
+		cleanupService := workers.NewResourceCleanupService(registry)
+
 		log.Println("Starting Event Source Updated Consumer")
-		eventSourceUpdatedConsumer := workers.NewEventSourceUpdatedConsumer(registry, rabbitMQURL)
+		eventSourceUpdatedConsumer := workers.NewEventSourceUpdatedConsumer(registry, rabbitMQURL, cleanupService)
 		go eventSourceUpdatedConsumer.Start()
 
 		log.Println("Starting Stage Updated Consumer")
-		stageUpdatedConsumer := workers.NewStageUpdatedConsumer(registry, rabbitMQURL)
+		stageUpdatedConsumer := workers.NewStageUpdatedConsumer(registry, rabbitMQURL, cleanupService)
 		go stageUpdatedConsumer.Start()
 	}
 

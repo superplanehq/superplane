@@ -22,7 +22,7 @@ type StageUpdatedConsumer struct {
 	RabbitMQURL    string
 }
 
-func NewStageUpdatedConsumer(registry *registry.Registry, rabbitMQURL string) *StageUpdatedConsumer {
+func NewStageUpdatedConsumer(registry *registry.Registry, rabbitMQURL string, cleanupService *ResourceCleanupService) *StageUpdatedConsumer {
 	logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
 		"consumer": "stage_updated",
 	}))
@@ -33,7 +33,7 @@ func NewStageUpdatedConsumer(registry *registry.Registry, rabbitMQURL string) *S
 	return &StageUpdatedConsumer{
 		RabbitMQURL:    rabbitMQURL,
 		Consumer:       consumer,
-		CleanupService: NewResourceCleanupService(registry),
+		CleanupService: cleanupService,
 	}
 }
 

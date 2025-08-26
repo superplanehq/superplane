@@ -22,7 +22,7 @@ type EventSourceUpdatedConsumer struct {
 	RabbitMQURL    string
 }
 
-func NewEventSourceUpdatedConsumer(registry *registry.Registry, rabbitMQURL string) *EventSourceUpdatedConsumer {
+func NewEventSourceUpdatedConsumer(registry *registry.Registry, rabbitMQURL string, cleanupService *ResourceCleanupService) *EventSourceUpdatedConsumer {
 	logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
 		"consumer": "event_source_updated",
 	}))
@@ -33,7 +33,7 @@ func NewEventSourceUpdatedConsumer(registry *registry.Registry, rabbitMQURL stri
 	return &EventSourceUpdatedConsumer{
 		RabbitMQURL:    rabbitMQURL,
 		Consumer:       consumer,
-		CleanupService: NewResourceCleanupService(registry),
+		CleanupService: cleanupService,
 	}
 }
 
