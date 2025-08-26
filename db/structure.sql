@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lx7SBo9hwCG2FMbbYbYYbRVCkmM9WfefZzzsjXnblsTdVZ3Nh7gK2sO8uhxWtru
+\restrict Ne45evHIYOXHGEhS2PfOUCwHHKzxcI6bygCk9XxzHSINiOAWYzPf54pqCJY55In
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -168,7 +168,8 @@ CREATE TABLE public.connection_groups (
     updated_at timestamp without time zone,
     updated_by uuid,
     spec jsonb DEFAULT '{}'::jsonb NOT NULL,
-    description text
+    description text,
+    deleted_at timestamp with time zone
 );
 
 
@@ -204,7 +205,8 @@ CREATE TABLE public.event_sources (
     state character varying(64) NOT NULL,
     scope character varying(64) NOT NULL,
     description text,
-    event_types jsonb DEFAULT '[]'::jsonb NOT NULL
+    event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
+    deleted_at timestamp with time zone
 );
 
 
@@ -440,7 +442,8 @@ CREATE TABLE public.stages (
     executor_type character varying(64) NOT NULL,
     resource_id uuid,
     description text,
-    executor_name text
+    executor_name text,
+    deleted_at timestamp with time zone
 );
 
 
@@ -830,6 +833,20 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
+-- Name: idx_connection_groups_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connection_groups_deleted_at ON public.connection_groups USING btree (deleted_at);
+
+
+--
+-- Name: idx_event_sources_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_sources_deleted_at ON public.event_sources USING btree (deleted_at);
+
+
+--
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -848,6 +865,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_stages_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_stages_deleted_at ON public.stages USING btree (deleted_at);
 
 
 --
@@ -1077,13 +1101,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lx7SBo9hwCG2FMbbYbYYbRVCkmM9WfefZzzsjXnblsTdVZ3Nh7gK2sO8uhxWtru
+\unrestrict Ne45evHIYOXHGEhS2PfOUCwHHKzxcI6bygCk9XxzHSINiOAWYzPf54pqCJY55In
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict mJM5mKREsvlOGDGHORt7dGZ2NSx67NNcNSSp3aZYsPIuTWCyh1bcrbmO6L4mYXa
+\restrict L6g1sHdULNX6quowgXUM2ecfPxjl5B3UTALFahjPdhrUuB7gKOhHwEwWQiIycbg
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1105,7 +1129,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250821200205	f
+20250826183406	f
 \.
 
 
@@ -1113,5 +1137,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mJM5mKREsvlOGDGHORt7dGZ2NSx67NNcNSSp3aZYsPIuTWCyh1bcrbmO6L4mYXa
+\unrestrict L6g1sHdULNX6quowgXUM2ecfPxjl5B3UTALFahjPdhrUuB7gKOhHwEwWQiIycbg
 

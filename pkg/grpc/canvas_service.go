@@ -96,6 +96,11 @@ func (s *CanvasService) ListEventSources(ctx context.Context, req *pb.ListEventS
 	return eventsources.ListEventSources(ctx, canvasID)
 }
 
+func (s *CanvasService) DeleteEventSource(ctx context.Context, req *pb.DeleteEventSourceRequest) (*pb.DeleteEventSourceResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return eventsources.DeleteEventSource(ctx, canvasID, req.IdOrName)
+}
+
 //
 // Methods for stages
 //
@@ -132,6 +137,11 @@ func (s *CanvasService) ListStageEvents(ctx context.Context, req *pb.ListStageEv
 	return stageevents.ListStageEvents(ctx, canvasID, req.StageIdOrName, req.States)
 }
 
+func (s *CanvasService) DeleteStage(ctx context.Context, req *pb.DeleteStageRequest) (*pb.DeleteStageResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stages.DeleteStage(ctx, canvasID, req.IdOrName)
+}
+
 //
 // Methods for connection groups
 //
@@ -159,6 +169,11 @@ func (s *CanvasService) ListConnectionGroups(ctx context.Context, req *pb.ListCo
 func (s *CanvasService) ListConnectionGroupFieldSets(ctx context.Context, req *pb.ListConnectionGroupFieldSetsRequest) (*pb.ListConnectionGroupFieldSetsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return groups.ListConnectionGroupFieldSets(ctx, canvasID, req.IdOrName)
+}
+
+func (s *CanvasService) DeleteConnectionGroup(ctx context.Context, req *pb.DeleteConnectionGroupRequest) (*pb.DeleteConnectionGroupResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return groups.DeleteConnectionGroup(ctx, canvasID, req.IdOrName)
 }
 
 func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsRequest) (*pb.ListEventsResponse, error) {
