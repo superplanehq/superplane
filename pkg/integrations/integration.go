@@ -57,6 +57,12 @@ type ResourceManager interface {
 	// so it should also update webhook-related resources, if needed.
 	//
 	SetupWebhook(options WebhookOptions) ([]Resource, error)
+
+	//
+	// Clean up a webhook for an integration resource.
+	// Used when a stage's integration or resource changes to clean up the old webhook.
+	//
+	CleanupWebhook(parentResource Resource, webhook Resource) error
 }
 
 type Executor interface {

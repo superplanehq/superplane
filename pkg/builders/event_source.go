@@ -20,17 +20,18 @@ import (
 var ErrResourceAlreadyUsed = fmt.Errorf("resource already used")
 
 type EventSourceBuilder struct {
-	tx          *gorm.DB
-	ctx         context.Context
-	encryptor   crypto.Encryptor
-	registry    *registry.Registry
-	canvasID    uuid.UUID
-	name        string
-	description string
-	scope       string
-	eventTypes  []models.EventType
-	integration *models.Integration
-	resource    integrations.Resource
+	tx                 *gorm.DB
+	ctx                context.Context
+	encryptor          crypto.Encryptor
+	registry           *registry.Registry
+	canvasID           uuid.UUID
+	name               string
+	description        string
+	scope              string
+	eventTypes         []models.EventType
+	integration        *models.Integration
+	resource           integrations.Resource
+	existingEventSource *models.EventSource
 }
 
 func NewEventSourceBuilder(encryptor crypto.Encryptor, registry *registry.Registry) *EventSourceBuilder {
@@ -83,6 +84,11 @@ func (b *EventSourceBuilder) ForResource(resource integrations.Resource) *EventS
 
 func (b *EventSourceBuilder) WithEventTypes(eventTypes []models.EventType) *EventSourceBuilder {
 	b.eventTypes = eventTypes
+	return b
+}
+
+func (b *EventSourceBuilder) WithExistingEventSource(existingEventSource *models.EventSource) *EventSourceBuilder {
+	b.existingEventSource = existingEventSource
 	return b
 }
 
@@ -264,4 +270,118 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 	}
 
 	return eventSource, string(plainKey), nil
+}
+
+func (b *EventSourceBuilder) Update() (*models.EventSource, string, error) {
+	if b.existingEventSource == nil {
+		return nil, "", fmt.Errorf("no existing event source specified")
+	}
+
+	if b.tx != nil {
+		return b.update(b.tx)
+	}
+
+	var plainKey string
+	var eventSource *models.EventSource
+	var err error
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		eventSource, plainKey, err = b.update(tx)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	return eventSource, plainKey, err
+}
+
+func (b *EventSourceBuilder) update(tx *gorm.DB) (*models.EventSource, string, error) {
+	if b.integration == nil && b.resource == nil {
+		return b.updateWithoutIntegration(tx)
+	}
+
+	return b.updateForIntegration(tx)
+}
+
+func (b *EventSourceBuilder) updateWithoutIntegration(tx *gorm.DB) (*models.EventSource, string, error) {
+	plainKey, err := b.encryptor.Decrypt(b.ctx, b.existingEventSource.Key, []byte(b.existingEventSource.ID.String()))
+	if err != nil {
+		return nil, "", err
+	}
+
+	now := time.Now()
+	err = tx.Model(b.existingEventSource).
+		Update("name", b.name).
+		Update("description", b.description).
+		Update("updated_at", now).
+		Update("event_types", datatypes.NewJSONSlice(b.eventTypes)).
+		Update("resource_id", nil).
+		Error
+
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to update event source: %v", err)
+	}
+
+	return b.existingEventSource, string(plainKey), nil
+}
+
+func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSource, string, error) {
+	eventHandler, err := b.registry.GetEventHandler(b.integration.Type)
+	if err != nil {
+		return nil, "", fmt.Errorf("no event handler for integration %s: %v", b.integration.Type, err)
+	}
+
+	eventTypes := eventHandler.EventTypes()
+	for _, eventType := range b.eventTypes {
+		if !slices.Contains(eventTypes, eventType.Type) {
+			return nil, "", fmt.Errorf("event type %s is not supported for integration %s. Available event types are: %v",
+				eventType.Type,
+				b.integration.Type,
+				eventTypes,
+			)
+		}
+	}
+
+	resource, err := b.findOrCreateResource(tx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	existingSource, err := resource.FindEventSourceInTransaction(tx)
+	if err == nil && existingSource.ID != b.existingEventSource.ID {
+		if existingSource.Scope == models.EventSourceScopeExternal {
+			return nil, "", ErrResourceAlreadyUsed
+		}
+	}
+
+	plainKey, err := b.encryptor.Decrypt(b.ctx, b.existingEventSource.Key, []byte(b.existingEventSource.ID.String()))
+	if err != nil {
+		return nil, "", err
+	}
+
+	now := time.Now()
+	updates := map[string]interface{}{
+		"name":        b.name,
+		"description": b.description,
+		"updated_at":  now,
+		"event_types": datatypes.NewJSONSlice(b.eventTypes),
+		"resource_id": &resource.ID,
+	}
+
+	// If resource changed, set to pending so webhook gets recreated
+	if b.existingEventSource.ResourceID == nil || *b.existingEventSource.ResourceID != resource.ID {
+		updates["state"] = models.EventSourceStatePending
+	}
+
+	err = tx.Model(b.existingEventSource).Updates(updates).Error
+
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to update event source: %v", err)
+	}
+
+	return b.existingEventSource, string(plainKey), nil
 }
