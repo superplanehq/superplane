@@ -40,6 +40,7 @@ type ConnectionGroup struct {
 	CreatedBy   uuid.UUID
 	UpdatedAt   *time.Time
 	UpdatedBy   uuid.UUID
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 }
 
 func FindConnectionGroupByName(canvasID string, name string) (*ConnectionGroup, error) {

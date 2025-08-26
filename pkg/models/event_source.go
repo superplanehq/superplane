@@ -30,6 +30,7 @@ type EventSource struct {
 	Scope       string
 	CreatedAt   *time.Time
 	UpdatedAt   *time.Time
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 
 	EventTypes datatypes.JSONSlice[EventType]
 }

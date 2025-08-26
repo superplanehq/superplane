@@ -28,6 +28,7 @@ type Stage struct {
 	UpdatedAt   *time.Time
 	CreatedBy   uuid.UUID
 	UpdatedBy   uuid.UUID
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 
 	ExecutorType string
 	ExecutorSpec datatypes.JSON
