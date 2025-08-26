@@ -355,8 +355,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           if (!executor.resource?.name) {
             errors.executorProject = 'Project name is required';
           }
-          if (!executor.spec.branch) {
-            errors.executorBranch = 'Branch is required';
+          if (!executor.spec.ref) {
+            errors.executorRef = 'Ref (branch/tag) is required';
           }
           if (!executor.spec.pipelineFile) {
             errors.executorPipelineFile = 'Pipeline file is required';
@@ -1774,12 +1774,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             </ValidationField>
                           )}
 
-                          <ValidationField label="Branch">
+                          <ValidationField label="Ref">
                             <input
                               type="text"
-                              value={(executor.spec?.branch as string) || ''}
-                              onChange={(e) => updateExecutorField('branch', e.target.value)}
-                              placeholder="main"
+                              value={(executor.spec?.ref as string) || ''}
+                              onChange={(e) => updateExecutorField('ref', e.target.value)}
+                              placeholder="refs/heads/main"
                               className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                             />
                           </ValidationField>

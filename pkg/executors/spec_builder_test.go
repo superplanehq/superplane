@@ -13,7 +13,7 @@ func Test__SpecBuilder_Build(t *testing.T) {
 
 	t.Run("fields in spec are resolved", func(t *testing.T) {
 		specData, err := json.Marshal(map[string]any{
-			"branch":       "main",
+			"ref":          "refs/heads/main",
 			"pipelineFile": ".semaphore/run.yml",
 			"parameters": map[string]any{
 				"PARAM_1": "${{ inputs.VAR_1 }}",
@@ -29,7 +29,7 @@ func Test__SpecBuilder_Build(t *testing.T) {
 		var resolvedSpec map[string]any
 		err = json.Unmarshal(d, &resolvedSpec)
 		require.NoError(t, err)
-		assert.Equal(t, resolvedSpec["branch"], "main")
+		assert.Equal(t, resolvedSpec["ref"], "refs/heads/main")
 		assert.Equal(t, resolvedSpec["pipelineFile"], ".semaphore/run.yml")
 		assert.Equal(t, map[string]any{"PARAM_1": "hello", "PARAM_2": "token"}, resolvedSpec["parameters"])
 	})

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/executors"
@@ -18,7 +19,7 @@ type SemaphoreExecutor struct {
 
 type ExecutorSpec struct {
 	Task         string            `json:"task"`
-	Branch       string            `json:"branch"`
+	Ref          string            `json:"ref"`
 	PipelineFile string            `json:"pipelineFile"`
 	Parameters   map[string]string `json:"parameters"`
 }
@@ -37,8 +38,8 @@ func (e *SemaphoreExecutor) Validate(ctx context.Context, specData []byte) error
 		return fmt.Errorf("error unmarshaling spec data: %v", err)
 	}
 
-	if spec.Branch == "" {
-		return fmt.Errorf("branch is required")
+	if spec.Ref == "" {
+		return fmt.Errorf("ref is required")
 	}
 
 	return e.validateTask(spec)
@@ -92,7 +93,7 @@ func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.Execut
 	if spec.Task != "" {
 		semaphore.runTask(&RunTaskRequest{
 			TaskID:       spec.Task,
-			Branch:       spec.Branch,
+			Branch:       strings.TrimPrefix(spec.Ref, "refs/heads/"),
 			PipelineFile: spec.PipelineFile,
 			Parameters:   e.workflowParameters(spec.Parameters, parameters),
 		})
@@ -100,7 +101,7 @@ func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.Execut
 
 	return semaphore.runWorkflow(CreateWorkflowRequest{
 		ProjectID:    e.Resource.Id(),
-		Reference:    "refs/heads/" + spec.Branch,
+		Reference:    spec.Ref,
 		PipelineFile: spec.PipelineFile,
 		Parameters:   e.workflowParameters(spec.Parameters, parameters),
 	})

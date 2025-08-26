@@ -152,7 +152,7 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("stage is updated", func(t *testing.T) {
 		newSpec, err := structpb.NewStruct(map[string]any{
-			"branch":       "other",
+			"ref":          "refs/heads/other",
 			"pipelineFile": ".semaphore/other.yml",
 			"parameters":   map[string]any{},
 		})
@@ -214,7 +214,7 @@ func Test__UpdateStage(t *testing.T) {
 
 		// Executor spec is updated
 		assert.Equal(t, models.IntegrationTypeSemaphore, res.Stage.Spec.Executor.Type)
-		assert.Equal(t, "other", res.Stage.Spec.Executor.Spec.GetFields()["branch"].GetStringValue())
+		assert.Equal(t, "refs/heads/other", res.Stage.Spec.Executor.Spec.GetFields()["ref"].GetStringValue())
 		assert.Equal(t, ".semaphore/other.yml", res.Stage.Spec.Executor.Spec.GetFields()["pipelineFile"].GetStringValue())
 		assert.Equal(t, map[string]any{}, res.Stage.Spec.Executor.Spec.GetFields()["parameters"].GetStructValue().AsMap())
 

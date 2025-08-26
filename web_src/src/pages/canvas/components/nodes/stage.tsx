@@ -360,7 +360,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     if (props.data.executor?.type === 'semaphore') {
       const resourceName = (props.data.executor?.resource?.name as string)?.replace('.semaphore/', '')
       const pipelineFile = (props.data.executor?.spec?.['pipelineFile'] as string)?.replace('.semaphore/', '')
-      const ref = props.data.executor?.spec?.['branch'] as string
+      const ref = props.data.executor?.spec?.['ref'] as string
 
       if (resourceName) badges.push({ icon: 'assignment', text: resourceName })
       if (pipelineFile) badges.push({ icon: 'code', text: pipelineFile })

@@ -271,7 +271,7 @@ func CreateExecutionWithData(t *testing.T,
 
 func Executor(t *testing.T, r *ResourceRegistry) (string, []byte, integrations.Resource) {
 	spec, err := json.Marshal(map[string]any{
-		"branch":       "main",
+		"ref":          "refs/heads/main",
 		"pipelineFile": ".semaphore/run.yml",
 		"parameters": map[string]string{
 			"PARAM_1": "VALUE_1",
@@ -291,7 +291,7 @@ func Executor(t *testing.T, r *ResourceRegistry) (string, []byte, integrations.R
 
 func ProtoExecutor(t *testing.T, r *ResourceRegistry) *pb.Executor {
 	spec, err := structpb.NewStruct(map[string]any{
-		"branch":       "main",
+		"ref":          "refs/heads/main",
 		"pipelineFile": ".semaphore/run.yml",
 		"parameters":   map[string]any{},
 	})
