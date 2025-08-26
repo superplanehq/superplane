@@ -209,6 +209,42 @@
           "ConnectionGroup"
         ]
       },
+      "delete": {
+        "summary": "Delete a connection group",
+        "description": "Deletes the specified connection group (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_DeleteConnectionGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDeleteConnectionGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      },
       "patch": {
         "summary": "Update a connection group",
         "description": "Updates the specified connection group (canvas can be referenced by ID or name)",
@@ -372,6 +408,42 @@
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/SuperplaneDescribeEventSourceResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "EventSource"
+        ]
+      },
+      "delete": {
+        "summary": "Delete an event source",
+        "description": "Deletes the specified event source (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_DeleteEventSource",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDeleteEventSourceResponse"
             }
           },
           "default": {
@@ -621,6 +693,42 @@
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/SuperplaneDescribeStageResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Stage"
+        ]
+      },
+      "delete": {
+        "summary": "Delete a stage",
+        "description": "Deletes the specified stage (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_DeleteStage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDeleteStageResponse"
             }
           },
           "default": {
@@ -3455,6 +3563,15 @@
       }
     },
     "SuperplaneDeleteCanvasResponse": {
+      "type": "object"
+    },
+    "SuperplaneDeleteConnectionGroupResponse": {
+      "type": "object"
+    },
+    "SuperplaneDeleteEventSourceResponse": {
+      "type": "object"
+    },
+    "SuperplaneDeleteStageResponse": {
       "type": "object"
     },
     "SuperplaneDescribeCanvasResponse": {
