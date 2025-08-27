@@ -80,7 +80,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
         );
 
       case 'history':
-        return <HistoryTab allExecutions={allExecutions} organizationId={organizationId!} />;
+        return <HistoryTab approveStageEvent={approveStageEvent} allExecutions={allExecutions} organizationId={organizationId!} selectedStage={selectedStage} allStageEvents={selectedStage.queue || []} />;
 
       case 'settings':
         return <SettingsTab selectedStage={selectedStage} />;
