@@ -1,9 +1,9 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneListEvents } from "@/api-client";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneListEvents, SuperplaneStage, SuperplaneEventSource, SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEvent } from "@/api-client";
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { EventSourceSidebar } from "./components/EventSourceSidebar";
@@ -25,7 +25,7 @@ export function Canvas() {
   const [canvasName, setCanvasName] = useState<string>('');
 
   const getActiveViewFromHash = (): CanvasView => {
-    const hash = location.hash.substring(1); // Remove the #
+    const hash = location.hash.substring(1);
     switch (hash) {
       case 'secrets':
         return 'secrets';
@@ -50,10 +50,8 @@ export function Canvas() {
     }
   };
 
-  // Custom hook for setting up event handlers - must be called at top level
   useWebsocketEvents(canvasId!, organizationId!);
 
-  // Use the modular node handlers
   const { handleAddNode } = useNodeHandlers(canvasId || '');
 
   const { applyElkAutoLayout } = useAutoLayout();
@@ -61,9 +59,124 @@ export function Canvas() {
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
   const selectedEventSource = useMemo(() => eventSources.find(eventSource => eventSource.metadata!.id === selectedEventSourceId), [eventSources, selectedEventSourceId]);
 
+  const fetchCanvasBasicData = useCallback(async () => {
+    const [canvasResponse, stagesResponse, connectionGroupsResponse, eventSourcesResponse] = await Promise.all([
+      superplaneDescribeCanvas(
+        withOrganizationHeader({
+          path: { id: canvasId },
+          query: { organizationId: organizationId }
+        })
+      ),
+      superplaneListStages(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+        })
+      ),
+      superplaneListConnectionGroups(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+        })
+      ),
+      superplaneListEventSources(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId }
+        })
+      )
+    ]);
+
+    if (!canvasResponse.data?.canvas) {
+      throw new Error('Failed to fetch canvas data');
+    }
+    if (!stagesResponse.data?.stages) {
+      throw new Error('Failed to fetch stages data');
+    }
+    if (!connectionGroupsResponse.data?.connectionGroups) {
+      throw new Error('Failed to fetch connection groups data');
+    }
+    if (!eventSourcesResponse.data?.eventSources) {
+      throw new Error('Failed to fetch event sources data');
+    }
+
+    return {
+      canvas: canvasResponse.data.canvas,
+      stages: stagesResponse.data.stages,
+      connectionGroups: connectionGroupsResponse.data.connectionGroups,
+      eventSources: eventSourcesResponse.data.eventSources
+    };
+  }, [canvasId, organizationId]);
+
+  const fetchStageEvents = useCallback(async (stages: SuperplaneStage[]) => {
+    const stageEventsPromises = stages.map(stage =>
+      superplaneListStageEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId!, stageIdOrName: stage.metadata!.id! }
+        })
+      ).then(response => ({
+        stage,
+        events: response.data?.events || []
+      }))
+    );
+
+    return Promise.all(stageEventsPromises);
+  }, [canvasId]);
+
+  const fetchEventSourceEvents = useCallback(async (eventSources: SuperplaneEventSource[]) => {
+    const eventSourceEventsPromises = eventSources.map(eventSource =>
+      superplaneListEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId! },
+          query: {
+            sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
+            sourceId: eventSource.metadata?.id
+          }
+        })
+      ).then(response => ({
+        eventSource,
+        events: response.data?.events || []
+      }))
+    );
+
+    return Promise.all(eventSourceEventsPromises);
+  }, [canvasId]);
+
+  const processAndInitializeStore = useCallback((
+    canvas: SuperplaneCanvas,
+    connectionGroups: SuperplaneConnectionGroup[],
+    stageEventsResults: Array<{ stage: SuperplaneStage; events: SuperplaneStageEvent[] }>,
+    eventSourceEventsResults: Array<{ eventSource: SuperplaneEventSource; events: SuperplaneEvent[] }>
+  ) => {
+    const allEvents: Record<string, SuperplaneStageEvent> = {};
+    const stagesWithQueues: StageWithEventQueue[] = stageEventsResults.map(({ stage, events }) => {
+      for (const event of events) {
+        allEvents[event.id!] = event;
+      }
+
+      return {
+        ...stage,
+        queue: events
+      };
+    });
+
+    const eventSourcesWithEvents: EventSourceWithEvents[] = eventSourceEventsResults.map(({ eventSource, events }) => ({
+      ...eventSource,
+      events,
+      eventFilters: events
+    }));
+
+    const initialData = {
+      canvas: canvas || {},
+      stages: stagesWithQueues,
+      eventSources: eventSourcesWithEvents,
+      connectionGroups: connectionGroups || [],
+      handleEvent: () => { },
+      removeHandleEvent: () => { },
+      pushEvent: () => { },
+    };
+
+    initialize(initialData);
+  }, [initialize]);
 
   useEffect(() => {
-    // Return early if no canvas ID or organization ID is available
     if (!canvasId || !organizationId) {
       if (!canvasId) {
         setError("No canvas ID provided");
@@ -76,116 +189,22 @@ export function Canvas() {
       try {
         setIsLoading(true);
 
-        // Fetch canvas details
-        const canvasResponse = await superplaneDescribeCanvas(
-          withOrganizationHeader({
-            path: { id: canvasId },
-            query: { organizationId: organizationId }
-          })
+        const basicData = await fetchCanvasBasicData();
+
+        setCanvasName(basicData.canvas.metadata?.name || 'Unknown Canvas');
+
+        const [stageEventsResults, eventSourceEventsResults] = await Promise.all([
+          fetchStageEvents(basicData.stages),
+          fetchEventSourceEvents(basicData.eventSources)
+        ]);
+
+        processAndInitializeStore(
+          basicData.canvas,
+          basicData.connectionGroups,
+          stageEventsResults,
+          eventSourceEventsResults
         );
 
-        if (!canvasResponse.data?.canvas) {
-          throw new Error('Failed to fetch canvas data');
-        }
-
-        // Store canvas name for navigation
-        setCanvasName(canvasResponse.data.canvas.metadata?.name || 'Unknown Canvas');
-
-        // Fetch stages for the canvas
-        const stagesResponse = await superplaneListStages(
-          withOrganizationHeader({
-            path: { canvasIdOrName: canvasId },
-          })
-        );
-
-        // Check if stages data was fetched successfully
-        if (!stagesResponse.data?.stages) {
-          throw new Error('Failed to fetch stages data');
-        }
-
-        // Fetch connection groups for the canvas
-        const connectionGroupsResponse = await superplaneListConnectionGroups(
-          withOrganizationHeader({
-            path: { canvasIdOrName: canvasId },
-          })
-        );
-
-        if (!connectionGroupsResponse.data?.connectionGroups) {
-          throw new Error('Failed to fetch connection groups data');
-        }
-
-        // Fetch event sources for the canvas
-        const eventSourcesResponse = await superplaneListEventSources(
-          withOrganizationHeader({
-            path: { canvasIdOrName: canvasId }
-          })
-        );
-
-        // Check if event sources data was fetched successfully
-        if (!eventSourcesResponse.data?.eventSources) {
-          throw new Error('Failed to fetch event sources data');
-        }
-
-        // Use the API stages directly with minimal adaptation
-        const mappedStages = stagesResponse.data?.stages || [];
-
-        // Collect all events from all stages
-        const allEvents: Record<string, SuperplaneStageEvent> = {};
-        const stagesWithQueues: StageWithEventQueue[] = [];
-
-        // Fetch events for each stage
-        for (const stage of mappedStages) {
-          const stageEventsResponse = await superplaneListStageEvents(
-            withOrganizationHeader({
-              path: { canvasIdOrName: canvasId!, stageIdOrName: stage.metadata!.id! }
-            })
-          );
-
-          const stageEvents = stageEventsResponse.data?.events || [];
-
-          // Add events to the collection
-          for (const event of stageEvents) {
-            allEvents[event.id!] = event;
-          }
-
-          stagesWithQueues.push({
-            ...stage,
-            queue: stageEvents
-          });
-        }
-
-        // Fetch events for each event source using the new ListEvents API
-        const eventSourcesWithEvents: EventSourceWithEvents[] = [];
-        for (const eventSource of (eventSourcesResponse.data?.eventSources || [])) {
-          const eventsResponse = await superplaneListEvents(
-            withOrganizationHeader({
-              path: { canvasIdOrName: canvasId! },
-              query: {
-                sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
-                sourceId: eventSource.metadata?.id
-              }
-            })
-          );
-
-          eventSourcesWithEvents.push({
-            ...eventSource,
-            events: eventsResponse.data?.events || [],
-            eventFilters: eventsResponse.data?.events || []
-          });
-        }
-
-        // Initialize the store with the mapped data
-        const initialData = {
-          canvas: canvasResponse.data?.canvas || {},
-          stages: stagesWithQueues,
-          eventSources: eventSourcesWithEvents,
-          connectionGroups: connectionGroupsResponse.data?.connectionGroups || [],
-          handleEvent: () => { },
-          removeHandleEvent: () => { },
-          pushEvent: () => { },
-        };
-
-        initialize(initialData);
         setIsLoading(false);
 
       } catch (err) {
@@ -196,7 +215,7 @@ export function Canvas() {
     };
 
     fetchCanvasData();
-  }, [canvasId, initialize, organizationId]);
+  }, [canvasId, organizationId, fetchCanvasBasicData, fetchStageEvents, fetchEventSourceEvents, processAndInitializeStore]);
 
   if (isLoading) {
     return <div className="loading-state">Loading canvas...</div>;
@@ -258,7 +277,6 @@ export function Canvas() {
         return undefined;
     }
   };
-
 
   return (
     <StrictMode>
