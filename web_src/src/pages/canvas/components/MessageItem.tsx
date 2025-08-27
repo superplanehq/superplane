@@ -81,16 +81,6 @@ const MessageItem = React.memo(({
       ?.find(condition => condition.type === "CONDITION_TYPE_TIME_WINDOW"),
     [selectedStage]);
 
-  const getStatusLabel = useCallback(() => {
-    if (event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL') {
-      return 'Waiting';
-    } else if (event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW') {
-      return 'Waiting';
-    } else if (event.state === 'STATE_PENDING') {
-      return 'Pending';
-    }
-    return 'Pending';
-  }, [event.state, event.stateReason]);
 
   const formatTimeWindow = useCallback(() => {
     if (timeWindowCondition?.timeWindow?.start && timeWindowCondition?.timeWindow?.end) {
@@ -110,10 +100,22 @@ const MessageItem = React.memo(({
       <div className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer" onClick={toggleExpand}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 truncate">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full flex-shrink-0 bg-amber-600 dark:bg-amber-500 animate-pulse"></div>
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-500">{getStatusLabel()}</span>
-            </div>
+            {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' ? (
+              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-amber-400/20 text-amber-700 group-data-hover:bg-amber-400/30 dark:bg-amber-400/10 dark:text-amber-400 dark:group-data-hover:bg-amber-400/15">
+                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">how_to_reg</span>
+                <span className="uppercase">Approval</span>
+              </span>
+            ) : event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' ? (
+              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">schedule</span>
+                <span className="uppercase">Scheduled</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">pending</span>
+                <span className="uppercase">Pending</span>
+              </span>
+            )}
             <span className="font-medium truncate text-sm dark:text-white">
               {event.name || event.id || 'Unknown'}
             </span>
