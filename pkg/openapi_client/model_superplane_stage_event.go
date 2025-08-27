@@ -31,6 +31,7 @@ type SuperplaneStageEvent struct {
 	Execution *SuperplaneExecution `json:"execution,omitempty"`
 	Inputs []SuperplaneKeyValuePair `json:"inputs,omitempty"`
 	Name *string `json:"name,omitempty"`
+	EventId *string `json:"eventId,omitempty"`
 }
 
 // NewSuperplaneStageEvent instantiates a new SuperplaneStageEvent object
@@ -382,6 +383,38 @@ func (o *SuperplaneStageEvent) SetName(v string) {
 	o.Name = &v
 }
 
+// GetEventId returns the EventId field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetEventId() string {
+	if o == nil || IsNil(o.EventId) {
+		var ret string
+		return ret
+	}
+	return *o.EventId
+}
+
+// GetEventIdOk returns a tuple with the EventId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneStageEvent) GetEventIdOk() (*string, bool) {
+	if o == nil || IsNil(o.EventId) {
+		return nil, false
+	}
+	return o.EventId, true
+}
+
+// HasEventId returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasEventId() bool {
+	if o != nil && !IsNil(o.EventId) {
+		return true
+	}
+
+	return false
+}
+
+// SetEventId gets a reference to the given string and assigns it to the EventId field.
+func (o *SuperplaneStageEvent) SetEventId(v string) {
+	o.EventId = &v
+}
+
 func (o SuperplaneStageEvent) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -421,6 +454,9 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
+	}
+	if !IsNil(o.EventId) {
+		toSerialize["eventId"] = o.EventId
 	}
 	return toSerialize, nil
 }
