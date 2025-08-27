@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { ConnectionGroupNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useCreateConnectionGroup, useUpdateConnectionGroup } from '@/hooks/useCanvasData';
+import { useCreateConnectionGroup, useUpdateConnectionGroup, useDeleteConnectionGroup } from '@/hooks/useCanvasData';
 import { SuperplaneConnection, GroupByField, SpecTimeoutBehavior, SuperplaneConnectionGroup } from '@/api-client';
 import { ConnectionGroupEditModeContent } from '../ConnectionGroupEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -26,6 +26,20 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const currentConnectionGroup = useCanvasStore(state =>
     state.connectionGroups.find(cg => cg.metadata?.id === props.id)
   );
+  const nodes = useCanvasStore(state => state.nodes);
+
+  const isPartiallyBroken = useMemo(() => {
+    if (!currentConnectionGroup || isNewNode)
+      return false;
+
+    const hasNoConnections = currentConnectionGroup.spec?.connections?.length === 0
+
+    const hasInvalidConnections = currentConnectionGroup.spec?.connections?.some(connection => {
+      return !nodes.some(node => node?.data?.name === connection.name)
+    })
+
+    return hasNoConnections || hasInvalidConnections
+  }, [currentConnectionGroup, isNewNode, nodes])
 
   const validateConnectionGroupName = (name: string) => {
     if (!name || name.trim() === '') {
@@ -50,6 +64,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createConnectionGroupMutation = useCreateConnectionGroup(canvasId);
   const updateConnectionGroupMutation = useUpdateConnectionGroup(canvasId);
+  const deleteConnectionGroupMutation = useDeleteConnectionGroup(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
   const groupByFields = props.data.groupBy?.fields || [];
 
@@ -143,8 +158,19 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     setConnectionGroupDescription(props.data.description || '');
   };
 
-  const handleDiscardConnectionGroup = () => {
+  const handleDiscardConnectionGroup = async () => {
     if (currentConnectionGroup?.metadata?.id) {
+      const isTemporaryId = /^\\d+$/.test(currentConnectionGroup.metadata.id);
+      const isRealConnectionGroup = !isTemporaryId;
+
+      if (isRealConnectionGroup) {
+        try {
+          await deleteConnectionGroupMutation.mutateAsync(currentConnectionGroup.metadata.id);
+        } catch (error) {
+          console.error('Failed to delete connection group:', error);
+          return;
+        }
+      }
       removeConnectionGroup(currentConnectionGroup.metadata.id);
     }
     setShowDiscardConfirm(false);
@@ -197,9 +223,20 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     }
   };
 
+  const borderColor = useMemo(() => {
+    if (isPartiallyBroken) {
+      return 'border-red-400 dark:border-red-200'
+    }
+
+    if (props.selected || focusedNodeId === props.id) {
+      return 'border-blue-400'
+    }
+    return 'border-gray-200 dark:border-gray-700'
+  }, [props.selected, focusedNodeId, props.id, isPartiallyBroken])
+
   return (
     <div
-      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative`}
+      className={twMerge(`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 relative`, borderColor)}
       style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {focusedNodeId === props.id && (

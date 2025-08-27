@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
+import { useUpdateStage, useCreateStage, useDeleteStage } from '@/hooks/useCanvasData';
 import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -38,9 +38,27 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
+  const nodes = useCanvasStore(state => state.nodes);
   const currentStage = useCanvasStore(state =>
     state.stages.find(stage => stage.metadata?.id === props.id)
   );
+
+  const isPartiallyBroken = useMemo(() => {
+    if (!currentStage || isNewNode)
+      return false;
+
+    const hasNoConnections = currentStage.spec?.connections?.length === 0
+
+    const hasInvalidConnections = currentStage.spec?.connections?.some(connection => {
+      return !nodes.some(node => node?.data?.name === connection.name)
+    })
+
+    const hasInvalidInputMappings = currentStage.spec?.inputMappings?.some(mapping => {
+      return !currentStage.spec?.connections?.some(connection => connection.name === mapping.when?.triggeredBy?.connection)
+    })
+
+    return hasNoConnections || hasInvalidConnections || hasInvalidInputMappings
+  }, [currentStage, isNewNode, nodes])
 
   const validateStageName = (name: string) => {
     if (!name || name.trim() === '') {
@@ -64,6 +82,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
+  const deleteStageMutation = useDeleteStage(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
 
   const pendingEvents = useMemo(() =>
@@ -256,8 +275,19 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setStageDescription(props.data.description || '');
   };
 
-  const handleDiscardStage = () => {
+  const handleDiscardStage = async () => {
     if (currentStage?.metadata?.id) {
+      const isTemporaryId = /^\\d+$/.test(currentStage.metadata.id);
+      const isRealStage = !isTemporaryId && !currentStage.isDraft;
+
+      if (isRealStage) {
+        try {
+          await deleteStageMutation.mutateAsync(currentStage.metadata.id);
+        } catch (error) {
+          console.error('Failed to delete stage:', error);
+          return;
+        }
+      }
       removeStage(currentStage.metadata.id);
     }
     setShowDiscardConfirm(false);
@@ -380,10 +410,22 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     return badges
   }, [props.data.executor])
 
+
+  const borderColor = useMemo(() => {
+    if (isPartiallyBroken) {
+      return 'border-red-400 dark:border-red-200'
+    }
+
+    if (props.selected || focusedNodeId === props.id) {
+      return 'border-blue-400 dark:border-gray-200'
+    }
+    return 'border-transparent dark:border-transparent'
+  }, [props.selected, focusedNodeId, props.id, isPartiallyBroken])
+
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
-      className={`bg-transparent rounded-xl border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400 dark:border-gray-200' : 'border-transparent dark:border-transparent'} relative `}
+      className={twMerge(`bg-transparent rounded-xl border-2 relative `, borderColor)}
     >
       <div className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-gray-700 rounded-xl"
         style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}

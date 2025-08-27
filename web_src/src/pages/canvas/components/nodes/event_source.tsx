@@ -3,7 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useCreateEventSource, useUpdateEventSource } from '@/hooks/useCanvasData';
+import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource } from '@/hooks/useCanvasData';
 import { SuperplaneEventSource, SuperplaneEventSourceSpec } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -31,6 +31,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createEventSourceMutation = useCreateEventSource(canvasId);
   const updateEventSourceMutation = useUpdateEventSource(canvasId);
+  const deleteEventSourceMutation = useDeleteEventSource(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
   const allEventSources = useCanvasStore(state => state.eventSources);
   const currentEventSource = useCanvasStore(state =>
@@ -179,8 +180,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
-  const handleDiscardEventSource = () => {
+  const handleDiscardEventSource = async () => {
     if (currentEventSource?.metadata?.id) {
+      const isTemporaryId = /^\\d+$/.test(currentEventSource.metadata.id);
+      const isRealEventSource = !isTemporaryId;
+
+      if (isRealEventSource) {
+        try {
+          await deleteEventSourceMutation.mutateAsync(currentEventSource.metadata.id);
+        } catch (error) {
+          console.error('Failed to delete event source:', error);
+          return;
+        }
+      }
       removeEventSource(currentEventSource.metadata.id);
     }
     setShowDiscardConfirm(false);

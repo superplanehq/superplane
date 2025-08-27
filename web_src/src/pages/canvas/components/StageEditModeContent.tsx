@@ -933,7 +933,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     displayName={connection.name || `Connection ${index + 1}`}
                     badge={connection.type && (
                       <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
-                        {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
+                        {connection.type?.replace?.('TYPE_', '').replace('_', ' ').toLowerCase()}
                       </span>
                     )}
                     editForm={
