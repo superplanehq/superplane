@@ -28,6 +28,7 @@ type Stage struct {
 	UpdatedAt   *time.Time
 	CreatedBy   uuid.UUID
 	UpdatedBy   uuid.UUID
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 
 	ExecutorType string
 	ExecutorSpec datatypes.JSON
@@ -224,6 +225,23 @@ func FindUnscopedStage(id string) (*Stage, error) {
 	}
 
 	return &stage, nil
+}
+
+func ListUnscopedSoftDeletedStages(limit int) ([]Stage, error) {
+	var stages []Stage
+
+	err := database.Conn().
+		Unscoped().
+		Where("deleted_at is not null").
+		Limit(limit).
+		Find(&stages).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
 }
 
 func FindStageByID(canvasID string, id string) (*Stage, error) {
@@ -442,4 +460,56 @@ func ListStagesByIDs(ids []uuid.UUID) ([]Stage, error) {
 	}
 
 	return stages, nil
+}
+
+func (s *Stage) Delete() error {
+	deletedName := fmt.Sprintf("%s-deleted-%d", s.Name, time.Now().Unix())
+
+	return database.Conn().Model(s).
+		Where("id = ?", s.ID).
+		Update("name", deletedName).
+		Update("deleted_at", time.Now()).
+		Error
+}
+
+func (s *Stage) HardDeleteInTransaction(tx *gorm.DB) error {
+	return tx.Unscoped().Delete(s).Error
+}
+
+func (s *Stage) DeleteStageExecutionsInTransaction(tx *gorm.DB) error {
+	// Delete execution resources for all executions of this stage
+	if err := tx.Unscoped().
+		Where("execution_id IN (SELECT id FROM stage_executions WHERE stage_id = ?)", s.ID).
+		Delete(&ExecutionResource{}).Error; err != nil {
+		return fmt.Errorf("failed to delete execution resources: %v", err)
+	}
+
+	// Delete stage executions
+	if err := tx.Unscoped().Where("stage_id = ?", s.ID).Delete(&StageExecution{}).Error; err != nil {
+		return fmt.Errorf("failed to delete stage executions: %v", err)
+	}
+
+	return nil
+}
+
+func (s *Stage) DeleteStageEventsInTransaction(tx *gorm.DB) error {
+	// Delete events associated with stage events
+	if err := tx.Unscoped().
+		Where("id IN (SELECT event_id FROM stage_events WHERE stage_id = ?)", s.ID).
+		Delete(&Event{}).Error; err != nil {
+		return fmt.Errorf("failed to delete events: %v", err)
+	}
+
+	if err := tx.Unscoped().Where("stage_id = ?", s.ID).Delete(&StageEvent{}).Error; err != nil {
+		return fmt.Errorf("failed to delete stage events: %v", err)
+	}
+
+	return nil
+}
+
+func (s *Stage) DeleteConnectionsInTransaction(tx *gorm.DB) error {
+	if err := tx.Unscoped().Where("target_id = ? AND target_type = ?", s.ID, ConnectionTargetTypeStage).Delete(&Connection{}).Error; err != nil {
+		return fmt.Errorf("failed to delete connections: %v", err)
+	}
+	return nil
 }

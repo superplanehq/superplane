@@ -202,3 +202,4 @@ func FindStageEventsWaitingForTimeWindow() ([]StageEventWithConditions, error) {
 
 	return events, nil
 }
+

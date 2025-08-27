@@ -38,6 +38,7 @@ services:
       START_EVENT_DISTRIBUTER: "yes"
       START_PENDING_FIELD_SETS_WORKER: "yes"
       START_PENDING_EVENT_SOURCES_WORKER: "yes"
+      START_HARD_DELETION_WORKER: "yes"
       WEB_BASE_PATH: "/app"
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv

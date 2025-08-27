@@ -6,14 +6,17 @@ import {
   superplaneListStages,
   superplaneCreateStage,
   superplaneUpdateStage,
+  superplaneDeleteStage,
   superplaneDescribeStage,
   superplaneCreateEventSource,
   superplaneUpdateEventSource,
+  superplaneDeleteEventSource,
   superplaneDescribeEventSource,
   superplaneResetEventSourceKey,
   superplaneListConnectionGroups,
   superplaneCreateConnectionGroup,
   superplaneUpdateConnectionGroup,
+  superplaneDeleteConnectionGroup,
   superplaneDescribeConnectionGroup,
   integrationsListIntegrations,
   superplaneAddUser,
@@ -321,6 +324,26 @@ export const useUpdateStage = (canvasId: string) => {
   })
 }
 
+export const useDeleteStage = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (stageId: string) => {
+      return await superplaneDeleteStage(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: stageId }
+        })
+      )
+    },
+    onSuccess: (_, stageId) => {
+      // Invalidate and refetch canvas stages
+      queryClient.invalidateQueries({ queryKey: canvasKeys.stages(canvasId) })
+      // Remove specific stage from cache
+      queryClient.removeQueries({ queryKey: canvasKeys.stage(canvasId, stageId) })
+    }
+  })
+}
+
 // Event Source-related hooks
 export const useEventSourceDetails = (canvasId: string, eventSourceId: string) => {
   return useQuery({
@@ -417,6 +440,26 @@ export const useUpdateEventSource = (canvasId: string) => {
     onSuccess: () => {
       // Invalidate and refetch canvas event sources
       queryClient.invalidateQueries({ queryKey: canvasKeys.eventSources(canvasId) })
+    }
+  })
+}
+
+export const useDeleteEventSource = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (eventSourceId: string) => {
+      return await superplaneDeleteEventSource(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: eventSourceId }
+        })
+      )
+    },
+    onSuccess: (_, eventSourceId) => {
+      // Invalidate and refetch canvas event sources
+      queryClient.invalidateQueries({ queryKey: canvasKeys.eventSources(canvasId) })
+      // Remove specific event source from cache
+      queryClient.removeQueries({ queryKey: canvasKeys.eventSource(canvasId, eventSourceId) })
     }
   })
 }
@@ -538,6 +581,26 @@ export const useUpdateConnectionGroup = (canvasId: string) => {
       // Invalidate and refetch canvas connection groups and specific connection group
       queryClient.invalidateQueries({ queryKey: canvasKeys.connectionGroups(canvasId) })
       queryClient.invalidateQueries({ queryKey: canvasKeys.connectionGroup(canvasId, variables.connectionGroupId) })
+    }
+  })
+}
+
+export const useDeleteConnectionGroup = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (connectionGroupId: string) => {
+      return await superplaneDeleteConnectionGroup(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: connectionGroupId }
+        })
+      )
+    },
+    onSuccess: (_, connectionGroupId) => {
+      // Invalidate and refetch canvas connection groups
+      queryClient.invalidateQueries({ queryKey: canvasKeys.connectionGroups(canvasId) })
+      // Remove specific connection group from cache
+      queryClient.removeQueries({ queryKey: canvasKeys.connectionGroup(canvasId, connectionGroupId) })
     }
   })
 }

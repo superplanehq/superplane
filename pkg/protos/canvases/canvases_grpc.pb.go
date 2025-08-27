@@ -37,8 +37,11 @@ const (
 	Superplane_ListEvents_FullMethodName                   = "/Superplane.Superplane/ListEvents"
 	Superplane_ListConnectionGroupFieldSets_FullMethodName = "/Superplane.Superplane/ListConnectionGroupFieldSets"
 	Superplane_UpdateStage_FullMethodName                  = "/Superplane.Superplane/UpdateStage"
+	Superplane_DeleteStage_FullMethodName                  = "/Superplane.Superplane/DeleteStage"
 	Superplane_UpdateEventSource_FullMethodName            = "/Superplane.Superplane/UpdateEventSource"
+	Superplane_DeleteEventSource_FullMethodName            = "/Superplane.Superplane/DeleteEventSource"
 	Superplane_UpdateConnectionGroup_FullMethodName        = "/Superplane.Superplane/UpdateConnectionGroup"
+	Superplane_DeleteConnectionGroup_FullMethodName        = "/Superplane.Superplane/DeleteConnectionGroup"
 	Superplane_ApproveStageEvent_FullMethodName            = "/Superplane.Superplane/ApproveStageEvent"
 	Superplane_AddUser_FullMethodName                      = "/Superplane.Superplane/AddUser"
 	Superplane_RemoveUser_FullMethodName                   = "/Superplane.Superplane/RemoveUser"
@@ -66,8 +69,11 @@ type SuperplaneClient interface {
 	ListEvents(ctx context.Context, in *ListEventsRequest, opts ...grpc.CallOption) (*ListEventsResponse, error)
 	ListConnectionGroupFieldSets(ctx context.Context, in *ListConnectionGroupFieldSetsRequest, opts ...grpc.CallOption) (*ListConnectionGroupFieldSetsResponse, error)
 	UpdateStage(ctx context.Context, in *UpdateStageRequest, opts ...grpc.CallOption) (*UpdateStageResponse, error)
+	DeleteStage(ctx context.Context, in *DeleteStageRequest, opts ...grpc.CallOption) (*DeleteStageResponse, error)
 	UpdateEventSource(ctx context.Context, in *UpdateEventSourceRequest, opts ...grpc.CallOption) (*UpdateEventSourceResponse, error)
+	DeleteEventSource(ctx context.Context, in *DeleteEventSourceRequest, opts ...grpc.CallOption) (*DeleteEventSourceResponse, error)
 	UpdateConnectionGroup(ctx context.Context, in *UpdateConnectionGroupRequest, opts ...grpc.CallOption) (*UpdateConnectionGroupResponse, error)
+	DeleteConnectionGroup(ctx context.Context, in *DeleteConnectionGroupRequest, opts ...grpc.CallOption) (*DeleteConnectionGroupResponse, error)
 	ApproveStageEvent(ctx context.Context, in *ApproveStageEventRequest, opts ...grpc.CallOption) (*ApproveStageEventResponse, error)
 	AddUser(ctx context.Context, in *AddUserRequest, opts ...grpc.CallOption) (*AddUserResponse, error)
 	RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error)
@@ -261,6 +267,16 @@ func (c *superplaneClient) UpdateStage(ctx context.Context, in *UpdateStageReque
 	return out, nil
 }
 
+func (c *superplaneClient) DeleteStage(ctx context.Context, in *DeleteStageRequest, opts ...grpc.CallOption) (*DeleteStageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteStageResponse)
+	err := c.cc.Invoke(ctx, Superplane_DeleteStage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *superplaneClient) UpdateEventSource(ctx context.Context, in *UpdateEventSourceRequest, opts ...grpc.CallOption) (*UpdateEventSourceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateEventSourceResponse)
@@ -271,10 +287,30 @@ func (c *superplaneClient) UpdateEventSource(ctx context.Context, in *UpdateEven
 	return out, nil
 }
 
+func (c *superplaneClient) DeleteEventSource(ctx context.Context, in *DeleteEventSourceRequest, opts ...grpc.CallOption) (*DeleteEventSourceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteEventSourceResponse)
+	err := c.cc.Invoke(ctx, Superplane_DeleteEventSource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *superplaneClient) UpdateConnectionGroup(ctx context.Context, in *UpdateConnectionGroupRequest, opts ...grpc.CallOption) (*UpdateConnectionGroupResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateConnectionGroupResponse)
 	err := c.cc.Invoke(ctx, Superplane_UpdateConnectionGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *superplaneClient) DeleteConnectionGroup(ctx context.Context, in *DeleteConnectionGroupRequest, opts ...grpc.CallOption) (*DeleteConnectionGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteConnectionGroupResponse)
+	err := c.cc.Invoke(ctx, Superplane_DeleteConnectionGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -333,8 +369,11 @@ type SuperplaneServer interface {
 	ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error)
 	ListConnectionGroupFieldSets(context.Context, *ListConnectionGroupFieldSetsRequest) (*ListConnectionGroupFieldSetsResponse, error)
 	UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error)
+	DeleteStage(context.Context, *DeleteStageRequest) (*DeleteStageResponse, error)
 	UpdateEventSource(context.Context, *UpdateEventSourceRequest) (*UpdateEventSourceResponse, error)
+	DeleteEventSource(context.Context, *DeleteEventSourceRequest) (*DeleteEventSourceResponse, error)
 	UpdateConnectionGroup(context.Context, *UpdateConnectionGroupRequest) (*UpdateConnectionGroupResponse, error)
+	DeleteConnectionGroup(context.Context, *DeleteConnectionGroupRequest) (*DeleteConnectionGroupResponse, error)
 	ApproveStageEvent(context.Context, *ApproveStageEventRequest) (*ApproveStageEventResponse, error)
 	AddUser(context.Context, *AddUserRequest) (*AddUserResponse, error)
 	RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error)
@@ -401,11 +440,20 @@ func (UnimplementedSuperplaneServer) ListConnectionGroupFieldSets(context.Contex
 func (UnimplementedSuperplaneServer) UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateStage not implemented")
 }
+func (UnimplementedSuperplaneServer) DeleteStage(context.Context, *DeleteStageRequest) (*DeleteStageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteStage not implemented")
+}
 func (UnimplementedSuperplaneServer) UpdateEventSource(context.Context, *UpdateEventSourceRequest) (*UpdateEventSourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateEventSource not implemented")
 }
+func (UnimplementedSuperplaneServer) DeleteEventSource(context.Context, *DeleteEventSourceRequest) (*DeleteEventSourceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteEventSource not implemented")
+}
 func (UnimplementedSuperplaneServer) UpdateConnectionGroup(context.Context, *UpdateConnectionGroupRequest) (*UpdateConnectionGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateConnectionGroup not implemented")
+}
+func (UnimplementedSuperplaneServer) DeleteConnectionGroup(context.Context, *DeleteConnectionGroupRequest) (*DeleteConnectionGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteConnectionGroup not implemented")
 }
 func (UnimplementedSuperplaneServer) ApproveStageEvent(context.Context, *ApproveStageEventRequest) (*ApproveStageEventResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ApproveStageEvent not implemented")
@@ -760,6 +808,24 @@ func _Superplane_UpdateStage_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_DeleteStage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteStageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).DeleteStage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_DeleteStage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).DeleteStage(ctx, req.(*DeleteStageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Superplane_UpdateEventSource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateEventSourceRequest)
 	if err := dec(in); err != nil {
@@ -778,6 +844,24 @@ func _Superplane_UpdateEventSource_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_DeleteEventSource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteEventSourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).DeleteEventSource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_DeleteEventSource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).DeleteEventSource(ctx, req.(*DeleteEventSourceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Superplane_UpdateConnectionGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateConnectionGroupRequest)
 	if err := dec(in); err != nil {
@@ -792,6 +876,24 @@ func _Superplane_UpdateConnectionGroup_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SuperplaneServer).UpdateConnectionGroup(ctx, req.(*UpdateConnectionGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Superplane_DeleteConnectionGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteConnectionGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).DeleteConnectionGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_DeleteConnectionGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).DeleteConnectionGroup(ctx, req.(*DeleteConnectionGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -930,12 +1032,24 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Superplane_UpdateStage_Handler,
 		},
 		{
+			MethodName: "DeleteStage",
+			Handler:    _Superplane_DeleteStage_Handler,
+		},
+		{
 			MethodName: "UpdateEventSource",
 			Handler:    _Superplane_UpdateEventSource_Handler,
 		},
 		{
+			MethodName: "DeleteEventSource",
+			Handler:    _Superplane_DeleteEventSource_Handler,
+		},
+		{
 			MethodName: "UpdateConnectionGroup",
 			Handler:    _Superplane_UpdateConnectionGroup_Handler,
+		},
+		{
+			MethodName: "DeleteConnectionGroup",
+			Handler:    _Superplane_DeleteConnectionGroup_Handler,
 		},
 		{
 			MethodName: "ApproveStageEvent",

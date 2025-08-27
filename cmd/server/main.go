@@ -16,7 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, cleanupService *workers.ResourceCleanupService, baseURL string) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -54,8 +54,6 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		log.Println("Starting Stage Event Approved Consumer")
 		stageEventApprovedConsumer := workers.NewStageEventApprovedConsumer(rabbitMQURL)
 		go stageEventApprovedConsumer.Start()
-
-		cleanupService := workers.NewResourceCleanupService(registry)
 
 		log.Println("Starting Event Source Updated Consumer")
 		eventSourceUpdatedConsumer := workers.NewEventSourceUpdatedConsumer(registry, rabbitMQURL, cleanupService)
@@ -111,6 +109,13 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 			panic(err)
 		}
 
+		go w.Start()
+	}
+
+	if os.Getenv("START_HARD_DELETION_WORKER") == "yes" {
+		log.Println("Starting Hard Deletion Worker")
+
+		w := workers.NewHardDeletionWorker(registry, cleanupService)
 		go w.Start()
 	}
 }
@@ -224,6 +229,7 @@ func main() {
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	oidcVerifier := crypto.NewOIDCVerifier()
 	registry := registry.NewRegistry(encryptorInstance)
+	cleanupService := workers.NewResourceCleanupService(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
@@ -233,7 +239,7 @@ func main() {
 		go startInternalAPI(encryptorInstance, authService, registry)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance, registry, baseURL)
+	startWorkers(jwtSigner, encryptorInstance, registry, cleanupService, baseURL)
 
 	log.Println("Superplane is UP.")
 

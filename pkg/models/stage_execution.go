@@ -399,3 +399,4 @@ func (e *StageExecution) AddResource(externalID string, externalType string, par
 
 	return r, nil
 }
+

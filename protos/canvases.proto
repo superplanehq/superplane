@@ -231,6 +231,17 @@ service Superplane {
       tags: "Stage";
     };
   }
+
+  rpc DeleteStage(DeleteStageRequest) returns (DeleteStageResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id_or_name}/stages/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a stage";
+      description: "Deletes the specified stage (canvas can be referenced by ID or name)";
+      tags: "Stage";
+    };
+  }
   
   rpc UpdateEventSource(UpdateEventSourceRequest) returns (UpdateEventSourceResponse) {
     option (google.api.http) = {
@@ -244,6 +255,17 @@ service Superplane {
     };
   }
 
+  rpc DeleteEventSource(DeleteEventSourceRequest) returns (DeleteEventSourceResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id_or_name}/event-sources/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete an event source";
+      description: "Deletes the specified event source (canvas can be referenced by ID or name)";
+      tags: "EventSource";
+    };
+  }
+
   rpc UpdateConnectionGroup(UpdateConnectionGroupRequest) returns (UpdateConnectionGroupResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}"
@@ -252,6 +274,17 @@ service Superplane {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update a connection group";
       description: "Updates the specified connection group (canvas can be referenced by ID or name)";
+      tags: "ConnectionGroup";
+    };
+  }
+
+  rpc DeleteConnectionGroup(DeleteConnectionGroupRequest) returns (DeleteConnectionGroupResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a connection group";
+      description: "Deletes the specified connection group (canvas can be referenced by ID or name)";
       tags: "ConnectionGroup";
     };
   }
@@ -813,6 +846,27 @@ message RemoveUserRequest {
 }
 
 message RemoveUserResponse {}
+
+message DeleteEventSourceRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message DeleteEventSourceResponse {}
+
+message DeleteStageRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message DeleteStageResponse {}
+
+message DeleteConnectionGroupRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message DeleteConnectionGroupResponse {}
 
 enum EventSourceType {
   EVENT_SOURCE_TYPE_UNKNOWN = 0;

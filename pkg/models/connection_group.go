@@ -40,6 +40,7 @@ type ConnectionGroup struct {
 	CreatedBy   uuid.UUID
 	UpdatedAt   *time.Time
 	UpdatedBy   uuid.UUID
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 }
 
 func FindConnectionGroupByName(canvasID string, name string) (*ConnectionGroup, error) {
@@ -221,6 +222,23 @@ func ListConnectionGroups(canvasID string) ([]ConnectionGroup, error) {
 	return connectionGroups, nil
 }
 
+func ListUnscopedSoftDeletedConnectionGroups(limit int) ([]ConnectionGroup, error) {
+	var sources []ConnectionGroup
+
+	err := database.Conn().
+		Unscoped().
+		Where("deleted_at is not null").
+		Limit(limit).
+		Find(&sources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return sources, nil
+}
+
 func CreateConnectionGroup(
 	canvasID uuid.UUID,
 	name, description, createdBy string,
@@ -333,4 +351,50 @@ func FindConnectionGroupByIDInTransaction(tx *gorm.DB, canvasID string, id strin
 	}
 
 	return connectionGroup, nil
+}
+
+func (g *ConnectionGroup) Delete() error {
+	deletedName := fmt.Sprintf("%s-deleted-%d", g.Name, time.Now().Unix())
+
+	return database.Conn().Model(g).
+		Where("id = ?", g.ID).
+		Update("name", deletedName).
+		Update("deleted_at", time.Now()).
+		Error
+}
+
+func (g *ConnectionGroup) HardDeleteInTransaction(tx *gorm.DB) error {
+	return tx.Unscoped().Delete(g).Error
+}
+
+func (g *ConnectionGroup) DeleteFieldSetsInTransaction(tx *gorm.DB) error {
+	// Delete field set events for all field sets of this connection group
+	if err := tx.
+		Where("connection_group_set_id IN (SELECT id FROM connection_group_field_sets WHERE connection_group_id = ?)", g.ID).
+		Delete(&ConnectionGroupFieldSetEvent{}).Error; err != nil {
+		return fmt.Errorf("failed to delete field set events: %v", err)
+	}
+
+	if err := tx.Where("connection_group_id = ?", g.ID).Delete(&ConnectionGroupFieldSet{}).Error; err != nil {
+		return fmt.Errorf("failed to delete field sets: %v", err)
+	}
+
+	return nil
+}
+
+func (g *ConnectionGroup) DeleteConnectionsInTransaction(tx *gorm.DB) error {
+	if err := tx.Unscoped().Where("source_id = ? AND source_type = ?", g.ID, SourceTypeConnectionGroup).Delete(&Connection{}).Error; err != nil {
+		return fmt.Errorf("failed to delete source connections: %v", err)
+	}
+	if err := tx.Unscoped().Where("target_id = ? AND target_type = ?", g.ID, ConnectionTargetTypeConnectionGroup).Delete(&Connection{}).Error; err != nil {
+		return fmt.Errorf("failed to delete target connections: %v", err)
+	}
+	return nil
+}
+
+func (g *ConnectionGroup) DeleteEventsInTransaction(tx *gorm.DB) error {
+	if err := tx.Unscoped().Where("source_id = ? AND source_type = ?", g.ID, SourceTypeConnectionGroup).Delete(&Event{}).Error; err != nil {
+		return fmt.Errorf("failed to delete events: %v", err)
+	}
+	return nil
 }
