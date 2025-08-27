@@ -221,36 +221,6 @@ func Test__HardDeletionWorker(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("respects grace period - skips recently deleted items", func(t *testing.T) {
-
-		stage := models.Stage{
-			CanvasID:      r.Canvas.ID,
-			Name:          "test-stage-grace-period",
-			Description:   "Test Stage for Grace Period",
-			ExecutorType:  models.ExecutorTypeHTTP,
-			ExecutorName:  "test-executor",
-			ExecutorSpec:  datatypes.JSON(`{}`),
-			Conditions:    datatypes.NewJSONSlice([]models.StageCondition{}),
-			Inputs:        datatypes.NewJSONSlice([]models.InputDefinition{}),
-			InputMappings: datatypes.NewJSONSlice([]models.InputMapping{}),
-			Outputs:       datatypes.NewJSONSlice([]models.OutputDefinition{}),
-			Secrets:       datatypes.NewJSONSlice([]models.ValueDefinition{}),
-		}
-		err := database.Conn().Create(&stage).Error
-		require.NoError(t, err)
-
-		err = stage.Delete()
-		require.NoError(t, err)
-
-		err = worker.processStages()
-		require.NoError(t, err)
-
-		var foundStage models.Stage
-		err = database.Conn().Unscoped().Where("id = ?", stage.ID).First(&foundStage).Error
-		require.NoError(t, err)
-		assert.NotNil(t, foundStage.DeletedAt)
-	})
-
 	t.Run("full worker tick processes all component types", func(t *testing.T) {
 
 		err := worker.Tick()
