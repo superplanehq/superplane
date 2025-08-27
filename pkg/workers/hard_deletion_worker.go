@@ -12,8 +12,6 @@ import (
 )
 
 const (
-	// Process components that have been soft deleted for at least this duration
-	HardDeletionGracePeriod = 24 * time.Hour
 	// Maximum number of items to process per tick
 	MaxHardDeletionBatchSize = 10
 )
@@ -21,7 +19,6 @@ const (
 type HardDeletionWorker struct {
 	Registry       *registry.Registry
 	CleanupService *ResourceCleanupService
-	GracePeriod    time.Duration
 	BatchSize      int
 }
 
@@ -29,7 +26,6 @@ func NewHardDeletionWorker(registry *registry.Registry, cleanupService *Resource
 	return &HardDeletionWorker{
 		Registry:       registry,
 		CleanupService: cleanupService,
-		GracePeriod:    HardDeletionGracePeriod,
 		BatchSize:      MaxHardDeletionBatchSize,
 	}
 }
@@ -67,9 +63,7 @@ func (w *HardDeletionWorker) Tick() error {
 // processStages handles hard deletion of soft-deleted stages following hierarchical dependency chain:
 // stages -> stage_events -> events, stage_executions -> execution_resources, connections
 func (w *HardDeletionWorker) processStages() error {
-	cutoffTime := time.Now().Add(-w.GracePeriod)
-
-	stages, err := models.ListUnscopedSoftDeletedStages(w.BatchSize, cutoffTime)
+	stages, err := models.ListUnscopedSoftDeletedStages(w.BatchSize)
 	if err != nil {
 		return fmt.Errorf("failed to list soft deleted stages: %v", err)
 	}
@@ -137,9 +131,7 @@ func (w *HardDeletionWorker) hardDeleteStage(logger *log.Entry, stage *models.St
 // processEventSources handles hard deletion of soft-deleted event sources:
 // event_sources -> stage_events -> events, connections
 func (w *HardDeletionWorker) processEventSources() error {
-	cutoffTime := time.Now().Add(-w.GracePeriod)
-
-	eventSources, err := models.ListUnscopedSoftDeletedEventSources(w.BatchSize, cutoffTime)
+	eventSources, err := models.ListUnscopedSoftDeletedEventSources(w.BatchSize)
 	if err != nil {
 		return fmt.Errorf("failed to list soft deleted event sources: %v", err)
 	}
@@ -203,9 +195,7 @@ func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSourc
 // processConnectionGroups handles hard deletion of soft-deleted connection groups:
 // connection_groups -> connection_group_field_sets -> connection_group_field_set_events, connections
 func (w *HardDeletionWorker) processConnectionGroups() error {
-	cutoffTime := time.Now().Add(-w.GracePeriod)
-
-	connectionGroups, err := models.ListUnscopedSoftDeletedConnectionGroups(w.BatchSize, cutoffTime)
+	connectionGroups, err := models.ListUnscopedSoftDeletedConnectionGroups(w.BatchSize)
 	if err != nil {
 		return fmt.Errorf("failed to list soft deleted connection groups: %v", err)
 	}

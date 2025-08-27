@@ -191,13 +191,12 @@ func FindExternalEventSourceByName(canvasID string, name string) (*EventSource, 
 	return &eventSource, nil
 }
 
-func ListUnscopedSoftDeletedEventSources(limit int, cutoffTime time.Time) ([]EventSource, error) {
+func ListUnscopedSoftDeletedEventSources(limit int) ([]EventSource, error) {
 	var sources []EventSource
 
 	err := database.Conn().
 		Unscoped().
 		Where("deleted_at is not null").
-		Where("deleted_at <= ?", cutoffTime).
 		Limit(limit).
 		Find(&sources).
 		Error

@@ -2,7 +2,6 @@ package workers
 
 import (
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -22,8 +21,6 @@ func Test__HardDeletionWorker(t *testing.T) {
 
 	cleanupService := NewResourceCleanupService(r.Registry)
 	worker := NewHardDeletionWorker(r.Registry, cleanupService)
-
-	worker.GracePeriod = time.Millisecond * 100
 
 	t.Run("hard delete stage with full dependency chain", func(t *testing.T) {
 
@@ -80,8 +77,6 @@ func Test__HardDeletionWorker(t *testing.T) {
 		err = stage.Delete()
 		require.NoError(t, err)
 
-		time.Sleep(worker.GracePeriod + time.Millisecond*10)
-
 		err = worker.processStages()
 		require.NoError(t, err)
 
@@ -137,8 +132,6 @@ func Test__HardDeletionWorker(t *testing.T) {
 
 		err = eventSource.Delete()
 		require.NoError(t, err)
-
-		time.Sleep(worker.GracePeriod + time.Millisecond*10)
 
 		err = worker.processEventSources()
 		require.NoError(t, err)
@@ -204,8 +197,6 @@ func Test__HardDeletionWorker(t *testing.T) {
 
 		err = connectionGroup.Delete()
 		require.NoError(t, err)
-
-		time.Sleep(worker.GracePeriod + time.Millisecond*10)
 
 		err = worker.processConnectionGroups()
 		require.NoError(t, err)

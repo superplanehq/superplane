@@ -222,13 +222,12 @@ func ListConnectionGroups(canvasID string) ([]ConnectionGroup, error) {
 	return connectionGroups, nil
 }
 
-func ListUnscopedSoftDeletedConnectionGroups(limit int, cutoffTime time.Time) ([]ConnectionGroup, error) {
+func ListUnscopedSoftDeletedConnectionGroups(limit int) ([]ConnectionGroup, error) {
 	var sources []ConnectionGroup
 
 	err := database.Conn().
 		Unscoped().
 		Where("deleted_at is not null").
-		Where("deleted_at <= ?", cutoffTime).
 		Limit(limit).
 		Find(&sources).
 		Error

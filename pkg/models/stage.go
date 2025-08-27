@@ -227,13 +227,12 @@ func FindUnscopedStage(id string) (*Stage, error) {
 	return &stage, nil
 }
 
-func ListUnscopedSoftDeletedStages(limit int, cutoffTime time.Time) ([]Stage, error) {
+func ListUnscopedSoftDeletedStages(limit int) ([]Stage, error) {
 	var stages []Stage
 
 	err := database.Conn().
 		Unscoped().
 		Where("deleted_at is not null").
-		Where("deleted_at <= ?", cutoffTime).
 		Limit(limit).
 		Find(&stages).
 		Error
