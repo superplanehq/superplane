@@ -93,9 +93,14 @@ func (e *HTTPExecutor) Execute(specData []byte, parameters executors.ExecutionPa
 		return nil, fmt.Errorf("error reading response: %v", err)
 	}
 
+	var allowedCodes []uint32
+	if spec.ResponsePolicy != nil && spec.ResponsePolicy.StatusCodes != nil {
+		allowedCodes = spec.ResponsePolicy.StatusCodes
+	}
+
 	return &HTTPResponse{
 		statusCode:   res.StatusCode,
-		allowedCodes: spec.ResponsePolicy.StatusCodes,
+		allowedCodes: allowedCodes,
 		body:         body,
 	}, nil
 }
