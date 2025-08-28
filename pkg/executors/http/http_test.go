@@ -163,6 +163,71 @@ func Test_HTTP__Execute(t *testing.T) {
 		assert.True(t, response.Successful())
 		assert.Equal(t, map[string]any{"foo": "bar"}, response.Outputs())
 	})
+
+	t.Run("nil response policy handles gracefully", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		defer server.Close()
+
+		spec, err := json.Marshal(HTTPSpec{
+			URL:            server.URL,
+			ResponsePolicy: nil,
+		})
+
+		require.NoError(t, err)
+		response, err := executor.Execute(spec, executors.ExecutionParameters{
+			StageID:     stageID.String(),
+			ExecutionID: executionID.String(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.False(t, response.Successful())
+	})
+
+	t.Run("missing response policy in JSON handles gracefully", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		defer server.Close()
+
+		jsonSpec := `{"url": "` + server.URL + `", "headers": {}, "payload": {}}`
+
+		response, err := executor.Execute([]byte(jsonSpec), executors.ExecutionParameters{
+			StageID:     stageID.String(),
+			ExecutionID: executionID.String(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		// With missing response policy, allowedCodes should be empty, so any status code should be unsuccessful
+		require.False(t, response.Successful())
+	})
+
+	t.Run("panic regression test - nil response policy access", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		defer server.Close()
+
+		jsonSpec := `{"url": "` + server.URL + `", "headers": {}, "payload": {}, "responsePolicy": null}`
+
+		// This should not panic and should handle gracefully
+		require.NotPanics(t, func() {
+			response, err := executor.Execute([]byte(jsonSpec), executors.ExecutionParameters{
+				StageID:     stageID.String(),
+				ExecutionID: executionID.String(),
+			})
+
+			require.NoError(t, err)
+			require.NotNil(t, response)
+			require.False(t, response.Successful())
+		})
+	})
 }
 
 func Test_HTTP__Validate(t *testing.T) {
@@ -209,5 +274,26 @@ func Test_HTTP__Validate(t *testing.T) {
 		data, err := json.Marshal(&spec)
 		require.NoError(t, err)
 		require.NoError(t, executor.Validate(context.Background(), data))
+	})
+
+	t.Run("HTTP spec with nil response policy -> no error", func(t *testing.T) {
+		spec := HTTPSpec{
+			URL:            "https://httpbin.org/get",
+			ResponsePolicy: nil, // Explicitly nil
+		}
+
+		data, err := json.Marshal(&spec)
+		require.NoError(t, err)
+
+		err = executor.Validate(context.Background(), data)
+		require.NoError(t, err) // Should not error with nil ResponsePolicy
+	})
+
+	t.Run("HTTP spec missing response policy field -> no error", func(t *testing.T) {
+		// JSON without responsePolicy field
+		jsonSpec := `{"url": "https://httpbin.org/get", "headers": {}, "payload": {}}`
+
+		err := executor.Validate(context.Background(), []byte(jsonSpec))
+		require.NoError(t, err) // Should not error with missing ResponsePolicy field
 	})
 }
