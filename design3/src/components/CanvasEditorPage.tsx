@@ -556,7 +556,37 @@ export function CanvasEditorPage({
           partialSave: false,
           saveGranular: true,
           modalEdit: false,
-          savedConnectionIndices: [0]
+          savedConnectionIndices: [0],
+          errors: [], // Initialize with empty errors array
+          onResolveError: (errorId: string) => {
+            console.log('Resolving error:', errorId, 'for node:', nodeData.id);
+            // Switch to edit mode when resolving error
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === nodeData.id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        variant: 'edit',
+                        // Remove the resolved error
+                        errors: (n.data as any).errors?.filter((e: any) => e.id !== errorId) || []
+                      }
+                    }
+                  : n
+              )
+            );
+            
+            // Log the error resolution for debugging
+            const resolvedError = ((nodes.find(n => n.id === nodeData.id)?.data as any)?.errors || [])
+              .find((e: any) => e.id === errorId);
+            if (resolvedError) {
+              console.log(`Resolved ${resolvedError.type} error: "${resolvedError.message}"`);
+              if (resolvedError.type === 'connection') {
+                console.log(`Broken connection to "${resolvedError.resourceName}" has been resolved`);
+              }
+            }
+          }
         }
       };
     });
@@ -663,16 +693,23 @@ const computedEdges = edges.map(edge => {
           onDelete: () => {
             setNodes((nds) => {
               const filteredNodes = nds.filter((n) => n.id !== node.id);
-              return filteredNodes.map((n) => ({
+              const remainingEdges = edges.filter((edge) => edge.source !== node.id && edge.target !== node.id);
+              
+              // Detect broken connections and add errors to affected nodes
+              const nodesWithBrokenConnectionErrors = detectBrokenConnections(node.id, filteredNodes, remainingEdges);
+              
+              return nodesWithBrokenConnectionErrors.map((n) => ({
                 ...n,
                 data: {
                   ...n.data,
-                  nodes: filteredNodes,
-                  totalNodesCount: filteredNodes.length
+                  nodes: nodesWithBrokenConnectionErrors,
+                  totalNodesCount: nodesWithBrokenConnectionErrors.length
                 }
               }));
             });
             setEdges((eds) => eds.filter((edge) => edge.source !== node.id && edge.target !== node.id));
+            
+            console.log(`Node "${node.id}" deleted - checking for broken connections...`);
           },
           onSelect: () => {
             setNodes((nds) =>
@@ -879,6 +916,77 @@ const computedEdges = edges.map(edge => {
   ]);
   const [editingSecret, setEditingSecret] = useState<any>(null);
   const [isCreatingSecret, setIsCreatingSecret] = useState(false);
+
+  // Function to detect broken connections when a node is deleted
+  const detectBrokenConnections = (deletedNodeId: string, remainingNodes: any[], remainingEdges: any[]) => {
+    console.log(`🔍 detectBrokenConnections called for deleted node: ${deletedNodeId}`);
+    
+    const deletedNode = nodes.find(n => n.id === deletedNodeId);
+    if (!deletedNode) {
+      console.log(`❌ Deleted node ${deletedNodeId} not found in nodes array`);
+      return remainingNodes;
+    }
+
+    const deletedNodeData = (deletedNode.data as any).workflowNodeData;
+    const deletedNodeTitle = deletedNodeData?.title || 'Unknown Node';
+    const deletedNodeType = deletedNodeData?.type || 'node';
+
+    console.log(`📝 Deleted node info: "${deletedNodeTitle}" (type: ${deletedNodeType})`);
+
+    // Find nodes that were connected to the deleted node
+    const connectedEdges = edges.filter(edge => 
+      edge.source === deletedNodeId || edge.target === deletedNodeId
+    );
+
+    console.log(`🔗 Found ${connectedEdges.length} connected edges:`, connectedEdges.map(e => `${e.source} → ${e.target}`));
+
+    // Update remaining nodes to add broken connection errors
+    return remainingNodes.map(node => {
+      const isConnectedToDeleted = connectedEdges.some(edge => 
+        (edge.source === deletedNodeId && edge.target === node.id) ||
+        (edge.target === deletedNodeId && edge.source === node.id)
+      );
+
+      console.log(`🔍 Checking node ${node.id}: connected to deleted = ${isConnectedToDeleted}`);
+
+      if (isConnectedToDeleted) {
+        const currentErrors = (node.data as any).errors || [];
+        console.log(`⚠️ Node ${node.id} was connected to deleted node. Current errors:`, currentErrors.length);
+        
+        const brokenConnectionError = {
+          id: `broken_conn_${deletedNodeId}_${Date.now()}`,
+          type: 'connection' as const,
+          severity: 'error' as const,
+          message: 'Broken Connection',
+          description: `Connection to "${deletedNodeTitle}" (${deletedNodeType}) was broken because the node was deleted from the workflow.`,
+          action: 'Resolve Error',
+          connectionType: deletedNodeData?.icon || 'stage' as const,
+          resourceName: deletedNodeTitle,
+          resourceType: 'node' as const
+        };
+
+        // Check if this error already exists to avoid duplicates
+        const errorExists = currentErrors.some((err: any) => 
+          err.type === 'connection' && err.resourceName === deletedNodeTitle
+        );
+
+        if (!errorExists) {
+          console.log(`✅ Adding broken connection error to node ${node.id}:`, brokenConnectionError);
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              errors: [...currentErrors, brokenConnectionError]
+            }
+          };
+        } else {
+          console.log(`⚠️ Error already exists for node ${node.id}, skipping`);
+        }
+      }
+
+      return node;
+    });
+  };
 
 
   // Mock data for canvas members
@@ -1196,7 +1304,58 @@ const computedEdges = edges.map(edge => {
               setCurrentEditingNodeId(nodeId);
               setShowConnectionModal(true);
             },
-            savedConnectionIndices: nodeSavedConnections[nodeId] || []
+            savedConnectionIndices: nodeSavedConnections[nodeId] || [],
+            // Add sample errors for demonstration
+            errors: nodeType === 'semaphore' ? [
+              {
+                id: 'conn_err_1',
+                type: 'connection' as const,
+                severity: 'error' as const,
+                message: 'Broken Connection',
+                description: 'Semaphore project "my-project" has been deleted or is no longer accessible.',
+                action: 'Resolve Error',
+                connectionType: 'semaphore' as const,
+                resourceName: 'my-project',
+                resourceType: 'project' as const
+              },
+              {
+                id: 'config_err_1',
+                type: 'configuration' as const,
+                severity: 'warning' as const,
+                message: 'Missing Configuration',
+                description: 'Required environment variable SEMAPHORE_API_TOKEN is not set.',
+                action: 'Configure'
+              }
+            ] : [],
+            onResolveError: (errorId: string) => {
+              console.log('Resolving error:', errorId);
+              // Switch to edit mode when resolving error
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === nodeId
+                    ? {
+                        ...n,
+                        data: {
+                          ...n.data,
+                          variant: 'edit',
+                          // Remove the resolved error
+                          errors: (n.data as any).errors?.filter((e: any) => e.id !== errorId) || []
+                        }
+                      }
+                    : n
+                )
+              );
+              
+              // Log the error resolution for debugging
+              const resolvedError = ((nodes.find(n => n.id === nodeId)?.data as any)?.errors || [])
+                .find((e: any) => e.id === errorId);
+              if (resolvedError) {
+                console.log(`Resolved ${resolvedError.type} error: "${resolvedError.message}"`);
+                if (resolvedError.type === 'connection') {
+                  console.log(`Broken connection to "${resolvedError.resourceName}" has been resolved`);
+                }
+              }
+            }
           } : {
             // Tab-specific props
             tabs: [
@@ -1261,17 +1420,24 @@ const computedEdges = edges.map(edge => {
           onDelete: () => {
             setNodes((nds) => {
               const filteredNodes = nds.filter((node) => node.id !== nodeId);
+              const remainingEdges = edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+              
+              // Detect broken connections and add errors to affected nodes
+              const nodesWithBrokenConnectionErrors = detectBrokenConnections(nodeId, filteredNodes, remainingEdges);
+              
               // Update all remaining nodes with the new nodes array and count
-              return filteredNodes.map((node) => ({
+              return nodesWithBrokenConnectionErrors.map((node) => ({
                 ...node,
                 data: {
                   ...node.data,
-                  nodes: filteredNodes,
-                  totalNodesCount: filteredNodes.length
+                  nodes: nodesWithBrokenConnectionErrors,
+                  totalNodesCount: nodesWithBrokenConnectionErrors.length
                 }
               }));
             });
             setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+            
+            console.log(`Node "${nodeId}" deleted - checking for broken connections...`);
           },
           onSelect: () => {
             setSelectedNode(nodeId);
@@ -1458,6 +1624,28 @@ const computedEdges = edges.map(edge => {
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onNodeClick={onNodeClick}
+                onNodesDelete={(deletedNodes) => {
+                  console.log('🔥 Nodes deleted via keyboard:', deletedNodes.map(n => n.id));
+                  // Process each deleted node for broken connection detection
+                  deletedNodes.forEach(deletedNode => {
+                    const remainingNodes = nodes.filter(n => n.id !== deletedNode.id);
+                    const remainingEdges = edges.filter(e => e.source !== deletedNode.id && e.target !== deletedNode.id);
+                    const nodesWithBrokenConnectionErrors = detectBrokenConnections(deletedNode.id, remainingNodes, remainingEdges);
+                    
+                    // Update the nodes state with error information
+                    setNodes(nodesWithBrokenConnectionErrors.map((node) => ({
+                      ...node,
+                      data: {
+                        ...node.data,
+                        nodes: nodesWithBrokenConnectionErrors,
+                        totalNodesCount: nodesWithBrokenConnectionErrors.length
+                      }
+                    })));
+                  });
+                }}
+                onEdgesDelete={(deletedEdges) => {
+                  console.log('🔗 Edges deleted via keyboard:', deletedEdges.map(e => `${e.source} → ${e.target}`));
+                }}
                 nodeTypes={nodeTypes}
                 connectionLineType={ConnectionLineType.SmoothStep}
                 colorMode="system"
@@ -1583,7 +1771,7 @@ const computedEdges = edges.map(edge => {
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <Heading level={2}>Members</Heading>
+                <Heading level={1} className='text-2xl'>Members</Heading>
                 <Text>Manage canvas access and permissions.</Text>
               </div>
             </div>

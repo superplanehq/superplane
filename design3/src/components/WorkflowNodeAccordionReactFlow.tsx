@@ -3,6 +3,23 @@ import { Handle, Position, NodeProps } from '@xyflow/react'
 import { WorkflowNodeAccordion, type WorkflowNodeData } from './lib/WorkflowNode/workflow-node-accordion'
 import { type AccordionItem } from './lib/Accordion/accordion'
 
+// Error types for workflow nodes
+export interface WorkflowNodeError {
+  id: string
+  type: 'connection' | 'configuration' | 'permission' | 'resource'
+  severity: 'error' | 'warning'
+  message: string
+  description: string
+  action?: string
+}
+
+export interface WorkflowNodeConnectionError extends WorkflowNodeError {
+  type: 'connection'
+  connectionType: 'semaphore' | 'github' | 'api'
+  resourceName: string
+  resourceType: 'project' | 'repository' | 'endpoint'
+}
+
 // React Flow node data interface for accordion version
 export interface WorkflowNodeAccordionReactFlowData {
   workflowNodeData: WorkflowNodeData
@@ -17,9 +34,11 @@ export interface WorkflowNodeAccordionReactFlowData {
   onSave?: () => void
   onCancel?: () => void
   onSelect?: () => void
+  onResolveError?: (errorId: string) => void
   nodes?: any[]
   totalNodesCount?: number
   savedConnectionIndices?: number[]
+  errors?: WorkflowNodeError[]
 }
 
 /**
@@ -40,9 +59,11 @@ export const WorkflowNodeAccordionReactFlow = memo(({ data, selected }: NodeProp
     onSave,
     onCancel,
     onSelect,
+    onResolveError,
     nodes = [],
     totalNodesCount = 0,
-    savedConnectionIndices = []
+    savedConnectionIndices = [],
+    errors = []
   } = data as unknown as WorkflowNodeAccordionReactFlowData
 
   const handleUpdate = (updates: Partial<WorkflowNodeData>) => {
@@ -67,6 +88,10 @@ export const WorkflowNodeAccordionReactFlow = memo(({ data, selected }: NodeProp
 
   const handleSelect = () => {
     onSelect?.()
+  }
+
+  const handleResolveError = (errorId: string) => {
+    onResolveError?.(errorId)
   }
 
   return (
@@ -94,9 +119,11 @@ export const WorkflowNodeAccordionReactFlow = memo(({ data, selected }: NodeProp
         onSave={handleSave}
         onCancel={handleCancel}
         onSelect={handleSelect}
+        onResolveError={handleResolveError}
         nodes={nodes}
         totalNodesCount={totalNodesCount}
         savedConnectionIndices={savedConnectionIndices}
+        errors={errors}
       />
       
       {/* Output Handle */}

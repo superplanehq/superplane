@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol'
-import { Subheading } from './lib/Heading/heading'
+import { Heading, Subheading } from './lib/Heading/heading'
 import { Button } from './lib/Button/button'
 import { 
   Dropdown, 
@@ -186,13 +186,16 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
     <div className={`bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+          <Heading level={3} className="!text-sm font-semibold text-zinc-900 dark:text-white mb-1">
             Add members
+          </Heading>
+          <Subheading level={3} className="!text-xs !font-normal text-zinc-900 dark:text-white mb-1">
+            Lorem ipsum
           </Subheading>
         </div>
       </div>
       
-      <div className="space-y-4">
+      <div className="space-y-4 flex flex-col justify-end items-end">
         <div className="flex items-start gap-3 w-full">
           <div className="flex-grow-1 w-full relative">
               <MultiCombobox
@@ -232,7 +235,7 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
               const isCustomEmailSuggestion = user.id.startsWith('email_') || user.id.startsWith('custom_')
               
               return (
-                <div className='group w-full flex items-center gap-2'>
+                <div className='group w-full flex items-center gap-1'>
                   {isCustomEmailSuggestion ? (
                     // For custom emails, always show mail icon (both in dropdown and as tags)
                     <div className="flex items-center justify-center size-6 bg-zinc-100 dark:bg-zinc-800 rounded-full">
@@ -279,7 +282,7 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
           
           {showRoleSelection && (
             <Dropdown>
-              <DropdownButton outline className="flex items-center gap-2 text-sm">
+              <DropdownButton outline className="flex items-center gap-2 text-sm !py-2.5">
                 {userRole}
                 <MaterialSymbol name="expand_more" size="md" />
               </DropdownButton>
@@ -300,6 +303,9 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
             </Dropdown>
           )}
           
+          
+        </div>
+          <div>
           <Button 
             color="blue" 
             className='flex items-center text-sm gap-2 whitespace-nowrap' 
@@ -309,8 +315,7 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
             <MaterialSymbol name="add" size="sm" />
             Invite {selectedUsers.length > 0 && `(${selectedUsers.length})`}
           </Button>
-        </div>
-
+          </div>
         
 
       </div>

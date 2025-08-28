@@ -31,15 +31,34 @@ import { ControlledTabs } from '../Tabs/tabs';
 
 export type { WorkflowNodeData } from './workflow-node'
 
+// Error types (re-exported from react flow wrapper)
+export interface WorkflowNodeError {
+  id: string
+  type: 'connection' | 'configuration' | 'permission' | 'resource'
+  severity: 'error' | 'warning'
+  message: string
+  description: string
+  action?: string
+}
+
+export interface WorkflowNodeConnectionError extends WorkflowNodeError {
+  type: 'connection'
+  connectionType: 'semaphore' | 'github' | 'api'
+  resourceName: string
+  resourceType: 'project' | 'repository' | 'endpoint'
+}
+
 export interface WorkflowNodeAccordionProps extends Omit<WorkflowNodeProps, 'tabs'> {
   sections?: AccordionItem[]
   multiple?: boolean
   partialSave?: boolean
   saveGranular?: boolean
   onSelect?: () => void
+  onResolveError?: (errorId: string) => void
   nodes?: any[]
   totalNodesCount?: number
   savedConnectionIndices?: number[]
+  errors?: WorkflowNodeError[]
 }
 
 export function WorkflowNodeAccordion({
@@ -57,9 +76,11 @@ export function WorkflowNodeAccordion({
   onSave,
   onCancel,
   onSelect,
+  onResolveError,
   nodes = [],
   totalNodesCount = 0,
-  savedConnectionIndices = []
+  savedConnectionIndices = [],
+  errors = []
 }: WorkflowNodeAccordionProps) {
   const [editedTitle, setEditedTitle] = useState(data.title)
   const [editedDescription, setEditedDescription] = useState(data.description || '')
@@ -210,6 +231,13 @@ export function WorkflowNodeAccordion({
   // Accordion state
   const [openSections, setOpenSections] = useState<string[]>([])
   
+  // Open Triggers accordion by default in edit mode
+  useEffect(() => {
+    if (variant === 'edit' && !openSections.includes('connections')) {
+      setOpenSections(prev => [...prev, 'connections'])
+    }
+  }, [variant])
+  
   // Track which sections have been saved
   const [savedSections, setSavedSections] = useState<Set<string>>(new Set())
   
@@ -229,8 +257,35 @@ export function WorkflowNodeAccordion({
   // Filter state for connections
   const [connectionFilters, setConnectionFilters] = useState<Record<number, Array<{id: string, type: string, expression: string, operator?: string}>>>({})
   
+  // State for parameter input (no longer needed with Combobox implementation)
+  const [parameterTags, setParameterTags] = useState<Record<number, Array<{label: string, value: string}>>>({})
+  
   // State to track which connection filters are expanded
   const [expandedFilters, setExpandedFilters] = useState<Set<number>>(new Set())
+  
+  // Initialize parameter tags from existing values
+  useEffect(() => {
+    if (yamlConfig.spec.executor?.config?.parameters) {
+      const newParameterTags: Record<number, Array<{label: string, value: string}>> = {};
+      yamlConfig.spec.executor.config.parameters.forEach((param: any, index: number) => {
+        if (param.value && typeof param.value === 'string') {
+          const inputVariableRegex = /\$\{\{\s*inputs\.(\w+)\s*\}\}/g;
+          const tags: Array<{label: string, value: string}> = [];
+          let match;
+          while ((match = inputVariableRegex.exec(param.value)) !== null) {
+            tags.push({
+              label: match[1], // The input name
+              value: match[0]  // The full ${inputs.name} expression
+            });
+          }
+          if (tags.length > 0) {
+            newParameterTags[index] = tags;
+          }
+        }
+      });
+      setParameterTags(newParameterTags);
+    }
+  }, [yamlConfig.spec.executor?.config?.parameters])
   
   // State to track inline editing for title and description
   const [editingField, setEditingField] = useState<'title' | 'description' | null>(null)
@@ -808,7 +863,7 @@ export function WorkflowNodeAccordion({
 
     return (
       <div className="min-w-[250px] max-w-xs">
-        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3">
+        <div className={`bg-white dark:bg-zinc-800 border rounded-lg p-3 ${errors.length > 0 ? 'border-red-600 dark:border-red-600' : 'border-gray-200 dark:border-zinc-700'}`}>
           <div className="flex items-start gap-3">
         
             <div className="flex-1">
@@ -837,97 +892,57 @@ export function WorkflowNodeAccordion({
   // Default accordion sections
   const defaultSections: AccordionItem[] = [
     {
-      id: 'general',
-      title: (
-        <div className="flex items-center">
-          <span>General</span>
-          <ModificationIndicator sectionId="general" />
-        </div>
-      ),
-      defaultOpen: true,
-      content: (
-        <div className="space-y-4">
-          {/* Name Field */}
-          <Field>
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              placeholder="Enter stage name"
-              value={editedTitle}
-              onChange={(e) => {
-                const newTitle = e.target.value;
-                setEditedTitle(newTitle);
-                markSectionModified('general');
-                // Update the node title in real-time
-                onUpdate?.({
-                  title: newTitle
-                });
-              }}
-              onFocus={handleInputFocus}
-              className="w-full"
-            />
-          </Field>
-
-          {/* Description Field */}
-          <Field>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Enter stage description"
-              value={editedDescription}
-              onChange={(e) => {
-                setEditedDescription(e.target.value);
-                markSectionModified('general');
-              }}
-              onFocus={handleInputFocus}
-              rows={3}
-              className="w-full"
-            />
-          </Field>
-
-          {partialSave && (
-            <>
-              <Divider/>
-              <Field className='flex justify-end'>
-                <Button
-                  color='blue'
-                  className='flex items-center !text-xs'
-                  onClick={() => {
-                    onUpdate?.({
-                      title: editedTitle,
-                      description: editedDescription
-                    });
-                    console.log('General info saved:', { title: editedTitle, description: editedDescription });
-                    
-                    // Mark general section as saved
-                    setSavedSections(prev => new Set([...prev, 'general']));
-                    
-                    // Collapse the general accordion section
-                    setOpenSections(prev => prev.filter(id => id !== 'general'));
-                  }}
-                >
-                  <MaterialSymbol name="save" size="sm" />
-                  Save
-                </Button>
-              </Field>
-            </>
-          )}
-        </div>
-      )
-    },
-    {
       id: 'connections',
       title: (
         <div className="flex items-center justify-between w-full">
-          <div className="flex items-center">
-            <span>Connections</span>
+          <div className="flex items-center gap-2">
+            <span className={errors.filter(e => e.type === 'connection').length > 0 ? "text-red-700" : ""}>Trigger configuration</span>
             <ModificationIndicator sectionId="connections" />
+            <div className='hidden'>
+            {errors.filter(e => e.type === 'connection').length > 0 && (
+              <Tippy 
+                content={
+                  <div className="p-3 max-w-sm">
+                    <div className="font-medium text-sm mb-2">
+                      Connection Errors
+                    </div>
+                    <div className="space-y-2">
+                      {errors.filter(e => e.type === 'connection').slice(0, 2).map((error) => (
+                        <div key={error.id} className="text-xs">
+                          <div className="font-medium">{error.message}</div>
+                          <div className="text-gray-200 dark:text-gray-300">{error.description}</div>
+                          {error.action && (
+                            <button 
+                              onClick={() => onResolveError?.(error.id)}
+                              className="text-blue-300 hover:text-blue-200 mt-1 underline"
+                            >
+                              {error.action}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                }
+                theme="dark"
+                placement="top"
+                arrow={true}
+                interactive={true}
+              >
+              
+                <MaterialSymbol name="error" size="md" className='text-red-600 dark:text-red-500'/>
+              </Tippy>
+             )}
+           </div>
           </div>
+          <div className="flex items-center gap-2">
+            
           {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
             <span className="text-xs text-gray-600 dark:text-gray-400 text-code !font-normal pr-2">
               {yamlConfig.spec.connections.length} connection{yamlConfig.spec.connections.length !== 1 ? 's' : ''}
             </span>
           )}
+          </div>
         </div>
       ),
       defaultOpen: true,
@@ -937,11 +952,136 @@ export function WorkflowNodeAccordion({
 
           {/* Connections List */}
           <div className="space-y-2">
+          <Text color="gray" className="!text-xs !font-normal pr-2">
+              Select event sources or other stages to trigger this stage
+          </Text>
+          <Field>
+          <Label>Triggers</Label>
+          </Field>
+          
+          {/* Add Connection Dropdown - Only show when no connections exist */}
+          {(!yamlConfig.spec.connections || yamlConfig.spec.connections.length === 0) && (
+            <div className="flex-auto space-y-1 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-sm">
+              <div className="flex flex-col">
+                
+                <Field className="flex flex-col items-start gap-2">
+                  <Badge color='blue' className='mt-1'>Trigger 1 </Badge>
+                    <Dropdown>
+                      <DropdownButton color='white' className="!justify-between flex items-center w-full">
+                        Select event source or stage
+                        <MaterialSymbol name="expand_more" size="md" />
+                      </DropdownButton>
+                      <DropdownMenu anchor="bottom start">
+                        <DropdownItem className='flex items-center gap-2' onClick={() => {
+                          const newConnections = [...(yamlConfig.spec.connections || [])]
+                          newConnections.push({ type: 'stage', name: 'Deploy to staging', config: {} })
+                          setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+                          // Mark as modified since we're adding a new connection
+                          markSectionModified('connections');
+                        }}>
+                          
+                            <MaterialSymbol name="rocket_launch" size="md" />
+                            <DropdownLabel> Deploy to staging</DropdownLabel>
+                        </DropdownItem>
+                        <DropdownItem className='flex items-center gap-2' onClick={() => {
+                          const newConnections = [...(yamlConfig.spec.connections || [])]
+                          newConnections.push({ type: 'event source', name: 'Github webhook', config: {} })
+                          setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+                          // Mark as modified since we're adding a new connection
+                          markSectionModified('connections');
+                        }}>
+                          
+                          <MaterialSymbol name="bolt" size="sm" />
+                          <DropdownLabel>Github webhook</DropdownLabel>
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                    <div className='flex items-center gap-1'>
+                      <Link href="#" className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                        <MaterialSymbol name="add" size="sm"/>
+                        <span>Add filters</span>
+                        <span className="text-xs text-zinc-600 dark:text-zinc-400">(optional)</span> 
+                      </Link>
+                      <Tippy content={<div className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-xs max-w-50">Filters allow you to filter events based on specific criteria.</div>}>
+                        <Link href="#"><MaterialSymbol name="help" size="sm" className='text-gray-600 dark:text-gray-400'/></Link>
+                      </Tippy>
+                    </div>
+                </Field>
+                
+              </div>  
+              
+            </div>
+            
+          )}
+          <Link href="#" className="text-sm bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 flex justify-center align-middle gap-1 mt-3 border border-zinc-400 dark:border-zinc-700 rounded-sm border-dashed p-2 text-center">
+              <MaterialSymbol name="add" size="sm"/>
+              <span>Add trigger</span>
+          </Link>
+          <Link href="#" className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1 mt-2">
+              <MaterialSymbol name="add" size="sm"/>
+              <span>Add trigger</span>
+            </Link>
+          <Divider/>
+          <Field>
+            <Label className='flex items-center gap-1'>Conditions <span className="text-xs text-gray-600 dark:text-zinc-400 font-light">(optional)</span> <Tippy content="Conditions allow you to filter events based on specific criteria." placement="top"><MaterialSymbol name="help" size="sm"/></Tippy> </Label>
+            <Link href="#" className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1 mt-2">
+              <MaterialSymbol name="add" size="sm"/>
+              <span>Add condition</span>
+            </Link>
+           
+          </Field>
+          <Field className='flex justify-end'>
+          <Button
+              plain
+              className='flex items-center !text-xs'
+            >
+              Cancel
+            </Button>
+            <Button
+              color='blue'
+              className='flex items-center !text-xs'
+              onClick={handleConnectionsSave}
+            >
+              Save
+            </Button>
+          </Field>
+          {/* Add another connection button when connections already exist */}
+          {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
+            <div className="mt-2">
+              <Dropdown>
+                <DropdownButton plain className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300">
+                  <MaterialSymbol name="add" size="sm" />
+                  Add Connection
+                </DropdownButton>
+                <DropdownMenu anchor="bottom start">
+                  <DropdownItem className='flex items-center gap-2' onClick={() => {
+                    const newConnections = [...(yamlConfig.spec.connections || [])]
+                    newConnections.push({ type: 'stage', name: 'Deploy to staging', config: {} })
+                    setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+                    markSectionModified('connections');
+                  }}>
+                    <MaterialSymbol name="rocket_launch" size="md" />
+                    <DropdownLabel>Deploy to staging</DropdownLabel>
+                  </DropdownItem>
+                  <DropdownItem className='flex items-center gap-2' onClick={() => {
+                    const newConnections = [...(yamlConfig.spec.connections || [])]
+                    newConnections.push({ type: 'event source', name: 'Github webhook', config: {} })
+                    setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+                    markSectionModified('connections');
+                  }}>
+                    <MaterialSymbol name="bolt" size="sm" />
+                    <DropdownLabel>Github webhook</DropdownLabel>
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </div>
+          )}
+
             {yamlConfig.spec.connections?.map((connection, index) => (
               <div key={index} className="flex connection">
                 {savedConnections.has(index) ? (
                   // Read-only mode - entire connection box is read-only
-                  <div className="flex-auto space-y-1 border border-zinc-50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/20 p-2 rounded-sm">
+                  <div className={`${errors.filter(e => e.type === 'connection').length  > 0 ? 'bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-900' : 'flex-auto space-y-1 border border-zinc-50 dark:border-zinc-800 '} p-2 rounded-sm w-full`}>
                     {/* Connection name with edit button */}
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -949,12 +1089,14 @@ export function WorkflowNodeAccordion({
                         {connection.type === 'stage' ? (
                           <span className="flex items-center gap-1">
                             <MaterialSymbol name="rocket_launch" size="sm" />
-                            Deploy to staging
+                            Deploy to staging 
+                            <MaterialSymbol name="error" size="md" className='text-red-600 dark:text-red-500'/>
                           </span>
                         ) : (
                           <span className="flex items-center gap-1">
                             <MaterialSymbol name="bolt" size="sm" />
                             Github webhook
+                            <MaterialSymbol name="error" size="md" className='text-red-600 dark:text-red-500'/>
                           </span>
                         )}
                       </h4>
@@ -1102,9 +1244,9 @@ export function WorkflowNodeAccordion({
                           <DropdownMenu anchor="bottom start">
                             <DropdownItem className='flex items-center gap-2' onClick={() => {
                               const newConnections = [...(yamlConfig.spec.connections || [])]
-                              newConnections[index] = { ...connection, type: 'stage' }
+                              newConnections.push({ type: 'stage', name: 'Deploy to staging', config: {} })
                               setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
-                              // Mark as modified since we're editing an existing connection
+                              // Mark as modified since we're adding a new connection
                               markSectionModified('connections');
                             }}>
                               
@@ -1113,9 +1255,9 @@ export function WorkflowNodeAccordion({
                             </DropdownItem>
                             <DropdownItem className='flex items-center gap-2' onClick={() => {
                               const newConnections = [...(yamlConfig.spec.connections || [])]
-                              newConnections[index] = { ...connection, type: 'event source' }
+                              newConnections.push({ type: 'event source', name: 'Github webhook', config: {} })
                               setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
-                              // Mark as modified since we're editing an existing connection
+                              // Mark as modified since we're adding a new connection
                               markSectionModified('connections');
                             }}>
                               
@@ -1126,147 +1268,13 @@ export function WorkflowNodeAccordion({
                         </Dropdown>
                       </Field>
                     </div>
-                  {/* Filters List */}
-                  {connectionFilters[index] && connectionFilters[index].length > 0 && (
-                    <Field className="">
-                      <Label className="!text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                        Filters
-                      </Label>
-                      {connectionFilters[index].map((filter, filterIndex) => (
-                        <div key={filter.id} className='relative w-full'>
-                          {/* Show AND/OR button before filter (except for the first filter) */}
-                          {filter.operator && filterIndex > 0 && (
-                            <div className={filter.operator === 'AND' ? "relative justify-center flex items-center" : "relative justify-center flex items-center"}>
-                              <Link
-                                href="#"
-                                onClick={() => handleToggleOperator(index, filter.id)}
-                                className="!text-xs font-medium !px-2 !py-0 bg-blue-50 text-zinc-700 dark:text-zinc-300 hover:bg-blue-100 dark:hover:bg-zinc-600 rounded"
-                              >
-                                {filter.operator || 'AND'}
-                              </Link>
-                            </div>
-                          )}
-                          
-                          <div className="">
-                            <div className="flex justify-between p-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded gap-1">
-                             <div className='flex flex-auto items-center'>
-                                <Dropdown>
-                                  <DropdownButton outline className="flex items-center !justify-between min-w-[90px]">
-                                    {filter.type}
-                                    <MaterialSymbol name="expand_more" size="sm" />
-                                  </DropdownButton>
-                                  <DropdownMenu anchor="bottom start">
-                                    <DropdownItem onClick={() => handleUpdateFilter(index, filter.id, 'type', 'data')}>
-                                      <DropdownLabel>Data</DropdownLabel>
-                                    </DropdownItem>
-                                    <DropdownItem onClick={() => handleUpdateFilter(index, filter.id, 'type', 'header')}>
-                                      <DropdownLabel>Header</DropdownLabel>
-                                    </DropdownItem>
-                                  </DropdownMenu>
-                                </Dropdown>
-                                
-                                <Input
-                                  placeholder="Expression"
-                                  value={filter.expression}
-                                  onChange={(e) => handleUpdateFilter(index, filter.id, 'expression', e.target.value)}
-                                  onFocus={handleInputFocus}
-                                  className="flex-auto text-xs"
-                                />
-                              </div>
-                              <div className='flex items-center'>
-                                <Link
-                                  href='#'
-                                  onClick={() => handleRemoveFilter(index, filter.id)}
-                                  className=""
-                                >
-                                  <MaterialSymbol name="close" size="sm" />
-                                </Link>
-                              </div>
-                            </div>
-                         
-                         
-                          </div>
-                        </div>
-                      ))}
-                    </Field>
-                  )}      
-                    {/* Add Filter Button */}
-                    <Link
-                      href="#"
-                      onClick={() => handleAddFilter(index)}
-                      className="flex items-center !text-xs"
-                    >
-                      <MaterialSymbol name="add" size="sm" />
-                      Add Filter
-                    </Link>
-
-                    {/* Save Button - only show if saveGranular is true and connection is not saved */}
-                    {saveGranular && (
-                      <div className='flex items-center justify-end w-full border-t border-zinc-200 dark:border-zinc-700 pt-2'>
-                          <Button
-                            plain
-                            className='flex items-center !text-xs'
-                            onClick={() => {
-                              setSavedConnections(prev => new Set([...prev, index]));
-                              console.log('Connection saved:', connection);
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            color='blue'
-                            className='flex items-center !text-xs'
-                            onClick={() => {
-                              setSavedConnections(prev => new Set([...prev, index]));
-                              // Clear modification status when saving
-                              clearSectionModified('connections');
-                              console.log('Connection saved:', connection);
-                            }}
-                          >
-                            <MaterialSymbol name="save" size="sm" />
-                            Save
-                          </Button>
-                        </div>
-                    )}
                   </div>
                 )}
                 
                 
               </div>
             ))}
-             {totalNodesCount > 1 && (
-            <div>
-              <Link
-                href='#'
-                onClick={() => {
-                  // Use inline behavior to add connection
-                  handleAddConnection();
-                }}
-                className="text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 flex items-center !text-xs"
-              >
-                <MaterialSymbol name="add" size="sm" />
-                Add Connection
-              </Link>
-            </div>
-          )}
-            {yamlConfig.spec.connections?.length === 0 && totalNodesCount <= 1 ? (
-              <div className="flex justify-center items-center h-full">
-                <div className="flex flex-col items-center justify-center h-full space-y-4">
-                  <Text className="text-zinc-500 dark:text-zinc-400">
-                    No connections added
-                  </Text>
-                  <Button
-                    onClick={handleAddConnection}
-                    className="text-blue-600 hover:text-blue-700 flex items-center !text-xs"
-                    plain
-                  >
-                    <MaterialSymbol name="add" size="sm" />
-                    Add Connection
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              partialSave && (yamlConfig.spec.connections?.length !== undefined && yamlConfig.spec.connections?.length > 0) && (
+            {partialSave && (yamlConfig.spec.connections?.length !== undefined && yamlConfig.spec.connections?.length > 0) && (
                 <>
                   <Divider/>
                   <Field className='flex justify-end'>
@@ -1281,10 +1289,616 @@ export function WorkflowNodeAccordion({
                   </Field>
                 </>
               )
-            )}
+            }
             
           </div>
          
+        </div>
+      )
+    },
+    {
+      id: 'executor',
+      title: (
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center">
+            <span>Run Configuration</span>
+            <ModificationIndicator sectionId="executor" />
+          </div>
+          {yamlConfig.spec.executor && yamlConfig.spec.executor.type !== 'default' && (
+            <span className="text-xs text-gray-600 dark:text-gray-400 text-code !font-normal pr-2">
+              {yamlConfig.spec.executor.type}
+            </span>
+          )}
+        </div>
+      ),
+      content: (
+        <div className="space-y-4">
+          {/* Add Executor Button */}
+          {/* Executor Display */}
+          {yamlConfig.spec.executor && (
+            <div className="space-y-2">
+              <div className="flex">
+                {savedExecutors.has(0) ? (
+                  // Read-only mode - entire executor box is read-only
+                  <div className="flex-auto space-y-1 border border-zinc-50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/20 p-2 rounded-sm">
+                    {/* Executor type and name with edit button */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                          {yamlConfig.spec.executor.type === 'github' ? 'GitHub' : yamlConfig.spec.executor.type === 'semaphore' ? 'Semaphore' : yamlConfig.spec.executor.type}
+                        </h4>
+                      </div>
+                      <div className="flex items-center">
+                        <Button
+                          plain
+                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                          onClick={() => {
+                            // Remove from saved executors to make it editable again
+                            setSavedExecutors(prev => {
+                              const newSaved = new Set(prev);
+                              newSaved.delete(0);
+                              return newSaved;
+                            });
+                            console.log('Executor made editable:', yamlConfig.spec.executor);
+                          }}
+                        >
+                          <MaterialSymbol name="edit" size="sm" />
+                        </Button>
+                        <Button
+                          plain
+                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                          onClick={() => {
+                            // Remove executor
+                            setYamlConfig(prev => ({ 
+                              ...prev, 
+                              spec: { 
+                                ...prev.spec, 
+                                executor: { type: 'default', config: {} }
+                              } 
+                            }))
+                            
+                            markSectionModified('executor');
+                            
+                            // Also remove from saved executors
+                            setSavedExecutors(prev => {
+                              const newSaved = new Set(prev);
+                              newSaved.delete(0);
+                              return newSaved;
+                            });
+                            
+                            console.log('Executor deleted');
+                          }}
+                        >
+                          <MaterialSymbol name="delete" size="sm" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Editable mode - executor is editable inline
+                  <div className="flex-auto space-y-3 bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 rounded-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 space-y-3">
+                        {/* Semaphore Integration */}
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 ">
+                            Integration
+                          </Label>
+                          <Dropdown>
+                            <DropdownButton color='white' className="w-full flex items-center !justify-between mt-3">
+                              <span>
+                                {yamlConfig.spec.executor?.config?.integration || 'Select integration'}
+                              </span>
+                              <MaterialSymbol name="expand_more" size="sm" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom start">
+                              <DropdownItem onClick={() => {
+                                setYamlConfig(prev => ({ 
+                                  ...prev, 
+                                  spec: { 
+                                    ...prev.spec, 
+                                    executor: { 
+                                      type: 'semaphore', 
+                                      config: { 
+                                        integration: "zawkey's semaphore org"
+                                      } 
+                                    }
+                                  }
+                                }))
+                                markSectionModified('executor');
+                              }}>
+                                <DropdownLabel>zawkey's semaphore org</DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem onClick={() => {
+                                setYamlConfig(prev => ({ 
+                                  ...prev, 
+                                  spec: { 
+                                    ...prev.spec, 
+                                    executor: { 
+                                      type: 'semaphore', 
+                                      config: { 
+                                        integration: 'semaphore test org'
+                                      } 
+                                    }
+                                  }
+                                }))
+                                markSectionModified('executor');
+                              }}>
+                                <DropdownLabel>semaphore test org</DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem onClick={() => {
+                                setYamlConfig(prev => ({ 
+                                  ...prev, 
+                                  spec: { 
+                                    ...prev.spec, 
+                                    executor: { 
+                                      type: 'semaphore', 
+                                      config: { 
+                                        integration: 'my organization'
+                                      } 
+                                    }
+                                  }
+                                }))
+                                markSectionModified('executor');
+                              }}>
+                                <DropdownLabel>my organization</DropdownLabel>
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        </Field>
+
+
+                       
+
+                        {/* Semaphore specific fields */}
+                        
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Project Name
+                          </Label>
+                          <Input value={yamlConfig.spec.executor?.config?.projectName} onChange={(e) => {
+                            setYamlConfig(prev => ({ 
+                              ...prev, 
+                              spec: { 
+                                ...prev.spec, 
+                                executor: { 
+                                  type: 'semaphore', 
+                                  config: { 
+                                    integration: 'my organization',
+                                    projectName: e.target.value 
+                                  } 
+                                }
+                              }
+                            }))
+                            markSectionModified('executor');
+                          }} />
+                        </Field>
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Execution type
+                          </Label>
+                        
+                          <ControlledTabs 
+                            className='mt-3'
+                            tabs={[
+                              { id: 'workflow', label: 'Workflow' },
+                              { id: 'task', label: 'Task' },
+                            ]}
+                            activeTab='workflow'
+                            variant='pills'
+                            onTabChange={(tabId) => {
+                              console.log('Tab changed to:', tabId);
+                            }}  
+                          />  
+                          
+                        </Field>
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
+                            Ref 
+                            <Tippy content="Branch or tag to checkout">
+                              <Link href="https://docs.semaphoreci.com/" target="_blank" className="text-zinc-500 dark:text-zinc-400 flex items-center">
+                                <MaterialSymbol name="help" size="sm"/>
+                              </Link>
+                            </Tippy>
+                          </Label>
+                          <Input value={yamlConfig.spec.executor?.config?.branch} onChange={(e) => {
+                            setYamlConfig(prev => ({ 
+                              ...prev, 
+                              spec: { 
+                                ...prev.spec, 
+                                executor: { 
+                                  type: 'semaphore', 
+                                  config: { 
+                                    integration: 'my organization',
+                                    branch: e.target.value 
+                                  } 
+                                }
+                              }
+                            }))
+                            markSectionModified('executor');
+                          }} />
+                          
+                        </Field>
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
+                            Pipeline
+                            <Tippy content="Branch or tag to checkout">
+                              <Link href="https://docs.semaphoreci.com/" target="_blank" className="text-zinc-500 dark:text-zinc-400 flex items-center">
+                                <MaterialSymbol name="help" size="sm"/>
+                              </Link>
+                            </Tippy>
+                          </Label>
+                          <Input value={yamlConfig.spec.executor?.config?.pipeline} onChange={(e) => {
+                            setYamlConfig(prev => ({ 
+                              ...prev, 
+                              spec: { 
+                                ...prev.spec, 
+                                executor: { 
+                                  type: 'semaphore', 
+                                  config: { 
+                                    integration: 'my organization',
+                                    branch: e.target.value 
+                                  } 
+                                }
+                              }
+                            }))
+                            markSectionModified('executor');
+                          }} />
+                          
+                        </Field>
+
+                        {/* Parameters Section */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
+                              Parameters <span className="text-xs text-zinc-500">(optional)</span> 
+                              <Tippy content="Add Parameter">
+                                <Link href="#" className='flex items-center'>
+                                  <MaterialSymbol name="help" size="sm" />
+                                </Link>
+                              </Tippy>
+                            </div>
+                            
+                          </div>
+                          {/* Parameters List */}
+                          {yamlConfig.spec.executor?.config?.parameters && yamlConfig.spec.executor.config.parameters.length > 0 && yamlConfig.spec.executor.config.parameters.map((param: any, index: number) => (
+                               <div>
+                                <Text className="text-zinc-500 !text-xs mb-2">Pro tip: Type <span className="font-mono bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 p-1">$</span> to set value from inputs</Text>
+                               <div className="flex w-full justify-between p-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded gap-1 space-y-2">
+                                  <div key={index} className="flex items-center">
+                                    <div className='w-20'>
+                                    <Input
+                                      value={param.key}
+                                      onChange={(e) => {
+                                        const newParams = [...(yamlConfig.spec.executor?.config?.parameters || [])];
+                                        newParams[index] = { ...param, key: e.target.value };
+                                        setYamlConfig(prev => ({ 
+                                          ...prev, 
+                                          spec: { 
+                                            ...prev.spec, 
+                                            executor: { 
+                                              ...prev.spec.executor,
+                                              type: 'semaphore', 
+                                              config: { 
+                                                ...prev.spec.executor?.config,
+                                                parameters: newParams
+                                              } 
+                                            }
+                                          }
+                                        }))
+                                        markSectionModified('executor');
+                                      }}
+                                      placeholder="Key"
+                                      className="w-6 text-xs"
+                                    />
+                                    </div>
+                                      <div className="flex-1 ml-2">
+                                        {(() => {
+                                          const availableInputs = yamlConfig.spec.inputs || [];
+                                          const currentValue = param.value || '';
+                                          const currentTags = parameterTags[index] || [];
+                                          const hasTag = currentTags.length > 0;
+                                          
+                                          const handleChange = (newValue: string) => {
+                                            const newParams = [...(yamlConfig.spec.executor?.config?.parameters || [])];
+                                            newParams[index] = { ...param, value: newValue };
+                                            setYamlConfig(prev => ({ 
+                                              ...prev, 
+                                              spec: { 
+                                                ...prev.spec, 
+                                                executor: { 
+                                                  ...prev.spec.executor,
+                                                  type: 'semaphore', 
+                                                  config: { 
+                                                    ...prev.spec.executor?.config,
+                                                    parameters: newParams
+                                                  } 
+                                                }
+                                              }
+                                            }));
+                                            markSectionModified('executor');
+                                          };
+
+                                          const handleSuggestionSelect = (suggestion: any) => {
+                                            handleChange(suggestion.value);
+                                            const newTag = {
+                                              label: suggestion.label,
+                                              value: suggestion.value
+                                            };
+                                            setParameterTags(prev => ({ ...prev, [index]: [newTag] }));
+                                          };
+
+                                          const clearTag = () => {
+                                            setParameterTags(prev => ({ ...prev, [index]: [] }));
+                                            handleChange('');
+                                          };
+
+                                          // Check if user is autocompleting (typing after $)
+                                          const lastDollarIndex = currentValue.lastIndexOf('$');
+                                          const isAutocompleting = lastDollarIndex !== -1;
+                                          const searchQuery = isAutocompleting ? currentValue.slice(lastDollarIndex + 1) : '';
+                                          
+                                          // Create input suggestions
+                                          const inputSuggestions = availableInputs.map((input: any) => ({
+                                            id: input.name,
+                                            label: input.name,
+                                            value: `\${{ inputs.${input.name} }}`
+                                          }));
+
+                                          if (hasTag) {
+                                            // Show tag when value is selected
+                                            return (
+                                              <div className="relative">
+                                                <Input
+                                                  readOnly
+                                                  className="text-xs font-mono w-full"
+                                                />
+                                                
+                                                <div className="absolute top-[4px] left-[4px] max-w-[140px] inline-flex items-center bg-zinc-200 dark:bg-zinc-800/30 text-zinc-700 dark:text-zinc-300 px-1 py-0.5 rounded-lg text-xs font-medium border border-zinc-200 dark:border-zinc-800">
+                                                  <span className="font-mono truncate">{currentTags[0].value}</span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={clearTag}
+                                                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 ml-1"
+                                                  >
+                                                    <MaterialSymbol name="close" size="sm" />
+                                                  </button>
+                                                </div>
+                                                <Button
+                                                plain
+                                                onClick={() => {
+                                                  if (!currentValue.includes('$')) {
+                                                    handleChange(currentValue + '$');
+                                                  }
+                                                }}
+                                                className="!absolute !right-0 !top-1/2 !transform !-translate-y-1/2 p-0.5 !text-blue-600 dark:!text-blue-400 hover:!text-blue-800 dark:hover:!text-blue-200"
+                                              >
+                                                <MaterialSymbol name="input" size="sm" />
+                                              </Button>
+                                            </div>
+                                            
+                                            );
+                                          }
+
+                                          // Show input with autocomplete when no tag is selected
+                                          return (
+                                            <div className="relative">
+                                              <Input
+                                                value={currentValue}
+                                                onChange={(e) => handleChange(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter' && isAutocompleting && inputSuggestions.length > 0) {
+                                                    e.preventDefault();
+                                                    const filteredSuggestions = inputSuggestions.filter(suggestion => {
+                                                      const searchTerm = searchQuery.toLowerCase();
+                                                      return suggestion.label.toLowerCase().includes(searchTerm);
+                                                    });
+                                                    
+                                                    if (filteredSuggestions.length > 0) {
+                                                      handleSuggestionSelect(filteredSuggestions[0]);
+                                                    }
+                                                  }
+                                                }}
+                                                placeholder="Value"
+                                                className="text-xs font-mono w-full"
+                                              />
+                                              
+                                              {/* Dropdown suggestions */}
+                                              {isAutocompleting && (
+                                                <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                                                  {inputSuggestions.length === 0 ? (
+                                                    <div className="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">
+                                                      No inputs available. Configure inputs first.
+                                                    </div>
+                                                  ) : (
+                                                    <>
+                                                      {inputSuggestions
+                                                        .filter(suggestion => {
+                                                          const searchTerm = searchQuery.toLowerCase();
+                                                          return suggestion.label.toLowerCase().includes(searchTerm);
+                                                        })
+                                                        .map((suggestion, suggestionIndex) => {
+                                                          const isFirstMatch = suggestionIndex === 0;
+                                                          
+                                                          return (
+                                                            <Button
+                                                              key={suggestion.id}
+                                                              plain
+                                                              onClick={() => handleSuggestionSelect(suggestion)}
+                                                              className={`w-full py-1 text-left hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-700 last:border-b-0 ${
+                                                                isFirstMatch ? 'bg-blue-600 dark:bg-blue-600/50 hover:!bg-blue-600 dark:hover:!bg-blue-600/50' : ''
+                                                              }`}
+                                                            >
+                                                              <div>
+                                                                <div className={`font-medium text-gray-900 dark:text-white ${isFirstMatch ? 'text-white' : ''}`}>
+                                                                  {suggestion.label}
+                                                                </div>
+                                                                <div className={`text-xs text-gray-500 dark:text-gray-400 ${isFirstMatch ? 'text-white' : ''}`}>
+                                                                  {suggestion.value}
+                                                                </div>
+                                                              </div>
+                                                            </Button>
+                                                          );
+                                                        })
+                                                      }
+                                                      {inputSuggestions.filter(suggestion => {
+                                                        const searchTerm = searchQuery.toLowerCase();
+                                                        return suggestion.label.toLowerCase().includes(searchTerm);
+                                                      }).length === 0 && (
+                                                        <div className="py-2 text-gray-500 dark:text-gray-400 text-sm">
+                                                          No matching inputs found
+                                                        </div>
+                                                      )}
+                                                    </>
+                                                  )}
+                                                </div>
+                                              )}
+                                              
+                                              {/* Icon button */}
+                                              <Button
+                                                plain
+                                                onClick={() => {
+                                                  if (!currentValue.includes('$')) {
+                                                    handleChange(currentValue + '$');
+                                                  }
+                                                }}
+                                                className="!absolute !right-0 !top-1/2 !transform !-translate-y-1/2 p-0.5"
+                                              >
+                                                <MaterialSymbol name="input" size="sm" />
+                                              </Button>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                        
+                                    
+                                    <Button
+                                      plain
+                                      onClick={() => {
+                                        const newParams = yamlConfig.spec.executor?.config?.parameters?.filter((_: any, i: number) => i !== index) || [];
+                                        setYamlConfig(prev => ({ 
+                                          ...prev, 
+                                          spec: { 
+                                            ...prev.spec, 
+                                            executor: { 
+                                              ...prev.spec.executor,
+                                              type: 'semaphore', 
+                                              config: { 
+                                                ...prev.spec.executor?.config,
+                                                parameters: newParams
+                                              } 
+                                            }
+                                          }
+                                        }))
+                                        markSectionModified('executor');
+                                      }}
+                                      className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-400"
+                                    >
+                                      <MaterialSymbol name="close" size="sm" />
+                                    </Button>
+                                  </div>
+                                 </div>
+                               </div>
+                          ))}
+                           
+                          
+                          <Link
+                              href="#"
+                             
+                              onClick={() => {
+                                const newParams = yamlConfig.spec.executor?.config?.parameters || [];
+                                setYamlConfig(prev => ({ 
+                                  ...prev, 
+                                  spec: { 
+                                    ...prev.spec, 
+                                    executor: { 
+                                      ...prev.spec.executor,
+                                      type: 'semaphore', 
+                                      config: { 
+                                        ...prev.spec.executor?.config,
+                                        parameters: [...newParams, { key: '', value: '' }]
+                                      } 
+                                    }
+                                  }
+                                }))
+                                markSectionModified('executor');
+                              }}
+                              className="flex items-center text-xs text-blue-700 dark:text-blue-400"
+                            >
+                              <MaterialSymbol name="add" size="sm" className="mr-1" />
+                              Add parameter
+                            </Link>
+                        </div>
+
+                        {/* Save Button - only show if saveGranular is true */}
+                        {saveGranular && (
+                          <div className='flex items-center justify-end w-full border-t border-zinc-200 dark:border-zinc-700 pt-2'>
+                            <Button
+                              plain
+                              className='flex items-center !text-xs'
+                              onClick={() => {
+                                setSavedExecutors(prev => new Set([...prev, 0]));
+                                console.log('Executor cancelled');
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              color='blue'
+                              className='flex items-center !text-xs'
+                              onClick={() => {
+                                // Save executor
+                                onUpdate?.({
+                                  yamlConfig: {
+                                    ...yamlConfig,
+                                    spec: {
+                                      ...yamlConfig.spec,
+                                      executor: yamlConfig.spec.executor || { type: 'default', config: {} }
+                                    }
+                                  }
+                                });
+                                
+                                setSavedExecutors(prev => new Set([...prev, 0]));
+                                // Clear modification status when saving
+                                clearSectionModified('executor');
+                                console.log('Executor saved:', yamlConfig.spec.executor);
+                              }}
+                            >
+                              <MaterialSymbol name="save" size="sm" />
+                              Save
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {partialSave && (
+            <>
+              <Divider/>
+              <Field className='flex justify-end'>
+                <Button
+                  plain
+                  className='flex items-center !text-xs'
+              
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color='white'
+                  className='flex items-center !text-xs'
+                  onClick={handleExecutorsSave}
+                >
+                  Save
+                </Button>
+              </Field>
+            </>
+          )}
         </div>
       )
     },
@@ -1293,7 +1907,7 @@ export function WorkflowNodeAccordion({
       title: (
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center">
-            <span>Inputs</span>
+            <span>Inputs & outputs </span><span className="text-xs text-zinc-500 dark:text-zinc-300"> (optional)</span>
             <ModificationIndicator sectionId="inputs" />
           </div>
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
@@ -1304,8 +1918,12 @@ export function WorkflowNodeAccordion({
         </div>
       ),
       content: (
-        <div className="space-y-4">
-          
+        <div className="space-y-2">
+          <Field>
+            <Label className="text-zinc-700 dark:text-zinc-300">
+              Inputs
+            </Label>
+          </Field>
           {/* Inputs List */}
           <div className="space-y-2">
             {yamlConfig.spec.inputs?.map((input, index) => {
@@ -1594,29 +2212,24 @@ export function WorkflowNodeAccordion({
             </>
           )}
           {/* Add Input Button */}
+          
           <Link
             href='#'
             onClick={handleAddInput}
-            className="text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 flex items-center !text-xs"
+            className="text-blue-700 hover:text-blue-600 flex items-center !text-xs"
           >
             <MaterialSymbol name="add" size="sm" />
             Add Input
           </Link>
-        </div>
-      )
-    },
-    {
-      id: 'outputs',
-      title: 'Outputs',
-      content: (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center mb-3">
+          <Divider/>
+          <div className="space-y-4">
+          <div className="flex flex-col mb-3">
             <Field>
-              <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <Label className="text-zinc-700 dark:text-zinc-300">
                 Outputs
               </Label>
-            </Field>
-            <Button
+              <Link
+              href="#"
               onClick={() => setYamlConfig(prev => ({
                 ...prev,
                 spec: {
@@ -1624,12 +2237,13 @@ export function WorkflowNodeAccordion({
                   outputs: [...(prev.spec.outputs || []), { name: '', type: 'string', value: '', description: '', required: false }]
                 }
               }))}
-              className="text-blue-600 hover:text-blue-700"
-              plain
+              className="text-xs flex items-center text-blue-700 hover:text-blue-600 mt-2"
             >
               <MaterialSymbol name="add" size="sm" />
               Add Output
-            </Button>
+            </Link>
+            </Field>
+            
           </div>
           <div className="space-y-3">
             {yamlConfig.spec.outputs?.map((output, index) => (
@@ -1690,7 +2304,7 @@ export function WorkflowNodeAccordion({
                           newOutputs[index] = { ...output, required: e.target.checked }
                           setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, outputs: newOutputs } }))
                         }}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                        className={`w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 ${errors.length > 0 && 'focus:!ring-offset-red-500 dark:focus:!ring-offset-red-100'} dark:bg-gray-700 dark:border-gray-600`}
                       />
                       <Label htmlFor={`output-required-${index}`} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                         Is Required
@@ -1718,599 +2332,14 @@ export function WorkflowNodeAccordion({
             </>
           )}
         </div>
+        </div>
+        
       )
     },
-    {
-      id: 'secrets',
-      title: 'Secrets Management',
-      content: (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <Field>
-              <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Secrets
-              </Label>
-            </Field>
-            <Button
-              onClick={() => setYamlConfig(prev => ({
-                ...prev,
-                spec: {
-                  ...prev.spec,
-                  secrets: [...(prev.spec.secrets || []), { name: '', key: '', value: '' }]
-                }
-              }))}
-              className="text-blue-600 hover:text-blue-700"
-              plain
-            >
-              <MaterialSymbol name="add" size="sm" />
-              Add Secret
-            </Button>
-          </div>
-          <div className="space-y-3">
-            {yamlConfig.spec.secrets?.map((secret, index) => (
-              <div key={index} className="grid grid-cols-3 gap-2 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                <Input
-                  placeholder="Secret name"
-                  value={secret.name}
-                  onChange={(e) => {
-                    const newSecrets = [...(yamlConfig.spec.secrets || [])]
-                    newSecrets[index] = { ...secret, name: e.target.value }
-                    setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, secrets: newSecrets } }))
-                  }}
-                />
-                <Input
-                  placeholder="Key"
-                  value={secret.key}
-                  onChange={(e) => {
-                    const newSecrets = [...(yamlConfig.spec.secrets || [])]
-                    newSecrets[index] = { ...secret, key: e.target.value }
-                    setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, secrets: newSecrets } }))
-                  }}
-                />
-                <div className="flex gap-1">
-                  <Input
-                    placeholder="Value"
-                    value={secret.value}
-                    onChange={(e) => {
-                      const newSecrets = [...(yamlConfig.spec.secrets || [])]
-                      newSecrets[index] = { ...secret, value: e.target.value }
-                      setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, secrets: newSecrets } }))
-                    }}
-                  />
-                  <Button
-                    plain
-                    onClick={() => {
-                      const newSecrets = yamlConfig.spec.secrets?.filter((_, i) => i !== index) || []
-                      setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, secrets: newSecrets } }))
-                    }}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <MaterialSymbol name="delete" size="sm" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {yamlConfig.spec.secrets && yamlConfig.spec.secrets.length > 0 && partialSave && (
-            <>
-              <Divider/>
-              <Field className='flex justify-end'>
-                <Button
-                  color='blue'
-                  className='flex items-center !text-xs'
-                  onClick={handleSecretsSave}
-                >
-                  <MaterialSymbol name="save" size="sm" />
-                  Save
-                </Button>
-              </Field>
-            </>
-          )}
-        </div>
-      )
-    },
-    {
-      id: 'executor',
-      title: (
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center">
-            <span>Executor Configuration</span>
-            <ModificationIndicator sectionId="executor" />
-          </div>
-          {yamlConfig.spec.executor && yamlConfig.spec.executor.type !== 'default' && (
-            <span className="text-xs text-gray-600 dark:text-gray-400 text-code !font-normal pr-2">
-              {yamlConfig.spec.executor.type}
-            </span>
-          )}
-        </div>
-      ),
-      content: (
-        <div className="space-y-4">
-          {/* Add Executor Button */}
-          {yamlConfig.spec.executor && yamlConfig.spec.executor.type == 'default' && (
-          <Link 
-            href="#"
-            onClick={handleAddExecutor}
-            className="flex items-center text-xs"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            Add Executor
-          </Link>
-          )}
-          {/* Executor Display */}
-          {yamlConfig.spec.executor && yamlConfig.spec.executor.type !== 'default' && (
-            <div className="space-y-2">
-              <div className="flex">
-                {savedExecutors.has(0) ? (
-                  // Read-only mode - entire executor box is read-only
-                  <div className="flex-auto space-y-1 border border-zinc-50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/20 p-2 rounded-sm">
-                    {/* Executor type and name with edit button */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                          {yamlConfig.spec.executor.type === 'github' ? 'GitHub' : yamlConfig.spec.executor.type === 'semaphore' ? 'Semaphore' : yamlConfig.spec.executor.type}
-                        </h4>
-                      </div>
-                      <div className="flex items-center">
-                        <Button
-                          plain
-                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
-                          onClick={() => {
-                            // Remove from saved executors to make it editable again
-                            setSavedExecutors(prev => {
-                              const newSaved = new Set(prev);
-                              newSaved.delete(0);
-                              return newSaved;
-                            });
-                            console.log('Executor made editable:', yamlConfig.spec.executor);
-                          }}
-                        >
-                          <MaterialSymbol name="edit" size="sm" />
-                        </Button>
-                        <Button
-                          plain
-                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                          onClick={() => {
-                            // Remove executor
-                            setYamlConfig(prev => ({ 
-                              ...prev, 
-                              spec: { 
-                                ...prev.spec, 
-                                executor: { type: 'default', config: {} }
-                              } 
-                            }))
-                            
-                            markSectionModified('executor');
-                            
-                            // Also remove from saved executors
-                            setSavedExecutors(prev => {
-                              const newSaved = new Set(prev);
-                              newSaved.delete(0);
-                              return newSaved;
-                            });
-                            
-                            console.log('Executor deleted');
-                          }}
-                        >
-                          <MaterialSymbol name="delete" size="sm" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  // Editable mode - executor is editable inline
-                  <div className="flex-auto space-y-3 bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 rounded-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 space-y-3">
-                        {/* Semaphore Integration */}
-                        <Field>
-                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Semaphore integration
-                          </Label>
-                          <Dropdown>
-                            <DropdownButton color='white' className="w-full flex items-center !justify-between">
-                              <span>
-                                {yamlConfig.spec.executor?.config?.integration || 'Select Semaphore integration'}
-                              </span>
-                              <MaterialSymbol name="expand_more" size="sm" />
-                            </DropdownButton>
-                            <DropdownMenu anchor="bottom start">
-                              <DropdownItem onClick={() => {
-                                setYamlConfig(prev => ({ 
-                                  ...prev, 
-                                  spec: { 
-                                    ...prev.spec, 
-                                    executor: { 
-                                      type: 'semaphore', 
-                                      config: { 
-                                        integration: "zawkey's semaphore org"
-                                      } 
-                                    }
-                                  }
-                                }))
-                                markSectionModified('executor');
-                              }}>
-                                <DropdownLabel>zawkey's semaphore org</DropdownLabel>
-                              </DropdownItem>
-                              <DropdownItem onClick={() => {
-                                setYamlConfig(prev => ({ 
-                                  ...prev, 
-                                  spec: { 
-                                    ...prev.spec, 
-                                    executor: { 
-                                      type: 'semaphore', 
-                                      config: { 
-                                        integration: 'semaphore test org'
-                                      } 
-                                    }
-                                  }
-                                }))
-                                markSectionModified('executor');
-                              }}>
-                                <DropdownLabel>semaphore test org</DropdownLabel>
-                              </DropdownItem>
-                              <DropdownItem onClick={() => {
-                                setYamlConfig(prev => ({ 
-                                  ...prev, 
-                                  spec: { 
-                                    ...prev.spec, 
-                                    executor: { 
-                                      type: 'semaphore', 
-                                      config: { 
-                                        integration: 'my organization'
-                                      } 
-                                    }
-                                  }
-                                }))
-                                markSectionModified('executor');
-                              }}>
-                                <DropdownLabel>my organization</DropdownLabel>
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
-                        </Field>
 
-
-                       
-
-                        {/* Semaphore specific fields */}
-                        
-                        <Field>
-                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Project Name
-                          </Label>
-                          <Input value={yamlConfig.spec.executor?.config?.projectName} onChange={(e) => {
-                            setYamlConfig(prev => ({ 
-                              ...prev, 
-                              spec: { 
-                                ...prev.spec, 
-                                executor: { 
-                                  type: 'semaphore', 
-                                  config: { 
-                                    integration: 'my organization',
-                                    projectName: e.target.value 
-                                  } 
-                                }
-                              }
-                            }))
-                            markSectionModified('executor');
-                          }} />
-                        </Field>
-                        <Field>
-                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Execution type
-                          </Label>
-                        
-                          <ControlledTabs 
-                            className='mt-3'
-                            tabs={[
-                              { id: 'workflow', label: 'Workflow' },
-                              { id: 'task', label: 'Task' },
-                            ]}
-                            activeTab='workflow'
-                            variant='pills'
-                            onTabChange={(tabId) => {
-                              console.log('Tab changed to:', tabId);
-                            }}  
-                          />  
-                          
-                        </Field>
-                        <Field>
-                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Branch
-                          </Label>
-                          <Input value={yamlConfig.spec.executor?.config?.branch} onChange={(e) => {
-                            setYamlConfig(prev => ({ 
-                              ...prev, 
-                              spec: { 
-                                ...prev.spec, 
-                                executor: { 
-                                  type: 'semaphore', 
-                                  config: { 
-                                    integration: 'my organization',
-                                    branch: e.target.value 
-                                  } 
-                                }
-                              }
-                            }))
-                            markSectionModified('executor');
-                          }} />
-                          
-                        </Field>
-                        <Field>
-                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Pipeline
-                          </Label>
-                          <Input value={yamlConfig.spec.executor?.config?.pipeline} onChange={(e) => {
-                            setYamlConfig(prev => ({ 
-                              ...prev, 
-                              spec: { 
-                                ...prev.spec, 
-                                executor: { 
-                                  type: 'semaphore', 
-                                  config: { 
-                                    integration: 'my organization',
-                                    branch: e.target.value 
-                                  } 
-                                }
-                              }
-                            }))
-                            markSectionModified('executor');
-                          }} />
-                          
-                        </Field>
-
-                        {/* Parameters Section */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                              Parameters
-                            </div>
-                            
-                          </div>
-                          
-                          {/* Parameters List */}
-                          {yamlConfig.spec.executor?.config?.parameters && yamlConfig.spec.executor.config.parameters.length > 0 && yamlConfig.spec.executor.config.parameters.map((param: any, index: number) => (
-                               <div className="flex w-full justify-between p-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded gap-1 space-y-2">
-                                  <div key={index} className="flex items-center">
-                                    <Input
-                                      value={param.key}
-                                      onChange={(e) => {
-                                        const newParams = [...(yamlConfig.spec.executor?.config?.parameters || [])];
-                                        newParams[index] = { ...param, key: e.target.value };
-                                        setYamlConfig(prev => ({ 
-                                          ...prev, 
-                                          spec: { 
-                                            ...prev.spec, 
-                                            executor: { 
-                                              ...prev.spec.executor,
-                                              type: 'semaphore', 
-                                              config: { 
-                                                ...prev.spec.executor?.config,
-                                                parameters: newParams
-                                              } 
-                                            }
-                                          }
-                                        }))
-                                        markSectionModified('executor');
-                                      }}
-                                      placeholder="VERSION"
-                                      className="flex-1 text-xs"
-                                    />
-                                      <Input
-                                        value={param.value}
-                                        onChange={(e) => {
-                                          const newParams = [...(yamlConfig.spec.executor?.config?.parameters || [])];
-                                          newParams[index] = { ...param, value: e.target.value };
-                                          setYamlConfig(prev => ({ 
-                                            ...prev, 
-                                            spec: { 
-                                              ...prev.spec, 
-                                              executor: { 
-                                                ...prev.spec.executor,
-                                                type: 'semaphore', 
-                                                config: { 
-                                                  ...prev.spec.executor?.config,
-                                                  parameters: newParams
-                                                } 
-                                              }
-                                            }
-                                          }))
-                                          markSectionModified('executor');
-                                        }}
-                                        placeholder="VERSION"
-                                        className="border-none bg-transparent p-0 text-xs focus:ring-0 focus:border-none flex-1 ml-2"
-                                        style={{ boxShadow: 'none' }}
-                                      />
-                                        
-                                    
-                                    <Button
-                                      plain
-                                      onClick={() => {
-                                        const newParams = yamlConfig.spec.executor?.config?.parameters?.filter((_: any, i: number) => i !== index) || [];
-                                        setYamlConfig(prev => ({ 
-                                          ...prev, 
-                                          spec: { 
-                                            ...prev.spec, 
-                                            executor: { 
-                                              ...prev.spec.executor,
-                                              type: 'semaphore', 
-                                              config: { 
-                                                ...prev.spec.executor?.config,
-                                                parameters: newParams
-                                              } 
-                                            }
-                                          }
-                                        }))
-                                        markSectionModified('executor');
-                                      }}
-                                      className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-400"
-                                    >
-                                      <MaterialSymbol name="close" size="sm" />
-                                    </Button>
-                                  </div>
-                                 </div>
-                          ))}
-                           
-                          
-                          <Link
-                              href="#"
-                              onClick={() => {
-                                const newParams = yamlConfig.spec.executor?.config?.parameters || [];
-                                setYamlConfig(prev => ({ 
-                                  ...prev, 
-                                  spec: { 
-                                    ...prev.spec, 
-                                    executor: { 
-                                      ...prev.spec.executor,
-                                      type: 'semaphore', 
-                                      config: { 
-                                        ...prev.spec.executor?.config,
-                                        parameters: [...newParams, { key: '', value: '' }]
-                                      } 
-                                    }
-                                  }
-                                }))
-                                markSectionModified('executor');
-                              }}
-                              className="flex items-center text-xs"
-                            >
-                              <MaterialSymbol name="add" size="sm" className="mr-1" />
-                              Add parameter
-                            </Link>
-                        </div>
-
-                        {/* Save Button - only show if saveGranular is true */}
-                        {saveGranular && (
-                          <div className='flex items-center justify-end w-full border-t border-zinc-200 dark:border-zinc-700 pt-2'>
-                            <Button
-                              plain
-                              className='flex items-center !text-xs'
-                              onClick={() => {
-                                setSavedExecutors(prev => new Set([...prev, 0]));
-                                console.log('Executor cancelled');
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              color='blue'
-                              className='flex items-center !text-xs'
-                              onClick={() => {
-                                // Save executor
-                                onUpdate?.({
-                                  yamlConfig: {
-                                    ...yamlConfig,
-                                    spec: {
-                                      ...yamlConfig.spec,
-                                      executor: yamlConfig.spec.executor || { type: 'default', config: {} }
-                                    }
-                                  }
-                                });
-                                
-                                setSavedExecutors(prev => new Set([...prev, 0]));
-                                // Clear modification status when saving
-                                clearSectionModified('executor');
-                                console.log('Executor saved:', yamlConfig.spec.executor);
-                              }}
-                            >
-                              <MaterialSymbol name="save" size="sm" />
-                              Save
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                      
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {partialSave && (
-            <>
-              <Divider/>
-              <Field className='flex justify-end'>
-                <Button
-                  color='blue'
-                  className='flex items-center !text-xs'
-                  onClick={handleExecutorsSave}
-                >
-                  <MaterialSymbol name="save" size="sm" />
-                  Save
-                </Button>
-              </Field>
-            </>
-          )}
-        </div>
-      )
-    },
-    {
-      id: 'advanced',
-      title: 'Advanced',
-      content: (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Field>
-              <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                API Version
-              </Label>
-              <Input
-                type="text"
-                value={yamlConfig.apiVersion}
-                onChange={(e) => setYamlConfig(prev => ({ ...prev, apiVersion: e.target.value }))}
-                placeholder="v1"
-                className="w-full"
-              />
-            </Field>
-            <Field>
-              <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Kind
-              </Label>
-              <Input
-                type="text"
-                value={yamlConfig.kind}
-                onChange={(e) => setYamlConfig(prev => ({ ...prev, kind: e.target.value }))}
-                placeholder="Stage"
-                className="w-full"
-              />
-            </Field>
-          </div>
-          <Field>
-            <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Name
-            </Label>
-            <Input
-              type="text"
-              value={yamlConfig.metadata.name}
-              onChange={(e) => setYamlConfig(prev => ({ 
-                ...prev, 
-                metadata: { ...prev.metadata, name: e.target.value }
-              }))}
-              placeholder="deploy-to-staging"
-              className="w-full"
-            />
-          </Field>
-          <Field>
-            <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Canvas ID
-            </Label>
-            <Input
-              type="text"
-              value={yamlConfig.metadata.canvasId}
-              onChange={(e) => setYamlConfig(prev => ({ 
-                ...prev, 
-                metadata: { ...prev.metadata, canvasId: e.target.value }
-              }))}
-              placeholder="c2181c55-64ac-41ba-8925-0eaf0357b3f6"
-              className="w-full"
-            />
-          </Field>
-        </div>
-      )
-    }
+    
+   
+  
   ]
 
   const handleAccordionToggle = (sectionId: string) => {
@@ -2334,11 +2363,12 @@ export function WorkflowNodeAccordion({
     
       <div className={clsx(
         'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-sm min-w-sm max-w-sm relative',
+        
         className
       )}>
       {selected && (
         <div 
-          className="action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50"
+          className={`action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50`}
           onClick={(e) => e.stopPropagation()}
         >
          
@@ -2398,11 +2428,11 @@ export function WorkflowNodeAccordion({
       )}
         <div className="node-header p-4 flex justify-between border-b border-gray-200 dark:border-zinc-700 align-start items-start">
           <div className="flex flex-col w-full">
-            <div className="flex items-start gap-2">
-              <div className='w-10 h-10 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex items-center justify-center'>
-                <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
+            <div className="flex items-center gap-2">
+              <div className='p-2 w-10 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex items-center justify-center'>
+                <img width="24" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
               </div>
-              <div className="flex flex-col w-full">
+              <div className="flex flex-col flex-grow-1">
                 {/* Inline editable title */}
                 {editingField === 'title' ? (
                   <div className="flex-1">
@@ -2430,8 +2460,11 @@ export function WorkflowNodeAccordion({
                   </div>
                 )}
             
-                {/* Inline editable description */}
-                {editingField === 'description' ? (
+                
+              </div>
+            </div>
+            {/* Inline editable description */}
+            {editingField === 'description' ? (
                   <div className="mt-2">
                     <Textarea
                       value={tempDescription}
@@ -2444,7 +2477,7 @@ export function WorkflowNodeAccordion({
                     />
                   </div>
                 ) : (
-                  <div className="group relative w-full">
+                  <div className="group relative w-full mt-3">
                     <div className="flex items-center">
                       <Subheading 
                         className='!font-normal cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 px-2 py-1 rounded transition-colors'
@@ -2464,9 +2497,36 @@ export function WorkflowNodeAccordion({
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
           </div>
+          {errors.filter(e => e.type === 'connection').length > 0 && (
+            <Tippy 
+            content={
+              <div className="p-3 max-w-sm bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg">
+                <div className="font-medium text-sm mb-2">
+                  Connection Errors
+                </div>
+                <div className="space-y-2">
+                  {errors.filter(e => e.type === 'connection').slice(0, 2).map((error) => (
+                    <div key={error.id} className="text-xs">
+                      <div className="font-medium">{error.message}</div>
+                      <div className="text-gray-700 dark:text-gray-300">{error.description}</div>
+                      
+                    </div>
+                  ))}
+                </div>
+              </div>
+            }
+            theme="dark"
+            placement="top"
+            arrow={true}
+            interactive={true}
+          >
+              <BadgeButton color="red" className='mr-2 flex items-center' onClick={() => onEdit?.()}>
+                <MaterialSymbol name="error" size="sm"/>
+                <span className='text-black dark:text-white'>{errors.filter(e => e.type === 'connection').length}</span>
+              </BadgeButton>
+            </Tippy>
+          )}
           <Badge color="zinc">Draft</Badge>
       </div>
         {/* Header */}
@@ -2565,7 +2625,7 @@ export function WorkflowNodeAccordion({
     <div 
       className={clsx(
         'bg-white dark:bg-zinc-800 rounded-lg border-2 relative transition-all duration-200 hover:shadow-lg min-w-[320px]',
-        selected ? 'border-blue-600 dark:border-zinc-200 ring-2 ring-blue-200 dark:ring-white' : 'border-gray-200 dark:border-zinc-700',
+        errors.length > 0 ? 'border-red-600 dark:border-red-600 ring-2 ring-red-200 dark:ring-red-200' :  selected ? 'border-blue-600 dark:border-zinc-200 ring-2 ring-blue-200 dark:ring-white' : 'border-gray-200 dark:border-zinc-700',
         className
       )}
       style={{ width: 340, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
@@ -2636,8 +2696,39 @@ export function WorkflowNodeAccordion({
             {data.icon == 'semaphore' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />}
             {data.icon == 'openAI' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAAAAABXZoBIAAABEElEQVR4AbTJIWyDQACG0d+rWsxENQ6Jwi0YFLIWRTKFxecc6pIzJzF4QTKDT23lSby5BPUt6ZJe2i1ze/aJP/x/+ly5/z2PU7ne1rIYm4/tR9YDsNeaFqP3l9wFx6AJgPLylLN6rrpEcBaiQko6dR/YDq4659po55SL8D1ujI0MLGpbl/K84nr8SWbSCBj5lNrvWewQCy1wU0gZsDV+ABi603nHtI9sJ0KW9d/paCxBjwy6wawyQiwdg2VPiZeBY5S10j3XjJRNoxWMqn20DB4tKeeWTUWhDfqJsX9rSRl0gLUQe20McpCSSwWAUxdBgaek0rQ6lQEwFS/JZ1cNebWFrVaElInLlNmv0TNpYgIAMy6KDbFgKo8AAAAASUVORK5CYII=" alt="" />}
           </div>
-            <div className='flex flex-col'> 
-              <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
+            <div className='flex flex-col w-full'> 
+              <div className="flex items-center gap-2 justify-between w-full">
+                <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
+                {errors.filter(e => e.type === 'connection').length > 0 && (
+            <Tippy 
+            content={
+              <div className="p-3 max-w-sm bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg">
+                <div className="font-medium text-sm mb-2">
+                  Connection Errors
+                </div>
+                <div className="space-y-2">
+                  {errors.filter(e => e.type === 'connection').slice(0, 2).map((error) => (
+                    <div key={error.id} className="text-xs">
+                      <div className="font-medium">{error.message}</div>
+                      <div className="text-gray-700 dark:text-gray-300">{error.description}</div>
+                      
+                    </div>
+                  ))}
+                </div>
+              </div>
+            }
+            theme="dark"
+            placement="top"
+            arrow={true}
+            interactive={true}
+          >
+              <BadgeButton color="red" className='mr-2 flex items-center' onClick={() => onEdit?.()}>
+                <MaterialSymbol name="error" size="sm"/>
+                <span className='text-black dark:text-white'>{errors.filter(e => e.type === 'connection').length}</span>
+              </BadgeButton>
+            </Tippy>
+          )}
+              </div>
               <Link className='text-xs text-blue-500 dark:text-blue-400 hidden' href="#">semaphore-project/semaphore.yml</Link>
               
               
@@ -2703,7 +2794,7 @@ export function WorkflowNodeAccordion({
               <span className='uppercase'>Passed</span>
             </Badge>
             )}
-            {data.status == 'failed' && (
+            {data.status == 'error' && (
             <Badge color='red' className='!flex !items-center mr-2'>
                 <MaterialSymbol name='cancel' size='md'/>
               <span className='uppercase'>Failed</span>
@@ -2720,11 +2811,11 @@ export function WorkflowNodeAccordion({
          
           </div>
           <div className={`flex items-center gap-2 ${consistentStatuses ? 'hidden' : 'visible'}`}>
-          <Badge color={data.status == 'success' ? 'green' : data.status == 'failed' ? 'red' : 'blue'} className='!flex !items-center mr-2'>
+          <Badge color={data.status == 'success' ? 'green' : data.status == 'error' ? 'red' : 'blue'} className='!flex !items-center mr-2'>
             <MaterialSymbol 
               name={statusConfig.icon} 
               size='lg'
-              className={statusConfig.iconColor}
+            
             />
             </Badge>
           </div>

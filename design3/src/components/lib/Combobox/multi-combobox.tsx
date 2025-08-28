@@ -237,7 +237,7 @@ export function MultiCombobox<T extends { id: string }>({
               <span
                 key={option.id}
                 className={clsx(
-                  'inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs',
+                  'inline-flex items-center gap-1 px-1 py-1 rounded-md text-xs',
                   isValid ? (
                     'bg-zinc-50 text-zinc-700 border border-zinc-200 dark:bg-zinc-800/20 dark:text-zinc-300 dark:border-zinc-800'
                   ) : (
