@@ -15,13 +15,15 @@ import {
 interface ExecutionTimelineProps {
   executions: ExecutionWithEvent[];
   organizationId: string;
-  allPlainEventsById: Record<string, SuperplaneEvent>;
+  connectionEventsById: Record<string, SuperplaneEvent>;
+  eventsByExecutionId: Record<string, SuperplaneEvent>;
 }
 
 export const ExecutionTimeline = ({
   executions,
   organizationId,
-  allPlainEventsById,
+  connectionEventsById,
+  eventsByExecutionId,
 }: ExecutionTimelineProps) => {
   // Fetch organization users to resolve user IDs to names
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
@@ -42,9 +44,8 @@ export const ExecutionTimeline = ({
     <div className="space-y-3">
       {
         executions.map((execution) => {
-          const relatedPlainEvent = allPlainEventsById[execution.event.eventId || ''];
-          const plainEventPayload = relatedPlainEvent?.raw;
-          const plainEventHeaders = relatedPlainEvent?.headers;
+          const sourceEvent = connectionEventsById[execution.event.eventId || ''];
+          const emmitedEvent = eventsByExecutionId[execution.id || ''];
 
           return (
             <RunItem
@@ -60,10 +61,9 @@ export const ExecutionTimeline = ({
               approvedOn={getMinApprovedAt(execution)}
               approvedBy={getApprovalsNames(execution, userDisplayNames)}
               queuedOn={execution.event.createdAt}
-              eventId={relatedPlainEvent?.id}
-              relatedPlainEvent={relatedPlainEvent}
-              plainEventPayload={plainEventPayload}
-              plainEventHeaders={plainEventHeaders}
+              eventId={sourceEvent?.id}
+              sourceEvent={sourceEvent}
+              emmitedEvent={emmitedEvent}
             />
           );
         })

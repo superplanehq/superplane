@@ -19,10 +19,11 @@ interface HistoryTabProps {
   allStageEvents: SuperplaneStageEvent[];
   organizationId: string;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
-  allPlainEventsById?: Record<string, SuperplaneEvent>;
+  connectionEventsById?: Record<string, SuperplaneEvent>;
+  eventsByExecutionId?: Record<string, SuperplaneEvent>;
 }
 
-export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organizationId, approveStageEvent, allPlainEventsById }: HistoryTabProps) => {
+export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organizationId, approveStageEvent, connectionEventsById, eventsByExecutionId }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
     type: 'execution' | 'stage_event' | 'discarded_event';
@@ -61,10 +62,10 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
       }
     });
 
-    // Add discarded events from allPlainEventsById
-    if (allPlainEventsById) {
-      Object.values(allPlainEventsById).forEach(plainEvent => {
-        if (plainEvent?.state === 'STATE_DISCARDED' && plainEvent?.receivedAt) {
+    // Add discarded events from connectionEventsById
+    if (connectionEventsById) {
+      Object.values(connectionEventsById).forEach(plainEvent => {
+        if (plainEvent?.state === 'STATE_DISCARDED' && plainEvent?.receivedAt && plainEvent.sourceId !== selectedStage.metadata?.id) {
           items.push({
             type: 'discarded_event',
             timestamp: plainEvent.receivedAt,
@@ -98,9 +99,8 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
           timeline.map((item) => {
             if (item.type === 'execution') {
               const execution = item.data as ExecutionWithEvent;
-              const relatedPlainEvent = allPlainEventsById?.[execution.event.eventId || ''];
-              const plainEventPayload = relatedPlainEvent?.raw;
-              const plainEventHeaders = relatedPlainEvent?.headers;
+              const sourceEvent = connectionEventsById?.[execution.event.eventId || ''];
+              const emmitedEvent = eventsByExecutionId?.[execution.id || ''];
 
               return (
                 <RunItem
@@ -116,18 +116,17 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
                   approvedOn={getMinApprovedAt(execution)}
                   approvedBy={getApprovalsNames(execution, userDisplayNames)}
                   queuedOn={execution.event.createdAt}
-                  eventId={relatedPlainEvent?.id}
-                  relatedPlainEvent={relatedPlainEvent}
-                  plainEventPayload={plainEventPayload}
-                  plainEventHeaders={plainEventHeaders}
+                  eventId={sourceEvent?.id}
+                  sourceEvent={sourceEvent}
+                  emmitedEvent={emmitedEvent}
                 />
               );
             }
             if (item.type === 'stage_event') {
               const stageEvent = item.data as SuperplaneStageEvent;
-              const relatedPlainEvent = allPlainEventsById?.[stageEvent.eventId || ''];
-              const plainEventPayload = allPlainEventsById?.[stageEvent.eventId || '']?.raw;
-              const plainEventHeaders = allPlainEventsById?.[stageEvent.eventId || '']?.headers;
+              const sourceEvent = connectionEventsById?.[stageEvent.eventId || ''];
+              const plainEventPayload = connectionEventsById?.[stageEvent.eventId || '']?.raw;
+              const plainEventHeaders = connectionEventsById?.[stageEvent.eventId || '']?.headers;
               return (
                 <MessageItem
                   key={stageEvent.id}
@@ -137,7 +136,7 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
                   onApprove={stageEvent.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
                   plainEventPayload={plainEventPayload}
                   plainEventHeaders={plainEventHeaders}
-                  relatedPlainEvent={relatedPlainEvent}
+                  sourceEvent={sourceEvent}
                 />
               );
             }

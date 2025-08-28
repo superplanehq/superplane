@@ -13,7 +13,7 @@ import { SettingsTab } from "./tabs/SettingsTab";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
-import { SuperplaneEvent } from "@/api-client";
+import { SuperplaneEvent, SuperplaneExecution } from "@/api-client";
 import { useCanvasStore } from "../store/canvasStore";
 
 const StageImageMap = {
@@ -46,7 +46,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     [selectedStage.spec?.connections]
   );
 
-  const allPlainEventsById = useMemo(() => {
+  const connectionEventsById = useMemo(() => {
     const plainEventsById: Record<string, SuperplaneEvent> = {};
 
     const hasEventSourceConnection = allConnections?.some(connection => connection.type === 'TYPE_EVENT_SOURCE');
@@ -80,6 +80,19 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     return plainEventsById;
   }, [allConnections, eventSources, stages, connectionGroups]);
 
+
+  const eventsByExecutionId = useMemo(() => {
+    const emittedEventsById: Record<string, SuperplaneEvent> = {};
+
+    selectedStage.events?.forEach(event => {
+      const execution = event.raw?.execution as SuperplaneExecution;
+      if (execution?.id) {
+        emittedEventsById[execution.id || ''] = event;
+      }
+    })
+
+    return emittedEventsById;
+  }, [selectedStage.events]);
 
   const allExecutions = useMemo(() =>
     selectedStage.queue
@@ -119,12 +132,21 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
             approveStageEvent={approveStageEvent}
             executionRunning={executionRunning}
             organizationId={organizationId!}
-            allPlainEventsById={allPlainEventsById}
+            connectionEventsById={connectionEventsById}
+            eventsByExecutionId={eventsByExecutionId}
           />
         );
 
       case 'history':
-        return <HistoryTab approveStageEvent={approveStageEvent} allExecutions={allExecutions} organizationId={organizationId!} selectedStage={selectedStage} allStageEvents={selectedStage.queue || []} allPlainEventsById={allPlainEventsById} />;
+        return <HistoryTab
+          approveStageEvent={approveStageEvent}
+          allExecutions={allExecutions}
+          organizationId={organizationId!}
+          selectedStage={selectedStage}
+          allStageEvents={selectedStage.queue || []}
+          connectionEventsById={connectionEventsById}
+          eventsByExecutionId={eventsByExecutionId}
+        />;
 
       case 'settings':
         return <SettingsTab selectedStage={selectedStage} />;

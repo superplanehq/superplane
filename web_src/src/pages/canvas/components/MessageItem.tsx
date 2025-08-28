@@ -6,7 +6,7 @@ import { PayloadDisplay } from './PayloadDisplay';
 
 interface MessageItemProps {
   event: SuperplaneStageEvent | SuperplaneEvent;
-  relatedPlainEvent?: SuperplaneEvent;
+  sourceEvent?: SuperplaneEvent;
   selectedStage?: SuperplaneStage;
   onApprove?: (eventId: string) => void;
   onRemove?: (eventId: string) => void;
@@ -22,7 +22,7 @@ const MessageItem = React.memo(({
   onRemove,
   plainEventPayload,
   plainEventHeaders,
-  relatedPlainEvent
+  sourceEvent
 }: MessageItemProps) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -226,14 +226,14 @@ const MessageItem = React.memo(({
               )}
 
               {/* Show payload/headers for plain events */}
-              {isStageEvent(event) && relatedPlainEvent && (plainEventPayload || plainEventHeaders) && (
+              {isStageEvent(event) && sourceEvent && (plainEventPayload || plainEventHeaders) && (
                 <PayloadDisplay
                   showDetailsTab={true}
-                  eventId={relatedPlainEvent.id}
-                  timestamp={relatedPlainEvent.receivedAt}
-                  state={relatedPlainEvent.state}
-                  eventType={relatedPlainEvent.type}
-                  sourceName={relatedPlainEvent.sourceName}
+                  eventId={sourceEvent.id}
+                  timestamp={sourceEvent.receivedAt}
+                  state={sourceEvent.state}
+                  eventType={sourceEvent.type}
+                  sourceName={sourceEvent.sourceName}
                   headers={plainEventHeaders}
                   payload={plainEventPayload}
                 />
