@@ -4,6 +4,7 @@ DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 DOCKER_COMPOSE_OPTS=-f docker-compose.dev.yml
 TEST_PACKAGES := ./...
+BASE_URL?=https://app.superplane.com
 
 #
 # Targets for prod-like environment
@@ -124,7 +125,7 @@ IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
 image.build:
-	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 image.auth:
 	@printf "%s" "$(GITHUB_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin
