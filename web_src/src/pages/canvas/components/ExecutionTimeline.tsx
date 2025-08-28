@@ -45,7 +45,7 @@ export const ExecutionTimeline = ({
           const relatedPlainEvent = allPlainEventsById[execution.event.eventId || ''];
           const plainEventPayload = relatedPlainEvent?.raw;
           const plainEventHeaders = relatedPlainEvent?.headers;
-          
+
           return (
             <RunItem
               key={execution.id!}
@@ -60,7 +60,7 @@ export const ExecutionTimeline = ({
               approvedOn={getMinApprovedAt(execution)}
               approvedBy={getApprovalsNames(execution, userDisplayNames)}
               queuedOn={execution.event.createdAt}
-              eventId={execution.event.id}
+              eventId={relatedPlainEvent?.id}
               relatedPlainEvent={relatedPlainEvent}
               plainEventPayload={plainEventPayload}
               plainEventHeaders={plainEventHeaders}

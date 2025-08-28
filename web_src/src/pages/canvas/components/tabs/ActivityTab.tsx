@@ -65,15 +65,24 @@ export const ActivityTab = ({
           ) : (
             [...pendingEvents, ...waitingEvents]
               .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
-              .map((event) => (
-                <MessageItem
-                  key={event.id}
-                  event={event}
-                  selectedStage={selectedStage}
-                  onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
-                  executionRunning={executionRunning}
-                />
-              ))
+              .map((event) => {
+                const relatedPlainEvent = allPlainEventsById[event.eventId || ''];
+                const plainEventPayload = relatedPlainEvent?.raw;
+                const plainEventHeaders = relatedPlainEvent?.headers;
+                
+                return (
+                  <MessageItem
+                    key={event.id}
+                    event={event}
+                    selectedStage={selectedStage}
+                    onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
+                    executionRunning={executionRunning}
+                    relatedPlainEvent={relatedPlainEvent}
+                    plainEventPayload={plainEventPayload}
+                    plainEventHeaders={plainEventHeaders}
+                  />
+                );
+              })
           )}
         </div>
       </div>
