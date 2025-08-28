@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import useWebSocket from 'react-use-websocket';
 import { EventMap, ServerEvent } from '../types/events';
 import { useCanvasStore } from "../store/canvasStore";
-import { EventSourceWithEvents } from '../store/types';
-import { pollEventSourceUntilNoPending } from '../utils/eventSourcePolling';
+import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from '../store/types';
+import { pollConnectionGroupUntilNoPending, pollEventSourceUntilNoPending, pollStageUntilNoPending } from '../utils/eventSourcePolling';
 import { SuperplaneEventSource, SuperplaneFilterType } from '@/api-client';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
@@ -16,6 +16,8 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
   // Get store access methods directly within the hook
   const updateWebSocketConnectionStatus = useCanvasStore((s) => s.updateWebSocketConnectionStatus);
   const eventSources = useCanvasStore((s) => s.eventSources);
+  const connectionGroups = useCanvasStore((s) => s.connectionGroups);
+  const stages = useCanvasStore((s) => s.stages);
   const updateStage = useCanvasStore((s) => s.updateStage);
   const addStage = useCanvasStore((s) => s.addStage);
   const addConnectionGroup = useCanvasStore((s) => s.addConnectionGroup);
@@ -64,6 +66,8 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
     let executionFinishedPayload: EventMap['execution_finished']
     let executionStartedPayload: EventMap['execution_started']
     let eventSourceWithNewEvent: EventSourceWithEvents | undefined;
+    let connectionGroupWithNewEvent: ConnectionGroupWithEvents | undefined;
+    let stageWithNewEvent: StageWithEventQueue | undefined;
     let eventSource: SuperplaneEventSource;
     
     // Route the event to the appropriate handler
@@ -102,6 +106,16 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
         if (payload.source_type === 'event-source') {
           eventSourceWithNewEvent = eventSources.find(es => es.metadata!.id === payload.source_id);
           pollEventSourceUntilNoPending(canvasId, eventSourceWithNewEvent?.metadata?.id || '');
+        }
+
+        if (payload.source_type === 'connection-group') {
+          connectionGroupWithNewEvent = connectionGroups.find(es => es.metadata!.id === payload.source_id);
+          pollConnectionGroupUntilNoPending(canvasId, connectionGroupWithNewEvent?.metadata?.id || '');
+        }
+
+        if (payload.source_type === 'stage') {
+          stageWithNewEvent = stages.find(es => es.metadata!.id === payload.source_id);
+          pollStageUntilNoPending(canvasId, stageWithNewEvent?.metadata?.id || '');
         }
         break;
 

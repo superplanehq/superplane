@@ -1,5 +1,5 @@
-import { SuperplaneStage, SuperplaneCanvas, SuperplaneConnectionGroup } from "@/api-client";
-import { EventSourceWithEvents } from "../../store/types";
+import { SuperplaneCanvas } from "@/api-client";
+import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from "../../store/types";
 
 export type ExecutionPayload = { id: string; stage_id: string; canvas_id: string; result: string; timestamp: string }
 export type StageEventPayload = { stage_id: string; source_id: string, timestamp: string };
@@ -7,9 +7,9 @@ export type EventPayload = { id: string; stage_id: string; source_id: string, so
 
 // event_name: payload_type
 export type EventMap = {
-    stage_added: SuperplaneStage;
-    connection_group_added: SuperplaneConnectionGroup;
-    stage_updated: SuperplaneStage;
+    stage_added: StageWithEventQueue;
+    connection_group_added: ConnectionGroupWithEvents;
+    stage_updated: StageWithEventQueue;
     event_source_added: EventSourceWithEvents;
     canvas_updated: SuperplaneCanvas;
     new_stage_event: StageEventPayload;
