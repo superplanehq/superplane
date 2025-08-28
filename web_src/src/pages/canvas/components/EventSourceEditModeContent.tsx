@@ -304,7 +304,8 @@ export function EventSourceEditModeContent({
   const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
 
   const webhookUrl = useMemo(() => {
-    return `https://superplane.sxmoon.com/api/v1/sources/${data.id}`;
+    const baseUrl = import.meta.env.VITE_BASE_URL || 'https://app.superplane.com';
+    return `${baseUrl}/api/v1/sources/${data.id}`;
   }, [data.id]);
 
   const webhookExampleCode = useMemo(() => {
