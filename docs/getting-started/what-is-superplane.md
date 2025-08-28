@@ -95,7 +95,6 @@ Automate alert routing, run diagnostic workflows, notify stakeholders, and track
 - Simple pipelines with linear, single-tool execution
 - Teams preferring custom code solutions over visual orchestration
 - Organizations where DevOps processes are already fully standardized and optimized
-- Use cases requiring complex data transformations beyond standard API payload mapping
 
 ## Getting Started Requirements
 - **Platform access**: Ability to install self-hosted instance of SuperPlane or register an organization on Cloud.
