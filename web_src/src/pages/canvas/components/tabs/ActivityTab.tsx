@@ -1,6 +1,6 @@
 import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
 import { ExecutionTimeline } from '../ExecutionTimeline';
-import { SuperplaneStageEvent } from "@/api-client";
+import { SuperplaneStageEvent, SuperplaneEvent } from "@/api-client";
 import MessageItem from '../MessageItem';
 
 interface ActivityTabProps {
@@ -12,6 +12,7 @@ interface ActivityTabProps {
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
   organizationId: string;
+  allPlainEventsById: Record<string, SuperplaneEvent>;
 }
 
 export const ActivityTab = ({
@@ -22,7 +23,8 @@ export const ActivityTab = ({
   approveStageEvent,
   executionRunning,
   onChangeTab,
-  organizationId
+  organizationId,
+  allPlainEventsById
 }: ActivityTabProps) => {
   const queueCount = pendingEvents.length + waitingEvents.length;
 
@@ -41,6 +43,7 @@ export const ActivityTab = ({
         <ExecutionTimeline
           executions={allExecutions.slice(0, 3)}
           organizationId={organizationId}
+          allPlainEventsById={allPlainEventsById}
         />
       </div>
 

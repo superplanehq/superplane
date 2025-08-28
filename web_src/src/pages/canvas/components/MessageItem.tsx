@@ -1,14 +1,18 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { SuperplaneStageEvent, SuperplaneStage } from '@/api-client';
+import { SuperplaneStageEvent, SuperplaneStage, SuperplaneEvent } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { formatRelativeTime } from '../utils/stageEventUtils';
+import { PayloadDisplay } from './PayloadDisplay';
 
 interface MessageItemProps {
-  event: SuperplaneStageEvent;
-  selectedStage: SuperplaneStage;
+  event: SuperplaneStageEvent | SuperplaneEvent;
+  relatedPlainEvent?: SuperplaneEvent;
+  selectedStage?: SuperplaneStage;
   onApprove?: (eventId: string) => void;
   onRemove?: (eventId: string) => void;
   executionRunning?: boolean;
+  plainEventPayload?: { [key: string]: unknown };
+  plainEventHeaders?: { [key: string]: unknown };
 }
 
 const MessageItem = React.memo(({
@@ -16,10 +20,23 @@ const MessageItem = React.memo(({
   selectedStage,
   onApprove,
   onRemove,
+  plainEventPayload,
+  plainEventHeaders,
+  relatedPlainEvent
 }: MessageItemProps) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Type guard to determine if this is a SuperplaneStageEvent
+  const isStageEvent = (evt: SuperplaneStageEvent | SuperplaneEvent): evt is SuperplaneStageEvent => {
+    return 'inputs' in evt || 'stateReason' in evt;
+  };
+
+  // Type guard to determine if this is a SuperplaneEvent (discarded event)
+  const isPlainEvent = (evt: SuperplaneStageEvent | SuperplaneEvent): evt is SuperplaneEvent => {
+    return !isStageEvent(evt);
+  };
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -52,8 +69,14 @@ const MessageItem = React.memo(({
 
 
   const mapEventInputs = useCallback(() => {
+    // Only show inputs for stage events, not plain events
+    if (isPlainEvent(event) || !selectedStage) {
+      return {};
+    }
+
     const map: Record<string, string> = {};
-    const eventInputs = event.inputs?.map(input => [input.name, input.value]).reduce((acc, [key, value]) => {
+    const stageEvent = event as SuperplaneStageEvent;
+    const eventInputs = stageEvent.inputs?.map(input => [input.name, input.value]).reduce((acc, [key, value]) => {
       acc[key!] = value!;
       return acc;
     }, {} as Record<string, string>);
@@ -71,13 +94,13 @@ const MessageItem = React.memo(({
 
   const inputsRecord = useMemo(() => mapEventInputs(), [mapEventInputs]);
   const requiredApprovals = useMemo(() =>
-    selectedStage.spec?.conditions
+    selectedStage?.spec?.conditions
       ?.find(condition => condition.type === "CONDITION_TYPE_APPROVAL")
       ?.approval?.count || 0,
     [selectedStage]);
 
   const timeWindowCondition = useMemo(() =>
-    selectedStage.spec?.conditions
+    selectedStage?.spec?.conditions
       ?.find(condition => condition.type === "CONDITION_TYPE_TIME_WINDOW"),
     [selectedStage]);
 
@@ -91,24 +114,35 @@ const MessageItem = React.memo(({
   }, [timeWindowCondition]);
 
   const getRelativeTime = useCallback(() => {
-    if (!event.createdAt) return 'now';
-    return formatRelativeTime(event.createdAt, true);
-  }, [event.createdAt]);
+    let timestamp: string | undefined;
+    if (isStageEvent(event)) {
+      timestamp = event.createdAt;
+    } else {
+      timestamp = event.receivedAt;
+    }
+    if (!timestamp) return 'now';
+    return formatRelativeTime(timestamp, true);
+  }, [event]);
 
   return (
     <div className="queueItem">
       <div className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer" onClick={toggleExpand}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 truncate">
-            {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' ? (
+            {isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' ? (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-amber-400/20 text-amber-700 group-data-hover:bg-amber-400/30 dark:bg-amber-400/10 dark:text-amber-400 dark:group-data-hover:bg-amber-400/15">
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">how_to_reg</span>
                 <span className="uppercase">Approval</span>
               </span>
-            ) : event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' ? (
+            ) : isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' ? (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">schedule</span>
                 <span className="uppercase">Scheduled</span>
+              </span>
+            ) : isPlainEvent(event) && event.state === 'STATE_DISCARDED' ? (
+              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base" aria-hidden="true">block</span>
+                <span className="uppercase">Discarded</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
@@ -117,7 +151,7 @@ const MessageItem = React.memo(({
               </span>
             )}
             <span className="font-medium truncate text-sm dark:text-white">
-              {event.name || event.id || 'Unknown'}
+              {isStageEvent(event) ? (event.name || event.id || 'Unknown') : (event.sourceName || event.id || 'Discarded Event')}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -137,47 +171,80 @@ const MessageItem = React.memo(({
         {isExpanded && (
           <div className="text-left mt-3 space-y-3">
             <div className="mt-3 space-y-3">
-              {Object.keys(inputsRecord).length > 0 ? (
-                <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1">
-                      <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
-                      <div className="space-y-1">
-                        {Object.entries(inputsRecord).map(([key, value]) => (
-                          <div key={key} className="flex items-center justify-between gap-2 min-w-0">
-                            <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
-                                {value}
-                              </span>
-                            </div>
+              {/* Show inputs for stage events */}
+              {isStageEvent(event) && (
+                <>
+                  {Object.keys(inputsRecord).length > 0 ? (
+                    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
+                          <div className="space-y-1">
+                            {Object.entries(inputsRecord).map(([key, value]) => (
+                              <div key={key} className="flex items-center justify-between gap-2 min-w-0">
+                                <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
+                                    {value}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1">
-                      <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">No inputs</span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  ) : (
+                    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">No inputs</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Show payload/headers for plain events */}
+              {isPlainEvent(event) && (plainEventPayload || plainEventHeaders) && (
+                <PayloadDisplay
+                  showDetailsTab={true}
+                  eventId={event.id}
+                  timestamp={event.receivedAt}
+                  state={event.state}
+                  eventType={event.type}
+                  sourceName={event.sourceName}
+                  headers={plainEventHeaders}
+                  payload={plainEventPayload}
+                />
+              )}
+
+              {/* Show payload/headers for plain events */}
+              {isStageEvent(event) && relatedPlainEvent && (plainEventPayload || plainEventHeaders) && (
+                <PayloadDisplay
+                  showDetailsTab={true}
+                  eventId={relatedPlainEvent.id}
+                  timestamp={relatedPlainEvent.receivedAt}
+                  state={relatedPlainEvent.state}
+                  eventType={relatedPlainEvent.type}
+                  sourceName={relatedPlainEvent.sourceName}
+                  headers={plainEventHeaders}
+                  payload={plainEventPayload}
+                />
               )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Approval Footer */}
-      {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' && (
+      {/* Approval Footer - only for stage events */}
+      {isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' && (
         <div className="px-3 py-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-700">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
@@ -218,8 +285,8 @@ const MessageItem = React.memo(({
         </div>
       )}
 
-      {/* Time Window Footer */}
-      {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' && (
+      {/* Time Window Footer - only for stage events */}
+      {isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' && (
         <div className="px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700">
           <div className="flex items-center">
             <MaterialSymbol name="schedule" size="md" className="text-orange-700 dark:text-orange-200 mr-2" />

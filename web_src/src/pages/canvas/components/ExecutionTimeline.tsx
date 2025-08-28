@@ -2,6 +2,7 @@ import { ExecutionWithEvent } from "../store/types";
 import { RunItem } from "./tabs/RunItem";
 import { useOrganizationUsersForCanvas } from "../../../hooks/useCanvasData";
 import { useMemo } from "react";
+import { SuperplaneEvent } from "@/api-client";
 import {
   formatDuration,
   getMinApprovedAt,
@@ -14,11 +15,13 @@ import {
 interface ExecutionTimelineProps {
   executions: ExecutionWithEvent[];
   organizationId: string;
+  allPlainEventsById: Record<string, SuperplaneEvent>;
 }
 
 export const ExecutionTimeline = ({
   executions,
   organizationId,
+  allPlainEventsById,
 }: ExecutionTimelineProps) => {
   // Fetch organization users to resolve user IDs to names
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
@@ -38,23 +41,32 @@ export const ExecutionTimeline = ({
   return (
     <div className="space-y-3">
       {
-        executions.map((execution) => (
-          <RunItem
-            key={execution.id!}
-            title={execution.event.name || execution.id || 'Execution'}
-            runId={execution.id}
-            inputs={mapExecutionEventInputs(execution)}
-            outputs={mapExecutionOutputs(execution)}
-            state={execution.state || 'STATE_UNKNOWN'}
-            result={execution.result || 'RESULT_UNKNOWN'}
-            timestamp={execution.createdAt || new Date().toISOString()}
-            executionDuration={formatDuration(execution.startedAt || execution.createdAt, execution.finishedAt)}
-            approvedOn={getMinApprovedAt(execution)}
-            approvedBy={getApprovalsNames(execution, userDisplayNames)}
-            queuedOn={execution.event.createdAt}
-            eventId={execution.event.id}
-          />
-        ))
+        executions.map((execution) => {
+          const relatedPlainEvent = allPlainEventsById[execution.event.eventId || ''];
+          const plainEventPayload = relatedPlainEvent?.raw;
+          const plainEventHeaders = relatedPlainEvent?.headers;
+          
+          return (
+            <RunItem
+              key={execution.id!}
+              title={execution.event.name || execution.id || 'Execution'}
+              runId={execution.id}
+              inputs={mapExecutionEventInputs(execution)}
+              outputs={mapExecutionOutputs(execution)}
+              state={execution.state || 'STATE_UNKNOWN'}
+              result={execution.result || 'RESULT_UNKNOWN'}
+              timestamp={execution.createdAt || new Date().toISOString()}
+              executionDuration={formatDuration(execution.startedAt || execution.createdAt, execution.finishedAt)}
+              approvedOn={getMinApprovedAt(execution)}
+              approvedBy={getApprovalsNames(execution, userDisplayNames)}
+              queuedOn={execution.event.createdAt}
+              eventId={execution.event.id}
+              relatedPlainEvent={relatedPlainEvent}
+              plainEventPayload={plainEventPayload}
+              plainEventHeaders={plainEventHeaders}
+            />
+          );
+        })
       }
     </div>
   );

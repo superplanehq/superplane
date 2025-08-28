@@ -1,6 +1,7 @@
 import React, { JSX } from 'react';
-import { ExecutionResult, SuperplaneExecutionState } from '@/api-client';
+import { ExecutionResult, SuperplaneExecutionState, SuperplaneEvent } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { PayloadDisplay } from '../PayloadDisplay';
 
 interface RunItemProps {
   state: SuperplaneExecutionState;
@@ -15,6 +16,9 @@ interface RunItemProps {
   queuedOn?: string;
   approvedOn?: string;
   approvedBy?: string;
+  relatedPlainEvent?: SuperplaneEvent;
+  plainEventPayload?: { [key: string]: unknown };
+  plainEventHeaders?: { [key: string]: unknown };
 }
 
 export const RunItem: React.FC<RunItemProps> = React.memo(({
@@ -30,6 +34,9 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   queuedOn,
   approvedOn,
   approvedBy,
+  relatedPlainEvent,
+  plainEventPayload,
+  plainEventHeaders,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
 
@@ -278,6 +285,20 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Show payload/headers for related plain event */}
+            {relatedPlainEvent && (plainEventPayload || plainEventHeaders) && (
+              <PayloadDisplay
+                showDetailsTab={true}
+                eventId={relatedPlainEvent.id}
+                timestamp={relatedPlainEvent.receivedAt}
+                state={relatedPlainEvent.state}
+                eventType={relatedPlainEvent.type}
+                sourceName={relatedPlainEvent.sourceName}
+                headers={plainEventHeaders}
+                payload={plainEventPayload}
+              />
             )}
           </div>
         )}

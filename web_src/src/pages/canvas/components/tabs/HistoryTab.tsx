@@ -1,5 +1,5 @@
 import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
-import { SuperplaneStageEvent } from "@/api-client";
+import { SuperplaneStageEvent, SuperplaneEvent } from "@/api-client";
 import MessageItem from '../MessageItem';
 import { RunItem } from './RunItem';
 import { useMemo } from 'react';
@@ -19,14 +19,15 @@ interface HistoryTabProps {
   allStageEvents: SuperplaneStageEvent[];
   organizationId: string;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
+  allPlainEventsById?: Record<string, SuperplaneEvent>;
 }
 
-export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organizationId, approveStageEvent }: HistoryTabProps) => {
-  // Create a unified timeline by merging executions and stage events
+export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organizationId, approveStageEvent, allPlainEventsById }: HistoryTabProps) => {
+  // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
-    type: 'execution' | 'event';
+    type: 'execution' | 'stage_event' | 'discarded_event';
     timestamp: string;
-    data: ExecutionWithEvent | SuperplaneStageEvent;
+    data: ExecutionWithEvent | SuperplaneStageEvent | SuperplaneEvent;
   };
 
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
@@ -46,18 +47,32 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
       }
     });
 
+    // Add orphaned stage events (events without executions)
     const executionEventIds = new Set(allExecutions.map(exec => exec.event?.id).filter(Boolean));
-    const orphanedEvents = allStageEvents.filter(event => !executionEventIds.has(event.id));
+    const orphanedStageEvents = allStageEvents.filter(event => !executionEventIds.has(event.id));
 
-    orphanedEvents.forEach(event => {
+    orphanedStageEvents.forEach(event => {
       if (event?.createdAt) {
         items.push({
-          type: 'event',
+          type: 'stage_event',
           timestamp: event.createdAt,
           data: event
         });
       }
     });
+
+    // Add discarded events from allPlainEventsById
+    if (allPlainEventsById) {
+      Object.values(allPlainEventsById).forEach(plainEvent => {
+        if (plainEvent?.state === 'STATE_DISCARDED' && plainEvent?.receivedAt) {
+          items.push({
+            type: 'discarded_event',
+            timestamp: plainEvent.receivedAt,
+            data: plainEvent
+          });
+        }
+      });
+    }
 
     return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   };
@@ -83,6 +98,10 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
           timeline.map((item) => {
             if (item.type === 'execution') {
               const execution = item.data as ExecutionWithEvent;
+              const relatedPlainEvent = allPlainEventsById?.[execution.event.eventId || ''];
+              const plainEventPayload = relatedPlainEvent?.raw;
+              const plainEventHeaders = relatedPlainEvent?.headers;
+              
               return (
                 <RunItem
                   key={execution.id!}
@@ -98,19 +117,47 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
                   approvedBy={getApprovalsNames(execution, userDisplayNames)}
                   queuedOn={execution.event.createdAt}
                   eventId={execution.event.id}
+                  relatedPlainEvent={relatedPlainEvent}
+                  plainEventPayload={plainEventPayload}
+                  plainEventHeaders={plainEventHeaders}
                 />
               );
             }
-            return (
-              <MessageItem
-                key={item.data.id}
-                event={item.data as SuperplaneStageEvent}
-                selectedStage={selectedStage}
-                executionRunning={false}
-                onApprove={item.data.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
+            if (item.type === 'stage_event') {
+              const stageEvent = item.data as SuperplaneStageEvent;
+              const relatedPlainEvent = allPlainEventsById?.[stageEvent.eventId || ''];
+              const plainEventPayload = allPlainEventsById?.[stageEvent.eventId || '']?.raw;
+              const plainEventHeaders = allPlainEventsById?.[stageEvent.eventId || '']?.headers;
+              return (
+                <MessageItem
+                  key={stageEvent.id}
+                  event={stageEvent}
+                  selectedStage={selectedStage}
+                  executionRunning={false}
+                  onApprove={stageEvent.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
+                  plainEventPayload={plainEventPayload}
+                  plainEventHeaders={plainEventHeaders}
+                  relatedPlainEvent={relatedPlainEvent}
+                />
+              );
+            }
+            if (item.type === 'discarded_event') {
+              const plainEvent = item.data as SuperplaneEvent;
+              // Get payload from the plain event's raw data
+              const plainEventPayload = plainEvent.raw;
+              const plainEventHeaders = plainEvent.headers
 
-              />
-            );
+              return (
+                <MessageItem
+                  key={plainEvent.id}
+                  event={plainEvent}
+                  executionRunning={false}
+                  plainEventPayload={plainEventPayload}
+                  plainEventHeaders={plainEventHeaders}
+                />
+              );
+            }
+            return null;
           })
         )}
       </div>
