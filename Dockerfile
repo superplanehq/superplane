@@ -77,12 +77,14 @@ CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
 
 FROM base AS builder
 
+ARG BASE_URL=https://app.superplane.com
+
 WORKDIR /app
 RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN npm install
-RUN npm run build
+RUN VITE_BASE_URL=$BASE_URL npm run build
 
 FROM ${RUNNER_IMAGE} AS runner
 
