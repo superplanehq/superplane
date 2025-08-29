@@ -709,6 +709,7 @@ export type SuperplaneStageEvent = {
     execution?: SuperplaneExecution;
     inputs?: Array<SuperplaneKeyValuePair>;
     name?: string;
+    eventId?: string;
 };
 
 export type SuperplaneStageEventApproval = {

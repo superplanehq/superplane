@@ -117,6 +117,7 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		Approvals:   []*pb.StageEventApproval{},
 		Inputs:      []*pb.KeyValuePair{},
 		Name:        in.Name,
+		EventId:     in.EventID.String(),
 	}
 
 	//

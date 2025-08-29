@@ -13,6 +13,8 @@ import { SettingsTab } from "./tabs/SettingsTab";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
+import { SuperplaneConnectionType, SuperplaneEvent, SuperplaneExecution } from "@/api-client";
+import { useCanvasStore } from "../store/canvasStore";
 
 const StageImageMap = {
   'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
@@ -30,6 +32,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
   const [activeTab, setActiveTab] = useState('activity');
   const { organizationId } = useParams<{ organizationId: string }>();
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
+  const { connectionGroups, stages, eventSources } = useCanvasStore();
 
   // Sidebar tab definitions - memoized to prevent unnecessary re-renders
   const tabs = useMemo(() => [
@@ -37,6 +40,70 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     { key: 'history', label: 'History' },
     { key: 'settings', label: 'Settings' },
   ], []);
+
+  const allConnections: { type: SuperplaneConnectionType; name: string }[] = useMemo(() =>
+    selectedStage.spec?.connections
+      ?.map(connection => ({ type: connection.type as SuperplaneConnectionType, name: connection.name as string })) || [],
+    [selectedStage.spec?.connections]
+  );
+
+  const connectionEventsById = useMemo(() => {
+    const plainEventsById: Record<string, SuperplaneEvent> = {};
+
+    const connectedEventSourceNames = new Set<string>();
+    const connectedStageNames = new Set<string>();
+    const connectedConnectionGroupNames = new Set<string>();
+
+    allConnections.forEach(connection => {
+      if (connection.type === 'TYPE_EVENT_SOURCE') {
+        connectedEventSourceNames.add(connection.name);
+      } else if (connection.type === 'TYPE_STAGE') {
+        connectedStageNames.add(connection.name);
+      } else if (connection.type === 'TYPE_CONNECTION_GROUP') {
+        connectedConnectionGroupNames.add(connection.name);
+      }
+    });
+
+    eventSources.forEach(eventSource => {
+      if (connectedEventSourceNames.has(eventSource.metadata?.name || '')) {
+        eventSource?.events?.forEach(event => {
+          plainEventsById[event?.id || ''] = event;
+        });
+      }
+    });
+
+    stages.forEach(stage => {
+      if (connectedStageNames.has(stage.metadata?.name || '')) {
+        stage?.events?.forEach(event => {
+          plainEventsById[event?.id || ''] = event;
+        });
+      }
+    });
+
+    connectionGroups.forEach(connectionGroup => {
+      if (connectedConnectionGroupNames.has(connectionGroup.metadata?.name || '')) {
+        connectionGroup?.events?.forEach(event => {
+          plainEventsById[event?.id || ''] = event;
+        });
+      }
+    });
+
+    return plainEventsById;
+  }, [allConnections, eventSources, stages, connectionGroups]);
+
+
+  const eventsByExecutionId = useMemo(() => {
+    const emittedEventsById: Record<string, SuperplaneEvent> = {};
+
+    selectedStage.events?.forEach(event => {
+      const execution = event.raw?.execution as SuperplaneExecution;
+      if (execution?.id) {
+        emittedEventsById[execution.id || ''] = event;
+      }
+    })
+
+    return emittedEventsById;
+  }, [selectedStage.events]);
 
   const allExecutions = useMemo(() =>
     selectedStage.queue
@@ -76,11 +143,21 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
             approveStageEvent={approveStageEvent}
             executionRunning={executionRunning}
             organizationId={organizationId!}
+            connectionEventsById={connectionEventsById}
+            eventsByExecutionId={eventsByExecutionId}
           />
         );
 
       case 'history':
-        return <HistoryTab allExecutions={allExecutions} organizationId={organizationId!} />;
+        return <HistoryTab
+          approveStageEvent={approveStageEvent}
+          allExecutions={allExecutions}
+          organizationId={organizationId!}
+          selectedStage={selectedStage}
+          allStageEvents={selectedStage.queue || []}
+          connectionEventsById={connectionEventsById}
+          eventsByExecutionId={eventsByExecutionId}
+        />;
 
       case 'settings':
         return <SettingsTab selectedStage={selectedStage} />;

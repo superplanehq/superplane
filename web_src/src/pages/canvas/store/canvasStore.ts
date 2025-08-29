@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
-import { CanvasState, EventSourceWithEvents } from './types';
-import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneStage } from "@/api-client/types.gen";
+import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from './types';
+import { SuperplaneCanvas } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
@@ -48,11 +48,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow({ autoLayout: true });
   },
 
-  addStage: (stage: SuperplaneStage, draft = false, autoLayout = false) => {
+  addStage: (stage: StageWithEventQueue, draft = false, autoLayout = false) => {
     set((state) => ({
       stages: [...state.stages, {
         ...stage,
         queue: [],
+        events: [],
         isDraft: draft
       }]
     }));
@@ -69,18 +70,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
-  updateStage: (stage: SuperplaneStage) => {
+  updateStage: (stage: StageWithEventQueue) => {
     set((state) => ({
       stages: state.stages.map((s) => s.metadata!.id === stage.metadata!.id ? {
-        ...stage, queue: s.queue
+        ...stage, queue: s.queue, events: s.events
       } : s)
     }));
     get().syncToReactFlow();
   },
 
-  addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => {
+  addConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => {
     set((state) => ({
-      connectionGroups: [...state.connectionGroups, connectionGroup]
+      connectionGroups: [...state.connectionGroups, { ...connectionGroup, events: [] }],
     }));
     get().syncToReactFlow();
   },
@@ -92,7 +93,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
-  updateConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => {
+  updateConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => {
     set((state) => ({
       connectionGroups: state.connectionGroups.map(cg => cg.metadata?.id === connectionGroup.metadata?.id ? connectionGroup : cg)
     }));
@@ -101,7 +102,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   addEventSource: (eventSource: EventSourceWithEvents, autoLayout = false) => {
     set((state) => ({
-      eventSources: [...state.eventSources, eventSource]
+      eventSources: [...state.eventSources, { ...eventSource, events: [] }]
     }));
     get().syncToReactFlow({ autoLayout });
   },
@@ -234,6 +235,54 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         ...updatingEventSource,
         events: eventsResponse.data?.events || []
       } : es)
+    }));
+  },
+
+  syncStagePlainEvents: async (canvasId: string, stageId: string) => {
+    const { stages } = get();
+    const updatingStage = stages.find(stage => stage.metadata!.id === stageId);
+
+    if (!updatingStage) {
+      return;
+    }
+
+    const eventsResponse = await superplaneListEvents(withOrganizationHeader({
+      path: { canvasIdOrName: canvasId },
+      query: { 
+        sourceType: 'EVENT_SOURCE_TYPE_STAGE' as const,
+        sourceId: stageId 
+      }
+    }));
+
+    set((state) => ({
+      stages: state.stages.map((s) => s.metadata!.id === stageId ? {
+        ...updatingStage,
+        events: eventsResponse.data?.events || []
+      } : s)
+    }));
+  },
+
+  syncConnectionGroupPlainEvents: async (canvasId: string, connectionGroupId: string) => {
+    const { connectionGroups } = get();
+    const updatingConnectionGroup = connectionGroups.find(cg => cg.metadata!.id === connectionGroupId);
+
+    if (!updatingConnectionGroup) {
+      return;
+    }
+
+    const eventsResponse = await superplaneListEvents(withOrganizationHeader({
+      path: { canvasIdOrName: canvasId },
+      query: { 
+        sourceType: 'EVENT_SOURCE_TYPE_CONNECTION_GROUP' as const,
+        sourceId: connectionGroupId 
+      }
+    }));
+
+    set((state) => ({
+      connectionGroups: state.connectionGroups.map((cg) => cg.metadata!.id === connectionGroupId ? {
+        ...updatingConnectionGroup,
+        events: eventsResponse.data?.events || []
+      } : cg)
     }));
   },
 

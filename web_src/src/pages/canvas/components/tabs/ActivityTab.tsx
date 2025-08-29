@@ -1,6 +1,6 @@
 import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
 import { ExecutionTimeline } from '../ExecutionTimeline';
-import { SuperplaneStageEvent } from "@/api-client";
+import { SuperplaneStageEvent, SuperplaneEvent } from "@/api-client";
 import MessageItem from '../MessageItem';
 
 interface ActivityTabProps {
@@ -12,6 +12,8 @@ interface ActivityTabProps {
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
   organizationId: string;
+  connectionEventsById: Record<string, SuperplaneEvent>;
+  eventsByExecutionId: Record<string, SuperplaneEvent>;
 }
 
 export const ActivityTab = ({
@@ -22,7 +24,9 @@ export const ActivityTab = ({
   approveStageEvent,
   executionRunning,
   onChangeTab,
-  organizationId
+  organizationId,
+  connectionEventsById,
+  eventsByExecutionId
 }: ActivityTabProps) => {
   const queueCount = pendingEvents.length + waitingEvents.length;
 
@@ -41,6 +45,8 @@ export const ActivityTab = ({
         <ExecutionTimeline
           executions={allExecutions.slice(0, 3)}
           organizationId={organizationId}
+          connectionEventsById={connectionEventsById}
+          eventsByExecutionId={eventsByExecutionId}
         />
       </div>
 
@@ -62,15 +68,24 @@ export const ActivityTab = ({
           ) : (
             [...pendingEvents, ...waitingEvents]
               .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
-              .map((event) => (
-                <MessageItem
-                  key={event.id}
-                  event={event}
-                  selectedStage={selectedStage}
-                  onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
-                  executionRunning={executionRunning}
-                />
-              ))
+              .map((event) => {
+                const sourceEvent = connectionEventsById[event.eventId || ''];
+                const plainEventPayload = sourceEvent?.raw;
+                const plainEventHeaders = sourceEvent?.headers;
+
+                return (
+                  <MessageItem
+                    key={event.id}
+                    event={event}
+                    selectedStage={selectedStage}
+                    onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
+                    executionRunning={executionRunning}
+                    sourceEvent={sourceEvent}
+                    plainEventPayload={plainEventPayload}
+                    plainEventHeaders={plainEventHeaders}
+                  />
+                );
+              })
           )}
         </div>
       </div>
