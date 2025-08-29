@@ -3107,8 +3107,10 @@ export function WorkflowNodeAccordion({
             interactive={true}
           >
               <BadgeButton color="red" className='mr-2 flex items-center' onClick={() => onEdit?.()}>
-                <MaterialSymbol name="error" size="sm"/>
+                <MaterialSymbol name="cancel" fill={1} size="sm" className='text-red-600 dark:text-red-400'/>
                 <span className='text-black dark:text-white'>{errors.filter(e => e.type === 'connection').length}</span>
+                <MaterialSymbol name="warning" fill={1} size="sm" className='text-yellow-600 dark:text-yellow-400'/>
+                <span className='text-black dark:text-white'>12</span>
               </BadgeButton>
             </Tippy>
           )}
@@ -3287,44 +3289,37 @@ export function WorkflowNodeAccordion({
                 {errors.filter(e => e.type === 'connection').length > 0 && (
             <Tippy 
             content={
-              <div className="p-3 max-w-sm bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg">
-                <div className="font-medium text-sm mb-3 text-gray-900 dark:text-white">
-                  Connection Issues
+              <div className="p-4 max-w-sm bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg">
+                <div className="font-medium text-sm mb-4 text-gray-900 dark:text-white">
+                  Errors
                 </div>
-                <div className="space-y-3">
-                  {/* Broken Connections */}
-                  <div className="text-xs">
-                    <div className="font-medium text-red-600 dark:text-red-400 flex items-center gap-1">
-                      <MaterialSymbol name="error" size="sm" />
-                      2 broken connections
-                    </div>
-                    <div className="text-gray-700 dark:text-gray-300 mt-1">
-                      Check the stage configuration
+                
+           
+
+                {/* Error Details */}
+                <div className="space-y-1">
+                  <div>
+                    <div className="flex items-start gap-2 text-xs font-mono text-gray-700 dark:text-gray-300 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                    <MaterialSymbol name="cancel" fill={1} size="sm" className='text-red-600 dark:text-red-400 -mt-0.5' /> 
+                    <span className='block'>2 broken connections. Check the stage configuration</span>
                     </div>
                   </div>
-
-                  {/* Failed Runs */}
-                  <div className="text-xs">
-                    <div className="font-medium text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                      <MaterialSymbol name="warning" size="sm" />
-                      28 runs failed to start
-                    </div>
-                    <div className="text-gray-700 dark:text-gray-300 mt-1">
-                      In last 24h
+                  
+                  <div>
+                    <div className="flex items-start gap-2 text-xs font-mono text-gray-700 dark:text-gray-300 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
+                    <MaterialSymbol name="warning" fill={1} size="sm" className='text-yellow-600 dark:text-yellow-400 -mt-0.5' /> 
+                    <span className='block'>28 runs failed to start in last 24h</span>
                     </div>
                   </div>
-
-                  {/* Input Mapping Errors */}
-                  <div className="text-xs">
-                    <div className="font-medium text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                      <MaterialSymbol name="link_off" size="sm" />
-                      2 input mapping errors
-                    </div>
-                    <div className="text-gray-700 dark:text-gray-300 mt-1">
-                      Detected in workflow configuration
+                  
+                  <div>
+                    <div className="flex items-start gap-2 text-xs font-mono text-gray-700 dark:text-gray-300 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                    <MaterialSymbol name="cancel" fill={1} size="sm" className='text-red-600 dark:text-red-400 -mt-0.5' /> 
+                    <span className='block'>2 input mapping errors detected</span>
                     </div>
                   </div>
                 </div>
+                
                 
                 {/* Action Button */}
                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-zinc-600">
@@ -3343,8 +3338,10 @@ export function WorkflowNodeAccordion({
             interactive={true}
           >
               <BadgeButton color="red" className='mr-2 flex items-center' onClick={() => onEdit?.()}>
-                <MaterialSymbol name="error" size="sm"/>
+                <MaterialSymbol name="cancel" fill={1} size="sm" className='text-red-600 dark:text-red-400'/>
                 <span className='text-black dark:text-white'>{errors.filter(e => e.type === 'connection').length}</span>
+                <MaterialSymbol name="warning" fill={1} size="sm" className='text-yellow-600 dark:text-yellow-400'/>
+                <span className='text-black dark:text-white'>12</span>
               </BadgeButton>
             </Tippy>
           )}
