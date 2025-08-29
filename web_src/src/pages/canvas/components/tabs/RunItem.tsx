@@ -202,7 +202,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Run Details
                 </div>
-                
+
                 {Object.keys(inputs).length > 0 && (
                   <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
                     <div className="flex items-start gap-3">
@@ -249,7 +249,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
 
                 {emmitedEvent && (emmitedEventPayload || emmitedEventHeaders) && (
                   <div>
-                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-2 font-bold">Payload Emitted</div>
+                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-2 font-bold">Emitted Event</div>
                     <PayloadDisplay
                       showDetailsTab={true}
                       eventId={emmitedEvent.id}
@@ -271,7 +271,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Queue Details
                 </div>
-                
+
                 <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
                   <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Queue Metadata</div>
                   <div className="space-y-1">
@@ -328,7 +328,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Event Details
                 </div>
-                
+
                 <PayloadDisplay
                   showDetailsTab={true}
                   eventId={sourceEvent.id}

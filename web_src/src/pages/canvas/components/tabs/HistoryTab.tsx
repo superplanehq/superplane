@@ -2,8 +2,9 @@ import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
 import { SuperplaneStageEvent, SuperplaneEvent } from "@/api-client";
 import MessageItem from '../MessageItem';
 import { RunItem } from './RunItem';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useOrganizationUsersForCanvas } from '@/hooks/useCanvasData';
+import { ControlledTabs, Tab } from '@/components/Tabs/tabs';
 import {
   formatDuration,
   getMinApprovedAt,
@@ -32,6 +33,8 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
   };
 
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
 
 
   const createTimeline = (): TimelineItem[] => {
@@ -80,23 +83,104 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
 
   const userDisplayNames = useMemo(() => createUserDisplayNames(orgUsers), [orgUsers]);
 
+  const filterTabs: Tab[] = [
+    { id: 'all', label: 'All' },
+    { id: 'runs', label: 'Runs' },
+    { id: 'queue', label: 'Queue' },
+    { id: 'events', label: 'Events' }
+  ];
 
   const timeline = createTimeline();
+
+  const filteredTimeline = useMemo(() => {
+    let filtered = timeline;
+
+    // Filter by type
+    if (activeFilter !== 'all') {
+      if (activeFilter === 'runs') {
+        filtered = filtered.filter(item => item.type === 'execution');
+      } else if (activeFilter === 'queue') {
+        filtered = filtered.filter(item => item.type === 'stage_event');
+      } else if (activeFilter === 'events') {
+        filtered = filtered.filter(item => item.type === 'discarded_event');
+      }
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => {
+        if (item.type === 'execution') {
+          const execution = item.data as ExecutionWithEvent;
+          return (
+            execution.event?.name?.toLowerCase().includes(query) ||
+            execution.id?.toLowerCase().includes(query) ||
+            execution.state?.toLowerCase().includes(query) ||
+            execution.result?.toLowerCase().includes(query)
+          );
+        } else if (item.type === 'stage_event') {
+          const stageEvent = item.data as SuperplaneStageEvent;
+          return (
+            stageEvent.name?.toLowerCase().includes(query) ||
+            stageEvent.id?.toLowerCase().includes(query) ||
+            stageEvent.state?.toLowerCase().includes(query)
+          );
+        } else if (item.type === 'discarded_event') {
+          const plainEvent = item.data as SuperplaneEvent;
+          return (
+            plainEvent.id?.toLowerCase().includes(query) ||
+            plainEvent.state?.toLowerCase().includes(query)
+          );
+        }
+        return false;
+      });
+    }
+
+    return filtered;
+  }, [timeline, activeFilter, searchQuery]);
 
   return (
     <div className="p-6">
       <h3 className="font-bold text-left text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-        History ({timeline.length} items)
+        History ({filteredTimeline.length} items)
       </h3>
 
-      <div className="mb-8 mt-5 space-y-3">
-        {timeline.length === 0 ? (
+      <div className="mt-5 mb-6">
+        <div className="flex items-center gap-2">
+          <div className="flex-grow">
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-500 dark:text-zinc-400 text-base pointer-events-none text-base!">
+                search
+              </span>
+              <input
+                type="search"
+                placeholder="Search history..."
+                className="w-full pl-8 pr-4 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex-shrink-0">
+            <ControlledTabs
+              tabs={filterTabs}
+              activeTab={activeFilter}
+              onTabChange={setActiveFilter}
+              variant="pills"
+              buttonClasses="text-xs"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-8 space-y-3">
+        {filteredTimeline.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
             <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3" aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>history</span>
             <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No history available</p>
           </div>
         ) : (
-          timeline.map((item) => {
+          filteredTimeline.map((item) => {
             if (item.type === 'execution') {
               const execution = item.data as ExecutionWithEvent;
               const sourceEvent = connectionEventsById?.[execution.event.eventId || ''];

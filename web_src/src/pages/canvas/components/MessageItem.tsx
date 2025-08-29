@@ -151,7 +151,7 @@ const MessageItem = React.memo(({
               </span>
             )}
             <span className="font-medium truncate text-sm dark:text-white">
-              {isStageEvent(event) ? (event.name || event.id || 'Unknown') : (event.sourceName || event.id || 'Discarded Event')}
+              {isStageEvent(event) ? (event.name || event.id || 'Unknown') : (event.id || 'Discarded Event')}
             </span>
           </div>
           <div className="flex items-center gap-3">

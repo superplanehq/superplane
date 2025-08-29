@@ -25,10 +25,20 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   sourceName,
   showDetailsTab = false
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>(showDetailsTab ? 'details' : 'headers');
-
   const displayHeaders = headers || {};
   const displayPayload = payload || {};
+
+  const hasHeaders = Object.keys(displayHeaders).length > 0;
+  const hasPayload = Object.keys(displayPayload).length > 0;
+  
+  const getDefaultTab = (): TabType => {
+    if (showDetailsTab) return 'details';
+    if (hasHeaders) return 'headers';
+    if (hasPayload) return 'payload';
+    return 'details';
+  };
+
+  const [activeTab, setActiveTab] = useState<TabType>(getDefaultTab());
 
   // State configuration for details tab
   const getStateConfig = () => {
@@ -212,7 +222,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   };
 
   // Don't render if no data to display
-  if (Object.keys(displayHeaders).length === 0 && Object.keys(displayPayload).length === 0 && !showDetailsTab) {
+  if (!hasHeaders && !hasPayload && !showDetailsTab) {
     return null;
   }
 
@@ -223,8 +233,8 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
           <div className="w-full border-b border-zinc-200 dark:border-zinc-700">
             <nav className="flex gap-0">
               {showDetailsTab && renderTabButton('details', 'Details')}
-              {renderTabButton('headers', 'Headers')}
-              {renderTabButton('payload', 'Payload')}
+              {hasHeaders && renderTabButton('headers', 'Headers')}
+              {hasPayload && renderTabButton('payload', 'Payload')}
             </nav>
           </div>
         </div>
