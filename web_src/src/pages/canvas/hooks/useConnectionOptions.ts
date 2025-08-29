@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
-import { SuperplaneConnectionType } from '@/api-client';
+import { SuperplaneConnectionType, SuperplaneConnection } from '@/api-client';
 
 interface ConnectionOption {
   value: string;
@@ -9,14 +9,28 @@ interface ConnectionOption {
   type: SuperplaneConnectionType;
 }
 
-export function useConnectionOptions(currentEntityId?: string) {
+export function useConnectionOptions(currentEntityId?: string, existingConnections?: SuperplaneConnection[]) {
   const { stages, eventSources, connectionGroups } = useCanvasStore();
 
   const getConnectionOptions = useMemo(() => {
-    return (): ConnectionOption[] => {
+    return (currentConnectionIndex?: number): ConnectionOption[] => {
       const options: ConnectionOption[] = [];
+      const seenNames = new Set<string>();
+      
+      // Get names of existing connections (excluding the current one being edited)
+      const existingConnectionNames = new Set(
+        existingConnections
+          ?.filter((_, index) => index !== currentConnectionIndex)
+          ?.map(conn => conn.name)
+          ?.filter(Boolean) || []
+      );
+
       stages.forEach(stage => {
-        if (stage.metadata?.name && stage.metadata?.id !== currentEntityId) {
+        if (stage.metadata?.name && 
+            stage.metadata?.id !== currentEntityId && 
+            !seenNames.has(stage.metadata.name) &&
+            !existingConnectionNames.has(stage.metadata.name)) {
+          seenNames.add(stage.metadata.name);
           options.push({
             value: stage.metadata.name,
             label: stage.metadata.name,
@@ -26,7 +40,10 @@ export function useConnectionOptions(currentEntityId?: string) {
         }
       });
       eventSources.forEach(eventSource => {
-        if (eventSource.metadata?.name) {
+        if (eventSource.metadata?.name && 
+            !seenNames.has(eventSource.metadata.name) &&
+            !existingConnectionNames.has(eventSource.metadata.name)) {
+          seenNames.add(eventSource.metadata.name);
           options.push({
             value: eventSource.metadata.name,
             label: eventSource.metadata.name,
@@ -36,7 +53,11 @@ export function useConnectionOptions(currentEntityId?: string) {
         }
       });
       connectionGroups.forEach(group => {
-        if (group.metadata?.name && group.metadata?.id !== currentEntityId) {
+        if (group.metadata?.name && 
+            group.metadata?.id !== currentEntityId && 
+            !seenNames.has(group.metadata.name) &&
+            !existingConnectionNames.has(group.metadata.name)) {
+          seenNames.add(group.metadata.name);
           options.push({
             value: group.metadata.name,
             label: group.metadata.name,
@@ -47,7 +68,7 @@ export function useConnectionOptions(currentEntityId?: string) {
       });
       return options;
     };
-  }, [stages, eventSources, connectionGroups, currentEntityId]);
+  }, [stages, eventSources, connectionGroups, currentEntityId, existingConnections]);
 
   return { getConnectionOptions };
 }

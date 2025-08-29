@@ -14,6 +14,7 @@ interface ConnectionSelectorProps {
   currentEntityId?: string;
   validationError?: string;
   showFilters?: boolean;
+  existingConnections?: SuperplaneConnection[];
 }
 
 export function ConnectionSelector({
@@ -26,12 +27,13 @@ export function ConnectionSelector({
   onFilterOperatorToggle,
   currentEntityId,
   validationError,
-  showFilters = true
+  showFilters = true,
+  existingConnections
 }: ConnectionSelectorProps) {
-  const { getConnectionOptions } = useConnectionOptions(currentEntityId);
+  const { getConnectionOptions } = useConnectionOptions(currentEntityId, existingConnections);
 
   const renderConnectionOptions = () => {
-    const options = getConnectionOptions();
+    const options = getConnectionOptions(index);
 
     if (options.length === 0 && connection.type) {
       return (
