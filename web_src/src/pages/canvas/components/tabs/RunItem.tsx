@@ -1,6 +1,7 @@
-import React, { JSX } from 'react';
-import { ExecutionResult, SuperplaneExecutionState } from '@/api-client';
+import React, { JSX, useMemo } from 'react';
+import { ExecutionResult, SuperplaneExecutionState, SuperplaneEvent } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { PayloadDisplay } from '../PayloadDisplay';
 
 interface RunItemProps {
   state: SuperplaneExecutionState;
@@ -15,6 +16,8 @@ interface RunItemProps {
   queuedOn?: string;
   approvedOn?: string;
   approvedBy?: string;
+  sourceEvent?: SuperplaneEvent;
+  emmitedEvent?: SuperplaneEvent;
 }
 
 export const RunItem: React.FC<RunItemProps> = React.memo(({
@@ -30,12 +33,19 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   queuedOn,
   approvedOn,
   approvedBy,
+  sourceEvent,
+  emmitedEvent,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
 
   const toggleExpand = (): void => {
     setIsExpanded(!isExpanded);
   };
+
+  const sourceEventPayload = useMemo(() => sourceEvent?.raw, [sourceEvent]);
+  const sourceEventHeaders = useMemo(() => sourceEvent?.headers, [sourceEvent]);
+  const emmitedEventPayload = useMemo(() => emmitedEvent?.raw, [emmitedEvent]);
+  const emmitedEventHeaders = useMemo(() => emmitedEvent?.headers, [emmitedEvent]);
 
   const renderStatusBadge = (): JSX.Element => {
     switch (state) {
@@ -185,98 +195,150 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
 
         {/* Expanded content */}
         {isExpanded && (
-          <div className="mt-3 space-y-3 text-left">
-            {Object.keys(inputs).length > 0 && (
-              <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-                <div className="flex items-start gap-3">
-                  <div className="flex-1">
-                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
-                    <div className="space-y-1">
-                      {Object.entries(inputs).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between gap-2 min-w-0">
-                          <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
-                              {value || '-'}
-                            </span>
-                          </div>
+          <div className="mt-3 space-y-4 text-left">
+            {/* Run Details Section */}
+            {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0 || (emmitedEvent && (emmitedEventPayload || emmitedEventHeaders))) && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                  Run Details
+                </div>
+
+                {Object.keys(inputs).length > 0 && (
+                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1">
+                        <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
+                        <div className="space-y-1">
+                          {Object.entries(inputs).map(([key, value]) => (
+                            <div key={key} className="flex items-center justify-between gap-2 min-w-0">
+                              <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
+                                  {value || '-'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {Object.keys(outputs).length > 0 && (
+                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1">
+                        <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Outputs</div>
+                        <div className="space-y-1">
+                          {Object.entries(outputs).map(([key, value]) => (
+                            <div key={key} className="flex items-center justify-between gap-2 min-w-0">
+                              <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
+                                  {value || '-'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {emmitedEvent && (emmitedEventPayload || emmitedEventHeaders) && (
+                  <div>
+                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-2 font-bold">Emitted Event</div>
+                    <PayloadDisplay
+                      showDetailsTab={true}
+                      eventId={emmitedEvent.id}
+                      timestamp={emmitedEvent.receivedAt}
+                      state={emmitedEvent.state}
+                      eventType={emmitedEvent.type}
+                      sourceName={emmitedEvent.sourceName}
+                      headers={emmitedEventHeaders}
+                      payload={emmitedEventPayload}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
-            {Object.keys(outputs).length > 0 && (
-              <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-                <div className="flex items-start gap-3">
-                  <div className="flex-1">
-                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Outputs</div>
-                    <div className="space-y-1">
-                      {Object.entries(outputs).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between gap-2 min-w-0">
-                          <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
-                              {value || '-'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
+            {/* Queue Details Section */}
             {(queuedOn || approvedOn || approvedBy) && (
-              <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
-                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Queue Information</div>
-                <div className="space-y-1">
-                  {queuedOn && (
-                    <div className="flex items-center gap-1">
-                      <MaterialSymbol name="schedule" size="md" className="text-gray-600 dark:text-zinc-400" />
-                      <span className="text-xs text-gray-500 dark:text-zinc-400">
-                        Added to queue on {new Date(queuedOn).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })} {new Date(queuedOn).toLocaleTimeString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: false
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  {approvedOn && (
-                    <div className="flex items-center gap-1">
-                      <MaterialSymbol name="check_circle" size="md" className="text-gray-600 dark:text-zinc-400" />
-                      <span className="text-xs text-gray-500 dark:text-zinc-400">
-                        Approved on {new Date(approvedOn).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })} {new Date(approvedOn).toLocaleTimeString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: false
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  {approvedBy && (
-                    <div className="flex items-center gap-1">
-                      <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
-                      <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-                        Approved by <span className="text-blue-600 dark:text-blue-400 truncate">{approvedBy}</span>
-                      </span>
-                    </div>
-                  )}
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                  Queue Details
                 </div>
+
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Queue Metadata</div>
+                  <div className="space-y-1">
+                    {queuedOn && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="schedule" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Added to queue on {new Date(queuedOn).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(queuedOn).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {approvedOn && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="check_circle" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Approved on {new Date(approvedOn).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(approvedOn).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {approvedBy && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                          Approved by <span className="text-blue-600 dark:text-blue-400 truncate">{approvedBy}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Event Details Section */}
+            {sourceEvent && (sourceEventPayload || sourceEventHeaders) && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                  Event Details
+                </div>
+
+                <PayloadDisplay
+                  showDetailsTab={true}
+                  eventId={sourceEvent.id}
+                  timestamp={sourceEvent.receivedAt}
+                  state={sourceEvent.state}
+                  eventType={sourceEvent.type}
+                  sourceName={sourceEvent.sourceName}
+                  headers={sourceEventHeaders}
+                  payload={sourceEventPayload}
+                />
               </div>
             )}
           </div>

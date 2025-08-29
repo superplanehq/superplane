@@ -1,3 +1,5 @@
+import { ExecutionWithEvent } from '../store/types';
+
 export const formatRelativeTime = (dateString: string | undefined, abbreviated?: boolean) => {
   if (!dateString) return 'N/A'
 
@@ -95,4 +97,91 @@ export const formatExecutionDuration = (startDate: string | undefined, endDate: 
   } else {
     return `${diffSeconds}s`;
   }
+};
+
+export const formatDuration = (startedAt?: string, finishedAt?: string) => {
+  if (!startedAt || !finishedAt) {
+    return "-";
+  }
+  const duration = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
+  const hours = Math.floor(duration / (1000 * 60 * 60));
+  const prefixHours = hours >= 10 ? `${hours}h ` : `0${hours}h`;
+  const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+  const prefixMinutes = minutes >= 10 ? `${minutes}m ` : `0${minutes}m`;
+  const seconds = Math.floor((duration % (1000 * 60)) / 1000);
+  const prefixSeconds = seconds >= 10 ? `${seconds}s` : `0${seconds}s`;
+  return `${prefixHours} ${prefixMinutes} ${prefixSeconds}`;
+};
+
+interface UserData {
+  metadata?: {
+    id?: string;
+    email?: string;
+  };
+  spec?: {
+    displayName?: string;
+  };
+}
+
+interface Approval {
+  approvedAt?: string;
+  approvedBy?: string;
+}
+
+export const getMinApprovedAt = (execution: ExecutionWithEvent) => {
+  if (!execution.event.approvals?.length)
+    return undefined;
+
+  return execution.event.approvals.reduce((min: string, approval: Approval) => {
+    if (approval.approvedAt && new Date(approval.approvedAt).getTime() < new Date(min).getTime()) {
+      return approval.approvedAt;
+    }
+    return min;
+  }, execution.event.approvals[0].approvedAt!);
+};
+
+export const getApprovalsNames = (execution: ExecutionWithEvent, userDisplayNames: Record<string, string>) => {
+  const names: string[] = [];
+  execution.event.approvals?.forEach((approval: Approval) => {
+    if (approval.approvedBy) {
+      names.push(userDisplayNames[approval.approvedBy]);
+    }
+  });
+  return names.join(', ');
+};
+
+export const mapExecutionOutputs = (execution: ExecutionWithEvent) => {
+  const map: Record<string, string> = {};
+  execution.outputs?.forEach((output) => {
+    if (!output.name) {
+      return;
+    }
+
+    map[output.name!] = output.value!;
+  });
+
+  return map;
+};
+
+export const mapExecutionEventInputs = (execution: ExecutionWithEvent) => {
+  const map: Record<string, string> = {};
+  execution.event.inputs?.forEach((input) => {
+    if (!input.name) {
+      return;
+    }
+
+    map[input.name!] = input.value!;
+  });
+
+  return map;
+};
+
+export const createUserDisplayNames = (orgUsers: UserData[]) => {
+  const map: Record<string, string> = {};
+  orgUsers.forEach(user => {
+    if (user.metadata?.id) {
+      map[user.metadata.id] = user.spec?.displayName || user.metadata?.email || user.metadata.id;
+    }
+  });
+  return map;
 };

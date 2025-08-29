@@ -2,8 +2,9 @@ import { useEffect } from 'react';
 import useWebSocket from 'react-use-websocket';
 import { EventMap, ServerEvent } from '../types/events';
 import { useCanvasStore } from "../store/canvasStore";
-import { EventSourceWithEvents } from '../store/types';
-import { pollEventSourceUntilNoPending } from '../utils/eventSourcePolling';
+import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from '../store/types';
+import { pollConnectionGroupUntilNoPending, pollEventSourceUntilNoPending, pollStageUntilNoPending } from '../utils/eventSourcePolling';
+import { stageUpdateQueue } from '../utils/stageUpdateQueue';
 import { SuperplaneEventSource, SuperplaneFilterType } from '@/api-client';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
@@ -16,6 +17,8 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
   // Get store access methods directly within the hook
   const updateWebSocketConnectionStatus = useCanvasStore((s) => s.updateWebSocketConnectionStatus);
   const eventSources = useCanvasStore((s) => s.eventSources);
+  const connectionGroups = useCanvasStore((s) => s.connectionGroups);
+  const stages = useCanvasStore((s) => s.stages);
   const updateStage = useCanvasStore((s) => s.updateStage);
   const addStage = useCanvasStore((s) => s.addStage);
   const addConnectionGroup = useCanvasStore((s) => s.addConnectionGroup);
@@ -64,6 +67,8 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
     let executionFinishedPayload: EventMap['execution_finished']
     let executionStartedPayload: EventMap['execution_started']
     let eventSourceWithNewEvent: EventSourceWithEvents | undefined;
+    let connectionGroupWithNewEvent: ConnectionGroupWithEvents | undefined;
+    let stageWithNewEvent: StageWithEventQueue | undefined;
     let eventSource: SuperplaneEventSource;
     
     // Route the event to the appropriate handler
@@ -103,16 +108,31 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
           eventSourceWithNewEvent = eventSources.find(es => es.metadata!.id === payload.source_id);
           pollEventSourceUntilNoPending(canvasId, eventSourceWithNewEvent?.metadata?.id || '');
         }
+
+        if (payload.source_type === 'connection-group') {
+          connectionGroupWithNewEvent = connectionGroups.find(es => es.metadata!.id === payload.source_id);
+          pollConnectionGroupUntilNoPending(canvasId, connectionGroupWithNewEvent?.metadata?.id || '');
+        }
+
+        if (payload.source_type === 'stage') {
+          stageWithNewEvent = stages.find(es => es.metadata!.id === payload.source_id);
+          const stageId = stageWithNewEvent?.metadata?.id || '';
+          if (stageId) {
+            stageUpdateQueue.enqueue(stageId, () => pollStageUntilNoPending(canvasId, stageId));
+          }
+        }
         break;
 
       case 'new_stage_event':
         newEventPayload = payload as EventMap['new_stage_event'];
         eventSourceWithNewEvent = eventSources.find(es => es.metadata!.id === newEventPayload.source_id);
 
-        syncStageEvents(canvasId, newEventPayload.stage_id);
+        // Queue immediate sync
+        stageUpdateQueue.enqueue(newEventPayload.stage_id, () => syncStageEvents(canvasId, newEventPayload.stage_id));
 
+        // Queue delayed sync
         setTimeout(() => {
-          syncStageEvents(canvasId, newEventPayload.stage_id);
+          stageUpdateQueue.enqueue(newEventPayload.stage_id, () => syncStageEvents(canvasId, newEventPayload.stage_id));
         }, 3000);
 
         if (eventSourceWithNewEvent) {
@@ -124,19 +144,21 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
         break;
       case 'stage_event_approved':
         approvedEventPayload = payload as EventMap['stage_event_approved'];
-        syncStageEvents(canvasId, approvedEventPayload.stage_id);
+        stageUpdateQueue.enqueue(approvedEventPayload.stage_id, () => syncStageEvents(canvasId, approvedEventPayload.stage_id));
         break;
       case 'execution_finished':
         executionFinishedPayload = payload as EventMap['execution_finished'];
-        syncStageEvents(canvasId, executionFinishedPayload.stage_id);
+        stageUpdateQueue.enqueue(executionFinishedPayload.stage_id, () => pollStageUntilNoPending(canvasId, executionFinishedPayload.stage_id), 'high');
+        stageUpdateQueue.enqueue(executionFinishedPayload.stage_id, () => syncStageEvents(canvasId, executionFinishedPayload.stage_id));
         break;
       case 'execution_started':
         executionStartedPayload = payload as EventMap['execution_started'];
-        syncStageEvents(canvasId, executionStartedPayload.stage_id);
+        stageUpdateQueue.enqueue(executionStartedPayload.stage_id, () => pollStageUntilNoPending(canvasId, executionStartedPayload.stage_id), 'high');
+        stageUpdateQueue.enqueue(executionStartedPayload.stage_id, () => syncStageEvents(canvasId, executionStartedPayload.stage_id));
         break;
       default:
     }
 
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastJsonMessage, addEventSource, addStage, updateCanvas, updateStage, syncStageEvents]);
 }
