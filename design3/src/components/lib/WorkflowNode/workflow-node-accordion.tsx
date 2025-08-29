@@ -263,6 +263,22 @@ export function WorkflowNodeAccordion({
   // State to track which connection filters are expanded
   const [expandedFilters, setExpandedFilters] = useState<Set<number>>(new Set())
   
+  // State to track selected connection names for dropdowns
+  const [selectedConnectionNames, setSelectedConnectionNames] = useState<Record<number, string>>({})
+  
+  // Initialize selected connection names from existing connections
+  useEffect(() => {
+    if (yamlConfig.spec.connections) {
+      const newSelectedNames: Record<number, string> = {}
+      yamlConfig.spec.connections.forEach((connection: any, index: number) => {
+        if (connection.name) {
+          newSelectedNames[index] = connection.name
+        }
+      })
+      setSelectedConnectionNames(newSelectedNames)
+    }
+  }, [yamlConfig.spec.connections])
+
   // Initialize parameter tags from existing values
   useEffect(() => {
     if (yamlConfig.spec.executor?.config?.parameters) {
@@ -958,15 +974,19 @@ export function WorkflowNodeAccordion({
          
           
           {/* Add Connection Dropdown - Only show when no connections exist */}
-          {(!yamlConfig.spec.connections || yamlConfig.spec.connections.length === 0) && (
+            
+          
             <div className="flex-auto space-y-1 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-sm">
               <div className="flex flex-col">
                 
                 <Field className="flex flex-col items-start gap-2">
+                 
                   <Badge color='blue' className='mt-1'>Trigger 1 </Badge>
+                
+                  
                     <Dropdown>
                       <DropdownButton color='white' className="!justify-between flex items-center w-full">
-                        Select event source or stage
+                        {selectedConnectionNames[0] || "Select event source or stage"}
                         <MaterialSymbol name="expand_more" size="md" />
                       </DropdownButton>
                       <DropdownMenu anchor="bottom start">
@@ -974,6 +994,8 @@ export function WorkflowNodeAccordion({
                           const newConnections = [...(yamlConfig.spec.connections || [])]
                           newConnections.push({ type: 'stage', name: 'Deploy to staging', config: {} })
                           setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+                          // Update selected connection name for dropdown display
+                          setSelectedConnectionNames(prev => ({ ...prev, 0: 'Deploy to staging' }))
                           // Mark as modified since we're adding a new connection
                           markSectionModified('connections');
                         }}>
@@ -985,6 +1007,8 @@ export function WorkflowNodeAccordion({
                           const newConnections = [...(yamlConfig.spec.connections || [])]
                           newConnections.push({ type: 'event source', name: 'Github webhook', config: {} })
                           setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+                          // Update selected connection name for dropdown display
+                          setSelectedConnectionNames(prev => ({ ...prev, 0: 'Github webhook' }))
                           // Mark as modified since we're adding a new connection
                           markSectionModified('connections');
                         }}>
@@ -1080,6 +1104,7 @@ export function WorkflowNodeAccordion({
                             e.preventDefault()
                             console.log('Add filters clicked - adding filter for connection 0')
                             handleAddFilter(0)
+                            console.log(connectionFilters[0]);
                           }}
                         >
                           <MaterialSymbol name="add" size="sm"/>
@@ -1093,15 +1118,19 @@ export function WorkflowNodeAccordion({
                         )}
                       </div>
                       <div className='flex items-center gap-1'>
+                       <Button plain>
+                        <MaterialSymbol name="close" size="sm"/>
+                       </Button>
                         <Button
-                          outline
+                          color='white'
                           onClick={handleConnectionsSave}
                         >
-                          Save
+                          <MaterialSymbol name="check" size="sm"/>
                         </Button>
                         
                       </div>
                     </div>
+                   
                     
                     
                     
@@ -1111,55 +1140,10 @@ export function WorkflowNodeAccordion({
               
             </div>
             
-          )}
-          <Link href="#" className="text-sm bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 flex justify-center align-middle gap-1 mt-3 border border-zinc-400 dark:border-zinc-700 rounded-sm border-dashed p-2 text-center">
-              <MaterialSymbol name="add" size="sm"/>
-              <span>Add trigger</span>
-          </Link>
           
-          <Divider/>
-          <Field>
-            <Label className='flex items-center gap-1'>Conditions <span className="text-xs text-gray-600 dark:text-zinc-400 font-light">(optional)</span> <Tippy content="Conditions allow you to filter events based on specific criteria." placement="top"><MaterialSymbol name="help" size="sm"/></Tippy> </Label>
-            <Link href="#" className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1 mt-2">
-              <MaterialSymbol name="add" size="sm"/>
-              <span>Add condition</span>
-            </Link>
+           {/* Add another connection button when connections already exist */}
            
-          </Field>
-         
-          {/* Add another connection button when connections already exist */}
-          {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
-            <div className="mt-2">
-              <Dropdown>
-                <DropdownButton plain className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300">
-                  <MaterialSymbol name="add" size="sm" />
-                  Add Connection
-                </DropdownButton>
-                <DropdownMenu anchor="bottom start">
-                  <DropdownItem className='flex items-center gap-2' onClick={() => {
-                    const newConnections = [...(yamlConfig.spec.connections || [])]
-                    newConnections.push({ type: 'stage', name: 'Deploy to staging', config: {} })
-                    setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
-                    markSectionModified('connections');
-                  }}>
-                    <MaterialSymbol name="rocket_launch" size="md" />
-                    <DropdownLabel>Deploy to staging</DropdownLabel>
-                  </DropdownItem>
-                  <DropdownItem className='flex items-center gap-2' onClick={() => {
-                    const newConnections = [...(yamlConfig.spec.connections || [])]
-                    newConnections.push({ type: 'event source', name: 'Github webhook', config: {} })
-                    setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
-                    markSectionModified('connections');
-                  }}>
-                    <MaterialSymbol name="bolt" size="sm" />
-                    <DropdownLabel>Github webhook</DropdownLabel>
-                  </DropdownItem>
-                </DropdownMenu>
-              </Dropdown>
-            </div>
-          )}
-
-            {yamlConfig.spec.connections?.map((connection, index) => (
+           {yamlConfig.spec.connections?.map((connection, index) => (
               <div key={index} className="flex connection">
                 {savedConnections.has(index) ? (
                   // Read-only mode - entire connection box is read-only
@@ -1324,15 +1308,17 @@ export function WorkflowNodeAccordion({
                       <Field className='flex justify-between'>
                         <Dropdown>
                           <DropdownButton color='white' className="!justify-between flex items-center w-full">
-                            Select connection
+                            {selectedConnectionNames[index] || "Select connection"}
                             <MaterialSymbol name="expand_more" size="md" />
                           </DropdownButton>
                           <DropdownMenu anchor="bottom start">
                             <DropdownItem className='flex items-center gap-2' onClick={() => {
                               const newConnections = [...(yamlConfig.spec.connections || [])]
-                              newConnections.push({ type: 'stage', name: 'Deploy to staging', config: {} })
+                              newConnections[index] = { type: 'stage', name: 'Deploy to staging', config: {} }
                               setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
-                              // Mark as modified since we're adding a new connection
+                              // Update selected connection name for dropdown display
+                              setSelectedConnectionNames(prev => ({ ...prev, [index]: 'Deploy to staging' }))
+                              // Mark as modified since we're updating a connection
                               markSectionModified('connections');
                             }}>
                               
@@ -1341,9 +1327,11 @@ export function WorkflowNodeAccordion({
                             </DropdownItem>
                             <DropdownItem className='flex items-center gap-2' onClick={() => {
                               const newConnections = [...(yamlConfig.spec.connections || [])]
-                              newConnections.push({ type: 'event source', name: 'Github webhook', config: {} })
+                              newConnections[index] = { type: 'event source', name: 'Github webhook', config: {} }
                               setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
-                              // Mark as modified since we're adding a new connection
+                              // Update selected connection name for dropdown display
+                              setSelectedConnectionNames(prev => ({ ...prev, [index]: 'Github webhook' }))
+                              // Mark as modified since we're updating a connection
                               markSectionModified('connections');
                             }}>
                               
@@ -1360,22 +1348,25 @@ export function WorkflowNodeAccordion({
                 
               </div>
             ))}
-            {(yamlConfig.spec.connections?.length !== undefined && yamlConfig.spec.connections?.length > 0) && (
-                <>
-                  <Divider/>
-                  <Field className='flex justify-end'>
-                    <Button
-                      color='blue'
-                      className='flex items-center !text-xs'
-                      onClick={handleConnectionsSave}
-                    >
-                      <MaterialSymbol name="save" size="sm" />
-                      Save
-                    </Button>
-                  </Field>
-                </>
-              )
-            }
+          <Link href="#" className="text-sm bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 flex justify-center align-middle gap-1 mt-3 border border-zinc-400 dark:border-zinc-700 rounded-sm border-dashed p-2 text-center">
+              <MaterialSymbol name="add" size="sm"/>
+              <span>Add trigger</span>
+          </Link>
+          
+          <Divider/>
+          <Field>
+            <Label className='flex items-center gap-1'>Conditions <span className="text-xs text-gray-600 dark:text-zinc-400 font-light">(optional)</span> <Tippy content="Conditions allow you to filter events based on specific criteria." placement="top"><MaterialSymbol name="help" size="sm"/></Tippy> </Label>
+            <Link href="#" className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1 mt-2">
+              <MaterialSymbol name="add" size="sm"/>
+              <span>Add condition</span>
+            </Link>
+           
+          </Field>
+         
+         
+
+           
+          
             
           </div>
          
