@@ -25,7 +25,7 @@ import 'tippy.js/dist/tippy.css';
 export interface ComponentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceType?: string) => void;
+  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: { name: string; type: string } | null) => void;
   className?: string;
 }
 
@@ -64,10 +64,25 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     setHideComingSoon(newValue);
     localStorage.setItem('hideComingSoon', JSON.stringify(newValue));
   };
-  const { eventSources } = useCanvasStore();
+  const { eventSources, focusedNodeId, nodes } = useCanvasStore();
 
   // Check if there are any event sources in the canvas
   const hasEventSources = eventSources.length > 0;
+
+  // Get focused node name and type for auto-connecting
+  const getFocusedNodeInfo = () => {
+    if (!focusedNodeId) return null;
+
+    const node = nodes.find(node => node.id === focusedNodeId);
+    if (node) {
+      return {
+        name: node.data?.name,
+        type: `TYPE_${node.type?.toUpperCase()}`
+      };
+    }
+
+    return null;
+  };
 
   const components: ComponentDefinition[] = [
     // Stages - Available
@@ -249,7 +264,8 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
 
   const handleAddComponent = (component: ComponentDefinition) => {
     if (!isComponentDisabled(component) && !component.comingSoon) {
-      onNodeAdd(component.id, component.executorType, component.eventSourceType);
+      const focusedNodeInfo = getFocusedNodeInfo();
+      onNodeAdd(component.id, component.executorType, component.eventSourceType, focusedNodeInfo);
     }
   };
 

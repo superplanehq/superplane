@@ -1,4 +1,4 @@
-import { SuperplaneStage, SuperplaneEventSource, SuperplaneConnectionGroup } from '@/api-client/types.gen';
+import { SuperplaneStage, SuperplaneEventSource, SuperplaneConnectionGroup, SuperplaneConnection } from '@/api-client/types.gen';
 
 /**
  * Factory functions to create empty/default nodes for different types
@@ -11,12 +11,13 @@ export interface CreateNodeParams {
   name?: string;
   executorType?: string;
   eventSourceType?: string;
+  connections?: Array<SuperplaneConnection>;
 }
 
 /**
  * Creates an empty stage with default configuration
  */
-export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }: CreateNodeParams): SuperplaneStage => {
+export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, connections = [] }: CreateNodeParams): SuperplaneStage => {
   const getExecutorTemplate = (type?: string) => {
     switch (type) {
       case 'semaphore':
@@ -61,7 +62,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
       inputs: [],
       outputs: [],
       executor: getExecutorTemplate(executorType),
-      connections: [],
+      connections: connections,
       inputMappings: [],
       secrets: []
     },
@@ -87,7 +88,7 @@ export const createEmptyEventSource = ({ canvasId, name = 'New Event Source' }: 
 /**
  * Creates an empty connection group with default configuration
  */
-export const createEmptyConnectionGroup = ({ canvasId, name = 'New Connection Group' }: CreateNodeParams): SuperplaneConnectionGroup => {
+export const createEmptyConnectionGroup = ({ canvasId, name = 'New Connection Group', connections = [] }: CreateNodeParams): SuperplaneConnectionGroup => {
   return {
     metadata: {
       canvasId,
@@ -95,7 +96,7 @@ export const createEmptyConnectionGroup = ({ canvasId, name = 'New Connection Gr
       id: Date.now().toString(), // Temporary ID
     },
     spec: {
-      connections: [],
+      connections: connections,
       groupBy: {
         // Default groupBy configuration
       }
