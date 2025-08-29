@@ -952,12 +952,10 @@ export function WorkflowNodeAccordion({
 
           {/* Connections List */}
           <div className="space-y-2">
-          <Text color="gray" className="!text-xs !font-normal pr-2">
+          <Text color="gray" className="!text-xs !font-normal pr-2 -mt-2">
               Select event sources or other stages to trigger this stage
           </Text>
-          <Field>
-          <Label>Triggers</Label>
-          </Field>
+         
           
           {/* Add Connection Dropdown - Only show when no connections exist */}
           {(!yamlConfig.spec.connections || yamlConfig.spec.connections.length === 0) && (
@@ -996,16 +994,117 @@ export function WorkflowNodeAccordion({
                         </DropdownItem>
                       </DropdownMenu>
                     </Dropdown>
-                    <div className='flex items-center gap-1'>
-                      <Link href="#" className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1">
-                        <MaterialSymbol name="add" size="sm"/>
-                        <span>Add filters</span>
-                        <span className="text-xs text-zinc-600 dark:text-zinc-400">(optional)</span> 
-                      </Link>
-                      <Tippy content={<div className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-xs max-w-50">Filters allow you to filter events based on specific criteria.</div>}>
-                        <Link href="#"><MaterialSymbol name="help" size="sm" className='text-gray-600 dark:text-gray-400'/></Link>
-                      </Tippy>
+                    {/* Filters Section for first connection */}
+                    {connectionFilters[0] && connectionFilters[0].length > 0 && (
+                      <div className="mt-1 w-full">
+                        <Field className='flex items-center gap-2 mb-1'>
+                          <Label>Filters</Label>
+                          <Tippy
+                            content={
+                              <div className="p-3 max-w-sm">
+                                <div className=" text-sm mb-2">
+                                  Connection Filters
+                                </div>
+                               
+                              </div>
+                            }
+                            theme="dark"
+                            placement="top"
+                            arrow={true}
+                            interactive={true}
+                          >
+                            <MaterialSymbol name="help" size="md" />
+                          </Tippy>
+                        </Field>
+                        {connectionFilters[0].map((filter, filterIndex) => (
+                          <div key={filter.id} className='relative w-full mb-1'>
+                            {/* Show AND/OR indicator */}
+                            {filter.operator && filterIndex > 0 && (
+                              <div className="relative justify-center flex items-center mb-1">
+                                <button 
+                                  onClick={() => handleToggleOperator(0, filter.id)}
+                                  className="!text-xs font-medium !px-2 !py-0 text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 rounded-sm border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
+                                >
+                                  {filter.operator}
+                                </button>
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center w-full">
+                              <div className="p-1 flex flex-auto bg-white dark:bg-zinc-900/40 items-center gap-2 rounded-lg text-xs border border-zinc-300 dark:border-zinc-800">
+                                <Dropdown>
+                                  <DropdownButton 
+                                    outline 
+                                  >
+                                    {filter.type}
+                                    <MaterialSymbol name="expand_more" size="sm" />
+                                  </DropdownButton>
+                                  <DropdownMenu anchor="bottom start">
+                                    <DropdownItem onClick={() => handleUpdateFilter(0, filter.id, 'type', 'Data')}>
+                                      <DropdownLabel>Data</DropdownLabel>
+                                    </DropdownItem>
+                                    <DropdownItem onClick={() => handleUpdateFilter(0, filter.id, 'type', 'Event')}>
+                                      <DropdownLabel>Event</DropdownLabel>
+                                    </DropdownItem>
+                                    <DropdownItem onClick={() => handleUpdateFilter(0, filter.id, 'type', 'User')}>
+                                      <DropdownLabel>User</DropdownLabel>
+                                    </DropdownItem>
+                                  </DropdownMenu>
+                                </Dropdown>
+                                <Input
+                                  value={filter.expression}
+                                  onChange={(e) => handleUpdateFilter(0, filter.id, 'expression', e.target.value)}
+                                  placeholder="Filter expression"
+                                  
+                                />
+                                <Button
+                                plain
+                                className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 "
+                                onClick={() => handleRemoveFilter(0, filter.id)}
+                              >
+                                <MaterialSymbol name="close" size="sm" />
+                              </Button>
+                              </div>
+                              
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className='flex items-center justify-between w-full'>
+                      <div className='flex items-center gap-1'>
+                        <Link 
+                          href="#" 
+                          className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            console.log('Add filters clicked - adding filter for connection 0')
+                            handleAddFilter(0)
+                          }}
+                        >
+                          <MaterialSymbol name="add" size="sm"/>
+                          {connectionFilters[0] && connectionFilters[0].length == 0 ? <span>Add filters</span> : <span>Add filter</span>}
+                          {connectionFilters[0] && connectionFilters[0].length == 0 && <span className="text-xs text-zinc-600 dark:text-zinc-400">(optional)</span>}
+                        </Link>
+                        {connectionFilters[0] && connectionFilters[0].length == 0 && (
+                          <Tippy content={<div className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-xs max-w-50">Filters allow you to filter events based on specific criteria.</div>}>
+                            <Link href="#"><MaterialSymbol name="help" size="sm" className='text-gray-600 dark:text-gray-400'/></Link>
+                          </Tippy>
+                        )}
+                      </div>
+                      <div className='flex items-center gap-1'>
+                        <Button
+                          outline
+                          onClick={handleConnectionsSave}
+                        >
+                          Save
+                        </Button>
+                        
+                      </div>
                     </div>
+                    
+                    
+                    
                 </Field>
                 
               </div>  
@@ -1017,10 +1116,7 @@ export function WorkflowNodeAccordion({
               <MaterialSymbol name="add" size="sm"/>
               <span>Add trigger</span>
           </Link>
-          <Link href="#" className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1 mt-2">
-              <MaterialSymbol name="add" size="sm"/>
-              <span>Add trigger</span>
-            </Link>
+          
           <Divider/>
           <Field>
             <Label className='flex items-center gap-1'>Conditions <span className="text-xs text-gray-600 dark:text-zinc-400 font-light">(optional)</span> <Tippy content="Conditions allow you to filter events based on specific criteria." placement="top"><MaterialSymbol name="help" size="sm"/></Tippy> </Label>
@@ -1030,21 +1126,7 @@ export function WorkflowNodeAccordion({
             </Link>
            
           </Field>
-          <Field className='flex justify-end'>
-          <Button
-              plain
-              className='flex items-center !text-xs'
-            >
-              Cancel
-            </Button>
-            <Button
-              color='blue'
-              className='flex items-center !text-xs'
-              onClick={handleConnectionsSave}
-            >
-              Save
-            </Button>
-          </Field>
+         
           {/* Add another connection button when connections already exist */}
           {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
             <div className="mt-2">
@@ -1202,7 +1284,11 @@ export function WorkflowNodeAccordion({
                         
                         {/* Collapsible filters content */}
                         {expandedFilters.has(index) && (
-                          <div className="mt-2">
+                          <div className="mt-2 w-full">
+                            <Field>
+                              <Label>Filters <Tippy content={<div className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-xs max-w-50">Filters allow you to filter events based on specific criteria.</div>}><MaterialSymbol name="help" size="sm" className='text-gray-600 dark:text-gray-400'/></Tippy></Label>
+                             
+                            </Field>
                           {connectionFilters[index].map((filter, filterIndex) => (
                             <div key={filter.id} className='relative w-full'>
                               {/* Show AND/OR indicator (read-only) */}
@@ -1214,7 +1300,7 @@ export function WorkflowNodeAccordion({
                                 </div>
                               )}
                               
-                              <div className="flex items-center">
+                              <div className="flex items-center w-full">
                                 <div className="flex flex-auto bg-white dark:bg-zinc-900/40 items-center gap-2 rounded-lg text-xs border border-zinc-300 dark:border-zinc-800">
                                   <span className="rounded-md rounded-r-none px-2 bg-zinc-100 dark:bg-zinc-900/40  text-zinc-700 py-1 dark:text-zinc-300 border-r border-zinc-400 dark:border-zinc-800">
                                     {filter.type}
@@ -1274,7 +1360,7 @@ export function WorkflowNodeAccordion({
                 
               </div>
             ))}
-            {partialSave && (yamlConfig.spec.connections?.length !== undefined && yamlConfig.spec.connections?.length > 0) && (
+            {(yamlConfig.spec.connections?.length !== undefined && yamlConfig.spec.connections?.length > 0) && (
                 <>
                   <Divider/>
                   <Field className='flex justify-end'>
