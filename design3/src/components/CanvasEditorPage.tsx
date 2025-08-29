@@ -1808,7 +1808,7 @@ const computedEdges = edges.map(edge => {
               <Table dense>
                 <TableHead>
                   <TableRow>
-                    <TableHeader>Name</TableHeader>
+                    <TableHeader className='w-[40%]'>Name</TableHeader>
                     <TableHeader>Email</TableHeader>
                     <TableHeader>Role</TableHeader>
                     <TableHeader>Status</TableHeader>

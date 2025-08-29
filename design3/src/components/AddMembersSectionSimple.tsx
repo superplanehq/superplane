@@ -196,8 +196,9 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
       </div>
       
       <div className="space-y-4 flex flex-col justify-end items-end">
-        <div className="flex items-start gap-3 w-full">
-          <div className="flex-grow-1 w-full relative">
+        <div className="flex items-start gap-6 w-full">
+          <div className="flex-grow-1 w-full relative flex items-start gap-1">
+          
               <MultiCombobox
                 options={mockUsers}
                 displayValue={(user) => user.name}
@@ -236,18 +237,11 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
               
               return (
                 <div className='group w-full flex items-center gap-1'>
-                  {isCustomEmailSuggestion ? (
+                  {isCustomEmailSuggestion && (
                     // For custom emails, always show mail icon (both in dropdown and as tags)
-                    <div className="flex items-center justify-center size-6 bg-zinc-100 dark:bg-zinc-800 rounded-full">
+                    <div className="flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full">
                       <MaterialSymbol name="mail" size="sm" className="text-zinc-600 dark:text-zinc-400" />
                     </div>
-                  ) : (
-                    // For users from predefined list, show avatar
-                    <Avatar 
-                      src={user.avatar} 
-                      initials={user.name ? user.name.split(' ').map(n => n[0]).join('') : ''}
-                      className="size-6"
-                    />
                   )}
                   <MultiComboboxLabel className="flex flex-col">
                     {isSelected ? (
@@ -277,35 +271,33 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
                 </div>
               )
             }}
-          </MultiCombobox>
+              </MultiCombobox>
+          
+          
+              {showRoleSelection && (
+                <Dropdown>
+                  <DropdownButton outline className="flex items-center gap-2 text-sm">
+                    {userRole}
+                    <MaterialSymbol name="expand_more" size="md" />
+                  </DropdownButton>
+                  <DropdownMenu anchor="bottom end">
+                    <DropdownItem onClick={() => setUserRole('Owner')}>
+                      <DropdownLabel>Owner</DropdownLabel>
+                      <DropdownDescription>Full access to organization settings</DropdownDescription>
+                    </DropdownItem>
+                    <DropdownItem onClick={() => setUserRole('Admin')}>
+                      <DropdownLabel>Admin</DropdownLabel>
+                      <DropdownDescription>Can manage members and organization settings</DropdownDescription>
+                    </DropdownItem>
+                    <DropdownItem onClick={() => setUserRole('Member')}>
+                      <DropdownLabel>Member</DropdownLabel>
+                      <DropdownDescription>Standard member access</DropdownDescription>
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+              )}
+
           </div>
-          
-          {showRoleSelection && (
-            <Dropdown>
-              <DropdownButton outline className="flex items-center gap-2 text-sm !py-2.5">
-                {userRole}
-                <MaterialSymbol name="expand_more" size="md" />
-              </DropdownButton>
-              <DropdownMenu anchor="bottom end">
-                <DropdownItem onClick={() => setUserRole('Owner')}>
-                  <DropdownLabel>Owner</DropdownLabel>
-                  <DropdownDescription>Full access to organization settings</DropdownDescription>
-                </DropdownItem>
-                <DropdownItem onClick={() => setUserRole('Admin')}>
-                  <DropdownLabel>Admin</DropdownLabel>
-                  <DropdownDescription>Can manage members and organization settings</DropdownDescription>
-                </DropdownItem>
-                <DropdownItem onClick={() => setUserRole('Member')}>
-                  <DropdownLabel>Member</DropdownLabel>
-                  <DropdownDescription>Standard member access</DropdownDescription>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          )}
-          
-          
-        </div>
-          <div>
           <Button 
             color="blue" 
             className='flex items-center text-sm gap-2 whitespace-nowrap' 
@@ -315,7 +307,9 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
             <MaterialSymbol name="add" size="sm" />
             Invite {selectedUsers.length > 0 && `(${selectedUsers.length})`}
           </Button>
-          </div>
+          
+        </div>
+        
         
 
       </div>
@@ -342,10 +336,10 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
           </div>
         </div>
         <div className="px-6 pb-6">
-          <Table dense>
+          <Table dense bleed className='[--gutter:--spacing(6)]'>
             <TableHead>
               <TableRow>
-                <TableHeader>Name</TableHeader>
+                <TableHeader className='w-[40%]'>Name</TableHeader>
                 <TableHeader>Email</TableHeader>
                 <TableHeader>Role</TableHeader>
                 <TableHeader>Status</TableHeader>

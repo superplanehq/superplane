@@ -14,6 +14,7 @@ export function MultiCombobox<T extends { id: string }>({
   placeholder,
   autoFocus,
   'aria-label': ariaLabel,
+  showButton = false,
   children,
   value = [],
   onChange,
@@ -31,6 +32,7 @@ export function MultiCombobox<T extends { id: string }>({
   placeholder?: string
   autoFocus?: boolean
   'aria-label'?: string
+  showButton?: boolean
   children: (value: T, isSelected: boolean) => React.ReactElement
   value?: T[]
   onChange?: (values: T[]) => void
@@ -237,7 +239,7 @@ export function MultiCombobox<T extends { id: string }>({
               <span
                 key={option.id}
                 className={clsx(
-                  'inline-flex items-center gap-1 px-1 py-1 rounded-md text-xs',
+                  'inline-flex items-center gap-1 px-1 rounded-md text-xs',
                   isValid ? (
                     'bg-zinc-50 text-zinc-700 border border-zinc-200 dark:bg-zinc-800/20 dark:text-zinc-300 dark:border-zinc-800'
                   ) : (
@@ -255,7 +257,7 @@ export function MultiCombobox<T extends { id: string }>({
                     e.stopPropagation()
                     handleRemove(option)
                   }}
-                  className="ml-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 rounded p-0.5 transition-colors"
+                  className="ml-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 rounded transition-colors"
                 >
                   <MaterialSymbol name="close" size="sm" />
                 </button>
@@ -291,18 +293,12 @@ export function MultiCombobox<T extends { id: string }>({
             ])}
           />
         </div>
-
-        <Headless.ComboboxButton className="group absolute inset-y-0 right-0 flex items-center px-2">
-          <svg
-            className="size-5 stroke-zinc-500 group-data-disabled:stroke-zinc-600 group-data-hover:stroke-zinc-700 sm:size-4 dark:stroke-zinc-400 dark:group-data-hover:stroke-zinc-300 forced-colors:stroke-[CanvasText]"
-            viewBox="0 0 16 16"
-            aria-hidden="true"
-            fill="none"
-          >
-            <path d="M5.75 10.75L8 13L10.25 10.75" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M10.25 5.25L8 3L5.75 5.25" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+      {showButton && (
+         <Headless.ComboboxButton className="group absolute inset-y-0 right-0 flex items-center px-2">
+          <MaterialSymbol name="expand_more" size="sm" />
         </Headless.ComboboxButton>
+      )}
+       
       </span>
 
       {isOpen && (query === '' || hasMatches) && (
