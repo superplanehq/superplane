@@ -43,6 +43,22 @@ blocks:
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run build
 
+  - name: "🧪 Frontend Tests"
+    dependencies: [🔨 Frontend Build]
+    task:
+      prologue:
+        commands:
+          - checkout
+          - sem-version node 20
+      jobs:
+        - name: "UI Tests"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
+            - cd web_src
+            - npm ci
+            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
+            - npm run test:run
+
 after_pipeline:
   task:
     jobs:
