@@ -948,6 +948,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         currentEntityId={currentStageId}
                         validationError={validationErrors[`connection_${index}`]}
                         showFilters={true}
+                        existingConnections={connections}
                       />
                     }
                   />
