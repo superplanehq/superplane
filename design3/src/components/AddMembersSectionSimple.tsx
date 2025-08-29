@@ -243,7 +243,7 @@ export function AddMembersSectionSimple({ className, showRoleSelection = true, o
                       <MaterialSymbol name="mail" size="sm" className="text-zinc-600 dark:text-zinc-400" />
                     </div>
                   )}
-                  <MultiComboboxLabel className="flex flex-col">
+                  <MultiComboboxLabel className="flex flex-col w-full">
                     {isSelected ? (
                       // For tags, show different content based on type
                       <span className="font-medium">

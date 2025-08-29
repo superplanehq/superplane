@@ -266,6 +266,12 @@ export function WorkflowNodeAccordion({
   // State to track selected connection names for dropdowns
   const [selectedConnectionNames, setSelectedConnectionNames] = useState<Record<number, string>>({})
   
+  // State for conditions
+  const [conditions, setConditions] = useState<Array<{id: string, type: 'user_approval' | 'time_window', config: any}>>([])
+  
+  // State to track saved conditions (read-only mode)
+  const [savedConditions, setSavedConditions] = useState<Set<string>>(new Set())
+  
   // Initialize selected connection names from existing connections
   useEffect(() => {
     if (yamlConfig.spec.connections) {
@@ -704,6 +710,76 @@ export function WorkflowNodeAccordion({
     }
   }
 
+  // Condition handlers
+  const handleAddCondition = (type: 'user_approval' | 'time_window') => {
+    const newCondition = {
+      id: `condition_${Date.now()}`,
+      type,
+      config: type === 'user_approval' 
+        ? { approvers: [], requiredApprovals: 1 }
+        : { 
+            startTime: '--:--', 
+            endTime: '--:--', 
+            daysOfWeek: {
+              monday: false,
+              tuesday: false,
+              wednesday: false,
+              thursday: false,
+              friday: false,
+              saturday: false,
+              sunday: false
+            }
+          }
+    }
+    
+    setConditions(prev => [...prev, newCondition])
+    markSectionModified('conditions')
+  }
+
+  const handleRemoveCondition = (conditionId: string) => {
+    setConditions(prev => prev.filter(condition => condition.id !== conditionId))
+    markSectionModified('conditions')
+  }
+
+  const handleUpdateCondition = (conditionId: string, field: string, value: any) => {
+    setConditions(prev => 
+      prev.map(condition => 
+        condition.id === conditionId 
+          ? { ...condition, config: { ...condition.config, [field]: value } }
+          : condition
+      )
+    )
+    markSectionModified('conditions')
+  }
+
+  const handleSaveCondition = (conditionId: string) => {
+    setSavedConditions(prev => {
+      const newSaved = new Set(prev)
+      newSaved.add(conditionId)
+      return newSaved
+    })
+    clearSectionModified('conditions')
+  }
+
+  const handleCancelCondition = (conditionId: string) => {
+    // Remove the condition if it was just added and not saved yet
+    if (!savedConditions.has(conditionId)) {
+      handleRemoveCondition(conditionId)
+    } else {
+      // For existing saved conditions, we could revert to saved state
+      // For now, just keep the current state
+    }
+  }
+
+  const handleEditCondition = (conditionId: string) => {
+    setSavedConditions(prev => {
+      const newSaved = new Set(prev)
+      newSaved.delete(conditionId)
+      return newSaved
+    })
+    markSectionModified('conditions')
+  }
+
   const handleAddInputMapping = (inputId: string) => {
     const newMapping = {
       id: `mapping_${Date.now()}`,
@@ -929,24 +1005,52 @@ export function WorkflowNodeAccordion({
               <Tippy 
                 content={
                   <div className="p-3 max-w-sm">
-                    <div className="font-medium text-sm mb-2">
-                      Connection Errors
+                    <div className="font-medium text-sm mb-3">
+                      Connection Issues
                     </div>
-                    <div className="space-y-2">
-                      {errors.filter(e => e.type === 'connection').slice(0, 2).map((error) => (
-                        <div key={error.id} className="text-xs">
-                          <div className="font-medium">{error.message}</div>
-                          <div className="text-gray-200 dark:text-gray-300">{error.description}</div>
-                          {error.action && (
-                            <button 
-                              onClick={() => onResolveError?.(error.id)}
-                              className="text-blue-300 hover:text-blue-200 mt-1 underline"
-                            >
-                              {error.action}
-                            </button>
-                          )}
+                    <div className="space-y-3">
+                      {/* Broken Connections */}
+                      <div className="text-xs">
+                        <div className="font-medium text-red-300 flex items-center gap-1">
+                          <MaterialSymbol name="error" size="sm" />
+                          2 broken connections
                         </div>
-                      ))}
+                        <div className="text-gray-200 dark:text-gray-300 mt-1">
+                          Check the stage configuration
+                        </div>
+                      </div>
+
+                      {/* Failed Runs */}
+                      <div className="text-xs">
+                        <div className="font-medium text-orange-300 flex items-center gap-1">
+                          <MaterialSymbol name="warning" size="sm" />
+                          28 runs failed to start
+                        </div>
+                        <div className="text-gray-200 dark:text-gray-300 mt-1">
+                          In last 24h
+                        </div>
+                      </div>
+
+                      {/* Input Mapping Errors */}
+                      <div className="text-xs">
+                        <div className="font-medium text-yellow-300 flex items-center gap-1">
+                          <MaterialSymbol name="link_off" size="sm" />
+                          2 input mapping errors
+                        </div>
+                        <div className="text-gray-200 dark:text-gray-300 mt-1">
+                          Detected in workflow configuration
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Action Button */}
+                    <div className="mt-3 pt-3 border-t border-gray-600">
+                      <button 
+                        onClick={() => onResolveError?.('connection-issues')}
+                        className="text-blue-300 hover:text-blue-200 text-xs underline"
+                      >
+                        View detailed diagnostics →
+                      </button>
                     </div>
                   </div>
                 }
@@ -1116,14 +1220,14 @@ export function WorkflowNodeAccordion({
                             e.preventDefault()
                             console.log('Add filters clicked - adding filter for connection 0')
                             handleAddFilter(0)
-                            console.log(connectionFilters[0]);
+                            
                           }}
                         >
                           <MaterialSymbol name="add" size="sm"/>
-                          {connectionFilters[0] && connectionFilters[0].length == 0 ? <span>Add filters</span> : <span>Add filter</span>}
-                          {connectionFilters[0] && connectionFilters[0].length == 0 && <span className="text-xs text-zinc-600 dark:text-zinc-400">(optional)</span>}
+                          {Object.keys(connectionFilters).length == 0 ||(connectionFilters[0] && connectionFilters[0].length == 0) ? <span>Add filters</span> : <span>Add filter</span>}
+                          {Object.keys(connectionFilters).length == 0 || (connectionFilters[0] && connectionFilters[0].length == 0)  && <span className="text-xs text-zinc-600 dark:text-zinc-400">(optional)</span>}
                         </Link>
-                        {connectionFilters[0] && connectionFilters[0].length == 0 && (
+                        {(Object.keys(connectionFilters).length == 0 || (connectionFilters[0] && connectionFilters[0].length == 0)) && (
                           <Tippy content={<div className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-xs max-w-50">Filters allow you to filter events based on specific criteria.</div>}>
                             <Link href="#"><MaterialSymbol name="help" size="sm" className='text-gray-600 dark:text-gray-400'/></Link>
                           </Tippy>
@@ -1502,11 +1606,239 @@ export function WorkflowNodeAccordion({
           
           <Divider/>
           <Field>
-            <Label className='flex items-center gap-1'>Conditions <span className="text-xs text-gray-600 dark:text-zinc-400 font-light">(optional)</span> <Tippy content="Conditions allow you to filter events based on specific criteria." placement="top"><MaterialSymbol name="help" size="sm"/></Tippy> </Label>
-            <Link href="#" className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1 mt-2">
-              <MaterialSymbol name="add" size="sm"/>
-              <span>Add condition</span>
-            </Link>
+            <Label className='flex items-center gap-1'>Conditions <span className="text-xs text-gray-600 dark:text-zinc-400 font-light">(optional)</span> <Tippy content="Conditions allow you to control when the workflow continues execution." placement="top"><MaterialSymbol name="help" size="sm"/></Tippy> </Label>
+            
+            {/* Render existing conditions */}
+            {conditions.map((condition) => {
+              const isReadOnly = savedConditions.has(condition.id)
+              
+              return (
+                <div key={condition.id} className={`mt-2 p-3 border rounded-lg ${
+                  isReadOnly 
+                    ? 'border-zinc-50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/20' 
+                    : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <MaterialSymbol 
+                        name={condition.type === 'user_approval' ? 'person_check' : 'schedule'} 
+                        size="sm" 
+                        className="text-blue-600 dark:text-blue-400" 
+                      />
+                      <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                        {condition.type === 'user_approval' ? 'User Approval' : 'Time Window'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {isReadOnly ? (
+                        <>
+                          <Button
+                            plain
+                            onClick={() => handleEditCondition(condition.id)}
+                            className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                          >
+                            <MaterialSymbol name="edit" size="sm" />
+                          </Button>
+                          <Button
+                            plain
+                            onClick={() => handleRemoveCondition(condition.id)}
+                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                          >
+                            <MaterialSymbol name="close" size="sm" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          plain
+                          onClick={() => handleRemoveCondition(condition.id)}
+                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                        >
+                          <MaterialSymbol name="close" size="sm" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {isReadOnly ? (
+                    // Read-only mode
+                    <div className="space-y-2">
+                      {condition.type === 'user_approval' ? (
+                        <>
+                          <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                            <span className="font-medium">Required Approvals:</span> {condition.config.requiredApprovals}
+                          </div>
+                          <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                            <span className="font-medium">Approvers:</span> {
+                              condition.config.approvers.length > 0 
+                                ? condition.config.approvers.join(', ') 
+                                : 'None specified'
+                            }
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                            <span className="font-medium">Time Range:</span> {condition.config.startTime} - {condition.config.endTime}
+                          </div>
+                          <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                            <span className="font-medium">Days:</span> {
+                              Object.entries(condition.config.daysOfWeek || {})
+                                .filter(([_, selected]) => selected)
+                                .map(([day, _]) => day.charAt(0).toUpperCase() + day.slice(1))
+                                .join(', ') || 'None selected'
+                            }
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Editable mode
+                    <>
+                      {condition.type === 'user_approval' ? (
+                        <div className="space-y-2">
+                          <Field>
+                            <Label className="text-xs">Required Approvals</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={condition.config.requiredApprovals}
+                              onChange={(e) => handleUpdateCondition(condition.id, 'requiredApprovals', parseInt(e.target.value))}
+                              className="text-xs"
+                            />
+                          </Field>
+                          <Field>
+                            <Label className="text-xs">Approvers (comma-separated emails)</Label>
+                            <Input
+                              placeholder="user1@example.com, user2@example.com"
+                              value={condition.config.approvers.join(', ')}
+                              onChange={(e) => handleUpdateCondition(condition.id, 'approvers', e.target.value.split(',').map((email: string) => email.trim()).filter(Boolean))}
+                              className="text-xs"
+                            />
+                          </Field>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Time Range */}
+                          <div className="flex items-center gap-2">
+                            <Field className="flex-1">
+                              <Label className="text-xs">Start Time</Label>
+                              <div className="relative">
+                                <Input
+                                  type="time"
+                                  value={condition.config.startTime === '--:--' ? '' : condition.config.startTime}
+                                  onChange={(e) => handleUpdateCondition(condition.id, 'startTime', e.target.value || '--:--')}
+                                  className="text-xs pr-8"
+                                />
+                                <MaterialSymbol 
+                                  name="schedule" 
+                                  size="sm" 
+                                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-zinc-400 pointer-events-none" 
+                                />
+                              </div>
+                            </Field>
+                            <Field className="flex-1">
+                              <Label className="text-xs">End Time</Label>
+                              <div className="relative">
+                                <Input
+                                  type="time"
+                                  value={condition.config.endTime === '--:--' ? '' : condition.config.endTime}
+                                  onChange={(e) => handleUpdateCondition(condition.id, 'endTime', e.target.value || '--:--')}
+                                  className="text-xs pr-8"
+                                />
+                                <MaterialSymbol 
+                                  name="schedule" 
+                                  size="sm" 
+                                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-zinc-400 pointer-events-none" 
+                                />
+                              </div>
+                            </Field>
+                          </div>
+                          
+                          {/* Days of Week */}
+                          <Field>
+                            <Label className="text-xs mb-2">Days of Week</Label>
+                            <div className="grid grid-cols-7 gap-2">
+                              {[
+                                { key: 'monday', label: 'Mon' },
+                                { key: 'tuesday', label: 'Tue' },
+                                { key: 'wednesday', label: 'Wed' },
+                                { key: 'thursday', label: 'Thu' },
+                                { key: 'friday', label: 'Fri' },
+                                { key: 'saturday', label: 'Sat' },
+                                { key: 'sunday', label: 'Sun' }
+                              ].map((day) => (
+                                <label
+                                  key={day.key}
+                                  className={`flex flex-col items-center p-2 border rounded cursor-pointer transition-colors text-xs ${
+                                    condition.config.daysOfWeek?.[day.key]
+                                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                      : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={condition.config.daysOfWeek?.[day.key] || false}
+                                    onChange={(e) => {
+                                      const newDaysOfWeek = {
+                                        ...condition.config.daysOfWeek,
+                                        [day.key]: e.target.checked
+                                      }
+                                      handleUpdateCondition(condition.id, 'daysOfWeek', newDaysOfWeek)
+                                    }}
+                                    className="sr-only"
+                                  />
+                                  <span className="font-medium">{day.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </Field>
+                        </div>
+                      )}
+                      
+                      {/* Save/Cancel buttons for editable mode */}
+                      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                        <Button
+                          plain
+                          onClick={() => handleCancelCondition(condition.id)}
+                          className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          color="blue"
+                          onClick={() => handleSaveCondition(condition.id)}
+                          className="text-xs"
+                        >
+                          <MaterialSymbol name="check" size="sm" />
+                          Save
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+            
+            {/* Add condition dropdown */}
+            <div className="mt-2">
+              <Dropdown>
+                <DropdownButton plain className="!text-xs !text-blue-700 dark:!text-blue-400 flex items-center gap-1 hover:bg-transparent dark:hover:bg-transparent !font-normal">
+                  <MaterialSymbol name="add" size="sm"/>
+                  <span>Add condition</span>
+                  <MaterialSymbol name="expand_more" size="sm" />
+                </DropdownButton>
+                <DropdownMenu anchor="bottom start">
+                  <DropdownItem className='flex items-center gap-2' onClick={() => handleAddCondition('user_approval')}>
+                    <MaterialSymbol name="person_check" size="sm" />
+                    <DropdownLabel>User Approval</DropdownLabel>
+                  </DropdownItem>
+                  <DropdownItem className='flex items-center gap-2' onClick={() => handleAddCondition('time_window')}>
+                    <MaterialSymbol name="schedule" size="sm" />
+                    <DropdownLabel>Time Window</DropdownLabel>
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </div>
            
           </Field>
          
@@ -2067,10 +2399,10 @@ export function WorkflowNodeAccordion({
                                 console.log('Executor cancelled');
                               }}
                             >
-                              Cancel
+                              <MaterialSymbol name="close" size="sm" />
                             </Button>
                             <Button
-                              color='blue'
+                              color='white'
                               className='flex items-center !text-xs'
                               onClick={() => {
                                 // Save executor
@@ -2090,8 +2422,7 @@ export function WorkflowNodeAccordion({
                                 console.log('Executor saved:', yamlConfig.spec.executor);
                               }}
                             >
-                              <MaterialSymbol name="save" size="sm" />
-                              Save
+                              <MaterialSymbol name="check" size="sm" />
                             </Button>
                           </div>
                         )}
@@ -2727,42 +3058,46 @@ export function WorkflowNodeAccordion({
           {errors.filter(e => e.type === 'connection').length > 0 && (
             <Tippy 
             content={
-              <div className="p-3 max-w-sm bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg">
-                <div className="font-medium text-sm mb-2">
-                  Connection Errors
-                </div>
-                <div className="space-y-2">
-                  {errors.filter(e => e.type === 'connection').slice(0, 2).map((error) => (
-                    <div key={error.id} className="text-xs">
-                      <div className="font-medium">{error.message}</div>
-                      <div className="text-gray-700 dark:text-gray-300">{error.description}</div>
-                      
-                    </div>
-                  ))}
+              <div className="p-4 max-w-sm bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg">
+                <div className="font-medium text-sm mb-4 text-gray-900 dark:text-white">
+                  Errors
                 </div>
                 
-                {/* Run Errors Section */}
-                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-zinc-700">
-                  <div className="font-medium text-sm mb-2">
-                    Recent Run Errors
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-xs">
-                      <div className="font-medium">Failed to establish connection</div>
-                      <div className="text-gray-700 dark:text-gray-300">Connection timed out after 30s</div>
-                      <div className="text-gray-500 dark:text-gray-400 mt-1">2 minutes ago</div>
-                    </div>
-                    <div className="text-xs">
-                      <div className="font-medium">Authentication failed</div>
-                      <div className="text-gray-700 dark:text-gray-300">Invalid credentials provided</div>
-                      <div className="text-gray-500 dark:text-gray-400 mt-1">5 minutes ago</div>
+           
+
+                {/* Error Details */}
+                <div className="space-y-1">
+                  <div>
+                    <div className="flex items-start gap-2 text-xs font-mono text-gray-700 dark:text-gray-300 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                    <MaterialSymbol name="cancel" fill={1} size="sm" className='text-red-600 dark:text-red-400 -mt-0.5' /> 
+                    <span className='block'>2 broken connections. Check the stage configuration</span>
                     </div>
                   </div>
-                  <div className="mt-2 pt-2 border-t border-gray-100 dark:border-zinc-600">
-                    <div className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer">
-                      View all run logs →
+                  
+                  <div>
+                    <div className="flex items-start gap-2 text-xs font-mono text-gray-700 dark:text-gray-300 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
+                    <MaterialSymbol name="warning" fill={1} size="sm" className='text-yellow-600 dark:text-yellow-400 -mt-0.5' /> 
+                    <span className='block'>28 runs failed to start in last 24h</span>
                     </div>
                   </div>
+                  
+                  <div>
+                    <div className="flex items-start gap-2 text-xs font-mono text-gray-700 dark:text-gray-300 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                    <MaterialSymbol name="cancel" fill={1} size="sm" className='text-red-600 dark:text-red-400 -mt-0.5' /> 
+                    <span className='block'>2 input mapping errors detected</span>
+                    </div>
+                  </div>
+                </div>
+                
+                
+                {/* Action Button */}
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-zinc-600">
+                  <button 
+                    onClick={() => onResolveError?.('connection-issues')}
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs underline font-medium"
+                  >
+                    View detailed diagnostics →
+                  </button>
                 </div>
               </div>
             }
@@ -2953,41 +3288,52 @@ export function WorkflowNodeAccordion({
             <Tippy 
             content={
               <div className="p-3 max-w-sm bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg">
-                <div className="font-medium text-sm mb-2">
-                  Connection Errors
+                <div className="font-medium text-sm mb-3 text-gray-900 dark:text-white">
+                  Connection Issues
                 </div>
-                <div className="space-y-2">
-                  {errors.filter(e => e.type === 'connection').slice(0, 2).map((error) => (
-                    <div key={error.id} className="text-xs">
-                      <div className="font-medium">{error.message}</div>
-                      <div className="text-gray-700 dark:text-gray-300">{error.description}</div>
-                      
+                <div className="space-y-3">
+                  {/* Broken Connections */}
+                  <div className="text-xs">
+                    <div className="font-medium text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <MaterialSymbol name="error" size="sm" />
+                      2 broken connections
                     </div>
-                  ))}
+                    <div className="text-gray-700 dark:text-gray-300 mt-1">
+                      Check the stage configuration
+                    </div>
+                  </div>
+
+                  {/* Failed Runs */}
+                  <div className="text-xs">
+                    <div className="font-medium text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                      <MaterialSymbol name="warning" size="sm" />
+                      28 runs failed to start
+                    </div>
+                    <div className="text-gray-700 dark:text-gray-300 mt-1">
+                      In last 24h
+                    </div>
+                  </div>
+
+                  {/* Input Mapping Errors */}
+                  <div className="text-xs">
+                    <div className="font-medium text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                      <MaterialSymbol name="link_off" size="sm" />
+                      2 input mapping errors
+                    </div>
+                    <div className="text-gray-700 dark:text-gray-300 mt-1">
+                      Detected in workflow configuration
+                    </div>
+                  </div>
                 </div>
                 
-                {/* Run Errors Section */}
-                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-zinc-700">
-                  <div className="font-medium text-sm mb-2">
-                    Recent Run Errors
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-xs">
-                      <div className="font-medium">Failed to establish connection</div>
-                      <div className="text-gray-700 dark:text-gray-300">Connection timed out after 30s</div>
-                      <div className="text-gray-500 dark:text-gray-400 mt-1">2 minutes ago</div>
-                    </div>
-                    <div className="text-xs">
-                      <div className="font-medium">Authentication failed</div>
-                      <div className="text-gray-700 dark:text-gray-300">Invalid credentials provided</div>
-                      <div className="text-gray-500 dark:text-gray-400 mt-1">5 minutes ago</div>
-                    </div>
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-gray-100 dark:border-zinc-600">
-                    <div className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer">
-                      View all run logs →
-                    </div>
-                  </div>
+                {/* Action Button */}
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-zinc-600">
+                  <button 
+                    onClick={() => onResolveError?.('connection-issues')}
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs underline font-medium"
+                  >
+                    View detailed diagnostics →
+                  </button>
                 </div>
               </div>
             }
