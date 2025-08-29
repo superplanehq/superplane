@@ -24,6 +24,14 @@ export function Canvas() {
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
   const [canvasName, setCanvasName] = useState<string>('');
 
+  useEffect(() => {
+    if (canvasName) {
+      document.title = `${canvasName} - Superplane`;
+    } else {
+      document.title = 'Superplane';
+    }
+  }, [canvasName]);
+
   const getActiveViewFromHash = (): CanvasView => {
     const hash = location.hash.substring(1);
     switch (hash) {
