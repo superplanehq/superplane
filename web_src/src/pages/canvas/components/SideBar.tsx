@@ -13,7 +13,7 @@ import { SettingsTab } from "./tabs/SettingsTab";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
-import { SuperplaneEvent, SuperplaneExecution } from "@/api-client";
+import { SuperplaneConnectionType, SuperplaneEvent, SuperplaneExecution } from "@/api-client";
 import { useCanvasStore } from "../store/canvasStore";
 
 const StageImageMap = {
@@ -41,41 +41,52 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     { key: 'settings', label: 'Settings' },
   ], []);
 
-  const allConnections = useMemo(() =>
-    selectedStage.spec?.connections?.map(connection => ({ type: connection.type, id: connection.name })),
+  const allConnections: { type: SuperplaneConnectionType; name: string }[] = useMemo(() =>
+    selectedStage.spec?.connections
+      ?.map(connection => ({ type: connection.type as SuperplaneConnectionType, name: connection.name as string })) || [],
     [selectedStage.spec?.connections]
   );
 
   const connectionEventsById = useMemo(() => {
     const plainEventsById: Record<string, SuperplaneEvent> = {};
 
-    const hasEventSourceConnection = allConnections?.some(connection => connection.type === 'TYPE_EVENT_SOURCE');
-    const hasStageConnection = allConnections?.some(connection => connection.type === 'TYPE_STAGE');
-    const hasConnectionGroupConnection = allConnections?.some(connection => connection.type === 'TYPE_CONNECTION_GROUP');
+    const connectedEventSourceNames = new Set<string>();
+    const connectedStageNames = new Set<string>();
+    const connectedConnectionGroupNames = new Set<string>();
 
-    if (hasEventSourceConnection) {
-      eventSources.forEach(eventSource => {
+    allConnections.forEach(connection => {
+      if (connection.type === 'TYPE_EVENT_SOURCE') {
+        connectedEventSourceNames.add(connection.name);
+      } else if (connection.type === 'TYPE_STAGE') {
+        connectedStageNames.add(connection.name);
+      } else if (connection.type === 'TYPE_CONNECTION_GROUP') {
+        connectedConnectionGroupNames.add(connection.name);
+      }
+    });
+
+    eventSources.forEach(eventSource => {
+      if (connectedEventSourceNames.has(eventSource.metadata?.name || '')) {
         eventSource?.events?.forEach(event => {
           plainEventsById[event?.id || ''] = event;
-        })
-      })
-    }
+        });
+      }
+    });
 
-    if (hasStageConnection) {
-      stages.forEach(stage => {
+    stages.forEach(stage => {
+      if (connectedStageNames.has(stage.metadata?.name || '')) {
         stage?.events?.forEach(event => {
           plainEventsById[event?.id || ''] = event;
-        })
-      })
-    }
+        });
+      }
+    });
 
-    if (hasConnectionGroupConnection) {
-      connectionGroups.forEach(connectionGroup => {
+    connectionGroups.forEach(connectionGroup => {
+      if (connectedConnectionGroupNames.has(connectionGroup.metadata?.name || '')) {
         connectionGroup?.events?.forEach(event => {
           plainEventsById[event?.id || ''] = event;
-        })
-      })
-    }
+        });
+      }
+    });
 
     return plainEventsById;
   }, [allConnections, eventSources, stages, connectionGroups]);
