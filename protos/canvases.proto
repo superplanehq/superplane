@@ -778,6 +778,7 @@ message StageEvent {
   Execution execution = 8;
   repeated KeyValuePair inputs = 9;
   string name = 10;
+  string event_id = 11;
 }
 
 message KeyValuePair {

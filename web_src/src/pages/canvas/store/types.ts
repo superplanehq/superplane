@@ -10,7 +10,7 @@ export interface CanvasState {
   canvasId: string;
   stages: StageWithEventQueue[];
   eventSources: EventSourceWithEvents[];
-  connectionGroups: SuperplaneConnectionGroup[];
+  connectionGroups: ConnectionGroupWithEvents[];
   nodePositions: Record<string, { x: number, y: number }>;
   selectedStageId: string | null;
   selectedEventSourceId: string | null;
@@ -23,12 +23,12 @@ export interface CanvasState {
   
   // Actions
   initialize: (data: CanvasData) => void;
-  addStage: (stage: SuperplaneStage, draft?: boolean, autoLayout?: boolean) => void;
+  addStage: (stage: StageWithEventQueue, draft?: boolean, autoLayout?: boolean) => void;
   removeStage: (stageId: string) => void;
-  addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
+  addConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => void;
   removeConnectionGroup: (connectionGroupId: string) => void;
-  updateConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
-  updateStage: (stage: SuperplaneStage) => void;
+  updateConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => void;
+  updateStage: (stage: StageWithEventQueue) => void;
   addEventSource: (eventSource: EventSourceWithEvents, autoLayout?: boolean) => void;
   removeEventSource: (eventSourceId: string) => void;
   updateEventSource: (eventSource: EventSourceWithEvents) => void;
@@ -47,6 +47,8 @@ export interface CanvasState {
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
   syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
   syncEventSourceEvents: (canvasId: string, eventSourceId: string) => Promise<void>;
+  syncStagePlainEvents: (canvasId: string, stageId: string) => Promise<void>;
+  syncConnectionGroupPlainEvents: (canvasId: string, connectionGroupId: string) => Promise<void>;
 
   // flow fields
   nodes: AllNodeType[];
@@ -89,6 +91,7 @@ export interface CanvasState {
   setLockedNodes: (locked: boolean) => void;
 }
 
-export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; isDraft?: boolean}
+export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; events: Array<SuperplaneEvent>; isDraft?: boolean}
 export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneEvent>; eventSourceType?: string; eventFilters?: Array<EventSourceEventType>}
+export type ConnectionGroupWithEvents = SuperplaneConnectionGroup & {events: Array<SuperplaneEvent>}
 export type ExecutionWithEvent = SuperplaneExecution & {event: SuperplaneStageEvent}

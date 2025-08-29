@@ -3794,6 +3794,7 @@ type StageEvent struct {
 	Execution     *Execution             `protobuf:"bytes,8,opt,name=execution,proto3" json:"execution,omitempty"`
 	Inputs        []*KeyValuePair        `protobuf:"bytes,9,rep,name=inputs,proto3" json:"inputs,omitempty"`
 	Name          string                 `protobuf:"bytes,10,opt,name=name,proto3" json:"name,omitempty"`
+	EventId       string                 `protobuf:"bytes,11,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3894,6 +3895,13 @@ func (x *StageEvent) GetInputs() []*KeyValuePair {
 func (x *StageEvent) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *StageEvent) GetEventId() string {
+	if x != nil {
+		return x.EventId
 	}
 	return ""
 }
@@ -6847,7 +6855,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x06states\x18\x03 \x03(\x0e2\x1c.Superplane.StageEvent.StateR\x06states\x12G\n" +
 	"\rstate_reasons\x18\x04 \x03(\x0e2\".Superplane.StageEvent.StateReasonR\fstateReasons\"I\n" +
 	"\x17ListStageEventsResponse\x12.\n" +
-	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\x91\x06\n" +
+	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\xac\x06\n" +
 	"\n" +
 	"StageEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -6862,7 +6870,8 @@ const file_canvases_proto_rawDesc = "" +
 	"\texecution\x18\b \x01(\v2\x15.Superplane.ExecutionR\texecution\x120\n" +
 	"\x06inputs\x18\t \x03(\v2\x18.Superplane.KeyValuePairR\x06inputs\x12\x12\n" +
 	"\x04name\x18\n" +
-	" \x01(\tR\x04name\"U\n" +
+	" \x01(\tR\x04name\x12\x19\n" +
+	"\bevent_id\x18\v \x01(\tR\aeventId\"U\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +

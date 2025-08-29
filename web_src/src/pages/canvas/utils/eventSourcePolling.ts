@@ -1,27 +1,53 @@
 import { useCanvasStore } from '../store/canvasStore';
+import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from '../store/types';
 
-export const pollEventSourceUntilNoPending = async (canvasId: string, eventSourceId: string) => {
+const buildPollFunction = (sourceType: 'event-source' | 'connection-group' | 'stage', canvasId: string, sourceId: string, syncFunction: (canvasId: string, sourceId: string) => Promise<void>) => {
   const maxAttempts = 20;
   const pollInterval = 1000;
   let attempts = 0;
 
   const poll = async (): Promise<void> => {
     attempts++;
-    await useCanvasStore.getState().syncEventSourceEvents(canvasId, eventSourceId);
+    await syncFunction(canvasId, sourceId);
     
-    const currentEventSources = useCanvasStore.getState().eventSources;
-    const eventSource = currentEventSources.find(es => es.metadata?.id === eventSourceId);
+    let currentSources: EventSourceWithEvents[] | ConnectionGroupWithEvents[] | StageWithEventQueue[] = []
     
-    if (!eventSource) {
+    if (sourceType === 'event-source') {
+      currentSources = useCanvasStore.getState().eventSources;
+    } else if (sourceType === 'connection-group') {
+      currentSources = useCanvasStore.getState().connectionGroups;
+    } else if (sourceType === 'stage') {
+      currentSources = useCanvasStore.getState().stages;
+    }
+    
+    const source = currentSources.find(s => s.metadata?.id === sourceId);
+    
+    if (!source) {
       return;
     }
 
-    const hasPendingEvents = eventSource.events?.some(event => event.state === 'STATE_PENDING') ?? false;
+    const hasPendingEvents = source.events?.some(event => event.state === 'STATE_PENDING') ?? false;
     
     if (hasPendingEvents && attempts < maxAttempts) {
       setTimeout(poll, pollInterval);
     }
   };
 
+  return poll;
+};
+
+export const pollEventSourceUntilNoPending = async (canvasId: string, eventSourceId: string) => {
+  const poll = buildPollFunction('event-source', canvasId, eventSourceId, useCanvasStore.getState().syncEventSourceEvents);
   await poll();
 };
+
+export const pollConnectionGroupUntilNoPending = async (canvasId: string, connectionGroupId: string) => {
+  const poll = buildPollFunction('connection-group', canvasId, connectionGroupId, useCanvasStore.getState().syncConnectionGroupPlainEvents);
+  await poll();
+};
+
+export const pollStageUntilNoPending = async (canvasId: string, stageId: string) => {
+  const poll = buildPollFunction('stage', canvasId, stageId, useCanvasStore.getState().syncStagePlainEvents);
+  await poll();
+};
+    

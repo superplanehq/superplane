@@ -1,6 +1,6 @@
 import { useCanvasStore } from '../store/canvasStore';
 import { NodeType, createEmptyNode, CreateNodeParams } from './nodeFactories';
-import { EventSourceWithEvents } from '../store/types';
+import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from '../store/types';
 
 /**
  * Hook that provides modular node handling functionality
@@ -21,7 +21,13 @@ export const useNodeHandlers = (canvasId: string) => {
       switch (nodeType) {
         case 'stage': {
           const stage = createEmptyNode('stage', params);
-          addStage(stage, true); // true = draft mode
+          const stageWithEventQueue: StageWithEventQueue = {
+            ...stage,
+            queue: [],
+            events: [],
+            isDraft: true
+          };
+          addStage(stageWithEventQueue, true); // true = draft mode
           return stage.metadata?.id || '';
         }
         
@@ -39,7 +45,11 @@ export const useNodeHandlers = (canvasId: string) => {
         
         case 'connection_group': {
           const connectionGroup = createEmptyNode('connection_group', params);
-          addConnectionGroup(connectionGroup);
+          const connectionGroupWithEvents: ConnectionGroupWithEvents = {
+            ...connectionGroup,
+            events: [],
+          };
+          addConnectionGroup(connectionGroupWithEvents);
           return connectionGroup.metadata?.id || '';
         }
         
