@@ -228,7 +228,7 @@ const initialNodesData = [
       title: 'Production - US',
       description: '',
       type: 'stage',
-      status: 'failed',
+      status: 'error',
       icon: 'github',
       nodeNumber: 11,
       queueIcon: 'pause',

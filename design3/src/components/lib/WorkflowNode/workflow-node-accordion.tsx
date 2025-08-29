@@ -5,7 +5,7 @@ import { getStatusConfig } from '../../../utils/status-config'
 import { Button } from '../Button/button'
 import { Input } from '../Input/input'
 import { Textarea } from '../Textarea/textarea'
-import { Field, Label } from '../Fieldset/fieldset'
+import { Description, Field, Label } from '../Fieldset/fieldset'
 import { 
   Dropdown, 
   DropdownButton, 
@@ -364,6 +364,16 @@ export function WorkflowNodeAccordion({
 
   // Individual section save handlers
   const handleConnectionsSave = () => {
+    // Add all current connections to saved connections (read-only mode)
+    if (yamlConfig.spec.connections) {
+      const allConnectionIndices = yamlConfig.spec.connections.map((_, index) => index)
+      setSavedConnections(prev => {
+        const newSaved = new Set(prev)
+        allConnectionIndices.forEach(index => newSaved.add(index))
+        return newSaved
+      })
+    }
+    
     onUpdate?.({
       yamlConfig: {
         ...yamlConfig,
@@ -977,7 +987,336 @@ export function WorkflowNodeAccordion({
             
           
             <div className="flex-auto space-y-1 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-2 rounded-sm">
-              <div className="flex flex-col">
+              <div className="connection flex flex-col">
+                
+                <Field className="flex flex-col items-start gap-2">
+                 
+                  <Badge color='blue' className='mt-1'>Trigger 1 </Badge>
+                
+                  
+                    <Dropdown>
+                      <DropdownButton color='white' className="!justify-between flex items-center w-full">
+                        {selectedConnectionNames[0] || "Select event source or stage"}
+                        <MaterialSymbol name="expand_more" size="md" />
+                      </DropdownButton>
+                      <DropdownMenu anchor="bottom start">
+                        <DropdownItem className='flex items-center gap-2' onClick={() => {
+                          const newConnections = [...(yamlConfig.spec.connections || [])]
+                          newConnections.push({ type: 'stage', name: 'Deploy to staging', config: {} })
+                          setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+                          // Update selected connection name for dropdown display
+                          setSelectedConnectionNames(prev => ({ ...prev, 0: 'Deploy to staging' }))
+                          // Mark as modified since we're adding a new connection
+                          markSectionModified('connections');
+                        }}>
+                          
+                            <MaterialSymbol name="rocket_launch" size="md" />
+                            <DropdownLabel> Deploy to staging</DropdownLabel>
+                        </DropdownItem>
+                        <DropdownItem className='flex items-center gap-2' onClick={() => {
+                          const newConnections = [...(yamlConfig.spec.connections || [])]
+                          newConnections.push({ type: 'event source', name: 'Github webhook', config: {} })
+                          setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+                          // Update selected connection name for dropdown display
+                          setSelectedConnectionNames(prev => ({ ...prev, 0: 'Github webhook' }))
+                          // Mark as modified since we're adding a new connection
+                          markSectionModified('connections');
+                        }}>
+                          
+                          <MaterialSymbol name="bolt" size="sm" />
+                          <DropdownLabel>Github webhook</DropdownLabel>
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                    {/* Filters Section for first connection */}
+                    {connectionFilters[0] && connectionFilters[0].length > 0 && (
+                      <div className="mt-1 w-full">
+                        <Field className='flex items-center gap-2 mb-1'>
+                          <Label>Filters</Label>
+                          <Tippy
+                            content={
+                              <div className="p-3 max-w-sm">
+                                <div className=" text-sm mb-2">
+                                  Connection Filters
+                                </div>
+                               
+                              </div>
+                            }
+                            theme="dark"
+                            placement="top"
+                            arrow={true}
+                            interactive={true}
+                          >
+                            <MaterialSymbol name="help" size="md" />
+                          </Tippy>
+                        </Field>
+                        {connectionFilters[0].map((filter, filterIndex) => (
+                          <div key={filter.id} className='relative w-full mb-1'>
+                            {/* Show AND/OR indicator */}
+                            {filter.operator && filterIndex > 0 && (
+                              <div className="relative justify-center flex items-center mb-1">
+                                <button 
+                                  onClick={() => handleToggleOperator(0, filter.id)}
+                                  className="!text-xs font-medium !px-2 !py-0 text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 rounded-sm border border-zinc-300 dark:border-zinc-600 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
+                                >
+                                  {filter.operator}
+                                </button>
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center w-full">
+                              <div className="p-1 flex flex-auto bg-white dark:bg-zinc-900/40 items-center rounded-lg text-xs border border-zinc-300 dark:border-zinc-800">
+                               <div className="flex items-center gap-2 flex-grow-1">
+                                  <Dropdown>
+                                    <DropdownButton 
+                                      outline 
+                                    >
+                                      {filter.type}
+                                      <MaterialSymbol name="expand_more" size="sm" />
+                                    </DropdownButton>
+                                    <DropdownMenu anchor="bottom start">
+                                      <DropdownItem onClick={() => handleUpdateFilter(0, filter.id, 'type', 'Data')}>
+                                        <DropdownLabel>Data</DropdownLabel>
+                                      </DropdownItem>
+                                      <DropdownItem onClick={() => handleUpdateFilter(0, filter.id, 'type', 'Event')}>
+                                        <DropdownLabel>Event</DropdownLabel>
+                                      </DropdownItem>
+                                      <DropdownItem onClick={() => handleUpdateFilter(0, filter.id, 'type', 'User')}>
+                                        <DropdownLabel>User</DropdownLabel>
+                                      </DropdownItem>
+                                    </DropdownMenu>
+                                  </Dropdown>
+                                  <Input
+                                    value={filter.expression}
+                                    onChange={(e) => handleUpdateFilter(0, filter.id, 'expression', e.target.value)}
+                                    placeholder="Filter expression"
+                                    
+                                  />
+                                </div>
+                                <Button
+                                plain
+                                className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 "
+                                onClick={() => handleRemoveFilter(0, filter.id)}
+                              >
+                                <MaterialSymbol name="close" size="sm" />
+                              </Button>
+                              </div>
+                              
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className='flex items-center justify-between w-full'>
+                      <div className='flex items-center gap-1'>
+                        <Link 
+                          href="#" 
+                          className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            console.log('Add filters clicked - adding filter for connection 0')
+                            handleAddFilter(0)
+                            console.log(connectionFilters[0]);
+                          }}
+                        >
+                          <MaterialSymbol name="add" size="sm"/>
+                          {connectionFilters[0] && connectionFilters[0].length == 0 ? <span>Add filters</span> : <span>Add filter</span>}
+                          {connectionFilters[0] && connectionFilters[0].length == 0 && <span className="text-xs text-zinc-600 dark:text-zinc-400">(optional)</span>}
+                        </Link>
+                        {connectionFilters[0] && connectionFilters[0].length == 0 && (
+                          <Tippy content={<div className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-xs max-w-50">Filters allow you to filter events based on specific criteria.</div>}>
+                            <Link href="#"><MaterialSymbol name="help" size="sm" className='text-gray-600 dark:text-gray-400'/></Link>
+                          </Tippy>
+                        )}
+                      </div>
+                      <div className='flex items-center gap-1'>
+                       <Button plain>
+                        <MaterialSymbol name="close" size="sm"/>
+                       </Button>
+                        <Button
+                          color='white'
+                          onClick={handleConnectionsSave}
+                        >
+                          <MaterialSymbol name="check" size="sm"/>
+                        </Button>
+                        
+                      </div>
+                    </div>
+                   
+                    
+                    
+                    
+                </Field>
+                
+              </div>  
+              
+            </div>
+            
+          
+           {/* Add another connection button when connections already exist */}
+           
+           {yamlConfig.spec.connections?.map((connection, index) => (
+              <div key={index} className="flex connection">
+                {savedConnections.has(index) ? (
+                  // Read-only mode - entire connection box is read-only
+                  <div className={`${errors.filter(e => e.type === 'connection').length  > 0 ? 'bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-900' : 'flex-auto space-y-1 border border-zinc-50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 '} p-2 rounded-sm w-full`}>
+                    {/* Connection name with edit button */}
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium  text-zinc-700 dark:text-zinc-300">
+                      
+                        {connection.type === 'stage' ? (
+                          <span className="flex items-center gap-1">
+                            <MaterialSymbol name="rocket_launch" size="sm" />
+                            Deploy to staging 
+                              {errors.filter(e => e.type === 'connection').length  > 0 && <MaterialSymbol name="error" size="md" className='text-red-600 dark:text-red-500'/>}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <MaterialSymbol name="bolt" size="sm" />
+                            Github webhook
+                            {errors.filter(e => e.type === 'connection').length  > 0 && <MaterialSymbol name="error" size="md" className='text-red-600 dark:text-red-500'/>}
+                          </span>
+                        )}
+                      </h4>
+                      <div className="flex items-center">
+                      <Button
+                        plain
+                        className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        onClick={() => {
+                          // Remove from saved connections to make it editable again
+                          setSavedConnections(prev => {
+                            const newSaved = new Set(prev);
+                            newSaved.delete(index);
+                            return newSaved;
+                          });
+                          console.log('Connection made editable:', connection);
+                        }}
+                      >
+                        <MaterialSymbol name="edit" size="sm" />
+                        
+                      </Button>
+                      <Button
+                        plain
+                        className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                        onClick={() => {
+                          // Remove connection from the list
+                          const newConnections = yamlConfig.spec.connections?.filter((_, i) => i !== index) || []
+                          setYamlConfig(prev => ({ 
+                            ...prev, 
+                            spec: { 
+                              ...prev.spec, 
+                              connections: newConnections 
+                            } 
+                          }))
+                          
+                          markSectionModified('connections');
+                          
+                          // Also remove from saved connections and expanded filters
+                          setSavedConnections(prev => {
+                            const newSaved = new Set(prev);
+                            newSaved.delete(index);
+                            // Update indices for remaining connections
+                            const updatedSaved = new Set<number>();
+                            newSaved.forEach(savedIndex => {
+                              if (savedIndex < index) {
+                                updatedSaved.add(savedIndex);
+                              } else if (savedIndex > index) {
+                                updatedSaved.add(savedIndex - 1);
+                              }
+                            });
+                            return updatedSaved;
+                          });
+                          
+                          // Remove from expanded filters
+                          setExpandedFilters(prev => {
+                            const newExpanded = new Set(prev);
+                            newExpanded.delete(index);
+                            // Update indices for remaining connections
+                            const updatedExpanded = new Set<number>();
+                            newExpanded.forEach(expandedIndex => {
+                              if (expandedIndex < index) {
+                                updatedExpanded.add(expandedIndex);
+                              } else if (expandedIndex > index) {
+                                updatedExpanded.add(expandedIndex - 1);
+                              }
+                            });
+                            return updatedExpanded;
+                          });
+                          
+                          console.log('Connection deleted:', connection);
+                        }}
+                      >
+                        <MaterialSymbol name="delete" size="sm" />
+                        
+                      </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Collapsible Filters Group */}
+                    {connectionFilters[index] && connectionFilters[index].length > 0 && (
+                      <div className="mt-2">
+                        <Link 
+                          href="#"
+                          className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                          onClick={() => {
+                            // Toggle filter visibility for this specific connection
+                            setExpandedFilters(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(index)) {
+                                newSet.delete(index);
+                              } else {
+                                newSet.add(index);
+                              }
+                              return newSet;
+                            });
+                          }}
+                        >
+                          <MaterialSymbol 
+                            name={expandedFilters.has(index) ? "keyboard_arrow_down" : "keyboard_arrow_right"} 
+                            size="sm" 
+                          />
+                          {connectionFilters[index].length} filter{connectionFilters[index].length !== 1 ? 's' : ''}
+                        </Link>
+                        
+                        {/* Collapsible filters content */}
+                        {expandedFilters.has(index) && (
+                          <div className="mt-2 w-full">
+                            <Field>
+                              <Label>Filters <Tippy content={<div className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-xs max-w-50">Filters allow you to filter events based on specific criteria.</div>}><MaterialSymbol name="help" size="sm" className='text-gray-600 dark:text-gray-400'/></Tippy></Label>
+                             
+                            </Field>
+                          {connectionFilters[index].map((filter, filterIndex) => (
+                            <div key={filter.id} className='relative w-full'>
+                              {/* Show AND/OR indicator (read-only) */}
+                              {filter.operator && filterIndex > 0 && (
+                                <div className="relative justify-center flex items-center">
+                                  <span className="!text-xs font-medium !px-2 !py-0 text-zinc-700 dark:text-zinc-300">
+                                    {filter.operator}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              <div className="flex items-center w-full">
+                                <div className="flex flex-auto bg-white dark:bg-zinc-900/40 items-center gap-2 rounded-lg text-xs border border-zinc-300 dark:border-zinc-800">
+                                  <span className="rounded-md rounded-r-none px-2 bg-zinc-100 dark:bg-zinc-900/40  text-zinc-700 py-1 dark:text-zinc-300 border-r border-zinc-400 dark:border-zinc-800">
+                                    {filter.type}
+                                  </span>
+                                  <span className="text-zinc-600 py-1 dark:text-zinc-400 font-mono">
+                                    {filter.expression}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Editable mode - show full editable connection box
+                  <div className="flex-auto space-y-1 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-1 rounded-sm">
+                   <div className="connection flex flex-col">
                 
                 <Field className="flex flex-col items-start gap-2">
                  
@@ -1137,218 +1476,26 @@ export function WorkflowNodeAccordion({
                 </Field>
                 
               </div>  
-              
-            </div>
-            
-          
-           {/* Add another connection button when connections already exist */}
-           
-           {yamlConfig.spec.connections?.map((connection, index) => (
-              <div key={index} className="flex connection">
-                {savedConnections.has(index) ? (
-                  // Read-only mode - entire connection box is read-only
-                  <div className={`${errors.filter(e => e.type === 'connection').length  > 0 ? 'bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-900' : 'flex-auto space-y-1 border border-zinc-50 dark:border-zinc-800 '} p-2 rounded-sm w-full`}>
-                    {/* Connection name with edit button */}
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                      
-                        {connection.type === 'stage' ? (
-                          <span className="flex items-center gap-1">
-                            <MaterialSymbol name="rocket_launch" size="sm" />
-                            Deploy to staging 
-                            <MaterialSymbol name="error" size="md" className='text-red-600 dark:text-red-500'/>
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1">
-                            <MaterialSymbol name="bolt" size="sm" />
-                            Github webhook
-                            <MaterialSymbol name="error" size="md" className='text-red-600 dark:text-red-500'/>
-                          </span>
-                        )}
-                      </h4>
-                      <div className="flex items-center">
-                      <Button
-                        plain
-                        className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
-                        onClick={() => {
-                          // Remove from saved connections to make it editable again
-                          setSavedConnections(prev => {
-                            const newSaved = new Set(prev);
-                            newSaved.delete(index);
-                            return newSaved;
-                          });
-                          console.log('Connection made editable:', connection);
-                        }}
-                      >
-                        <MaterialSymbol name="edit" size="sm" />
-                        
-                      </Button>
-                      <Button
-                        plain
-                        className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                        onClick={() => {
-                          // Remove connection from the list
-                          const newConnections = yamlConfig.spec.connections?.filter((_, i) => i !== index) || []
-                          setYamlConfig(prev => ({ 
-                            ...prev, 
-                            spec: { 
-                              ...prev.spec, 
-                              connections: newConnections 
-                            } 
-                          }))
-                          
-                          markSectionModified('connections');
-                          
-                          // Also remove from saved connections and expanded filters
-                          setSavedConnections(prev => {
-                            const newSaved = new Set(prev);
-                            newSaved.delete(index);
-                            // Update indices for remaining connections
-                            const updatedSaved = new Set<number>();
-                            newSaved.forEach(savedIndex => {
-                              if (savedIndex < index) {
-                                updatedSaved.add(savedIndex);
-                              } else if (savedIndex > index) {
-                                updatedSaved.add(savedIndex - 1);
-                              }
-                            });
-                            return updatedSaved;
-                          });
-                          
-                          // Remove from expanded filters
-                          setExpandedFilters(prev => {
-                            const newExpanded = new Set(prev);
-                            newExpanded.delete(index);
-                            // Update indices for remaining connections
-                            const updatedExpanded = new Set<number>();
-                            newExpanded.forEach(expandedIndex => {
-                              if (expandedIndex < index) {
-                                updatedExpanded.add(expandedIndex);
-                              } else if (expandedIndex > index) {
-                                updatedExpanded.add(expandedIndex - 1);
-                              }
-                            });
-                            return updatedExpanded;
-                          });
-                          
-                          console.log('Connection deleted:', connection);
-                        }}
-                      >
-                        <MaterialSymbol name="delete" size="sm" />
-                        
-                      </Button>
-                      </div>
-                    </div>
-                    
-                    {/* Collapsible Filters Group */}
-                    {connectionFilters[index] && connectionFilters[index].length > 0 && (
-                      <div className="mt-2">
-                        <Link 
-                          href="#"
-                          className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
-                          onClick={() => {
-                            // Toggle filter visibility for this specific connection
-                            setExpandedFilters(prev => {
-                              const newSet = new Set(prev);
-                              if (newSet.has(index)) {
-                                newSet.delete(index);
-                              } else {
-                                newSet.add(index);
-                              }
-                              return newSet;
-                            });
-                          }}
-                        >
-                          <MaterialSymbol 
-                            name={expandedFilters.has(index) ? "keyboard_arrow_down" : "keyboard_arrow_right"} 
-                            size="sm" 
-                          />
-                          {connectionFilters[index].length} filter{connectionFilters[index].length !== 1 ? 's' : ''}
-                        </Link>
-                        
-                        {/* Collapsible filters content */}
-                        {expandedFilters.has(index) && (
-                          <div className="mt-2 w-full">
-                            <Field>
-                              <Label>Filters <Tippy content={<div className="p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-sm text-xs max-w-50">Filters allow you to filter events based on specific criteria.</div>}><MaterialSymbol name="help" size="sm" className='text-gray-600 dark:text-gray-400'/></Tippy></Label>
-                             
-                            </Field>
-                          {connectionFilters[index].map((filter, filterIndex) => (
-                            <div key={filter.id} className='relative w-full'>
-                              {/* Show AND/OR indicator (read-only) */}
-                              {filter.operator && filterIndex > 0 && (
-                                <div className="relative justify-center flex items-center">
-                                  <span className="!text-xs font-medium !px-2 !py-0 text-zinc-700 dark:text-zinc-300">
-                                    {filter.operator}
-                                  </span>
-                                </div>
-                              )}
-                              
-                              <div className="flex items-center w-full">
-                                <div className="flex flex-auto bg-white dark:bg-zinc-900/40 items-center gap-2 rounded-lg text-xs border border-zinc-300 dark:border-zinc-800">
-                                  <span className="rounded-md rounded-r-none px-2 bg-zinc-100 dark:bg-zinc-900/40  text-zinc-700 py-1 dark:text-zinc-300 border-r border-zinc-400 dark:border-zinc-800">
-                                    {filter.type}
-                                  </span>
-                                  <span className="text-zinc-600 py-1 dark:text-zinc-400 font-mono">
-                                    {filter.expression}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  // Editable mode - show full editable connection box
-                  <div className="flex-auto space-y-1 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-1 rounded-sm">
-                    <div className="flex flex-col">
-                      <Field className='flex justify-between'>
-                        <Dropdown>
-                          <DropdownButton color='white' className="!justify-between flex items-center w-full">
-                            {selectedConnectionNames[index] || "Select connection"}
-                            <MaterialSymbol name="expand_more" size="md" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom start">
-                            <DropdownItem className='flex items-center gap-2' onClick={() => {
-                              const newConnections = [...(yamlConfig.spec.connections || [])]
-                              newConnections[index] = { type: 'stage', name: 'Deploy to staging', config: {} }
-                              setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
-                              // Update selected connection name for dropdown display
-                              setSelectedConnectionNames(prev => ({ ...prev, [index]: 'Deploy to staging' }))
-                              // Mark as modified since we're updating a connection
-                              markSectionModified('connections');
-                            }}>
-                              
-                                <MaterialSymbol name="rocket_launch" size="md" />
-                                <DropdownLabel> Deploy to staging</DropdownLabel>
-                            </DropdownItem>
-                            <DropdownItem className='flex items-center gap-2' onClick={() => {
-                              const newConnections = [...(yamlConfig.spec.connections || [])]
-                              newConnections[index] = { type: 'event source', name: 'Github webhook', config: {} }
-                              setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
-                              // Update selected connection name for dropdown display
-                              setSelectedConnectionNames(prev => ({ ...prev, [index]: 'Github webhook' }))
-                              // Mark as modified since we're updating a connection
-                              markSectionModified('connections');
-                            }}>
-                              
-                              <MaterialSymbol name="bolt" size="sm" />
-                              <DropdownLabel>Github webhook</DropdownLabel>
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </Field>
-                    </div>
                   </div>
                 )}
                 
                 
               </div>
             ))}
-          <Link href="#" className="text-sm bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 flex justify-center align-middle gap-1 mt-3 border border-zinc-400 dark:border-zinc-700 rounded-sm border-dashed p-2 text-center">
+          <Link 
+            href="#" 
+            className="text-sm bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-400 flex justify-center align-middle gap-1 mt-3 border border-zinc-400 dark:border-zinc-700 rounded-sm border-dashed p-2 text-center"
+            onClick={(e) => {
+              e.preventDefault()
+              const newConnections = [...(yamlConfig.spec.connections || [])]
+              // Add a new empty connection that will show in editable mode
+              newConnections.push({ type: '', name: '', config: {} })
+              setYamlConfig(prev => ({ ...prev, spec: { ...prev.spec, connections: newConnections } }))
+              // Mark as modified since we're adding a new connection
+              markSectionModified('connections')
+              console.log('Added new connection trigger')
+            }}
+          >
               <MaterialSymbol name="add" size="sm"/>
               <span>Add trigger</span>
           </Link>
@@ -1604,7 +1751,9 @@ export function WorkflowNodeAccordion({
                                 <MaterialSymbol name="help" size="sm"/>
                               </Link>
                             </Tippy>
+                            
                           </Label>
+                          <Description className='!text-xs text-zinc-500 dark:text-zinc-400'>Branch or tag to checkout</Description>
                           <Input value={yamlConfig.spec.executor?.config?.pipeline} onChange={(e) => {
                             setYamlConfig(prev => ({ 
                               ...prev, 
@@ -2591,6 +2740,30 @@ export function WorkflowNodeAccordion({
                     </div>
                   ))}
                 </div>
+                
+                {/* Run Errors Section */}
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-zinc-700">
+                  <div className="font-medium text-sm mb-2">
+                    Recent Run Errors
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs">
+                      <div className="font-medium">Failed to establish connection</div>
+                      <div className="text-gray-700 dark:text-gray-300">Connection timed out after 30s</div>
+                      <div className="text-gray-500 dark:text-gray-400 mt-1">2 minutes ago</div>
+                    </div>
+                    <div className="text-xs">
+                      <div className="font-medium">Authentication failed</div>
+                      <div className="text-gray-700 dark:text-gray-300">Invalid credentials provided</div>
+                      <div className="text-gray-500 dark:text-gray-400 mt-1">5 minutes ago</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-100 dark:border-zinc-600">
+                    <div className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer">
+                      View all run logs →
+                    </div>
+                  </div>
+                </div>
               </div>
             }
             theme="dark"
@@ -2792,6 +2965,30 @@ export function WorkflowNodeAccordion({
                     </div>
                   ))}
                 </div>
+                
+                {/* Run Errors Section */}
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-zinc-700">
+                  <div className="font-medium text-sm mb-2">
+                    Recent Run Errors
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs">
+                      <div className="font-medium">Failed to establish connection</div>
+                      <div className="text-gray-700 dark:text-gray-300">Connection timed out after 30s</div>
+                      <div className="text-gray-500 dark:text-gray-400 mt-1">2 minutes ago</div>
+                    </div>
+                    <div className="text-xs">
+                      <div className="font-medium">Authentication failed</div>
+                      <div className="text-gray-700 dark:text-gray-300">Invalid credentials provided</div>
+                      <div className="text-gray-500 dark:text-gray-400 mt-1">5 minutes ago</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-100 dark:border-zinc-600">
+                    <div className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer">
+                      View all run logs →
+                    </div>
+                  </div>
+                </div>
               </div>
             }
             theme="dark"
@@ -2892,7 +3089,7 @@ export function WorkflowNodeAccordion({
             <MaterialSymbol 
               name={statusConfig.icon} 
               size='lg'
-            
+              className={data.status == "running" ? 'animate-spin' : ''}
             />
             </Badge>
           </div>
