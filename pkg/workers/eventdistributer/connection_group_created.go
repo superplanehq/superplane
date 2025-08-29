@@ -9,6 +9,7 @@ import (
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,10 +26,15 @@ func HandleConnectionGroupCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to describe connection group: %w", err)
 	}
 
+	connectionGroupJSON, err := protojson.Marshal(response.ConnectionGroup)
+	if err != nil {
+		return fmt.Errorf("failed to marshal connection group to JSON: %w", err)
+	}
+
 	// Convert to JSON for websocket transmission
 	wsEventJSON, err := json.Marshal(map[string]interface{}{
 		"event":   "connection_group_added",
-		"payload": response.ConnectionGroup,
+		"payload": json.RawMessage(connectionGroupJSON),
 	})
 
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,9 +26,14 @@ func HandleEventSourceCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to describe event source: %w", err)
 	}
 
+	eventSourceJSON, err := protojson.Marshal(describeEventSourceResp.EventSource)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event source to JSON: %w", err)
+	}
+
 	wsEventJSON, err := json.Marshal(map[string]interface{}{
 		"event":   "event_source_added",
-		"payload": describeEventSourceResp.EventSource,
+		"payload": json.RawMessage(eventSourceJSON),
 	})
 
 	if err != nil {

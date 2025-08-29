@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,9 +26,14 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to describe stage: %w", err)
 	}
 
+	stageJSON, err := protojson.Marshal(describeStageResp.Stage)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stage to JSON: %w", err)
+	}
+
 	event, err := json.Marshal(map[string]any{
 		"event":   "stage_updated",
-		"payload": describeStageResp.Stage,
+		"payload": json.RawMessage(stageJSON),
 	})
 
 	if err != nil {

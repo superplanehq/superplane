@@ -4,7 +4,7 @@ import { EventMap, ServerEvent } from '../types/events';
 import { useCanvasStore } from "../store/canvasStore";
 import { EventSourceWithEvents } from '../store/types';
 import { pollEventSourceUntilNoPending } from '../utils/eventSourcePolling';
-import { SuperplaneEventSource, SuperplaneFilterType } from '@/api-client';
+import { SuperplaneEventSource } from '@/api-client';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
 
@@ -82,15 +82,6 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
         break;
       case 'event_source_added':
         eventSource = payload;
-        eventSource.spec?.events?.forEach(event => {
-          event.filters?.forEach(filter => {
-            if (typeof filter.type === 'number') {
-              const filterTypes = ['FILTER_TYPE_UNKNOWN', 'FILTER_TYPE_DATA', 'FILTER_TYPE_HEADER'];
-              filter.type = filterTypes[filter.type] as SuperplaneFilterType;
-            }
-          });
-        });
-
         addEventSource(eventSource as EventSourceWithEvents);
         syncReactFlowWithTimeout(lockedNodes);
         break;
