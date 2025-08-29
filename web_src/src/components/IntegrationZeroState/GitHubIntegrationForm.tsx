@@ -15,16 +15,21 @@ export function GitHubIntegrationForm({
 }: BaseIntegrationFormProps) {
   const [showGitHubPatInfo, setShowGitHubPatInfo] = useState(false);
   const [dirtyByUser, setDirtyByUser] = useState(false);
+  const [displayName, setDisplayName] = useState(() => {
+    return integrationData.orgUrl ? githubConfig.extractOrgName(integrationData.orgUrl) : '';
+  });
 
-  const handleOrgUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
+  const handleOrgNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value;
+    const sanitizedOrgName = input.replace(/[^a-zA-Z0-9-]/g, '');
+
+    setDisplayName(sanitizedOrgName);
+
+    const url = sanitizedOrgName ? `https://github.com/${sanitizedOrgName}` : '';
     setIntegrationData(prev => ({ ...prev, orgUrl: url }));
 
-    if (url && !dirtyByUser) {
-      const orgName = githubConfig.extractOrgName(url);
-      if (orgName) {
-        setIntegrationData(prev => ({ ...prev, name: `${orgName}-account` }));
-      }
+    if (sanitizedOrgName && !dirtyByUser) {
+      setIntegrationData(prev => ({ ...prev, name: `${sanitizedOrgName}-account` }));
     }
 
     if (errors.orgUrl) {
@@ -40,9 +45,9 @@ export function GitHubIntegrationForm({
         </Label>
         <Input
           ref={orgUrlRef}
-          type="url"
-          value={integrationData.orgUrl}
-          onChange={handleOrgUrlChange}
+          type="text"
+          value={displayName}
+          onChange={handleOrgNameChange}
           placeholder={githubConfig.urlPlaceholder}
           className="w-full"
         />
