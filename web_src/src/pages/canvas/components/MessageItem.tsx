@@ -171,46 +171,6 @@ const MessageItem = React.memo(({
         {isExpanded && (
           <div className="text-left mt-3 space-y-3">
             <div className="mt-3 space-y-3">
-              {/* Show inputs for stage events */}
-              {isStageEvent(event) && (
-                <>
-                  {Object.keys(inputsRecord).length > 0 ? (
-                    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
-                          <div className="space-y-1">
-                            {Object.entries(inputsRecord).map(([key, value]) => (
-                              <div key={key} className="flex items-center justify-between gap-2 min-w-0">
-                                <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
-                                    {value}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">No inputs</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
               {/* Show payload/headers for plain events */}
               {isPlainEvent(event) && (plainEventPayload || plainEventHeaders) && (
                 <PayloadDisplay
@@ -222,10 +182,12 @@ const MessageItem = React.memo(({
                   sourceName={event.sourceName}
                   headers={plainEventHeaders}
                   payload={plainEventPayload}
+                  inputs={inputsRecord}
+                  rounded={false}
                 />
               )}
 
-              {/* Show payload/headers for plain events */}
+              {/* Show payload/headers for stage events */}
               {isStageEvent(event) && sourceEvent && (plainEventPayload || plainEventHeaders) && (
                 <PayloadDisplay
                   showDetailsTab={true}
@@ -236,6 +198,8 @@ const MessageItem = React.memo(({
                   sourceName={sourceEvent.sourceName}
                   headers={plainEventHeaders}
                   payload={plainEventPayload}
+                  inputs={inputsRecord}
+                  rounded={false}
                 />
               )}
             </div>

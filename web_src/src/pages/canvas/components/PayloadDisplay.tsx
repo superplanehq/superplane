@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { twMerge } from 'tailwind-merge';
 
 interface PayloadDisplayProps {
   headers?: { [key: string]: unknown };
@@ -11,9 +12,13 @@ interface PayloadDisplayProps {
   eventType?: string;
   sourceName?: string;
   showDetailsTab?: boolean;
+  // Inputs/Outputs props
+  inputs?: Record<string, string>;
+  outputs?: Record<string, string>;
+  rounded?: boolean;
 }
 
-type TabType = 'details' | 'headers' | 'payload';
+type TabType = 'details' | 'headers' | 'payload' | 'inputs' | 'outputs';
 
 export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   headers,
@@ -23,15 +28,24 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   state,
   eventType,
   sourceName,
-  showDetailsTab = false
+  showDetailsTab = false,
+  inputs,
+  outputs,
+  rounded = true,
 }) => {
   const displayHeaders = headers || {};
   const displayPayload = payload || {};
+  const displayInputs = inputs || {};
+  const displayOutputs = outputs || {};
 
   const hasHeaders = Object.keys(displayHeaders).length > 0;
   const hasPayload = Object.keys(displayPayload).length > 0;
-  
+  const hasInputs = Object.keys(displayInputs).length > 0;
+  const hasOutputs = Object.keys(displayOutputs).length > 0;
+
   const getDefaultTab = (): TabType => {
+    if (hasInputs) return 'inputs';
+    if (hasOutputs) return 'outputs';
     if (showDetailsTab) return 'details';
     if (hasHeaders) return 'headers';
     if (hasPayload) return 'payload';
@@ -130,7 +144,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
                 <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">STATE</div>
                 <div className="text-blue-600 dark:text-blue-400 text-xs font-medium">
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 ${stateConfig.dotColor} ${stateConfig.animate ? 'animate-pulse' : ''} rounded-full flex-shrink-0`}></div>
+                    <div className={`w-2 h-2 ${stateConfig.dotColor} ${stateConfig.animate ? 'animate-pulse' : ''} ${rounded ? 'rounded-full' : 'rounded'} flex-shrink-0`}></div>
                     <span className={`text-xs font-medium ${stateConfig.textColor}`}>{stateConfig.label}</span>
                   </div>
                 </div>
@@ -160,7 +174,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
         return (
           <div>
             <div className="space-y-2">
-              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 h-60 max-h-60 overflow-y-auto">
+              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
                 {Object.keys(displayHeaders).length > 0 ? (
                   <div className="space-y-2">
                     {Object.entries(displayHeaders).map(([key, value]) => (
@@ -203,7 +217,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
                 </a>
               </div>
             </div>
-            <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 h-60 max-h-60 overflow-y-auto">
+            <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
               {Object.keys(displayPayload).length > 0 ? (
                 <pre className="text-xs font-mono text-gray-900 dark:text-zinc-200 whitespace-pre-wrap">
                   {JSON.stringify(displayPayload, null, 2)}
@@ -216,22 +230,78 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
             </div>
           </div>
         );
+      case 'inputs':
+        return (
+          <div>
+            <div className="space-y-2">
+              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
+                {Object.keys(displayInputs).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(displayInputs).map(([key, value]) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium pr-2 flex-shrink-0">
+                          {key}
+                        </span>
+                        <span className="text-xs font-mono text-gray-900 dark:text-zinc-200 break-all">
+                          {value || '-'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
+                    No inputs available
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      case 'outputs':
+        return (
+          <div>
+            <div className="space-y-2">
+              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
+                {Object.keys(displayOutputs).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(displayOutputs).map(([key, value]) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium pr-2 flex-shrink-0">
+                          {key}
+                        </span>
+                        <span className="text-xs font-mono text-gray-900 dark:text-zinc-200 break-all">
+                          {value || '-'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
+                    No outputs available
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
       default:
         return null;
     }
   };
 
   // Don't render if no data to display
-  if (!hasHeaders && !hasPayload && !showDetailsTab) {
+  if (!hasHeaders && !hasPayload && !hasInputs && !hasOutputs && !showDetailsTab) {
     return null;
   }
 
   return (
     <div className="mt-3" onClick={(e) => e.stopPropagation()}>
-      <div className="border border-gray-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900">
+      <div className={twMerge(`border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`, rounded ? 'rounded-lg' : '')}>
         <div className="border-b border-gray-200 dark:border-zinc-700">
           <div className="w-full border-b border-zinc-200 dark:border-zinc-700">
             <nav className="flex gap-0">
+              {hasInputs && renderTabButton('inputs', 'Inputs')}
+              {hasOutputs && renderTabButton('outputs', 'Outputs')}
               {showDetailsTab && renderTabButton('details', 'Details')}
               {hasHeaders && renderTabButton('headers', 'Headers')}
               {hasPayload && renderTabButton('payload', 'Payload')}
