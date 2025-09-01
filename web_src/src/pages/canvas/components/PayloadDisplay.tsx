@@ -44,9 +44,9 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   const hasOutputs = Object.keys(displayOutputs).length > 0;
 
   const getDefaultTab = (): TabType => {
-    if (showDetailsTab) return 'details';
     if (hasInputs) return 'inputs';
     if (hasOutputs) return 'outputs';
+    if (showDetailsTab) return 'details';
     if (hasHeaders) return 'headers';
     if (hasPayload) return 'payload';
     return 'details';
@@ -174,7 +174,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
         return (
           <div>
             <div className="space-y-2">
-              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 h-60 max-h-60 overflow-y-auto">
+              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
                 {Object.keys(displayHeaders).length > 0 ? (
                   <div className="space-y-2">
                     {Object.entries(displayHeaders).map(([key, value]) => (
@@ -217,7 +217,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
                 </a>
               </div>
             </div>
-            <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 h-60 max-h-60 overflow-y-auto">
+            <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
               {Object.keys(displayPayload).length > 0 ? (
                 <pre className="text-xs font-mono text-gray-900 dark:text-zinc-200 whitespace-pre-wrap">
                   {JSON.stringify(displayPayload, null, 2)}
@@ -234,7 +234,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
         return (
           <div>
             <div className="space-y-2">
-              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 h-60 max-h-60 overflow-y-auto">
+              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
                 {Object.keys(displayInputs).length > 0 ? (
                   <div className="space-y-2">
                     {Object.entries(displayInputs).map(([key, value]) => (
@@ -261,7 +261,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
         return (
           <div>
             <div className="space-y-2">
-              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 h-60 max-h-60 overflow-y-auto">
+              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
                 {Object.keys(displayOutputs).length > 0 ? (
                   <div className="space-y-2">
                     {Object.entries(displayOutputs).map(([key, value]) => (
@@ -300,9 +300,9 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
         <div className="border-b border-gray-200 dark:border-zinc-700">
           <div className="w-full border-b border-zinc-200 dark:border-zinc-700">
             <nav className="flex gap-0">
-              {showDetailsTab && renderTabButton('details', 'Details')}
               {hasInputs && renderTabButton('inputs', 'Inputs')}
               {hasOutputs && renderTabButton('outputs', 'Outputs')}
+              {showDetailsTab && renderTabButton('details', 'Details')}
               {hasHeaders && renderTabButton('headers', 'Headers')}
               {hasPayload && renderTabButton('payload', 'Payload')}
             </nav>

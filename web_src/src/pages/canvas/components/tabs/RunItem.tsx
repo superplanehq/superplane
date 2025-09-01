@@ -200,7 +200,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0 || (emmitedEvent && (emmitedEventPayload || emmitedEventHeaders))) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  Run Details
+                  Run
                 </div>
                 <div>
                   <PayloadDisplay
@@ -224,7 +224,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             {(queuedOn || approvedOn || approvedBy) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  Queue Details
+                  Queue
                 </div>
 
                 <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
@@ -280,7 +280,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             {sourceEvent && (sourceEventPayload || sourceEventHeaders) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  Trigger Details
+                  Trigger Event
                 </div>
 
                 <PayloadDisplay
