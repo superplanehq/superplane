@@ -1299,6 +1299,8 @@ export type SuperplaneListEventsData = {
     query?: {
         sourceType?: 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
         sourceId?: string;
+        limit?: number;
+        after?: string;
     };
     url: '/api/v1/canvases/{canvasIdOrName}/events';
 };
@@ -1522,6 +1524,8 @@ export type SuperplaneListStageEventsData = {
     query?: {
         states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED'>;
         stateReasons?: Array<'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY'>;
+        limit?: number;
+        after?: string;
     };
     url: '/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events';
 };

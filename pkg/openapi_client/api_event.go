@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 
@@ -152,6 +153,8 @@ type ApiSuperplaneListEventsRequest struct {
 	canvasIdOrName string
 	sourceType *string
 	sourceId *string
+	limit *int32
+	after *time.Time
 }
 
 func (r ApiSuperplaneListEventsRequest) SourceType(sourceType string) ApiSuperplaneListEventsRequest {
@@ -161,6 +164,16 @@ func (r ApiSuperplaneListEventsRequest) SourceType(sourceType string) ApiSuperpl
 
 func (r ApiSuperplaneListEventsRequest) SourceId(sourceId string) ApiSuperplaneListEventsRequest {
 	r.sourceId = &sourceId
+	return r
+}
+
+func (r ApiSuperplaneListEventsRequest) Limit(limit int32) ApiSuperplaneListEventsRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiSuperplaneListEventsRequest) After(after time.Time) ApiSuperplaneListEventsRequest {
+	r.after = &after
 	return r
 }
 
@@ -215,6 +228,12 @@ func (a *EventAPIService) SuperplaneListEventsExecute(r ApiSuperplaneListEventsR
 	}
 	if r.sourceId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "sourceId", r.sourceId, "", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
+	}
+	if r.after != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "after", r.after, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

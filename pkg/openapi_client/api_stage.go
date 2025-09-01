@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 	"reflect"
 )
 
@@ -636,6 +637,8 @@ type ApiSuperplaneListStageEventsRequest struct {
 	stageIdOrName string
 	states *[]string
 	stateReasons *[]string
+	limit *int32
+	after *time.Time
 }
 
 func (r ApiSuperplaneListStageEventsRequest) States(states []string) ApiSuperplaneListStageEventsRequest {
@@ -645,6 +648,16 @@ func (r ApiSuperplaneListStageEventsRequest) States(states []string) ApiSuperpla
 
 func (r ApiSuperplaneListStageEventsRequest) StateReasons(stateReasons []string) ApiSuperplaneListStageEventsRequest {
 	r.stateReasons = &stateReasons
+	return r
+}
+
+func (r ApiSuperplaneListStageEventsRequest) Limit(limit int32) ApiSuperplaneListStageEventsRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiSuperplaneListStageEventsRequest) After(after time.Time) ApiSuperplaneListStageEventsRequest {
+	r.after = &after
 	return r
 }
 
@@ -715,6 +728,12 @@ func (a *StageAPIService) SuperplaneListStageEventsExecute(r ApiSuperplaneListSt
 		} else {
 			parameterAddToHeaderOrQuery(localVarQueryParams, "stateReasons", t, "form", "multi")
 		}
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
+	}
+	if r.after != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "after", r.after, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

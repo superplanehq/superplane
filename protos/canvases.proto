@@ -768,6 +768,8 @@ message ListStageEventsRequest {
   string canvas_id_or_name = 2;
   repeated StageEvent.State states = 3;
   repeated StageEvent.StateReason state_reasons = 4;
+  int32 limit = 5;
+  google.protobuf.Timestamp after = 6;
 }
 
 message ListStageEventsResponse {
@@ -904,6 +906,8 @@ message ListEventsRequest {
   string canvas_id_or_name = 1;
   EventSourceType source_type = 2;
   string source_id = 3;
+  int32 limit = 4;
+  google.protobuf.Timestamp after = 5;
 }
 
 message ListEventsResponse {
