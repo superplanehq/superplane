@@ -9,7 +9,10 @@
     "clean": "rm -rf ../pkg/web/assets/dist",
     "lint": "eslint .",
     "generate:api": "openapi-ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -41,17 +44,23 @@
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@hey-api/openapi-ts": "^0.67.4",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^16.1.1",
+    "@testing-library/user-event": "^14.5.2",
     "@types/lodash.debounce": "^4.0.9",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
+    "@vitest/ui": "^2.1.8",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
+    "jsdom": "^25.0.1",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
+    "vitest": "^2.1.8",
     "web-worker": "^1.5.0"
   }
 }
