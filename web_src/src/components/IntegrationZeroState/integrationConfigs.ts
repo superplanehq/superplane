@@ -2,8 +2,8 @@ import type { IntegrationConfig } from './types';
 
 export const githubConfig: IntegrationConfig = {
   displayName: 'GitHub',
-  urlPlaceholder: 'https://github.com/owner',
-  orgUrlLabel: 'GitHub organization/owner URL',
+  urlPlaceholder: 'Johndoe',
+  orgUrlLabel: 'GitHub organization/owner name',
   validateUrl: (url: string): string | undefined => {
     if (!url.trim()) {
       return 'Field cannot be empty';

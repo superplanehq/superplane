@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneListEvents, SuperplaneStage, SuperplaneEventSource, SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEvent } from "@/api-client";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneListEvents, SuperplaneStage, SuperplaneEventSource, SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEvent, SuperplaneConnection, SuperplaneConnectionType } from "@/api-client";
 import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { EventSourceSidebar } from "./components/EventSourceSidebar";
@@ -23,6 +23,14 @@ export function Canvas() {
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
   const [canvasName, setCanvasName] = useState<string>('');
+
+  useEffect(() => {
+    if (canvasName) {
+      document.title = `${canvasName} - Superplane`;
+    } else {
+      document.title = 'Superplane';
+    }
+  }, [canvasName]);
 
   const getActiveViewFromHash = (): CanvasView => {
     const hash = location.hash.substring(1);
@@ -279,9 +287,9 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
-  const handleAddNodeByType = async (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
+  const handleAddNodeByType = async (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: { name: string; type: string } | null) => {
     try {
-      const config = getNodeConfig(nodeType, executorType, eventSourceType);
+      const config = getNodeConfig(nodeType, executorType, eventSourceType, focusedNodeInfo);
       const nodeId = handleAddNode(nodeType, config);
 
       setFocusedNodeId(nodeId);
@@ -313,19 +321,37 @@ export function Canvas() {
     }
   };
 
-  const getNodeConfig = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
+  const getNodeConfig = (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: { name: string; type: string } | null) => {
+    const baseConfig: { connections?: Array<SuperplaneConnection> } = {};
+
+    if (focusedNodeInfo && (nodeType !== 'event_source')) {
+      baseConfig.connections = [{
+        name: focusedNodeInfo.name,
+        type: focusedNodeInfo.type as SuperplaneConnectionType,
+        filters: [],
+        filterOperator: "FILTER_OPERATOR_AND"
+      }];
+    }
+
     switch (nodeType) {
       case 'stage':
         return executorType ? {
           name: '',
-          executorType
-        } : undefined;
+          executorType,
+          ...baseConfig
+        } : baseConfig;
 
       case 'event_source':
         return eventSourceType ? {
           name: '',
           eventSourceType
         } : undefined;
+
+      case 'connection_group':
+        return {
+          name: '',
+          ...baseConfig
+        };
 
       default:
         return undefined;
@@ -334,7 +360,6 @@ export function Canvas() {
 
   return (
     <StrictMode>
-      {/* Canvas Navigation */}
       <div className="h-[100vh] overflow-hidden">
 
         <CanvasNavigation
@@ -344,18 +369,16 @@ export function Canvas() {
           organizationId={organizationId!}
         />
 
-        {/* Content based on active view */}
         {activeView === 'editor' ? (
           <div className="relative" style={{ height: "calc(100vh - 2.6rem)", overflow: "hidden" }}>
             <ComponentSidebar
               isOpen={isComponentSidebarOpen}
               onClose={() => setIsComponentSidebarOpen(false)}
-              onNodeAdd={(nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
-                handleAddNodeByType(nodeType, executorType, eventSourceType);
+              onNodeAdd={(nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: { name: string; type: string } | null) => {
+                handleAddNodeByType(nodeType, executorType, eventSourceType, focusedNodeInfo);
               }}
             />
 
-            {/* Toggle Button for ComponentSidebar - Only show when closed */}
             {!isComponentSidebarOpen && (
               <button
                 onClick={() => setIsComponentSidebarOpen(true)}

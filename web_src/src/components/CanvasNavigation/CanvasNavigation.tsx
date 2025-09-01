@@ -34,7 +34,7 @@ export function CanvasNavigation({
   const navigationTabs: Tab[] = [
     {
       id: 'editor',
-      label: 'Preview',
+      label: 'Canvas',
     },
     {
       id: 'integrations',
