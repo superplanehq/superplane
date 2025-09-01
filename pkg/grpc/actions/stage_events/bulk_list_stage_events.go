@@ -38,7 +38,9 @@ func BulkListStageEvents(ctx context.Context, canvasID string, stages []*pb.Stag
 		stageIDMap[stageItem.StageIdOrName] = stage.ID
 	}
 
-	eventsByStageID, err := models.BulkListStageEventsByCanvasIDAndMultipleStages(canvasUUID, stageIDs, int(limitPerStage))
+	validatedLimit := validateLimit(int(limitPerStage))
+	
+	eventsByStageID, err := models.BulkListStageEventsByCanvasIDAndMultipleStages(canvasUUID, stageIDs, validatedLimit)
 	if err != nil {
 		return nil, err
 	}

@@ -26,7 +26,9 @@ func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSou
 		})
 	}
 
-	eventsBySource, err := models.BulkListEventsByCanvasIDAndMultipleSources(canvasUUID, sourceFilters, int(limitPerSource))
+	validatedLimit := validateLimit(int(limitPerSource))
+	
+	eventsBySource, err := models.BulkListEventsByCanvasIDAndMultipleSources(canvasUUID, sourceFilters, validatedLimit)
 	if err != nil {
 		return nil, err
 	}
