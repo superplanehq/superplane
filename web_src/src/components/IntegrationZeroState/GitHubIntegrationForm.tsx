@@ -98,9 +98,13 @@ export function GitHubIntegrationForm({
             </button>
             {showGitHubPatInfo && (
               <div className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-                <div><strong>Open GitHub to create a new PAT</strong></div>
-                <ul className="list-disc ml-5 mt-1 space-y-1">
-                  <li>Select <strong>Fine-grained token</strong></li>
+                <ol className="list-decimal ml-5 mt-1 space-y-1">
+                  <li>
+                    <a className="text-blue-600 dark:text-blue-400 underline!" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">
+                      Open GitHub to create a new PAT
+                    </a>
+                  </li>
+                  <li>Select the <strong>Resource owner</strong></li>
                   <li>Choose <strong>All repositories</strong> or pick specific repositories</li>
                   <li>Under <strong>Permissions</strong>, set:</li>
                   <ul className="list-disc ml-5 mt-1 space-y-1">
@@ -108,9 +112,9 @@ export function GitHubIntegrationForm({
                     <li><strong>Webhooks</strong> → Read & Write</li>
                   </ul>
                   <li>Click <strong>Generate token</strong>, then copy and paste it here</li>
-                </ul>
+                </ol>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-2">
-                  Tip: You can manage, rotate, or revoke tokens anytime in your GitHub settings.
+                  Tip: You can manage, rotate, or revoke tokens anytime in your <a className="text-blue-600 dark:text-blue-400 underline!" href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">GitHub settings</a>.
                 </p>
               </div>
             )}
