@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	uuid "github.com/google/uuid"
@@ -407,6 +408,65 @@ func (s *Stage) ListEventsInTransaction(tx *gorm.DB, states, stateReasons []stri
 	}
 
 	return events, nil
+}
+
+func BulkFindStagesByCanvasIDAndIdentifiers(canvasID uuid.UUID, identifiers []string) (map[string]*Stage, error) {
+	if len(identifiers) == 0 {
+		return map[string]*Stage{}, nil
+	}
+
+	var stages []Stage
+
+	var stageIDs []uuid.UUID
+	var stageNames []string
+
+	for _, identifier := range identifiers {
+		if id, err := uuid.Parse(identifier); err == nil {
+			stageIDs = append(stageIDs, id)
+		} else {
+			stageNames = append(stageNames, identifier)
+		}
+	}
+
+	query := database.Conn().Where("canvas_id = ?", canvasID)
+
+	var conditions []string
+	var args []interface{}
+
+	if len(stageIDs) > 0 {
+		conditions = append(conditions, "id IN ?")
+		args = append(args, stageIDs)
+	}
+
+	if len(stageNames) > 0 {
+		conditions = append(conditions, "name IN ?")
+		args = append(args, stageNames)
+	}
+
+	if len(conditions) > 0 {
+		whereClause := fmt.Sprintf("(%s)", strings.Join(conditions, " OR "))
+		query = query.Where(whereClause, args...)
+	}
+
+	err := query.Find(&stages).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]*Stage)
+
+	for _, stage := range stages {
+		stageIDStr := stage.ID.String()
+		if slices.Contains(identifiers, stageIDStr) {
+			result[stageIDStr] = &stage
+		}
+
+		if slices.Contains(identifiers, stage.Name) {
+			result[stage.Name] = &stage
+		}
+	}
+
+	return result, nil
 }
 
 func (s *Stage) FindExecutionByID(id uuid.UUID) (*StageExecution, error) {
