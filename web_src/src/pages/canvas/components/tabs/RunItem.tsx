@@ -202,66 +202,21 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Run Details
                 </div>
-
-                {Object.keys(inputs).length > 0 && (
-                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Inputs</div>
-                        <div className="space-y-1">
-                          {Object.entries(inputs).map(([key, value]) => (
-                            <div key={key} className="flex items-center justify-between gap-2 min-w-0">
-                              <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
-                                  {value || '-'}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {Object.keys(outputs).length > 0 && (
-                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-zinc-50 dark:bg-zinc-800">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Outputs</div>
-                        <div className="space-y-1">
-                          {Object.entries(outputs).map(([key, value]) => (
-                            <div key={key} className="flex items-center justify-between gap-2 min-w-0">
-                              <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium font-mono truncate">{key}</span>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="font-mono !text-xs truncate inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10 max-w-32">
-                                  {value || '-'}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {emmitedEvent && (emmitedEventPayload || emmitedEventHeaders) && (
-                  <div>
-                    <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-2 font-bold">Emitted Event</div>
-                    <PayloadDisplay
-                      showDetailsTab={true}
-                      eventId={emmitedEvent.id}
-                      timestamp={emmitedEvent.receivedAt}
-                      state={emmitedEvent.state}
-                      eventType={emmitedEvent.type}
-                      sourceName={emmitedEvent.sourceName}
-                      headers={emmitedEventHeaders}
-                      payload={emmitedEventPayload}
-                    />
-                  </div>
-                )}
+                <div>
+                  <PayloadDisplay
+                    showDetailsTab={false}
+                    eventId={emmitedEvent?.id}
+                    timestamp={emmitedEvent?.receivedAt}
+                    state={emmitedEvent?.state}
+                    eventType={emmitedEvent?.type}
+                    sourceName={emmitedEvent?.sourceName}
+                    headers={emmitedEventHeaders}
+                    payload={emmitedEventPayload}
+                    inputs={inputs}
+                    outputs={outputs}
+                    rounded={false}
+                  />
+                </div>
               </div>
             )}
 
@@ -273,7 +228,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                 </div>
 
                 <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
-                  <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">Queue Metadata</div>
                   <div className="space-y-1">
                     {queuedOn && (
                       <div className="flex items-center gap-1">
@@ -322,11 +276,11 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
               </div>
             )}
 
-            {/* Event Details Section */}
+            {/* Trigger Event Details Section */}
             {sourceEvent && (sourceEventPayload || sourceEventHeaders) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  Event Details
+                  Trigger Details
                 </div>
 
                 <PayloadDisplay
@@ -338,6 +292,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                   sourceName={sourceEvent.sourceName}
                   headers={sourceEventHeaders}
                   payload={sourceEventPayload}
+                  rounded={false}
                 />
               </div>
             )}
