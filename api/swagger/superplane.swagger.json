@@ -613,6 +613,86 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/events/bulk": {
+      "post": {
+        "summary": "Bulk list events",
+        "description": "Returns events for multiple sources in a single request to optimize loading performance",
+        "operationId": "Superplane_BulkListEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneBulkListEventsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneBulkListEventsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Event"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/stage-events/bulk": {
+      "post": {
+        "summary": "Bulk list stage events",
+        "description": "Returns stage events for multiple stages in a single request to optimize loading performance",
+        "operationId": "Superplane_BulkListStageEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneBulkListStageEventsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneBulkListStageEventsBody"
+            }
+          }
+        ],
+        "tags": [
+          "Stage"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/stages": {
       "get": {
         "summary": "List stages",
@@ -3238,6 +3318,62 @@
         }
       }
     },
+    "SuperplaneBulkListEventsBody": {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneEventSourceItemRequest"
+          }
+        },
+        "limitPerSource": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "SuperplaneBulkListEventsResponse": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneEventSourceItemResult"
+          }
+        }
+      }
+    },
+    "SuperplaneBulkListStageEventsBody": {
+      "type": "object",
+      "properties": {
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneStageEventItemRequest"
+          }
+        },
+        "limitPerStage": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "SuperplaneBulkListStageEventsResponse": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneStageEventItemResult"
+          }
+        }
+      }
+    },
     "SuperplaneCanvas": {
       "type": "object",
       "properties": {
@@ -3647,6 +3783,35 @@
         },
         "spec": {
           "$ref": "#/definitions/SuperplaneEventSourceSpec"
+        }
+      }
+    },
+    "SuperplaneEventSourceItemRequest": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "sourceType": {
+          "$ref": "#/definitions/SuperplaneEventSourceType"
+        }
+      }
+    },
+    "SuperplaneEventSourceItemResult": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "sourceType": {
+          "$ref": "#/definitions/SuperplaneEventSourceType"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneEvent"
+          }
         }
       }
     },
@@ -4107,6 +4272,29 @@
         "approvedAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneStageEventItemRequest": {
+      "type": "object",
+      "properties": {
+        "stageIdOrName": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneStageEventItemResult": {
+      "type": "object",
+      "properties": {
+        "stageId": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneStageEvent"
+          }
         }
       }
     },

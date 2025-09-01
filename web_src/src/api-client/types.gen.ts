@@ -370,6 +370,24 @@ export type SuperplaneApproveStageEventResponse = {
     event?: SuperplaneStageEvent;
 };
 
+export type SuperplaneBulkListEventsBody = {
+    sources?: Array<SuperplaneEventSourceItemRequest>;
+    limitPerSource?: number;
+};
+
+export type SuperplaneBulkListEventsResponse = {
+    results?: Array<SuperplaneEventSourceItemResult>;
+};
+
+export type SuperplaneBulkListStageEventsBody = {
+    stages?: Array<SuperplaneStageEventItemRequest>;
+    limitPerStage?: number;
+};
+
+export type SuperplaneBulkListStageEventsResponse = {
+    results?: Array<SuperplaneStageEventItemResult>;
+};
+
 export type SuperplaneCanvas = {
     metadata?: SuperplaneCanvasMetadata;
 };
@@ -544,6 +562,17 @@ export type SuperplaneEventSource = {
     spec?: SuperplaneEventSourceSpec;
 };
 
+export type SuperplaneEventSourceItemRequest = {
+    sourceId?: string;
+    sourceType?: SuperplaneEventSourceType;
+};
+
+export type SuperplaneEventSourceItemResult = {
+    sourceId?: string;
+    sourceType?: SuperplaneEventSourceType;
+    events?: Array<SuperplaneEvent>;
+};
+
 export type SuperplaneEventSourceMetadata = {
     id?: string;
     name?: string;
@@ -715,6 +744,15 @@ export type SuperplaneStageEvent = {
 export type SuperplaneStageEventApproval = {
     approvedBy?: string;
     approvedAt?: string;
+};
+
+export type SuperplaneStageEventItemRequest = {
+    stageIdOrName?: string;
+};
+
+export type SuperplaneStageEventItemResult = {
+    stageId?: string;
+    events?: Array<SuperplaneStageEvent>;
 };
 
 export type SuperplaneStageEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED';
@@ -1282,6 +1320,60 @@ export type SuperplaneListEventsResponses = {
 };
 
 export type SuperplaneListEventsResponse2 = SuperplaneListEventsResponses[keyof SuperplaneListEventsResponses];
+
+export type SuperplaneBulkListEventsData = {
+    body: SuperplaneBulkListEventsBody;
+    path: {
+        canvasIdOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/events/bulk';
+};
+
+export type SuperplaneBulkListEventsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneBulkListEventsError = SuperplaneBulkListEventsErrors[keyof SuperplaneBulkListEventsErrors];
+
+export type SuperplaneBulkListEventsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneBulkListEventsResponse;
+};
+
+export type SuperplaneBulkListEventsResponse2 = SuperplaneBulkListEventsResponses[keyof SuperplaneBulkListEventsResponses];
+
+export type SuperplaneBulkListStageEventsData = {
+    body: SuperplaneBulkListStageEventsBody;
+    path: {
+        canvasIdOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/stage-events/bulk';
+};
+
+export type SuperplaneBulkListStageEventsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneBulkListStageEventsError = SuperplaneBulkListStageEventsErrors[keyof SuperplaneBulkListStageEventsErrors];
+
+export type SuperplaneBulkListStageEventsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneBulkListStageEventsResponse;
+};
+
+export type SuperplaneBulkListStageEventsResponse2 = SuperplaneBulkListStageEventsResponses[keyof SuperplaneBulkListStageEventsResponses];
 
 export type SuperplaneListStagesData = {
     body?: never;
