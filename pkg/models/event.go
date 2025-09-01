@@ -301,6 +301,37 @@ func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr str
 	return events, nil
 }
 
+func ListEventsByCanvasIDWithLimitAndAfter(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int, after *time.Time) ([]Event, error) {
+	var events []Event
+
+	query := database.Conn().Where("canvas_id = ?", canvasID)
+
+	if sourceType != "" {
+		query = query.Where("source_type = ?", sourceType)
+	}
+
+	if sourceIDStr != "" {
+		sourceID, err := uuid.Parse(sourceIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source ID: %v", err)
+		}
+		query = query.Where("source_id = ?", sourceID)
+	}
+
+	if after != nil {
+		query = query.Where("received_at > ?", after)
+	}
+
+	query = query.Order("received_at DESC").Limit(limit)
+
+	err := query.Find(&events).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
 func BulkListEventsByCanvasIDAndSource(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int) ([]Event, error) {
 	var events []Event
 

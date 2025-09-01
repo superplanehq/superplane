@@ -410,6 +410,28 @@ func (s *Stage) ListEventsInTransaction(tx *gorm.DB, states, stateReasons []stri
 	return events, nil
 }
 
+func (s *Stage) ListEventsWithLimitAndAfter(states, stateReasons []string, limit int, after *time.Time) ([]StageEvent, error) {
+	var events []StageEvent
+	query := database.Conn().
+		Where("stage_id = ?", s.ID).
+		Where("state IN ?", states)
+
+	if len(stateReasons) > 0 {
+		query = query.Where("state_reason IN ?", stateReasons)
+	}
+
+	if after != nil {
+		query = query.Where("created_at > ?", after)
+	}
+
+	err := query.Order("created_at DESC").Limit(limit).Find(&events).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
 func BulkFindStagesByCanvasIDAndIdentifiers(canvasID uuid.UUID, identifiers []string) (map[string]*Stage, error) {
 	if len(identifiers) == 0 {
 		return map[string]*Stage{}, nil
