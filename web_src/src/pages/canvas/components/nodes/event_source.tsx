@@ -303,7 +303,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
       onClick={handleNodeClick}
     >
-      {focusedNodeId === props.id && (
+      {(focusedNodeId === props.id || isEditMode) && (
         <EditModeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveEventSource}
