@@ -431,7 +431,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
       >
 
-        {focusedNodeId === props.id || isEditMode && (
+        {(focusedNodeId === props.id || isEditMode) && (
           <EditModeActionButtons
             isNewNode={!!isNewNode}
             onSave={handleSaveStage}

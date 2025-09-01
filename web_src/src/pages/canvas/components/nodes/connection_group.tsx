@@ -239,7 +239,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       className={twMerge(`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 relative`, borderColor)}
       style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
-      {focusedNodeId === props.id || isEditMode && (
+      {(focusedNodeId === props.id || isEditMode) && (
         <EditModeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveConnectionGroup}
