@@ -20,7 +20,7 @@ const (
 	MaxLimit     = 50
 )
 
-func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit int32, after *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
+func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit int32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
 	err := actions.ValidateUUIDs(stageIdOrName)
 	var stage *models.Stage
 	if err != nil {
@@ -49,13 +49,13 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 
 	validatedLimit := validateLimit(int(limit))
 
-	var afterTime *time.Time
-	if after != nil && after.IsValid() {
-		t := after.AsTime()
-		afterTime = &t
+	var beforeTime *time.Time
+	if before != nil && before.IsValid() {
+		t := before.AsTime()
+		beforeTime = &t
 	}
 
-	events, err := stage.ListEventsWithLimitAndAfter(states, stateReasons, validatedLimit, afterTime)
+	events, err := stage.ListEventsWithLimitAndBefore(states, stateReasons, validatedLimit, beforeTime)
 	if err != nil {
 		return nil, err
 	}

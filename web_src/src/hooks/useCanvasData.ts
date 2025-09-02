@@ -632,7 +632,7 @@ export const useEventSourceEvents = (canvasId: string, eventSourceId: string) =>
             sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE',
             sourceId: eventSourceId,
             limit: 20,
-            ...(pageParam && { after: pageParam })
+            ...(pageParam && { before: pageParam })
           }
         })
       )

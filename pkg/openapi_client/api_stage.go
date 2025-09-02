@@ -638,7 +638,7 @@ type ApiSuperplaneListStageEventsRequest struct {
 	states *[]string
 	stateReasons *[]string
 	limit *int32
-	after *time.Time
+	before *time.Time
 }
 
 func (r ApiSuperplaneListStageEventsRequest) States(states []string) ApiSuperplaneListStageEventsRequest {
@@ -656,8 +656,8 @@ func (r ApiSuperplaneListStageEventsRequest) Limit(limit int32) ApiSuperplaneLis
 	return r
 }
 
-func (r ApiSuperplaneListStageEventsRequest) After(after time.Time) ApiSuperplaneListStageEventsRequest {
-	r.after = &after
+func (r ApiSuperplaneListStageEventsRequest) Before(before time.Time) ApiSuperplaneListStageEventsRequest {
+	r.before = &before
 	return r
 }
 
@@ -732,8 +732,8 @@ func (a *StageAPIService) SuperplaneListStageEventsExecute(r ApiSuperplaneListSt
 	if r.limit != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
 	}
-	if r.after != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "after", r.after, "", "")
+	if r.before != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

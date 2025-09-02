@@ -301,7 +301,7 @@ func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr str
 	return events, nil
 }
 
-func ListEventsByCanvasIDWithLimitAndAfter(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int, after *time.Time) ([]Event, error) {
+func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int, before *time.Time) ([]Event, error) {
 	var events []Event
 
 	query := database.Conn().Where("canvas_id = ?", canvasID)
@@ -318,8 +318,8 @@ func ListEventsByCanvasIDWithLimitAndAfter(canvasID uuid.UUID, sourceType string
 		query = query.Where("source_id = ?", sourceID)
 	}
 
-	if after != nil {
-		query = query.Where("received_at < ?", after)
+	if before != nil {
+		query = query.Where("received_at < ?", before)
 	}
 
 	query = query.Order("received_at DESC").Limit(limit)

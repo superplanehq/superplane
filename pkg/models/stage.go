@@ -410,7 +410,7 @@ func (s *Stage) ListEventsInTransaction(tx *gorm.DB, states, stateReasons []stri
 	return events, nil
 }
 
-func (s *Stage) ListEventsWithLimitAndAfter(states, stateReasons []string, limit int, after *time.Time) ([]StageEvent, error) {
+func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons []string, limit int, before *time.Time) ([]StageEvent, error) {
 	var events []StageEvent
 	query := database.Conn().
 		Where("stage_id = ?", s.ID).
@@ -420,8 +420,8 @@ func (s *Stage) ListEventsWithLimitAndAfter(states, stateReasons []string, limit
 		query = query.Where("state_reason IN ?", stateReasons)
 	}
 
-	if after != nil {
-		query = query.Where("created_at < ?", after)
+	if before != nil {
+		query = query.Where("created_at < ?", before)
 	}
 
 	err := query.Order("created_at DESC").Limit(limit).Find(&events).Error

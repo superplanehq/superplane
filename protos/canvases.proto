@@ -769,7 +769,7 @@ message ListStageEventsRequest {
   repeated StageEvent.State states = 3;
   repeated StageEvent.StateReason state_reasons = 4;
   int32 limit = 5;
-  google.protobuf.Timestamp after = 6;
+  google.protobuf.Timestamp before = 6;
 }
 
 message ListStageEventsResponse {
@@ -907,7 +907,7 @@ message ListEventsRequest {
   EventSourceType source_type = 2;
   string source_id = 3;
   int32 limit = 4;
-  google.protobuf.Timestamp after = 5;
+  google.protobuf.Timestamp before = 5;
 }
 
 message ListEventsResponse {
@@ -955,7 +955,9 @@ message BulkListEventsResponse {
 message BulkListStageEventsRequest {
   string canvas_id_or_name = 1;
   repeated StageEventItemRequest stages = 2;
-  int32 limit_per_stage = 3;
+  repeated StageEvent.State states = 3;
+  repeated StageEvent.StateReason state_reasons = 4;
+  int32 limit_per_stage = 5;
 }
 
 message BulkListStageEventsResponse {

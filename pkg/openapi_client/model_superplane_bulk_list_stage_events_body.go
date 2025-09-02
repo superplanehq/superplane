@@ -21,6 +21,8 @@ var _ MappedNullable = &SuperplaneBulkListStageEventsBody{}
 // SuperplaneBulkListStageEventsBody struct for SuperplaneBulkListStageEventsBody
 type SuperplaneBulkListStageEventsBody struct {
 	Stages []SuperplaneStageEventItemRequest `json:"stages,omitempty"`
+	States []SuperplaneStageEventState `json:"states,omitempty"`
+	StateReasons []SuperplaneStageEventStateReason `json:"stateReasons,omitempty"`
 	LimitPerStage *int32 `json:"limitPerStage,omitempty"`
 }
 
@@ -73,6 +75,70 @@ func (o *SuperplaneBulkListStageEventsBody) SetStages(v []SuperplaneStageEventIt
 	o.Stages = v
 }
 
+// GetStates returns the States field value if set, zero value otherwise.
+func (o *SuperplaneBulkListStageEventsBody) GetStates() []SuperplaneStageEventState {
+	if o == nil || IsNil(o.States) {
+		var ret []SuperplaneStageEventState
+		return ret
+	}
+	return o.States
+}
+
+// GetStatesOk returns a tuple with the States field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneBulkListStageEventsBody) GetStatesOk() ([]SuperplaneStageEventState, bool) {
+	if o == nil || IsNil(o.States) {
+		return nil, false
+	}
+	return o.States, true
+}
+
+// HasStates returns a boolean if a field has been set.
+func (o *SuperplaneBulkListStageEventsBody) HasStates() bool {
+	if o != nil && !IsNil(o.States) {
+		return true
+	}
+
+	return false
+}
+
+// SetStates gets a reference to the given []SuperplaneStageEventState and assigns it to the States field.
+func (o *SuperplaneBulkListStageEventsBody) SetStates(v []SuperplaneStageEventState) {
+	o.States = v
+}
+
+// GetStateReasons returns the StateReasons field value if set, zero value otherwise.
+func (o *SuperplaneBulkListStageEventsBody) GetStateReasons() []SuperplaneStageEventStateReason {
+	if o == nil || IsNil(o.StateReasons) {
+		var ret []SuperplaneStageEventStateReason
+		return ret
+	}
+	return o.StateReasons
+}
+
+// GetStateReasonsOk returns a tuple with the StateReasons field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneBulkListStageEventsBody) GetStateReasonsOk() ([]SuperplaneStageEventStateReason, bool) {
+	if o == nil || IsNil(o.StateReasons) {
+		return nil, false
+	}
+	return o.StateReasons, true
+}
+
+// HasStateReasons returns a boolean if a field has been set.
+func (o *SuperplaneBulkListStageEventsBody) HasStateReasons() bool {
+	if o != nil && !IsNil(o.StateReasons) {
+		return true
+	}
+
+	return false
+}
+
+// SetStateReasons gets a reference to the given []SuperplaneStageEventStateReason and assigns it to the StateReasons field.
+func (o *SuperplaneBulkListStageEventsBody) SetStateReasons(v []SuperplaneStageEventStateReason) {
+	o.StateReasons = v
+}
+
 // GetLimitPerStage returns the LimitPerStage field value if set, zero value otherwise.
 func (o *SuperplaneBulkListStageEventsBody) GetLimitPerStage() int32 {
 	if o == nil || IsNil(o.LimitPerStage) {
@@ -117,6 +183,12 @@ func (o SuperplaneBulkListStageEventsBody) ToMap() (map[string]interface{}, erro
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Stages) {
 		toSerialize["stages"] = o.Stages
+	}
+	if !IsNil(o.States) {
+		toSerialize["states"] = o.States
+	}
+	if !IsNil(o.StateReasons) {
+		toSerialize["stateReasons"] = o.StateReasons
 	}
 	if !IsNil(o.LimitPerStage) {
 		toSerialize["limitPerStage"] = o.LimitPerStage

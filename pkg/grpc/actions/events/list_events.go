@@ -19,7 +19,7 @@ const (
 	MaxLimit     = 50
 )
 
-func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string, limit int32, after *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
+func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string, limit int32, before *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
@@ -27,13 +27,13 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 
 	validatedLimit := validateLimit(int(limit))
 
-	var afterTime *time.Time
-	if after != nil && after.IsValid() {
-		t := after.AsTime()
-		afterTime = &t
+	var beforeTime *time.Time
+	if before != nil && before.IsValid() {
+		t := before.AsTime()
+		beforeTime = &t
 	}
-	log.Println("afterTime", afterTime)
-	events, err := models.ListEventsByCanvasIDWithLimitAndAfter(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit, afterTime)
+	log.Println("beforeTime", beforeTime)
+	events, err := models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit, beforeTime)
 	if err != nil {
 		return nil, err
 	}

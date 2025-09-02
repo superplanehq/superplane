@@ -615,7 +615,7 @@
             "format": "int32"
           },
           {
-            "name": "after",
+            "name": "before",
             "in": "query",
             "required": false,
             "type": "string",
@@ -970,7 +970,7 @@
             "format": "int32"
           },
           {
-            "name": "after",
+            "name": "before",
             "in": "query",
             "required": false,
             "type": "string",
@@ -3382,6 +3382,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneStageEventItemRequest"
+          }
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SuperplaneStageEventState"
+          }
+        },
+        "stateReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SuperplaneStageEventStateReason"
           }
         },
         "limitPerStage": {
