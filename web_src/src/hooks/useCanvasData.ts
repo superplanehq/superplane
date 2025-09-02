@@ -22,6 +22,8 @@ import {
   superplaneAddUser,
   superplaneRemoveUser,
   superplaneListEvents,
+  superplaneListStageEvents,
+  superplaneBulkListEvents,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping } from '../api-client/types.gen'
@@ -36,6 +38,7 @@ export const canvasKeys = {
   eventSources: (canvasId: string) => [...canvasKeys.all, 'eventSources', canvasId] as const,
   eventSource: (canvasId: string, eventSourceId: string) => [...canvasKeys.all, 'eventSource', canvasId, eventSourceId] as const,
   events: (canvasId: string, sourceType: string, sourceId: string) => [...canvasKeys.all, 'events', canvasId, sourceType, sourceId] as const,
+  stageEvents: (canvasId: string, stageId: string) => [...canvasKeys.all, 'stageEvents', canvasId, stageId] as const,
   connectionGroups: (canvasId: string) => [...canvasKeys.all, 'connectionGroups', canvasId] as const,
   connectionGroup: (canvasId: string, connectionGroupId: string) => [...canvasKeys.all, 'connectionGroup', canvasId, connectionGroupId] as const,
   integrations: (canvasId?: string) => canvasId ? [...canvasKeys.all, 'integrations', canvasId] as const : ['integrations'] as const,
@@ -648,5 +651,160 @@ export const useEventSourceEvents = (canvasId: string, eventSourceId: string) =>
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!eventSourceId
+  })
+}
+
+export const useStageEvents = (canvasId: string, stageId: string) => {
+  return useInfiniteQuery({
+    queryKey: canvasKeys.events(canvasId, 'EVENT_SOURCE_TYPE_STAGE', stageId),
+    queryFn: async ({ pageParam }) => {
+      const response = await superplaneListEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          query: {
+            sourceType: 'EVENT_SOURCE_TYPE_STAGE',
+            sourceId: stageId,
+            limit: 20,
+            ...(pageParam && { after: pageParam })
+          }
+        })
+      )
+      return {
+        events: response.data?.events || [],
+        nextCursor: response.data?.events && response.data.events.length === 20 
+          ? response.data.events[response.data.events.length - 1]?.receivedAt 
+          : undefined
+      }
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && !!stageId
+  })
+}
+
+export const useStageQueueEvents = (canvasId: string, stageId: string) => {
+  return useInfiniteQuery({
+    queryKey: canvasKeys.stageEvents(canvasId, stageId),
+    queryFn: async ({ pageParam }) => {
+      const response = await superplaneListStageEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, stageIdOrName: stageId },
+          query: {
+            limit: 20,
+            ...(pageParam && { after: pageParam })
+          }
+        })
+      )
+      return {
+        events: response.data?.events || [],
+        nextCursor: response.data?.events && response.data.events.length === 20 
+          ? response.data.events[response.data.events.length - 1]?.createdAt 
+          : undefined
+      }
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && !!stageId
+  })
+}
+
+export const useConnectionGroupEvents = (canvasId: string, connectionGroupId: string) => {
+  return useInfiniteQuery({
+    queryKey: canvasKeys.events(canvasId, 'EVENT_SOURCE_TYPE_CONNECTION_GROUP', connectionGroupId),
+    queryFn: async ({ pageParam }) => {
+      const response = await superplaneListEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          query: {
+            sourceType: 'EVENT_SOURCE_TYPE_CONNECTION_GROUP',
+            sourceId: connectionGroupId,
+            limit: 20,
+            ...(pageParam && { after: pageParam })
+          }
+        })
+      )
+      return {
+        events: response.data?.events || [],
+        nextCursor: response.data?.events && response.data.events.length === 20 
+          ? response.data.events[response.data.events.length - 1]?.receivedAt 
+          : undefined
+      }
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && !!connectionGroupId
+  })
+}
+
+// Hook for fetching events from multiple connected sources
+export const useConnectedSourcesEvents = (
+  canvasId: string, 
+  connectedSources: {
+    eventSourceIds: string[];
+    stageIds: string[];
+    connectionGroupIds: string[];
+  },
+  limitPerSource: number = 20
+) => {
+  return useInfiniteQuery({
+    queryKey: ['connectedEvents', canvasId, connectedSources, limitPerSource],
+    queryFn: async () => {
+      const sources = [
+        ...connectedSources.eventSourceIds.map(id => ({
+          sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
+          sourceId: id
+        })),
+        ...connectedSources.stageIds.map(id => ({
+          sourceType: 'EVENT_SOURCE_TYPE_STAGE' as const,
+          sourceId: id
+        })),
+        ...connectedSources.connectionGroupIds.map(id => ({
+          sourceType: 'EVENT_SOURCE_TYPE_CONNECTION_GROUP' as const,
+          sourceId: id
+        }))
+      ];
+
+      if (sources.length === 0) {
+        return { events: [], nextCursor: undefined, limitPerSource };
+      }
+
+      const response = await superplaneBulkListEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          body: {
+            sources,
+            limitPerSource: limitPerSource
+          }
+        })
+      );
+
+      const allEvents = response.data?.results?.flatMap(result => result.events || []) || [];
+      
+      // Sort by receivedAt desc
+      allEvents.sort((a, b) => new Date(b.receivedAt || '').getTime() - new Date(a.receivedAt || '').getTime());
+      
+      return {
+        events: allEvents,
+        limitPerSource,
+        nextCursor: allEvents.length > 0 && allEvents.length >= limitPerSource 
+          ? allEvents[allEvents.length - 1]?.receivedAt 
+          : undefined
+      };
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && (
+      connectedSources.eventSourceIds.length > 0 ||
+      connectedSources.stageIds.length > 0 ||
+      connectedSources.connectionGroupIds.length > 0
+    )
   })
 }
