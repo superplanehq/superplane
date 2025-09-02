@@ -9,6 +9,8 @@ import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflo
 import { AllNodeType, EdgeType } from '../types/flow';
 import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
 
+const SYNC_EVENTS_LIMIT = 5;
+
 // Create the store
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Initial state
@@ -203,8 +205,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const stageEventsResponse = await superplaneListStageEvents(withOrganizationHeader({
       path: {
         canvasIdOrName: canvasId,
-        stageIdOrName: stageId
-      }
+        stageIdOrName: stageId,
+      },
+      query: {
+        limit: SYNC_EVENTS_LIMIT
+      } 
     }));
     set((state) => ({
       stages: state.stages.map((s) => s.metadata!.id === stageId ? {
@@ -226,7 +231,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       path: { canvasIdOrName: canvasId },
       query: { 
         sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
-        sourceId: eventSourceId 
+        sourceId: eventSourceId,
+        limit: SYNC_EVENTS_LIMIT
       }
     }));
 
@@ -250,7 +256,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       path: { canvasIdOrName: canvasId },
       query: { 
         sourceType: 'EVENT_SOURCE_TYPE_STAGE' as const,
-        sourceId: stageId 
+        sourceId: stageId,
+        limit: SYNC_EVENTS_LIMIT
       }
     }));
 
@@ -274,7 +281,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       path: { canvasIdOrName: canvasId },
       query: { 
         sourceType: 'EVENT_SOURCE_TYPE_CONNECTION_GROUP' as const,
-        sourceId: connectionGroupId 
+        sourceId: connectionGroupId,
+        limit: SYNC_EVENTS_LIMIT
       }
     }));
 
