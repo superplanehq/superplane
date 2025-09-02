@@ -2,7 +2,7 @@ import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
 import { SuperplaneStageEvent, SuperplaneEvent, SuperplaneExecution } from "@/api-client";
 import MessageItem from '../MessageItem';
 import { RunItem } from './RunItem';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useOrganizationUsersForCanvas, useStageQueueEvents, useStageEvents } from '@/hooks/useCanvasData';
 import { ControlledTabs, Tab } from '@/components/Tabs/tabs';
 import {
@@ -42,21 +42,24 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     data: queueEventsData,
     fetchNextPage: fetchNextQueuePage,
     hasNextPage: hasNextQueuePage,
-    isFetchingNextPage: isFetchingNextQueuePage
+    isFetchingNextPage: isFetchingNextQueuePage,
+    refetch: refetchQueueEvents
   } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PENDING', 'STATE_WAITING']);
 
   const {
     data: finishedEventsData,
     fetchNextPage: fetchNextFinishedPage,
     hasNextPage: hasNextFinishedPage,
-    isFetchingNextPage: isFetchingNextFinishedPage
+    isFetchingNextPage: isFetchingNextFinishedPage,
+    refetch: refetchFinishedEvents
   } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PROCESSED']);
 
   const {
     data: stagePlainEventsData,
     fetchNextPage: fetchNextStagePage,
     hasNextPage: hasNextStagePage,
-    isFetchingNextPage: isFetchingNextStagePage
+    isFetchingNextPage: isFetchingNextStagePage,
+    refetch: refetchStageEvents
   } = useStageEvents(canvasId, selectedStage.metadata!.id!);
 
   const eventsByExecutionId = useMemo(() => {
@@ -76,6 +79,15 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     .filter(event => event.execution)
     .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
     .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [finishedEventsData]);
+
+  // Refetch queries when selectedStage.events or .queue changes
+  // That means there was a new event or a new queue event since
+  // those small arrays are updated near real time
+  useEffect(() => {
+    refetchQueueEvents();
+    refetchFinishedEvents();
+    refetchStageEvents();
+  }, [selectedStage.events, selectedStage.queue, refetchQueueEvents, refetchFinishedEvents, refetchStageEvents]);
 
   const createTimeline = (): TimelineItem[] => {
     const items: TimelineItem[] = [];
