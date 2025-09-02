@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"log"
 	"time"
 
 	uuid "github.com/google/uuid"
@@ -31,7 +32,7 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 		t := after.AsTime()
 		afterTime = &t
 	}
-
+	log.Println("afterTime", afterTime)
 	events, err := models.ListEventsByCanvasIDWithLimitAndAfter(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit, afterTime)
 	if err != nil {
 		return nil, err

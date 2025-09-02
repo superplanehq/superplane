@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import {
   rolesListRoles,
   usersListUsers,
@@ -21,6 +21,7 @@ import {
   integrationsListIntegrations,
   superplaneAddUser,
   superplaneRemoveUser,
+  superplaneListEvents,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping } from '../api-client/types.gen'
@@ -34,6 +35,7 @@ export const canvasKeys = {
   stage: (canvasId: string, stageId: string) => [...canvasKeys.all, 'stage', canvasId, stageId] as const,
   eventSources: (canvasId: string) => [...canvasKeys.all, 'eventSources', canvasId] as const,
   eventSource: (canvasId: string, eventSourceId: string) => [...canvasKeys.all, 'eventSource', canvasId, eventSourceId] as const,
+  events: (canvasId: string, sourceType: string, sourceId: string) => [...canvasKeys.all, 'events', canvasId, sourceType, sourceId] as const,
   connectionGroups: (canvasId: string) => [...canvasKeys.all, 'connectionGroups', canvasId] as const,
   connectionGroup: (canvasId: string, connectionGroupId: string) => [...canvasKeys.all, 'connectionGroup', canvasId, connectionGroupId] as const,
   integrations: (canvasId?: string) => canvasId ? [...canvasKeys.all, 'integrations', canvasId] as const : ['integrations'] as const,
@@ -615,5 +617,36 @@ export const useIntegrations = () => {
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+  })
+}
+
+// Event-related hooks
+export const useEventSourceEvents = (canvasId: string, eventSourceId: string) => {
+  return useInfiniteQuery({
+    queryKey: canvasKeys.events(canvasId, 'EVENT_SOURCE_TYPE_EVENT_SOURCE', eventSourceId),
+    queryFn: async ({ pageParam }) => {
+      const response = await superplaneListEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          query: {
+            sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE',
+            sourceId: eventSourceId,
+            limit: 20,
+            ...(pageParam && { after: pageParam })
+          }
+        })
+      )
+      return {
+        events: response.data?.events || [],
+        nextCursor: response.data?.events && response.data.events.length === 20 
+          ? response.data.events[response.data.events.length - 1]?.receivedAt 
+          : undefined
+      }
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && !!eventSourceId
   })
 }

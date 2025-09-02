@@ -319,7 +319,7 @@ func ListEventsByCanvasIDWithLimitAndAfter(canvasID uuid.UUID, sourceType string
 	}
 
 	if after != nil {
-		query = query.Where("received_at > ?", after)
+		query = query.Where("received_at < ?", after)
 	}
 
 	query = query.Order("received_at DESC").Limit(limit)

@@ -421,7 +421,7 @@ func (s *Stage) ListEventsWithLimitAndAfter(states, stateReasons []string, limit
 	}
 
 	if after != nil {
-		query = query.Where("created_at > ?", after)
+		query = query.Where("created_at < ?", after)
 	}
 
 	err := query.Order("created_at DESC").Limit(limit).Find(&events).Error
