@@ -227,6 +227,7 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
 
   const hasMoreItems = timeline.length > timelineLimit || hasNextQueuePage || hasNextStagePage;
   const isLoadingMore = isFetchingNextQueuePage || isFetchingNextStagePage || isFetchingNextConnectedEvents;
+  const isInitialLoading = !queueEventsData && !finishedEventsData && !stagePlainEventsData;
 
   return (
     <div className="p-6">
@@ -263,7 +264,14 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
       </div>
 
       <div className="mb-8 space-y-3">
-        {filteredTimeline.length === 0 ? (
+        {isInitialLoading ? (
+          <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+            <div className="inline-flex items-center justify-center w-16 h-16 mx-auto mb-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">Loading history...</p>
+          </div>
+        ) : filteredTimeline.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
             <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3" aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>history</span>
             <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No history available</p>
