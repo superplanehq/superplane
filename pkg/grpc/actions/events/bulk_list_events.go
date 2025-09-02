@@ -4,15 +4,17 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSourceItemRequest, limitPerSource int32) (*pb.BulkListEventsResponse, error) {
+func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSourceItemRequest, limitPerSource int32, before *timestamppb.Timestamp) (*pb.BulkListEventsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
@@ -27,8 +29,14 @@ func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSou
 	}
 
 	validatedLimit := validateLimit(int(limitPerSource))
-	
-	eventsBySource, err := models.BulkListEventsByCanvasIDAndMultipleSources(canvasUUID, sourceFilters, validatedLimit)
+
+	var beforeTime *time.Time
+	if before != nil && before.IsValid() {
+		t := before.AsTime()
+		beforeTime = &t
+	}
+
+	eventsBySource, err := models.BulkListEventsByCanvasIDAndMultipleSources(canvasUUID, sourceFilters, validatedLimit, beforeTime)
 	if err != nil {
 		return nil, err
 	}

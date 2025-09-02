@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 )
 
@@ -24,7 +26,7 @@ func Test__BulkListEvents(t *testing.T) {
 				SourceType: protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE,
 			},
 		}
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -48,7 +50,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -91,7 +93,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 2)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 2, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -125,7 +127,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 2)
@@ -150,7 +152,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		_, err := BulkListEvents(ctx, "invalid-canvas-id", sources, 10)
+		_, err := BulkListEvents(ctx, "invalid-canvas-id", sources, 10, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid canvas ID")
 	})
@@ -164,7 +166,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -174,5 +176,49 @@ func Test__BulkListEvents(t *testing.T) {
 		assert.Equal(t, protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, result.SourceType)
 
 		assert.Greater(t, len(result.Events), 0)
+	})
+
+	t.Run("filter by before timestamp", func(t *testing.T) {
+		// Create an event, wait, then create another event
+		event1, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "before_data1"}`), []byte(`{"x-header": "before_value1"}`))
+		require.NoError(t, err)
+
+		// Wait a bit to ensure different timestamps
+		time.Sleep(10 * time.Millisecond)
+		beforeTime := time.Now()
+		time.Sleep(10 * time.Millisecond)
+
+		event2, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "before_data2"}`), []byte(`{"x-header": "before_value2"}`))
+		require.NoError(t, err)
+
+		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
+		sources := []*protos.EventSourceItemRequest{
+			{
+				SourceId:   r.Source.ID.String(),
+				SourceType: protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE,
+			},
+		}
+
+		// Test with before filter - should only return events created before the timestamp
+		beforeTimestamp := timestamppb.New(beforeTime)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, beforeTimestamp)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Results, 1)
+
+		// Should contain event1 but not event2
+		foundEvent1 := false
+		foundEvent2 := false
+		for _, event := range res.Results[0].Events {
+			if event.Id == event1.ID.String() {
+				foundEvent1 = true
+			}
+			if event.Id == event2.ID.String() {
+				foundEvent2 = true
+			}
+		}
+
+		assert.True(t, foundEvent1, "Should find event1 (created before the timestamp)")
+		assert.False(t, foundEvent2, "Should not find event2 (created after the timestamp)")
 	})
 }

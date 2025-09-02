@@ -203,23 +203,34 @@ func FindStageEventsWaitingForTimeWindow() ([]StageEventWithConditions, error) {
 	return events, nil
 }
 
-func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs []uuid.UUID, limitPerStage int) (map[string][]StageEvent, error) {
+func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs []uuid.UUID, limitPerStage int, before *time.Time, states []string, stateReasons []string) (map[string][]StageEvent, error) {
 	if len(stageIDs) == 0 {
 		return map[string][]StageEvent{}, nil
 	}
 
 	var events []StageEvent
 
-	states := []string{
-		StageEventStatePending,
-		StageEventStateWaiting,
-		StageEventStateProcessed,
+	if len(states) == 0 {
+		states = []string{
+			StageEventStatePending,
+			StageEventStateWaiting,
+			StageEventStateProcessed,
+		}
 	}
 
 	query := database.Conn().
 		Where("stage_id IN ?", stageIDs).
-		Where("state IN ?", states).
-		Order("stage_id, created_at DESC")
+		Where("state IN ?", states)
+
+	if len(stateReasons) > 0 {
+		query = query.Where("state_reason IN ?", stateReasons)
+	}
+
+	if before != nil {
+		query = query.Where("created_at < ?", before)
+	}
+
+	query = query.Order("stage_id, created_at DESC")
 
 	err := query.Find(&events).Error
 	if err != nil {

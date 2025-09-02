@@ -110,29 +110,29 @@ func Test__ListEvents(t *testing.T) {
 		assert.Len(t, res.Events, 3)
 	})
 
-	t.Run("after parameter", func(t *testing.T) {
+	t.Run("before parameter", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
 
-		event1, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "after1"}`), []byte(`{}`))
+		event1, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "before1"}`), []byte(`{}`))
 		require.NoError(t, err)
 
 		time.Sleep(10 * time.Millisecond)
 
-		event2, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "after2"}`), []byte(`{}`))
+		event2, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "before2"}`), []byte(`{}`))
 		require.NoError(t, err)
 
-		afterTime := timestamppb.New(*event1.ReceivedAt)
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, afterTime)
+		beforeTime := timestamppb.New(*event1.ReceivedAt)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, beforeTime)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 
 		require.Greater(t, len(res.Events), 0)
 		for _, event := range res.Events {
 			eventTime := event.ReceivedAt.AsTime()
-			assert.True(t, eventTime.After(*event1.ReceivedAt))
+			assert.True(t, eventTime.Before(*event1.ReceivedAt))
 		}
 
-		assert.Contains(t, getEventIDs(res.Events), event2.ID.String())
+		assert.NotContains(t, getEventIDs(res.Events), event2.ID.String())
 	})
 }
 
