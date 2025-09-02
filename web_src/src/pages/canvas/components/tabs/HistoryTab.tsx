@@ -22,41 +22,9 @@ interface HistoryTabProps {
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   connectionEventsById?: Record<string, SuperplaneEvent>;
   eventsByExecutionId?: Record<string, SuperplaneEvent>;
-  hasNextQueueEvents?: boolean;
-  fetchNextQueueEvents?: () => void;
-  isFetchingNextQueueEvents?: boolean;
-  hasNextStageEvents?: boolean;
-  fetchNextStageEvents?: () => void;
-  isFetchingNextStageEvents?: boolean;
-  queueEventsLoading?: boolean;
-  stageEventsLoading?: boolean;
-  hasNextConnectedEvents?: boolean;
-  fetchNextConnectedEvents?: () => void;
-  isFetchingNextConnectedEvents?: boolean;
-  connectedEventsLoading?: boolean;
 }
 
-export const HistoryTab = ({ 
-  allExecutions, 
-  selectedStage, 
-  allStageEvents, 
-  organizationId, 
-  approveStageEvent, 
-  connectionEventsById, 
-  eventsByExecutionId,
-  hasNextQueueEvents,
-  fetchNextQueueEvents,
-  isFetchingNextQueueEvents,
-  hasNextStageEvents,
-  fetchNextStageEvents,
-  isFetchingNextStageEvents,
-  queueEventsLoading,
-  stageEventsLoading,
-  hasNextConnectedEvents,
-  fetchNextConnectedEvents,
-  isFetchingNextConnectedEvents,
-  connectedEventsLoading
-}: HistoryTabProps) => {
+export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organizationId, approveStageEvent, connectionEventsById, eventsByExecutionId }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
     type: 'execution' | 'stage_event' | 'discarded_event';
@@ -274,39 +242,6 @@ export const HistoryTab = ({
             }
             return null;
           })
-        )}
-
-        {/* Load More Button - only show when no search/filter is active */}
-        {(hasNextQueueEvents || hasNextStageEvents || hasNextConnectedEvents) && 
-         !searchQuery.trim() && 
-         activeFilter === 'all' && (
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                if (hasNextQueueEvents && fetchNextQueueEvents) {
-                  fetchNextQueueEvents();
-                }
-                if (hasNextStageEvents && fetchNextStageEvents) {
-                  fetchNextStageEvents();
-                }
-                if (hasNextConnectedEvents && fetchNextConnectedEvents) {
-                  fetchNextConnectedEvents();
-                }
-              }}
-              disabled={isFetchingNextQueueEvents || isFetchingNextStageEvents || isFetchingNextConnectedEvents}
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed"
-            >
-              {(isFetchingNextQueueEvents || isFetchingNextStageEvents || isFetchingNextConnectedEvents) ? 'Loading...' : 'Load more'}
-            </button>
-          </div>
-        )}
-
-        {/* Loading indicators */}
-        {(queueEventsLoading || stageEventsLoading || connectedEventsLoading) && filteredTimeline.length === 0 && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-sm text-gray-500 mt-2">Loading events...</p>
-          </div>
         )}
       </div>
     </div>
