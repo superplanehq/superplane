@@ -49,9 +49,9 @@ func Test__BulkListStageEvents(t *testing.T) {
 		result := res.Results[0]
 		assert.Equal(t, r.Stage.ID.String(), result.StageId)
 
-		eventIds := []string{result.Events[0].Id, result.Events[1].Id}
-		assert.Contains(t, eventIds, stageEvent1.ID.String())
-		assert.Contains(t, eventIds, stageEvent2.ID.String())
+		eventIDs := []string{result.Events[0].Id, result.Events[1].Id}
+		assert.Contains(t, eventIDs, stageEvent1.ID.String())
+		assert.Contains(t, eventIDs, stageEvent2.ID.String())
 
 		e := result.Events[0]
 		assert.NotEmpty(t, e.Id)

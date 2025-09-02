@@ -93,7 +93,7 @@ func Test__ListEvents(t *testing.T) {
 
 	t.Run("limit parameter", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		
+
 		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
@@ -112,12 +112,12 @@ func Test__ListEvents(t *testing.T) {
 
 	t.Run("after parameter", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		
+
 		event1, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "after1"}`), []byte(`{}`))
 		require.NoError(t, err)
-		
+
 		time.Sleep(10 * time.Millisecond)
-		
+
 		event2, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "after2"}`), []byte(`{}`))
 		require.NoError(t, err)
 
@@ -125,18 +125,18 @@ func Test__ListEvents(t *testing.T) {
 		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, afterTime)
 		require.NoError(t, err)
 		require.NotNil(t, res)
-		
+
 		require.Greater(t, len(res.Events), 0)
 		for _, event := range res.Events {
 			eventTime := event.ReceivedAt.AsTime()
 			assert.True(t, eventTime.After(*event1.ReceivedAt))
 		}
-		
-		assert.Contains(t, getEventIds(res.Events), event2.ID.String())
+
+		assert.Contains(t, getEventIDs(res.Events), event2.ID.String())
 	})
 }
 
-func getEventIds(events []*protos.Event) []string {
+func getEventIDs(events []*protos.Event) []string {
 	ids := make([]string, len(events))
 	for i, event := range events {
 		ids[i] = event.Id
