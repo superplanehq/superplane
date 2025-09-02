@@ -65,6 +65,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   removeStage: (stageId: string) => {
     set((state) => ({
       stages: state.stages.filter(s => s.metadata?.id !== stageId),
+      edges: state.edges.filter(e => e.source !== stageId && e.target !== stageId),
       // Also clear selection and editing state if this stage was selected/being edited
       selectedStageId: state.selectedStageId === stageId ? null : state.selectedStageId,
       editingStageId: state.editingStageId === stageId ? null : state.editingStageId
@@ -90,7 +91,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   removeConnectionGroup: (connectionGroupId: string) => {
     set((state) => ({
-      connectionGroups: state.connectionGroups.filter(cg => cg.metadata?.id !== connectionGroupId)
+      connectionGroups: state.connectionGroups.filter(cg => cg.metadata?.id !== connectionGroupId),
+      edges: state.edges.filter(e => e.source !== connectionGroupId && e.target !== connectionGroupId)
     }));
     get().syncToReactFlow();
   },
@@ -112,6 +114,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   removeEventSource: (eventSourceId: string) => {
     set((state) => ({
       eventSources: state.eventSources.filter(es => es.metadata?.id !== eventSourceId),
+      edges: state.edges.filter(e => e.source !== eventSourceId && e.target !== eventSourceId),
       // Also clear editing state if this event source was being edited
       editingEventSourceId: state.editingEventSourceId === eventSourceId ? null : state.editingEventSourceId
     }));
