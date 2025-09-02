@@ -13,9 +13,9 @@ import { FlowControls } from "./FlowControls";
 import { ConnectionStatus } from "./ConnectionStatus";
 
 export const nodeTypes = {
-  connectionGroup: ConnectionGroupNode,
-  stage: StageNode,
-  eventSource: EventSourceNode,
+  'connection_group': ConnectionGroupNode,
+  'stage': StageNode,
+  'event_source': EventSourceNode,
 };
 
 export const FlowRenderer: React.FC = () => {

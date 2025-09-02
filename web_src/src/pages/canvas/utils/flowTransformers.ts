@@ -26,7 +26,7 @@ export const transformEventSourcesToNodes = (
     
     return ({
       id: es.metadata?.id || '',
-      type: 'eventSource',
+      type: 'event_source',
       data: {
         id: es.metadata?.id || '',
         name: es.metadata?.name,
@@ -82,7 +82,7 @@ export const transformConnectionGroupsToNodes = (
 ): AllNodeType[] => {
   return connectionGroups.map((g, idx) => ({
     id: g.metadata?.id || '',
-    type: 'connectionGroup',
+    type: 'connection_group',
     data: {
       id: g.metadata?.id || '',
       name: g.metadata?.name || '',
@@ -172,6 +172,10 @@ export const transformToEdges = (
   return allEdges;
 };
 
+const filterEdgesByExistingNodes = (edges: Edge[], nodeIds: Set<string>): Edge[] => {
+  return edges.filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target));
+};
+
 export const autoLayoutNodes = async (
   nodes: AllNodeType[],
   edges: Edge[]
@@ -182,14 +186,17 @@ export const autoLayoutNodes = async (
     height: DEFAULT_HEIGHT,
   }));
 
+  elkNodes = Array.from(new Map(elkNodes.map((node) => [node.id, node])).values());
+  
+  const nodeIdSet = new Set(elkNodes.map(node => node.id));
+  const filteredEdges = filterEdgesByExistingNodes(edges, nodeIdSet);
 
-  let elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({
+  let elkEdges: ElkExtendedEdge[] = filteredEdges.map((edge) => ({
     id: edge.id,
     sources: [edge.source],
     targets: [edge.target],
   }));
 
-  elkNodes = Array.from(new Map(elkNodes.map((node) => [node.id, node])).values());
   elkEdges = Array.from(new Map(elkEdges.map((edge) => [edge.id, edge])).values());
 
   try {

@@ -21,11 +21,14 @@ import { Switch } from '../../../components/Switch/switch';
 import { Badge } from '../../../components/Badge/badge';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
+import { SuperplaneConnectionType } from '@/api-client';
+
+export type ConnectionInfo = { name: string; type: SuperplaneConnectionType };
 
 export interface ComponentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: { name: string; type: string } | null) => void;
+  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => void;
   className?: string;
 }
 
@@ -77,7 +80,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     if (node) {
       return {
         name: node.data?.name,
-        type: `TYPE_${node.type?.toUpperCase()}`
+        type: `TYPE_${node.type?.toUpperCase()}` as SuperplaneConnectionType
       };
     }
 
