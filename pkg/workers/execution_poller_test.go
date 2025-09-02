@@ -65,7 +65,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	require.NoError(t, err)
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
-	w := NewExecutionPoller(r.Encryptor)
+	w := NewExecutionPoller(r.Encryptor, r.Registry)
 
 	t.Run("failed resource -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
