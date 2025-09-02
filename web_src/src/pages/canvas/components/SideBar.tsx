@@ -124,7 +124,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     data: connectedEventsData,
     isFetchingNextPage: isFetchingNextConnectedEvents,
     refetch: refetchConnectedEvents,
-    fetchNextPage,
+    fetchNextPage: fetchNextConnectedEvents,
   } = useConnectedSourcesEvents(canvasId || '', connectedSources, 20);
 
   const connectionEventsById = useMemo(() => {
@@ -152,7 +152,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     return emittedEventsById;
   }, [selectedStage.events]);
 
-  const allExecutions = useMemo(() =>
+  const partialExecutions = useMemo(() =>
     selectedStage.queue
       ?.filter(event => event.execution)
       .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
@@ -161,8 +161,8 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
   );
 
   const executionRunning = useMemo(() =>
-    allExecutions.some(execution => execution.state === 'STATE_STARTED'),
-    [allExecutions]
+    partialExecutions.some(execution => execution.state === 'STATE_STARTED'),
+    [partialExecutions]
   );
 
   // Filter events by their state
@@ -191,7 +191,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
             selectedStage={selectedStage}
             pendingEvents={pendingEvents}
             waitingEvents={waitingEvents}
-            allExecutions={allExecutions}
+            partialExecutions={partialExecutions}
             approveStageEvent={approveStageEvent}
             executionRunning={executionRunning}
             organizationId={organizationId!}
@@ -202,13 +202,13 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
 
       case 'history':
         return <HistoryTab
+          canvasId={canvasId!}
           approveStageEvent={approveStageEvent}
-          allExecutions={allExecutions}
           organizationId={organizationId!}
           selectedStage={selectedStage}
-          allStageEvents={selectedStage.queue || []}
           connectionEventsById={connectionEventsById}
-          eventsByExecutionId={eventsByExecutionId}
+          isFetchingNextConnectedEvents={isFetchingNextConnectedEvents}
+          fetchNextConnectedEvents={fetchNextConnectedEvents}
         />;
 
       case 'settings':

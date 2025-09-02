@@ -23,9 +23,10 @@ import {
   superplaneRemoveUser,
   superplaneListEvents,
   superplaneBulkListEvents,
+  superplaneListStageEvents,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
-import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping } from '../api-client/types.gen'
+import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState } from '../api-client/types.gen'
 
 export const canvasKeys = {
   all: ['canvas'] as const,
@@ -37,6 +38,7 @@ export const canvasKeys = {
   eventSources: (canvasId: string) => [...canvasKeys.all, 'eventSources', canvasId] as const,
   eventSource: (canvasId: string, eventSourceId: string) => [...canvasKeys.all, 'eventSource', canvasId, eventSourceId] as const,
   events: (canvasId: string, sourceType: string, sourceId: string) => [...canvasKeys.all, 'events', canvasId, sourceType, sourceId] as const,
+  stageEvents: (canvasId: string, stageId: string, states: SuperplaneStageEventState[]) => [...canvasKeys.all, 'stageEvents', canvasId, stageId, states] as const,
   connectionGroups: (canvasId: string) => [...canvasKeys.all, 'connectionGroups', canvasId] as const,
   connectionGroup: (canvasId: string, connectionGroupId: string) => [...canvasKeys.all, 'connectionGroup', canvasId, connectionGroupId] as const,
   integrations: (canvasId?: string) => canvasId ? [...canvasKeys.all, 'integrations', canvasId] as const : ['integrations'] as const,
@@ -719,3 +721,62 @@ export const useConnectedSourcesEvents = (
     enabled: Object.values(connectedSources).some(arr => arr.length > 0)
   });
 };
+
+export const useStageEvents = (canvasId: string, stageId: string) => {
+  return useInfiniteQuery({
+    queryKey: canvasKeys.events(canvasId, 'EVENT_SOURCE_TYPE_STAGE', stageId),
+    queryFn: async ({ pageParam }) => {
+      const response = await superplaneListEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          query: {
+            sourceType: 'EVENT_SOURCE_TYPE_STAGE',
+            sourceId: stageId,
+            limit: 20,
+            ...(pageParam && { before: pageParam })
+          }
+        })
+      )
+      return {
+        events: response.data?.events || [],
+        nextCursor: response.data?.events && response.data.events.length === 20 
+          ? response.data.events[response.data.events.length - 1]?.receivedAt 
+          : undefined
+      }
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && !!stageId
+  })
+}
+
+export const useStageQueueEvents = (canvasId: string, stageId: string, states: SuperplaneStageEventState[]) => {
+  return useInfiniteQuery({
+    queryKey: canvasKeys.stageEvents(canvasId, stageId, states),
+    queryFn: async ({ pageParam }) => {
+      const response = await superplaneListStageEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, stageIdOrName: stageId },
+          query: {
+            states: states,
+            limit: 20,
+            ...(pageParam && { before: pageParam })
+          }
+        })
+      )
+      return {
+        events: response.data?.events || [],
+        nextCursor: response.data?.events && response.data.events.length === 20 
+          ? response.data.events[response.data.events.length - 1]?.createdAt 
+          : undefined
+      }
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && !!stageId
+  })
+}
