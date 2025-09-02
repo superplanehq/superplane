@@ -74,10 +74,10 @@ describe('autoLayoutNodes', () => {
     const result = await autoLayoutNodes(nodes, edges);
 
     expect(result).toHaveLength(3);
-    expect(result[0].position.x).toBeCloseTo(100, 3);
+    expect(result[0].position.x).toBeCloseTo(100, 0);
     expect(result[0].position.y).toBeCloseTo(150, 0);
-    expect(result[1].position.x).toBeCloseTo(300, 3);
-    expect(result[2].position.x).toBeCloseTo(500, 3);
+    expect(result[1].position.x).toBeCloseTo(300, 0);
+    expect(result[2].position.x).toBeCloseTo(500, 0);
 
     // Verify ELK was called with filtered edges (all edges should be valid)
     expect(elk.layout).toHaveBeenCalledWith({

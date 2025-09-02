@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { SuperplaneEventSource, SuperplaneEvent } from "@/api-client";
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { SidebarHeader } from "./SidebarHeader";
@@ -7,6 +7,7 @@ import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import { EventItem } from "./EventItem";
 import { useIntegrations } from "../hooks/useIntegrations";
 import { useCanvasStore } from "../store/canvasStore";
+import { useEventSourceEvents } from "@/hooks/useCanvasData";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { SidebarTabs } from './SidebarTabs';
@@ -34,6 +35,38 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
 
+  const {
+    data: eventsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: eventsLoading,
+    refetch: refetchEvents
+  } = useEventSourceEvents(canvasId, selectedEventSource.metadata?.id || '');
+
+  // Flatten all pages into a single array
+  const allEvents = useMemo(() => {
+    return eventsData?.pages.flatMap(page => page.events) || [];
+  }, [eventsData]);
+
+  useEffect(() => {
+    if ((selectedEventSource?.events?.length || 0) > 0 && allEvents.length > 0) {
+      const latestBulkEvent = selectedEventSource?.events?.[0];
+      const latestQueryEvent = allEvents[0];
+
+      // If bulk has a newer event or there are pending events, refetch the query
+      if (latestBulkEvent?.receivedAt && latestQueryEvent?.receivedAt) {
+        const bulkTime = new Date(latestBulkEvent.receivedAt);
+        const queryTime = new Date(latestQueryEvent.receivedAt);
+        const hasPendingEvents = allEvents.some(event => event.state === 'STATE_PENDING');
+        
+        if (bulkTime > queryTime || hasPendingEvents) {
+          refetchEvents();
+        }
+      }
+    }
+  }, [selectedEventSource?.events, allEvents, refetchEvents]);
+
   const eventSourceType = useMemo(() => {
     if (selectedEventSource.eventSourceType)
       return selectedEventSource.eventSourceType;
@@ -45,8 +78,6 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
     }
     return "webhook";
   }, [canvasIntegrations, selectedEventSource.eventSourceType, selectedEventSource.spec?.integration?.name]);
-  const events = selectedEventSource.events || [];
-  const allEvents = events.slice(0, 20);
 
 
   return (
@@ -86,7 +117,12 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
             </div>
 
             <div className="space-y-2">
-              {allEvents.length > 0 ? (
+              {eventsLoading && allEvents.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-sm text-gray-500 mt-2">Loading events...</p>
+                </div>
+              ) : allEvents.length > 0 ? (
                 allEvents.map((event) => (
                   <EventItem
                     key={event.id}
@@ -107,10 +143,14 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
               )}
             </div>
 
-            {events.length > 20 && (
+            {hasNextPage && (
               <div className="mt-4 text-center">
-                <button className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                  Load more events
+                <button
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isFetchingNextPage ? 'Loading...' : 'Load more events'}
                 </button>
               </div>
             )}

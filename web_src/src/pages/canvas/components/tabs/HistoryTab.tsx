@@ -1,9 +1,9 @@
 import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
-import { SuperplaneStageEvent, SuperplaneEvent } from "@/api-client";
+import { SuperplaneStageEvent, SuperplaneEvent, SuperplaneExecution } from "@/api-client";
 import MessageItem from '../MessageItem';
 import { RunItem } from './RunItem';
-import { useMemo, useState } from 'react';
-import { useOrganizationUsersForCanvas } from '@/hooks/useCanvasData';
+import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useOrganizationUsersForCanvas, useStageQueueEvents, useStageEvents } from '@/hooks/useCanvasData';
 import { ControlledTabs, Tab } from '@/components/Tabs/tabs';
 import {
   formatDuration,
@@ -15,16 +15,16 @@ import {
 } from '../../utils/stageEventUtils';
 
 interface HistoryTabProps {
-  allExecutions: ExecutionWithEvent[];
   selectedStage: StageWithEventQueue;
-  allStageEvents: SuperplaneStageEvent[];
   organizationId: string;
+  canvasId: string;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   connectionEventsById?: Record<string, SuperplaneEvent>;
-  eventsByExecutionId?: Record<string, SuperplaneEvent>;
+  isFetchingNextConnectedEvents: boolean;
+  fetchNextConnectedEvents: () => void;
 }
 
-export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organizationId, approveStageEvent, connectionEventsById, eventsByExecutionId }: HistoryTabProps) => {
+export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, connectionEventsById, isFetchingNextConnectedEvents, fetchNextConnectedEvents }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
     type: 'execution' | 'stage_event' | 'discarded_event';
@@ -35,12 +35,63 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [timelineLimit, setTimelineLimit] = useState(20);
 
+  // Fetch stage queue events (pending/waiting)
+  const {
+    data: queueEventsData,
+    fetchNextPage: fetchNextQueuePage,
+    hasNextPage: hasNextQueuePage,
+    isFetchingNextPage: isFetchingNextQueuePage,
+    refetch: refetchQueueEvents
+  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PENDING', 'STATE_WAITING']);
+
+  const {
+    data: finishedEventsData,
+    fetchNextPage: fetchNextFinishedPage,
+    hasNextPage: hasNextFinishedPage,
+    isFetchingNextPage: isFetchingNextFinishedPage,
+    refetch: refetchFinishedEvents
+  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PROCESSED']);
+
+  const {
+    data: stagePlainEventsData,
+    fetchNextPage: fetchNextStagePage,
+    hasNextPage: hasNextStagePage,
+    isFetchingNextPage: isFetchingNextStagePage,
+    refetch: refetchStageEvents
+  } = useStageEvents(canvasId, selectedStage.metadata!.id!);
+
+  const eventsByExecutionId = useMemo(() => {
+    const emittedEventsById: Record<string, SuperplaneEvent> = {};
+
+    stagePlainEventsData?.pages.flatMap(page => page.events)?.forEach(event => {
+      const execution = event.raw?.execution as SuperplaneExecution;
+      if (execution?.id) {
+        emittedEventsById[execution.id || ''] = event;
+      }
+    })
+
+    return emittedEventsById;
+  }, [stagePlainEventsData?.pages]);
+
+  const allExecutions = useMemo(() => (finishedEventsData?.pages.flatMap(page => page.events) || [])
+    .filter(event => event.execution)
+    .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
+    .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [finishedEventsData]);
+
+  // Refetch queries when selectedStage.events or .queue changes
+  // That means there was a new event or a new queue event since
+  // those small arrays are updated near real time
+  useEffect(() => {
+    refetchQueueEvents();
+    refetchFinishedEvents();
+    refetchStageEvents();
+  }, [selectedStage.events, selectedStage.queue, refetchQueueEvents, refetchFinishedEvents, refetchStageEvents]);
 
   const createTimeline = (): TimelineItem[] => {
     const items: TimelineItem[] = [];
 
-    // Add executions
     allExecutions.forEach(execution => {
       if (execution?.createdAt) {
         items.push({
@@ -51,7 +102,11 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
       }
     });
 
-    // Add orphaned stage events (events without executions)
+    // Get all stage events from paginated data
+    const allStageEvents = (finishedEventsData?.pages.flatMap(page => page.events) || []).concat(
+      queueEventsData?.pages.flatMap(page => page.events) || []
+    );
+
     const executionEventIds = new Set(allExecutions.map(exec => exec.event?.id).filter(Boolean));
     const orphanedStageEvents = allStageEvents.filter(event => !executionEventIds.has(event.id));
 
@@ -136,8 +191,43 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
       });
     }
 
-    return filtered;
-  }, [timeline, activeFilter, searchQuery]);
+    return filtered.slice(0, timelineLimit);
+  }, [timeline, activeFilter, searchQuery, timelineLimit]);
+
+  const handleLoadMore = useCallback(() => {
+    const newLimit = timelineLimit + 20;
+    setTimelineLimit(newLimit);
+
+    // Fetch next pages if we need more data
+    if (hasNextQueuePage && !isFetchingNextQueuePage) {
+      fetchNextQueuePage();
+    }
+    if (hasNextStagePage && !isFetchingNextStagePage) {
+      fetchNextStagePage();
+    }
+    if (hasNextFinishedPage && !isFetchingNextFinishedPage) {
+      fetchNextFinishedPage();
+    }
+
+    // Fetch next connected events
+    fetchNextConnectedEvents();
+  }, [
+    timelineLimit,
+    hasNextQueuePage,
+    isFetchingNextQueuePage,
+    hasNextStagePage,
+    isFetchingNextStagePage,
+    fetchNextConnectedEvents,
+    fetchNextQueuePage,
+    fetchNextStagePage,
+    hasNextFinishedPage,
+    isFetchingNextFinishedPage,
+    fetchNextFinishedPage
+  ]);
+
+  const hasMoreItems = timeline.length > timelineLimit || hasNextQueuePage || hasNextStagePage;
+  const isLoadingMore = isFetchingNextQueuePage || isFetchingNextStagePage || isFetchingNextConnectedEvents;
+  const isInitialLoading = !queueEventsData && !finishedEventsData && !stagePlainEventsData;
 
   return (
     <div className="p-6">
@@ -174,74 +264,95 @@ export const HistoryTab = ({ allExecutions, selectedStage, allStageEvents, organ
       </div>
 
       <div className="mb-8 space-y-3">
-        {filteredTimeline.length === 0 ? (
+        {isInitialLoading ? (
+          <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+            <div className="inline-flex items-center justify-center w-16 h-16 mx-auto mb-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">Loading history...</p>
+          </div>
+        ) : filteredTimeline.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
             <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3" aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>history</span>
             <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No history available</p>
           </div>
         ) : (
-          filteredTimeline.map((item) => {
-            if (item.type === 'execution') {
-              const execution = item.data as ExecutionWithEvent;
-              const sourceEvent = connectionEventsById?.[execution.event.eventId || ''];
-              const emmitedEvent = eventsByExecutionId?.[execution.id || ''];
+          <>
+            {filteredTimeline.map((item) => {
+              if (item.type === 'execution') {
+                const execution = item.data as ExecutionWithEvent;
+                const sourceEvent = connectionEventsById?.[execution.event.eventId || ''];
+                const emmitedEvent = eventsByExecutionId?.[execution.id || ''];
 
-              return (
-                <RunItem
-                  key={execution.id!}
-                  title={execution.event.name || execution.id || 'Execution'}
-                  runId={execution.id}
-                  inputs={mapExecutionEventInputs(execution)}
-                  outputs={mapExecutionOutputs(execution)}
-                  state={execution.state || 'STATE_UNKNOWN'}
-                  result={execution.result || 'RESULT_UNKNOWN'}
-                  timestamp={execution.createdAt || new Date().toISOString()}
-                  executionDuration={formatDuration(execution.startedAt || execution.createdAt, execution.finishedAt)}
-                  approvedOn={getMinApprovedAt(execution)}
-                  approvedBy={getApprovalsNames(execution, userDisplayNames)}
-                  queuedOn={execution.event.createdAt}
-                  eventId={sourceEvent?.id}
-                  sourceEvent={sourceEvent}
-                  emmitedEvent={emmitedEvent}
-                />
-              );
-            }
-            if (item.type === 'stage_event') {
-              const stageEvent = item.data as SuperplaneStageEvent;
-              const sourceEvent = connectionEventsById?.[stageEvent.eventId || ''];
-              const plainEventPayload = connectionEventsById?.[stageEvent.eventId || '']?.raw;
-              const plainEventHeaders = connectionEventsById?.[stageEvent.eventId || '']?.headers;
-              return (
-                <MessageItem
-                  key={stageEvent.id}
-                  event={stageEvent}
-                  selectedStage={selectedStage}
-                  executionRunning={false}
-                  onApprove={stageEvent.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
-                  plainEventPayload={plainEventPayload}
-                  plainEventHeaders={plainEventHeaders}
-                  sourceEvent={sourceEvent}
-                />
-              );
-            }
-            if (item.type === 'discarded_event') {
-              const plainEvent = item.data as SuperplaneEvent;
-              // Get payload from the plain event's raw data
-              const plainEventPayload = plainEvent.raw;
-              const plainEventHeaders = plainEvent.headers
+                return (
+                  <RunItem
+                    key={execution.id!}
+                    title={execution.event.name || execution.id || 'Execution'}
+                    runId={execution.id}
+                    inputs={mapExecutionEventInputs(execution)}
+                    outputs={mapExecutionOutputs(execution)}
+                    state={execution.state || 'STATE_UNKNOWN'}
+                    result={execution.result || 'RESULT_UNKNOWN'}
+                    timestamp={execution.createdAt || new Date().toISOString()}
+                    executionDuration={formatDuration(execution.startedAt || execution.createdAt, execution.finishedAt)}
+                    approvedOn={getMinApprovedAt(execution)}
+                    approvedBy={getApprovalsNames(execution, userDisplayNames)}
+                    queuedOn={execution.event.createdAt}
+                    eventId={sourceEvent?.id}
+                    sourceEvent={sourceEvent}
+                    emmitedEvent={emmitedEvent}
+                  />
+                );
+              }
+              if (item.type === 'stage_event') {
+                const stageEvent = item.data as SuperplaneStageEvent;
+                const sourceEvent = connectionEventsById?.[stageEvent.eventId || ''];
+                const plainEventPayload = connectionEventsById?.[stageEvent.eventId || '']?.raw;
+                const plainEventHeaders = connectionEventsById?.[stageEvent.eventId || '']?.headers;
+                return (
+                  <MessageItem
+                    key={stageEvent.id}
+                    event={stageEvent}
+                    selectedStage={selectedStage}
+                    executionRunning={false}
+                    onApprove={stageEvent.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
+                    plainEventPayload={plainEventPayload}
+                    plainEventHeaders={plainEventHeaders}
+                    sourceEvent={sourceEvent}
+                  />
+                );
+              }
+              if (item.type === 'discarded_event') {
+                const plainEvent = item.data as SuperplaneEvent;
+                // Get payload from the plain event's raw data
+                const plainEventPayload = plainEvent.raw;
+                const plainEventHeaders = plainEvent.headers
 
-              return (
-                <MessageItem
-                  key={plainEvent.id}
-                  event={plainEvent}
-                  executionRunning={false}
-                  plainEventPayload={plainEventPayload}
-                  plainEventHeaders={plainEventHeaders}
-                />
-              );
-            }
-            return null;
-          })
+                return (
+                  <MessageItem
+                    key={plainEvent.id}
+                    event={plainEvent}
+                    executionRunning={false}
+                    plainEventPayload={plainEventPayload}
+                    plainEventHeaders={plainEventHeaders}
+                  />
+                );
+              }
+              return null;
+            })}
+
+            {hasMoreItems && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="text-blue-600 text-sm hover:text-blue-700 disabled:text-blue-400 underline transition-colors duration-200 disabled:cursor-not-allowed"
+                >
+                  {isLoadingMore ? 'Loading...' : 'Load More'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

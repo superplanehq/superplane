@@ -98,6 +98,10 @@ docs/SpecTimeoutBehavior.md
 docs/StageAPI.md
 docs/SuperplaneAddUserBody.md
 docs/SuperplaneApproveStageEventResponse.md
+docs/SuperplaneBulkListEventsBody.md
+docs/SuperplaneBulkListEventsResponse.md
+docs/SuperplaneBulkListStageEventsBody.md
+docs/SuperplaneBulkListStageEventsResponse.md
 docs/SuperplaneCanvas.md
 docs/SuperplaneCanvasMetadata.md
 docs/SuperplaneCondition.md
@@ -128,6 +132,8 @@ docs/SuperplaneDescribeEventSourceResponse.md
 docs/SuperplaneDescribeStageResponse.md
 docs/SuperplaneEvent.md
 docs/SuperplaneEventSource.md
+docs/SuperplaneEventSourceItemRequest.md
+docs/SuperplaneEventSourceItemResult.md
 docs/SuperplaneEventSourceMetadata.md
 docs/SuperplaneEventSourceSpec.md
 docs/SuperplaneEventSourceType.md
@@ -159,6 +165,8 @@ docs/SuperplaneResetEventSourceKeyResponse.md
 docs/SuperplaneStage.md
 docs/SuperplaneStageEvent.md
 docs/SuperplaneStageEventApproval.md
+docs/SuperplaneStageEventItemRequest.md
+docs/SuperplaneStageEventItemResult.md
 docs/SuperplaneStageEventState.md
 docs/SuperplaneStageEventStateReason.md
 docs/SuperplaneStageMetadata.md
@@ -255,6 +263,10 @@ model_spec_group_by.go
 model_spec_timeout_behavior.go
 model_superplane_add_user_body.go
 model_superplane_approve_stage_event_response.go
+model_superplane_bulk_list_events_body.go
+model_superplane_bulk_list_events_response.go
+model_superplane_bulk_list_stage_events_body.go
+model_superplane_bulk_list_stage_events_response.go
 model_superplane_canvas.go
 model_superplane_canvas_metadata.go
 model_superplane_condition.go
@@ -285,6 +297,8 @@ model_superplane_describe_event_source_response.go
 model_superplane_describe_stage_response.go
 model_superplane_event.go
 model_superplane_event_source.go
+model_superplane_event_source_item_request.go
+model_superplane_event_source_item_result.go
 model_superplane_event_source_metadata.go
 model_superplane_event_source_spec.go
 model_superplane_event_source_type.go
@@ -316,6 +330,8 @@ model_superplane_reset_event_source_key_response.go
 model_superplane_stage.go
 model_superplane_stage_event.go
 model_superplane_stage_event_approval.go
+model_superplane_stage_event_item_request.go
+model_superplane_stage_event_item_result.go
 model_superplane_stage_event_state.go
 model_superplane_stage_event_state_reason.go
 model_superplane_stage_metadata.go

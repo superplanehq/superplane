@@ -7,7 +7,7 @@ interface ActivityTabProps {
   selectedStage: StageWithEventQueue;
   pendingEvents: SuperplaneStageEvent[];
   waitingEvents: SuperplaneStageEvent[];
-  allExecutions: ExecutionWithEvent[];
+  partialExecutions: ExecutionWithEvent[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
@@ -20,7 +20,7 @@ export const ActivityTab = ({
   selectedStage,
   pendingEvents,
   waitingEvents,
-  allExecutions,
+  partialExecutions,
   approveStageEvent,
   executionRunning,
   onChangeTab,
@@ -43,7 +43,7 @@ export const ActivityTab = ({
           </button>
         </div>
         <ExecutionTimeline
-          executions={allExecutions.slice(0, 3)}
+          executions={partialExecutions.slice(0, 3)}
           organizationId={organizationId}
           connectionEventsById={connectionEventsById}
           eventsByExecutionId={eventsByExecutionId}
