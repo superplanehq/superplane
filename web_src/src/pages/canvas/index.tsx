@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneBulkListEvents, superplaneBulkListStageEvents, SuperplaneStage, SuperplaneEventSource, SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEvent, SuperplaneConnection, SuperplaneConnectionType } from "@/api-client";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneBulkListEvents, superplaneBulkListStageEvents, SuperplaneStage, SuperplaneEventSource, SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEvent, SuperplaneConnection, SuperplaneConnectionType, SuperplaneBulkListStageEventsData, SuperplaneStageEventState } from "@/api-client";
 import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { EventSourceSidebar } from "./components/EventSourceSidebar";
@@ -15,7 +15,7 @@ import { withOrganizationHeader } from "../../utils/withOrganizationHeader";
 import { useAutoLayout } from "./hooks/useAutoLayout";
 
 const EVENTS_LIMIT = 3;
-const STAGE_EVENTS_LIMIT = 2;
+const STAGE_EVENTS_LIMIT = 3;
 
 export function Canvas() {
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
@@ -116,7 +116,7 @@ export function Canvas() {
     };
   }, [canvasId, organizationId]);
 
-  const fetchStageEvents = useCallback(async (stages: SuperplaneStage[]) => {
+  const fetchStageEvents = useCallback(async (stages: SuperplaneStage[], states: SuperplaneStageEventState[]) => {
     if (stages.length === 0) {
       return [];
     }
@@ -128,9 +128,10 @@ export function Canvas() {
           stages: stages.map(stage => ({
             stageIdOrName: stage.metadata!.id!
           })),
-          limitPerStage: STAGE_EVENTS_LIMIT
+          limitPerStage: STAGE_EVENTS_LIMIT,
+          states: states
         }
-      })
+      } as SuperplaneBulkListStageEventsData)
     );
 
     const results = response.data?.results || [];
@@ -231,7 +232,8 @@ export function Canvas() {
   const processAndInitializeStore = useCallback((
     canvas: SuperplaneCanvas,
     connectionGroupPlainEventsResults: Array<{ connectionGroup: SuperplaneConnectionGroup; events: SuperplaneEvent[] }>,
-    stageEventsResults: Array<{ stage: SuperplaneStage; stageEvents: SuperplaneStageEvent[] }>,
+    stageEventsPedingOrWaitingResults: Array<{ stage: SuperplaneStage; stageEvents: SuperplaneStageEvent[] }>,
+    stageEventsProcessedResults: Array<{ stage: SuperplaneStage; stageEvents: SuperplaneStageEvent[] }>,
     stagePlainEventsResults: Array<{ stage: SuperplaneStage; events: SuperplaneEvent[] }>,
     eventSourceEventsResults: Array<{ eventSource: SuperplaneEventSource; events: SuperplaneEvent[] }>
   ) => {
@@ -242,14 +244,21 @@ export function Canvas() {
       return acc;
     }, {} as Record<string, SuperplaneEvent[]>);
 
-    const stagesWithQueues: StageWithEventQueue[] = stageEventsResults.map(({ stage, stageEvents }) => {
-      for (const stageEvent of stageEvents) {
+    const stageProcessedEventsResultsByStageId = stageEventsProcessedResults.reduce((acc, { stage, stageEvents }) => {
+      acc[stage.metadata!.id!] = stageEvents;
+      return acc;
+    }, {} as Record<string, SuperplaneStageEvent[]>);
+
+    const stagesWithQueues: StageWithEventQueue[] = stageEventsPedingOrWaitingResults.map(({ stage, stageEvents }) => {
+      const processedEvents = stageProcessedEventsResultsByStageId[stage.metadata!.id!] || [];
+      const currentStageEvents = stageEvents.concat(processedEvents);
+      for (const stageEvent of currentStageEvents) {
         allStageEvents[stageEvent.id!] = stageEvent;
       }
 
       return {
         ...stage,
-        queue: stageEvents,
+        queue: currentStageEvents,
         events: stagePlainEventsResultsByStageId[stage.metadata!.id!] || []
       };
     });
@@ -295,8 +304,9 @@ export function Canvas() {
 
         setCanvasName(basicData.canvas.metadata?.name || 'Unknown Canvas');
 
-        const [stageEventsResults, plainEventsResults] = await Promise.all([
-          fetchStageEvents(basicData.stages),
+        const [stageEventsPedingOrWaitingResults, stageEventsProcessedResults, plainEventsResults] = await Promise.all([
+          fetchStageEvents(basicData.stages, ['STATE_PENDING', 'STATE_WAITING']),
+          fetchStageEvents(basicData.stages, ['STATE_PROCESSED']),
           fetchAllPlainEvents(basicData.stages, basicData.connectionGroups, basicData.eventSources)
         ]);
 
@@ -305,7 +315,8 @@ export function Canvas() {
         processAndInitializeStore(
           basicData.canvas,
           connectionGroupEventsResults,
-          stageEventsResults,
+          stageEventsPedingOrWaitingResults,
+          stageEventsProcessedResults,
           stagePlainEventsResults,
           eventSourceEventsResults
         );

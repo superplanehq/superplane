@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from 'react-router-dom';
 import { ExecutionWithEvent, StageWithEventQueue } from "../store/types";
 
@@ -15,6 +15,7 @@ import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { SuperplaneConnectionType, SuperplaneEvent, SuperplaneExecution } from "@/api-client";
 import { useCanvasStore } from "../store/canvasStore";
+import { useConnectedSourcesEvents } from "@/hooks/useCanvasData";
 
 const StageImageMap = {
   'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
@@ -30,11 +31,10 @@ interface SidebarProps {
 
 export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState('activity');
-  const { organizationId } = useParams<{ organizationId: string }>();
+  const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
   const { connectionGroups, stages, eventSources } = useCanvasStore();
 
-  // Sidebar tab definitions - memoized to prevent unnecessary re-renders
   const tabs = useMemo(() => [
     { key: 'activity', label: 'Activity' },
     { key: 'history', label: 'History' },
@@ -47,8 +47,8 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     [selectedStage.spec?.connections]
   );
 
-  const connectionEventsById = useMemo(() => {
-    const plainEventsById: Record<string, SuperplaneEvent> = {};
+  const partialConnectionEvents = useMemo(() => {
+    const plainEventsById: SuperplaneEvent[] = [];
 
     const connectedEventSourceNames = new Set<string>();
     const connectedStageNames = new Set<string>();
@@ -67,7 +67,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     eventSources.forEach(eventSource => {
       if (connectedEventSourceNames.has(eventSource.metadata?.name || '')) {
         eventSource?.events?.forEach(event => {
-          plainEventsById[event?.id || ''] = event;
+          plainEventsById.push(event);
         });
       }
     });
@@ -75,7 +75,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     stages.forEach(stage => {
       if (connectedStageNames.has(stage.metadata?.name || '')) {
         stage?.events?.forEach(event => {
-          plainEventsById[event?.id || ''] = event;
+          plainEventsById.push(event);
         });
       }
     });
@@ -83,7 +83,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     connectionGroups.forEach(connectionGroup => {
       if (connectedConnectionGroupNames.has(connectionGroup.metadata?.name || '')) {
         connectionGroup?.events?.forEach(event => {
-          plainEventsById[event?.id || ''] = event;
+          plainEventsById.push(event);
         });
       }
     });
@@ -91,6 +91,53 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     return plainEventsById;
   }, [allConnections, eventSources, stages, connectionGroups]);
 
+
+  const connectedSources = useMemo(() => {
+    const eventSourceIds: string[] = [];
+    const stageIds: string[] = [];
+    const connectionGroupIds: string[] = [];
+
+    allConnections.forEach(connection => {
+      if (connection.type === 'TYPE_EVENT_SOURCE') {
+        const eventSource = eventSources.find(es => es.metadata?.name === connection.name);
+        if (eventSource?.metadata?.id) {
+          eventSourceIds.push(eventSource.metadata.id);
+        }
+      } else if (connection.type === 'TYPE_STAGE') {
+        const stage = stages.find(s => s.metadata?.name === connection.name);
+        if (stage?.metadata?.id) {
+          stageIds.push(stage.metadata.id);
+        }
+      } else if (connection.type === 'TYPE_CONNECTION_GROUP') {
+        const connectionGroup = connectionGroups.find(cg => cg.metadata?.name === connection.name);
+        if (connectionGroup?.metadata?.id) {
+          connectionGroupIds.push(connectionGroup.metadata.id);
+        }
+      }
+    });
+
+    return { eventSourceIds, stageIds, connectionGroupIds };
+  }, [allConnections, eventSources, stages, connectionGroups]);
+
+
+  const {
+    data: connectedEventsData,
+    isFetchingNextPage: isFetchingNextConnectedEvents,
+    refetch: refetchConnectedEvents,
+    fetchNextPage,
+  } = useConnectedSourcesEvents(canvasId || '', connectedSources, 20);
+
+  const connectionEventsById = useMemo(() => {
+    const eventsById: Record<string, SuperplaneEvent> = {};
+
+    connectedEventsData?.pages.forEach(page => {
+      page.events.forEach(event => {
+        eventsById[event.id || ''] = event;
+      });
+    });
+
+    return eventsById;
+  }, [connectedEventsData]);
 
   const eventsByExecutionId = useMemo(() => {
     const emittedEventsById: Record<string, SuperplaneEvent> = {};
@@ -128,6 +175,11 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     selectedStage.queue?.filter(event => event.state === 'STATE_WAITING' && !event.execution) || [],
     [selectedStage.queue]
   );
+
+  // Every time partialConnectionEvents changes, refetch connected events
+  useEffect(() => {
+    refetchConnectedEvents();
+  }, [refetchConnectedEvents, partialConnectionEvents]);
 
   // Render the appropriate content based on the active tab
   const renderTabContent = () => {

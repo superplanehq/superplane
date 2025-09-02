@@ -22,6 +22,7 @@ import {
   superplaneAddUser,
   superplaneRemoveUser,
   superplaneListEvents,
+  superplaneBulkListEvents,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping } from '../api-client/types.gen'
@@ -650,3 +651,71 @@ export const useEventSourceEvents = (canvasId: string, eventSourceId: string) =>
     enabled: !!canvasId && !!eventSourceId
   })
 }
+
+export const useConnectedSourcesEvents = (
+  canvasId: string, 
+  connectedSources: {
+    eventSourceIds: string[];
+    stageIds: string[];
+    connectionGroupIds: string[];
+  },
+  limitPerSource: number = 20
+) => {
+  return useInfiniteQuery({
+    queryKey: ['connectedEvents', canvasId, connectedSources, limitPerSource],
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
+      const sources = [
+        ...connectedSources.eventSourceIds.map(id => ({
+          sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
+          sourceId: id
+        })),
+        ...connectedSources.stageIds.map(id => ({
+          sourceType: 'EVENT_SOURCE_TYPE_STAGE' as const,
+          sourceId: id
+        })),
+        ...connectedSources.connectionGroupIds.map(id => ({
+          sourceType: 'EVENT_SOURCE_TYPE_CONNECTION_GROUP' as const,
+          sourceId: id
+        }))
+      ];
+
+      if (sources.length === 0) {
+        return { 
+          events: [], 
+          nextCursor: undefined, 
+          limitPerSource 
+        };
+      }
+
+      const response = await superplaneBulkListEvents(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          body: {
+            sources,
+            limitPerSource: limitPerSource,
+            before: pageParam 
+          }
+        })
+      );
+
+      const allEvents = response.data?.results?.flatMap(result => result.events || []) || [];
+
+      allEvents.sort((a, b) => 
+        new Date(b.receivedAt || '').getTime() - new Date(a.receivedAt || '').getTime()
+      );
+
+      const nextCursor = allEvents.length > 0 && allEvents.length >= limitPerSource 
+        ? allEvents[allEvents.length - 1].receivedAt 
+        : undefined;
+
+      return {
+        events: allEvents,
+        limitPerSource,
+        nextCursor
+      };
+    },
+    getNextPageParam: (lastPage): string | undefined => lastPage.nextCursor,
+    initialPageParam: undefined as string | undefined,
+    enabled: Object.values(connectedSources).some(arr => arr.length > 0)
+  });
+};
