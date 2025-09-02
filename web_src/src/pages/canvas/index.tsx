@@ -7,7 +7,7 @@ import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSour
 import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { EventSourceSidebar } from "./components/EventSourceSidebar";
-import { ComponentSidebar } from "./components/ComponentSidebar";
+import { ComponentSidebar, ConnectionInfo } from "./components/ComponentSidebar";
 import { CanvasNavigation, CanvasNavigationContent, type CanvasView } from "../../components/CanvasNavigation";
 import { useNodeHandlers } from "./utils/nodeHandlers";
 import { NodeType } from "./utils/nodeFactories";
@@ -287,7 +287,7 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
-  const handleAddNodeByType = async (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: { name: string; type: string } | null) => {
+  const handleAddNodeByType = async (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => {
     try {
       const config = getNodeConfig(nodeType, executorType, eventSourceType, focusedNodeInfo);
       const nodeId = handleAddNode(nodeType, config);
@@ -321,7 +321,7 @@ export function Canvas() {
     }
   };
 
-  const getNodeConfig = (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: { name: string; type: string } | null) => {
+  const getNodeConfig = (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => {
     const baseConfig: { connections?: Array<SuperplaneConnection> } = {};
 
     if (focusedNodeInfo && (nodeType !== 'event_source')) {
@@ -374,7 +374,7 @@ export function Canvas() {
             <ComponentSidebar
               isOpen={isComponentSidebarOpen}
               onClose={() => setIsComponentSidebarOpen(false)}
-              onNodeAdd={(nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: { name: string; type: string } | null) => {
+              onNodeAdd={(nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => {
                 handleAddNodeByType(nodeType, executorType, eventSourceType, focusedNodeInfo);
               }}
             />
