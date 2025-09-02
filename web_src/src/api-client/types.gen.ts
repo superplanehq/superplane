@@ -373,6 +373,7 @@ export type SuperplaneApproveStageEventResponse = {
 export type SuperplaneBulkListEventsBody = {
     sources?: Array<SuperplaneEventSourceItemRequest>;
     limitPerSource?: number;
+    before?: string;
 };
 
 export type SuperplaneBulkListEventsResponse = {
@@ -384,6 +385,7 @@ export type SuperplaneBulkListStageEventsBody = {
     states?: Array<SuperplaneStageEventState>;
     stateReasons?: Array<SuperplaneStageEventStateReason>;
     limitPerStage?: number;
+    before?: string;
 };
 
 export type SuperplaneBulkListStageEventsResponse = {

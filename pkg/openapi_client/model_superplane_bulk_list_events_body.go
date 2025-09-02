@@ -13,6 +13,7 @@ package openapi_client
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // checks if the SuperplaneBulkListEventsBody type satisfies the MappedNullable interface at compile time
@@ -22,6 +23,7 @@ var _ MappedNullable = &SuperplaneBulkListEventsBody{}
 type SuperplaneBulkListEventsBody struct {
 	Sources []SuperplaneEventSourceItemRequest `json:"sources,omitempty"`
 	LimitPerSource *int32 `json:"limitPerSource,omitempty"`
+	Before *time.Time `json:"before,omitempty"`
 }
 
 // NewSuperplaneBulkListEventsBody instantiates a new SuperplaneBulkListEventsBody object
@@ -105,6 +107,38 @@ func (o *SuperplaneBulkListEventsBody) SetLimitPerSource(v int32) {
 	o.LimitPerSource = &v
 }
 
+// GetBefore returns the Before field value if set, zero value otherwise.
+func (o *SuperplaneBulkListEventsBody) GetBefore() time.Time {
+	if o == nil || IsNil(o.Before) {
+		var ret time.Time
+		return ret
+	}
+	return *o.Before
+}
+
+// GetBeforeOk returns a tuple with the Before field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneBulkListEventsBody) GetBeforeOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.Before) {
+		return nil, false
+	}
+	return o.Before, true
+}
+
+// HasBefore returns a boolean if a field has been set.
+func (o *SuperplaneBulkListEventsBody) HasBefore() bool {
+	if o != nil && !IsNil(o.Before) {
+		return true
+	}
+
+	return false
+}
+
+// SetBefore gets a reference to the given time.Time and assigns it to the Before field.
+func (o *SuperplaneBulkListEventsBody) SetBefore(v time.Time) {
+	o.Before = &v
+}
+
 func (o SuperplaneBulkListEventsBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +154,9 @@ func (o SuperplaneBulkListEventsBody) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.LimitPerSource) {
 		toSerialize["limitPerSource"] = o.LimitPerSource
+	}
+	if !IsNil(o.Before) {
+		toSerialize["before"] = o.Before
 	}
 	return toSerialize, nil
 }

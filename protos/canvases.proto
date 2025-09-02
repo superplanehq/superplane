@@ -946,6 +946,7 @@ message BulkListEventsRequest {
   string canvas_id_or_name = 1;
   repeated EventSourceItemRequest sources = 2;
   int32 limit_per_source = 3;
+  google.protobuf.Timestamp before = 4;
 }
 
 message BulkListEventsResponse {
@@ -958,6 +959,7 @@ message BulkListStageEventsRequest {
   repeated StageEvent.State states = 3;
   repeated StageEvent.StateReason state_reasons = 4;
   int32 limit_per_stage = 5;
+  google.protobuf.Timestamp before = 6;
 }
 
 message BulkListStageEventsResponse {
