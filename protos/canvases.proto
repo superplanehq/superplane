@@ -209,6 +209,30 @@ service Superplane {
     };
   }
 
+  rpc BulkListEvents(BulkListEventsRequest) returns (BulkListEventsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/events/bulk"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Bulk list events";
+      description: "Returns events for multiple sources in a single request to optimize loading performance";
+      tags: "Event";
+    };
+  }
+
+  rpc BulkListStageEvents(BulkListStageEventsRequest) returns (BulkListStageEventsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/stage-events/bulk"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Bulk list stage events";
+      description: "Returns stage events for multiple stages in a single request to optimize loading performance";
+      tags: "Stage";
+    };
+  }
+
   rpc ListConnectionGroupFieldSets(ListConnectionGroupFieldSetsRequest) returns (ListConnectionGroupFieldSetsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}/field-sets"
@@ -744,6 +768,8 @@ message ListStageEventsRequest {
   string canvas_id_or_name = 2;
   repeated StageEvent.State states = 3;
   repeated StageEvent.StateReason state_reasons = 4;
+  int32 limit = 5;
+  google.protobuf.Timestamp before = 6;
 }
 
 message ListStageEventsResponse {
@@ -880,6 +906,8 @@ message ListEventsRequest {
   string canvas_id_or_name = 1;
   EventSourceType source_type = 2;
   string source_id = 3;
+  int32 limit = 4;
+  google.protobuf.Timestamp before = 5;
 }
 
 message ListEventsResponse {
@@ -903,6 +931,50 @@ message Event {
   google.protobuf.Timestamp received_at = 7;
   google.protobuf.Struct raw = 8;
   google.protobuf.Struct headers = 9;
+}
+
+message EventSourceItemRequest {
+  string source_id = 1;
+  EventSourceType source_type = 2;
+}
+
+message StageEventItemRequest {
+  string stage_id_or_name = 1;
+}
+
+message BulkListEventsRequest {
+  string canvas_id_or_name = 1;
+  repeated EventSourceItemRequest sources = 2;
+  int32 limit_per_source = 3;
+  google.protobuf.Timestamp before = 4;
+}
+
+message BulkListEventsResponse {
+  repeated EventSourceItemResult results = 1;
+}
+
+message BulkListStageEventsRequest {
+  string canvas_id_or_name = 1;
+  repeated StageEventItemRequest stages = 2;
+  repeated StageEvent.State states = 3;
+  repeated StageEvent.StateReason state_reasons = 4;
+  int32 limit_per_stage = 5;
+  google.protobuf.Timestamp before = 6;
+}
+
+message BulkListStageEventsResponse {
+  repeated StageEventItemResult results = 1;
+}
+
+message EventSourceItemResult {
+  string source_id = 1;
+  EventSourceType source_type = 2;
+  repeated Event events = 3;
+}
+
+message StageEventItemResult {
+  string stage_id = 1;
+  repeated StageEvent events = 2;
 }
 
 message StageCreated {

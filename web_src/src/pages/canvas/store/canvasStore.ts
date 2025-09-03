@@ -1,13 +1,15 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from './types';
-import { SuperplaneCanvas } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneStageEventState } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { AllNodeType, EdgeType } from '../types/flow';
 import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
+
+const SYNC_EVENTS_LIMIT = 5;
 
 // Create the store
 export const useCanvasStore = create<CanvasState>((set, get) => ({
@@ -203,16 +205,37 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return;
     }
 
-    const stageEventsResponse = await superplaneListStageEvents(withOrganizationHeader({
-      path: {
-        canvasIdOrName: canvasId,
-        stageIdOrName: stageId
-      }
-    }));
+    // Here it is required two make two requests
+    // One to get the events that are in the queue
+    // And another to get the events that are in the processing
+    // Since we can have older events waiting and the queue and they must appear in the component
+    const processedEventsState: SuperplaneStageEventState[] = ['STATE_PROCESSED']
+    const pendingOrWaitingState: SuperplaneStageEventState[] = ['STATE_WAITING', 'STATE_PENDING']
+    const requestingStates = [
+      processedEventsState,
+      pendingOrWaitingState
+    ]
+
+    const responsePromises = requestingStates.map(states => {
+      return superplaneListStageEvents(withOrganizationHeader({
+        path: {
+          canvasIdOrName: canvasId,
+          stageIdOrName: stageId,
+        },
+        query: {
+          limit: SYNC_EVENTS_LIMIT,
+          states: states
+        } 
+      }));
+    })
+
+    const responses = await Promise.all(responsePromises)
+    const queueEvents = responses.flatMap(res => res.data.events || [])
+
     set((state) => ({
       stages: state.stages.map((s) => s.metadata!.id === stageId ? {
         ...updatingStage,
-        queue: stageEventsResponse.data?.events || []
+        queue: queueEvents
       } : s)
     }));
   },
@@ -229,7 +252,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       path: { canvasIdOrName: canvasId },
       query: { 
         sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
-        sourceId: eventSourceId 
+        sourceId: eventSourceId,
+        limit: SYNC_EVENTS_LIMIT
       }
     }));
 
@@ -253,7 +277,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       path: { canvasIdOrName: canvasId },
       query: { 
         sourceType: 'EVENT_SOURCE_TYPE_STAGE' as const,
-        sourceId: stageId 
+        sourceId: stageId,
+        limit: SYNC_EVENTS_LIMIT
       }
     }));
 
@@ -277,7 +302,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       path: { canvasIdOrName: canvasId },
       query: { 
         sourceType: 'EVENT_SOURCE_TYPE_CONNECTION_GROUP' as const,
-        sourceId: connectionGroupId 
+        sourceId: connectionGroupId,
+        limit: SYNC_EVENTS_LIMIT
       }
     }));
 
