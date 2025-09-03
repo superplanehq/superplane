@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -20,7 +21,7 @@ const (
 	DefaultExecutionTimeout      = 30 * time.Minute
 	DefaultExecutionFinalTimeout = 3 * time.Hour
 	MaxRetryAttempts             = 5
-	RetryDelay                   = 30 * time.Second
+	RetryDelay                   = 10 * time.Second
 )
 
 type ExecutionPoller struct {
@@ -186,11 +187,19 @@ func (w *ExecutionPoller) ProcessStuckExecution(logger *log.Entry, execution *mo
 			continue
 		}
 
+		//
+		// If status is nil, it means we're skipping this retry attempt (not enough time passed)
+		//
+		if status == nil {
+			allFinished = false
+			logger.Debugf("Skipping retry for resource %s, will check again in next poll cycle", resource.ExternalID)
+			continue
+		}
+
 		if !status.Finished() {
 			allFinished = false
 			logger.Infof("Resource %s is still running according to third-party API", resource.ExternalID)
 			continue
-
 		}
 
 		result := models.ResultPassed
@@ -242,26 +251,30 @@ func (w *ExecutionPoller) pollResourceStatusWithRetry(logger *log.Entry, resourc
 	}
 
 	//
-	// Retry logic with exponential backoff
+	// Check if we should retry based on non-blocking retry logic
 	//
-	var lastErr error
-	for attempt := 0; attempt < MaxRetryAttempts; attempt++ {
-		if attempt > 0 {
-			logger.Infof("Retry attempt %d/%d for resource %s, waiting %v", attempt+1, MaxRetryAttempts, resource.ExternalID, RetryDelay)
-			time.Sleep(RetryDelay)
+	if !resource.ShouldRetry(MaxRetryAttempts, RetryDelay) {
+		if resource.RetryCount >= MaxRetryAttempts {
+			return nil, fmt.Errorf("max retry attempts (%d) exceeded for resource %s", MaxRetryAttempts, resource.ExternalID)
 		}
-
-		statefulResource, err := integrationImpl.Status(resource.Type, resource.ExternalID, parentResource)
-		if err == nil {
-			logger.Infof("Successfully polled status for resource %s on attempt %d", resource.ExternalID, attempt+1)
-			return statefulResource, nil
-		}
-
-		lastErr = err
-		logger.Warnf("Attempt %d failed for resource %s: %v", attempt+1, resource.ExternalID, err)
+		logger.Debugf("Skipping retry for resource %s, not enough time since last attempt", resource.ExternalID)
+		return nil, nil
 	}
 
-	return nil, lastErr
+	//
+	// Attempt to get status from third-party API
+	//
+	statefulResource, err := integrationImpl.Status(resource.Type, resource.ExternalID, parentResource)
+	if err != nil {
+		if updateErr := resource.IncrementRetryCount(); updateErr != nil {
+			logger.Errorf("Failed to update retry count for resource %s: %v", resource.ExternalID, updateErr)
+		}
+		logger.Warnf("Retry attempt %d/%d failed for resource %s: %v", resource.RetryCount+1, MaxRetryAttempts, resource.ExternalID, err)
+		return nil, err
+	}
+
+	logger.Infof("Successfully polled status for resource %s on attempt %d", resource.ExternalID, resource.RetryCount+1)
+	return statefulResource, nil
 }
 
 func (w *ExecutionPoller) finishStuckExecution(execution *models.StageExecution, result string, reason string) error {

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Ne45evHIYOXHGEhS2PfOUCwHHKzxcI6bygCk9XxzHSINiOAWYzPf54pqCJY55In
+\restrict rOrDrT3vki9FsATWhdLLsstfYBHRU5HGQVUW9fhMB3olLmg6ms8WO0go7EWy83l
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -242,7 +242,9 @@ CREATE TABLE public.execution_resources (
     state character varying(64) NOT NULL,
     result character varying(64) NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    retry_count integer DEFAULT 0 NOT NULL,
+    last_retry_at timestamp without time zone
 );
 
 
@@ -1101,13 +1103,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Ne45evHIYOXHGEhS2PfOUCwHHKzxcI6bygCk9XxzHSINiOAWYzPf54pqCJY55In
+\unrestrict rOrDrT3vki9FsATWhdLLsstfYBHRU5HGQVUW9fhMB3olLmg6ms8WO0go7EWy83l
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict L6g1sHdULNX6quowgXUM2ecfPxjl5B3UTALFahjPdhrUuB7gKOhHwEwWQiIycbg
+\restrict fadWC2lruZpcfJneJwzv9FeeY86a6n4hU16YTVuE4USh8Xec8hyXpGDqBEMwux3
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1129,7 +1131,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250826183406	f
+20250903152159	f
 \.
 
 
@@ -1137,5 +1139,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict L6g1sHdULNX6quowgXUM2ecfPxjl5B3UTALFahjPdhrUuB7gKOhHwEwWQiIycbg
+\unrestrict fadWC2lruZpcfJneJwzv9FeeY86a6n4hU16YTVuE4USh8Xec8hyXpGDqBEMwux3
 
