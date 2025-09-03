@@ -45,7 +45,7 @@ git clone https://github.com/your-org/superplane
 cd superplane
 make dev.setup && make dev.start
 
-# Open http://localhost:8080
+# Open http://localhost:8000
 ```
 
 → [Complete Quick Start Guide](docs/getting-started/quick-start.md)
