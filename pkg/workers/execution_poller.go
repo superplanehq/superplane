@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"math"
 	"slices"
 	"time"
 
@@ -21,7 +20,7 @@ const (
 	DefaultExecutionTimeout      = 30 * time.Minute
 	DefaultExecutionFinalTimeout = 3 * time.Hour
 	MaxRetryAttempts             = 5
-	BaseRetryDelay               = 30 * time.Second
+	RetryDelay                   = 30 * time.Second
 )
 
 type ExecutionPoller struct {
@@ -187,21 +186,23 @@ func (w *ExecutionPoller) ProcessStuckExecution(logger *log.Entry, execution *mo
 			continue
 		}
 
-		if status.Finished() {
-			result := models.ResultPassed
-			if !status.Successful() {
-				result = models.ResultFailed
-			}
-
-			err = resource.Finish(result)
-			if err != nil {
-				logger.Errorf("Failed to finish resource: %v", err)
-			}
-			logger.Infof("Updated resource %s status to %s via polling", resource.ExternalID, result)
-		} else {
+		if !status.Finished() {
 			allFinished = false
 			logger.Infof("Resource %s is still running according to third-party API", resource.ExternalID)
+			continue
+
 		}
+
+		result := models.ResultPassed
+		if !status.Successful() {
+			result = models.ResultFailed
+		}
+
+		err = resource.Finish(result)
+		if err != nil {
+			logger.Errorf("Failed to finish resource: %v", err)
+		}
+		logger.Infof("Updated resource %s status to %s via polling", resource.ExternalID, result)
 	}
 
 	if allFinished {
@@ -246,9 +247,8 @@ func (w *ExecutionPoller) pollResourceStatusWithRetry(logger *log.Entry, resourc
 	var lastErr error
 	for attempt := 0; attempt < MaxRetryAttempts; attempt++ {
 		if attempt > 0 {
-			delay := time.Duration(float64(BaseRetryDelay) * math.Pow(2, float64(attempt-1)))
-			logger.Infof("Retry attempt %d/%d for resource %s, waiting %v", attempt+1, MaxRetryAttempts, resource.ExternalID, delay)
-			time.Sleep(delay)
+			logger.Infof("Retry attempt %d/%d for resource %s, waiting %v", attempt+1, MaxRetryAttempts, resource.ExternalID, RetryDelay)
+			time.Sleep(RetryDelay)
 		}
 
 		statefulResource, err := integrationImpl.Status(resource.Type, resource.ExternalID, parentResource)
