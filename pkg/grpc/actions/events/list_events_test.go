@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"testing"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func Test__ListEvents(t *testing.T) {
@@ -18,7 +20,7 @@ func Test__ListEvents(t *testing.T) {
 
 	t.Run("canvas with no events -> empty list", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "")
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
@@ -32,7 +34,7 @@ func Test__ListEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "")
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Events, 2)
@@ -65,12 +67,12 @@ func Test__ListEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, "")
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, "", 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Len(t, res.Events, 3)
 
-		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_STAGE, "")
+		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_STAGE, "", 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
@@ -78,14 +80,66 @@ func Test__ListEvents(t *testing.T) {
 
 	t.Run("filter by source ID", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, r.Source.ID.String())
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, r.Source.ID.String(), 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Len(t, res.Events, 3)
 
-		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, uuid.NewString())
+		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, uuid.NewString(), 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
 	})
+
+	t.Run("limit parameter", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
+
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		assert.Len(t, res.Events, 2)
+
+		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		assert.Len(t, res.Events, 3)
+
+		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 100, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		assert.Len(t, res.Events, 3)
+	})
+
+	t.Run("before parameter", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
+
+		event1, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "before1"}`), []byte(`{}`))
+		require.NoError(t, err)
+
+		time.Sleep(10 * time.Millisecond)
+
+		event2, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "before2"}`), []byte(`{}`))
+		require.NoError(t, err)
+
+		beforeTime := timestamppb.New(*event1.ReceivedAt)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, beforeTime)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		require.Greater(t, len(res.Events), 0)
+		for _, event := range res.Events {
+			eventTime := event.ReceivedAt.AsTime()
+			assert.True(t, eventTime.Before(*event1.ReceivedAt))
+		}
+
+		assert.NotContains(t, getEventIDs(res.Events), event2.ID.String())
+	})
+}
+
+func getEventIDs(events []*protos.Event) []string {
+	ids := make([]string, len(events))
+	for i, event := range events {
+		ids[i] = event.Id
+	}
+	return ids
 }

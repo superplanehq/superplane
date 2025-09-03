@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -14,7 +15,12 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State) (*pb.ListStageEventsResponse, error) {
+const (
+	DefaultLimit = 20
+	MaxLimit     = 50
+)
+
+func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit int32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
 	err := actions.ValidateUUIDs(stageIdOrName)
 	var stage *models.Stage
 	if err != nil {
@@ -36,7 +42,20 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	events, err := stage.ListEvents(states, []string{})
+	stateReasons, err := validateStageEventStateReasons(pbStateReasons)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	validatedLimit := validateLimit(int(limit))
+
+	var beforeTime *time.Time
+	if before != nil && before.IsValid() {
+		t := before.AsTime()
+		beforeTime = &t
+	}
+
+	events, err := stage.ListEventsWithLimitAndBefore(states, stateReasons, validatedLimit, beforeTime)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +95,49 @@ func validateStageEventStates(in []pb.StageEvent_State) ([]string, error) {
 	}
 
 	return states, nil
+}
+
+func validateLimit(limit int) int {
+	if limit < 1 || limit > MaxLimit {
+		return DefaultLimit
+	}
+	return limit
+}
+
+func validateStageEventStateReasons(in []pb.StageEvent_StateReason) ([]string, error) {
+	if len(in) == 0 {
+		return []string{}, nil
+	}
+
+	stateReasons := []string{}
+	for _, sr := range in {
+		stateReason, err := protoToStateReason(sr)
+		if err != nil {
+			return nil, err
+		}
+		stateReasons = append(stateReasons, stateReason)
+	}
+
+	return stateReasons, nil
+}
+
+func protoToStateReason(stateReason pb.StageEvent_StateReason) (string, error) {
+	switch stateReason {
+	case pb.StageEvent_STATE_REASON_APPROVAL:
+		return models.StageEventStateReasonApproval, nil
+	case pb.StageEvent_STATE_REASON_TIME_WINDOW:
+		return models.StageEventStateReasonTimeWindow, nil
+	case pb.StageEvent_STATE_REASON_EXECUTION:
+		return models.StageEventStateReasonExecution, nil
+	case pb.StageEvent_STATE_REASON_CONNECTION:
+		return models.StageEventStateReasonConnection, nil
+	case pb.StageEvent_STATE_REASON_CANCELLED:
+		return models.StageEventStateReasonCancelled, nil
+	case pb.StageEvent_STATE_REASON_UNHEALTHY:
+		return models.StageEventStateReasonUnhealthy, nil
+	default:
+		return "", fmt.Errorf("invalid state reason: %v", stateReason)
+	}
 }
 
 func protoToState(state pb.StageEvent_State) (string, error) {

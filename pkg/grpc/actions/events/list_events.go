@@ -2,6 +2,8 @@ package events
 
 import (
 	"context"
+	"log"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -12,13 +14,26 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string) (*pb.ListEventsResponse, error) {
+const (
+	DefaultLimit = 20
+	MaxLimit     = 50
+)
+
+func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string, limit int32, before *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
 	}
 
-	events, err := models.ListEventsByCanvasID(canvasUUID, EventSourceTypeToString(sourceType), sourceID)
+	validatedLimit := validateLimit(int(limit))
+
+	var beforeTime *time.Time
+	if before != nil && before.IsValid() {
+		t := before.AsTime()
+		beforeTime = &t
+	}
+	log.Println("beforeTime", beforeTime)
+	events, err := models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit, beforeTime)
 	if err != nil {
 		return nil, err
 	}
@@ -33,6 +48,13 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 	}
 
 	return response, nil
+}
+
+func validateLimit(limit int) int {
+	if limit < 1 || limit > MaxLimit {
+		return DefaultLimit
+	}
+	return limit
 }
 
 func EventSourceTypeToString(sourceType pb.EventSourceType) string {
