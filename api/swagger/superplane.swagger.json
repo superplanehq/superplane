@@ -1036,6 +1036,58 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/cancel": {
+      "post": {
+        "summary": "Cancel a stage event",
+        "description": "Cancels the specified stage event (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_CancelStageEvent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCancelStageEventResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "stageIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCancelStageEventBody"
+            }
+          }
+        ],
+        "tags": [
+          "Stage"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/users": {
       "post": {
         "summary": "Add a user to a canvas",
@@ -3424,6 +3476,17 @@
         }
       }
     },
+    "SuperplaneCancelStageEventBody": {
+      "type": "object"
+    },
+    "SuperplaneCancelStageEventResponse": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "$ref": "#/definitions/SuperplaneStageEvent"
+        }
+      }
+    },
     "SuperplaneCanvas": {
       "type": "object",
       "properties": {
@@ -3982,7 +4045,8 @@
         "STATE_UNKNOWN",
         "STATE_PENDING",
         "STATE_STARTED",
-        "STATE_FINISHED"
+        "STATE_FINISHED",
+        "STATE_CANCELLED"
       ],
       "default": "STATE_UNKNOWN"
     },

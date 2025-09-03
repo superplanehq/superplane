@@ -325,6 +325,18 @@ service Superplane {
     };
   }
 
+  rpc CancelStageEvent(CancelStageEventRequest) returns (CancelStageEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel a stage event";
+      description: "Cancels the specified stage event (canvas can be referenced by ID or name)";
+      tags: "Stage";
+    };
+  }
+
   rpc AddUser(AddUserRequest) returns (AddUserResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/users"
@@ -824,7 +836,8 @@ message Execution {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_STARTED = 2;
-    STATE_FINISHED = 4;
+    STATE_FINISHED = 3;
+    STATE_CANCELLED = 4;
   }
 
   enum Result {
@@ -859,6 +872,16 @@ message ApproveStageEventRequest {
 }
 
 message ApproveStageEventResponse {
+  StageEvent event = 1;
+}
+
+message CancelStageEventRequest {
+  string stage_id_or_name = 1;
+  string canvas_id_or_name = 2;
+  string event_id = 3;
+}
+
+message CancelStageEventResponse {
   StageEvent event = 1;
 }
 

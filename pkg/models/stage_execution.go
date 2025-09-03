@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	ExecutionPending  = "pending"
-	ExecutionStarted  = "started"
-	ExecutionFinished = "finished"
+	ExecutionPending   = "pending"
+	ExecutionStarted   = "started"
+	ExecutionFinished  = "finished"
+	ExecutionCancelled = "cancelled"
 
 	ExecutionResourcePending  = "pending"
 	ExecutionResourceFinished = "finished"
@@ -285,7 +286,7 @@ type ExecutionResource struct {
 	Type             string
 	State            string
 	Result           string
-	RetryCount       int        `gorm:"default:0"`
+	RetryCount       int `gorm:"default:0"`
 	LastRetryAt      *time.Time
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
@@ -331,11 +332,11 @@ func (e *ExecutionResource) ShouldRetry(maxRetries int, retryDelay time.Duration
 	if e.RetryCount >= maxRetries {
 		return false
 	}
-	
+
 	if e.LastRetryAt == nil {
 		return true
 	}
-	
+
 	return time.Since(*e.LastRetryAt) >= retryDelay
 }
 
@@ -424,4 +425,3 @@ func (e *StageExecution) AddResource(externalID string, externalType string, par
 
 	return r, nil
 }
-

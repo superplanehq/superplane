@@ -274,6 +274,8 @@ func executionStateToProto(state string) pb.Execution_State {
 		return pb.Execution_STATE_STARTED
 	case models.ExecutionFinished:
 		return pb.Execution_STATE_FINISHED
+	case models.ExecutionCancelled:
+		return pb.Execution_STATE_CANCELLED
 	default:
 		return pb.Execution_STATE_UNKNOWN
 	}
