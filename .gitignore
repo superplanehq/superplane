@@ -3,3 +3,5 @@ pkg/web/assets/dist
 tmp
 build/
 design/node_modules/
+# macOS Finder metadata
+.DS_Store

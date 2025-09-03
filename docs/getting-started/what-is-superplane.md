@@ -1,14 +1,29 @@
 # What is Superplane
 
+## Table of Contents
+
+- [The DevOps Integration Problem](#the-devops-integration-problem)
+- [How Superplane Solves This](#how-superplane-solves-this)
+- [Deployment Options](#deployment-options)
+- [Primary Use Cases](#primary-use-cases)
+- [Technical Architecture](#technical-architecture)
+- [When to Use Superplane](#when-to-use-superplane)
+- [Getting Started Requirements](#getting-started-requirements)
+- [Next Steps](#next-steps)
+
+---
+
 ## The DevOps Integration Problem
 
 DevOps teams use many different tools: source control systems, deployment orchestration platforms, infrastructure management tools, CI/CD systems, monitoring services, and incident response tools. Each tool works well on its own, but connecting them requires custom scripts and manual coordination.
 
 This creates several problems:
-- **Custom scripts everywhere**: Teams write and maintain integration code between tools
-- **No single view**: You need to check multiple dashboards to see what's happening
-- **Manual processes**: Approvals, compliance checks, and escalations happen outside the tools
-- **Knowledge silos**: Only certain team members know how the integrations work
+- **Custom scripts everywhere** - Teams write and maintain integration code between tools
+- **No single view** - You need to check multiple dashboards to see what's happening
+- **Manual processes** - Approvals, compliance checks, and escalations happen outside the tools
+- **Knowledge silos** - Only certain team members know how the integrations work
+
+---
 
 ## How Superplane Solves This
 
@@ -26,28 +41,32 @@ Connect multiple tools and coordinate their workflows:
 ### Event-Driven Process Automation
 
 Build workflows that respond to events automatically:
-- **Event listeners**: Start workflows when code is pushed, builds complete, Kubernetess environment changes, or alerts fire
-- **Policy enforcement**: Setup and enforce compliance rules and deloyment policies
-- **Approval processes**: Route requests to the right people and track decisions
-- **Complete audit logs**: Every event, action and run is recorded with timestamps and user attribution
+- **Event listeners** - Start workflows when code is pushed, builds complete, Kubernetes environments change, or alerts fire
+- **Policy enforcement** - Set up and enforce compliance rules and deployment policies
+- **Approval processes** - Route requests to the right people and track decisions
+- **Complete audit logs** - Every event, action and run is recorded with timestamps and user attribution
 
 ### Operational Knowledge Centralization
 
 Make your DevOps processes easier to understand and maintain:
-- **Visual workflows**: See how your processes work without reading code
-- **Living documentation**: Workflows serve as up-to-date process documentation
-- **Easier onboarding**: New team members can see and understand existing processes
-- **Reduced silos**: Everyone can see how the full DevOps pipeline works
+- **Visual workflows** - See how your processes work without reading code
+- **Living documentation** - Workflows serve as up-to-date process documentation
+- **Easier onboarding** - New team members can see and understand existing processes
+- **Reduced silos** - Everyone can see how the full DevOps pipeline works
 
-![Overview](../images/sidebar.png)
+![Canvas Sidebar](../images/sidebar.png)
+
+---
 
 ## Deployment Options
 
-**Cloud-hosted**: Use Superplane's managed service with automatic updates and scaling.
+**Cloud-hosted:** Use Superplane's managed service with automatic updates and scaling.
 
-**Self-hosted**: Deploy on your own infrastructure using Docker or Kubernetes for data control.
+**Self-hosted:** Deploy on your own infrastructure using Docker or Kubernetes for data control.
 
-**Local development**: Run locally for testing workflows or your custom built components, before production deployment.
+**Local development:** Run locally for testing workflows or custom built components before production deployment.
+
+---
 
 ## Primary Use Cases
 
@@ -63,12 +82,14 @@ Coordinate infrastructure changes across environments. Validate prerequisites, s
 ### Incident Response
 Automate alert routing, run diagnostic workflows, notify stakeholders, and track resolution tasks without manual coordination.
 
+---
+
 ## Technical Architecture
 
 ### Component System
-- **Native components**: HTTP requests, webhooks, conditionals, data processing
-- **Integration components**: Tool-specific actions like triggering builds or listening to repository changes
-- **Logic components**: Control flow, parallel execution, error handling
+- **Native components** - HTTP requests, webhooks, conditionals, data processing
+- **Integration components** - Tool-specific actions like triggering builds or listening to repository changes
+- **Logic components** - Control flow, parallel execution, error handling
 
 ### Execution Engine
 - Event-driven workflow execution with state persistence
@@ -81,6 +102,8 @@ Automate alert routing, run diagnostic workflows, notify stakeholders, and track
 - Role-based access control at organization and project levels
 - Complete audit trails for compliance and security reviews
 - Organization-level data isolation
+
+---
 
 ## When to Use Superplane
 
@@ -96,10 +119,17 @@ Automate alert routing, run diagnostic workflows, notify stakeholders, and track
 - Teams preferring custom code solutions over visual orchestration
 - Organizations where DevOps processes are already fully standardized and optimized
 
+---
+
 ## Getting Started Requirements
-- **Platform access**: Ability to install self-hosted instance of SuperPlane or register an organization on Cloud.
-- **Integration permissions**: Administrative access to configure webhooks and API integrations in target tools
-- **Team knowledge**: Understanding of your existing tools and processes
+
+**Platform access:** Ability to install self-hosted instance of Superplane or register an organization on the cloud platform.
+
+**Integration permissions:** Administrative access to configure webhooks and API integrations in target tools.
+
+**Team knowledge:** Understanding of your existing tools and processes.
+
+---
 
 ## Next Steps
 
@@ -109,10 +139,8 @@ Automate alert routing, run diagnostic workflows, notify stakeholders, and track
 
 **Learn the concepts:**
 
-→ [Core Concepts](core-concepts.md) - Canvases, Components, and primitives
-
-→ [Example Workflow](example-workflow.md) - Explore a simple example workflow
+→ [Core Concepts](core-concepts.md) - Canvases, Components, and workflows
 
 **Set up in your environment:**
 
-→ [Local development](../instalation/local-development.md) - Setup and run in your local environment
+→ [Local development](../installation/local-development.md) - Set up and run in your local environment
