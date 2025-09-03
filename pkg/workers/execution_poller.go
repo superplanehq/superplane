@@ -10,20 +10,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/integrations"
 	"gorm.io/gorm"
 )
 
 const (
-	// Default timeout for executions stuck in started state (30 minutes)
-	DefaultExecutionTimeout = 30 * time.Minute
-	// Maximum number of retry attempts
-	MaxRetryAttempts = 5
-	// Base delay for exponential backoff
-	BaseRetryDelay = 30 * time.Second
+	DefaultExecutionTimeout      = 30 * time.Minute
+	DefaultExecutionFinalTimeout = 3 * time.Hour
+	MaxRetryAttempts             = 5
+	BaseRetryDelay               = 30 * time.Second
 )
 
 type ExecutionPoller struct {
@@ -62,23 +60,18 @@ func (w *ExecutionPoller) Tick() error {
 	for _, execution := range executions {
 		e := execution
 		logger := logging.ForExecution(&e)
-		
-		// Check if execution is stuck (running longer than timeout)
+
 		if w.isExecutionStuck(&e) {
 			logger.Warnf("Execution has been running for %v, attempting status polling", w.nowFunc().Sub(*e.StartedAt))
 			err := w.ProcessStuckExecution(logger, &e)
 			if err != nil {
 				logger.Errorf("Error processing stuck execution: %v", err)
-				// Continue with other executions even if one fails
 				continue
 			}
-		} else {
-			// Normal execution processing (existing logic)
-			err := w.ProcessExecution(logger, &e)
-			if err != nil {
-				return err
-			}
 		}
+
+		err := w.ProcessExecution(logger, &e)
+		logger.Errorf("Error processing execution: %v", err)
 	}
 
 	return nil
@@ -160,52 +153,46 @@ func (w *ExecutionPoller) isExecutionStuck(execution *models.StageExecution) boo
 	if execution.StartedAt == nil {
 		return false
 	}
-	
+
 	runningDuration := w.nowFunc().Sub(*execution.StartedAt)
 	return runningDuration > w.ExecutionTimeout
 }
 
-// ProcessStuckExecution handles executions that have been stuck in started state
 func (w *ExecutionPoller) ProcessStuckExecution(logger *log.Entry, execution *models.StageExecution) error {
-	// Get all execution resources to check their status via third-party APIs
 	resources, err := execution.Resources()
 	if err != nil {
 		return err
 	}
 
-	// If there are no resources, the execution might be truly stuck
 	if len(resources) == 0 {
-		logger.Warnf("Execution has no resources and has been running for %v, marking as failed", 
+		logger.Warnf("Execution has no resources and has been running for %v, marking as failed",
 			w.nowFunc().Sub(*execution.StartedAt))
-		return w.finishStuckExecution(execution, models.ResultFailed, "No resources and execution timeout exceeded")
+		return w.finishStuckExecution(execution, models.ResultFailed, models.StageEventStateReasonStuck)
 	}
 
-	// Poll status of each resource with retry logic
 	allFinished := true
-	
+
 	for _, resource := range resources {
 		if resource.State != models.ExecutionResourcePending {
-			continue // Already processed
+			continue
 		}
-		
-		// Try to get the latest status from the third-party API with retry
+
 		status, err := w.pollResourceStatusWithRetry(logger, resource)
 		if err != nil {
 			logger.Errorf("Failed to poll status for resource %s after retries: %v", resource.ExternalID, err)
-			// If we can't get status after retries, consider it failed
 			err = resource.Finish(models.ResultFailed)
 			if err != nil {
 				logger.Errorf("Failed to mark resource as failed: %v", err)
 			}
 			continue
 		}
-		
+
 		if status.Finished() {
 			result := models.ResultPassed
 			if !status.Successful() {
 				result = models.ResultFailed
 			}
-			
+
 			err = resource.Finish(result)
 			if err != nil {
 				logger.Errorf("Failed to finish resource: %v", err)
@@ -216,28 +203,27 @@ func (w *ExecutionPoller) ProcessStuckExecution(logger *log.Entry, execution *mo
 			logger.Infof("Resource %s is still running according to third-party API", resource.ExternalID)
 		}
 	}
-	
-	// If all resources are finished, process the execution normally
+
 	if allFinished {
 		logger.Infof("All resources finished via polling, processing execution normally")
 		return w.ProcessExecution(logger, execution)
 	}
-	
-	// If some resources are still running but we've exceeded timeout, 
+
+	//
+	// If some resources are still running but we've exceeded timeout,
 	// we need to decide whether to fail the execution or wait longer
+	//
 	runningDuration := w.nowFunc().Sub(*execution.StartedAt)
-	if runningDuration > 2*w.ExecutionTimeout {
-		// If running for more than 2x timeout, force fail
+	if runningDuration > DefaultExecutionFinalTimeout {
 		logger.Warnf("Execution has been running for %v (2x timeout), force failing", runningDuration)
-		return w.finishStuckExecution(execution, models.ResultFailed, "Execution timeout exceeded (2x)")
+		return w.finishStuckExecution(execution, models.ResultFailed, models.StageEventStateReasonTimeout)
 	}
-	
+
 	// Otherwise, let it continue for now
 	logger.Infof("Some resources still running, will check again in next poll cycle")
 	return nil
 }
 
-// pollResourceStatusWithRetry polls a resource status with exponential backoff retry
 func (w *ExecutionPoller) pollResourceStatusWithRetry(logger *log.Entry, resource models.ExecutionResource) (integrations.StatefulResource, error) {
 	integration, err := resource.FindIntegration()
 	if err != nil {
@@ -253,31 +239,31 @@ func (w *ExecutionPoller) pollResourceStatusWithRetry(logger *log.Entry, resourc
 	if err != nil {
 		return nil, err
 	}
-	
+
+	//
 	// Retry logic with exponential backoff
+	//
 	var lastErr error
 	for attempt := 0; attempt < MaxRetryAttempts; attempt++ {
 		if attempt > 0 {
-			// Calculate delay: base * 2^(attempt-1)
 			delay := time.Duration(float64(BaseRetryDelay) * math.Pow(2, float64(attempt-1)))
 			logger.Infof("Retry attempt %d/%d for resource %s, waiting %v", attempt+1, MaxRetryAttempts, resource.ExternalID, delay)
 			time.Sleep(delay)
 		}
-		
+
 		statefulResource, err := integrationImpl.Status(resource.Type, resource.ExternalID, parentResource)
 		if err == nil {
 			logger.Infof("Successfully polled status for resource %s on attempt %d", resource.ExternalID, attempt+1)
 			return statefulResource, nil
 		}
-		
+
 		lastErr = err
 		logger.Warnf("Attempt %d failed for resource %s: %v", attempt+1, resource.ExternalID, err)
 	}
-	
+
 	return nil, lastErr
 }
 
-// finishStuckExecution marks an execution as finished with a specific result and reason
 func (w *ExecutionPoller) finishStuckExecution(execution *models.StageExecution, result string, reason string) error {
 	stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
 	if err != nil {
@@ -297,7 +283,7 @@ func (w *ExecutionPoller) finishStuckExecution(execution *models.StageExecution,
 	}
 
 	log.Infof("Finished stuck execution %s with result: %s (reason: %s)", execution.ID, result, reason)
-	
+
 	// Publish messages
 	err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), execution).Publish()
 	if err != nil {

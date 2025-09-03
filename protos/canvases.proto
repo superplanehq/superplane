@@ -792,6 +792,8 @@ message StageEvent {
     STATE_REASON_CONNECTION = 4;
     STATE_REASON_CANCELLED = 5;
     STATE_REASON_UNHEALTHY = 6;
+    STATE_REASON_STUCK = 7;
+    STATE_REASON_TIMEOUT = 8;
   }
 
   string id = 1;

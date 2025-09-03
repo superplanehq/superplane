@@ -490,6 +490,8 @@ const (
 	StageEvent_STATE_REASON_CONNECTION  StageEvent_StateReason = 4
 	StageEvent_STATE_REASON_CANCELLED   StageEvent_StateReason = 5
 	StageEvent_STATE_REASON_UNHEALTHY   StageEvent_StateReason = 6
+	StageEvent_STATE_REASON_STUCK       StageEvent_StateReason = 7
+	StageEvent_STATE_REASON_TIMEOUT     StageEvent_StateReason = 8
 )
 
 // Enum value maps for StageEvent_StateReason.
@@ -502,6 +504,8 @@ var (
 		4: "STATE_REASON_CONNECTION",
 		5: "STATE_REASON_CANCELLED",
 		6: "STATE_REASON_UNHEALTHY",
+		7: "STATE_REASON_STUCK",
+		8: "STATE_REASON_TIMEOUT",
 	}
 	StageEvent_StateReason_value = map[string]int32{
 		"STATE_REASON_UNKNOWN":     0,
@@ -511,6 +515,8 @@ var (
 		"STATE_REASON_CONNECTION":  4,
 		"STATE_REASON_CANCELLED":   5,
 		"STATE_REASON_UNHEALTHY":   6,
+		"STATE_REASON_STUCK":       7,
+		"STATE_REASON_TIMEOUT":     8,
 	}
 )
 
@@ -7337,7 +7343,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x122\n" +
 	"\x06before\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\"I\n" +
 	"\x17ListStageEventsResponse\x12.\n" +
-	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\xac\x06\n" +
+	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\xde\x06\n" +
 	"\n" +
 	"StageEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -7358,7 +7364,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
 	"\rSTATE_WAITING\x10\x02\x12\x13\n" +
-	"\x0fSTATE_PROCESSED\x10\x04\"\xd1\x01\n" +
+	"\x0fSTATE_PROCESSED\x10\x04\"\x83\x02\n" +
 	"\vStateReason\x12\x18\n" +
 	"\x14STATE_REASON_UNKNOWN\x10\x00\x12\x19\n" +
 	"\x15STATE_REASON_APPROVAL\x10\x01\x12\x1c\n" +
@@ -7366,7 +7372,9 @@ const file_canvases_proto_rawDesc = "" +
 	"\x16STATE_REASON_EXECUTION\x10\x03\x12\x1b\n" +
 	"\x17STATE_REASON_CONNECTION\x10\x04\x12\x1a\n" +
 	"\x16STATE_REASON_CANCELLED\x10\x05\x12\x1a\n" +
-	"\x16STATE_REASON_UNHEALTHY\x10\x06\"8\n" +
+	"\x16STATE_REASON_UNHEALTHY\x10\x06\x12\x16\n" +
+	"\x12STATE_REASON_STUCK\x10\a\x12\x18\n" +
+	"\x14STATE_REASON_TIMEOUT\x10\b\"8\n" +
 	"\fKeyValuePair\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"7\n" +

@@ -23,6 +23,8 @@ const (
 	StageEventStateReasonConnection = "connection"
 	StageEventStateReasonCancelled  = "cancelled"
 	StageEventStateReasonUnhealthy  = "unhealthy"
+	StageEventStateReasonStuck      = "stuck"
+	StageEventStateReasonTimeout    = "timeout"
 )
 
 var (

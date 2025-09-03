@@ -957,7 +957,9 @@
                 "STATE_REASON_EXECUTION",
                 "STATE_REASON_CONNECTION",
                 "STATE_REASON_CANCELLED",
-                "STATE_REASON_UNHEALTHY"
+                "STATE_REASON_UNHEALTHY",
+                "STATE_REASON_STUCK",
+                "STATE_REASON_TIMEOUT"
               ]
             },
             "collectionFormat": "multi"
@@ -4365,7 +4367,9 @@
         "STATE_REASON_EXECUTION",
         "STATE_REASON_CONNECTION",
         "STATE_REASON_CANCELLED",
-        "STATE_REASON_UNHEALTHY"
+        "STATE_REASON_UNHEALTHY",
+        "STATE_REASON_STUCK",
+        "STATE_REASON_TIMEOUT"
       ],
       "default": "STATE_REASON_UNKNOWN"
     },
