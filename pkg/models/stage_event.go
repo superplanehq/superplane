@@ -29,6 +29,8 @@ const (
 
 var (
 	ErrEventAlreadyApprovedByRequester = fmt.Errorf("event already approved by requester")
+	ErrEventAlreadyCancelled           = fmt.Errorf("event already cancelled")
+	ErrEventCannotBeCancelled          = fmt.Errorf("event cannot be cancelled")
 )
 
 type StageEvent struct {
@@ -84,6 +86,38 @@ func (e *StageEvent) Approve(requesterID uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (e *StageEvent) Cancel(requesterID uuid.UUID) error {
+	if e.StateReason == StageEventStateReasonCancelled {
+		return ErrEventAlreadyCancelled
+	}
+
+	if e.State == StageEventStateProcessed {
+		return ErrEventCannotBeCancelled
+	}
+
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		execution, err := FindExecutionByStageEventID(e.ID)
+		if err != nil && !strings.Contains(err.Error(), "record not found") {
+			return err
+		}
+
+		if execution != nil && execution.State != ExecutionFinished && execution.State != ExecutionCancelled {
+			execution.State = ExecutionCancelled
+			err = tx.Save(execution).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		err = e.UpdateStateInTransaction(tx, StageEventStateProcessed, StageEventStateReasonCancelled)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (e *StageEvent) FindApprovals() ([]StageEventApproval, error) {

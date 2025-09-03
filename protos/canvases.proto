@@ -1060,6 +1060,14 @@ message StageEventApproved {
   google.protobuf.Timestamp timestamp = 5;
 }
 
+message StageEventCancelled {
+  string canvas_id = 1;
+  string stage_id = 2;
+  string event_id = 3;
+  string source_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
 message StageExecutionCreated {
   string canvas_id = 1;
   string execution_id = 2;
