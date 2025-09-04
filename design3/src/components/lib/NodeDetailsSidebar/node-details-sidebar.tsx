@@ -1525,9 +1525,20 @@ export function NodeDetailsSidebar({
                                   <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Running</span>
                                 </Badge>
                                 )}
-                                <Link href="#" className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm">{run.name} 
-                                <MaterialSymbol name='arrow_outward' size='md'/>
-                                </Link>
+                                <div className="flex items-center w-full">
+                                  <div className="max-w-[200px]">
+                                    <Link href="#" className="font-medium text-blue-600 dark:text-blue-400 text-sm truncate block w-full" title={run.name}>
+                                      {run.name}
+                                    </Link>
+                                  </div>
+                                  {run.status === 'running' && (
+                                    <div className="ml-2">
+                                      <Link href="#" className="gray-400 dark:gray-400 underline text-xs">
+                                        Cancel
+                                      </Link>
+                                    </div>
+                                  )}
+                                </div>
                                 
                               </div>
                              

@@ -4,7 +4,11 @@ tmp
 build/
 design/node_modules/
 design2/node_modules/
+design3/node_modules/
 
 # Build outputs
 design2/dist/
 design2/storybook-static/
+
+# macOS Finder metadata
+.DS_Store
