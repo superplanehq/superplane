@@ -160,7 +160,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         );
       case 'STATE_CANCELLED':
         return (
-          <MaterialSymbol name="cancel" size="lg" className="text-red-600 mr-2" />
+          <MaterialSymbol name="block" size="lg" className="text-gray-600 dark:text-gray-400 mr-2" />
         );
       default:
         return (
@@ -370,7 +370,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       case 'STATE_PENDING':
         return 'bg-yellow-50 dark:bg-yellow-900/50 border-yellow-200 dark:border-yellow-700';
       case 'STATE_CANCELLED':
-        return 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-700';
+        return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
       default:
         return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
     }

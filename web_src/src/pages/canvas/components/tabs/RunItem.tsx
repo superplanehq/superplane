@@ -111,8 +111,8 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         return (
           <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
             <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
-            <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-red-500/15 text-red-700 group-hover:bg-red-500/25 dark:text-red-400 dark:group-hover:bg-red-500/25">
-              <MaterialSymbol name="cancel" size="sm" />
+            <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-gray-500/15 text-gray-700 group-hover:bg-gray-500/25 dark:text-gray-400 dark:group-hover:bg-gray-500/25">
+              <MaterialSymbol name="block" size="sm" />
               <span className="uppercase">cancelled</span>
             </span>
           </button>
@@ -145,7 +145,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
       case 'STATE_STARTED':
         return 'border-t-blue-400 dark:border-t-blue-700';
       case 'STATE_CANCELLED':
-        return 'border-t-red-400 dark:border-t-red-700';
+        return 'border-t-gray-400 dark:border-t-gray-700';
       default:
         return 'border-t-gray-400 dark:border-t-gray-700';
     }

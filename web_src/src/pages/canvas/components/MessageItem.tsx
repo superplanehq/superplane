@@ -156,8 +156,8 @@ const MessageItem = React.memo(({
                 <span className="uppercase">Scheduled</span>
               </span>
             ) : isStageEvent(event) && event.state === 'STATE_PROCESSED' && event.stateReason === 'STATE_REASON_CANCELLED' ? (
-              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-red-500/15 text-red-700 group-hover:bg-red-500/25 dark:text-red-400 dark:group-hover:bg-red-500/25">
-                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">cancel</span>
+              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base" aria-hidden="true">block</span>
                 <span className="uppercase">Cancelled</span>
               </span>
             ) : isPlainEvent(event) && event.state === 'STATE_DISCARDED' ? (
