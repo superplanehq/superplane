@@ -149,19 +149,6 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
 	}
 
-	// Register web routes only if START_WEB_SERVER is set to "yes"
-	if os.Getenv("START_WEB_SERVER") == "yes" {
-		webBasePath := os.Getenv("WEB_BASE_PATH")
-		if webBasePath == "" {
-			log.Warn("WEB_BASE_PATH is not set, defaulting to /")
-			webBasePath = "/"
-		}
-		log.Printf("Registering web routes in public API server with base path: %s", webBasePath)
-		server.RegisterWebRoutes(webBasePath)
-	} else {
-		log.Println("Web server routes not registered (START_WEB_SERVER != yes)")
-	}
-
 	if os.Getenv("START_GRPC_GATEWAY") == "yes" {
 		log.Println("Adding gRPC Gateway to Public API")
 
@@ -176,6 +163,20 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 		}
 
 		server.RegisterOpenAPIHandler()
+	}
+
+	// Register web routes only if START_WEB_SERVER is set to "yes"
+	// It is required to be registered AFTER the gRPC gateway registration
+	if os.Getenv("START_WEB_SERVER") == "yes" {
+		webBasePath := os.Getenv("WEB_BASE_PATH")
+		if webBasePath == "" {
+			log.Warn("WEB_BASE_PATH is not set, defaulting to /")
+			webBasePath = "/"
+		}
+		log.Printf("Registering web routes in public API server with base path: %s", webBasePath)
+		server.RegisterWebRoutes(webBasePath)
+	} else {
+		log.Println("Web server routes not registered (START_WEB_SERVER != yes)")
 	}
 
 	err = server.Serve("0.0.0.0", 8000)
