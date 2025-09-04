@@ -153,19 +153,20 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
       <div className="p-3">
         <div className="flex items-center justify-between cursor-pointer min-w-0" onClick={toggleExpand}>
           <div className="text-xs gap-2 min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-2 relative">
-              {renderStatusBadge()}
-              {title && (
-                <div className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm min-w-0">
-                  <span className="truncate">{title}</span>
-                  <MaterialSymbol name="arrow_outward" size="sm" className="flex-shrink-0" />
-                </div>
-              )}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {renderStatusBadge()}
+                {title && (
+                  <div className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm min-w-0 flex-1">
+                    <span className="truncate">{title}</span>
+                  </div>
+                )}
+              </div>
               {['STATE_PENDING', 'STATE_STARTED'].includes(state) && (
                 <span onClick={(e) => {
                   e.stopPropagation();
                   onCancel?.()
-                }} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline absolute -right-5">Cancel</span>
+                }} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Cancel</span>
               )}
             </div>
             <div className="flex items-center gap-4 mb-1">
