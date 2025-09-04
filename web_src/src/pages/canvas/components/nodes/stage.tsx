@@ -242,6 +242,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             inputs: currentFormData.inputs,
             outputs: currentFormData.outputs,
             connections: currentFormData.connections,
+            conditions: currentFormData.conditions,
             executor: currentFormData.executor,
             secrets: currentFormData.secrets,
             inputMappings: currentFormData.inputMappings
