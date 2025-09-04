@@ -819,6 +819,8 @@ message StageEvent {
   repeated KeyValuePair inputs = 9;
   string name = 10;
   string event_id = 11;
+  string cancelled_by = 12;
+  google.protobuf.Timestamp cancelled_at = 13;
 }
 
 message KeyValuePair {

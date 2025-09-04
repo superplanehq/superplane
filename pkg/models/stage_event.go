@@ -44,6 +44,8 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
+	CancelledBy *uuid.UUID
+	CancelledAt *time.Time
 	Inputs      datatypes.JSONType[map[string]any]
 }
 
@@ -115,6 +117,19 @@ func (e *StageEvent) Cancel(requesterID uuid.UUID) error {
 		if err != nil {
 			return err
 		}
+
+		now := time.Now()
+		err = tx.Model(e).
+			Clauses(clause.Returning{}).
+			Update("cancelled_by", requesterID).
+			Update("cancelled_at", now).
+			Error
+		if err != nil {
+			return err
+		}
+
+		e.CancelledBy = &requesterID
+		e.CancelledAt = &now
 
 		return nil
 	})

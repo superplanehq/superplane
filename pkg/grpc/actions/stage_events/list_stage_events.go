@@ -186,6 +186,13 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		EventId:     in.EventID.String(),
 	}
 
+	if in.CancelledBy != nil {
+		e.CancelledBy = in.CancelledBy.String()
+	}
+	if in.CancelledAt != nil {
+		e.CancelledAt = timestamppb.New(*in.CancelledAt)
+	}
+
 	//
 	// Add execution
 	//

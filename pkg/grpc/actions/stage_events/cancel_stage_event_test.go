@@ -68,6 +68,8 @@ func Test__CancelStageEvent(t *testing.T) {
 		assert.Equal(t, protos.StageEvent_STATE_PROCESSED, res.Event.State)
 		assert.Equal(t, protos.StageEvent_STATE_REASON_CANCELLED, res.Event.StateReason)
 		assert.NotNil(t, res.Event.CreatedAt)
+		assert.Equal(t, userID, res.Event.CancelledBy)
+		assert.NotNil(t, res.Event.CancelledAt)
 
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})

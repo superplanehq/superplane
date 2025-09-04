@@ -4374,6 +4374,13 @@
         },
         "eventId": {
           "type": "string"
+        },
+        "cancelledBy": {
+          "type": "string"
+        },
+        "cancelledAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

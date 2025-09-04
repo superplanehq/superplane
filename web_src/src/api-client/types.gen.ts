@@ -751,6 +751,8 @@ export type SuperplaneStageEvent = {
     inputs?: Array<SuperplaneKeyValuePair>;
     name?: string;
     eventId?: string;
+    cancelledBy?: string;
+    cancelledAt?: string;
 };
 
 export type SuperplaneStageEventApproval = {
