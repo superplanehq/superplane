@@ -14,6 +14,10 @@ interface MessageItemProps {
   executionRunning?: boolean;
   plainEventPayload?: { [key: string]: unknown };
   plainEventHeaders?: { [key: string]: unknown };
+  cancelledOn?: string;
+  cancelledBy?: string;
+  approvedOn?: string;
+  approvedBy?: string;
 }
 
 const MessageItem = React.memo(({
@@ -24,7 +28,11 @@ const MessageItem = React.memo(({
   onRemove,
   plainEventPayload,
   plainEventHeaders,
-  sourceEvent
+  sourceEvent,
+  cancelledOn,
+  cancelledBy,
+  approvedOn,
+  approvedBy
 }: MessageItemProps) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -183,37 +191,125 @@ const MessageItem = React.memo(({
 
         {isExpanded && (
           <div className="text-left mt-3 space-y-3">
+            {/* Queue Section - show for cancelled stage events */}
+            {isStageEvent(event) && event.state === 'STATE_PROCESSED' && event.stateReason === 'STATE_REASON_CANCELLED' && (event.createdAt || approvedOn || approvedBy || cancelledOn || cancelledBy) && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                  Queue
+                </div>
+
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    {event.createdAt && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="schedule" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Added to queue on {new Date(event.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(event.createdAt).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {approvedOn && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="check_circle" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Approved on {new Date(approvedOn).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(approvedOn).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {approvedBy && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                          Approved by <span className="text-blue-600 dark:text-blue-400 truncate">{approvedBy}</span>
+                        </span>
+                      </div>
+                    )}
+                    {cancelledOn && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Cancelled on {new Date(cancelledOn).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(cancelledOn).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {cancelledBy && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{cancelledBy}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 space-y-3">
               {/* Show payload/headers for plain events */}
               {isPlainEvent(event) && (plainEventPayload || plainEventHeaders) && (
-                <PayloadDisplay
-                  showDetailsTab={true}
-                  eventId={event.id}
-                  timestamp={event.receivedAt}
-                  state={event.state}
-                  eventType={event.type}
-                  sourceName={event.sourceName}
-                  headers={plainEventHeaders}
-                  payload={plainEventPayload}
-                  inputs={inputsRecord}
-                  rounded={false}
-                />
+                <div className="space-y-3">
+                  <PayloadDisplay
+                    showDetailsTab={true}
+                    eventId={event.id}
+                    timestamp={event.receivedAt}
+                    state={event.state}
+                    eventType={event.type}
+                    sourceName={event.sourceName}
+                    headers={plainEventHeaders}
+                    payload={plainEventPayload}
+                    inputs={inputsRecord}
+                    rounded={false}
+                  />
+                </div>
               )}
 
               {/* Show payload/headers for stage events */}
               {isStageEvent(event) && sourceEvent && (plainEventPayload || plainEventHeaders) && (
-                <PayloadDisplay
-                  showDetailsTab={true}
-                  eventId={sourceEvent.id}
-                  timestamp={sourceEvent.receivedAt}
-                  state={sourceEvent.state}
-                  eventType={sourceEvent.type}
-                  sourceName={sourceEvent.sourceName}
-                  headers={plainEventHeaders}
-                  payload={plainEventPayload}
-                  inputs={inputsRecord}
-                  rounded={false}
-                />
+                <div className="space-y-3">
+                  {(cancelledBy || cancelledOn) && <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                    Event
+                  </div>}
+                  <PayloadDisplay
+                    showDetailsTab={true}
+                    eventId={sourceEvent.id}
+                    timestamp={sourceEvent.receivedAt}
+                    state={sourceEvent.state}
+                    eventType={sourceEvent.type}
+                    sourceName={sourceEvent.sourceName}
+                    headers={plainEventHeaders}
+                    payload={plainEventPayload}
+                    inputs={inputsRecord}
+                    rounded={false}
+                  />
+                </div>
               )}
             </div>
           </div>

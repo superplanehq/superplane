@@ -311,6 +311,8 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                 const sourceEvent = connectionEventsById?.[stageEvent.eventId || ''];
                 const plainEventPayload = connectionEventsById?.[stageEvent.eventId || '']?.raw;
                 const plainEventHeaders = connectionEventsById?.[stageEvent.eventId || '']?.headers;
+                const approvalAndCancelledData = { event: stageEvent } as ExecutionWithEvent;
+
                 return (
                   <MessageItem
                     key={stageEvent.id}
@@ -322,6 +324,10 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     plainEventPayload={plainEventPayload}
                     plainEventHeaders={plainEventHeaders}
                     sourceEvent={sourceEvent}
+                    approvedOn={getMinApprovedAt(approvalAndCancelledData)}
+                    approvedBy={getApprovalsNames(approvalAndCancelledData, userDisplayNames)}
+                    cancelledOn={stageEvent.cancelledAt}
+                    cancelledBy={getCancelledByName(approvalAndCancelledData, userDisplayNames)}
                   />
                 );
               }
