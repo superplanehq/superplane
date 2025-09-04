@@ -17,6 +17,7 @@ interface ExecutionTimelineProps {
   organizationId: string;
   connectionEventsById: Record<string, SuperplaneEvent>;
   eventsByExecutionId: Record<string, SuperplaneEvent>;
+  onCancel: (eventId: string) => void;
 }
 
 export const ExecutionTimeline = ({
@@ -24,6 +25,7 @@ export const ExecutionTimeline = ({
   organizationId,
   connectionEventsById,
   eventsByExecutionId,
+  onCancel
 }: ExecutionTimelineProps) => {
   // Fetch organization users to resolve user IDs to names
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
@@ -64,6 +66,7 @@ export const ExecutionTimeline = ({
               eventId={sourceEvent?.id}
               sourceEvent={sourceEvent}
               emmitedEvent={emmitedEvent}
+              onCancel={() => onCancel(execution.event.id!)}
             />
           );
         })

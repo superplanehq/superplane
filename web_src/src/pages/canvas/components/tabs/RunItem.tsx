@@ -18,6 +18,7 @@ interface RunItemProps {
   approvedBy?: string;
   sourceEvent?: SuperplaneEvent;
   emmitedEvent?: SuperplaneEvent;
+  onCancel: () => void;
 }
 
 export const RunItem: React.FC<RunItemProps> = React.memo(({
@@ -35,6 +36,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   approvedBy,
   sourceEvent,
   emmitedEvent,
+  onCancel,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
 
@@ -101,6 +103,16 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             </span>
           </button>
         );
+      case 'STATE_CANCELLED':
+        return (
+          <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
+            <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+            <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-red-500/15 text-red-700 group-hover:bg-red-500/25 dark:text-red-400 dark:group-hover:bg-red-500/25">
+              <MaterialSymbol name="cancel" size="sm" />
+              <span className="uppercase">cancelled</span>
+            </span>
+          </button>
+        );
       default:
         return (
           <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
@@ -128,6 +140,8 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         return 'border-t-orange-400 dark:border-t-orange-700';
       case 'STATE_STARTED':
         return 'border-t-blue-400 dark:border-t-blue-700';
+      case 'STATE_CANCELLED':
+        return 'border-t-red-400 dark:border-t-red-700';
       default:
         return 'border-t-gray-400 dark:border-t-gray-700';
     }
@@ -139,13 +153,19 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
       <div className="p-3">
         <div className="flex items-center justify-between cursor-pointer min-w-0" onClick={toggleExpand}>
           <div className="text-xs gap-2 min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 relative">
               {renderStatusBadge()}
               {title && (
                 <div className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm min-w-0">
                   <span className="truncate">{title}</span>
                   <MaterialSymbol name="arrow_outward" size="sm" className="flex-shrink-0" />
                 </div>
+              )}
+              {['STATE_PENDING', 'STATE_STARTED'].includes(state) && (
+                <span onClick={(e) => {
+                  e.stopPropagation();
+                  onCancel?.()
+                }} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline absolute -right-5">Cancel</span>
               )}
             </div>
             <div className="flex items-center gap-4 mb-1">

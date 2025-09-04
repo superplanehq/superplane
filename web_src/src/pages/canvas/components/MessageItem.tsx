@@ -9,6 +9,7 @@ interface MessageItemProps {
   sourceEvent?: SuperplaneEvent;
   selectedStage?: SuperplaneStage;
   onApprove?: (eventId: string) => void;
+  onCancel?: (eventId: string) => void;
   onRemove?: (eventId: string) => void;
   executionRunning?: boolean;
   plainEventPayload?: { [key: string]: unknown };
@@ -19,6 +20,7 @@ const MessageItem = React.memo(({
   event,
   selectedStage,
   onApprove,
+  onCancel,
   onRemove,
   plainEventPayload,
   plainEventHeaders,
@@ -139,6 +141,11 @@ const MessageItem = React.memo(({
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">schedule</span>
                 <span className="uppercase">Scheduled</span>
               </span>
+            ) : isStageEvent(event) && event.state === 'STATE_PROCESSED' && event.stateReason === 'STATE_REASON_CANCELLED' ? (
+              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-red-500/15 text-red-700 group-hover:bg-red-500/25 dark:text-red-400 dark:group-hover:bg-red-500/25">
+                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">cancel</span>
+                <span className="uppercase">Cancelled</span>
+              </span>
             ) : isPlainEvent(event) && event.state === 'STATE_DISCARDED' ? (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base" aria-hidden="true">block</span>
@@ -252,9 +259,22 @@ const MessageItem = React.memo(({
       {/* Time Window Footer - only for stage events */}
       {isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' && (
         <div className="px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center">
-            <MaterialSymbol name="schedule" size="md" className="text-orange-700 dark:text-orange-200 mr-2" />
-            <span className="text-xs text-gray-700 dark:text-zinc-400">{formatTimeWindow()}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center text-left">
+              <MaterialSymbol name="schedule" size="md" className="text-orange-700 dark:text-orange-200 mr-2" />
+              <span className="text-xs text-gray-700 dark:text-zinc-400">{formatTimeWindow()}</span>
+            </div>
+            <span onClick={() => onCancel?.(event.id || '')} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Cancel</span>
+          </div>
+        </div>
+      )}
+
+      {/* Time Window Footer - only for stage events */}
+      {isStageEvent(event) && event.state === 'STATE_PENDING' && (
+        <div className="px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-700 dark:text-zinc-400">Waiting for execution</span>
+            <span onClick={() => onCancel?.(event.id || '')} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Cancel</span>
           </div>
         </div>
       )}

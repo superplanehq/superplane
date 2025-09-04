@@ -122,7 +122,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const allFinishedExecutions = useMemo(() =>
     allExecutions
-      .filter(execution => execution?.finishedAt)
+      .filter(execution => execution?.state === 'STATE_FINISHED' || execution?.state === 'STATE_CANCELLED')
     , [allExecutions]
   );
 
@@ -157,6 +157,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         return <MaterialSymbol name="check_circle" size="lg" className="text-green-600 mr-2" />; case 'STATE_PENDING':
         return (
           <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 mr-2 animate-spin" />
+        );
+      case 'STATE_CANCELLED':
+        return (
+          <MaterialSymbol name="cancel" size="lg" className="text-red-600 mr-2" />
         );
       default:
         return (
@@ -364,6 +368,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         return 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-700';
       case 'STATE_PENDING':
         return 'bg-yellow-50 dark:bg-yellow-900/50 border-yellow-200 dark:border-yellow-700';
+      case 'STATE_CANCELLED':
+        return 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-700';
       default:
         return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
     }

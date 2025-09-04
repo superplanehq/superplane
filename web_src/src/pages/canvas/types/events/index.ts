@@ -14,6 +14,7 @@ export type EventMap = {
     canvas_updated: SuperplaneCanvas;
     new_stage_event: StageEventPayload;
     stage_event_approved: StageEventPayload;
+    stage_event_cancelled: StageEventPayload;
     execution_finished: ExecutionPayload;
     execution_started: ExecutionPayload;
     event_created: EventPayload;
