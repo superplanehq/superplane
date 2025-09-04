@@ -47,13 +47,14 @@ func (e *EventDistributer) Start() error {
 		{messages.DeliveryHubCanvasExchange, messages.EventCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.StageEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageEventCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.StageEventApprovedRoutingKey, e.createHandler(eventdistributer.HandleStageEventApproved)},
+		{messages.DeliveryHubCanvasExchange, messages.StageEventCancelledRoutingKey, e.createHandler(eventdistributer.HandleStageEventCancelled)},
 		{messages.DeliveryHubCanvasExchange, messages.EventSourceCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventSourceCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.ExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleExecutionCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.ExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleExecutionStarted)},
 		{messages.DeliveryHubCanvasExchange, messages.ExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleExecutionFinished)},
 		{messages.DeliveryHubCanvasExchange, messages.StageCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.ConnectionGroupCreatedRoutingKey, e.createHandler(eventdistributer.HandleConnectionGroupCreated)},
-		{messages.DeliveryHubCanvasExchange, "stage-updated", e.createHandler(eventdistributer.HandleStageUpdated)},
+		{messages.DeliveryHubCanvasExchange, messages.StageUpdatedRoutingKey, e.createHandler(eventdistributer.HandleStageUpdated)},
 	}
 
 	// Start a consumer for each route

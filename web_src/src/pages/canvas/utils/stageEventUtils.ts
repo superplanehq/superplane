@@ -150,6 +150,13 @@ export const getApprovalsNames = (execution: ExecutionWithEvent, userDisplayName
   return names.join(', ');
 };
 
+export const getCancelledByName = (execution: ExecutionWithEvent, userDisplayNames: Record<string, string>) => {
+  if (!execution.event.cancelledBy) {
+    return undefined;
+  }
+  return userDisplayNames[execution.event.cancelledBy] || execution.event.cancelledBy;
+};
+
 export const mapExecutionOutputs = (execution: ExecutionWithEvent) => {
   const map: Record<string, string> = {};
   execution.outputs?.forEach((output) => {

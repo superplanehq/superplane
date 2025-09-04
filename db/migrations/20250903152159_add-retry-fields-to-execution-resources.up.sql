@@ -1,0 +1,7 @@
+BEGIN;
+
+ALTER TABLE execution_resources
+  ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN last_retry_at TIMESTAMP;
+
+COMMIT;
