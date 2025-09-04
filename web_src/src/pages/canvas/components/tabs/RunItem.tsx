@@ -16,6 +16,8 @@ interface RunItemProps {
   queuedOn?: string;
   approvedOn?: string;
   approvedBy?: string;
+  cancelledOn?: string;
+  cancelledBy?: string;
   sourceEvent?: SuperplaneEvent;
   emmitedEvent?: SuperplaneEvent;
   onCancel: () => void;
@@ -34,6 +36,8 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   queuedOn,
   approvedOn,
   approvedBy,
+  cancelledOn,
+  cancelledBy,
   sourceEvent,
   emmitedEvent,
   onCancel,
@@ -217,11 +221,65 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         {/* Expanded content */}
         {isExpanded && (
           <div className="mt-3 space-y-4 text-left">
+            {/* Run Section */}
+            {(state === 'STATE_CANCELLED' && (cancelledOn || cancelledBy)) && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                  Run
+                </div>
+
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <MaterialSymbol name="calendar_today" size="md" className="text-gray-600 dark:text-zinc-400" />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400">
+                        Started on {new Date(timestamp).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })} {new Date(timestamp).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: false
+                        })}
+                      </span>
+                    </div>
+                    {cancelledOn && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Cancelled on {new Date(cancelledOn).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(cancelledOn).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {cancelledBy && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{cancelledBy}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Run Details Section */}
             {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0 || (emmitedEvent && (emmitedEventPayload || emmitedEventHeaders))) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  Run
+                  {state === 'STATE_CANCELLED' ? 'Event' : 'Run'}
                 </div>
                 <div>
                   <PayloadDisplay

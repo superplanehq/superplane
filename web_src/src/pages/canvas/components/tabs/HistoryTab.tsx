@@ -9,6 +9,7 @@ import {
   formatDuration,
   getMinApprovedAt,
   getApprovalsNames,
+  getCancelledByName,
   mapExecutionOutputs,
   mapExecutionEventInputs,
   createUserDisplayNames
@@ -296,6 +297,8 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     approvedOn={getMinApprovedAt(execution)}
                     approvedBy={getApprovalsNames(execution, userDisplayNames)}
                     queuedOn={execution.event.createdAt}
+                    cancelledOn={execution.event.cancelledAt}
+                    cancelledBy={getCancelledByName(execution, userDisplayNames)}
                     eventId={sourceEvent?.id}
                     sourceEvent={sourceEvent}
                     emmitedEvent={emmitedEvent}
