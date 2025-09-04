@@ -153,8 +153,8 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 	if os.Getenv("START_WEB_SERVER") == "yes" {
 		webBasePath := os.Getenv("WEB_BASE_PATH")
 		if webBasePath == "" {
-			log.Warn("WEB_BASE_PATH is not set, defaulting to /app")
-			webBasePath = "/app"
+			log.Warn("WEB_BASE_PATH is not set, defaulting to /")
+			webBasePath = "/"
 		}
 		log.Printf("Registering web routes in public API server with base path: %s", webBasePath)
 		server.RegisterWebRoutes(webBasePath)
