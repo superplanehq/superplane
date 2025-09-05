@@ -38,12 +38,14 @@ const withAuthOnly = (Component: React.ComponentType) => (
   </AuthGuard>
 )
 
+const BASE_PATH = import.meta.env.BASE_URL || '/'
+
 // Main App component with router
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
-        <BrowserRouter basename="/">
+        <BrowserRouter basename={BASE_PATH}>
           <Routes>
 
             {/* Organization-scoped protected routes */}
