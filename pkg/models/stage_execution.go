@@ -441,3 +441,12 @@ func DeleteStageExecutionsBySourceInTransaction(tx *gorm.DB, sourceID uuid.UUID,
 
 	return nil
 }
+
+func DeleteExecutionResourcesByParentResourceInTransaction(tx *gorm.DB, parentResourceID uuid.UUID) error {
+	if err := tx.Unscoped().
+		Where("parent_resource_id = ?", parentResourceID).
+		Delete(&ExecutionResource{}).Error; err != nil {
+		return fmt.Errorf("failed to delete execution resources for parent resource: %v", err)
+	}
+	return nil
+}

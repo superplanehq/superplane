@@ -306,6 +306,146 @@ func Test__HardDeletionWorker(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("hard delete stage without resource avoids webhook cleanup", func(t *testing.T) {
+		stage := models.Stage{
+			CanvasID:      r.Canvas.ID,
+			Name:          "test-stage-no-resource",
+			Description:   "Test Stage without Resource",
+			ExecutorType:  models.ExecutorTypeHTTP,
+			ExecutorName:  "test-executor",
+			ExecutorSpec:  datatypes.JSON(`{}`),
+			Conditions:    datatypes.NewJSONSlice([]models.StageCondition{}),
+			Inputs:        datatypes.NewJSONSlice([]models.InputDefinition{}),
+			InputMappings: datatypes.NewJSONSlice([]models.InputMapping{}),
+			Outputs:       datatypes.NewJSONSlice([]models.OutputDefinition{}),
+			Secrets:       datatypes.NewJSONSlice([]models.ValueDefinition{}),
+		}
+		err := database.Conn().Create(&stage).Error
+		require.NoError(t, err)
+
+		event, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
+		require.NoError(t, err)
+
+		stageEvent, err := models.CreateStageEventInTransaction(
+			database.Conn(),
+			stage.ID,
+			event,
+			models.StageEventStatePending,
+			"",
+			map[string]any{"test": "value"},
+			"test-executor",
+		)
+		require.NoError(t, err)
+
+		stageExecution, err := models.CreateStageExecution(r.Canvas.ID, stage.ID, stageEvent.ID)
+		require.NoError(t, err)
+
+		resource := models.Resource{
+			IntegrationID: r.Integration.ID,
+			ExternalID:    "test-resource-id",
+			ResourceName:  "test-resource",
+			ResourceType:  "test-type",
+		}
+		err = database.Conn().Create(&resource).Error
+		require.NoError(t, err)
+
+		executionResource, err := stageExecution.AddResource("test-exec-resource", "test-type", resource.ID)
+		require.NoError(t, err)
+
+		childResource := models.Resource{
+			IntegrationID: r.Integration.ID,
+			ParentID:      &resource.ID,
+			ExternalID:    "child-resource-id",
+			ResourceName:  "child-resource",
+			ResourceType:  "child-type",
+		}
+		err = database.Conn().Create(&childResource).Error
+		require.NoError(t, err)
+
+		childExecutionResource, err := stageExecution.AddResource("child-exec-resource", "child-type", childResource.ID)
+		require.NoError(t, err)
+
+		err = stage.Delete()
+		require.NoError(t, err)
+
+		err = worker.processStages()
+		require.NoError(t, err)
+
+		var foundStage models.Stage
+		err = database.Conn().Unscoped().Where("id = ?", stage.ID).First(&foundStage).Error
+		assert.Error(t, err)
+
+		var foundExecution models.StageExecution
+		err = database.Conn().Unscoped().Where("id = ?", stageExecution.ID).First(&foundExecution).Error
+		assert.Error(t, err)
+
+		var foundExecutionResource models.ExecutionResource
+		err = database.Conn().Unscoped().Where("id = ?", executionResource.ID).First(&foundExecutionResource).Error
+		assert.Error(t, err)
+
+		var foundChildExecutionResource models.ExecutionResource
+		err = database.Conn().Unscoped().Where("id = ?", childExecutionResource.ID).First(&foundChildExecutionResource).Error
+		assert.Error(t, err)
+	})
+
+	t.Run("test execution resource cleanup by parent resource", func(t *testing.T) {
+		resource := models.Resource{
+			IntegrationID: r.Integration.ID,
+			ExternalID:    "test-resource-direct",
+			ResourceName:  "test-resource-direct",
+			ResourceType:  "test-type",
+		}
+		err := database.Conn().Create(&resource).Error
+		require.NoError(t, err)
+
+		stage := models.Stage{
+			CanvasID:      r.Canvas.ID,
+			Name:          "test-stage-for-direct-cleanup",
+			Description:   "Test Stage",
+			ExecutorType:  models.ExecutorTypeHTTP,
+			ExecutorName:  "test-executor",
+			ExecutorSpec:  datatypes.JSON(`{}`),
+			Conditions:    datatypes.NewJSONSlice([]models.StageCondition{}),
+			Inputs:        datatypes.NewJSONSlice([]models.InputDefinition{}),
+			InputMappings: datatypes.NewJSONSlice([]models.InputMapping{}),
+			Outputs:       datatypes.NewJSONSlice([]models.OutputDefinition{}),
+			Secrets:       datatypes.NewJSONSlice([]models.ValueDefinition{}),
+		}
+		err = database.Conn().Create(&stage).Error
+		require.NoError(t, err)
+
+		event, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
+		require.NoError(t, err)
+
+		stageEvent, err := models.CreateStageEventInTransaction(
+			database.Conn(),
+			stage.ID,
+			event,
+			models.StageEventStatePending,
+			"",
+			map[string]any{"test": "value"},
+			"test-executor",
+		)
+		require.NoError(t, err)
+
+		stageExecution, err := models.CreateStageExecution(r.Canvas.ID, stage.ID, stageEvent.ID)
+		require.NoError(t, err)
+
+		executionResource, err := stageExecution.AddResource("test-exec-resource", "test-type", resource.ID)
+		require.NoError(t, err)
+
+		err = models.DeleteResourceWithChildren(resource.ID)
+		require.NoError(t, err)
+
+		var foundResource models.Resource
+		err = database.Conn().Unscoped().Where("id = ?", resource.ID).First(&foundResource).Error
+		assert.Error(t, err)
+
+		var foundExecutionResource models.ExecutionResource
+		err = database.Conn().Unscoped().Where("id = ?", executionResource.ID).First(&foundExecutionResource).Error
+		assert.Error(t, err)
+	})
+
 	t.Run("full worker tick processes all component types", func(t *testing.T) {
 
 		err := worker.Tick()
