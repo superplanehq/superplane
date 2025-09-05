@@ -43,7 +43,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/">
           <Routes>
 
             {/* Organization-scoped protected routes */}
