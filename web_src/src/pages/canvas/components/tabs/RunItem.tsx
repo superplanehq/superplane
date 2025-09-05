@@ -16,8 +16,11 @@ interface RunItemProps {
   queuedOn?: string;
   approvedOn?: string;
   approvedBy?: string;
+  cancelledOn?: string;
+  cancelledBy?: string;
   sourceEvent?: SuperplaneEvent;
   emmitedEvent?: SuperplaneEvent;
+  onCancel: () => void;
 }
 
 export const RunItem: React.FC<RunItemProps> = React.memo(({
@@ -33,8 +36,11 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   queuedOn,
   approvedOn,
   approvedBy,
+  cancelledOn,
+  cancelledBy,
   sourceEvent,
   emmitedEvent,
+  onCancel,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
 
@@ -101,6 +107,16 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             </span>
           </button>
         );
+      case 'STATE_CANCELLED':
+        return (
+          <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
+            <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+            <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-gray-500/15 text-gray-700 group-hover:bg-gray-500/25 dark:text-gray-400 dark:group-hover:bg-gray-500/25">
+              <MaterialSymbol name="block" size="sm" />
+              <span className="uppercase">cancelled</span>
+            </span>
+          </button>
+        );
       default:
         return (
           <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
@@ -128,6 +144,8 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         return 'border-t-orange-400 dark:border-t-orange-700';
       case 'STATE_STARTED':
         return 'border-t-blue-400 dark:border-t-blue-700';
+      case 'STATE_CANCELLED':
+        return 'border-t-gray-400 dark:border-t-gray-700';
       default:
         return 'border-t-gray-400 dark:border-t-gray-700';
     }
@@ -139,13 +157,20 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
       <div className="p-3">
         <div className="flex items-center justify-between cursor-pointer min-w-0" onClick={toggleExpand}>
           <div className="text-xs gap-2 min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              {renderStatusBadge()}
-              {title && (
-                <div className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm min-w-0">
-                  <span className="truncate">{title}</span>
-                  <MaterialSymbol name="arrow_outward" size="sm" className="flex-shrink-0" />
-                </div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {renderStatusBadge()}
+                {title && (
+                  <div className="font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1 text-sm min-w-0 flex-1">
+                    <span className="truncate">{title}</span>
+                  </div>
+                )}
+              </div>
+              {['STATE_PENDING', 'STATE_STARTED'].includes(state) && (
+                <span onClick={(e) => {
+                  e.stopPropagation();
+                  onCancel?.()
+                }} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Cancel</span>
               )}
             </div>
             <div className="flex items-center gap-4 mb-1">
@@ -196,11 +221,65 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         {/* Expanded content */}
         {isExpanded && (
           <div className="mt-3 space-y-4 text-left">
+            {/* Run Section */}
+            {(state === 'STATE_CANCELLED' && (cancelledOn || cancelledBy)) && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                  Run
+                </div>
+
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1">
+                      <MaterialSymbol name="calendar_today" size="md" className="text-gray-600 dark:text-zinc-400" />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400">
+                        Started on {new Date(timestamp).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })} {new Date(timestamp).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: false
+                        })}
+                      </span>
+                    </div>
+                    {cancelledOn && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Cancelled on {new Date(cancelledOn).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(cancelledOn).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {cancelledBy && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{cancelledBy}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Run Details Section */}
             {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0 || (emmitedEvent && (emmitedEventPayload || emmitedEventHeaders))) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  Run
+                  {state === 'STATE_CANCELLED' ? 'Event' : 'Run'}
                 </div>
                 <div>
                   <PayloadDisplay

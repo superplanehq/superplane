@@ -278,6 +278,136 @@ func (a *StageAPIService) SuperplaneBulkListStageEventsExecute(r ApiSuperplaneBu
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiSuperplaneCancelStageEventRequest struct {
+	ctx context.Context
+	ApiService *StageAPIService
+	canvasIdOrName string
+	stageIdOrName string
+	eventId string
+	body *map[string]interface{}
+}
+
+func (r ApiSuperplaneCancelStageEventRequest) Body(body map[string]interface{}) ApiSuperplaneCancelStageEventRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiSuperplaneCancelStageEventRequest) Execute() (*SuperplaneCancelStageEventResponse, *http.Response, error) {
+	return r.ApiService.SuperplaneCancelStageEventExecute(r)
+}
+
+/*
+SuperplaneCancelStageEvent Cancel a stage event
+
+Cancels the specified stage event (canvas can be referenced by ID or name)
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasIdOrName
+ @param stageIdOrName
+ @param eventId
+ @return ApiSuperplaneCancelStageEventRequest
+*/
+func (a *StageAPIService) SuperplaneCancelStageEvent(ctx context.Context, canvasIdOrName string, stageIdOrName string, eventId string) ApiSuperplaneCancelStageEventRequest {
+	return ApiSuperplaneCancelStageEventRequest{
+		ApiService: a,
+		ctx: ctx,
+		canvasIdOrName: canvasIdOrName,
+		stageIdOrName: stageIdOrName,
+		eventId: eventId,
+	}
+}
+
+// Execute executes the request
+//  @return SuperplaneCancelStageEventResponse
+func (a *StageAPIService) SuperplaneCancelStageEventExecute(r ApiSuperplaneCancelStageEventRequest) (*SuperplaneCancelStageEventResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *SuperplaneCancelStageEventResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "StageAPIService.SuperplaneCancelStageEvent")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/cancel"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"stageIdOrName"+"}", url.PathEscape(parameterValueToString(r.stageIdOrName, "stageIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"eventId"+"}", url.PathEscape(parameterValueToString(r.eventId, "eventId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiSuperplaneCreateStageRequest struct {
 	ctx context.Context
 	ApiService *StageAPIService

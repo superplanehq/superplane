@@ -58,9 +58,10 @@ describe('HistoryTab', () => {
         approveStageEvent={vi.fn()}
         isFetchingNextConnectedEvents={false}
         fetchNextConnectedEvents={vi.fn()}
+        cancelStageEvent={vi.fn()}
       />
     );
-    
+
     expect(screen.getByText('History (0 items)')).toBeInTheDocument();
     expect(screen.getByText('No history available')).toBeInTheDocument();
   });
@@ -74,9 +75,10 @@ describe('HistoryTab', () => {
         approveStageEvent={vi.fn()}
         isFetchingNextConnectedEvents={false}
         fetchNextConnectedEvents={vi.fn()}
+        cancelStageEvent={vi.fn()}
       />
     );
-    
+
     expect(screen.getByPlaceholderText('Search history...')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Runs' })).toBeInTheDocument();

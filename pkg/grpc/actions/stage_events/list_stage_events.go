@@ -135,6 +135,10 @@ func protoToStateReason(stateReason pb.StageEvent_StateReason) (string, error) {
 		return models.StageEventStateReasonCancelled, nil
 	case pb.StageEvent_STATE_REASON_UNHEALTHY:
 		return models.StageEventStateReasonUnhealthy, nil
+	case pb.StageEvent_STATE_REASON_STUCK:
+		return models.StageEventStateReasonStuck, nil
+	case pb.StageEvent_STATE_REASON_TIMEOUT:
+		return models.StageEventStateReasonTimeout, nil
 	default:
 		return "", fmt.Errorf("invalid state reason: %v", stateReason)
 	}
@@ -180,6 +184,13 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		Inputs:      []*pb.KeyValuePair{},
 		Name:        in.Name,
 		EventId:     in.EventID.String(),
+	}
+
+	if in.CancelledBy != nil {
+		e.CancelledBy = in.CancelledBy.String()
+	}
+	if in.CancelledAt != nil {
+		e.CancelledAt = timestamppb.New(*in.CancelledAt)
 	}
 
 	//
@@ -270,6 +281,8 @@ func executionStateToProto(state string) pb.Execution_State {
 		return pb.Execution_STATE_STARTED
 	case models.ExecutionFinished:
 		return pb.Execution_STATE_FINISHED
+	case models.ExecutionCancelled:
+		return pb.Execution_STATE_CANCELLED
 	default:
 		return pb.Execution_STATE_UNKNOWN
 	}
@@ -302,6 +315,10 @@ func stateReasonToProto(stateReason string) pb.StageEvent_StateReason {
 		return pb.StageEvent_STATE_REASON_CANCELLED
 	case models.StageEventStateReasonUnhealthy:
 		return pb.StageEvent_STATE_REASON_UNHEALTHY
+	case models.StageEventStateReasonStuck:
+		return pb.StageEvent_STATE_REASON_STUCK
+	case models.StageEventStateReasonTimeout:
+		return pb.StageEvent_STATE_REASON_TIMEOUT
 	default:
 		return pb.StageEvent_STATE_REASON_UNKNOWN
 	}

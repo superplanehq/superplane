@@ -23,10 +23,14 @@ const (
 	StageEventStateReasonConnection = "connection"
 	StageEventStateReasonCancelled  = "cancelled"
 	StageEventStateReasonUnhealthy  = "unhealthy"
+	StageEventStateReasonStuck      = "stuck"
+	StageEventStateReasonTimeout    = "timeout"
 )
 
 var (
 	ErrEventAlreadyApprovedByRequester = fmt.Errorf("event already approved by requester")
+	ErrEventAlreadyCancelled           = fmt.Errorf("event already cancelled")
+	ErrEventCannotBeCancelled          = fmt.Errorf("event cannot be cancelled")
 )
 
 type StageEvent struct {
@@ -40,6 +44,8 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
+	CancelledBy *uuid.UUID
+	CancelledAt *time.Time
 	Inputs      datatypes.JSONType[map[string]any]
 }
 
@@ -82,6 +88,51 @@ func (e *StageEvent) Approve(requesterID uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func (e *StageEvent) Cancel(requesterID uuid.UUID) error {
+	if e.StateReason == StageEventStateReasonCancelled {
+		return ErrEventAlreadyCancelled
+	}
+
+	if e.State == StageEventStateProcessed {
+		return ErrEventCannotBeCancelled
+	}
+
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		execution, err := FindExecutionByStageEventID(e.ID)
+		if err != nil && !strings.Contains(err.Error(), "record not found") {
+			return err
+		}
+
+		if execution != nil && execution.State != ExecutionFinished && execution.State != ExecutionCancelled {
+			execution.State = ExecutionCancelled
+			err = tx.Save(execution).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		err = e.UpdateStateInTransaction(tx, StageEventStateProcessed, StageEventStateReasonCancelled)
+		if err != nil {
+			return err
+		}
+
+		now := time.Now()
+		err = tx.Model(e).
+			Clauses(clause.Returning{}).
+			Update("cancelled_by", requesterID).
+			Update("cancelled_at", now).
+			Error
+		if err != nil {
+			return err
+		}
+
+		e.CancelledBy = &requesterID
+		e.CancelledAt = &now
+
+		return nil
+	})
 }
 
 func (e *StageEvent) FindApprovals() ([]StageEventApproval, error) {
