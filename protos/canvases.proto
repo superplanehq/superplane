@@ -325,6 +325,18 @@ service Superplane {
     };
   }
 
+  rpc CancelStageEvent(CancelStageEventRequest) returns (CancelStageEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel a stage event";
+      description: "Cancels the specified stage event (canvas can be referenced by ID or name)";
+      tags: "Stage";
+    };
+  }
+
   rpc AddUser(AddUserRequest) returns (AddUserResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/users"
@@ -792,6 +804,8 @@ message StageEvent {
     STATE_REASON_CONNECTION = 4;
     STATE_REASON_CANCELLED = 5;
     STATE_REASON_UNHEALTHY = 6;
+    STATE_REASON_STUCK = 7;
+    STATE_REASON_TIMEOUT = 8;
   }
 
   string id = 1;
@@ -805,6 +819,8 @@ message StageEvent {
   repeated KeyValuePair inputs = 9;
   string name = 10;
   string event_id = 11;
+  string cancelled_by = 12;
+  google.protobuf.Timestamp cancelled_at = 13;
 }
 
 message KeyValuePair {
@@ -822,7 +838,8 @@ message Execution {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_STARTED = 2;
-    STATE_FINISHED = 4;
+    STATE_FINISHED = 3;
+    STATE_CANCELLED = 4;
   }
 
   enum Result {
@@ -857,6 +874,16 @@ message ApproveStageEventRequest {
 }
 
 message ApproveStageEventResponse {
+  StageEvent event = 1;
+}
+
+message CancelStageEventRequest {
+  string stage_id_or_name = 1;
+  string canvas_id_or_name = 2;
+  string event_id = 3;
+}
+
+message CancelStageEventResponse {
   StageEvent event = 1;
 }
 
@@ -1028,6 +1055,14 @@ message EventCreated {
 }
 
 message StageEventApproved {
+  string canvas_id = 1;
+  string stage_id = 2;
+  string event_id = 3;
+  string source_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message StageEventCancelled {
   string canvas_id = 1;
   string stage_id = 2;
   string event_id = 3;

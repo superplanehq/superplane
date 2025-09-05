@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
@@ -65,7 +66,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	require.NoError(t, err)
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
-	w := NewExecutionPoller(r.Encryptor)
+	w := NewExecutionPoller(r.Encryptor, r.Registry)
 
 	t.Run("failed resource -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
@@ -85,7 +86,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultFailed))
 
-		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
+		testconsumer := testconsumer.New(amqpURL, messages.ExecutionFinishedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
@@ -168,7 +169,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
-		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
+		testconsumer := testconsumer.New(amqpURL, messages.ExecutionFinishedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
@@ -206,7 +207,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
-		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
+		testconsumer := testconsumer.New(amqpURL, messages.ExecutionFinishedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
