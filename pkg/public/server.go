@@ -307,7 +307,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute := r.Methods(http.MethodGet, http.MethodPost).Subrouter()
 
 	// Health check
-	publicRoute.HandleFunc("/", s.HealthCheck).Methods("GET")
+	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 
 	//
 	// Webhook endpoints for integrations (they have their own authentication).

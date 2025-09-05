@@ -226,7 +226,7 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -395,7 +395,7 @@ const loginTemplate = `
 </head>
 <body>
     <div class="login-container">
-        <div class="logo">🛩️ Superplane</div>
+        <div class="logo">Superplane</div>
         <div class="subtitle">Welcome back! Please sign in to continue.</div>
         
         {{range .Providers}}
