@@ -33,7 +33,7 @@ Superplane creates a control layer above your existing DevOps tools, letting you
 Get your first workflow running in 10 minutes:
 
 ### Option 1: Cloud (Recommended)
-1. Sign up at [app.superplane.com](https://app.superplane.com/app)
+1. Sign up at [app.superplane.com](https://app.superplane.com)
 2. Create your first Canvas (workspace)
 3. Connect a tool (GitHub, Semaphore, etc.)
 4. Build a workflow using the visual editor

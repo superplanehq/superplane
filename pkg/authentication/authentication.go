@@ -395,7 +395,7 @@ const loginTemplate = `
 </head>
 <body>
     <div class="login-container">
-        <div class="logo">🛩️ Superplane</div>
+        <div class="logo">Superplane</div>
         <div class="subtitle">Welcome back! Please sign in to continue.</div>
         
         {{range .Providers}}

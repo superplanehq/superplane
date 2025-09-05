@@ -29,7 +29,7 @@ Each level builds on the previous one, so start with Level 1 even if you're expe
 
 ### Step 1: Create Your SuperPlane Account
 
-1. Go to [app.superplane.com](https://app.superplane.com/app)
+1. Go to [app.superplane.com](https://app.superplane.com)
 2. Click **"Sign in with GitHub"**
 3. Authorize SuperPlane to access your GitHub account
    - We need permission to read your email address for account creation
