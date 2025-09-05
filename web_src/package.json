@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build --base=/app",
+    "build": "tsc -b && vite build",
     "clean": "rm -rf ../pkg/web/assets/dist",
     "lint": "eslint .",
     "generate:api": "openapi-ts",

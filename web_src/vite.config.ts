@@ -28,7 +28,7 @@ export default defineConfig(({ command }: { command: string} ) => {
 
   return {
   plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
-  base: "/app",
+  base: "",
   server: {
     port: 5173,
     strictPort: true,

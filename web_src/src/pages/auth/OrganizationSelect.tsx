@@ -44,7 +44,7 @@ const OrganizationSelect: React.FC = () => {
 
   const handleOrganizationSelect = (org: Organization) => {
     // Redirect to the organization's app route
-    window.location.href = `/app/${org.id}`;
+    window.location.href = `/${org.id}`;
   };
 
   if (loading) {

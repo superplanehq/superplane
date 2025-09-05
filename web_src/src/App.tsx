@@ -24,9 +24,6 @@ const queryClient = new QueryClient({
   },
 })
 
-// Get the base URL from environment or default to '/app' for production
-const BASE_PATH = import.meta.env.BASE_URL || '/app'
-
 // Helper function to wrap components with Navigation and Auth Guard
 const withAuthAndNavigation = (Component: React.ComponentType) => (
   <AuthGuard>
@@ -46,14 +43,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
-        <BrowserRouter basename={BASE_PATH}>
+        <BrowserRouter>
           <Routes>
- 
+
             {/* Organization-scoped protected routes */}
             <Route path=":organizationId" element={withAuthAndNavigation(HomePage)} />
             <Route path=":organizationId/canvas/:canvasId" element={withAuthOnly(Canvas)} />
             <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
-            
+
             {/* Organization selection and creation */}
             <Route path="create" element={<OrganizationCreate />} />
             <Route path="" element={<OrganizationSelect />} />
