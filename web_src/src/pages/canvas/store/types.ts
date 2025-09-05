@@ -35,6 +35,7 @@ export interface CanvasState {
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
+  cancelStageEvent: (stageEventId: string, stageId: string) => void;
   selectStageId: (stageId: string) => void;
   cleanSelectedStageId: () => void;
   selectEventSourceId: (eventSourceId: string) => void;

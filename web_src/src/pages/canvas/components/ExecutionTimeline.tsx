@@ -7,6 +7,7 @@ import {
   formatDuration,
   getMinApprovedAt,
   getApprovalsNames,
+  getCancelledByName,
   mapExecutionOutputs,
   mapExecutionEventInputs,
   createUserDisplayNames
@@ -17,6 +18,7 @@ interface ExecutionTimelineProps {
   organizationId: string;
   connectionEventsById: Record<string, SuperplaneEvent>;
   eventsByExecutionId: Record<string, SuperplaneEvent>;
+  onCancel: (eventId: string) => void;
 }
 
 export const ExecutionTimeline = ({
@@ -24,6 +26,7 @@ export const ExecutionTimeline = ({
   organizationId,
   connectionEventsById,
   eventsByExecutionId,
+  onCancel
 }: ExecutionTimelineProps) => {
   // Fetch organization users to resolve user IDs to names
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
@@ -61,9 +64,12 @@ export const ExecutionTimeline = ({
               approvedOn={getMinApprovedAt(execution)}
               approvedBy={getApprovalsNames(execution, userDisplayNames)}
               queuedOn={execution.event.createdAt}
+              cancelledOn={execution.event.cancelledAt}
+              cancelledBy={getCancelledByName(execution, userDisplayNames)}
               eventId={sourceEvent?.id}
               sourceEvent={sourceEvent}
               emmitedEvent={emmitedEvent}
+              onCancel={() => onCancel(execution.event.id!)}
             />
           );
         })

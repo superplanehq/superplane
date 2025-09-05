@@ -102,6 +102,7 @@ docs/SuperplaneBulkListEventsBody.md
 docs/SuperplaneBulkListEventsResponse.md
 docs/SuperplaneBulkListStageEventsBody.md
 docs/SuperplaneBulkListStageEventsResponse.md
+docs/SuperplaneCancelStageEventResponse.md
 docs/SuperplaneCanvas.md
 docs/SuperplaneCanvasMetadata.md
 docs/SuperplaneCondition.md
@@ -267,6 +268,7 @@ model_superplane_bulk_list_events_body.go
 model_superplane_bulk_list_events_response.go
 model_superplane_bulk_list_stage_events_body.go
 model_superplane_bulk_list_stage_events_response.go
+model_superplane_cancel_stage_event_response.go
 model_superplane_canvas.go
 model_superplane_canvas_metadata.go
 model_superplane_condition.go

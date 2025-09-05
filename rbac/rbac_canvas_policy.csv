@@ -30,6 +30,7 @@ p,role:canvas_admin,canvas:{CANVAS_ID},stage,create
 p,role:canvas_admin,canvas:{CANVAS_ID},stage,update
 p,role:canvas_admin,canvas:{CANVAS_ID},stage,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},stageevent,approve
+p,role:canvas_admin,canvas:{CANVAS_ID},stageevent,cancel
 p,role:canvas_admin,canvas:{CANVAS_ID},secret,create
 p,role:canvas_admin,canvas:{CANVAS_ID},secret,update
 p,role:canvas_admin,canvas:{CANVAS_ID},secret,delete

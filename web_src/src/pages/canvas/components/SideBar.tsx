@@ -27,9 +27,10 @@ interface SidebarProps {
   selectedStage: StageWithEventQueue;
   onClose: () => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
+  cancelStageEvent: (stageEventId: string, stageId: string) => void;
 }
 
-export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarProps) => {
+export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStageEvent }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState('activity');
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
@@ -197,6 +198,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
             organizationId={organizationId!}
             connectionEventsById={connectionEventsById}
             eventsByExecutionId={eventsByExecutionId}
+            cancelStageEvent={cancelStageEvent}
           />
         );
 
@@ -209,6 +211,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
           connectionEventsById={connectionEventsById}
           isFetchingNextConnectedEvents={isFetchingNextConnectedEvents}
           fetchNextConnectedEvents={fetchNextConnectedEvents}
+          cancelStageEvent={cancelStageEvent}
         />;
 
       case 'settings':

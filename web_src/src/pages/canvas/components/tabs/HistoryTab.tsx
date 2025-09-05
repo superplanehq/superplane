@@ -9,6 +9,7 @@ import {
   formatDuration,
   getMinApprovedAt,
   getApprovalsNames,
+  getCancelledByName,
   mapExecutionOutputs,
   mapExecutionEventInputs,
   createUserDisplayNames
@@ -19,12 +20,13 @@ interface HistoryTabProps {
   organizationId: string;
   canvasId: string;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
+  cancelStageEvent: (stageEventId: string, stageId: string) => void;
   connectionEventsById?: Record<string, SuperplaneEvent>;
   isFetchingNextConnectedEvents: boolean;
   fetchNextConnectedEvents: () => void;
 }
 
-export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, connectionEventsById, isFetchingNextConnectedEvents, fetchNextConnectedEvents }: HistoryTabProps) => {
+export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, cancelStageEvent, connectionEventsById, isFetchingNextConnectedEvents, fetchNextConnectedEvents }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
     type: 'execution' | 'stage_event' | 'discarded_event';
@@ -75,10 +77,16 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     return emittedEventsById;
   }, [stagePlainEventsData?.pages]);
 
-  const allExecutions = useMemo(() => (finishedEventsData?.pages.flatMap(page => page.events) || [])
+  const allFinishedExecutions = useMemo(() => (finishedEventsData?.pages.flatMap(page => page.events) || [])
     .filter(event => event.execution)
     .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
     .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [finishedEventsData]);
+
+  const allPendingOrRunningExecutions = useMemo(() => (queueEventsData?.pages.flatMap(page => page.events) || [])
+    .filter(event => event.execution && (event.execution.state === 'STATE_STARTED' || event.execution.state === 'STATE_PENDING'))
+    .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
+    .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [queueEventsData]);
+
 
   // Refetch queries when selectedStage.events or .queue changes
   // That means there was a new event or a new queue event since
@@ -92,7 +100,7 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
   const createTimeline = (): TimelineItem[] => {
     const items: TimelineItem[] = [];
 
-    allExecutions.forEach(execution => {
+    (allFinishedExecutions.concat(allPendingOrRunningExecutions)).forEach(execution => {
       if (execution?.createdAt) {
         items.push({
           type: 'execution',
@@ -102,12 +110,11 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
       }
     });
 
-    // Get all stage events from paginated data
     const allStageEvents = (finishedEventsData?.pages.flatMap(page => page.events) || []).concat(
-      queueEventsData?.pages.flatMap(page => page.events) || []
+      queueEventsData?.pages.flatMap(page => page.events)?.filter(event => !event.execution) || []
     );
 
-    const executionEventIds = new Set(allExecutions.map(exec => exec.event?.id).filter(Boolean));
+    const executionEventIds = new Set(allFinishedExecutions.map(exec => exec.event?.id).filter(Boolean));
     const orphanedStageEvents = allStageEvents.filter(event => !executionEventIds.has(event.id));
 
     orphanedStageEvents.forEach(event => {
@@ -290,9 +297,12 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     approvedOn={getMinApprovedAt(execution)}
                     approvedBy={getApprovalsNames(execution, userDisplayNames)}
                     queuedOn={execution.event.createdAt}
+                    cancelledOn={execution.event.cancelledAt}
+                    cancelledBy={getCancelledByName(execution, userDisplayNames)}
                     eventId={sourceEvent?.id}
                     sourceEvent={sourceEvent}
                     emmitedEvent={emmitedEvent}
+                    onCancel={() => cancelStageEvent(execution.event.id!, selectedStage.metadata!.id!)}
                   />
                 );
               }
@@ -301,6 +311,8 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                 const sourceEvent = connectionEventsById?.[stageEvent.eventId || ''];
                 const plainEventPayload = connectionEventsById?.[stageEvent.eventId || '']?.raw;
                 const plainEventHeaders = connectionEventsById?.[stageEvent.eventId || '']?.headers;
+                const approvalAndCancelledData = { event: stageEvent } as ExecutionWithEvent;
+
                 return (
                   <MessageItem
                     key={stageEvent.id}
@@ -308,9 +320,14 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     selectedStage={selectedStage}
                     executionRunning={false}
                     onApprove={stageEvent.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
+                    onCancel={(eventId) => cancelStageEvent(eventId, selectedStage.metadata!.id!)}
                     plainEventPayload={plainEventPayload}
                     plainEventHeaders={plainEventHeaders}
                     sourceEvent={sourceEvent}
+                    approvedOn={getMinApprovedAt(approvalAndCancelledData)}
+                    approvedBy={getApprovalsNames(approvalAndCancelledData, userDisplayNames)}
+                    cancelledOn={stageEvent.cancelledAt}
+                    cancelledBy={getCancelledByName(approvalAndCancelledData, userDisplayNames)}
                   />
                 );
               }
