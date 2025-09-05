@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { twMerge } from 'tailwind-merge';
+import { PayloadModal } from './PayloadModal';
 
 interface PayloadDisplayProps {
   headers?: { [key: string]: unknown };
@@ -53,6 +54,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   };
 
   const [activeTab, setActiveTab] = useState<TabType>(getDefaultTab());
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // State configuration for details tab
   const getStateConfig = () => {
@@ -104,11 +106,6 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
     });
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).catch(err => {
-      console.error('Failed to copy: ', err);
-    });
-  };
 
   const renderTabButton = (tabKey: TabType, label: string) => {
     const isActive = activeTab === tabKey;
@@ -209,11 +206,11 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    copyToClipboard(JSON.stringify(displayPayload, null, 2));
+                    setIsModalOpen(true);
                   }}
                 >
-                  <MaterialSymbol name="content_copy" size="sm" className="mr-1" />
-                  Copy
+                  <MaterialSymbol name="fullscreen" size="sm" className="mr-1" />
+                  Expand
                 </a>
               </div>
             </div>
@@ -295,21 +292,30 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   }
 
   return (
-    <div className="mt-3" onClick={(e) => e.stopPropagation()}>
-      <div className={twMerge(`border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`, rounded ? 'rounded-lg' : '')}>
-        <div className="border-b border-gray-200 dark:border-zinc-700">
-          <div className="w-full border-b border-zinc-200 dark:border-zinc-700">
-            <nav className="flex gap-0">
-              {hasInputs && renderTabButton('inputs', 'Inputs')}
-              {hasOutputs && renderTabButton('outputs', 'Outputs')}
-              {showDetailsTab && renderTabButton('details', 'Details')}
-              {hasHeaders && renderTabButton('headers', 'Headers')}
-              {hasPayload && renderTabButton('payload', 'Payload')}
-            </nav>
+    <>
+      <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+        <div className={twMerge(`border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900`, rounded ? 'rounded-lg' : '')}>
+          <div className="border-b border-gray-200 dark:border-zinc-700">
+            <div className="w-full border-b border-zinc-200 dark:border-zinc-700">
+              <nav className="flex gap-0">
+                {hasInputs && renderTabButton('inputs', 'Inputs')}
+                {hasOutputs && renderTabButton('outputs', 'Outputs')}
+                {showDetailsTab && renderTabButton('details', 'Details')}
+                {hasHeaders && renderTabButton('headers', 'Headers')}
+                {hasPayload && renderTabButton('payload', 'Payload')}
+              </nav>
+            </div>
           </div>
+          <div className="px-4 py-3">{renderTabContent()}</div>
         </div>
-        <div className="px-4 py-3">{renderTabContent()}</div>
       </div>
-    </div>
+      
+      <PayloadModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Event Payload"
+        content={displayPayload}
+      />
+    </>
   );
 };
