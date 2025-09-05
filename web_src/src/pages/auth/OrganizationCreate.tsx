@@ -31,7 +31,7 @@ const OrganizationCreate: React.FC = () => {
       if (response.ok) {
         const org = await response.json();
         // Redirect to the new organization
-        window.location.href = `/app/${org.id}`;
+        window.location.href = `/${org.id}`;
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Failed to create organization');
