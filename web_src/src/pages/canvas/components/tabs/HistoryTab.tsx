@@ -232,7 +232,7 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     fetchNextFinishedPage
   ]);
 
-  const hasMoreItems = timeline.length > timelineLimit || hasNextQueuePage || hasNextStagePage;
+  const hasMoreItems = (filteredTimeline.length >= timelineLimit) && ((timeline.length > timelineLimit) || hasNextQueuePage || hasNextStagePage);
   const isLoadingMore = isFetchingNextQueuePage || isFetchingNextStagePage || isFetchingNextConnectedEvents;
 
   return (
