@@ -108,9 +108,6 @@ func (w *HardDeletionWorker) hardDeleteStage(logger *log.Entry, stage *models.St
 		if err := stage.DeleteConnectionsInTransaction(tx); err != nil {
 			return err
 		}
-		if err := stage.DeleteConnectionsInTransaction(tx); err != nil {
-			return err
-		}
 
 		if stage.ResourceID != nil {
 			if err := w.CleanupService.CleanupStageWebhooks(stage); err != nil {
@@ -157,13 +154,18 @@ func (w *HardDeletionWorker) processEventSources() error {
 }
 
 // hardDeleteEventSource handles hard deletion of soft-deleted event sources:
-// 1. Delete stage events and their associated events that originated from this event source
-// 2. Delete connections where this event source is the source
-// 3. Delete events directly created by this event source
-// 4. Clean up integration webhooks if event source has a resource
-// 5. Finally, hard delete the event source itself
+// 1. Delete stage executions that reference stage events from this event source FIRST
+// 2. Delete stage events and their associated events that originated from this event source
+// 3. Delete connections where this event source is the source
+// 4. Delete events directly created by this event source
+// 5. Clean up integration webhooks if event source has a resource
+// 6. Finally, hard delete the event source itself
 func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSource *models.EventSource) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.DeleteStageExecutionsBySourceInTransaction(tx, eventSource.ID, models.SourceTypeEventSource); err != nil {
+			return err
+		}
+
 		if err := eventSource.DeleteStageEventsInTransaction(tx); err != nil {
 			return err
 		}

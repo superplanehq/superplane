@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -196,6 +197,145 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 			"REF":      "refs/heads/test",
 			"REF_TYPE": "branch",
 		})
+	})
+
+	t.Run("executions for soft-deleted stages are filtered out", func(t *testing.T) {
+		//
+		// Create two stages, one that will fail and one that should succeed.
+		//
+		executorType, executorSpec, resource := support.Executor(t, r)
+
+		// First stage - will fail due to invalid stage ID
+		invalidStage, err := builders.NewStageBuilder(r.Registry).
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas.ID).
+			WithName("failing-stage-test1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
+		require.NoError(t, err)
+
+		// Second stage - should succeed
+		validStage, err := builders.NewStageBuilder(r.Registry).
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas.ID).
+			WithName("valid-stage-test1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
+		require.NoError(t, err)
+
+		validExecution := support.CreateExecution(t, r.Source, validStage)
+
+		// Soft delete the stage after creating the execution to simulate production issue
+		err = database.Conn().Delete(&invalidStage).Error
+		require.NoError(t, err)
+
+		//
+		// Trigger the worker - with the original bug, it would try to process the execution for the soft-deleted stage.
+		// With the fix, it should skip executions for soft-deleted stages.
+		//
+		err = w.Tick()
+		assert.NoError(t, err) // Should not error with the fix - soft-deleted stage executions are filtered out
+
+		//
+		// Verify that the valid execution was processed (moved to started state).
+		// The execution for the soft-deleted stage should be filtered out by ListExecutionsInState.
+		//
+		validExecution, err = validStage.FindExecutionByID(validExecution.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.ExecutionStarted, validExecution.State, "Valid execution should be processed because executions for soft-deleted stages are filtered out")
+	})
+
+	t.Run("executions for soft-deleted stages are filtered out and other executions continue", func(t *testing.T) {
+		executorType, executorSpec, resource := support.Executor(t, r)
+
+		softDeletedStage, err := builders.NewStageBuilder(r.Registry).
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas.ID).
+			WithName("soft-deleted-stage-test2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
+		require.NoError(t, err)
+		require.NoError(t, softDeletedStage.Delete())
+
+		validStage, err := builders.NewStageBuilder(r.Registry).
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas.ID).
+			WithName("valid-stage-test2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
+		require.NoError(t, err)
+
+		//
+		// Create pending executions for both stages.
+		//
+		support.CreateExecution(t, r.Source, softDeletedStage)
+		validExecution := support.CreateExecution(t, r.Source, validStage)
+
+		require.NoError(t, err)
+
+		testconsumer := testconsumer.New(amqpURL, ExecutionStartedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
+		//
+		// Trigger the worker - it should skip the execution for the soft-deleted stage and process the valid one.
+		//
+		err = w.Tick()
+		assert.NoError(t, err)
+
+		//
+		// Verify that the valid execution was processed successfully (moved to started state).
+		//
+		validExecution, err = validStage.FindExecutionByID(validExecution.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.ExecutionStarted, validExecution.State, "Valid execution should be processed even when another execution fails")
+		assert.NotEmpty(t, validExecution.StartedAt)
+
+		resources, err := validExecution.Resources()
+		require.NoError(t, err)
+		assert.Len(t, resources, 1)
+		assert.Equal(t, models.ExecutionResourcePending, resources[0].State)
+		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 }
 
