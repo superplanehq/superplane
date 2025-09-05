@@ -40,7 +40,7 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 
 	response := execRequest(server, requestParams{
 		method: "GET",
-		path:   "/",
+		path:   "/health",
 	})
 
 	require.Equal(t, 200, response.Code)

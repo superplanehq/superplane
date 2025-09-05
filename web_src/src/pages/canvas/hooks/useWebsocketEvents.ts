@@ -137,6 +137,10 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
         approvedEventPayload = payload as EventMap['stage_event_approved'];
         stageUpdateQueue.enqueue(approvedEventPayload.stage_id, () => syncStageEvents(canvasId, approvedEventPayload.stage_id));
         break;
+      case 'stage_event_cancelled':
+        approvedEventPayload = payload as EventMap['stage_event_cancelled'];
+        stageUpdateQueue.enqueue(approvedEventPayload.stage_id, () => syncStageEvents(canvasId, approvedEventPayload.stage_id));
+        break;
       case 'execution_finished':
         executionFinishedPayload = payload as EventMap['execution_finished'];
         stageUpdateQueue.enqueue(executionFinishedPayload.stage_id, () => pollStageUntilNoPending(canvasId, executionFinishedPayload.stage_id), 'high');

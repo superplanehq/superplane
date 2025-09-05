@@ -9,6 +9,7 @@ interface ActivityTabProps {
   waitingEvents: SuperplaneStageEvent[];
   partialExecutions: ExecutionWithEvent[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
+  cancelStageEvent: (stageEventId: string, stageId: string) => void;
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
   organizationId: string;
@@ -22,6 +23,7 @@ export const ActivityTab = ({
   waitingEvents,
   partialExecutions,
   approveStageEvent,
+  cancelStageEvent,
   executionRunning,
   onChangeTab,
   organizationId,
@@ -47,6 +49,7 @@ export const ActivityTab = ({
           organizationId={organizationId}
           connectionEventsById={connectionEventsById}
           eventsByExecutionId={eventsByExecutionId}
+          onCancel={(eventId) => cancelStageEvent(eventId, selectedStage.metadata!.id!)}
         />
       </div>
 
@@ -79,6 +82,7 @@ export const ActivityTab = ({
                     event={event}
                     selectedStage={selectedStage}
                     onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
+                    onCancel={(eventId) => cancelStageEvent(eventId, selectedStage.metadata!.id!)}
                     executionRunning={executionRunning}
                     sourceEvent={sourceEvent}
                     plainEventPayload={plainEventPayload}

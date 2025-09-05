@@ -8,8 +8,8 @@ export const useOrganizationId = (): string | null => {
 const getOrganizationIdFromUrl = (): string | null => {
   const pathSegments = window.location.pathname.split('/');
   
-  // Check if we're in the /app/:organizationId route pattern
-  if (pathSegments[1] === 'app' && pathSegments[2]) {
+  // Check if we're in the /:organizationId route pattern
+  if (pathSegments[1] === '' && pathSegments[2]) {
     return pathSegments[2];
   }
   
