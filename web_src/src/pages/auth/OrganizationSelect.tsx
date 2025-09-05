@@ -60,7 +60,6 @@ const OrganizationSelect: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-zinc-800">
-      <div className="text-4xl pt-8 pb-0 text-left pl-8">🛩️</div>
       <div className="p-8 pt-6">
         <div className="max-w-7xl w-full">
           <div className="mb-4">
