@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.25
 ARG UBUNTU_VERSION=22.04
 ARG BUILDER_IMAGE="golang:${GO_VERSION}"
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
@@ -69,7 +69,7 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
 RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
-RUN go install github.com/air-verse/air@latest
+RUN go install github.com/air-verse/air@v1.62.0
 RUN go install github.com/mgechev/revive@v1.8.0
 RUN go install gotest.tools/gotestsum@v1.12.1
 
