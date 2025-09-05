@@ -152,6 +152,91 @@ func Test__HardDeletionWorker(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("hard delete event source with stage executions referencing stage events", func(t *testing.T) {
+		eventSource := models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       "test-event-source-with-executions",
+			Key:        []byte(`test-key`),
+			Scope:      models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+		}
+		err := eventSource.Create()
+		require.NoError(t, err)
+
+		stage := models.Stage{
+			CanvasID:      r.Canvas.ID,
+			Name:          "test-stage-for-event-source",
+			Description:   "Test Stage for Event Source",
+			ExecutorType:  models.ExecutorTypeHTTP,
+			ExecutorName:  "test-executor",
+			ExecutorSpec:  datatypes.JSON(`{}`),
+			Conditions:    datatypes.NewJSONSlice([]models.StageCondition{}),
+			Inputs:        datatypes.NewJSONSlice([]models.InputDefinition{}),
+			InputMappings: datatypes.NewJSONSlice([]models.InputMapping{}),
+			Outputs:       datatypes.NewJSONSlice([]models.OutputDefinition{}),
+			Secrets:       datatypes.NewJSONSlice([]models.ValueDefinition{}),
+		}
+		err = database.Conn().Create(&stage).Error
+		require.NoError(t, err)
+
+		event, err := models.CreateEvent(eventSource.ID, eventSource.CanvasID, eventSource.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
+		require.NoError(t, err)
+
+		stageEvent, err := models.CreateStageEventInTransaction(
+			database.Conn(),
+			stage.ID,
+			event,
+			models.StageEventStatePending,
+			"",
+			map[string]any{"test": "value"},
+			"test-executor",
+		)
+		require.NoError(t, err)
+
+		stageExecution, err := models.CreateStageExecution(r.Canvas.ID, stage.ID, stageEvent.ID)
+		require.NoError(t, err)
+
+		connection := models.Connection{
+			CanvasID:   r.Canvas.ID,
+			SourceID:   eventSource.ID,
+			SourceName: eventSource.Name,
+			SourceType: models.SourceTypeEventSource,
+			TargetID:   stage.ID,
+			TargetType: models.ConnectionTargetTypeStage,
+		}
+		err = database.Conn().Create(&connection).Error
+		require.NoError(t, err)
+
+		err = eventSource.Delete()
+		require.NoError(t, err)
+
+		err = worker.processEventSources()
+		require.NoError(t, err)
+
+		var foundEventSource models.EventSource
+		err = database.Conn().Unscoped().Where("id = ?", eventSource.ID).First(&foundEventSource).Error
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "record not found")
+		}
+
+		var foundStageEvent models.StageEvent
+		err = database.Conn().Unscoped().Where("id = ?", stageEvent.ID).First(&foundStageEvent).Error
+		assert.Error(t, err)
+
+		var foundExecution models.StageExecution
+		err = database.Conn().Unscoped().Where("id = ?", stageExecution.ID).First(&foundExecution).Error
+		assert.Error(t, err)
+
+		var foundEvent models.Event
+		err = database.Conn().Unscoped().Where("id = ?", event.ID).First(&foundEvent).Error
+		assert.Error(t, err)
+
+		var foundConnection models.Connection
+		err = database.Conn().Unscoped().Where("id = ?", connection.ID).First(&foundConnection).Error
+		assert.Error(t, err)
+	})
+
 	t.Run("hard delete connection group with field sets", func(t *testing.T) {
 
 		spec := models.ConnectionGroupSpec{
