@@ -41,7 +41,7 @@ func Test__ListEvents(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Events, 2)
-		assert.Equal(t, int64(0), res.TotalCount)
+		assert.Equal(t, int64(2), res.TotalCount)
 		assert.False(t, res.HasNextPage)
 		assert.Nil(t, res.NextTimestamp)
 
