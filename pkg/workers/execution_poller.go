@@ -71,7 +71,9 @@ func (w *ExecutionPoller) Tick() error {
 		}
 
 		err := w.ProcessExecution(logger, &e)
-		logger.Errorf("Error processing execution: %v", err)
+		if err != nil {
+			logger.Errorf("Error processing execution: %v", err)
+		}
 	}
 
 	return nil
