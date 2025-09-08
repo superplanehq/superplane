@@ -71,7 +71,7 @@ RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway
 RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
 RUN go install github.com/air-verse/air@latest
 RUN go install github.com/mgechev/revive@v1.8.0
-RUN go install gotest.tools/gotestsum@v1.12.1
+RUN go install gotest.tools/gotestsum@v1.12.3
 
 CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
 
