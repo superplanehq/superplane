@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from './types';
-import { SuperplaneCanvas, SuperplaneStageEventState } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneStageEventState, SuperplaneStageEventStateReason } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneCancelStageEvent } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
@@ -10,6 +10,14 @@ import { AllNodeType, EdgeType } from '../types/flow';
 import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
 
 const SYNC_EVENTS_LIMIT = 5;
+const SYNC_STAGE_EVENTS_LIMIT = 20;
+const SYNC_STAGE_EVENTS_ACTIVITY_LIMIT = 5;
+
+type SyncStageEventRequest = {
+  states: SuperplaneStageEventState[]
+  stateReasons?: SuperplaneStageEventStateReason[]
+  limit: number
+}
 
 // Create the store
 export const useCanvasStore = create<CanvasState>((set, get) => ({
@@ -213,26 +221,40 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return;
     }
 
-    // Here it is required two make two requests
+    // Here it is required to make multiple requests
     // One to get the events that are in the queue
-    // And another to get the events that are in the processing
-    // Since we can have older events waiting and the queue and they must appear in the component
-    const processedEventsState: SuperplaneStageEventState[] = ['STATE_PROCESSED']
-    const pendingOrWaitingState: SuperplaneStageEventState[] = ['STATE_WAITING', 'STATE_PENDING']
+    // And other to get the events that are in the processing
+    // And another to get the events that are pending
+    // And another to get the events that are waiting for execution
+    // Since we can have older events waiting and the queue and they must appear in the node and in the sidebar (Activity tab)
+    const processedEventsState: SyncStageEventRequest = { states: ['STATE_PROCESSED'], limit: SYNC_EVENTS_LIMIT }
+    const waitingForConditionState: SyncStageEventRequest = { states: ['STATE_WAITING'], stateReasons: ['STATE_REASON_APPROVAL', 'STATE_REASON_TIME_WINDOW'], limit: SYNC_STAGE_EVENTS_LIMIT }
+    const waitingForExecutionState: SyncStageEventRequest = {
+      states: ['STATE_WAITING', 'STATE_PENDING'],
+      stateReasons: ['STATE_REASON_EXECUTION'],
+      limit: SYNC_STAGE_EVENTS_ACTIVITY_LIMIT
+    }
+    const pendingState: SyncStageEventRequest = {
+      states: ['STATE_PENDING'],
+      limit: SYNC_STAGE_EVENTS_LIMIT
+    }
     const requestingStates = [
       processedEventsState,
-      pendingOrWaitingState
+      waitingForConditionState,
+      waitingForExecutionState,
+      pendingState
     ]
 
-    const responsePromises = requestingStates.map(states => {
+    const responsePromises = requestingStates.map(request => {
       return superplaneListStageEvents(withOrganizationHeader({
         path: {
           canvasIdOrName: canvasId,
           stageIdOrName: stageId,
         },
         query: {
-          limit: SYNC_EVENTS_LIMIT,
-          states: states
+          limit: request.limit,
+          states: request.states,
+          stateReasons: request.stateReasons
         } 
       }));
     })
