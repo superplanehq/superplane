@@ -21,7 +21,7 @@ const (
 	MaxLimit     = 50
 )
 
-func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit int32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
+func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, pbExecutionStates []pb.Execution_State, pbExecutionResults []pb.Execution_Result, limit int32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
 	err := actions.ValidateUUIDs(stageIdOrName)
 	var stage *models.Stage
 	if err != nil {
@@ -48,6 +48,16 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	executionStates, err := validateExecutionStates(pbExecutionStates)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	executionResults, err := validateExecutionResults(pbExecutionResults)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	validatedLimit := validateLimit(int(limit))
 
 	var beforeTime *time.Time
@@ -62,11 +72,11 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 
 	done := make(chan struct{}, 2)
 	go func() {
-		events, listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, validatedLimit+1, beforeTime)
+		events, listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, executionStates, executionResults, validatedLimit+1, beforeTime)
 		done <- struct{}{}
 	}()
 	go func() {
-		totalCount, countErr = stage.CountEventsWithStatesAndReasons(states, stateReasons)
+		totalCount, countErr = stage.CountEventsWithStatesAndReasons(states, stateReasons, executionStates, executionResults)
 		done <- struct{}{}
 	}()
 	<-done
@@ -129,6 +139,42 @@ func validateStageEventStates(in []pb.StageEvent_State) ([]string, error) {
 	}
 
 	return states, nil
+}
+
+func validateExecutionStates(in []pb.Execution_State) ([]string, error) {
+	if len(in) == 0 {
+		return []string{}, nil
+	}
+
+	states := []string{}
+	for _, s := range in {
+		state, err := protoToExecutionState(s)
+		if err != nil {
+			return nil, err
+		}
+
+		states = append(states, state)
+	}
+
+	return states, nil
+}
+
+func validateExecutionResults(in []pb.Execution_Result) ([]string, error) {
+	if len(in) == 0 {
+		return []string{}, nil
+	}
+
+	results := []string{}
+	for _, r := range in {
+		result, err := actions.ProtoToExecutionResult(r)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, result)
+	}
+
+	return results, nil
 }
 
 func validateLimit(limit int) int {
@@ -321,6 +367,21 @@ func executionStateToProto(state string) pb.Execution_State {
 		return pb.Execution_STATE_CANCELLED
 	default:
 		return pb.Execution_STATE_UNKNOWN
+	}
+}
+
+func protoToExecutionState(state pb.Execution_State) (string, error) {
+	switch state {
+	case pb.Execution_STATE_PENDING:
+		return models.ExecutionPending, nil
+	case pb.Execution_STATE_STARTED:
+		return models.ExecutionStarted, nil
+	case pb.Execution_STATE_FINISHED:
+		return models.ExecutionFinished, nil
+	case pb.Execution_STATE_CANCELLED:
+		return models.ExecutionCancelled, nil
+	default:
+		return "", fmt.Errorf("invalid state: %v", state)
 	}
 }
 

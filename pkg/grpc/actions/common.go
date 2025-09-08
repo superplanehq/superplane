@@ -39,6 +39,17 @@ func ExecutionResultToProto(result string) pb.Execution_Result {
 	}
 }
 
+func ProtoToExecutionResult(result pb.Execution_Result) (string, error) {
+	switch result {
+	case pb.Execution_RESULT_FAILED:
+		return models.ResultFailed, nil
+	case pb.Execution_RESULT_PASSED:
+		return models.ResultPassed, nil
+	default:
+		return "", fmt.Errorf("invalid result: %v", result)
+	}
+}
+
 func FindConnectionSourceID(canvasID string, connection *pb.Connection) (*uuid.UUID, error) {
 	switch connection.Type {
 	case pb.Connection_TYPE_STAGE:

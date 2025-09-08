@@ -410,15 +410,10 @@ func (s *Stage) ListEventsInTransaction(tx *gorm.DB, states, stateReasons []stri
 	return events, nil
 }
 
-func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons []string, limit int, before *time.Time) ([]StageEvent, error) {
+func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons, executionStates, executionResults []string, limit int, before *time.Time) ([]StageEvent, error) {
 	var events []StageEvent
-	query := database.Conn().
-		Where("stage_id = ?", s.ID).
-		Where("state IN ?", states)
-
-	if len(stateReasons) > 0 {
-		query = query.Where("state_reason IN ?", stateReasons)
-	}
+	query := database.Conn()
+	query = s.addStageEventFilters(query, states, stateReasons, executionStates, executionResults)
 
 	if before != nil {
 		query = query.Where("created_at < ?", before)
@@ -432,15 +427,11 @@ func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons []string, limi
 	return events, nil
 }
 
-func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons []string) (int64, error) {
+func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons, executionStates, executionResults []string) (int64, error) {
 	var count int64
-	query := database.Conn().Model(&StageEvent{}).
-		Where("stage_id = ?", s.ID).
-		Where("state IN ?", states)
 
-	if len(stateReasons) > 0 {
-		query = query.Where("state_reason IN ?", stateReasons)
-	}
+	query := database.Conn().Model(&StageEvent{})
+	query = s.addStageEventFilters(query, states, stateReasons, executionStates, executionResults)
 
 	err := query.Count(&count).Error
 	if err != nil {
@@ -448,6 +439,34 @@ func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons []string) (
 	}
 
 	return count, nil
+}
+
+func (s *Stage) addStageEventFilters(db *gorm.DB, states, stateReasons, executionStates, executionResults []string) *gorm.DB {
+	query := db.
+		Table("stage_events as se").
+		Where("se.stage_id = ?", s.ID).
+		Where("se.state IN ?", states)
+
+	if len(stateReasons) > 0 {
+		query.Where("se.state_reason IN ?", stateReasons)
+	}
+
+	if len(executionStates) > 0 || len(executionResults) > 0 {
+		query = query.
+			Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = se.id")
+	}
+
+	if len(executionStates) > 0 {
+		query = query.
+			Where("ex.state IN ?", executionStates)
+	}
+
+	if len(executionResults) > 0 {
+		query = query.
+			Where("ex.result IN ?", executionResults)
+	}
+
+	return query
 }
 
 func BulkFindStagesByCanvasIDAndIdentifiers(canvasID uuid.UUID, identifiers []string) (map[string]*Stage, error) {
