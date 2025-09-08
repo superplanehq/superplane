@@ -786,6 +786,9 @@ message ListStageEventsRequest {
 
 message ListStageEventsResponse {
   repeated StageEvent events = 1;
+  int64 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp next_timestamp = 4;
 }
 
 message StageEvent {
@@ -939,6 +942,9 @@ message ListEventsRequest {
 
 message ListEventsResponse {
   repeated Event events = 1;
+  int64 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp next_timestamp = 4;
 }
 
 message Event {

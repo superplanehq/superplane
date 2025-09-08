@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -55,9 +56,39 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 		beforeTime = &t
 	}
 
-	events, err := stage.ListEventsWithLimitAndBefore(states, stateReasons, validatedLimit, beforeTime)
-	if err != nil {
-		return nil, err
+	var events []models.StageEvent
+	var totalCount int64
+	var listErr, countErr error
+
+	done := make(chan struct{}, 2)
+	go func() {
+		events, listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, validatedLimit+1, beforeTime)
+		done <- struct{}{}
+	}()
+	go func() {
+		totalCount, countErr = stage.CountEventsWithStatesAndReasons(states, stateReasons)
+		done <- struct{}{}
+	}()
+	<-done
+	<-done
+
+	if listErr != nil {
+		log.Errorf("Error listing stage events: %v", listErr)
+		return nil, listErr
+	}
+	if countErr != nil {
+		log.Errorf("Error counting stage events: %v", countErr)
+		return nil, countErr
+	}
+
+	hasNextPage := len(events) > validatedLimit
+	var nextTimestamp *timestamppb.Timestamp
+
+	if hasNextPage {
+		events = events[:validatedLimit]
+		if len(events) > 0 {
+			nextTimestamp = timestamppb.New(*events[len(events)-1].CreatedAt)
+		}
 	}
 
 	serialized, err := serializeStageEvents(events)
@@ -66,7 +97,10 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 	}
 
 	response := &pb.ListStageEventsResponse{
-		Events: serialized,
+		Events:        serialized,
+		TotalCount:    totalCount,
+		HasNextPage:   hasNextPage,
+		NextTimestamp: nextTimestamp,
 	}
 
 	return response, nil

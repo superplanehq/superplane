@@ -2,10 +2,10 @@ package events
 
 import (
 	"context"
-	"log"
 	"time"
 
 	uuid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -32,10 +32,40 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 		t := before.AsTime()
 		beforeTime = &t
 	}
-	log.Println("beforeTime", beforeTime)
-	events, err := models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit, beforeTime)
-	if err != nil {
-		return nil, err
+
+	var events []models.Event
+	var totalCount int64
+	var listErr, countErr error
+
+	done := make(chan struct{}, 2)
+	go func() {
+		events, listErr = models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit+1, beforeTime)
+		done <- struct{}{}
+	}()
+	go func() {
+		totalCount, countErr = models.CountEventsByCanvasID(canvasUUID, EventSourceTypeToString(sourceType), sourceID)
+		done <- struct{}{}
+	}()
+	<-done
+	<-done
+
+	if listErr != nil {
+		log.Errorf("Error listing events: %v", listErr)
+		return nil, status.Error(codes.Internal, "error listing events")
+	}
+	if countErr != nil {
+		log.Errorf("Error counting events: %v", countErr)
+		return nil, status.Error(codes.Internal, "error counting events")
+	}
+
+	hasNextPage := len(events) > validatedLimit
+	var nextTimestamp *timestamppb.Timestamp
+
+	if hasNextPage {
+		events = events[:validatedLimit]
+		if len(events) > 0 {
+			nextTimestamp = timestamppb.New(*events[len(events)-1].ReceivedAt)
+		}
 	}
 
 	serialized, err := serializeEvents(events)
@@ -44,7 +74,10 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 	}
 
 	response := &pb.ListEventsResponse{
-		Events: serialized,
+		Events:        serialized,
+		TotalCount:    totalCount,
+		HasNextPage:   hasNextPage,
+		NextTimestamp: nextTimestamp,
 	}
 
 	return response, nil

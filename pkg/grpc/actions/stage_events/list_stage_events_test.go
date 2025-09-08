@@ -40,6 +40,9 @@ func Test__ListStageEvents(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
+		assert.Equal(t, int64(0), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.NextTimestamp)
 	})
 
 	t.Run("stage with stage events - list", func(t *testing.T) {
@@ -74,6 +77,9 @@ func Test__ListStageEvents(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Events, 3)
+		assert.Equal(t, int64(0), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.NextTimestamp)
 
 		// event with execution
 		e := res.Events[0]
@@ -128,5 +134,26 @@ func Test__ListStageEvents(t *testing.T) {
 		require.Nil(t, e.Execution)
 		require.Len(t, e.Inputs, 0)
 		assert.Equal(t, "", e.Name)
+	})
+
+	t.Run("pagination fields", func(t *testing.T) {
+		for i := 0; i < 3; i++ {
+			support.CreateStageEvent(t, r.Source, r.Stage)
+		}
+
+		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), states, []protos.StageEvent_StateReason{}, 2, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		assert.Greater(t, res.TotalCount, int64(0))
+		assert.True(t, res.HasNextPage)
+		assert.NotNil(t, res.NextTimestamp)
+		require.Len(t, res.Events, 2)
+
+		res2, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), states, []protos.StageEvent_StateReason{}, 2, res.NextTimestamp)
+		require.NoError(t, err)
+		require.NotNil(t, res2)
+
+		assert.Greater(t, len(res2.Events), 0)
 	})
 }

@@ -688,10 +688,16 @@ export type SuperplaneListEventSourcesResponse = {
 
 export type SuperplaneListEventsResponse = {
     events?: Array<SuperplaneEvent>;
+    totalCount?: string;
+    hasNextPage?: boolean;
+    nextTimestamp?: string;
 };
 
 export type SuperplaneListStageEventsResponse = {
     events?: Array<SuperplaneStageEvent>;
+    totalCount?: string;
+    hasNextPage?: boolean;
+    nextTimestamp?: string;
 };
 
 export type SuperplaneListStagesResponse = {

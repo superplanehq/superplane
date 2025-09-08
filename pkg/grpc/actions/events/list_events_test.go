@@ -24,6 +24,9 @@ func Test__ListEvents(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
+		assert.Equal(t, int64(0), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.NextTimestamp)
 	})
 
 	t.Run("canvas with events - list all", func(t *testing.T) {
@@ -38,6 +41,9 @@ func Test__ListEvents(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Events, 2)
+		assert.Equal(t, int64(0), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.NextTimestamp)
 
 		e := res.Events[0]
 		assert.Equal(t, event2.ID.String(), e.Id)
@@ -133,6 +139,31 @@ func Test__ListEvents(t *testing.T) {
 		}
 
 		assert.NotContains(t, getEventIDs(res.Events), event2.ID.String())
+	})
+
+	t.Run("pagination fields", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
+
+		for i := 0; i < 3; i++ {
+			_, err := models.CreateEvent(r.Source.ID, r.Source.CanvasID, r.Source.Name, models.SourceTypeEventSource, "webhook", []byte(`{"test": "pagination"}`), []byte(`{}`))
+			require.NoError(t, err)
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		assert.Greater(t, res.TotalCount, int64(0))
+		assert.True(t, res.HasNextPage)
+		assert.NotNil(t, res.NextTimestamp)
+		require.Len(t, res.Events, 2)
+
+		res2, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, res.NextTimestamp)
+		require.NoError(t, err)
+		require.NotNil(t, res2)
+
+		assert.Greater(t, len(res2.Events), 0)
 	})
 }
 

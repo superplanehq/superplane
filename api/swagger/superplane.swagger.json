@@ -4226,6 +4226,17 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneEvent"
           }
+        },
+        "totalCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -4238,6 +4249,17 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneStageEvent"
           }
+        },
+        "totalCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "nextTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

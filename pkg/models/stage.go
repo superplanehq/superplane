@@ -432,6 +432,24 @@ func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons []string, limi
 	return events, nil
 }
 
+func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons []string) (int64, error) {
+	var count int64
+	query := database.Conn().Model(&StageEvent{}).
+		Where("stage_id = ?", s.ID).
+		Where("state IN ?", states)
+
+	if len(stateReasons) > 0 {
+		query = query.Where("state_reason IN ?", stateReasons)
+	}
+
+	err := query.Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func BulkFindStagesByCanvasIDAndIdentifiers(canvasID uuid.UUID, identifiers []string) (map[string]*Stage, error) {
 	if len(identifiers) == 0 {
 		return map[string]*Stage{}, nil
