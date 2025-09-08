@@ -47,12 +47,14 @@ func (w *PendingExecutionsWorker) Tick() error {
 	for _, execution := range executions {
 		stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
 		if err != nil {
-			return fmt.Errorf("error finding stage %s: %v", execution.StageID, err)
+			log.Errorf("Error finding stage %s: %v", execution.StageID, err)
+			continue
 		}
 
 		logger := logging.ForStage(stage)
 		if err := w.ProcessExecution(logger, stage, execution); err != nil {
-			return fmt.Errorf("error processing execution %s: %v", execution.ID, err)
+			log.Errorf("Error processing execution %s: %v", execution.ID, err)
+			continue
 		}
 	}
 

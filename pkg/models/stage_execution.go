@@ -425,3 +425,28 @@ func (e *StageExecution) AddResource(externalID string, externalType string, par
 
 	return r, nil
 }
+
+func DeleteStageExecutionsBySourceInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceType string) error {
+	if err := tx.Unscoped().
+		Where("execution_id IN (SELECT id FROM stage_executions WHERE stage_event_id IN (SELECT id FROM stage_events WHERE source_id = ? AND source_type = ?))", sourceID, sourceType).
+		Delete(&ExecutionResource{}).Error; err != nil {
+		return fmt.Errorf("failed to delete execution resources for source stage executions: %v", err)
+	}
+
+	if err := tx.Unscoped().
+		Where("stage_event_id IN (SELECT id FROM stage_events WHERE source_id = ? AND source_type = ?)", sourceID, sourceType).
+		Delete(&StageExecution{}).Error; err != nil {
+		return fmt.Errorf("failed to delete stage executions for source stage events: %v", err)
+	}
+
+	return nil
+}
+
+func DeleteExecutionResourcesByParentResourceInTransaction(tx *gorm.DB, parentResourceID uuid.UUID) error {
+	if err := tx.Unscoped().
+		Where("parent_resource_id = ?", parentResourceID).
+		Delete(&ExecutionResource{}).Error; err != nil {
+		return fmt.Errorf("failed to delete execution resources for parent resource: %v", err)
+	}
+	return nil
+}

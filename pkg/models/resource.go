@@ -169,6 +169,18 @@ func DeleteResourceWithChildren(resourceID uuid.UUID) error {
 			return err
 		}
 
+		for _, childResource := range childResources {
+			err = DeleteExecutionResourcesByParentResourceInTransaction(tx, childResource.ID)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = DeleteExecutionResourcesByParentResourceInTransaction(tx, resourceID)
+		if err != nil {
+			return err
+		}
+
 		// Delete internal event sources associated with child resources
 		for _, childResource := range childResources {
 			err = tx.Unscoped().Where("resource_id = ? AND scope = ?", childResource.ID, EventSourceScopeInternal).
