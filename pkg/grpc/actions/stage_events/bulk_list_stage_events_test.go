@@ -23,7 +23,7 @@ func Test__BulkListStageEvents(t *testing.T) {
 				StageIdOrName: r.Stage.ID.String(),
 			},
 		}
-		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, nil)
+		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, nil, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -42,7 +42,7 @@ func Test__BulkListStageEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, nil)
+		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, nil, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -74,7 +74,7 @@ func Test__BulkListStageEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 2, nil, nil, nil)
+		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 2, nil, nil, nil, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -90,7 +90,7 @@ func Test__BulkListStageEvents(t *testing.T) {
 			},
 		}
 
-		_, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, nil)
+		_, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, nil, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "stage not found")
 	})
@@ -103,7 +103,7 @@ func Test__BulkListStageEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, nil)
+		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, nil, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -131,7 +131,7 @@ func Test__BulkListStageEvents(t *testing.T) {
 
 		// Test with before filter - should only return events created before the timestamp
 		beforeTimestamp := timestamppb.New(beforeTime)
-		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, beforeTimestamp, nil, nil)
+		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, beforeTimestamp, nil, nil, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -162,7 +162,7 @@ func Test__BulkListStageEvents(t *testing.T) {
 
 		// Test filtering by pending state only
 		states := []protos.StageEvent_State{protos.StageEvent_STATE_PENDING}
-		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, states, nil)
+		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, states, nil, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -183,7 +183,7 @@ func Test__BulkListStageEvents(t *testing.T) {
 
 		// Test filtering by approval state reason
 		stateReasons := []protos.StageEvent_StateReason{protos.StageEvent_STATE_REASON_APPROVAL}
-		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, stateReasons)
+		res, err := BulkListStageEvents(ctx, r.Canvas.ID.String(), stages, 10, nil, nil, stateReasons, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
