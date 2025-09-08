@@ -20,7 +20,7 @@ func Test__ListEvents(t *testing.T) {
 
 	t.Run("canvas with no events -> empty list", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
@@ -37,7 +37,7 @@ func Test__ListEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Events, 2)
@@ -73,12 +73,12 @@ func Test__ListEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, "", 0, nil)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, "", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Len(t, res.Events, 3)
 
-		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_STAGE, "", 0, nil)
+		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_STAGE, "", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
@@ -86,12 +86,12 @@ func Test__ListEvents(t *testing.T) {
 
 	t.Run("filter by source ID", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, r.Source.ID.String(), 0, nil)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, r.Source.ID.String(), 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Len(t, res.Events, 3)
 
-		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, uuid.NewString(), 0, nil)
+		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, uuid.NewString(), 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
@@ -100,17 +100,17 @@ func Test__ListEvents(t *testing.T) {
 	t.Run("limit parameter", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
 
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, nil)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Len(t, res.Events, 2)
 
-		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil)
+		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Len(t, res.Events, 3)
 
-		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 100, nil)
+		res, err = ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 100, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Len(t, res.Events, 3)
@@ -128,7 +128,7 @@ func Test__ListEvents(t *testing.T) {
 		require.NoError(t, err)
 
 		beforeTime := timestamppb.New(*event1.ReceivedAt)
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, beforeTime)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 0, beforeTime, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 
@@ -150,7 +150,7 @@ func Test__ListEvents(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 		}
 
-		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, nil)
+		res, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 
@@ -159,7 +159,7 @@ func Test__ListEvents(t *testing.T) {
 		assert.NotNil(t, res.NextTimestamp)
 		require.Len(t, res.Events, 2)
 
-		res2, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, res.NextTimestamp)
+		res2, err := ListEvents(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, "", 2, res.NextTimestamp, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res2)
 

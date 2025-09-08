@@ -183,7 +183,7 @@ func (s *CanvasService) DeleteConnectionGroup(ctx context.Context, req *pb.Delet
 
 func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsRequest) (*pb.ListEventsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return events.ListEvents(ctx, canvasID, req.SourceType, req.SourceId, req.Limit, req.Before)
+	return events.ListEvents(ctx, canvasID, req.SourceType, req.SourceId, req.Limit, req.Before, req.States)
 }
 
 func (s *CanvasService) BulkListEvents(ctx context.Context, req *pb.BulkListEventsRequest) (*pb.BulkListEventsResponse, error) {

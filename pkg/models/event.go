@@ -301,10 +301,14 @@ func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr str
 	return events, nil
 }
 
-func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int, before *time.Time) ([]Event, error) {
+func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int, before *time.Time, states []string) ([]Event, error) {
 	var events []Event
 
 	query := database.Conn().Where("canvas_id = ?", canvasID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
 
 	if sourceType != "" {
 		query = query.Where("source_type = ?", sourceType)
@@ -332,10 +336,14 @@ func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType strin
 	return events, nil
 }
 
-func CountEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr string) (int64, error) {
+func CountEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr string, states []string) (int64, error) {
 	var count int64
 
 	query := database.Conn().Model(&Event{}).Where("canvas_id = ?", canvasID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
 
 	if sourceType != "" {
 		query = query.Where("source_type = ?", sourceType)

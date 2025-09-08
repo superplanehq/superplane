@@ -19,13 +19,14 @@ const (
 	MaxLimit     = 50
 )
 
-func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string, limit int32, before *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
+func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string, limit int32, before *timestamppb.Timestamp, states []pb.Event_State) (*pb.ListEventsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
 	}
 
 	validatedLimit := validateLimit(int(limit))
+	validatedStates := validateStates(states)
 
 	var beforeTime *time.Time
 	if before != nil && before.IsValid() {
@@ -39,11 +40,11 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 
 	done := make(chan struct{}, 2)
 	go func() {
-		events, listErr = models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit+1, beforeTime)
+		events, listErr = models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit+1, beforeTime, validatedStates)
 		done <- struct{}{}
 	}()
 	go func() {
-		totalCount, countErr = models.CountEventsByCanvasID(canvasUUID, EventSourceTypeToString(sourceType), sourceID)
+		totalCount, countErr = models.CountEventsByCanvasID(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedStates)
 		done <- struct{}{}
 	}()
 	<-done
@@ -88,6 +89,18 @@ func validateLimit(limit int) int {
 		return DefaultLimit
 	}
 	return limit
+}
+
+func validateStates(states []pb.Event_State) []string {
+	if len(states) == 0 {
+		return []string{}
+	}
+
+	validatedStates := make([]string, len(states))
+	for i, state := range states {
+		validatedStates[i] = EventStateProtoToString(state)
+	}
+	return validatedStates
 }
 
 func EventSourceTypeToString(sourceType pb.EventSourceType) string {
