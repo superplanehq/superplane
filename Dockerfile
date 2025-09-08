@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.25
 ARG UBUNTU_VERSION=22.04
 ARG BUILDER_IMAGE="golang:${GO_VERSION}"
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
@@ -71,7 +71,7 @@ RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway
 RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
 RUN go install github.com/air-verse/air@latest
 RUN go install github.com/mgechev/revive@v1.8.0
-RUN go install gotest.tools/gotestsum@v1.12.1
+RUN go install gotest.tools/gotestsum@v1.12.3
 
 CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
 
