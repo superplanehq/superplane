@@ -1,6 +1,6 @@
 module github.com/superplanehq/superplane
 
-go 1.24
+go 1.25
 
 require (
 	github.com/casbin/casbin/v2 v2.106.0
