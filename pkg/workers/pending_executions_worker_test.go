@@ -200,12 +200,8 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 	})
 
 	t.Run("executions for soft-deleted stages are filtered out", func(t *testing.T) {
-		//
-		// Create two stages, one that will fail and one that should succeed.
-		//
 		executorType, executorSpec, resource := support.Executor(t, r)
 
-		// First stage - will fail due to invalid stage ID
 		invalidStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas.ID).
@@ -224,7 +220,6 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 			Create()
 		require.NoError(t, err)
 
-		// Second stage - should succeed
 		validStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas.ID).
@@ -245,16 +240,11 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 
 		validExecution := support.CreateExecution(t, r.Source, validStage)
 
-		// Soft delete the stage after creating the execution to simulate production issue
 		err = database.Conn().Delete(&invalidStage).Error
 		require.NoError(t, err)
 
-		//
-		// Trigger the worker - with the original bug, it would try to process the execution for the soft-deleted stage.
-		// With the fix, it should skip executions for soft-deleted stages.
-		//
 		err = w.Tick()
-		assert.NoError(t, err) // Should not error with the fix - soft-deleted stage executions are filtered out
+		assert.NoError(t, err)
 
 		//
 		// Verify that the valid execution was processed (moved to started state).
