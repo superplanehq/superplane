@@ -173,6 +173,8 @@ func protoToStateReason(stateReason pb.StageEvent_StateReason) (string, error) {
 		return models.StageEventStateReasonStuck, nil
 	case pb.StageEvent_STATE_REASON_TIMEOUT:
 		return models.StageEventStateReasonTimeout, nil
+	case pb.StageEvent_STATE_REASON_UNKNOWN:
+		return models.StageEventStateReasonEmpty, nil
 	default:
 		return "", fmt.Errorf("invalid state reason: %v", stateReason)
 	}

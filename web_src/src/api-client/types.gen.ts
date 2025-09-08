@@ -372,6 +372,7 @@ export type SuperplaneApproveStageEventResponse = {
 
 export type SuperplaneBulkListEventsBody = {
     sources?: Array<SuperplaneEventSourceItemRequest>;
+    states?: Array<SuperplaneEventState>;
     limitPerSource?: number;
     before?: string;
 };
@@ -384,6 +385,8 @@ export type SuperplaneBulkListStageEventsBody = {
     stages?: Array<SuperplaneStageEventItemRequest>;
     states?: Array<SuperplaneStageEventState>;
     stateReasons?: Array<SuperplaneStageEventStateReason>;
+    executionStates?: Array<SuperplaneExecutionState>;
+    executionResults?: Array<ExecutionResult>;
     limitPerStage?: number;
     before?: string;
 };
@@ -1319,6 +1322,7 @@ export type SuperplaneListEventsData = {
     query?: {
         sourceType?: 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
         sourceId?: string;
+        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_DISCARDED' | 'STATE_PROCESSED'>;
         limit?: number;
         before?: string;
     };
@@ -1544,6 +1548,8 @@ export type SuperplaneListStageEventsData = {
     query?: {
         states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED'>;
         stateReasons?: Array<'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY' | 'STATE_REASON_STUCK' | 'STATE_REASON_TIMEOUT'>;
+        executionStates?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED' | 'STATE_CANCELLED'>;
+        executionResults?: Array<'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED'>;
         limit?: number;
         before?: string;
     };

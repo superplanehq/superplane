@@ -25,6 +25,7 @@ const (
 	StageEventStateReasonUnhealthy  = "unhealthy"
 	StageEventStateReasonStuck      = "stuck"
 	StageEventStateReasonTimeout    = "timeout"
+	StageEventStateReasonEmpty      = ""
 )
 
 var (

@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"reflect"
 )
 
 
@@ -153,6 +154,7 @@ type ApiSuperplaneListEventsRequest struct {
 	canvasIdOrName string
 	sourceType *string
 	sourceId *string
+	states *[]string
 	limit *int32
 	before *time.Time
 }
@@ -164,6 +166,11 @@ func (r ApiSuperplaneListEventsRequest) SourceType(sourceType string) ApiSuperpl
 
 func (r ApiSuperplaneListEventsRequest) SourceId(sourceId string) ApiSuperplaneListEventsRequest {
 	r.sourceId = &sourceId
+	return r
+}
+
+func (r ApiSuperplaneListEventsRequest) States(states []string) ApiSuperplaneListEventsRequest {
+	r.states = &states
 	return r
 }
 
@@ -228,6 +235,17 @@ func (a *EventAPIService) SuperplaneListEventsExecute(r ApiSuperplaneListEventsR
 	}
 	if r.sourceId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "sourceId", r.sourceId, "", "")
+	}
+	if r.states != nil {
+		t := *r.states
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "states", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "states", t, "form", "multi")
+		}
 	}
 	if r.limit != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")

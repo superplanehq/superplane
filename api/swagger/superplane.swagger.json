@@ -608,6 +608,22 @@
             "type": "string"
           },
           {
+            "name": "states",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STATE_UNKNOWN",
+                "STATE_PENDING",
+                "STATE_DISCARDED",
+                "STATE_PROCESSED"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -960,6 +976,38 @@
                 "STATE_REASON_UNHEALTHY",
                 "STATE_REASON_STUCK",
                 "STATE_REASON_TIMEOUT"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "executionStates",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STATE_UNKNOWN",
+                "STATE_PENDING",
+                "STATE_STARTED",
+                "STATE_FINISHED",
+                "STATE_CANCELLED"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "executionResults",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "RESULT_UNKNOWN",
+                "RESULT_PASSED",
+                "RESULT_FAILED"
               ]
             },
             "collectionFormat": "multi"
@@ -3410,6 +3458,12 @@
             "$ref": "#/definitions/SuperplaneEventSourceItemRequest"
           }
         },
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SuperplaneEventState"
+          }
+        },
         "limitPerSource": {
           "type": "integer",
           "format": "int32"
@@ -3452,6 +3506,18 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/SuperplaneStageEventStateReason"
+          }
+        },
+        "executionStates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SuperplaneExecutionState"
+          }
+        },
+        "executionResults": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExecutionResult"
           }
         },
         "limitPerStage": {

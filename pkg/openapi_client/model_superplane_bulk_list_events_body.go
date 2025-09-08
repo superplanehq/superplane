@@ -22,6 +22,7 @@ var _ MappedNullable = &SuperplaneBulkListEventsBody{}
 // SuperplaneBulkListEventsBody struct for SuperplaneBulkListEventsBody
 type SuperplaneBulkListEventsBody struct {
 	Sources []SuperplaneEventSourceItemRequest `json:"sources,omitempty"`
+	States []SuperplaneEventState `json:"states,omitempty"`
 	LimitPerSource *int32 `json:"limitPerSource,omitempty"`
 	Before *time.Time `json:"before,omitempty"`
 }
@@ -73,6 +74,38 @@ func (o *SuperplaneBulkListEventsBody) HasSources() bool {
 // SetSources gets a reference to the given []SuperplaneEventSourceItemRequest and assigns it to the Sources field.
 func (o *SuperplaneBulkListEventsBody) SetSources(v []SuperplaneEventSourceItemRequest) {
 	o.Sources = v
+}
+
+// GetStates returns the States field value if set, zero value otherwise.
+func (o *SuperplaneBulkListEventsBody) GetStates() []SuperplaneEventState {
+	if o == nil || IsNil(o.States) {
+		var ret []SuperplaneEventState
+		return ret
+	}
+	return o.States
+}
+
+// GetStatesOk returns a tuple with the States field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneBulkListEventsBody) GetStatesOk() ([]SuperplaneEventState, bool) {
+	if o == nil || IsNil(o.States) {
+		return nil, false
+	}
+	return o.States, true
+}
+
+// HasStates returns a boolean if a field has been set.
+func (o *SuperplaneBulkListEventsBody) HasStates() bool {
+	if o != nil && !IsNil(o.States) {
+		return true
+	}
+
+	return false
+}
+
+// SetStates gets a reference to the given []SuperplaneEventState and assigns it to the States field.
+func (o *SuperplaneBulkListEventsBody) SetStates(v []SuperplaneEventState) {
+	o.States = v
 }
 
 // GetLimitPerSource returns the LimitPerSource field value if set, zero value otherwise.
@@ -151,6 +184,9 @@ func (o SuperplaneBulkListEventsBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Sources) {
 		toSerialize["sources"] = o.Sources
+	}
+	if !IsNil(o.States) {
+		toSerialize["states"] = o.States
 	}
 	if !IsNil(o.LimitPerSource) {
 		toSerialize["limitPerSource"] = o.LimitPerSource

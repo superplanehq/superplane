@@ -767,6 +767,8 @@ type ApiSuperplaneListStageEventsRequest struct {
 	stageIdOrName string
 	states *[]string
 	stateReasons *[]string
+	executionStates *[]string
+	executionResults *[]string
 	limit *int32
 	before *time.Time
 }
@@ -778,6 +780,16 @@ func (r ApiSuperplaneListStageEventsRequest) States(states []string) ApiSuperpla
 
 func (r ApiSuperplaneListStageEventsRequest) StateReasons(stateReasons []string) ApiSuperplaneListStageEventsRequest {
 	r.stateReasons = &stateReasons
+	return r
+}
+
+func (r ApiSuperplaneListStageEventsRequest) ExecutionStates(executionStates []string) ApiSuperplaneListStageEventsRequest {
+	r.executionStates = &executionStates
+	return r
+}
+
+func (r ApiSuperplaneListStageEventsRequest) ExecutionResults(executionResults []string) ApiSuperplaneListStageEventsRequest {
+	r.executionResults = &executionResults
 	return r
 }
 
@@ -857,6 +869,28 @@ func (a *StageAPIService) SuperplaneListStageEventsExecute(r ApiSuperplaneListSt
 			}
 		} else {
 			parameterAddToHeaderOrQuery(localVarQueryParams, "stateReasons", t, "form", "multi")
+		}
+	}
+	if r.executionStates != nil {
+		t := *r.executionStates
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "executionStates", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "executionStates", t, "form", "multi")
+		}
+	}
+	if r.executionResults != nil {
+		t := *r.executionResults
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "executionResults", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "executionResults", t, "form", "multi")
 		}
 	}
 	if r.limit != nil {
