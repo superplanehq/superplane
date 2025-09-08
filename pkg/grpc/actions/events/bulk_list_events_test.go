@@ -26,7 +26,7 @@ func Test__BulkListEvents(t *testing.T) {
 				SourceType: protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE,
 			},
 		}
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -50,7 +50,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -93,7 +93,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 2, nil)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 2, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -127,7 +127,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 2)
@@ -152,7 +152,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		_, err := BulkListEvents(ctx, "invalid-canvas-id", sources, 10, nil)
+		_, err := BulkListEvents(ctx, "invalid-canvas-id", sources, 10, nil, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid canvas ID")
 	})
@@ -166,7 +166,7 @@ func Test__BulkListEvents(t *testing.T) {
 			},
 		}
 
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, nil, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)
@@ -201,7 +201,7 @@ func Test__BulkListEvents(t *testing.T) {
 
 		// Test with before filter - should only return events created before the timestamp
 		beforeTimestamp := timestamppb.New(beforeTime)
-		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, beforeTimestamp)
+		res, err := BulkListEvents(ctx, r.Canvas.ID.String(), sources, 10, beforeTimestamp, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Results, 1)

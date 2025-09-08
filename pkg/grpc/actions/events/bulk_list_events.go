@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSourceItemRequest, limitPerSource int32, before *timestamppb.Timestamp) (*pb.BulkListEventsResponse, error) {
+func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSourceItemRequest, limitPerSource int32, before *timestamppb.Timestamp, pbStates []pb.Event_State) (*pb.BulkListEventsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
@@ -29,6 +29,7 @@ func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSou
 	}
 
 	validatedLimit := validateLimit(int(limitPerSource))
+	validatedStates := validateStates(pbStates)
 
 	var beforeTime *time.Time
 	if before != nil && before.IsValid() {
@@ -36,7 +37,7 @@ func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSou
 		beforeTime = &t
 	}
 
-	eventsBySource, err := models.BulkListEventsByCanvasIDAndMultipleSources(canvasUUID, sourceFilters, validatedLimit, beforeTime)
+	eventsBySource, err := models.BulkListEventsByCanvasIDAndMultipleSources(canvasUUID, sourceFilters, validatedLimit, beforeTime, validatedStates)
 	if err != nil {
 		return nil, err
 	}

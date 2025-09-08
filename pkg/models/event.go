@@ -396,7 +396,7 @@ func BulkListEventsByCanvasIDAndSource(canvasID uuid.UUID, sourceType string, so
 	return events, nil
 }
 
-func BulkListEventsByCanvasIDAndMultipleSources(canvasID uuid.UUID, sourceFilters []SourceFilter, limitPerSource int, before *time.Time) (map[string][]Event, error) {
+func BulkListEventsByCanvasIDAndMultipleSources(canvasID uuid.UUID, sourceFilters []SourceFilter, limitPerSource int, before *time.Time, states []string) (map[string][]Event, error) {
 	if len(sourceFilters) == 0 {
 		return map[string][]Event{}, nil
 	}
@@ -426,6 +426,10 @@ func BulkListEventsByCanvasIDAndMultipleSources(canvasID uuid.UUID, sourceFilter
 	if len(conditions) > 0 {
 		whereClause := strings.Join(conditions, " OR ")
 		query = query.Where(whereClause, args...)
+	}
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
 	}
 
 	if before != nil {

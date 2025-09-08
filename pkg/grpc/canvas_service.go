@@ -188,7 +188,7 @@ func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsReques
 
 func (s *CanvasService) BulkListEvents(ctx context.Context, req *pb.BulkListEventsRequest) (*pb.BulkListEventsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return events.BulkListEvents(ctx, canvasID, req.Sources, req.LimitPerSource, req.Before)
+	return events.BulkListEvents(ctx, canvasID, req.Sources, req.LimitPerSource, req.Before, req.States)
 }
 
 func (s *CanvasService) BulkListStageEvents(ctx context.Context, req *pb.BulkListStageEventsRequest) (*pb.BulkListStageEventsResponse, error) {
