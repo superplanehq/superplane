@@ -1,6 +1,5 @@
 import React from 'react';
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol';
-import { Button } from '../../../components/Button/button';
 import { Badge } from '../../../components/Badge/badge';
 
 export interface SidebarItemProps {
