@@ -1,6 +1,5 @@
 import React from 'react';
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol';
-import { Button } from '../../../components/Button/button';
 import { Badge } from '../../../components/Badge/badge';
 
 export interface SidebarItemProps {
@@ -30,10 +29,11 @@ export function SidebarItem({
     <div
       className={`rounded-md flex items-center pl-2 pr-2 py-3 relative mb-2 group ${comingSoon || disabled
         ? 'bg-gray-50 dark:bg-zinc-800 opacity-60 cursor-not-allowed'
-        : `cursor-grab bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 ${className}`
+        : `cursor-pointer bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 ${className}`
         }`}
       draggable={!comingSoon && !disabled}
       onDragStart={comingSoon || disabled ? undefined : onDragStart}
+      onClick={disabled || comingSoon ? undefined : onClickAddNode}
     >
       <div className="flex items-center space-x-3 pr-1 flex-1 truncate">
         {icon && (
@@ -61,14 +61,9 @@ export function SidebarItem({
       )}
       {!comingSoon && (
         <div className="flex items-center">
-          <Button
-            plain
-            onClick={disabled ? undefined : onClickAddNode}
-            className="!px-1 !py-0 mr-2 opacity-0 group-hover:opacity-100"
-            disabled={disabled}
-          >
+          <div className="!px-1 !py-0 mr-2 opacity-0 group-hover:opacity-100">
             <MaterialSymbol name={disabled ? 'block' : 'add'} size="md" />
-          </Button>
+          </div>
         </div>
       )}
     </div>
