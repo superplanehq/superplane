@@ -24,9 +24,11 @@ interface HistoryTabProps {
   connectionEventsById?: Record<string, SuperplaneEvent>;
   isFetchingNextConnectedEvents: boolean;
   fetchNextConnectedEvents: () => void;
+  isFetchingNextDiscardedEvents: boolean;
+  fetchNextDiscardedEvents: () => void;
 }
 
-export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, cancelStageEvent, connectionEventsById, fetchNextConnectedEvents }: HistoryTabProps) => {
+export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, cancelStageEvent, connectionEventsById, fetchNextConnectedEvents, fetchNextDiscardedEvents, }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
     type: 'execution' | 'stage_event' | 'discarded_event';
@@ -214,12 +216,14 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
 
     // Fetch next connected events
     fetchNextConnectedEvents();
+    fetchNextDiscardedEvents();
   }, [
     timelineLimit,
     hasNextQueuePage,
     isFetchingNextQueuePage,
     isFetchingNextRunQueuePage,
     fetchNextConnectedEvents,
+    fetchNextDiscardedEvents,
     fetchNextQueuePage,
     fetchNextRunQueuePage,
     fetchNextStagePlainEventsPage,

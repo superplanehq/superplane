@@ -126,7 +126,15 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
     isFetchingNextPage: isFetchingNextConnectedEvents,
     refetch: refetchConnectedEvents,
     fetchNextPage: fetchNextConnectedEvents,
-  } = useConnectedSourcesEvents(canvasId || '', connectedSources, 20);
+  } = useConnectedSourcesEvents(canvasId || '', connectedSources, 50, ['STATE_PROCESSED']);
+
+  const {
+    data: discardedEventsData,
+    isFetchingNextPage: isFetchingNextDiscardedEvents,
+    refetch: refetchDiscardedEvents,
+    fetchNextPage: fetchNextDiscardedEvents,
+  } = useConnectedSourcesEvents(canvasId || '', connectedSources, 50, ['STATE_DISCARDED']);
+
 
   const connectionEventsById = useMemo(() => {
     const eventsById: Record<string, SuperplaneEvent> = {};
@@ -137,8 +145,14 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
       });
     });
 
+    discardedEventsData?.pages.forEach(page => {
+      page.events.forEach(event => {
+        eventsById[event.id || ''] = event;
+      });
+    });
+
     return eventsById;
-  }, [connectedEventsData]);
+  }, [connectedEventsData, discardedEventsData]);
 
   const eventsByExecutionId = useMemo(() => {
     const emittedEventsById: Record<string, SuperplaneEvent> = {};
@@ -178,7 +192,8 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
 
   useEffect(() => {
     refetchConnectedEvents();
-  }, [refetchConnectedEvents, partialConnectionEvents]);
+    refetchDiscardedEvents();
+  }, [refetchConnectedEvents, refetchDiscardedEvents, partialConnectionEvents]);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -207,6 +222,8 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
           connectionEventsById={connectionEventsById}
           isFetchingNextConnectedEvents={isFetchingNextConnectedEvents}
           fetchNextConnectedEvents={fetchNextConnectedEvents}
+          isFetchingNextDiscardedEvents={isFetchingNextDiscardedEvents}
+          fetchNextDiscardedEvents={fetchNextDiscardedEvents}
           cancelStageEvent={cancelStageEvent}
         />;
 

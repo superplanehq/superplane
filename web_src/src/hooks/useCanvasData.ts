@@ -661,10 +661,11 @@ export const useConnectedSourcesEvents = (
     stageIds: string[];
     connectionGroupIds: string[];
   },
-  limitPerSource: number = 20
+  limitPerSource: number = 20,
+  states?: SuperplaneEventState[],
 ) => {
   return useInfiniteQuery({
-    queryKey: ['connectedEvents', canvasId, connectedSources, limitPerSource],
+    queryKey: ['connectedEvents', canvasId, connectedSources, limitPerSource, states],
     queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       const sources = [
         ...connectedSources.eventSourceIds.map(id => ({
@@ -695,6 +696,7 @@ export const useConnectedSourcesEvents = (
           body: {
             sources,
             limitPerSource: limitPerSource,
+            states,
             before: pageParam 
           }
         })
