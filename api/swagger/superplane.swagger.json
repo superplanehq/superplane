@@ -1013,6 +1013,18 @@
             "collectionFormat": "multi"
           },
           {
+            "name": "executionFilter",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "EXECUTION_FILTER_UNKNOWN",
+              "EXECUTION_FILTER_WITH_EXECUTION",
+              "EXECUTION_FILTER_WITHOUT_EXECUTION"
+            ],
+            "default": "EXECUTION_FILTER_UNKNOWN"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -3520,6 +3532,9 @@
             "$ref": "#/definitions/ExecutionResult"
           }
         },
+        "executionFilter": {
+          "$ref": "#/definitions/SuperplaneExecutionFilter"
+        },
         "limitPerStage": {
           "type": "integer",
           "format": "int32"
@@ -4096,6 +4111,15 @@
           }
         }
       }
+    },
+    "SuperplaneExecutionFilter": {
+      "type": "string",
+      "enum": [
+        "EXECUTION_FILTER_UNKNOWN",
+        "EXECUTION_FILTER_WITH_EXECUTION",
+        "EXECUTION_FILTER_WITHOUT_EXECUTION"
+      ],
+      "default": "EXECUTION_FILTER_UNKNOWN"
     },
     "SuperplaneExecutionResource": {
       "type": "object",

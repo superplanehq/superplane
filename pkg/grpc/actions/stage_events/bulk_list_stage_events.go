@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func BulkListStageEvents(ctx context.Context, canvasID string, stages []*pb.StageEventItemRequest, limitPerStage int32, before *timestamppb.Timestamp, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, pbExecutionStates []pb.Execution_State, pbExecutionResults []pb.Execution_Result) (*pb.BulkListStageEventsResponse, error) {
+func BulkListStageEvents(ctx context.Context, canvasID string, stages []*pb.StageEventItemRequest, limitPerStage int32, before *timestamppb.Timestamp, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, pbExecutionStates []pb.Execution_State, pbExecutionResults []pb.Execution_Result, executionFilter pb.ExecutionFilter) (*pb.BulkListStageEventsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
@@ -34,6 +34,11 @@ func BulkListStageEvents(ctx context.Context, canvasID string, stages []*pb.Stag
 	}
 
 	executionResults, err := validateExecutionResults(pbExecutionResults)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	withExecution, err := validateExecutionFilter(executionFilter)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -68,7 +73,7 @@ func BulkListStageEvents(ctx context.Context, canvasID string, stages []*pb.Stag
 
 	validatedLimit := validateLimit(int(limitPerStage))
 
-	eventsByStageID, err := models.BulkListStageEventsByCanvasIDAndMultipleStages(canvasUUID, stageIDs, validatedLimit, beforeTime, states, stateReasons, executionStates, executionResults)
+	eventsByStageID, err := models.BulkListStageEventsByCanvasIDAndMultipleStages(canvasUUID, stageIDs, validatedLimit, beforeTime, states, stateReasons, executionStates, executionResults, withExecution)
 	if err != nil {
 		return nil, err
 	}

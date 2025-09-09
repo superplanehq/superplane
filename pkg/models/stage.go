@@ -410,10 +410,10 @@ func (s *Stage) ListEventsInTransaction(tx *gorm.DB, states, stateReasons []stri
 	return events, nil
 }
 
-func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons, executionStates, executionResults []string, limit int, before *time.Time) ([]StageEvent, error) {
+func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons, executionStates, executionResults []string, limit int, before *time.Time, withExecution *bool) ([]StageEvent, error) {
 	var events []StageEvent
 	query := database.Conn()
-	query = s.addStageEventFilters(query, states, stateReasons, executionStates, executionResults)
+	query = s.addStageEventFilters(query, states, stateReasons, executionStates, executionResults, withExecution)
 
 	if before != nil {
 		query = query.Where("created_at < ?", before)
@@ -427,11 +427,11 @@ func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons, executionStat
 	return events, nil
 }
 
-func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons, executionStates, executionResults []string) (int64, error) {
+func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons, executionStates, executionResults []string, withExecution *bool) (int64, error) {
 	var count int64
 
 	query := database.Conn().Model(&StageEvent{})
-	query = s.addStageEventFilters(query, states, stateReasons, executionStates, executionResults)
+	query = s.addStageEventFilters(query, states, stateReasons, executionStates, executionResults, withExecution)
 
 	err := query.Count(&count).Error
 	if err != nil {
@@ -441,7 +441,7 @@ func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons, executionS
 	return count, nil
 }
 
-func (s *Stage) addStageEventFilters(db *gorm.DB, states, stateReasons, executionStates, executionResults []string) *gorm.DB {
+func (s *Stage) addStageEventFilters(db *gorm.DB, states, stateReasons, executionStates, executionResults []string, withExecution *bool) *gorm.DB {
 	query := db.
 		Table("stage_events as se").
 		Where("se.stage_id = ?", s.ID).
@@ -451,7 +451,7 @@ func (s *Stage) addStageEventFilters(db *gorm.DB, states, stateReasons, executio
 		query.Where("se.state_reason IN ?", stateReasons)
 	}
 
-	if len(executionStates) > 0 || len(executionResults) > 0 {
+	if (withExecution != nil && *withExecution) || len(executionStates) > 0 || len(executionResults) > 0 {
 		query = query.
 			Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = se.id")
 	}

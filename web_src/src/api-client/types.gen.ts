@@ -387,6 +387,7 @@ export type SuperplaneBulkListStageEventsBody = {
     stateReasons?: Array<SuperplaneStageEventStateReason>;
     executionStates?: Array<SuperplaneExecutionState>;
     executionResults?: Array<ExecutionResult>;
+    executionFilter?: SuperplaneExecutionFilter;
     limitPerStage?: number;
     before?: string;
 };
@@ -617,6 +618,8 @@ export type SuperplaneExecution = {
     outputs?: Array<SuperplaneOutputValue>;
     resources?: Array<SuperplaneExecutionResource>;
 };
+
+export type SuperplaneExecutionFilter = 'EXECUTION_FILTER_UNKNOWN' | 'EXECUTION_FILTER_WITH_EXECUTION' | 'EXECUTION_FILTER_WITHOUT_EXECUTION';
 
 export type SuperplaneExecutionResource = {
     id?: string;
@@ -1550,6 +1553,7 @@ export type SuperplaneListStageEventsData = {
         stateReasons?: Array<'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY' | 'STATE_REASON_STUCK' | 'STATE_REASON_TIMEOUT'>;
         executionStates?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED' | 'STATE_CANCELLED'>;
         executionResults?: Array<'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED'>;
+        executionFilter?: 'EXECUTION_FILTER_UNKNOWN' | 'EXECUTION_FILTER_WITH_EXECUTION' | 'EXECUTION_FILTER_WITHOUT_EXECUTION';
         limit?: number;
         before?: string;
     };

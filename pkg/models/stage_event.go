@@ -255,7 +255,7 @@ func FindStageEventsWaitingForTimeWindow() ([]StageEventWithConditions, error) {
 	return events, nil
 }
 
-func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs []uuid.UUID, limitPerStage int, before *time.Time, states []string, stateReasons []string, executionStates []string, executionResults []string) (map[string][]StageEvent, error) {
+func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs []uuid.UUID, limitPerStage int, before *time.Time, states []string, stateReasons []string, executionStates []string, executionResults []string, withExecution *bool) (map[string][]StageEvent, error) {
 	if len(stageIDs) == 0 {
 		return map[string][]StageEvent{}, nil
 	}
@@ -278,7 +278,7 @@ func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs
 		query = query.Where("state_reason IN ?", stateReasons)
 	}
 
-	if len(executionStates) > 0 || len(executionResults) > 0 {
+	if (withExecution != nil && *withExecution) || len(executionStates) > 0 || len(executionResults) > 0 {
 		query = query.
 			Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = se.id")
 	}

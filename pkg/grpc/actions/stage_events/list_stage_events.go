@@ -21,7 +21,7 @@ const (
 	MaxLimit     = 50
 )
 
-func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, pbExecutionStates []pb.Execution_State, pbExecutionResults []pb.Execution_Result, limit int32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
+func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, pbExecutionStates []pb.Execution_State, pbExecutionResults []pb.Execution_Result, limit int32, before *timestamppb.Timestamp, pbExecutionFilter pb.ExecutionFilter) (*pb.ListStageEventsResponse, error) {
 	err := actions.ValidateUUIDs(stageIdOrName)
 	var stage *models.Stage
 	if err != nil {
@@ -58,6 +58,11 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	withExecution, err := validateExecutionFilter(pbExecutionFilter)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	validatedLimit := validateLimit(int(limit))
 
 	var beforeTime *time.Time
@@ -72,11 +77,11 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 
 	done := make(chan struct{}, 2)
 	go func() {
-		events, listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, executionStates, executionResults, validatedLimit+1, beforeTime)
+		events, listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, executionStates, executionResults, validatedLimit+1, beforeTime, withExecution)
 		done <- struct{}{}
 	}()
 	go func() {
-		totalCount, countErr = stage.CountEventsWithStatesAndReasons(states, stateReasons, executionStates, executionResults)
+		totalCount, countErr = stage.CountEventsWithStatesAndReasons(states, stateReasons, executionStates, executionResults, withExecution)
 		done <- struct{}{}
 	}()
 	<-done
@@ -175,6 +180,22 @@ func validateExecutionResults(in []pb.Execution_Result) ([]string, error) {
 	}
 
 	return results, nil
+}
+
+func validateExecutionFilter(in pb.ExecutionFilter) (*bool, error) {
+	var withExecution bool
+	switch in {
+	case pb.ExecutionFilter_EXECUTION_FILTER_UNKNOWN:
+		return nil, nil
+	case pb.ExecutionFilter_EXECUTION_FILTER_WITHOUT_EXECUTION:
+		withExecution = false
+		return &withExecution, nil
+	case pb.ExecutionFilter_EXECUTION_FILTER_WITH_EXECUTION:
+		withExecution = true
+		return &withExecution, nil
+	default:
+		return nil, fmt.Errorf("invalid execution filter: %v", in)
+	}
 }
 
 func validateLimit(limit int) int {

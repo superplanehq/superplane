@@ -139,7 +139,7 @@ func (s *CanvasService) ListStages(ctx context.Context, req *pb.ListStagesReques
 
 func (s *CanvasService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return stageevents.ListStageEvents(ctx, canvasID, req.StageIdOrName, req.States, req.StateReasons, req.ExecutionStates, req.ExecutionResults, req.Limit, req.Before)
+	return stageevents.ListStageEvents(ctx, canvasID, req.StageIdOrName, req.States, req.StateReasons, req.ExecutionStates, req.ExecutionResults, req.Limit, req.Before, req.ExecutionFilter)
 }
 
 func (s *CanvasService) DeleteStage(ctx context.Context, req *pb.DeleteStageRequest) (*pb.DeleteStageResponse, error) {
@@ -193,5 +193,5 @@ func (s *CanvasService) BulkListEvents(ctx context.Context, req *pb.BulkListEven
 
 func (s *CanvasService) BulkListStageEvents(ctx context.Context, req *pb.BulkListStageEventsRequest) (*pb.BulkListStageEventsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return stageevents.BulkListStageEvents(ctx, canvasID, req.Stages, req.LimitPerStage, req.Before, req.States, req.StateReasons, req.ExecutionStates, req.ExecutionResults)
+	return stageevents.BulkListStageEvents(ctx, canvasID, req.Stages, req.LimitPerStage, req.Before, req.States, req.StateReasons, req.ExecutionStates, req.ExecutionResults, req.ExecutionFilter)
 }

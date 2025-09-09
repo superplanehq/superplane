@@ -769,6 +769,7 @@ type ApiSuperplaneListStageEventsRequest struct {
 	stateReasons *[]string
 	executionStates *[]string
 	executionResults *[]string
+	executionFilter *string
 	limit *int32
 	before *time.Time
 }
@@ -790,6 +791,11 @@ func (r ApiSuperplaneListStageEventsRequest) ExecutionStates(executionStates []s
 
 func (r ApiSuperplaneListStageEventsRequest) ExecutionResults(executionResults []string) ApiSuperplaneListStageEventsRequest {
 	r.executionResults = &executionResults
+	return r
+}
+
+func (r ApiSuperplaneListStageEventsRequest) ExecutionFilter(executionFilter string) ApiSuperplaneListStageEventsRequest {
+	r.executionFilter = &executionFilter
 	return r
 }
 
@@ -892,6 +898,12 @@ func (a *StageAPIService) SuperplaneListStageEventsExecute(r ApiSuperplaneListSt
 		} else {
 			parameterAddToHeaderOrQuery(localVarQueryParams, "executionResults", t, "form", "multi")
 		}
+	}
+	if r.executionFilter != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "executionFilter", r.executionFilter, "", "")
+	} else {
+		var defaultValue string = "EXECUTION_FILTER_UNKNOWN"
+		r.executionFilter = &defaultValue
 	}
 	if r.limit != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")

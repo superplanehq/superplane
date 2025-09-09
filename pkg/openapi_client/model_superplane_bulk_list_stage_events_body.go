@@ -26,6 +26,7 @@ type SuperplaneBulkListStageEventsBody struct {
 	StateReasons []SuperplaneStageEventStateReason `json:"stateReasons,omitempty"`
 	ExecutionStates []SuperplaneExecutionState `json:"executionStates,omitempty"`
 	ExecutionResults []ExecutionResult `json:"executionResults,omitempty"`
+	ExecutionFilter *SuperplaneExecutionFilter `json:"executionFilter,omitempty"`
 	LimitPerStage *int32 `json:"limitPerStage,omitempty"`
 	Before *time.Time `json:"before,omitempty"`
 }
@@ -36,6 +37,8 @@ type SuperplaneBulkListStageEventsBody struct {
 // will change when the set of required properties is changed
 func NewSuperplaneBulkListStageEventsBody() *SuperplaneBulkListStageEventsBody {
 	this := SuperplaneBulkListStageEventsBody{}
+	var executionFilter SuperplaneExecutionFilter = SUPERPLANEEXECUTIONFILTER_EXECUTION_FILTER_UNKNOWN
+	this.ExecutionFilter = &executionFilter
 	return &this
 }
 
@@ -44,6 +47,8 @@ func NewSuperplaneBulkListStageEventsBody() *SuperplaneBulkListStageEventsBody {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneBulkListStageEventsBodyWithDefaults() *SuperplaneBulkListStageEventsBody {
 	this := SuperplaneBulkListStageEventsBody{}
+	var executionFilter SuperplaneExecutionFilter = SUPERPLANEEXECUTIONFILTER_EXECUTION_FILTER_UNKNOWN
+	this.ExecutionFilter = &executionFilter
 	return &this
 }
 
@@ -207,6 +212,38 @@ func (o *SuperplaneBulkListStageEventsBody) SetExecutionResults(v []ExecutionRes
 	o.ExecutionResults = v
 }
 
+// GetExecutionFilter returns the ExecutionFilter field value if set, zero value otherwise.
+func (o *SuperplaneBulkListStageEventsBody) GetExecutionFilter() SuperplaneExecutionFilter {
+	if o == nil || IsNil(o.ExecutionFilter) {
+		var ret SuperplaneExecutionFilter
+		return ret
+	}
+	return *o.ExecutionFilter
+}
+
+// GetExecutionFilterOk returns a tuple with the ExecutionFilter field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneBulkListStageEventsBody) GetExecutionFilterOk() (*SuperplaneExecutionFilter, bool) {
+	if o == nil || IsNil(o.ExecutionFilter) {
+		return nil, false
+	}
+	return o.ExecutionFilter, true
+}
+
+// HasExecutionFilter returns a boolean if a field has been set.
+func (o *SuperplaneBulkListStageEventsBody) HasExecutionFilter() bool {
+	if o != nil && !IsNil(o.ExecutionFilter) {
+		return true
+	}
+
+	return false
+}
+
+// SetExecutionFilter gets a reference to the given SuperplaneExecutionFilter and assigns it to the ExecutionFilter field.
+func (o *SuperplaneBulkListStageEventsBody) SetExecutionFilter(v SuperplaneExecutionFilter) {
+	o.ExecutionFilter = &v
+}
+
 // GetLimitPerStage returns the LimitPerStage field value if set, zero value otherwise.
 func (o *SuperplaneBulkListStageEventsBody) GetLimitPerStage() int32 {
 	if o == nil || IsNil(o.LimitPerStage) {
@@ -295,6 +332,9 @@ func (o SuperplaneBulkListStageEventsBody) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.ExecutionResults) {
 		toSerialize["executionResults"] = o.ExecutionResults
+	}
+	if !IsNil(o.ExecutionFilter) {
+		toSerialize["executionFilter"] = o.ExecutionFilter
 	}
 	if !IsNil(o.LimitPerStage) {
 		toSerialize["limitPerStage"] = o.LimitPerStage
