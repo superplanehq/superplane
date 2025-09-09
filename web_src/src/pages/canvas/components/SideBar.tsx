@@ -153,11 +153,13 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
     return emittedEventsById;
   }, [selectedStage.events]);
 
-  const partialExecutions = useMemo(() =>
-    selectedStage.queue
+  const partialExecutions = useMemo(() => {
+    const partialExecutions = selectedStage.queue
       ?.filter(event => event.execution)
-      .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
-      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
+      .map(event => ({ ...event.execution, event }) as ExecutionWithEvent)
+    const uniquePartialExecutions = partialExecutions.filter((item, index) => partialExecutions.findIndex(item2 => item2.id === item.id) === index);
+    return uniquePartialExecutions.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+  },
     [selectedStage.queue]
   );
 
@@ -166,23 +168,18 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
     [partialExecutions]
   );
 
-  // Filter events by their state
-  const pendingEvents = useMemo(() =>
-    selectedStage.queue?.filter(event => event.state === 'STATE_PENDING' && !event.execution) || [],
+  const queueItems = useMemo(() => {
+    const queueItems = selectedStage.queue?.filter(event => !event.execution) || [];
+    const uniqueQueueItems = queueItems.filter((item, index) => queueItems.findIndex(item2 => item2.id === item.id) === index);
+    return uniqueQueueItems;
+  },
     [selectedStage.queue]
   );
 
-  const waitingEvents = useMemo(() =>
-    selectedStage.queue?.filter(event => event.state === 'STATE_WAITING' && !event.execution) || [],
-    [selectedStage.queue]
-  );
-
-  // Every time partialConnectionEvents changes, refetch connected events
   useEffect(() => {
     refetchConnectedEvents();
   }, [refetchConnectedEvents, partialConnectionEvents]);
 
-  // Render the appropriate content based on the active tab
   const renderTabContent = () => {
     switch (activeTab) {
       case 'activity':
@@ -190,8 +187,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
           <ActivityTab
             onChangeTab={setActiveTab}
             selectedStage={selectedStage}
-            pendingEvents={pendingEvents}
-            waitingEvents={waitingEvents}
+            queueEvents={queueItems}
             partialExecutions={partialExecutions}
             approveStageEvent={approveStageEvent}
             executionRunning={executionRunning}

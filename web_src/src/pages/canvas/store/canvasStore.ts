@@ -232,7 +232,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
    const queueEventsRequest: SyncStageEventRequest = {
       states: ['STATE_PROCESSED', 'STATE_WAITING', "STATE_PENDING"],
-      stateReasons: ['STATE_REASON_APPROVAL', 'STATE_REASON_TIME_WINDOW', "STATE_REASON_CANCELLED", "STATE_REASON_UNKNOWN"],
+      stateReasons: ['STATE_REASON_APPROVAL', 'STATE_REASON_TIME_WINDOW', "STATE_REASON_UNKNOWN"],
       executionFilter: "EXECUTION_FILTER_WITHOUT_EXECUTION",
       limit: SYNC_STAGE_EVENTS_LIMIT
     }

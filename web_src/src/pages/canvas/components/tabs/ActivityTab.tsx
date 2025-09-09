@@ -5,8 +5,7 @@ import MessageItem from '../MessageItem';
 
 interface ActivityTabProps {
   selectedStage: StageWithEventQueue;
-  pendingEvents: SuperplaneStageEvent[];
-  waitingEvents: SuperplaneStageEvent[];
+  queueEvents: SuperplaneStageEvent[];
   partialExecutions: ExecutionWithEvent[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   cancelStageEvent: (stageEventId: string, stageId: string) => void;
@@ -19,8 +18,7 @@ interface ActivityTabProps {
 
 export const ActivityTab = ({
   selectedStage,
-  pendingEvents,
-  waitingEvents,
+  queueEvents,
   partialExecutions,
   approveStageEvent,
   cancelStageEvent,
@@ -30,7 +28,7 @@ export const ActivityTab = ({
   connectionEventsById,
   eventsByExecutionId
 }: ActivityTabProps) => {
-  const queueCount = pendingEvents.length + waitingEvents.length;
+  const queueCount = queueEvents.length;
 
   return (
     <div className="p-6 space-y-6">
@@ -63,13 +61,13 @@ export const ActivityTab = ({
 
         <div className="space-y-3">
           {/* All queue events using MessageItem */}
-          {[...pendingEvents, ...waitingEvents].length === 0 ? (
+          {queueEvents.length === 0 ? (
             <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
               <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3 " aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>queue</span>
               <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No items in queue</p>
             </div>
           ) : (
-            [...pendingEvents, ...waitingEvents]
+            queueEvents
               .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
               .map((event) => {
                 const sourceEvent = connectionEventsById[event.eventId || ''];

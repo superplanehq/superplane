@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneBulkListEvents, superplaneBulkListStageEvents, SuperplaneStage, SuperplaneEventSource, SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEvent, SuperplaneConnection, SuperplaneConnectionType, SuperplaneBulkListStageEventsData, SuperplaneStageEventState } from "@/api-client";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, SuperplaneStageEvent, superplaneListConnectionGroups, superplaneBulkListEvents, superplaneBulkListStageEvents, SuperplaneStage, SuperplaneEventSource, SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEvent, SuperplaneConnection, SuperplaneConnectionType, SuperplaneBulkListStageEventsData, SuperplaneStageEventState, SuperplaneExecutionFilter, SuperplaneStageEventStateReason, SuperplaneExecutionState } from "@/api-client";
 import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { EventSourceSidebar } from "./components/EventSourceSidebar";
@@ -16,6 +16,7 @@ import { useAutoLayout } from "./hooks/useAutoLayout";
 
 const EVENTS_LIMIT = 3;
 const STAGE_EVENTS_LIMIT = 3;
+const QUEUE_EVENTS_LIMIT = 20;
 
 export function Canvas() {
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
@@ -116,7 +117,14 @@ export function Canvas() {
     };
   }, [canvasId, organizationId]);
 
-  const fetchStageEvents = useCallback(async (stages: SuperplaneStage[], states: SuperplaneStageEventState[]) => {
+  const fetchStageEvents = useCallback(async (
+    stages: SuperplaneStage[],
+    states: SuperplaneStageEventState[],
+    stateReasons: SuperplaneStageEventStateReason[],
+    executionStates: SuperplaneExecutionState[],
+    executionFilter: SuperplaneExecutionFilter,
+    limitPerStage?: number
+  ) => {
     if (stages.length === 0) {
       return [];
     }
@@ -128,8 +136,11 @@ export function Canvas() {
           stages: stages.map(stage => ({
             stageIdOrName: stage.metadata!.id!
           })),
-          limitPerStage: STAGE_EVENTS_LIMIT,
-          states: states
+          limitPerStage: limitPerStage || STAGE_EVENTS_LIMIT,
+          states: states,
+          stateReasons: stateReasons,
+          executionStates: executionStates,
+          executionFilter: executionFilter
         }
       } as SuperplaneBulkListStageEventsData)
     );
@@ -232,8 +243,8 @@ export function Canvas() {
   const processAndInitializeStore = useCallback((
     canvas: SuperplaneCanvas,
     connectionGroupPlainEventsResults: Array<{ connectionGroup: SuperplaneConnectionGroup; events: SuperplaneEvent[] }>,
-    stageEventsPedingOrWaitingResults: Array<{ stage: SuperplaneStage; stageEvents: SuperplaneStageEvent[] }>,
-    stageEventsProcessedResults: Array<{ stage: SuperplaneStage; stageEvents: SuperplaneStageEvent[] }>,
+    stageRecentRunsResults: Array<{ stage: SuperplaneStage; stageEvents: SuperplaneStageEvent[] }>,
+    stageEventsQueueResults: Array<{ stage: SuperplaneStage; stageEvents: SuperplaneStageEvent[] }>,
     stagePlainEventsResults: Array<{ stage: SuperplaneStage; events: SuperplaneEvent[] }>,
     eventSourceEventsResults: Array<{ eventSource: SuperplaneEventSource; events: SuperplaneEvent[] }>
   ) => {
@@ -244,14 +255,14 @@ export function Canvas() {
       return acc;
     }, {} as Record<string, SuperplaneEvent[]>);
 
-    const stageProcessedEventsResultsByStageId = stageEventsProcessedResults.reduce((acc, { stage, stageEvents }) => {
+    const stageRecentRunsResultsByStageId = stageRecentRunsResults.reduce((acc, { stage, stageEvents }) => {
       acc[stage.metadata!.id!] = stageEvents;
       return acc;
     }, {} as Record<string, SuperplaneStageEvent[]>);
 
-    const stagesWithQueues: StageWithEventQueue[] = stageEventsPedingOrWaitingResults.map(({ stage, stageEvents }) => {
-      const processedEvents = stageProcessedEventsResultsByStageId[stage.metadata!.id!] || [];
-      const currentStageEvents = stageEvents.concat(processedEvents);
+    const stagesWithQueues: StageWithEventQueue[] = stageEventsQueueResults.map(({ stage, stageEvents }) => {
+      const recentRunsEvents = stageRecentRunsResultsByStageId[stage.metadata!.id!] || [];
+      const currentStageEvents = stageEvents.concat(recentRunsEvents);
       for (const stageEvent of currentStageEvents) {
         allStageEvents[stageEvent.id!] = stageEvent;
       }
@@ -304,9 +315,9 @@ export function Canvas() {
 
         setCanvasName(basicData.canvas.metadata?.name || 'Unknown Canvas');
 
-        const [stageEventsPedingOrWaitingResults, stageEventsProcessedResults, plainEventsResults] = await Promise.all([
-          fetchStageEvents(basicData.stages, ['STATE_PENDING', 'STATE_WAITING']),
-          fetchStageEvents(basicData.stages, ['STATE_PROCESSED']),
+        const [stageRecentRunsResults, stageEventsQueueResults, plainEventsResults] = await Promise.all([
+          fetchStageEvents(basicData.stages, ['STATE_PENDING', 'STATE_WAITING', 'STATE_PROCESSED'], ['STATE_REASON_EXECUTION', "STATE_REASON_UNKNOWN"], ["STATE_CANCELLED", "STATE_FINISHED", "STATE_FINISHED"], "EXECUTION_FILTER_WITH_EXECUTION", STAGE_EVENTS_LIMIT),
+          fetchStageEvents(basicData.stages, ['STATE_PENDING', 'STATE_WAITING', 'STATE_PROCESSED'], ['STATE_REASON_APPROVAL', 'STATE_REASON_TIME_WINDOW', "STATE_REASON_UNKNOWN"], [], "EXECUTION_FILTER_WITHOUT_EXECUTION", QUEUE_EVENTS_LIMIT),
           fetchAllPlainEvents(basicData.stages, basicData.connectionGroups, basicData.eventSources)
         ]);
 
@@ -315,8 +326,8 @@ export function Canvas() {
         processAndInitializeStore(
           basicData.canvas,
           connectionGroupEventsResults,
-          stageEventsPedingOrWaitingResults,
-          stageEventsProcessedResults,
+          stageRecentRunsResults,
+          stageEventsQueueResults,
           stagePlainEventsResults,
           eventSourceEventsResults
         );
