@@ -26,7 +26,7 @@ import {
   superplaneListStageEvents,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
-import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState } from '../api-client/types.gen'
+import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState, SuperplaneStageEventStateReason, SuperplaneExecutionState, ExecutionResult, SuperplaneEventState, SuperplaneExecutionFilter } from '../api-client/types.gen'
 
 export const canvasKeys = {
   all: ['canvas'] as const,
@@ -641,13 +641,13 @@ export const useEventSourceEvents = (canvasId: string, eventSourceId: string) =>
       )
       return {
         events: response.data?.events || [],
-        nextCursor: response.data?.events && response.data.events.length === 20 
-          ? response.data.events[response.data.events.length - 1]?.receivedAt 
-          : undefined
+        nextCursor: response.data?.nextTimestamp,
+        totalCount: Number(response.data?.totalCount),
+        hasNextPage: response.data?.hasNextPage
       }
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.nextCursor : undefined,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!eventSourceId
@@ -713,16 +713,17 @@ export const useConnectedSourcesEvents = (
       return {
         events: allEvents,
         limitPerSource,
-        nextCursor
+        nextCursor,
+        hasNextPage: allEvents.length >= limitPerSource
       };
     },
-    getNextPageParam: (lastPage): string | undefined => lastPage.nextCursor,
+    getNextPageParam: (lastPage): string | undefined => lastPage.hasNextPage ? lastPage.nextCursor : undefined,
     initialPageParam: undefined as string | undefined,
     enabled: Object.values(connectedSources).some(arr => arr.length > 0)
   });
 };
 
-export const useStageEvents = (canvasId: string, stageId: string) => {
+export const useStageEvents = (canvasId: string, stageId: string, states?: SuperplaneEventState[]) => {
   return useInfiniteQuery({
     queryKey: canvasKeys.events(canvasId, 'EVENT_SOURCE_TYPE_STAGE', stageId),
     queryFn: async ({ pageParam }) => {
@@ -733,26 +734,27 @@ export const useStageEvents = (canvasId: string, stageId: string) => {
             sourceType: 'EVENT_SOURCE_TYPE_STAGE',
             sourceId: stageId,
             limit: 20,
+            states: states,
             ...(pageParam && { before: pageParam })
           }
         })
       )
       return {
         events: response.data?.events || [],
-        nextCursor: response.data?.events && response.data.events.length === 20 
-          ? response.data.events[response.data.events.length - 1]?.receivedAt 
-          : undefined
+        nextCursor: response.data?.nextTimestamp,
+        totalCount: Number(response.data?.totalCount),
+        hasNextPage: response.data?.hasNextPage
       }
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.nextCursor : undefined,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!stageId
   })
 }
 
-export const useStageQueueEvents = (canvasId: string, stageId: string, states: SuperplaneStageEventState[]) => {
+export const useStageQueueEvents = (canvasId: string, stageId: string, states: SuperplaneStageEventState[], stateReasons?: SuperplaneStageEventStateReason[], executionStates?: SuperplaneExecutionState[], executionResults?: ExecutionResult[], withExecutionFilter?: SuperplaneExecutionFilter) => {
   return useInfiniteQuery({
     queryKey: canvasKeys.stageEvents(canvasId, stageId, states),
     queryFn: async ({ pageParam }) => {
@@ -761,6 +763,10 @@ export const useStageQueueEvents = (canvasId: string, stageId: string, states: S
           path: { canvasIdOrName: canvasId, stageIdOrName: stageId },
           query: {
             states: states,
+            stateReasons: stateReasons,
+            executionStates: executionStates,
+            executionResults: executionResults,
+            executionFilter: withExecutionFilter,
             limit: 20,
             ...(pageParam && { before: pageParam })
           }
@@ -768,13 +774,13 @@ export const useStageQueueEvents = (canvasId: string, stageId: string, states: S
       )
       return {
         events: response.data?.events || [],
-        nextCursor: response.data?.events && response.data.events.length === 20 
-          ? response.data.events[response.data.events.length - 1]?.createdAt 
-          : undefined
+        nextCursor: response.data?.nextTimestamp,
+        totalCount: Number(response.data?.totalCount),
+        hasNextPage: response.data?.hasNextPage
       }
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.nextCursor : undefined,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!stageId

@@ -271,14 +271,20 @@ func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs
 	}
 
 	query := database.Conn().
-		Where("stage_id IN ?", stageIDs).
-		Where("state IN ?", states)
+		Table("stage_events as se").
+		Model(&StageEvent{}).
+		Where("se.stage_id IN ?", stageIDs).
+		Where("se.state IN ?", states)
 
 	if len(stateReasons) > 0 {
-		query = query.Where("state_reason IN ?", stateReasons)
+		query = query.Where("se.state_reason IN ?", stateReasons)
 	}
 
-	if (withExecution != nil && *withExecution) || len(executionStates) > 0 || len(executionResults) > 0 {
+	if withExecution != nil && !(*withExecution) {
+		query = query.
+			Joins("LEFT JOIN stage_executions AS ex ON ex.stage_event_id = se.id").
+			Where("ex.id IS NULL")
+	} else if (withExecution != nil && *withExecution) || len(executionStates) > 0 || len(executionResults) > 0 {
 		query = query.
 			Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = se.id")
 	}
@@ -292,10 +298,10 @@ func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs
 	}
 
 	if before != nil {
-		query = query.Where("created_at < ?", before)
+		query = query.Where("se.created_at < ?", before)
 	}
 
-	query = query.Order("stage_id, created_at DESC")
+	query = query.Order("se.created_at DESC")
 
 	err := query.Find(&events).Error
 	if err != nil {

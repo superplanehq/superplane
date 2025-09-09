@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from './types';
-import { SuperplaneCanvas, SuperplaneStageEventState, SuperplaneStageEventStateReason } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneExecutionFilter, SuperplaneExecutionState, SuperplaneStageEventState, SuperplaneStageEventStateReason } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneCancelStageEvent } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
@@ -11,11 +11,12 @@ import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSource
 
 const SYNC_EVENTS_LIMIT = 5;
 const SYNC_STAGE_EVENTS_LIMIT = 20;
-const SYNC_STAGE_EVENTS_ACTIVITY_LIMIT = 5;
 
 type SyncStageEventRequest = {
   states: SuperplaneStageEventState[]
   stateReasons?: SuperplaneStageEventStateReason[]
+  executionState?: SuperplaneExecutionState[]
+  executionFilter?: SuperplaneExecutionFilter
   limit: number
 }
 
@@ -221,28 +222,24 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return;
     }
 
-    // Here it is required to make multiple requests
-    // One to get the events that are in the queue
-    // And other to get the events that are in the processing
-    // And another to get the events that are pending
-    // And another to get the events that are waiting for execution
-    // Since we can have older events waiting and the queue and they must appear in the node and in the sidebar (Activity tab)
-    const processedEventsState: SyncStageEventRequest = { states: ['STATE_PROCESSED'], limit: SYNC_EVENTS_LIMIT }
-    const waitingForConditionState: SyncStageEventRequest = { states: ['STATE_WAITING'], stateReasons: ['STATE_REASON_APPROVAL', 'STATE_REASON_TIME_WINDOW'], limit: SYNC_STAGE_EVENTS_LIMIT }
-    const waitingForExecutionState: SyncStageEventRequest = {
-      states: ['STATE_WAITING', 'STATE_PENDING'],
-      stateReasons: ['STATE_REASON_EXECUTION'],
-      limit: SYNC_STAGE_EVENTS_ACTIVITY_LIMIT
+    const recentRunsRequest: SyncStageEventRequest = {
+      states: ['STATE_PROCESSED', 'STATE_WAITING', "STATE_PENDING"],
+      stateReasons: ['STATE_REASON_EXECUTION', "STATE_REASON_UNKNOWN"],
+      executionState: ["STATE_CANCELLED", "STATE_FINISHED", "STATE_FINISHED"],
+      executionFilter: "EXECUTION_FILTER_WITH_EXECUTION",
+      limit: SYNC_EVENTS_LIMIT
     }
-    const pendingState: SyncStageEventRequest = {
-      states: ['STATE_PENDING'],
+
+   const queueEventsRequest: SyncStageEventRequest = {
+      states: ['STATE_PROCESSED', 'STATE_WAITING', "STATE_PENDING"],
+      stateReasons: ['STATE_REASON_APPROVAL', 'STATE_REASON_TIME_WINDOW', "STATE_REASON_CANCELLED", "STATE_REASON_UNKNOWN"],
+      executionFilter: "EXECUTION_FILTER_WITHOUT_EXECUTION",
       limit: SYNC_STAGE_EVENTS_LIMIT
     }
+
     const requestingStates = [
-      processedEventsState,
-      waitingForConditionState,
-      waitingForExecutionState,
-      pendingState
+      recentRunsRequest,
+      queueEventsRequest
     ]
 
     const responsePromises = requestingStates.map(request => {

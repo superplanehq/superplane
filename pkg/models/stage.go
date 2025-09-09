@@ -412,14 +412,16 @@ func (s *Stage) ListEventsInTransaction(tx *gorm.DB, states, stateReasons []stri
 
 func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons, executionStates, executionResults []string, limit int, before *time.Time, withExecution *bool) ([]StageEvent, error) {
 	var events []StageEvent
-	query := database.Conn()
+	query := database.Conn().
+		Table("stage_events as se").
+		Model(&StageEvent{})
 	query = s.addStageEventFilters(query, states, stateReasons, executionStates, executionResults, withExecution)
 
 	if before != nil {
-		query = query.Where("created_at < ?", before)
+		query = query.Where("se.created_at < ?", before)
 	}
 
-	err := query.Order("created_at DESC").Limit(limit).Find(&events).Error
+	err := query.Order("se.created_at DESC").Limit(limit).Find(&events).Error
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +432,9 @@ func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons, executionStat
 func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons, executionStates, executionResults []string, withExecution *bool) (int64, error) {
 	var count int64
 
-	query := database.Conn().Model(&StageEvent{})
+	query := database.Conn().
+		Table("stage_events as se").
+		Model(&StageEvent{})
 	query = s.addStageEventFilters(query, states, stateReasons, executionStates, executionResults, withExecution)
 
 	err := query.Count(&count).Error
@@ -443,7 +447,6 @@ func (s *Stage) CountEventsWithStatesAndReasons(states, stateReasons, executionS
 
 func (s *Stage) addStageEventFilters(db *gorm.DB, states, stateReasons, executionStates, executionResults []string, withExecution *bool) *gorm.DB {
 	query := db.
-		Table("stage_events as se").
 		Where("se.stage_id = ?", s.ID).
 		Where("se.state IN ?", states)
 
@@ -451,7 +454,11 @@ func (s *Stage) addStageEventFilters(db *gorm.DB, states, stateReasons, executio
 		query.Where("se.state_reason IN ?", stateReasons)
 	}
 
-	if (withExecution != nil && *withExecution) || len(executionStates) > 0 || len(executionResults) > 0 {
+	if withExecution != nil && !(*withExecution) {
+		query = query.
+			Joins("LEFT JOIN stage_executions AS ex ON ex.stage_event_id = se.id").
+			Where("ex.id IS NULL")
+	} else if (withExecution != nil && *withExecution) || len(executionStates) > 0 || len(executionResults) > 0 {
 		query = query.
 			Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = se.id")
 	}

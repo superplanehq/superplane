@@ -26,7 +26,7 @@ interface HistoryTabProps {
   fetchNextConnectedEvents: () => void;
 }
 
-export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, cancelStageEvent, connectionEventsById, isFetchingNextConnectedEvents, fetchNextConnectedEvents }: HistoryTabProps) => {
+export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, cancelStageEvent, connectionEventsById, fetchNextConnectedEvents }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
     type: 'execution' | 'stage_event' | 'discarded_event';
@@ -36,32 +36,35 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
 
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState('runs');
   const [timelineLimit, setTimelineLimit] = useState(20);
 
-  // Fetch stage queue events (pending/waiting)
+  const discardedEventsCount = useMemo(() => {
+    return Object.values(connectionEventsById || {}).filter(event => event.state === 'STATE_DISCARDED').length || 0;
+  }, [connectionEventsById]);
+
   const {
     data: queueEventsData,
     fetchNextPage: fetchNextQueuePage,
     hasNextPage: hasNextQueuePage,
     isFetchingNextPage: isFetchingNextQueuePage,
     refetch: refetchQueueEvents
-  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PENDING', 'STATE_WAITING']);
+  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PENDING', 'STATE_WAITING', 'STATE_PROCESSED'], ['STATE_REASON_APPROVAL', 'STATE_REASON_TIME_WINDOW', "STATE_REASON_CANCELLED", "STATE_REASON_UNKNOWN"], [], undefined, "EXECUTION_FILTER_WITHOUT_EXECUTION");
 
   const {
-    data: finishedEventsData,
-    fetchNextPage: fetchNextFinishedPage,
-    hasNextPage: hasNextFinishedPage,
-    isFetchingNextPage: isFetchingNextFinishedPage,
-    refetch: refetchFinishedEvents
-  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PROCESSED']);
+    data: runQueueEventsData,
+    fetchNextPage: fetchNextRunQueuePage,
+    hasNextPage: hasNextRunQueuePage,
+    isFetchingNextPage: isFetchingNextRunQueuePage,
+    refetch: refetchRunQueueEvents
+  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PROCESSED', 'STATE_WAITING', "STATE_PENDING"], ['STATE_REASON_EXECUTION', "STATE_REASON_UNKNOWN"], ["STATE_CANCELLED", "STATE_FINISHED", "STATE_FINISHED"], undefined, "EXECUTION_FILTER_WITH_EXECUTION");
 
   const {
     data: stagePlainEventsData,
-    fetchNextPage: fetchNextStagePage,
-    hasNextPage: hasNextStagePage,
-    isFetchingNextPage: isFetchingNextStagePage,
-    refetch: refetchStageEvents
+    fetchNextPage: fetchNextStagePlainEventsPage,
+    hasNextPage: hasNextStagePlainEventsPage,
+    isFetchingNextPage: isFetchingNextStagePlainEventsPage,
+    refetch: refetchStagePlainEvents
   } = useStageEvents(canvasId, selectedStage.metadata!.id!);
 
   const eventsByExecutionId = useMemo(() => {
@@ -77,30 +80,30 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     return emittedEventsById;
   }, [stagePlainEventsData?.pages]);
 
-  const allFinishedExecutions = useMemo(() => (finishedEventsData?.pages.flatMap(page => page.events) || [])
+
+  const allExecutionsData = useMemo(() => (runQueueEventsData?.pages.flatMap(page => page.events) || [])
     .filter(event => event.execution)
     .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
-    .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [finishedEventsData]);
+    .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [runQueueEventsData]);
 
-  const allPendingOrRunningExecutions = useMemo(() => (queueEventsData?.pages.flatMap(page => page.events) || [])
-    .filter(event => event.execution && (event.execution.state === 'STATE_STARTED' || event.execution.state === 'STATE_PENDING'))
-    .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
-    .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [queueEventsData]);
-
+  const discardedEvents = useMemo(() => {
+    return Object.values(connectionEventsById || {}).filter(event => event.state === 'STATE_DISCARDED')
+      .filter(plainEvent => (plainEvent?.state === 'STATE_DISCARDED' && plainEvent?.receivedAt && plainEvent.sourceId !== selectedStage.metadata?.id));
+  }, [connectionEventsById, selectedStage.metadata?.id]);
 
   // Refetch queries when selectedStage.events or .queue changes
   // That means there was a new event or a new queue event since
   // those small arrays are updated near real time
   useEffect(() => {
     refetchQueueEvents();
-    refetchFinishedEvents();
-    refetchStageEvents();
-  }, [selectedStage.events, selectedStage.queue, refetchQueueEvents, refetchFinishedEvents, refetchStageEvents]);
+    refetchRunQueueEvents();
+    refetchStagePlainEvents();
+  }, [selectedStage.events, selectedStage.queue, refetchQueueEvents, refetchRunQueueEvents, refetchStagePlainEvents]);
 
   const createTimeline = (): TimelineItem[] => {
     const items: TimelineItem[] = [];
 
-    (allFinishedExecutions.concat(allPendingOrRunningExecutions)).forEach(execution => {
+    allExecutionsData.forEach(execution => {
       if (execution?.createdAt) {
         items.push({
           type: 'execution',
@@ -110,14 +113,9 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
       }
     });
 
-    const allStageEvents = (finishedEventsData?.pages.flatMap(page => page.events) || []).concat(
-      queueEventsData?.pages.flatMap(page => page.events)?.filter(event => !event.execution) || []
-    );
+    const allStageEvents = (queueEventsData?.pages.flatMap(page => page.events) || [])
 
-    const executionEventIds = new Set(allFinishedExecutions.map(exec => exec.event?.id).filter(Boolean));
-    const orphanedStageEvents = allStageEvents.filter(event => !executionEventIds.has(event.id));
-
-    orphanedStageEvents.forEach(event => {
+    allStageEvents.forEach(event => {
       if (event?.createdAt) {
         items.push({
           type: 'stage_event',
@@ -127,16 +125,13 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
       }
     });
 
-    // Add discarded events from connectionEventsById
     if (connectionEventsById) {
-      Object.values(connectionEventsById).forEach(plainEvent => {
-        if (plainEvent?.state === 'STATE_DISCARDED' && plainEvent?.receivedAt && plainEvent.sourceId !== selectedStage.metadata?.id) {
-          items.push({
-            type: 'discarded_event',
-            timestamp: plainEvent.receivedAt,
-            data: plainEvent
-          });
-        }
+      discardedEvents.forEach(plainEvent => {
+        items.push({
+          type: 'discarded_event',
+          timestamp: plainEvent.receivedAt!,
+          data: plainEvent
+        });
       });
     }
 
@@ -209,11 +204,12 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     if (hasNextQueuePage && !isFetchingNextQueuePage) {
       fetchNextQueuePage();
     }
-    if (hasNextStagePage && !isFetchingNextStagePage) {
-      fetchNextStagePage();
+    if (hasNextRunQueuePage && !isFetchingNextRunQueuePage) {
+      fetchNextRunQueuePage();
     }
-    if (hasNextFinishedPage && !isFetchingNextFinishedPage) {
-      fetchNextFinishedPage();
+
+    if (hasNextStagePlainEventsPage && !isFetchingNextStagePlainEventsPage) {
+      fetchNextStagePlainEventsPage();
     }
 
     // Fetch next connected events
@@ -222,23 +218,70 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     timelineLimit,
     hasNextQueuePage,
     isFetchingNextQueuePage,
-    hasNextStagePage,
-    isFetchingNextStagePage,
+    isFetchingNextRunQueuePage,
     fetchNextConnectedEvents,
     fetchNextQueuePage,
-    fetchNextStagePage,
-    hasNextFinishedPage,
-    isFetchingNextFinishedPage,
-    fetchNextFinishedPage
+    fetchNextRunQueuePage,
+    fetchNextStagePlainEventsPage,
+    isFetchingNextStagePlainEventsPage,
+    hasNextRunQueuePage,
+    hasNextStagePlainEventsPage,
   ]);
 
-  const hasMoreItems = (filteredTimeline.length >= timelineLimit) && ((timeline.length > timelineLimit) || hasNextQueuePage || hasNextStagePage);
-  const isLoadingMore = isFetchingNextQueuePage || isFetchingNextStagePage || isFetchingNextConnectedEvents;
+  const totalCount = useMemo(() => {
+    const queueEventsTotalCount = queueEventsData?.pages.at(-1)?.totalCount || 0;
+    const runQueueEventsTotalCount = runQueueEventsData?.pages.at(-1)?.totalCount || 0;
+    const discardedEventsTotalCount = discardedEvents.length;
+
+    if (activeFilter === 'all') {
+      return runQueueEventsTotalCount + queueEventsTotalCount + discardedEventsTotalCount;
+    }
+
+    if (activeFilter === 'runs') {
+      return runQueueEventsTotalCount;
+    }
+
+    if (activeFilter === 'queue') {
+      return queueEventsTotalCount;
+    }
+
+    if (activeFilter === 'events') {
+      return discardedEventsTotalCount;
+    }
+
+    return 0;
+  }, [queueEventsData?.pages, runQueueEventsData?.pages, discardedEvents, activeFilter]);
+
+
+  const hasMoreItems = useMemo(() => {
+    if (activeFilter === 'all') {
+      return totalCount > timelineLimit;
+    }
+
+    if (activeFilter === 'runs') {
+      return hasNextRunQueuePage;
+    }
+
+    if (activeFilter === 'queue') {
+      return hasNextQueuePage;
+    }
+
+    if (activeFilter === 'events') {
+      return discardedEventsCount >= timelineLimit;
+    }
+
+    return false;
+  }, [hasNextQueuePage, hasNextRunQueuePage, activeFilter, timelineLimit, totalCount, discardedEventsCount]);
+
+  const isLoadingMore = isFetchingNextQueuePage || isFetchingNextRunQueuePage || isFetchingNextStagePlainEventsPage;
+
+  // Check if we're still fetching the first page of any of the data sources
+  const isLoadingInitial = !queueEventsData || !runQueueEventsData || !stagePlainEventsData;
 
   return (
     <div className="p-6">
       <h3 className="font-bold text-left text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-        History ({filteredTimeline.length} items)
+        History ({totalCount} items)
       </h3>
 
       <div className="mt-5 mb-6">
@@ -270,7 +313,12 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
       </div>
 
       <div className="mb-8 space-y-3">
-        {filteredTimeline.length === 0 ? (
+        {isLoadingInitial ? (
+          <div className="flex justify-center items-center py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+            <p className="ml-3 text-gray-500">Loading...</p>
+          </div>
+        ) : filteredTimeline.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
             <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3" aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>history</span>
             <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No history available</p>
