@@ -149,7 +149,7 @@ export function ApiTokenForm({
             <div className="space-y-4 w-full">
               <Text className='text-xs text-gray-500 dark:text-zinc-400'>
                 New secret will be created in your canvas secrets.
-                You can review and manage your secrets in the secrets tab <Link href={`/organization/${organizationId}/canvas/${canvasId}#secrets`} className='text-blue-600 dark:text-blue-200'>here</Link>
+                You can review and manage your secrets in the secrets tab <Link href={`/${organizationId}/canvas/${canvasId}#secrets`} className='text-blue-600 dark:text-blue-200'>here</Link>
               </Text>
 
               <Field className='flex items-start gap-3 w-full'>
