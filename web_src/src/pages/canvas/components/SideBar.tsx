@@ -123,14 +123,12 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
 
   const {
     data: connectedEventsData,
-    isFetchingNextPage: isFetchingNextConnectedEvents,
     refetch: refetchConnectedEvents,
     fetchNextPage: fetchNextConnectedEvents,
   } = useConnectedSourcesEvents(canvasId || '', connectedSources, 50, ['STATE_PROCESSED']);
 
   const {
     data: discardedEventsData,
-    isFetchingNextPage: isFetchingNextDiscardedEvents,
     refetch: refetchDiscardedEvents,
     fetchNextPage: fetchNextDiscardedEvents,
   } = useConnectedSourcesEvents(canvasId || '', connectedSources, 50, ['STATE_DISCARDED']);
@@ -220,9 +218,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
           organizationId={organizationId!}
           selectedStage={selectedStage}
           connectionEventsById={connectionEventsById}
-          isFetchingNextConnectedEvents={isFetchingNextConnectedEvents}
           fetchNextConnectedEvents={fetchNextConnectedEvents}
-          isFetchingNextDiscardedEvents={isFetchingNextDiscardedEvents}
           fetchNextDiscardedEvents={fetchNextDiscardedEvents}
           cancelStageEvent={cancelStageEvent}
         />;

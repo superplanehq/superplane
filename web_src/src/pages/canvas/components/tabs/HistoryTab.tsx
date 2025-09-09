@@ -22,9 +22,7 @@ interface HistoryTabProps {
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   cancelStageEvent: (stageEventId: string, stageId: string) => void;
   connectionEventsById?: Record<string, SuperplaneEvent>;
-  isFetchingNextConnectedEvents: boolean;
   fetchNextConnectedEvents: () => void;
-  isFetchingNextDiscardedEvents: boolean;
   fetchNextDiscardedEvents: () => void;
 }
 

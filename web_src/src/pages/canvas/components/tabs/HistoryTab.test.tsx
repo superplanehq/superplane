@@ -56,8 +56,8 @@ describe('HistoryTab', () => {
         organizationId="org-1"
         canvasId="canvas-1"
         approveStageEvent={vi.fn()}
-        isFetchingNextConnectedEvents={false}
         fetchNextConnectedEvents={vi.fn()}
+        fetchNextDiscardedEvents={vi.fn()}
         cancelStageEvent={vi.fn()}
       />
     );
@@ -73,8 +73,8 @@ describe('HistoryTab', () => {
         organizationId="org-1"
         canvasId="canvas-1"
         approveStageEvent={vi.fn()}
-        isFetchingNextConnectedEvents={false}
         fetchNextConnectedEvents={vi.fn()}
+        fetchNextDiscardedEvents={vi.fn()}
         cancelStageEvent={vi.fn()}
       />
     );
