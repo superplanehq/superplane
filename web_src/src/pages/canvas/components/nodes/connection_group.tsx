@@ -20,7 +20,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [connectionGroupName, setConnectionGroupName] = useState(props.data.name || '');
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
-  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup } = useCanvasStore();
+  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, updateConnectionSourceNames } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
@@ -119,6 +119,12 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           timeout: currentFormData.timeout,
           timeoutBehavior: currentFormData.timeoutBehavior
         });
+
+        // Update connection source names if connection group name changed
+        const oldConnectionGroupName = currentConnectionGroup.metadata?.name;
+        if (oldConnectionGroupName && oldConnectionGroupName !== connectionGroupName) {
+          updateConnectionSourceNames(oldConnectionGroupName, connectionGroupName);
+        }
 
         updateConnectionGroup({
           ...currentConnectionGroup,

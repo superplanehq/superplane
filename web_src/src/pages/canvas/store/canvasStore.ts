@@ -470,5 +470,48 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setLockedNodes: (locked: boolean) => {
     set({ lockedNodes: locked });
+  },
+
+  updateConnectionSourceNames: (oldName: string, newName: string) => {
+    set((state) => {
+      const updatedStages = state.stages.map(stage => {
+        if (!stage.spec?.connections) return stage;
+        
+        const updatedConnections = stage.spec.connections.map(connection => 
+          connection.name === oldName ? { ...connection, name: newName } : connection
+        );
+
+        return {
+          ...stage,
+          spec: {
+            ...stage.spec,
+            connections: updatedConnections
+          }
+        };
+      });
+
+      const updatedConnectionGroups = state.connectionGroups.map(cg => {
+        if (!cg.spec?.connections) return cg;
+        
+        const updatedConnections = cg.spec.connections.map(connection =>
+          connection.name === oldName ? { ...connection, name: newName } : connection
+        );
+
+        return {
+          ...cg,
+          spec: {
+            ...cg.spec,
+            connections: updatedConnections
+          }
+        };
+      });
+
+      return {
+        stages: updatedStages,
+        connectionGroups: updatedConnectionGroups
+      };
+    });
+    
+    get().syncToReactFlow();
   }
 }));

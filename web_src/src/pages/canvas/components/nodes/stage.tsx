@@ -36,7 +36,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [stageName, setStageName] = useState(props.data.name || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, updateConnectionSourceNames } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
   const nodes = useCanvasStore(state => state.nodes);
   const currentStage = useCanvasStore(state =>
@@ -229,6 +229,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           inputMappings: currentFormData.inputMappings
         };
         await updateStageMutation.mutateAsync(updateParams);
+
+        // Update connection source names if stage name changed
+        const oldStageName = currentStage.metadata?.name;
+        if (oldStageName && oldStageName !== stageName) {
+          updateConnectionSourceNames(oldStageName, stageName);
+        }
 
         updateStage({
           ...currentStage,
