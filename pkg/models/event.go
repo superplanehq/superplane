@@ -19,21 +19,15 @@ import (
 )
 
 const (
-	EventStatePending = "pending"
-
-	//
-	// Event ends up in this state when:
-	// - Event does not pass event source filters
-	// - Source is not connected to anything
-	// - Source is connected, but filters on all the connections reject it.
-	//
+	EventStatePending   = "pending"
 	EventStateDiscarded = "discarded"
-
-	//
-	// Event ends up in this state when:
-	// - Source is connected and not rejected by some connection filters.
-	//
 	EventStateProcessed = "processed"
+
+	EventStateReasonFiltered     = "filtered"
+	EventStateReasonError        = "error"
+	EventStateReasonNotConnected = "not-connected"
+	EventStateReasonOk           = "ok"
+	EventStateReasonUnknown      = "unknown"
 
 	SourceTypeEventSource     = "event-source"
 	SourceTypeStage           = "stage"
@@ -44,16 +38,18 @@ const (
 )
 
 type Event struct {
-	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	SourceID   uuid.UUID
-	CanvasID   uuid.UUID
-	SourceName string
-	SourceType string
-	Type       string
-	State      string
-	ReceivedAt *time.Time
-	Raw        datatypes.JSON
-	Headers    datatypes.JSON
+	ID           uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	SourceID     uuid.UUID
+	CanvasID     uuid.UUID
+	SourceName   string
+	SourceType   string
+	Type         string
+	State        string
+	StateReason  string
+	StateMessage string
+	ReceivedAt   *time.Time
+	Raw          datatypes.JSON
+	Headers      datatypes.JSON
 }
 
 type headerVisitor struct{}
@@ -83,14 +79,16 @@ func (v *headerVisitor) Visit(node *ast.Node) {
 	}
 }
 
-func (e *Event) UpdateState(state string) error {
-	return e.UpdateStateInTransaction(database.Conn(), state)
+func (e *Event) UpdateState(state, reason, message string) error {
+	return e.UpdateStateInTransaction(database.Conn(), state, reason, message)
 }
 
-func (e *Event) UpdateStateInTransaction(tx *gorm.DB, state string) error {
+func (e *Event) UpdateStateInTransaction(tx *gorm.DB, state, reason, message string) error {
 	return tx.Model(e).
 		Clauses(clause.Returning{}).
 		Update("state", state).
+		Update("state_reason", reason).
+		Update("state_message", message).
 		Error
 }
 

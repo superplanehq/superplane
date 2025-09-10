@@ -667,6 +667,64 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/rejections": {
+      "get": {
+        "summary": "List event rejections",
+        "description": "Returns a list of events that were rejected by a particular component",
+        "operationId": "Superplane_ListEventRejections",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListEventRejectionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "componentType",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "componentId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/stage-events/bulk": {
       "post": {
         "summary": "Bulk list stage events",
@@ -955,9 +1013,7 @@
                 "STATE_REASON_APPROVAL",
                 "STATE_REASON_TIME_WINDOW",
                 "STATE_REASON_EXECUTION",
-                "STATE_REASON_CONNECTION",
                 "STATE_REASON_CANCELLED",
-                "STATE_REASON_UNHEALTHY",
                 "STATE_REASON_STUCK",
                 "STATE_REASON_TIMEOUT"
               ]
@@ -2601,6 +2657,15 @@
       },
       "title": "Common data structures"
     },
+    "EventRejectionRejectionReason": {
+      "type": "string",
+      "enum": [
+        "REJECTION_REASON_UNKNOWN",
+        "REJECTION_REASON_FILTERED",
+        "REJECTION_REASON_ERROR"
+      ],
+      "default": "REJECTION_REASON_UNKNOWN"
+    },
     "EventSourceEventType": {
       "type": "object",
       "properties": {
@@ -3876,6 +3941,12 @@
         "state": {
           "$ref": "#/definitions/SuperplaneEventState"
         },
+        "stateReason": {
+          "$ref": "#/definitions/SuperplaneEventStateReason"
+        },
+        "stateMessage": {
+          "type": "string"
+        },
         "receivedAt": {
           "type": "string",
           "format": "date-time"
@@ -3885,6 +3956,36 @@
         },
         "headers": {
           "type": "object"
+        }
+      }
+    },
+    "SuperplaneEventRejection": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "eventId": {
+          "type": "string"
+        },
+        "componentType": {
+          "type": "string"
+        },
+        "componentId": {
+          "type": "string"
+        },
+        "componentName": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/definitions/EventRejectionRejectionReason"
+        },
+        "message": {
+          "type": "string"
+        },
+        "rejectedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -3990,6 +4091,17 @@
         "STATE_PROCESSED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneEventStateReason": {
+      "type": "string",
+      "enum": [
+        "STATE_REASON_UNKNOWN",
+        "STATE_REASON_FILTERED",
+        "STATE_REASON_ERROR",
+        "STATE_REASON_NOT_CONNECTED",
+        "STATE_REASON_OK"
+      ],
+      "default": "STATE_REASON_UNKNOWN"
     },
     "SuperplaneExecution": {
       "type": "object",
@@ -4201,6 +4313,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneConnectionGroup"
+          }
+        }
+      }
+    },
+    "SuperplaneListEventRejectionsResponse": {
+      "type": "object",
+      "properties": {
+        "rejections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneEventRejection"
           }
         }
       }
@@ -4436,9 +4560,7 @@
         "STATE_REASON_APPROVAL",
         "STATE_REASON_TIME_WINDOW",
         "STATE_REASON_EXECUTION",
-        "STATE_REASON_CONNECTION",
         "STATE_REASON_CANCELLED",
-        "STATE_REASON_UNHEALTHY",
         "STATE_REASON_STUCK",
         "STATE_REASON_TIMEOUT"
       ],

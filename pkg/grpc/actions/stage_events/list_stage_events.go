@@ -129,12 +129,8 @@ func protoToStateReason(stateReason pb.StageEvent_StateReason) (string, error) {
 		return models.StageEventStateReasonTimeWindow, nil
 	case pb.StageEvent_STATE_REASON_EXECUTION:
 		return models.StageEventStateReasonExecution, nil
-	case pb.StageEvent_STATE_REASON_CONNECTION:
-		return models.StageEventStateReasonConnection, nil
 	case pb.StageEvent_STATE_REASON_CANCELLED:
 		return models.StageEventStateReasonCancelled, nil
-	case pb.StageEvent_STATE_REASON_UNHEALTHY:
-		return models.StageEventStateReasonUnhealthy, nil
 	case pb.StageEvent_STATE_REASON_STUCK:
 		return models.StageEventStateReasonStuck, nil
 	case pb.StageEvent_STATE_REASON_TIMEOUT:
@@ -309,12 +305,8 @@ func stateReasonToProto(stateReason string) pb.StageEvent_StateReason {
 		return pb.StageEvent_STATE_REASON_TIME_WINDOW
 	case models.StageEventStateReasonExecution:
 		return pb.StageEvent_STATE_REASON_EXECUTION
-	case models.StageEventStateReasonConnection:
-		return pb.StageEvent_STATE_REASON_CONNECTION
 	case models.StageEventStateReasonCancelled:
 		return pb.StageEvent_STATE_REASON_CANCELLED
-	case models.StageEventStateReasonUnhealthy:
-		return pb.StageEvent_STATE_REASON_UNHEALTHY
 	case models.StageEventStateReasonStuck:
 		return pb.StageEvent_STATE_REASON_STUCK
 	case models.StageEventStateReasonTimeout:

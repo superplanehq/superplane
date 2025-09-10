@@ -1,0 +1,8 @@
+
+BEGIN;
+
+ALTER TABLE events
+  ADD COLUMN state_reason CHARACTER VARYING(64),
+  ADD COLUMN state_message TEXT;
+
+COMMIT;

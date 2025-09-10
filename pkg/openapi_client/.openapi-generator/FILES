@@ -23,6 +23,7 @@ docs/AuthorizationPermission.md
 docs/CanvasAPI.md
 docs/ConnectionGroupAPI.md
 docs/EventAPI.md
+docs/EventRejectionRejectionReason.md
 docs/EventSourceAPI.md
 docs/EventSourceEventType.md
 docs/ExecutionResult.md
@@ -132,6 +133,7 @@ docs/SuperplaneDescribeConnectionGroupResponse.md
 docs/SuperplaneDescribeEventSourceResponse.md
 docs/SuperplaneDescribeStageResponse.md
 docs/SuperplaneEvent.md
+docs/SuperplaneEventRejection.md
 docs/SuperplaneEventSource.md
 docs/SuperplaneEventSourceItemRequest.md
 docs/SuperplaneEventSourceItemResult.md
@@ -139,6 +141,7 @@ docs/SuperplaneEventSourceMetadata.md
 docs/SuperplaneEventSourceSpec.md
 docs/SuperplaneEventSourceType.md
 docs/SuperplaneEventState.md
+docs/SuperplaneEventStateReason.md
 docs/SuperplaneExecution.md
 docs/SuperplaneExecutionResource.md
 docs/SuperplaneExecutionState.md
@@ -155,6 +158,7 @@ docs/SuperplaneKeyValuePair.md
 docs/SuperplaneListCanvasesResponse.md
 docs/SuperplaneListConnectionGroupFieldSetsResponse.md
 docs/SuperplaneListConnectionGroupsResponse.md
+docs/SuperplaneListEventRejectionsResponse.md
 docs/SuperplaneListEventSourcesResponse.md
 docs/SuperplaneListEventsResponse.md
 docs/SuperplaneListStageEventsResponse.md
@@ -197,6 +201,7 @@ git_push.sh
 model_auth_token.go
 model_authorization_domain_type.go
 model_authorization_permission.go
+model_event_rejection_rejection_reason.go
 model_event_source_event_type.go
 model_execution_result.go
 model_googlerpc_status.go
@@ -298,6 +303,7 @@ model_superplane_describe_connection_group_response.go
 model_superplane_describe_event_source_response.go
 model_superplane_describe_stage_response.go
 model_superplane_event.go
+model_superplane_event_rejection.go
 model_superplane_event_source.go
 model_superplane_event_source_item_request.go
 model_superplane_event_source_item_result.go
@@ -305,6 +311,7 @@ model_superplane_event_source_metadata.go
 model_superplane_event_source_spec.go
 model_superplane_event_source_type.go
 model_superplane_event_state.go
+model_superplane_event_state_reason.go
 model_superplane_execution.go
 model_superplane_execution_resource.go
 model_superplane_execution_state.go
@@ -321,6 +328,7 @@ model_superplane_key_value_pair.go
 model_superplane_list_canvases_response.go
 model_superplane_list_connection_group_field_sets_response.go
 model_superplane_list_connection_groups_response.go
+model_superplane_list_event_rejections_response.go
 model_superplane_list_event_sources_response.go
 model_superplane_list_events_response.go
 model_superplane_list_stage_events_response.go

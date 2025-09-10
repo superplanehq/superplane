@@ -2,9 +2,9 @@
 -- PostgreSQL database dump
 --
 
-\restrict MWmKJTh3v9oh8htLVrbW0CSSLGvnbNUHoQxE2hg7NaF6dHHPrQmfSTaLFMlMNV8
+\restrict 7fwAiNGVBRdpX5kSQnqxKBuwnrc6ZjYilHmbeHaWndPdUKR9uVGyJKhaovC34Id
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
@@ -191,6 +191,21 @@ CREATE TABLE public.connections (
 
 
 --
+-- Name: event_rejections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.event_rejections (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    event_id uuid NOT NULL,
+    component_type character varying(64) NOT NULL,
+    component_id uuid NOT NULL,
+    reason character varying(64) NOT NULL,
+    message text,
+    rejected_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: event_sources; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -224,7 +239,9 @@ CREATE TABLE public.events (
     raw jsonb NOT NULL,
     state character varying(64) NOT NULL,
     headers jsonb DEFAULT '{}'::jsonb NOT NULL,
-    type character varying(128) NOT NULL
+    type character varying(128) NOT NULL,
+    state_reason character varying(64),
+    state_message text
 );
 
 
@@ -580,6 +597,14 @@ ALTER TABLE ONLY public.connections
 
 
 --
+-- Name: event_rejections event_rejections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_rejections
+    ADD CONSTRAINT event_rejections_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: event_sources event_sources_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -844,6 +869,20 @@ CREATE INDEX idx_connection_groups_deleted_at ON public.connection_groups USING 
 
 
 --
+-- Name: idx_event_rejections_component; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_rejections_component ON public.event_rejections USING btree (component_type, component_id);
+
+
+--
+-- Name: idx_event_rejections_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_rejections_event_id ON public.event_rejections USING btree (event_id);
+
+
+--
 -- Name: idx_event_sources_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -982,6 +1021,14 @@ ALTER TABLE ONLY public.connection_groups
 
 
 --
+-- Name: event_rejections event_rejections_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_rejections
+    ADD CONSTRAINT event_rejections_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
 -- Name: event_sources event_sources_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1105,15 +1152,15 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MWmKJTh3v9oh8htLVrbW0CSSLGvnbNUHoQxE2hg7NaF6dHHPrQmfSTaLFMlMNV8
+\unrestrict 7fwAiNGVBRdpX5kSQnqxKBuwnrc6ZjYilHmbeHaWndPdUKR9uVGyJKhaovC34Id
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 064poHNocEhBHOXbAuejZ5Zc1ClYr8yXW8G49hZwS7p7T0RUkJ4Mf0m9JbvN5cw
+\restrict YLApTgRZFdmMHsrhl6wWlYIspgfto4le1VUnszSFzqvj55B4x9HREtOu0VH2zUh
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
@@ -1133,7 +1180,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250904120548	f
+20250910175252	f
 \.
 
 
@@ -1141,5 +1188,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 064poHNocEhBHOXbAuejZ5Zc1ClYr8yXW8G49hZwS7p7T0RUkJ4Mf0m9JbvN5cw
+\unrestrict YLApTgRZFdmMHsrhl6wWlYIspgfto4le1VUnszSFzqvj55B4x9HREtOu0VH2zUh
 

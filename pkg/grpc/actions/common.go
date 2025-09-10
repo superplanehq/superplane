@@ -266,6 +266,17 @@ func ConnectionTypeToProto(t string) pb.Connection_Type {
 	}
 }
 
+func RejectionReasonToProto(reason string) pb.EventRejection_RejectionReason {
+	switch reason {
+	case models.EventRejectionReasonFiltered:
+		return pb.EventRejection_REJECTION_REASON_FILTERED
+	case models.EventRejectionReasonError:
+		return pb.EventRejection_REJECTION_REASON_ERROR
+	default:
+		return pb.EventRejection_REJECTION_REASON_UNKNOWN
+	}
+}
+
 func ProtoToDomainType(domainType pbAuth.DomainType) (string, error) {
 	switch domainType {
 	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:

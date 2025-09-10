@@ -57,7 +57,7 @@ func (w *PendingEventsWorker) Tick() error {
 		//
 		if err != nil {
 			logger.Errorf("Error processing event: %v", err)
-			err = e.UpdateState(models.EventStateDiscarded)
+			err = event.UpdateState(models.EventStateDiscarded, models.EventStateReasonError, err.Error())
 			if err != nil {
 				logger.Errorf("Error discarding event: %v", err)
 			}
@@ -98,13 +98,11 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 		//
 		accept, err := source.Accept(event)
 		if err != nil {
-			logger.Errorf("Error applying filter: %v", err)
-			return err
+			return event.UpdateState(models.EventStateDiscarded, models.EventStateReasonError, fmt.Sprintf("error applying filters: %v", err))
 		}
 
 		if !accept {
-			logger.Info("Event does not pass filters - discarding")
-			return event.UpdateState(models.EventStateDiscarded)
+			return event.UpdateState(models.EventStateDiscarded, models.EventStateReasonFiltered, "")
 		}
 	}
 
@@ -193,26 +191,7 @@ func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *model
 	// If the source is not connected to any stage, we discard the event.
 	//
 	if len(connections) == 0 {
-		logger.Info("Unconnected source - discarding")
-		return event.UpdateState(models.EventStateDiscarded)
-	}
-
-	for _, connection := range connections {
-		accept, err := connection.Accept(event)
-		if err != nil {
-			logger.Errorf("Error applying filter: %v", err)
-			continue
-		}
-
-		if !accept {
-			continue
-		}
-	}
-
-	connections = w.filterConnections(logger, event, connections)
-	if len(connections) == 0 {
-		logger.Info("No connections after applying connection filters - discarding")
-		return event.UpdateState(models.EventStateDiscarded)
+		return event.UpdateState(models.EventStateDiscarded, models.EventStateReasonNotConnected, "")
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -229,31 +208,34 @@ func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *model
 			}
 		}
 
-		return event.UpdateStateInTransaction(tx, models.EventStateProcessed)
+		return event.UpdateStateInTransaction(tx, models.EventStateProcessed, models.EventStateReasonOk, "")
 	})
 }
 
-func (w *PendingEventsWorker) filterConnections(logger *log.Entry, event *models.Event, connections []models.Connection) []models.Connection {
-	filtered := []models.Connection{}
-
-	for _, connection := range connections {
-		accept, err := connection.Accept(event)
-		if err != nil {
-			logger.Errorf("Error applying filter: %v", err)
-			continue
-		}
-
-		if !accept {
-			continue
-		}
-
-		filtered = append(filtered, connection)
+func (w *PendingEventsWorker) handleEventForConnection(tx *gorm.DB, event *models.Event, connection models.Connection) error {
+	accept, err := connection.Accept(event)
+	if err != nil {
+		return models.RejectEventInTransaction(
+			tx,
+			event.ID,
+			connection.TargetID,
+			connection.TargetType,
+			models.EventRejectionReasonError,
+			fmt.Sprintf("error applying filters: %v", err),
+		)
 	}
 
-	return filtered
-}
+	if !accept {
+		return models.RejectEventInTransaction(
+			tx,
+			event.ID,
+			connection.TargetID,
+			connection.TargetType,
+			models.EventRejectionReasonFiltered,
+			"",
+		)
+	}
 
-func (w *PendingEventsWorker) handleEventForConnection(tx *gorm.DB, event *models.Event, connection models.Connection) error {
 	switch connection.TargetType {
 	case models.ConnectionTargetTypeStage:
 		return w.handleEventForStage(tx, event, connection)
@@ -274,12 +256,26 @@ func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Eve
 
 	inputs, err := w.buildInputs(tx, event, *stage)
 	if err != nil {
-		return err
+		return models.RejectEventInTransaction(
+			tx,
+			event.ID,
+			connection.TargetID,
+			connection.TargetType,
+			models.EventRejectionReasonError,
+			fmt.Sprintf("error building inputs: %v", err),
+		)
 	}
 
 	executorName, err := w.buildExecutorName(inputs, *stage)
 	if err != nil {
-		return err
+		return models.RejectEventInTransaction(
+			tx,
+			event.ID,
+			connection.TargetID,
+			connection.TargetType,
+			models.EventRejectionReasonError,
+			fmt.Sprintf("error applying filters: %v", err),
+		)
 	}
 
 	stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs, executorName)
@@ -307,7 +303,14 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 	//
 	fields, hash, err := connectionGroup.CalculateFieldSet(event)
 	if err != nil {
-		return err
+		return models.RejectEventInTransaction(
+			tx,
+			event.ID,
+			connection.TargetID,
+			connection.TargetType,
+			models.EventRejectionReasonError,
+			fmt.Sprintf("unable to calculate field set: %v", err),
+		)
 	}
 
 	fieldSet, err := connectionGroup.FindPendingFieldSetByHash(tx, hash)

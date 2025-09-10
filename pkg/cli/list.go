@@ -360,6 +360,54 @@ var listConnectionGroupFieldSetsCmd = &cobra.Command{
 	},
 }
 
+var listEventRejectionsCmd = &cobra.Command{
+	Use:   "event-rejections",
+	Short: "List events that were rejected by a specific component",
+	Args:  cobra.ExactArgs(0),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
+		componentType, _ := cmd.Flags().GetString("component-type")
+		if componentType == "" {
+			fmt.Fprintf(os.Stderr, "Error: must specify --component-type\n")
+			os.Exit(1)
+		}
+
+		componentID, _ := cmd.Flags().GetString("component-id")
+		if componentID == "" {
+			fmt.Fprintf(os.Stderr, "Error: must specify --component-id\n")
+			os.Exit(1)
+		}
+
+		c := DefaultClient()
+		response, _, err := c.CanvasAPI.
+			SuperplaneListEventRejections(context.Background(), canvasIDOrName).
+			ComponentType(componentType).
+			ComponentId(componentID).
+			Execute()
+
+		Check(err)
+
+		if len(response.Rejections) == 0 {
+			fmt.Println("No rejections found.")
+			return
+		}
+
+		fmt.Printf("Found %d rejections:\n\n", len(response.Rejections))
+		for i, rejection := range response.Rejections {
+			fmt.Printf("%d. ID: %s\n", i+1, *rejection.Id)
+			fmt.Printf("   Event ID: %s\n", *rejection.EventId)
+			fmt.Printf("   Reason: %s\n", *rejection.Reason)
+			fmt.Printf("   Message: %s\n", *rejection.Message)
+			fmt.Printf("   Rejected At: %s\n", *rejection.RejectedAt)
+
+			if i < len(response.Rejections)-1 {
+				fmt.Println()
+			}
+		}
+	},
+}
+
 // Root list command
 var listCmd = &cobra.Command{
 	Use:     "list",
@@ -414,6 +462,13 @@ func init() {
 	listConnectionGroupFieldSetsCmd.Flags().String("canvas-name", "", "Canvas name")
 	listConnectionGroupFieldSetsCmd.Flags().String("connection-group-id", "", "Connection group ID")
 	listConnectionGroupFieldSetsCmd.Flags().String("connection-group-name", "", "Connection group name")
+
+	// Event rejections command
+	listCmd.AddCommand(listEventRejectionsCmd)
+	listEventRejectionsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listEventRejectionsCmd.Flags().String("canvas-name", "", "Canvas name")
+	listEventRejectionsCmd.Flags().String("component-type", "", "Component type")
+	listEventRejectionsCmd.Flags().String("component-id", "", "Component ID")
 }
 
 func fieldsAsString(fields []openapi_client.SuperplaneKeyValuePair) string {

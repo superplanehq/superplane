@@ -337,6 +337,17 @@ service Superplane {
     };
   }
 
+  rpc ListEventRejections(ListEventRejectionsRequest) returns (ListEventRejectionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/rejections"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List event rejections";
+      description: "Returns a list of events that were rejected by a particular component";
+      tags: "Canvas";
+    };
+  }
+
   rpc AddUser(AddUserRequest) returns (AddUserResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/users"
@@ -793,7 +804,7 @@ message StageEvent {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_WAITING = 2;
-    STATE_PROCESSED = 4;
+    STATE_PROCESSED = 3;
   }
 
   enum StateReason {
@@ -801,11 +812,9 @@ message StageEvent {
     STATE_REASON_APPROVAL = 1;
     STATE_REASON_TIME_WINDOW = 2;
     STATE_REASON_EXECUTION = 3;
-    STATE_REASON_CONNECTION = 4;
-    STATE_REASON_CANCELLED = 5;
-    STATE_REASON_UNHEALTHY = 6;
-    STATE_REASON_STUCK = 7;
-    STATE_REASON_TIMEOUT = 8;
+    STATE_REASON_CANCELLED = 4;
+    STATE_REASON_STUCK = 5;
+    STATE_REASON_TIMEOUT = 6;
   }
 
   string id = 1;
@@ -949,15 +958,54 @@ message Event {
     STATE_PROCESSED = 3;
   }
 
+  enum StateReason {
+    STATE_REASON_UNKNOWN = 0;
+    STATE_REASON_FILTERED = 1;
+    STATE_REASON_ERROR = 2;
+    STATE_REASON_NOT_CONNECTED = 3;
+    STATE_REASON_OK = 4;
+  }
+
   string id = 1;
   string source_id = 2;
   string source_name = 3;
   EventSourceType source_type = 4;
   string type = 5;
   State state = 6;
-  google.protobuf.Timestamp received_at = 7;
-  google.protobuf.Struct raw = 8;
-  google.protobuf.Struct headers = 9;
+  StateReason state_reason = 7;
+  string state_message = 8;
+  google.protobuf.Timestamp received_at = 9;
+  google.protobuf.Struct raw = 10;
+  google.protobuf.Struct headers = 11;
+}
+
+message EventRejection {
+  enum RejectionReason {
+    REJECTION_REASON_UNKNOWN = 0;
+    REJECTION_REASON_FILTERED = 1;
+    REJECTION_REASON_ERROR = 2;
+  }
+
+  string id = 1;
+  string event_id = 2;
+  string component_type = 3;
+  string component_id = 4;
+  string component_name = 5;
+  RejectionReason reason = 6;
+  string message = 7;
+  google.protobuf.Timestamp rejected_at = 8;
+}
+
+message ListEventRejectionsRequest {
+  string canvas_id_or_name = 1;
+  string component_type = 2;
+  string component_id = 3;
+  int32 limit = 4;
+  google.protobuf.Timestamp before = 5;
+}
+
+message ListEventRejectionsResponse {
+  repeated EventRejection rejections = 1;
 }
 
 message EventSourceItemRequest {
