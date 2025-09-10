@@ -20,17 +20,17 @@ import (
 var ErrResourceAlreadyUsed = fmt.Errorf("resource already used")
 
 type EventSourceBuilder struct {
-	tx                 *gorm.DB
-	ctx                context.Context
-	encryptor          crypto.Encryptor
-	registry           *registry.Registry
-	canvasID           uuid.UUID
-	name               string
-	description        string
-	scope              string
-	eventTypes         []models.EventType
-	integration        *models.Integration
-	resource           integrations.Resource
+	tx                  *gorm.DB
+	ctx                 context.Context
+	encryptor           crypto.Encryptor
+	registry            *registry.Registry
+	canvasID            uuid.UUID
+	name                string
+	description         string
+	scope               string
+	eventTypes          []models.EventType
+	integration         *models.Integration
+	resource            integrations.Resource
 	existingEventSource *models.EventSource
 }
 
@@ -313,6 +313,16 @@ func (b *EventSourceBuilder) updateWithoutIntegration(tx *gorm.DB) (*models.Even
 		return nil, "", err
 	}
 
+	//
+	// Update connection source names if event source name changed
+	//
+	if b.existingEventSource.Name != b.name {
+		err = models.UpdateConnectionSourceNameInTransaction(tx, b.existingEventSource.ID, models.SourceTypeEventSource, b.existingEventSource.Name, b.name)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to update connection source names: %v", err)
+		}
+	}
+
 	now := time.Now()
 	err = tx.Model(b.existingEventSource).
 		Update("name", b.name).
@@ -361,6 +371,16 @@ func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSou
 	plainKey, err := b.encryptor.Decrypt(b.ctx, b.existingEventSource.Key, []byte(b.existingEventSource.ID.String()))
 	if err != nil {
 		return nil, "", err
+	}
+
+	//
+	// Update connection source names if event source name changed
+	//
+	if b.existingEventSource.Name != b.name {
+		err = models.UpdateConnectionSourceNameInTransaction(tx, b.existingEventSource.ID, models.SourceTypeEventSource, b.existingEventSource.Name, b.name)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to update connection source names: %v", err)
+		}
 	}
 
 	now := time.Now()

@@ -87,3 +87,15 @@ func ListConnectionsInTransaction(tx *gorm.DB, targetID uuid.UUID, targetType st
 
 	return connections, nil
 }
+
+func UpdateConnectionSourceNameInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceType string, oldName string, newName string) error {
+	err := tx.
+		Model(&Connection{}).
+		Where("source_id = ?", sourceID).
+		Where("source_type = ?", sourceType).
+		Where("source_name = ?", oldName).
+		Update("source_name", newName).
+		Error
+
+	return err
+}
