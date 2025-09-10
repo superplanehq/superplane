@@ -36,6 +36,13 @@ interface StageEditModeContentProps {
   }) => void;
 }
 
+interface ParameterWithId {
+  id: string;
+  key: string;
+  value: string;
+}
+
+
 export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, onDataChange }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
@@ -56,6 +63,52 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     (executor.spec?.task as string) ? 'task' : 'workflow'
   );
   const [isEditingExecutor, setIsEditingExecutor] = useState(false);
+
+
+  const [semaphoreParameters, setSemaphoreParameters] = useState<ParameterWithId[]>(() => {
+    const params = executor.spec?.parameters as Record<string, string>;
+    if (!params) return [];
+    return Object.entries(params).map(([key, value], index) => ({
+      id: `param_${Date.now()}_${index}`,
+      key,
+      value
+    }));
+  });
+  const [githubInputs, setGithubInputs] = useState<ParameterWithId[]>(() => {
+    const inputs = executor.spec?.inputs as Record<string, string>;
+    if (!inputs) return [];
+    return Object.entries(inputs).map(([key, value], index) => ({
+      id: `input_${Date.now()}_${index}`,
+      key,
+      value
+    }));
+  });
+  const [httpHeaders, setHttpHeaders] = useState<ParameterWithId[]>(() => {
+    const headers = executor.spec?.headers as Record<string, string>;
+    if (!headers) return [];
+    return Object.entries(headers).map(([key, value], index) => ({
+      id: `header_${Date.now()}_${index}`,
+      key,
+      value
+    }));
+  });
+  const [nextIdCounter, setNextIdCounter] = useState(1);
+
+  const generateId = useCallback(() => {
+    const id = `param_${nextIdCounter}`;
+    setNextIdCounter(prev => prev + 1);
+    return id;
+  }, [nextIdCounter]);
+
+
+  const parametersWithIdToRecord = useCallback((params: ParameterWithId[]): Record<string, string> => {
+    return params.reduce((acc, param) => {
+      if (param.key.trim() !== '') {
+        acc[param.key] = param.value;
+      }
+      return acc;
+    }, {} as Record<string, string>);
+  }, []);
 
   // Validation
   const { validateName } = useValidation();
@@ -508,6 +561,40 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   };
 
 
+
+  useEffect(() => {
+    if (executor.type === 'semaphore' && semaphoreParameters.length > 0) {
+      const newParams = parametersWithIdToRecord(semaphoreParameters);
+      const currentParams = executor.spec?.parameters as Record<string, string>;
+
+      if (JSON.stringify(newParams) !== JSON.stringify(currentParams || {})) {
+        updateExecutorField('parameters', newParams);
+      }
+    }
+  }, [semaphoreParameters, executor.type, executor.spec?.parameters, parametersWithIdToRecord]);
+
+  useEffect(() => {
+    if (executor.type === 'github' && githubInputs.length > 0) {
+      const newInputs = parametersWithIdToRecord(githubInputs);
+      const currentInputs = executor.spec?.inputs as Record<string, string>;
+
+      if (JSON.stringify(newInputs) !== JSON.stringify(currentInputs || {})) {
+        updateExecutorField('inputs', newInputs);
+      }
+    }
+  }, [githubInputs, executor.type, executor.spec?.inputs, parametersWithIdToRecord]);
+
+  useEffect(() => {
+    if (executor.type === 'http' && httpHeaders.length > 0) {
+      const newHeaders = parametersWithIdToRecord(httpHeaders);
+      const currentHeaders = executor.spec?.headers as Record<string, string>;
+
+      if (JSON.stringify(newHeaders) !== JSON.stringify(currentHeaders || {})) {
+        updateExecutorField('headers', newHeaders);
+      }
+    }
+  }, [httpHeaders, executor.type, executor.spec?.headers, parametersWithIdToRecord]);
+
   // Sync component state with incoming data prop changes
   useEffect(() => {
     syncWithIncomingData(
@@ -647,59 +734,66 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   };
 
   const addExecutorParameter = () => {
-    const currentParams = (executor.spec?.parameters as Record<string, string>) || {};
-    const newKey = `PARAM_${Object.keys(currentParams).length + 1}`;
-    updateExecutorField('parameters', {
-      ...currentParams,
-      [newKey]: ''
-    });
+    const newParam: ParameterWithId = {
+      id: generateId(),
+      key: `PARAM_${semaphoreParameters.length + 1}`,
+      value: ''
+    };
+    setSemaphoreParameters(prev => [...prev, newParam]);
   };
 
-  const updateExecutorParameter = (oldKey: string, newKey: string, value: string) => {
-    const currentParams = (executor.spec?.parameters as Record<string, string>) || {};
-    const updatedParams = { ...currentParams };
-
-    if (oldKey !== newKey) {
-      delete updatedParams[oldKey];
-    }
-    updatedParams[newKey] = value;
-
-    updateExecutorField('parameters', updatedParams);
+  const updateExecutorParameter = (id: string, key: string, value: string) => {
+    setSemaphoreParameters(prev =>
+      prev.map(param =>
+        param.id === id ? { ...param, key, value } : param
+      )
+    );
   };
 
-  const removeExecutorParameter = (key: string) => {
-    const currentParams = (executor.spec?.parameters as Record<string, string>) || {};
-    const updatedParams = { ...currentParams };
-    delete updatedParams[key];
-    updateExecutorField('parameters', updatedParams);
+  const removeExecutorParameter = (id: string) => {
+    setSemaphoreParameters(prev => prev.filter(param => param.id !== id));
   };
 
   const addExecutorInput = () => {
-    const currentParams = (executor.spec?.inputs as Record<string, string>) || {};
-    const newKey = `INPUT_${Object.keys(currentParams).length + 1}`;
-    updateExecutorField('inputs', {
-      ...currentParams,
-      [newKey]: ''
-    });
+    const newInput: ParameterWithId = {
+      id: generateId(),
+      key: `INPUT_${githubInputs.length + 1}`,
+      value: ''
+    };
+    setGithubInputs(prev => [...prev, newInput]);
   };
 
-  const updateExecutorInput = (oldKey: string, newKey: string, value: string) => {
-    const currentParams = (executor.spec?.inputs as Record<string, string>) || {};
-    const updatedParams = { ...currentParams };
-
-    if (oldKey !== newKey) {
-      delete updatedParams[oldKey];
-    }
-    updatedParams[newKey] = value;
-
-    updateExecutorField('inputs', updatedParams);
+  const updateExecutorInput = (id: string, key: string, value: string) => {
+    setGithubInputs(prev =>
+      prev.map(input =>
+        input.id === id ? { ...input, key, value } : input
+      )
+    );
   };
 
-  const removeExecutorInput = (key: string) => {
-    const currentParams = (executor.spec?.inputs as Record<string, string>) || {};
-    const updatedParams = { ...currentParams };
-    delete updatedParams[key];
-    updateExecutorField('inputs', updatedParams);
+  const removeExecutorInput = (id: string) => {
+    setGithubInputs(prev => prev.filter(input => input.id !== id));
+  };
+
+  const addExecutorHeader = () => {
+    const newHeader: ParameterWithId = {
+      id: generateId(),
+      key: `Header_${httpHeaders.length + 1}`,
+      value: ''
+    };
+    setHttpHeaders(prev => [...prev, newHeader]);
+  };
+
+  const updateExecutorHeader = (id: string, key: string, value: string) => {
+    setHttpHeaders(prev =>
+      prev.map(header =>
+        header.id === id ? { ...header, key, value } : header
+      )
+    );
+  };
+
+  const removeExecutorHeader = (id: string) => {
+    setHttpHeaders(prev => prev.filter(header => header.id !== id));
   };
 
   const updateExecutorIntegration = (integrationName: string) => {
@@ -1797,24 +1891,24 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                           <ValidationField label="Parameters">
                             <div className="space-y-2">
-                              {Object.entries((executor.spec?.parameters as Record<string, string>) || {}).map(([key, value]) => (
-                                <div key={key} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                              {semaphoreParameters.map((param) => (
+                                <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
                                   <input
                                     type="text"
-                                    value={key}
-                                    onChange={(e) => updateExecutorParameter(key, e.target.value, value)}
+                                    value={param.key}
+                                    onChange={(e) => updateExecutorParameter(param.id, e.target.value, param.value)}
                                     placeholder="Parameter name"
                                     className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                   />
                                   <input
                                     type="text"
-                                    value={value}
-                                    onChange={(e) => updateExecutorParameter(key, key, e.target.value)}
+                                    value={param.value}
+                                    onChange={(e) => updateExecutorParameter(param.id, param.key, e.target.value)}
                                     placeholder="Parameter value"
                                     className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                   />
                                   <button
-                                    onClick={() => removeExecutorParameter(key)}
+                                    onClick={() => removeExecutorParameter(param.id)}
                                     className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                                   >
                                     <MaterialSymbol name="delete" size="sm" />
@@ -1894,24 +1988,24 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                           <ValidationField label="Inputs">
                             <div className="space-y-2">
-                              {Object.entries((executor.spec?.inputs as Record<string, string>) || {}).map(([key, value]) => (
-                                <div key={key} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                              {githubInputs.map((input) => (
+                                <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
                                   <input
                                     type="text"
-                                    value={key}
-                                    onChange={(e) => updateExecutorInput(key, e.target.value, value)}
+                                    value={input.key}
+                                    onChange={(e) => updateExecutorInput(input.id, e.target.value, input.value)}
                                     placeholder="Input name"
                                     className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                   />
                                   <input
                                     type="text"
-                                    value={value}
-                                    onChange={(e) => updateExecutorInput(key, key, e.target.value)}
+                                    value={input.value}
+                                    onChange={(e) => updateExecutorInput(input.id, input.key, e.target.value)}
                                     placeholder="Input value"
                                     className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                   />
                                   <button
-                                    onClick={() => removeExecutorInput(key)}
+                                    onClick={() => removeExecutorInput(input.id)}
                                     className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                                   >
                                     <MaterialSymbol name="delete" size="sm" />
@@ -1962,43 +2056,24 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                           <ValidationField label="Headers">
                             <div className="space-y-2">
-                              {Object.entries((executor.spec?.headers as Record<string, string>) || {}).map(([key, value]) => (
-                                <div key={key} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                              {httpHeaders.map((header) => (
+                                <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
                                   <input
                                     type="text"
-                                    value={key}
-                                    onChange={(e) => {
-                                      const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                                      const updatedHeaders = { ...currentHeaders };
-                                      if (e.target.value !== key) {
-                                        delete updatedHeaders[key];
-                                        updatedHeaders[e.target.value] = value;
-                                      }
-                                      updateExecutorField('headers', updatedHeaders);
-                                    }}
+                                    value={header.key}
+                                    onChange={(e) => updateExecutorHeader(header.id, e.target.value, header.value)}
                                     placeholder="Header name"
                                     className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                   />
                                   <input
                                     type="text"
-                                    value={value}
-                                    onChange={(e) => {
-                                      const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                                      updateExecutorField('headers', {
-                                        ...currentHeaders,
-                                        [key]: e.target.value
-                                      });
-                                    }}
+                                    value={header.value}
+                                    onChange={(e) => updateExecutorHeader(header.id, header.key, e.target.value)}
                                     placeholder="Header value"
                                     className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                                   />
                                   <button
-                                    onClick={() => {
-                                      const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                                      const updatedHeaders = { ...currentHeaders };
-                                      delete updatedHeaders[key];
-                                      updateExecutorField('headers', updatedHeaders);
-                                    }}
+                                    onClick={() => removeExecutorHeader(header.id)}
                                     className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                                   >
                                     <MaterialSymbol name="delete" size="sm" />
@@ -2006,14 +2081,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 </div>
                               ))}
                               <button
-                                onClick={() => {
-                                  const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                                  const newKey = `Header_${Object.keys(currentHeaders).length + 1}`;
-                                  updateExecutorField('headers', {
-                                    ...currentHeaders,
-                                    [newKey]: ''
-                                  });
-                                }}
+                                onClick={addExecutorHeader}
                                 className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                               >
                                 <MaterialSymbol name="add" size="sm" />
