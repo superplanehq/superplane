@@ -288,7 +288,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const handleDiscardStage = async () => {
     if (currentStage?.metadata?.id) {
-      const isTemporaryId = /^\\d+$/.test(currentStage.metadata.id);
+      const isTemporaryId = /^\d+$/.test(currentStage.metadata.id);
       const isRealStage = !isTemporaryId && !currentStage.isDraft;
 
       if (isRealStage) {

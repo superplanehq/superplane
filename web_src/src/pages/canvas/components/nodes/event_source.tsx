@@ -188,7 +188,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   const handleDiscardEventSource = async () => {
     if (currentEventSource?.metadata?.id) {
-      const isTemporaryId = /^\\d+$/.test(currentEventSource.metadata.id);
+      const isTemporaryId = /^\d+$/.test(currentEventSource.metadata.id);
       const isRealEventSource = !isTemporaryId;
 
       if (isRealEventSource) {
