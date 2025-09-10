@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/test/support"
@@ -130,5 +132,50 @@ func Test__UpdateEventSource(t *testing.T) {
 		assert.Nil(t, res.EventSource.Spec.Resource)
 		assert.Empty(t, res.EventSource.Spec.Events)
 		assert.NotEmpty(t, res.Key)
+	})
+
+	t.Run("connection source names are updated when event source name changes", func(t *testing.T) {
+		connectedStage, err := stages.CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.Stage{
+			Metadata: &protos.Stage_Metadata{
+				Name: "connected-stage",
+			},
+			Spec: &protos.Stage_Spec{
+				Executor: support.ProtoExecutor(t, r),
+				Connections: []*protos.Connection{
+					{
+						Name: "standalone-event-source",
+						Type: protos.Connection_TYPE_EVENT_SOURCE,
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		connectedStageUUID, err := uuid.Parse(connectedStage.Stage.Metadata.GetId())
+		require.NoError(t, err)
+		dbConnections, err := models.ListConnections(connectedStageUUID, models.ConnectionTargetTypeStage)
+		require.NoError(t, err)
+		require.Len(t, dbConnections, 1)
+		assert.Equal(t, "standalone-event-source", dbConnections[0].SourceName)
+
+		_, err = UpdateEventSource(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), eventSourceID, &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: "updated-event-source-name",
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: r.Integration.Name,
+				},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		dbConnections, err = models.ListConnections(connectedStageUUID, models.ConnectionTargetTypeStage)
+		require.NoError(t, err)
+		require.Len(t, dbConnections, 1)
+		assert.Equal(t, "updated-event-source-name", dbConnections[0].SourceName)
 	})
 }
