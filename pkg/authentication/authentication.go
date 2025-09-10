@@ -53,7 +53,7 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 
 		switch providerName {
 		case models.ProviderGitHub:
-			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL))
+			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "read:user", "user:email"))
 			log.Infof("GitHub OAuth provider initialized")
 		default:
 			log.Warnf("Unknown provider: %s", providerName)
