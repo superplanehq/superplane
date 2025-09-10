@@ -87,6 +87,7 @@ export const FlowRenderer: React.FC = () => {
         minZoom={0.4}
         maxZoom={1.5}
         colorMode={"system"}
+        onBeforeDelete={async () => false}
       >
         <FlowControls
           onAutoLayout={applyElkAutoLayout}

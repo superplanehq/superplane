@@ -138,7 +138,7 @@ export function IntegrationModal({
       <DialogTitle>Create {config.displayName} Integration</DialogTitle>
       <DialogDescription className='text-sm'>
         New integration will be saved to integrations page. Manage integrations{' '}
-        <Link href={`/organization/${organizationId}/canvas/${canvasId}#integrations`} className='text-blue-600 dark:text-blue-400'> here</Link>.
+        <Link href={`/${organizationId}/canvas/${canvasId}#integrations`} className='text-blue-600 dark:text-blue-400'> here</Link>.
       </DialogDescription>
 
       <DialogBody className="space-y-6">

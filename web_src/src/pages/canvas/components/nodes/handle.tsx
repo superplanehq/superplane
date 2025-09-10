@@ -54,7 +54,7 @@ export default function CustomBarHandle({ type, conditions, connections, interna
 
 
 function BarHandleRight({ handleStyle }: { handleStyle: CSSProperties }) {
-  return <Handle type="source" position={Position.Right} id="source" style={handleStyle} className="custom-bar-handle !bg-blue-500 dark:!bg-gray-200" />
+  return <Handle type="source" position={Position.Right} id="source" style={handleStyle} className="custom-bar-handle !bg-blue-500 dark:!bg-gray-200" isConnectable={false} />
 }
 
 function BarHandleLeft({ handleStyle, connections = [], conditions = [] }: { handleStyle: CSSProperties, connections?: SuperplaneConnection[], conditions?: SuperplaneCondition[] }) {

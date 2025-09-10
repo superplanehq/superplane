@@ -424,7 +424,7 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
                     {secrets.length === 0 && (
                       <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
                         No secrets available. Create a secret first in the &nbsp;
-                        <span className="text-blue-600 hover:underline cursor-pointer" onClick={() => navigate(`/organization/${organizationId}/canvas/${canvasId}#secrets`)}>secrets section</span>.
+                        <span className="text-blue-600 hover:underline cursor-pointer" onClick={() => navigate(`/${organizationId}/canvas/${canvasId}#secrets`)}>secrets section</span>.
                       </Text>
                     )}
                   </div>
