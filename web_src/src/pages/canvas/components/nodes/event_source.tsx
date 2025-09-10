@@ -52,7 +52,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
-  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, updateConnectionSourceNames } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
@@ -145,6 +145,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           description: eventSourceDescription,
           spec: currentFormData.spec
         });
+
+        // Update connection source names if event source name changed
+        const oldEventSourceName = currentEventSource.metadata?.name;
+        if (oldEventSourceName && oldEventSourceName !== eventSourceName) {
+          updateConnectionSourceNames(oldEventSourceName, eventSourceName);
+        }
 
         updateEventSource({
           ...currentEventSource,
