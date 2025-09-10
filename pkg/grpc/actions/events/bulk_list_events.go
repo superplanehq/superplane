@@ -23,7 +23,7 @@ func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSou
 	sourceFilters := make([]models.SourceFilter, 0, len(sources))
 	for _, source := range sources {
 		sourceFilters = append(sourceFilters, models.SourceFilter{
-			SourceType: EventSourceTypeToString(source.SourceType),
+			SourceType: ProtoToEventSourceType(source.SourceType),
 			SourceID:   source.SourceId,
 		})
 	}
@@ -46,10 +46,10 @@ func BulkListEvents(ctx context.Context, canvasID string, sources []*pb.EventSou
 		var sourceEvents []models.Event
 
 		if source.SourceId != "" {
-			sourceKey := fmt.Sprintf("%s|%s", EventSourceTypeToString(source.SourceType), source.SourceId)
+			sourceKey := fmt.Sprintf("%s|%s", ProtoToEventSourceType(source.SourceType), source.SourceId)
 			sourceEvents = eventsBySource[sourceKey]
 		} else {
-			sourceTypeStr := EventSourceTypeToString(source.SourceType)
+			sourceTypeStr := ProtoToEventSourceType(source.SourceType)
 			for key, events := range eventsBySource {
 				if strings.HasPrefix(key, sourceTypeStr+"|") {
 					sourceEvents = append(sourceEvents, events...)

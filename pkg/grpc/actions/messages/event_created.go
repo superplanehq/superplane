@@ -19,7 +19,7 @@ func NewEventCreatedMessage(canvasId string, event *models.Event) EventCreatedMe
 			CanvasId:   canvasId,
 			SourceId:   event.SourceID.String(),
 			EventId:    event.ID.String(),
-			SourceType: events.StringToEventSourceType(event.SourceType),
+			SourceType: events.EventSourceTypeToProto(event.SourceType),
 			Timestamp:  timestamppb.Now(),
 		},
 	}

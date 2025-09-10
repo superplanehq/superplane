@@ -33,7 +33,7 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 		beforeTime = &t
 	}
 	log.Println("beforeTime", beforeTime)
-	events, err := models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit, beforeTime)
+	events, err := models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, ProtoToEventSourceType(sourceType), sourceID, validatedLimit, beforeTime)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func validateLimit(limit int) int {
 	return limit
 }
 
-func EventSourceTypeToString(sourceType pb.EventSourceType) string {
+func ProtoToEventSourceType(sourceType pb.EventSourceType) string {
 	switch sourceType {
 	case pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE:
 		return models.SourceTypeEventSource
@@ -70,7 +70,7 @@ func EventSourceTypeToString(sourceType pb.EventSourceType) string {
 	}
 }
 
-func StringToEventSourceType(sourceType string) pb.EventSourceType {
+func EventSourceTypeToProto(sourceType string) pb.EventSourceType {
 	switch sourceType {
 	case models.SourceTypeEventSource:
 		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
@@ -83,20 +83,7 @@ func StringToEventSourceType(sourceType string) pb.EventSourceType {
 	}
 }
 
-func EventStateProtoToString(state pb.Event_State) string {
-	switch state {
-	case pb.Event_STATE_PROCESSED:
-		return models.EventStateProcessed
-	case pb.Event_STATE_PENDING:
-		return models.EventStatePending
-	case pb.Event_STATE_DISCARDED:
-		return models.EventStateDiscarded
-	default:
-		return ""
-	}
-}
-
-func StringToEventStateProto(state string) pb.Event_State {
+func StateToProto(state string) pb.Event_State {
 	switch state {
 	case models.EventStateProcessed:
 		return pb.Event_STATE_PROCESSED
@@ -106,6 +93,21 @@ func StringToEventStateProto(state string) pb.Event_State {
 		return pb.Event_STATE_DISCARDED
 	default:
 		return pb.Event_STATE_UNKNOWN
+	}
+}
+
+func StateReasonToProto(stateReason string) pb.Event_StateReason {
+	switch stateReason {
+	case models.EventStateReasonError:
+		return pb.Event_STATE_REASON_ERROR
+	case models.EventStateReasonFiltered:
+		return pb.Event_STATE_REASON_FILTERED
+	case models.EventStateReasonNotConnected:
+		return pb.Event_STATE_REASON_NOT_CONNECTED
+	case models.EventStateReasonOk:
+		return pb.Event_STATE_REASON_OK
+	default:
+		return pb.Event_STATE_REASON_UNKNOWN
 	}
 }
 
@@ -123,13 +125,15 @@ func serializeEvents(in []models.Event) ([]*pb.Event, error) {
 
 func serializeEvent(in models.Event) (*pb.Event, error) {
 	event := &pb.Event{
-		Id:         in.ID.String(),
-		SourceId:   in.SourceID.String(),
-		SourceName: in.SourceName,
-		SourceType: StringToEventSourceType(in.SourceType),
-		Type:       in.Type,
-		State:      StringToEventStateProto(in.State),
-		ReceivedAt: timestamppb.New(*in.ReceivedAt),
+		Id:           in.ID.String(),
+		SourceId:     in.SourceID.String(),
+		SourceName:   in.SourceName,
+		SourceType:   EventSourceTypeToProto(in.SourceType),
+		Type:         in.Type,
+		State:        StateToProto(in.State),
+		StateReason:  StateReasonToProto(in.StateReason),
+		StateMessage: in.StateMessage,
+		ReceivedAt:   timestamppb.New(*in.ReceivedAt),
 	}
 
 	if len(in.Raw) > 0 {

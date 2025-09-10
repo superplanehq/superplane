@@ -25,7 +25,7 @@ func HandleEventCreated(messageBody []byte, wsHub *ws.Hub) error {
 			"id":          pbMsg.EventId,
 			"canvas_id":   pbMsg.CanvasId,
 			"source_id":   pbMsg.SourceId,
-			"source_type": events.EventSourceTypeToString(pbMsg.SourceType),
+			"source_type": events.ProtoToEventSourceType(pbMsg.SourceType),
 			"timestamp":   pbMsg.Timestamp.AsTime(),
 		},
 	})
