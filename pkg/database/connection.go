@@ -89,7 +89,7 @@ func connect() *gorm.DB {
 
 func TruncateTables() error {
 	return Conn().Exec(`
-		truncate table canvases, events, event_rejections, event_sources, stages,
+		truncate table canvases, event_rejections, events, event_sources, stages,
 		stage_events, stage_event_approvals,
 		connections, stage_executions,
 		connection_groups, connection_group_field_sets, connection_group_field_set_events,

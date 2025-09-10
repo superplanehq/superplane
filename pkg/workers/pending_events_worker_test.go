@@ -42,21 +42,36 @@ func Test__PendingEventsWorker(t *testing.T) {
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.EventStateDiscarded, event.State)
+		assert.Equal(t, models.EventStateReasonNotConnected, event.StateReason)
+		assert.Empty(t, event.StateMessage)
 	})
 
 	t.Run("source has filter for event -> event is discarded", func(t *testing.T) {
 		source := &models.EventSource{
-			CanvasID:   r.Canvas.ID,
-			Name:       support.RandomName("source"),
-			Key:        []byte(`key`),
-			Scope:      models.EventSourceScopeExternal,
-			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+			CanvasID: r.Canvas.ID,
+			Name:     support.RandomName("source"),
+			Key:      []byte(`key`),
+			Scope:    models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{
+				{
+					Type:           "push",
+					FilterOperator: models.FilterOperatorAnd,
+					Filters: []models.Filter{
+						{
+							Type: models.FilterTypeData,
+							Data: &models.DataFilter{
+								Expression: "$.ref == 'refs/heads/main'",
+							},
+						},
+					},
+				},
+			}),
 		}
 
 		err := source.Create()
 		require.NoError(t, err)
 
-		event, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, "pull_request", []byte(`{}`), []byte(`{}`))
+		event, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
 		require.NoError(t, err)
 
 		err = w.Tick()
@@ -65,6 +80,46 @@ func Test__PendingEventsWorker(t *testing.T) {
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.EventStateDiscarded, event.State)
+		assert.Equal(t, models.EventStateReasonFiltered, event.StateReason)
+		assert.Empty(t, event.StateMessage)
+	})
+
+	t.Run("source has error applying filter for event -> event is discarded", func(t *testing.T) {
+		source := &models.EventSource{
+			CanvasID: r.Canvas.ID,
+			Name:     support.RandomName("source"),
+			Key:      []byte(`key`),
+			Scope:    models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{
+				{
+					Type: "push",
+					// NOTE: missing filter operator
+					Filters: []models.Filter{
+						{
+							Type: models.FilterTypeData,
+							Data: &models.DataFilter{
+								Expression: "$.ref == 'refs/heads/main'",
+							},
+						},
+					},
+				},
+			}),
+		}
+
+		err := source.Create()
+		require.NoError(t, err)
+
+		event, err := models.CreateEvent(source.ID, source.CanvasID, source.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
+		require.NoError(t, err)
+
+		err = w.Tick()
+		require.NoError(t, err)
+
+		event, err = models.FindEventByID(event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.EventStateDiscarded, event.State)
+		assert.Equal(t, models.EventStateReasonError, event.StateReason)
+		assert.Contains(t, event.StateMessage, "error applying filter")
 	})
 
 	t.Run("error when building inputs for stage event", func(t *testing.T) {
@@ -118,19 +173,28 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		//
-		// Event is moved to processed state,
-		// but no stage event is created.
+		// Event is moved to processed state.
 		//
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.EventStateProcessed, event.State)
 
 		//
-		// Two pending stage events are created: one for each stage.
+		// No stage events are created, since event didn't enter the queue.
 		//
 		stageEvents, err := stage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Empty(t, stageEvents)
+
+		//
+		// Event rejection is created.
+		//
+		rejections, err := models.ListEventRejections(models.ConnectionTargetTypeStage, stage.ID, 10, nil)
+		require.NoError(t, err)
+		require.Len(t, rejections, 1)
+		rejection := rejections[0]
+		assert.Equal(t, models.EventRejectionReasonError, rejection.Reason)
+		assert.Contains(t, rejection.Message, "error building inputs")
 	})
 
 	t.Run("source is connected to many stages -> event is added to each stage queue", func(t *testing.T) {
@@ -503,9 +567,19 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.Len(t, events, 1)
 		assert.Equal(t, r.Source.ID, events[0].SourceID)
 
+		//
+		// No pending stage event should be created for the second stage.
+		// Instead, an event rejection should be created.
+		//
 		events, err = secondStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 0)
+		rejections, err := models.ListEventRejections(models.ConnectionTargetTypeStage, secondStage.ID, 10, nil)
+		require.NoError(t, err)
+		require.Len(t, rejections, 1)
+		rejection := rejections[0]
+		assert.Equal(t, models.EventRejectionReasonFiltered, rejection.Reason)
+		assert.Empty(t, rejection.Message)
 	})
 
 	t.Run("execution resource is updated", func(t *testing.T) {
