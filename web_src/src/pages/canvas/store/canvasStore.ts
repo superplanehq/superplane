@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from './types';
 import { SuperplaneCanvas, SuperplaneStageEventState, SuperplaneStageEventStateReason } from "@/api-client/types.gen";
-import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneDiscardStageEvent, superplaneCancelStageExecution } from '@/api-client';
+import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneDiscardStageEvent, superplaneCancelStageExecution, superplaneListStageExecutions } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
@@ -152,8 +152,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }));
   },
 
-  approveStageEvent: (stageEventId: string, stageId: string) => {
-    superplaneApproveStageEvent(withOrganizationHeader({
+  approveStageEvent: async (stageEventId: string, stageId: string) => {
+    return await superplaneApproveStageEvent(withOrganizationHeader({
       path: {
         canvasIdOrName: get().canvas.metadata!.id!,
         stageIdOrName: stageId,
@@ -346,6 +346,32 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         ...updatingConnectionGroup,
         events: eventsResponse.data?.events || []
       } : cg)
+    }));
+  },
+
+  syncStageExecutions: async (canvasId: string, stageId: string) => {
+    const { stages } = get();
+    const updatingStage = stages.find(stage => stage.metadata!.id === stageId);
+
+    if (!updatingStage) {
+      return;
+    }
+
+    const executionsResponse = await superplaneListStageExecutions(withOrganizationHeader({
+      path: { canvasIdOrName: canvasId, stageIdOrName: stageId },
+      query: { 
+        limit: 10 // Limit to recent executions for stage node display
+      }
+    }));
+
+    const executions = executionsResponse.data?.executions || [];
+
+    set((state) => ({
+      stages: state.stages.map((s) => s.metadata!.id === stageId ? {
+        ...updatingStage,
+        queue: s.queue, // Keep existing queue data
+        executions: executions
+      } : s)
     }));
   },
 

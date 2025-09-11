@@ -8,7 +8,7 @@ interface ActivityTabProps {
   pendingEvents: SuperplaneStageEvent[];
   waitingEvents: SuperplaneStageEvent[];
   partialExecutions: SuperplaneExecution[];
-  approveStageEvent: (stageEventId: string, stageId: string) => void;
+  approveStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
   cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
   executionRunning: boolean;

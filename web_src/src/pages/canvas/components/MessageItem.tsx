@@ -384,15 +384,6 @@ const MessageItem = React.memo(({
         </div>
       )}
 
-      {/* Time Window Footer - only for stage events */}
-      {isStageEvent(event) && event.state === 'STATE_PENDING' && (
-        <div className="px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-700 dark:text-zinc-400">Waiting for execution</span>
-            <span onClick={() => onCancel?.(event.id || '')} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Cancel</span>
-          </div>
-        </div>
-      )}
 
       {isDropdownOpen && (
         <div

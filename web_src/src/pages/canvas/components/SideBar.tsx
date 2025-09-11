@@ -36,6 +36,23 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
   const queryClient = useQueryClient();
 
+  // Wrapper function to handle approval with query invalidation
+  const handleApproveStageEvent = async (stageEventId: string, stageId: string) => {
+    try {
+      await approveStageEvent(stageEventId, stageId);
+      
+      // Invalidate queries to refresh both stage events and executions data
+      await queryClient.invalidateQueries({
+        queryKey: canvasKeys.stageEvents(canvasId || '', stageId, ['STATE_PENDING', 'STATE_WAITING'])
+      });
+      await queryClient.invalidateQueries({
+        queryKey: canvasKeys.stageExecutions(canvasId || '', stageId)
+      });
+    } catch (error) {
+      console.error('Failed to approve stage event:', error);
+    }
+  };
+
   // Wrapper function to handle discard with query invalidation
   const handleDiscardStageEvent = async (stageEventId: string, stageId: string) => {
     try {
@@ -127,7 +144,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
             pendingEvents={pendingEvents}
             waitingEvents={waitingEvents}
             partialExecutions={partialExecutions}
-            approveStageEvent={approveStageEvent}
+            approveStageEvent={handleApproveStageEvent}
             executionRunning={executionRunning}
             organizationId={organizationId!}
             discardStageEvent={handleDiscardStageEvent}
@@ -138,7 +155,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
       case 'history':
         return <HistoryTab
           canvasId={canvasId!}
-          approveStageEvent={approveStageEvent}
+          approveStageEvent={handleApproveStageEvent}
           organizationId={organizationId!}
           selectedStage={selectedStage}
           discardStageEvent={handleDiscardStageEvent}

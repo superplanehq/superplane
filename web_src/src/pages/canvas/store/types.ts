@@ -34,7 +34,7 @@ export interface CanvasState {
   updateEventSource: (eventSource: EventSourceWithEvents) => void;
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
-  approveStageEvent: (stageEventId: string, stageId: string) => void;
+  approveStageEvent: (stageEventId: string, stageId: string) => Promise<any>;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
   cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
   selectStageId: (stageId: string) => void;
@@ -48,6 +48,7 @@ export interface CanvasState {
   setEditingConnectionGroup: (connectionGroupId: string | null) => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
   syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
+  syncStageExecutions: (canvasId: string, stageId: string) => Promise<void>;
   syncEventSourceEvents: (canvasId: string, eventSourceId: string) => Promise<void>;
   syncStagePlainEvents: (canvasId: string, stageId: string) => Promise<void>;
   syncConnectionGroupPlainEvents: (canvasId: string, connectionGroupId: string) => Promise<void>;

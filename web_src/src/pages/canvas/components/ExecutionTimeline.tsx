@@ -42,7 +42,7 @@ export const ExecutionTimeline = ({
     <div className="space-y-3">
       {
         executions.map((execution) => {
-          const sourceEvent = (execution.stageEvent as any)?.raw;
+          const sourceEvent = execution.stageEvent?.triggerEvent;
           const emmitedEvent = execution.emmitedEvent;
 
           return (

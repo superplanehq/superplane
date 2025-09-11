@@ -19,7 +19,7 @@ interface HistoryTabProps {
   selectedStage: Stage;
   organizationId: string;
   canvasId: string;
-  approveStageEvent: (stageEventId: string, stageId: string) => void;
+  approveStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
   cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
 }
