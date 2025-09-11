@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 
 	uuid "github.com/google/uuid"
@@ -19,6 +20,33 @@ const (
 	MaxLimit     = 50
 )
 
+type listAndCountEventsResult struct {
+	events     []models.Event
+	totalCount int64
+	listErr    error
+	countErr   error
+}
+
+func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType, sourceIDStr string, limit int, beforeTime *time.Time) *listAndCountEventsResult {
+	result := &listAndCountEventsResult{}
+	var wg sync.WaitGroup
+	
+	wg.Add(2)
+	
+	go func() {
+		defer wg.Done()
+		result.events, result.listErr = models.ListEventsByCanvasIDWithLimitAndBefore(canvasID, sourceType, sourceIDStr, limit, beforeTime)
+	}()
+	
+	go func() {
+		defer wg.Done()
+		result.totalCount, result.countErr = models.CountEventsByCanvasIDAndFilters(canvasID, sourceType, sourceIDStr)
+	}()
+	
+	wg.Wait()
+	return result
+}
+
 func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
@@ -33,18 +61,36 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 		beforeTime = &t
 	}
 	log.Println("beforeTime", beforeTime)
-	events, err := models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit, beforeTime)
+	
+	sourceTypeStr := EventSourceTypeToString(sourceType)
+	result := listAndCountEventsInParallel(canvasUUID, sourceTypeStr, sourceID, validatedLimit, beforeTime)
+	
+	if result.listErr != nil {
+		return nil, result.listErr
+	}
+	
+	if result.countErr != nil {
+		return nil, result.countErr
+	}
+
+	serialized, err := serializeEvents(result.events)
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := serializeEvents(events)
-	if err != nil {
-		return nil, err
+	hasNextPage := int64(len(result.events)) == int64(validatedLimit) && result.totalCount > int64(validatedLimit)
+	
+	var lastTimestamp *timestamppb.Timestamp
+	if len(result.events) > 0 {
+		lastEvent := result.events[len(result.events)-1]
+		lastTimestamp = timestamppb.New(*lastEvent.ReceivedAt)
 	}
 
 	response := &pb.ListEventsResponse{
-		Events: serialized,
+		Events:        serialized,
+		TotalCount:    uint32(result.totalCount),
+		HasNextPage:   hasNextPage,
+		LastTimestamp: lastTimestamp,
 	}
 
 	return response, nil
