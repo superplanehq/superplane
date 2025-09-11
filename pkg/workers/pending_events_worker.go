@@ -57,7 +57,7 @@ func (w *PendingEventsWorker) Tick() error {
 		//
 		if err != nil {
 			logger.Errorf("Error processing event: %v", err)
-			err = event.UpdateState(models.EventStateDiscarded, models.EventStateReasonError, err.Error())
+			err = event.UpdateState(models.EventStateRejected, models.EventStateReasonError, err.Error())
 			if err != nil {
 				logger.Errorf("Error discarding event: %v", err)
 			}
@@ -98,11 +98,11 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 		//
 		accept, err := source.Accept(event)
 		if err != nil {
-			return event.UpdateState(models.EventStateDiscarded, models.EventStateReasonError, fmt.Sprintf("error applying filters: %v", err))
+			return event.UpdateState(models.EventStateRejected, models.EventStateReasonError, fmt.Sprintf("error applying filters: %v", err))
 		}
 
 		if !accept {
-			return event.UpdateState(models.EventStateDiscarded, models.EventStateReasonFiltered, "")
+			return event.UpdateState(models.EventStateRejected, models.EventStateReasonFiltered, "")
 		}
 	}
 
@@ -191,7 +191,7 @@ func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *model
 	// If the source is not connected to any stage, we discard the event.
 	//
 	if len(connections) == 0 {
-		return event.UpdateState(models.EventStateDiscarded, models.EventStateReasonNotConnected, "")
+		return event.UpdateState(models.EventStateRejected, models.EventStateReasonNotConnected, "")
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {

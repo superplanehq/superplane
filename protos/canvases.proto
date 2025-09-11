@@ -954,7 +954,7 @@ message Event {
   enum State {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
-    STATE_DISCARDED = 2;
+    STATE_REJECTED = 2;
     STATE_PROCESSED = 3;
   }
 
@@ -1000,8 +1000,6 @@ message ListEventRejectionsRequest {
   string canvas_id_or_name = 1;
   string component_type = 2;
   string component_id = 3;
-  int32 limit = 4;
-  google.protobuf.Timestamp before = 5;
 }
 
 message ListEventRejectionsResponse {

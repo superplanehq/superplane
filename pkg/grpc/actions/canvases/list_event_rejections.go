@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -13,8 +12,8 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
-func ListEventRejections(ctx context.Context, canvasID string, componentType string, componentID uuid.UUID, limit int32, before *time.Time) (*pb.ListEventRejectionsResponse, error) {
-	rejections, err := models.ListEventRejections(componentType, componentID, limit, before)
+func ListEventRejections(ctx context.Context, canvasID string, componentType string, componentID uuid.UUID) (*pb.ListEventRejectionsResponse, error) {
+	rejections, err := models.ListEventRejections(componentType, componentID)
 	if err != nil {
 		log.Errorf("Error finding stage rejections: %v", err)
 		return nil, err

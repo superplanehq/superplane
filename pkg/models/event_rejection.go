@@ -37,20 +37,10 @@ func RejectEventInTransaction(tx *gorm.DB, eventID, componentID uuid.UUID, compo
 	return tx.Create(rejection).Error
 }
 
-func ListEventRejections(componentType string, componentID uuid.UUID, limit int32, before *time.Time) ([]EventRejection, error) {
+func ListEventRejections(componentType string, componentID uuid.UUID) ([]EventRejection, error) {
 	query := database.Conn().
 		Where("component_type = ?", componentType).
 		Where("component_id = ?", componentID)
-
-	if before != nil {
-		query = query.Where("rejected_at < ?", before)
-	}
-
-	query = query.Order("rejected_at DESC")
-
-	if limit > 0 {
-		query = query.Limit(int(limit))
-	}
 
 	var rejections []EventRejection
 	err := query.Find(&rejections).Error

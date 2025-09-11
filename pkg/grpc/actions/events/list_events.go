@@ -89,8 +89,8 @@ func StateToProto(state string) pb.Event_State {
 		return pb.Event_STATE_PROCESSED
 	case models.EventStatePending:
 		return pb.Event_STATE_PENDING
-	case models.EventStateDiscarded:
-		return pb.Event_STATE_DISCARDED
+	case models.EventStateRejected:
+		return pb.Event_STATE_REJECTED
 	default:
 		return pb.Event_STATE_UNKNOWN
 	}

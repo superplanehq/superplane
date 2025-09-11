@@ -704,20 +704,6 @@
             "in": "query",
             "required": false,
             "type": "string"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "type": "integer",
-            "format": "int32"
-          },
-          {
-            "name": "before",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "date-time"
           }
         ],
         "tags": [
@@ -4087,7 +4073,7 @@
       "enum": [
         "STATE_UNKNOWN",
         "STATE_PENDING",
-        "STATE_DISCARDED",
+        "STATE_REJECTED",
         "STATE_PROCESSED"
       ],
       "default": "STATE_UNKNOWN"

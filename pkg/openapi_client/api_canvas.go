@@ -18,7 +18,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 
@@ -609,8 +608,6 @@ type ApiSuperplaneListEventRejectionsRequest struct {
 	canvasIdOrName string
 	componentType *string
 	componentId *string
-	limit *int32
-	before *time.Time
 }
 
 func (r ApiSuperplaneListEventRejectionsRequest) ComponentType(componentType string) ApiSuperplaneListEventRejectionsRequest {
@@ -620,16 +617,6 @@ func (r ApiSuperplaneListEventRejectionsRequest) ComponentType(componentType str
 
 func (r ApiSuperplaneListEventRejectionsRequest) ComponentId(componentId string) ApiSuperplaneListEventRejectionsRequest {
 	r.componentId = &componentId
-	return r
-}
-
-func (r ApiSuperplaneListEventRejectionsRequest) Limit(limit int32) ApiSuperplaneListEventRejectionsRequest {
-	r.limit = &limit
-	return r
-}
-
-func (r ApiSuperplaneListEventRejectionsRequest) Before(before time.Time) ApiSuperplaneListEventRejectionsRequest {
-	r.before = &before
 	return r
 }
 
@@ -681,12 +668,6 @@ func (a *CanvasAPIService) SuperplaneListEventRejectionsExecute(r ApiSuperplaneL
 	}
 	if r.componentId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "componentId", r.componentId, "", "")
-	}
-	if r.limit != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
-	}
-	if r.before != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

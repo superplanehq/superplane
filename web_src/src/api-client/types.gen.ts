@@ -578,6 +578,7 @@ export type SuperplaneEventRejection = {
     eventId?: string;
     componentType?: string;
     componentId?: string;
+    componentName?: string;
     reason?: EventRejectionRejectionReason;
     message?: string;
     rejectedAt?: string;
@@ -616,7 +617,7 @@ export type SuperplaneEventSourceSpec = {
 
 export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
 
-export type SuperplaneEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_DISCARDED' | 'STATE_PROCESSED';
+export type SuperplaneEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_REJECTED' | 'STATE_PROCESSED';
 
 export type SuperplaneEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_FILTERED' | 'STATE_REASON_ERROR' | 'STATE_REASON_NOT_CONNECTED' | 'STATE_REASON_OK';
 
@@ -694,12 +695,12 @@ export type SuperplaneListConnectionGroupFieldSetsResponse = {
     fieldSets?: Array<SuperplaneConnectionGroupFieldSet>;
 };
 
-export type SuperplaneListConnectionGroupRejectionsResponse = {
-    rejections?: Array<SuperplaneEventRejection>;
-};
-
 export type SuperplaneListConnectionGroupsResponse = {
     connectionGroups?: Array<SuperplaneConnectionGroup>;
+};
+
+export type SuperplaneListEventRejectionsResponse = {
+    rejections?: Array<SuperplaneEventRejection>;
 };
 
 export type SuperplaneListEventSourcesResponse = {
@@ -712,10 +713,6 @@ export type SuperplaneListEventsResponse = {
 
 export type SuperplaneListStageEventsResponse = {
     events?: Array<SuperplaneStageEvent>;
-};
-
-export type SuperplaneListStageRejectionsResponse = {
-    rejections?: Array<SuperplaneEventRejection>;
 };
 
 export type SuperplaneListStagesResponse = {
@@ -1050,37 +1047,6 @@ export type SuperplaneCreateConnectionGroupResponses = {
 };
 
 export type SuperplaneCreateConnectionGroupResponse2 = SuperplaneCreateConnectionGroupResponses[keyof SuperplaneCreateConnectionGroupResponses];
-
-export type SuperplaneListConnectionGroupRejectionsData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        connectionGroupIdOrName: string;
-    };
-    query?: {
-        limit?: number;
-        before?: string;
-    };
-    url: '/api/v1/canvases/{canvasIdOrName}/connection-groups/{connectionGroupIdOrName}/rejections';
-};
-
-export type SuperplaneListConnectionGroupRejectionsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type SuperplaneListConnectionGroupRejectionsError = SuperplaneListConnectionGroupRejectionsErrors[keyof SuperplaneListConnectionGroupRejectionsErrors];
-
-export type SuperplaneListConnectionGroupRejectionsResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneListConnectionGroupRejectionsResponse;
-};
-
-export type SuperplaneListConnectionGroupRejectionsResponse2 = SuperplaneListConnectionGroupRejectionsResponses[keyof SuperplaneListConnectionGroupRejectionsResponses];
 
 export type SuperplaneDeleteConnectionGroupData = {
     body?: never;
@@ -1419,6 +1385,36 @@ export type SuperplaneBulkListEventsResponses = {
 
 export type SuperplaneBulkListEventsResponse2 = SuperplaneBulkListEventsResponses[keyof SuperplaneBulkListEventsResponses];
 
+export type SuperplaneListEventRejectionsData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+    };
+    query?: {
+        componentType?: string;
+        componentId?: string;
+    };
+    url: '/api/v1/canvases/{canvasIdOrName}/rejections';
+};
+
+export type SuperplaneListEventRejectionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneListEventRejectionsError = SuperplaneListEventRejectionsErrors[keyof SuperplaneListEventRejectionsErrors];
+
+export type SuperplaneListEventRejectionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListEventRejectionsResponse;
+};
+
+export type SuperplaneListEventRejectionsResponse2 = SuperplaneListEventRejectionsResponses[keyof SuperplaneListEventRejectionsResponses];
+
 export type SuperplaneBulkListStageEventsData = {
     body: SuperplaneBulkListStageEventsBody;
     path: {
@@ -1674,37 +1670,6 @@ export type SuperplaneCancelStageEventResponses = {
 };
 
 export type SuperplaneCancelStageEventResponse2 = SuperplaneCancelStageEventResponses[keyof SuperplaneCancelStageEventResponses];
-
-export type SuperplaneListStageRejectionsData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        stageIdOrName: string;
-    };
-    query?: {
-        limit?: number;
-        before?: string;
-    };
-    url: '/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/rejections';
-};
-
-export type SuperplaneListStageRejectionsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type SuperplaneListStageRejectionsError = SuperplaneListStageRejectionsErrors[keyof SuperplaneListStageRejectionsErrors];
-
-export type SuperplaneListStageRejectionsResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneListStageRejectionsResponse;
-};
-
-export type SuperplaneListStageRejectionsResponse2 = SuperplaneListStageRejectionsResponses[keyof SuperplaneListStageRejectionsResponses];
 
 export type SuperplaneAddUserData = {
     body: SuperplaneAddUserBody;

@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -202,16 +201,10 @@ func (s *CanvasService) BulkListStageEvents(ctx context.Context, req *pb.BulkLis
 
 func (s *CanvasService) ListEventRejections(ctx context.Context, req *pb.ListEventRejectionsRequest) (*pb.ListEventRejectionsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	var before *time.Time
-	if req.Before != nil {
-		b := req.Before.AsTime()
-		before = &b
-	}
-
 	componentID, err := uuid.Parse(req.ComponentId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid component id")
 	}
 
-	return canvases.ListEventRejections(ctx, canvasID, req.ComponentType, componentID, req.Limit, before)
+	return canvases.ListEventRejections(ctx, canvasID, req.ComponentType, componentID)
 }

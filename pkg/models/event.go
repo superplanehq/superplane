@@ -20,7 +20,7 @@ import (
 
 const (
 	EventStatePending   = "pending"
-	EventStateDiscarded = "discarded"
+	EventStateRejected  = "rejected"
 	EventStateProcessed = "processed"
 
 	EventStateReasonFiltered     = "filtered"

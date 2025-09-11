@@ -41,7 +41,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.EventStateDiscarded, event.State)
+		assert.Equal(t, models.EventStateRejected, event.State)
 		assert.Equal(t, models.EventStateReasonNotConnected, event.StateReason)
 		assert.Empty(t, event.StateMessage)
 	})
@@ -79,7 +79,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.EventStateDiscarded, event.State)
+		assert.Equal(t, models.EventStateRejected, event.State)
 		assert.Equal(t, models.EventStateReasonFiltered, event.StateReason)
 		assert.Empty(t, event.StateMessage)
 	})
@@ -117,7 +117,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.EventStateDiscarded, event.State)
+		assert.Equal(t, models.EventStateRejected, event.State)
 		assert.Equal(t, models.EventStateReasonError, event.StateReason)
 		assert.Contains(t, event.StateMessage, "error applying filter")
 	})
@@ -189,7 +189,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Event rejection is created.
 		//
-		rejections, err := models.ListEventRejections(models.ConnectionTargetTypeStage, stage.ID, 10, nil)
+		rejections, err := models.ListEventRejections(models.ConnectionTargetTypeStage, stage.ID)
 		require.NoError(t, err)
 		require.Len(t, rejections, 1)
 		rejection := rejections[0]
@@ -574,7 +574,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		events, err = secondStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 0)
-		rejections, err := models.ListEventRejections(models.ConnectionTargetTypeStage, secondStage.ID, 10, nil)
+		rejections, err := models.ListEventRejections(models.ConnectionTargetTypeStage, secondStage.ID)
 		require.NoError(t, err)
 		require.Len(t, rejections, 1)
 		rejection := rejections[0]
@@ -640,7 +640,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.EventStateDiscarded, event.State)
+		assert.Equal(t, models.EventStateRejected, event.State)
 
 		//
 		// The execution resource has its state updated.
