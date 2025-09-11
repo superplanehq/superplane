@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -11,6 +12,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -19,6 +21,33 @@ const (
 	DefaultLimit = 20
 	MaxLimit     = 50
 )
+
+type listAndCountEventsResult struct {
+	events   []models.StageEvent
+	totalCount int64
+	listErr    error
+	countErr   error
+}
+
+func listAndCountEventsInParallel(stage *models.Stage, states, stateReasons []string, limit int, beforeTime *time.Time) *listAndCountEventsResult {
+	result := &listAndCountEventsResult{}
+	var wg sync.WaitGroup
+	
+	wg.Add(2)
+	
+	go func() {
+		defer wg.Done()
+		result.events, result.listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, limit, beforeTime)
+	}()
+	
+	go func() {
+		defer wg.Done()
+		result.totalCount, result.countErr = stage.CountEvents(states, stateReasons)
+	}()
+	
+	wg.Wait()
+	return result
+}
 
 func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit uint32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
 	err := actions.ValidateUUIDs(stageIdOrName)
@@ -55,18 +84,34 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 		beforeTime = &t
 	}
 
-	events, err := stage.ListEventsWithLimitAndBefore(states, stateReasons, validatedLimit, beforeTime)
+	result := listAndCountEventsInParallel(stage, states, stateReasons, validatedLimit, beforeTime)
+	
+	if result.listErr != nil {
+		return nil, result.listErr
+	}
+	
+	if result.countErr != nil {
+		return nil, result.countErr
+	}
+
+	serialized, err := serializeStageEvents(result.events)
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := serializeStageEvents(events)
-	if err != nil {
-		return nil, err
+	hasNextPage := int64(len(result.events)) == int64(validatedLimit) && result.totalCount > int64(validatedLimit)
+	
+	var lastTimestamp *timestamppb.Timestamp
+	if len(result.events) > 0 {
+		lastEvent := result.events[len(result.events)-1]
+		lastTimestamp = timestamppb.New(*lastEvent.CreatedAt)
 	}
 
 	response := &pb.ListStageEventsResponse{
-		Events: serialized,
+		Events:        serialized,
+		TotalCount:    uint32(result.totalCount),
+		HasNextPage:   hasNextPage,
+		LastTimestamp: lastTimestamp,
 	}
 
 	return response, nil
@@ -213,6 +258,14 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		})
 	}
 
+	if in.Event != nil {
+		serializedTriggerEvent, err := serializeEvent(*in.Event)
+		if err != nil {
+			return nil, err
+		}
+		e.TriggerEvent = serializedTriggerEvent
+	}
+
 	return &e, nil
 }
 
@@ -309,5 +362,69 @@ func stateReasonToProto(stateReason string) pb.StageEvent_StateReason {
 		return pb.StageEvent_STATE_REASON_TIMEOUT
 	default:
 		return pb.StageEvent_STATE_REASON_UNKNOWN
+	}
+}
+
+func serializeEvent(event models.Event) (*pb.Event, error) {
+	e := &pb.Event{
+		Id:         event.ID.String(),
+		SourceId:   event.SourceID.String(),
+		SourceName: event.SourceName,
+		SourceType: sourceTypeModelToProto(event.SourceType),
+		Type:       event.Type,
+		State:      eventStateModelToProto(event.State),
+		ReceivedAt: timestamppb.New(*event.ReceivedAt),
+	}
+
+	if len(event.Raw) > 0 {
+		data, err := event.GetData()
+		if err != nil {
+			return nil, err
+		}
+
+		e.Raw, err = structpb.NewStruct(data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(event.Headers) > 0 {
+		headers, err := event.GetHeaders()
+		if err != nil {
+			return nil, err
+		}
+
+		e.Headers, err = structpb.NewStruct(headers)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return e, nil
+}
+
+func sourceTypeModelToProto(sourceType string) pb.EventSourceType {
+	switch sourceType {
+	case models.SourceTypeEventSource:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
+	case models.SourceTypeStage:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE
+	case models.SourceTypeConnectionGroup:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP
+	default:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN
+	}
+}
+
+func eventStateModelToProto(state string) pb.Event_State {
+	switch state {
+	case models.EventStatePending:
+		return pb.Event_STATE_PENDING
+	case models.EventStateDiscarded:
+		return pb.Event_STATE_DISCARDED
+	case models.EventStateProcessed:
+		return pb.Event_STATE_PROCESSED
+	default:
+		return pb.Event_STATE_UNKNOWN
 	}
 }

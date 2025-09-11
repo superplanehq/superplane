@@ -414,6 +414,7 @@ func (s *Stage) ListEventsInTransaction(tx *gorm.DB, states, stateReasons []stri
 func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons []string, limit int, before *time.Time) ([]StageEvent, error) {
 	var events []StageEvent
 	query := database.Conn().
+		Preload("Event").
 		Where("stage_id = ?", s.ID).
 		Where("state IN ?", states)
 
@@ -639,6 +640,50 @@ func (s *Stage) DeleteConnectionsInTransaction(tx *gorm.DB) error {
 		return fmt.Errorf("failed to delete connections: %v", err)
 	}
 	return nil
+}
+
+func (s *Stage) CountExecutions(states []string, results []string) (int64, error) {
+	query := database.Conn().
+		Model(&StageExecution{}).
+		Where("stage_id = ?", s.ID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
+	if len(results) > 0 {
+		query = query.Where("result IN ?", results)
+	}
+
+	var count int64
+	err := query.Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (s *Stage) CountEvents(states, stateReasons []string) (int64, error) {
+	query := database.Conn().
+		Model(&StageEvent{}).
+		Where("stage_id = ?", s.ID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
+	if len(stateReasons) > 0 {
+		query = query.Where("state_reason IN ?", stateReasons)
+	}
+
+	var count int64
+	err := query.Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func mapEmittedEventsToExecutions(emittedEvents []Event, executions []StageExecution) {
