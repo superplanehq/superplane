@@ -3,6 +3,7 @@ package stages
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -19,6 +20,33 @@ const (
 	DefaultExecutionLimit = 20
 	MaxExecutionLimit     = 50
 )
+
+type listAndCountResult struct {
+	executions []models.StageExecution
+	totalCount int64
+	listErr    error
+	countErr   error
+}
+
+func listAndCountExecutionsInParallel(stage *models.Stage, states, results []string, limit int, beforeTime *time.Time) *listAndCountResult {
+	result := &listAndCountResult{}
+	var wg sync.WaitGroup
+	
+	wg.Add(2)
+	
+	go func() {
+		defer wg.Done()
+		result.executions, result.listErr = stage.ListExecutionsWithLimitAndBefore(states, results, limit, beforeTime)
+	}()
+	
+	go func() {
+		defer wg.Done()
+		result.totalCount, result.countErr = stage.CountExecutions(states, results)
+	}()
+	
+	wg.Wait()
+	return result
+}
 
 func ListStageExecutions(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.Execution_State, pbResults []pb.Execution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListStageExecutionsResponse, error) {
 	err := actions.ValidateUUIDs(stageIdOrName)
@@ -54,18 +82,34 @@ func ListStageExecutions(ctx context.Context, canvasID string, stageIdOrName str
 		beforeTime = &t
 	}
 
-	executions, err := stage.ListExecutionsWithLimitAndBefore(states, results, validatedLimit, beforeTime)
+	result := listAndCountExecutionsInParallel(stage, states, results, validatedLimit, beforeTime)
+	
+	if result.listErr != nil {
+		return nil, result.listErr
+	}
+	
+	if result.countErr != nil {
+		return nil, result.countErr
+	}
+
+	serialized, err := serializeExecutions(result.executions)
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := serializeExecutions(executions)
-	if err != nil {
-		return nil, err
+	hasNextPage := int64(len(result.executions)) == int64(validatedLimit) && result.totalCount > int64(validatedLimit)
+	
+	var lastTimestamp *timestamppb.Timestamp
+	if len(result.executions) > 0 {
+		lastExecution := result.executions[len(result.executions)-1]
+		lastTimestamp = timestamppb.New(*lastExecution.CreatedAt)
 	}
 
 	response := &pb.ListStageExecutionsResponse{
-		Executions: serialized,
+		Executions:    serialized,
+		TotalCount:    uint32(result.totalCount),
+		HasNextPage:   hasNextPage,
+		LastTimestamp: lastTimestamp,
 	}
 
 	return response, nil

@@ -21,6 +21,9 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Empty(t, res.Executions)
+		assert.Equal(t, uint32(0), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.LastTimestamp)
 	})
 
 	t.Run("return empty list for non-existent stage", func(t *testing.T) {
@@ -46,6 +49,9 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Executions, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
 
 		exec := res.Executions[0]
 		assert.Equal(t, execution.ID.String(), exec.Id)
@@ -85,12 +91,18 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Executions, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
 		assert.Equal(t, protos.Execution_STATE_STARTED, res.Executions[0].State)
 
 		res, err = ListStageExecutions(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.Execution_State{protos.Execution_STATE_PENDING}, nil, 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Empty(t, res.Executions)
+		assert.Equal(t, uint32(0), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.LastTimestamp)
 	})
 
 	t.Run("filter by execution results", func(t *testing.T) {
@@ -116,6 +128,9 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Executions, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
 
 		exec := res.Executions[0]
 		assert.Equal(t, protos.Execution_RESULT_PASSED, exec.Result)
@@ -140,6 +155,9 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Empty(t, res.Executions)
+		assert.Equal(t, uint32(0), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.LastTimestamp)
 	})
 
 	t.Run("limit results", func(t *testing.T) {
@@ -160,6 +178,9 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Executions, 3)
+		assert.Equal(t, uint32(5), res.TotalCount)
+		assert.True(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
 	})
 
 	t.Run("filter by before timestamp", func(t *testing.T) {
@@ -179,12 +200,18 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Executions, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
 
 		pastTime := execution.CreatedAt.Add(-1 * time.Hour)
 		res, err = ListStageExecutions(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), nil, nil, 0, timestamppb.New(pastTime))
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Empty(t, res.Executions)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.LastTimestamp)
 	})
 
 	t.Run("find stage by name", func(t *testing.T) {
@@ -203,6 +230,9 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Executions, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
 	})
 
 	t.Run("test emitted events and complete relationships", func(t *testing.T) {
@@ -231,6 +261,9 @@ func TestListStageExecutions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Executions, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
 
 		exec := res.Executions[0]
 
@@ -299,5 +332,48 @@ func TestListStageExecutions(t *testing.T) {
 
 		assert.NotNil(t, exec.StageEvent.TriggerEvent.Headers)
 		assert.Equal(t, "push", exec.StageEvent.TriggerEvent.Headers.Fields["x-github-event"].GetStringValue())
+	})
+
+	t.Run("test pagination with hasNextPage", func(t *testing.T) {
+		r := support.Setup(t)
+
+		// Create 10 executions
+		for i := 0; i < 10; i++ {
+			event, err := models.CreateEvent(r.Source.ID, r.Canvas.ID, r.Source.Name, models.SourceTypeEventSource, "test.event", []byte(`{"key": "value"}`), []byte(`{}`))
+			require.NoError(t, err)
+
+			stageEvent, err := models.CreateStageEvent(r.Stage.ID, event, models.StageEventStatePending, "", map[string]any{"input": "value"}, "test-stage-event")
+			require.NoError(t, err)
+
+			_, err = models.CreateStageExecution(r.Canvas.ID, r.Stage.ID, stageEvent.ID)
+			require.NoError(t, err)
+		}
+
+		// Request 5 items, should have next page
+		res, err := ListStageExecutions(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), nil, nil, 5, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Executions, 5)
+		assert.Equal(t, uint32(10), res.TotalCount)
+		assert.True(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+
+		// Request 10 items, should NOT have next page
+		res, err = ListStageExecutions(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), nil, nil, 10, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Executions, 10)
+		assert.Equal(t, uint32(10), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+
+		// Request 15 items (more than exist), should NOT have next page
+		res, err = ListStageExecutions(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), nil, nil, 15, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Executions, 10)
+		assert.Equal(t, uint32(10), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
 	})
 }
