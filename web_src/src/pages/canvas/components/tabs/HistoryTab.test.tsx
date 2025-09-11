@@ -31,10 +31,19 @@ const mockUseStageEvents = {
   refetch: vi.fn(),
 };
 
+const mockUseStageExecutions = {
+  data: { pages: [] },
+  fetchNextPage: vi.fn(),
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  refetch: vi.fn(),
+};
+
 vi.mock('@/hooks/useCanvasData', () => ({
   useOrganizationUsersForCanvas: vi.fn(() => ({ data: [] })),
   useStageQueueEvents: vi.fn(() => mockUseStageQueueEvents),
   useStageEvents: vi.fn(() => mockUseStageEvents),
+  useStageExecutions: vi.fn(() => mockUseStageExecutions),
 }));
 
 const renderWithQueryClient = (component: React.ReactElement) => {

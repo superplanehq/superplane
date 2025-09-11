@@ -151,8 +151,12 @@ func validateExecutionResults(in []pb.Execution_Result) ([]string, error) {
 }
 
 func getLimit(limit uint32) uint32 {
-	if limit < MinLimit || limit > MaxLimit {
+	if limit == 0 {
 		return DefaultLimit
+	}
+
+	if limit > MaxLimit {
+		return MaxLimit
 	}
 
 	return limit

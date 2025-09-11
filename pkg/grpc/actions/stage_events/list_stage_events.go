@@ -142,8 +142,12 @@ func validateStageEventStates(in []pb.StageEvent_State) ([]string, error) {
 }
 
 func getLimit(limit uint32) uint32 {
-	if limit < MinLimit || limit > MaxLimit {
+	if limit == 0 {
 		return DefaultLimit
+	}
+
+	if limit > MaxLimit {
+		return MaxLimit
 	}
 
 	return limit
