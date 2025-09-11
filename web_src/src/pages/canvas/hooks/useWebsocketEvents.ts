@@ -65,8 +65,9 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
     let newEventPayload: EventMap['new_stage_event'];
     let approvedEventPayload: EventMap['stage_event_approved'];
     let discardedEventPayload: EventMap['stage_event_discarded'];
-    let executionFinishedPayload: EventMap['execution_finished']
-    let executionStartedPayload: EventMap['execution_started']
+    let executionFinishedPayload: EventMap['execution_finished'];
+    let executionStartedPayload: EventMap['execution_started'];
+    let executionCancelledPayload: EventMap['execution_cancelled'];
     let eventSourceWithNewEvent: EventSourceWithEvents | undefined;
     let connectionGroupWithNewEvent: ConnectionGroupWithEvents | undefined;
     let stageWithNewEvent: Stage | undefined;
@@ -151,6 +152,11 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
         executionStartedPayload = payload as EventMap['execution_started'];
         stageUpdateQueue.enqueue(executionStartedPayload.stage_id, () => pollStageUntilNoPending(canvasId, executionStartedPayload.stage_id), 'high');
         stageUpdateQueue.enqueue(executionStartedPayload.stage_id, () => syncStageEvents(canvasId, executionStartedPayload.stage_id));
+        break;
+      case 'execution_cancelled':
+        executionCancelledPayload = payload as EventMap['execution_cancelled'];
+        stageUpdateQueue.enqueue(executionCancelledPayload.stage_id, () => pollStageUntilNoPending(canvasId, executionCancelledPayload.stage_id), 'high');
+        stageUpdateQueue.enqueue(executionCancelledPayload.stage_id, () => syncStageEvents(canvasId, executionCancelledPayload.stage_id));
         break;
       default:
     }

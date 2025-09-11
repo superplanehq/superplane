@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from './types';
 import { SuperplaneCanvas, SuperplaneStageEventState, SuperplaneStageEventStateReason } from "@/api-client/types.gen";
-import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneDiscardStageEvent } from '@/api-client';
+import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneDiscardStageEvent, superplaneCancelStageExecution } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
@@ -169,6 +169,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         canvasIdOrName: get().canvas.metadata!.id!,
         stageIdOrName: stageId,
         eventId: stageEventId
+      },
+      body: {}
+    }));
+  },
+
+  cancelStageExecution: async (executionId: string, stageId: string) => {
+    await superplaneCancelStageExecution(withOrganizationHeader({
+      path: {
+        canvasIdOrName: get().canvas.metadata!.id!,
+        stageIdOrName: stageId,
+        executionId: executionId
       },
       body: {}
     }));

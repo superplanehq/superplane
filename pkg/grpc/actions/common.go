@@ -34,6 +34,8 @@ func ExecutionResultToProto(result string) pb.Execution_Result {
 		return pb.Execution_RESULT_FAILED
 	case models.ResultPassed:
 		return pb.Execution_RESULT_PASSED
+	case models.ResultCancelled:
+		return pb.Execution_RESULT_CANCELLED
 	default:
 		return pb.Execution_RESULT_UNKNOWN
 	}

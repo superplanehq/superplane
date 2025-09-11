@@ -324,6 +324,18 @@ service Superplane {
     };
   }
 
+  rpc CancelStageExecution(CancelStageExecutionRequest) returns (CancelStageExecutionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/executions/{execution_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel a stage execution";
+      description: "Cancel the specified stage execution (canvas can be referenced by ID or name)";
+      tags: "Stage";
+    };
+  }
+
   rpc AddUser(AddUserRequest) returns (AddUserResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/users"
@@ -855,13 +867,13 @@ message Execution {
     STATE_PENDING = 1;
     STATE_STARTED = 2;
     STATE_FINISHED = 3;
-    STATE_CANCELLED = 4;
   }
 
   enum Result {
     RESULT_UNKNOWN = 0;
     RESULT_PASSED = 1;
     RESULT_FAILED = 2;
+    RESULT_CANCELLED = 3;
   }
 
   string id = 1;
@@ -903,6 +915,16 @@ message DiscardStageEventRequest {
 
 message DiscardStageEventResponse {
   StageEvent event = 1;
+}
+
+message CancelStageExecutionRequest {
+  string stage_id_or_name = 1;
+  string canvas_id_or_name = 2;
+  string execution_id = 3;
+}
+
+message CancelStageExecutionResponse {
+  Execution execution = 1;
 }
 
 message AddUserRequest {
@@ -1064,6 +1086,14 @@ message StageExecutionStarted {
 }
 
 message StageExecutionFinished {
+  string canvas_id = 1;
+  string execution_id = 2;
+  string stage_id = 3;
+  string event_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message StageExecutionCancelled {
   string canvas_id = 1;
   string execution_id = 2;
   string stage_id = 3;

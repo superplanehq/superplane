@@ -12,37 +12,37 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleExecutionCreated(messageBody []byte, wsHub *ws.Hub) error {
-	log.Debugf("Received execution_created event")
+func HandleExecutionCancelled(messageBody []byte, wsHub *ws.Hub) error {
+	log.Debugf("Received execution_cancelled event")
 
-	pbMsg := &pb.StageExecutionStarted{}
-	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
-		return fmt.Errorf("failed to unmarshal ExecutionCreated message: %w", err)
+	var executionCancelled pb.StageExecutionCancelled
+	if err := proto.Unmarshal(messageBody, &executionCancelled); err != nil {
+		log.Errorf("Failed to unmarshal StageExecutionCancelled message: %v", err)
+		return err
 	}
 
-	executionID, err := uuid.Parse(pbMsg.ExecutionId)
+	executionID, err := uuid.Parse(executionCancelled.ExecutionId)
 	if err != nil {
-		return fmt.Errorf("failed to parse execution ID: %w", err)
+		return err
 	}
 
-	execution, err := models.FindExecutionByID(executionID, uuid.MustParse(pbMsg.StageId))
+	execution, err := models.FindExecutionByID(executionID, uuid.MustParse(executionCancelled.StageId))
 	if err != nil {
-		return fmt.Errorf("failed to find execution in database: %w", err)
+		return err
 	}
 
 	wsEventJSON, err := json.Marshal(map[string]any{
-		"event": "execution_created",
+		"event": "execution_cancelled",
 		"payload": map[string]any{
 			"id":             execution.ID.String(),
 			"stage_id":       execution.StageID.String(),
-			"canvas_id":      pbMsg.CanvasId,
+			"canvas_id":      executionCancelled.CanvasId,
 			"stage_event_id": execution.StageEventID.String(),
 			"state":          execution.State,
 			"result":         execution.Result,
 			"created_at":     execution.CreatedAt,
 			"updated_at":     execution.UpdatedAt,
-			"started_at":     execution.StartedAt,
-			"finished_at":    execution.FinishedAt,
+			"started_at":     execution.FinishedAt,
 		},
 	})
 
@@ -50,8 +50,8 @@ func HandleExecutionCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to marshal websocket event: %w", err)
 	}
 
-	wsHub.BroadcastToCanvas(pbMsg.CanvasId, wsEventJSON)
-	log.Debugf("Broadcasted execution_created event to canvas %s", pbMsg.CanvasId)
+	wsHub.BroadcastToCanvas(executionCancelled.CanvasId, wsEventJSON)
+	log.Debugf("Broadcasted execution_cancelled event to canvas %s", executionCancelled.CanvasId)
 
 	return nil
 }

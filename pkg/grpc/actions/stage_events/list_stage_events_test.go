@@ -71,7 +71,7 @@ func Test__ListStageEvents(t *testing.T) {
 			"VALUE_1": "value1",
 		}))
 
-		execution, err = models.FindExecutionByID(execution.ID)
+		execution, err = models.FindExecutionByID(execution.ID, execution.StageID)
 		require.NoError(t, err)
 
 		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), states, []protos.StageEvent_StateReason{}, 0, nil)

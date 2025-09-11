@@ -36,6 +36,7 @@ export interface CanvasState {
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
+  cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
   selectStageId: (stageId: string) => void;
   cleanSelectedStageId: () => void;
   selectEventSourceId: (eventSourceId: string) => void;

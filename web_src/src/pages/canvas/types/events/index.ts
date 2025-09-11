@@ -17,6 +17,7 @@ export type EventMap = {
     stage_event_discarded: StageEventPayload;
     execution_finished: ExecutionPayload;
     execution_started: ExecutionPayload;
+    execution_cancelled: ExecutionPayload;
     event_created: EventPayload;
 };
   

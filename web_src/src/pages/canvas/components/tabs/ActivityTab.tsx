@@ -10,6 +10,7 @@ interface ActivityTabProps {
   partialExecutions: SuperplaneExecution[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
+  cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
   organizationId: string;
@@ -22,6 +23,7 @@ export const ActivityTab = ({
   partialExecutions,
   approveStageEvent,
   discardStageEvent,
+  cancelStageExecution,
   executionRunning,
   onChangeTab,
   organizationId
@@ -43,7 +45,7 @@ export const ActivityTab = ({
         <ExecutionTimeline
           executions={partialExecutions.slice(0, 3)}
           organizationId={organizationId}
-          onCancel={(eventId) => discardStageEvent(eventId, selectedStage.metadata!.id!)}
+          onCancel={(executionId) => cancelStageExecution(executionId, selectedStage.metadata!.id!)}
         />
       </div>
 

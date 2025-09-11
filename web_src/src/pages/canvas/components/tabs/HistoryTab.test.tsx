@@ -57,6 +57,7 @@ describe('HistoryTab', () => {
         canvasId="canvas-1"
         approveStageEvent={vi.fn()}
         discardStageEvent={vi.fn()}
+        cancelStageExecution={vi.fn()}
       />
     );
 
@@ -72,6 +73,7 @@ describe('HistoryTab', () => {
         canvasId="canvas-1"
         approveStageEvent={vi.fn()}
         discardStageEvent={vi.fn()}
+        cancelStageExecution={vi.fn()}
       />
     );
 

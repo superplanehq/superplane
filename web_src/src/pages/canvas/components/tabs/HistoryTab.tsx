@@ -21,9 +21,10 @@ interface HistoryTabProps {
   canvasId: string;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
+  cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
 }
 
-export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, discardStageEvent }: HistoryTabProps) => {
+export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, discardStageEvent, cancelStageExecution }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
     type: 'execution' | 'stage_event' | 'discarded_event';
@@ -242,7 +243,7 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     eventId={sourceEvent?.id}
                     sourceEvent={sourceEvent}
                     emmitedEvent={emmitedEvent}
-                    onCancel={() => discardStageEvent(execution.stageEvent?.id!, selectedStage.metadata!.id!)}
+                    onCancel={() => cancelStageExecution(execution.id!, selectedStage.metadata!.id!)}
                   />
                 );
               }

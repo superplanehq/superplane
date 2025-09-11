@@ -545,7 +545,7 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, r
 		return nil
 	}
 
-	execution, err := models.FindExecutionByID(ID)
+	execution, err := models.FindUnscopedExecutionByID(ID)
 	if err != nil {
 		http.Error(w, "Execution not found", http.StatusNotFound)
 		return nil

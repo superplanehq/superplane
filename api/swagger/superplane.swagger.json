@@ -1048,8 +1048,7 @@
                 "STATE_UNKNOWN",
                 "STATE_PENDING",
                 "STATE_STARTED",
-                "STATE_FINISHED",
-                "STATE_CANCELLED"
+                "STATE_FINISHED"
               ]
             },
             "collectionFormat": "multi"
@@ -1064,7 +1063,8 @@
               "enum": [
                 "RESULT_UNKNOWN",
                 "RESULT_PASSED",
-                "RESULT_FAILED"
+                "RESULT_FAILED",
+                "RESULT_CANCELLED"
               ]
             },
             "collectionFormat": "multi"
@@ -1086,6 +1086,58 @@
         ],
         "tags": [
           "Execution"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/executions/{executionId}/cancel": {
+      "post": {
+        "summary": "Cancel a stage execution",
+        "description": "Cancel the specified stage execution (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_CancelStageExecution",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCancelStageExecutionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "stageIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCancelStageExecutionBody"
+            }
+          }
+        ],
+        "tags": [
+          "Stage"
         ]
       }
     },
@@ -2625,7 +2677,8 @@
       "enum": [
         "RESULT_UNKNOWN",
         "RESULT_PASSED",
-        "RESULT_FAILED"
+        "RESULT_FAILED",
+        "RESULT_CANCELLED"
       ],
       "default": "RESULT_UNKNOWN"
     },
@@ -3401,6 +3454,17 @@
         }
       }
     },
+    "SuperplaneCancelStageExecutionBody": {
+      "type": "object"
+    },
+    "SuperplaneCancelStageExecutionResponse": {
+      "type": "object",
+      "properties": {
+        "execution": {
+          "$ref": "#/definitions/SuperplaneExecution"
+        }
+      }
+    },
     "SuperplaneCanvas": {
       "type": "object",
       "properties": {
@@ -3966,8 +4030,7 @@
         "STATE_UNKNOWN",
         "STATE_PENDING",
         "STATE_STARTED",
-        "STATE_FINISHED",
-        "STATE_CANCELLED"
+        "STATE_FINISHED"
       ],
       "default": "STATE_UNKNOWN"
     },

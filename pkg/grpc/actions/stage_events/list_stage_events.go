@@ -18,16 +18,10 @@ import (
 )
 
 const (
-	DefaultLimit = 20
-	MaxLimit     = 50
+	MinLimit     = 50
+	MaxLimit     = 100
+	DefaultLimit = 50
 )
-
-type listAndCountEventsResult struct {
-	events     []models.StageEvent
-	totalCount int64
-	listErr    error
-	countErr   error
-}
 
 func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit uint32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
 	err := actions.ValidateUUIDs(stageIdOrName)
@@ -56,16 +50,8 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	validatedLimit := validateLimit(int(limit))
-
-	var beforeTime *time.Time
-	if before != nil && before.IsValid() {
-		t := before.AsTime()
-		beforeTime = &t
-	}
-
-	result := listAndCountEventsInParallel(stage, states, stateReasons, validatedLimit, beforeTime)
-
+	limit = getLimit(limit)
+	result := listAndCountEventsInParallel(stage, states, stateReasons, limit, getBefore(before))
 	if result.listErr != nil {
 		return nil, result.listErr
 	}
@@ -79,25 +65,37 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 		return nil, err
 	}
 
-	hasNextPage := int64(len(result.events)) == int64(validatedLimit) && result.totalCount > int64(validatedLimit)
-
-	var lastTimestamp *timestamppb.Timestamp
-	if len(result.events) > 0 {
-		lastEvent := result.events[len(result.events)-1]
-		lastTimestamp = timestamppb.New(*lastEvent.CreatedAt)
-	}
-
 	response := &pb.ListStageEventsResponse{
 		Events:        serialized,
 		TotalCount:    uint32(result.totalCount),
-		HasNextPage:   hasNextPage,
-		LastTimestamp: lastTimestamp,
+		HasNextPage:   result.hasNextPage(limit),
+		LastTimestamp: result.lastTimestamp(),
 	}
 
 	return response, nil
 }
 
-func listAndCountEventsInParallel(stage *models.Stage, states, stateReasons []string, limit int, beforeTime *time.Time) *listAndCountEventsResult {
+type listAndCountEventsResult struct {
+	events     []models.StageEvent
+	totalCount int64
+	listErr    error
+	countErr   error
+}
+
+func (r *listAndCountEventsResult) hasNextPage(limit uint32) bool {
+	return len(r.events) == int(limit) && r.totalCount > int64(limit)
+}
+
+func (r *listAndCountEventsResult) lastTimestamp() *timestamppb.Timestamp {
+	if len(r.events) > 0 {
+		lastEvent := r.events[len(r.events)-1]
+		return timestamppb.New(*lastEvent.CreatedAt)
+	}
+
+	return nil
+}
+
+func listAndCountEventsInParallel(stage *models.Stage, states, stateReasons []string, limit uint32, beforeTime *time.Time) *listAndCountEventsResult {
 	result := &listAndCountEventsResult{}
 	var wg sync.WaitGroup
 
@@ -105,7 +103,7 @@ func listAndCountEventsInParallel(stage *models.Stage, states, stateReasons []st
 
 	go func() {
 		defer wg.Done()
-		result.events, result.listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, limit, beforeTime)
+		result.events, result.listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, int(limit), beforeTime)
 	}()
 
 	go func() {
@@ -126,6 +124,7 @@ func validateStageEventStates(in []pb.StageEvent_State) ([]string, error) {
 			models.StageEventStatePending,
 			models.StageEventStateWaiting,
 			models.StageEventStateProcessed,
+			models.StageEventStateDiscarded,
 		}, nil
 	}
 
@@ -142,11 +141,21 @@ func validateStageEventStates(in []pb.StageEvent_State) ([]string, error) {
 	return states, nil
 }
 
-func validateLimit(limit int) int {
-	if limit < 1 || limit > MaxLimit {
+func getLimit(limit uint32) uint32 {
+	if limit < MinLimit || limit > MaxLimit {
 		return DefaultLimit
 	}
+
 	return limit
+}
+
+func getBefore(before *timestamppb.Timestamp) *time.Time {
+	if before != nil && before.IsValid() {
+		t := before.AsTime()
+		return &t
+	}
+
+	return nil
 }
 
 func validateStageEventStateReasons(in []pb.StageEvent_StateReason) ([]string, error) {
@@ -261,21 +270,6 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 	}
 
 	return &e, nil
-}
-
-func executionStateToProto(state string) pb.Execution_State {
-	switch state {
-	case models.ExecutionPending:
-		return pb.Execution_STATE_PENDING
-	case models.ExecutionStarted:
-		return pb.Execution_STATE_STARTED
-	case models.ExecutionFinished:
-		return pb.Execution_STATE_FINISHED
-	case models.ExecutionCancelled:
-		return pb.Execution_STATE_CANCELLED
-	default:
-		return pb.Execution_STATE_UNKNOWN
-	}
 }
 
 func stateToProto(state string) pb.StageEvent_State {

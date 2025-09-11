@@ -15,7 +15,7 @@ import {
 interface ExecutionTimelineProps {
   executions: SuperplaneExecution[];
   organizationId: string;
-  onCancel: (eventId: string) => void;
+  onCancel: (executionId: string) => void;
 }
 
 export const ExecutionTimeline = ({
@@ -64,7 +64,7 @@ export const ExecutionTimeline = ({
               eventId={sourceEvent?.id}
               sourceEvent={sourceEvent}
               emmitedEvent={emmitedEvent}
-              onCancel={() => onCancel(execution.stageEvent?.id!)}
+              onCancel={() => onCancel(execution.id!)}
             />
           );
         })

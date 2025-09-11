@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
@@ -30,19 +29,19 @@ type listAndCountEventsResult struct {
 func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType, sourceIDStr string, limit int, beforeTime *time.Time) *listAndCountEventsResult {
 	result := &listAndCountEventsResult{}
 	var wg sync.WaitGroup
-	
+
 	wg.Add(2)
-	
+
 	go func() {
 		defer wg.Done()
 		result.events, result.listErr = models.ListEventsByCanvasIDWithLimitAndBefore(canvasID, sourceType, sourceIDStr, limit, beforeTime)
 	}()
-	
+
 	go func() {
 		defer wg.Done()
 		result.totalCount, result.countErr = models.CountEventsByCanvasIDAndFilters(canvasID, sourceType, sourceIDStr)
 	}()
-	
+
 	wg.Wait()
 	return result
 }
@@ -60,15 +59,14 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 		t := before.AsTime()
 		beforeTime = &t
 	}
-	log.Println("beforeTime", beforeTime)
-	
+
 	sourceTypeStr := EventSourceTypeToString(sourceType)
 	result := listAndCountEventsInParallel(canvasUUID, sourceTypeStr, sourceID, validatedLimit, beforeTime)
-	
+
 	if result.listErr != nil {
 		return nil, result.listErr
 	}
-	
+
 	if result.countErr != nil {
 		return nil, result.countErr
 	}
@@ -79,7 +77,7 @@ func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceT
 	}
 
 	hasNextPage := int64(len(result.events)) == int64(validatedLimit) && result.totalCount > int64(validatedLimit)
-	
+
 	var lastTimestamp *timestamppb.Timestamp
 	if len(result.events) > 0 {
 		lastEvent := result.events[len(result.events)-1]

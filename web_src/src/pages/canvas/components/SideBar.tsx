@@ -27,9 +27,10 @@ interface SidebarProps {
   onClose: () => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
+  cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
 }
 
-export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStageEvent }: SidebarProps) => {
+export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStageEvent, cancelStageExecution }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState('activity');
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
@@ -46,6 +47,20 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
       });
     } catch (error) {
       console.error('Failed to discard stage event:', error);
+    }
+  };
+
+  // Wrapper function to handle execution cancellation with query invalidation
+  const handleCancelStageExecution = async (executionId: string, stageId: string) => {
+    try {
+      await cancelStageExecution(executionId, stageId);
+      
+      // Invalidate queries to refresh the data
+      await queryClient.invalidateQueries({
+        queryKey: canvasKeys.stageExecutions(canvasId || '', stageId)
+      });
+    } catch (error) {
+      console.error('Failed to cancel stage execution:', error);
     }
   };
 
@@ -116,6 +131,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
             executionRunning={executionRunning}
             organizationId={organizationId!}
             discardStageEvent={handleDiscardStageEvent}
+            cancelStageExecution={handleCancelStageExecution}
           />
         );
 
@@ -126,6 +142,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
           organizationId={organizationId!}
           selectedStage={selectedStage}
           discardStageEvent={handleDiscardStageEvent}
+          cancelStageExecution={handleCancelStageExecution}
         />;
 
       case 'settings':

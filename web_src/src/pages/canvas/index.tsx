@@ -19,7 +19,7 @@ export function Canvas() {
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, selectedEventSourceId, cleanSelectedEventSourceId, editingStageId, stages, eventSources, approveStageEvent, discardStageEvent, fitViewNode, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, selectedEventSourceId, cleanSelectedEventSourceId, editingStageId, stages, eventSources, approveStageEvent, discardStageEvent, cancelStageExecution, fitViewNode, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
@@ -314,7 +314,7 @@ export function Canvas() {
             )}
 
             <FlowRenderer />
-            {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} discardStageEvent={discardStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
+            {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} discardStageEvent={discardStageEvent} cancelStageExecution={cancelStageExecution} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
             {selectedEventSource && <EventSourceSidebar selectedEventSource={selectedEventSource} onClose={() => cleanSelectedEventSourceId()} />}
           </div>
         ) : (

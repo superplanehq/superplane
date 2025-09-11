@@ -78,6 +78,17 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             </button>
           );
         }
+        if (result === 'RESULT_CANCELLED') {
+          return (
+            <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
+              <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-gray-500/15 text-gray-700 group-hover:bg-gray-500/25 dark:text-gray-400 dark:group-hover:bg-gray-500/25">
+                <MaterialSymbol name="block" size="sm" />
+                <span className="uppercase">cancelled</span>
+              </span>
+            </button>
+          );
+        }
         return (
           <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
             <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
@@ -107,16 +118,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             </span>
           </button>
         );
-      case 'STATE_CANCELLED':
-        return (
-          <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
-            <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
-            <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-gray-500/15 text-gray-700 group-hover:bg-gray-500/25 dark:text-gray-400 dark:group-hover:bg-gray-500/25">
-              <MaterialSymbol name="block" size="sm" />
-              <span className="uppercase">cancelled</span>
-            </span>
-          </button>
-        );
       default:
         return (
           <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
@@ -139,13 +140,14 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         if (result === 'RESULT_FAILED') {
           return 'border-t-red-400 dark:border-t-red-700';
         }
+        if (result === 'RESULT_CANCELLED') {
+          return 'border-t-gray-400 dark:border-t-gray-700';
+        }
         return 'border-t-gray-400 dark:border-t-gray-700';
       case 'STATE_PENDING':
         return 'border-t-orange-400 dark:border-t-orange-700';
       case 'STATE_STARTED':
         return 'border-t-blue-400 dark:border-t-blue-700';
-      case 'STATE_CANCELLED':
-        return 'border-t-gray-400 dark:border-t-gray-700';
       default:
         return 'border-t-gray-400 dark:border-t-gray-700';
     }
@@ -222,7 +224,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         {isExpanded && (
           <div className="mt-3 space-y-4 text-left">
             {/* Run Section */}
-            {(state === 'STATE_CANCELLED' && (discardedOn || discardedBy)) && (
+            {(state === 'STATE_FINISHED' && result === 'RESULT_CANCELLED' && (discardedOn || discardedBy)) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Run
@@ -279,7 +281,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0 || (emmitedEvent && (emmitedEventPayload || emmitedEventHeaders))) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  {state === 'STATE_CANCELLED' ? 'Event' : 'Run'}
+                  {(state === 'STATE_FINISHED' && result === 'RESULT_CANCELLED') ? 'Event' : 'Run'}
                 </div>
                 <div>
                   <PayloadDisplay

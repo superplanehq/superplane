@@ -89,7 +89,7 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
             </span>
             {/* Event type badge */}
             <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-blue-100/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-              <span className="uppercase">{eventType || 'webhook'}</span>
+              <span>{eventType || 'webhook'}</span>
             </span>
           </div>
           <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap text-right">{formatRelativeTime(timestamp, true)}</span>
