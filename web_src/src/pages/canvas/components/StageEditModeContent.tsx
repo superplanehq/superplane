@@ -51,7 +51,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
   const [conditions, setConditions] = useState<SuperplaneCondition[]>(data.conditions || []);
-  const [executor, setExecutor] = useState<SuperplaneExecutor>(data.executor || { type: '', spec: {} });
+  const [executor, setExecutor] = useState<SuperplaneExecutor>({ type: data.executor?.type || '', spec: data.executor?.spec || {} });
   const [inputMappings, setInputMappings] = useState<SuperplaneInputMapping[]>(data.inputMappings || []);
   const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
     ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
@@ -62,8 +62,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const [semaphoreExecutionType, setSemaphoreExecutionType] = useState<'workflow' | 'task'>(
     (executor.spec?.task as string) ? 'task' : 'workflow'
   );
-  const [isEditingExecutor, setIsEditingExecutor] = useState(false);
-
 
   const [semaphoreParameters, setSemaphoreParameters] = useState<ParameterWithId[]>(() => {
     const params = executor.spec?.parameters as Record<string, string>;
@@ -85,6 +83,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   });
   const [httpHeaders, setHttpHeaders] = useState<ParameterWithId[]>(() => {
     const headers = executor.spec?.headers as Record<string, string>;
+    console.log(executor.spec);
     if (!headers) return [];
     return Object.entries(headers).map(([key, value], index) => ({
       id: `header_${Date.now()}_${index}`,
@@ -526,40 +525,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     errorPrefix: 'condition'
   });
 
-  // Executor management functions
-  const hasExecutor = () => {
-    return !!executor.spec
-  };
-
-  const addExecutorConfig = () => {
-    setIsEditingExecutor(true);
-    // Use the existing executor type if available, otherwise default to 'semaphore'
-    const executorType = executor?.type && executor.type !== '' ? executor.type : 'semaphore';
-    setExecutor({ type: executorType, spec: {} });
-  };
-
-  const saveExecutorConfig = () => {
-    setIsEditingExecutor(false);
-  };
-
-  const cancelExecutorConfig = () => {
-    setIsEditingExecutor(false);
-    if (!originalData.executor || !originalData.executor.type) {
-      setExecutor({ type: executor.type, spec: {} });
-    } else {
-      setExecutor({ ...originalData.executor });
-    }
-  };
-
-  const deleteExecutorConfig = () => {
-    setExecutor({ type: executor.type, spec: undefined });
-    setIsEditingExecutor(false);
-  };
-
-  const startEditingExecutor = () => {
-    setIsEditingExecutor(true);
-  };
-
 
 
   useEffect(() => {
@@ -685,7 +650,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         break;
       case 'executor':
         setExecutor({ ...originalData.executor });
-        setIsEditingExecutor(false);
+        setPayloadDisplay((originalData.executor?.spec as Record<string, unknown>)?.payload as string || '{}');
         break;
     }
   };
@@ -1761,370 +1726,338 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onToggle={handleAccordionToggle}
               isModified={isSectionModified(executor, 'executor')}
               onRevert={revertSection}
-              count={hasExecutor() ? 1 : 0}
               countLabel="executor"
+              className="rounded-lg"
             >
-              {hasExecutor() ? (
-                <InlineEditor
-                  isEditing={isEditingExecutor}
-                  onSave={saveExecutorConfig}
-                  onCancel={cancelExecutorConfig}
-                  onEdit={startEditingExecutor}
-                  onDelete={deleteExecutorConfig}
-                  displayName={`${executor.type?.charAt(0).toUpperCase()}${executor.type?.slice(1)} Executor`}
-                  badge={executor.type && (
-                    <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
-                      {executor.type}
-                    </span>
-                  )}
-                  editForm={
-                    <div className="space-y-4">
-                      {/* Executor Label - Universal field for all executor types */}
-                      <ValidationField label="Executor name">
+              <div className="space-y-4">
+                {/* Executor Label - Universal field for all executor types */}
+                <ValidationField label="Executor name">
+                  <input
+                    type="text"
+                    value={executor.name || ''}
+                    onChange={(e) => setExecutor(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="${{ inputs.VERSION }} deployment"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+
+                </ValidationField>
+
+                {executor.type === 'semaphore' && (
+                  <div className="space-y-4">
+                    <ValidationField label="Integration">
+                      <select
+                        value={executor.integration?.name || ''}
+                        onChange={(e) => updateExecutorIntegration(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      >
+                        <option value="">Select an integration...</option>
+                        {getAllIntegrations()
+                          .filter(integration => integration.spec?.type === 'semaphore')
+                          .map((integration) => (
+                            <option key={integration.metadata?.id} value={integration.metadata?.name}>
+                              {integration.metadata?.name}
+                            </option>
+                          ))}
+                      </select>
+                      {getAllIntegrations().filter(int => int.spec?.type === 'semaphore').length === 0 && (
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                          No Semaphore integrations available. Create one in canvas settings.
+                        </div>
+                      )}
+                    </ValidationField>
+
+                    <ValidationField
+                      label="Project Name"
+                      error={fieldErrors.project}
+                    >
+                      <input
+                        type="text"
+                        value={(executor.resource?.name as string) || ''}
+                        onChange={(e) => {
+                          if (executor.resource?.type !== 'project')
+                            updateExecutorResource('type', 'project');
+
+                          updateExecutorResource('name', e.target.value);
+                          if (fieldErrors.project) {
+                            setFieldErrors(prev => {
+                              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                              const { project, ...rest } = prev;
+                              return rest;
+                            });
+                          }
+                        }}
+                        placeholder="my-semaphore-project"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${fieldErrors.project
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
+                      />
+                    </ValidationField>
+
+                    <ValidationField label="Execution Type">
+                      <ControlledTabs
+                        className="text-left m-0 w-full"
+                        buttonClasses='w-full'
+                        tabs={[
+                          { id: 'workflow', label: 'Workflow' },
+                          { id: 'task', label: 'Task' },
+                        ]}
+                        variant="pills"
+                        activeTab={semaphoreExecutionType}
+                        onTabChange={(tabId) => updateSemaphoreExecutionType(tabId as 'workflow' | 'task')}
+                      />
+                    </ValidationField>
+
+                    {semaphoreExecutionType === 'task' && (
+                      <ValidationField label="Task">
                         <input
                           type="text"
-                          value={executor.name || ''}
-                          onChange={(e) => setExecutor(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="${{ inputs.VERSION }} deployment"
+                          value={(executor.spec?.task as string) || ''}
+                          onChange={(e) => updateExecutorField('task', e.target.value)}
+                          placeholder="my-task"
                           className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                         />
-
                       </ValidationField>
+                    )}
 
-                      {executor.type === 'semaphore' && (
-                        <div className="space-y-4">
-                          <ValidationField label="Integration">
-                            <select
-                              value={executor.integration?.name || ''}
-                              onChange={(e) => updateExecutorIntegration(e.target.value)}
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                    <ValidationField label="Ref">
+                      <input
+                        type="text"
+                        value={(executor.spec?.ref as string) || ''}
+                        onChange={(e) => updateExecutorField('ref', e.target.value)}
+                        placeholder="refs/heads/main"
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                    </ValidationField>
+
+                    <ValidationField label="Pipeline File">
+                      <input
+                        type="text"
+                        value={(executor.spec?.pipelineFile as string) || ''}
+                        onChange={(e) => updateExecutorField('pipelineFile', e.target.value)}
+                        placeholder=".semaphore/semaphore.yml"
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                    </ValidationField>
+
+                    <ValidationField label="Parameters">
+                      <div className="space-y-2">
+                        {semaphoreParameters.map((param) => (
+                          <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                            <input
+                              type="text"
+                              value={param.key}
+                              onChange={(e) => updateExecutorParameter(param.id, e.target.value, param.value)}
+                              placeholder="Parameter name"
+                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                            />
+                            <input
+                              type="text"
+                              value={param.value}
+                              onChange={(e) => updateExecutorParameter(param.id, param.key, e.target.value)}
+                              placeholder="Parameter value"
+                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                            />
+                            <button
+                              onClick={() => removeExecutorParameter(param.id)}
+                              className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                             >
-                              <option value="">Select an integration...</option>
-                              {getAllIntegrations()
-                                .filter(integration => integration.spec?.type === 'semaphore')
-                                .map((integration) => (
-                                  <option key={integration.metadata?.id} value={integration.metadata?.name}>
-                                    {integration.metadata?.name}
-                                  </option>
-                                ))}
-                            </select>
-                            {getAllIntegrations().filter(int => int.spec?.type === 'semaphore').length === 0 && (
-                              <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                                No Semaphore integrations available. Create one in canvas settings.
-                              </div>
-                            )}
-                          </ValidationField>
+                              <MaterialSymbol name="delete" size="sm" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          onClick={addExecutorParameter}
+                          className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        >
+                          <MaterialSymbol name="add" size="sm" />
+                          Add Parameter
+                        </button>
+                      </div>
+                    </ValidationField>
+                  </div>
+                )}
 
-                          <ValidationField
-                            label="Project Name"
-                            error={fieldErrors.project}
-                          >
-                            <input
-                              type="text"
-                              value={(executor.resource?.name as string) || ''}
-                              onChange={(e) => {
-                                if (executor.resource?.type !== 'project')
-                                  updateExecutorResource('type', 'project');
-
-                                updateExecutorResource('name', e.target.value);
-                                if (fieldErrors.project) {
-                                  setFieldErrors(prev => {
-                                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                    const { project, ...rest } = prev;
-                                    return rest;
-                                  });
-                                }
-                              }}
-                              placeholder="my-semaphore-project"
-                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${fieldErrors.project
-                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                                }`}
-                            />
-                          </ValidationField>
-
-                          <ValidationField label="Execution Type">
-                            <ControlledTabs
-                              className="text-left m-0 w-full"
-                              buttonClasses='w-full'
-                              tabs={[
-                                { id: 'workflow', label: 'Workflow' },
-                                { id: 'task', label: 'Task' },
-                              ]}
-                              variant="pills"
-                              activeTab={semaphoreExecutionType}
-                              onTabChange={(tabId) => updateSemaphoreExecutionType(tabId as 'workflow' | 'task')}
-                            />
-                          </ValidationField>
-
-                          {semaphoreExecutionType === 'task' && (
-                            <ValidationField label="Task">
-                              <input
-                                type="text"
-                                value={(executor.spec?.task as string) || ''}
-                                onChange={(e) => updateExecutorField('task', e.target.value)}
-                                placeholder="my-task"
-                                className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                              />
-                            </ValidationField>
-                          )}
-
-                          <ValidationField label="Ref">
-                            <input
-                              type="text"
-                              value={(executor.spec?.ref as string) || ''}
-                              onChange={(e) => updateExecutorField('ref', e.target.value)}
-                              placeholder="refs/heads/main"
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                            />
-                          </ValidationField>
-
-                          <ValidationField label="Pipeline File">
-                            <input
-                              type="text"
-                              value={(executor.spec?.pipelineFile as string) || ''}
-                              onChange={(e) => updateExecutorField('pipelineFile', e.target.value)}
-                              placeholder=".semaphore/semaphore.yml"
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                            />
-                          </ValidationField>
-
-                          <ValidationField label="Parameters">
-                            <div className="space-y-2">
-                              {semaphoreParameters.map((param) => (
-                                <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                                  <input
-                                    type="text"
-                                    value={param.key}
-                                    onChange={(e) => updateExecutorParameter(param.id, e.target.value, param.value)}
-                                    placeholder="Parameter name"
-                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={param.value}
-                                    onChange={(e) => updateExecutorParameter(param.id, param.key, e.target.value)}
-                                    placeholder="Parameter value"
-                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  />
-                                  <button
-                                    onClick={() => removeExecutorParameter(param.id)}
-                                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                                  >
-                                    <MaterialSymbol name="delete" size="sm" />
-                                  </button>
-                                </div>
-                              ))}
-                              <button
-                                onClick={addExecutorParameter}
-                                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                              >
-                                <MaterialSymbol name="add" size="sm" />
-                                Add Parameter
-                              </button>
-                            </div>
-                          </ValidationField>
+                {executor.type === 'github' && (
+                  <div className="space-y-4">
+                    <ValidationField label="Integration">
+                      <select
+                        value={executor.integration?.name || ''}
+                        onChange={(e) => updateExecutorIntegration(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      >
+                        <option value="">Select an integration...</option>
+                        {getAllIntegrations()
+                          .filter(integration => integration.spec?.type === 'github')
+                          .map((integration) => (
+                            <option key={integration.metadata?.id} value={integration.metadata?.name}>
+                              {integration.metadata?.name}
+                            </option>
+                          ))}
+                      </select>
+                      {getAllIntegrations().filter(int => int.spec?.type === 'github').length === 0 && (
+                        <div className="text-xs text-zinc-500 mt-1">
+                          No GitHub integrations available. Create one in canvas settings.
                         </div>
                       )}
+                    </ValidationField>
 
-                      {executor.type === 'github' && (
-                        <div className="space-y-4">
-                          <ValidationField label="Integration">
-                            <select
-                              value={executor.integration?.name || ''}
-                              onChange={(e) => updateExecutorIntegration(e.target.value)}
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                    <ValidationField label="Repository Name">
+                      <input
+                        type="text"
+                        value={(executor.resource?.name as string) || ''}
+                        onChange={(e) => {
+                          if (executor.resource?.type !== 'repository')
+                            updateExecutorResource('type', 'repository');
+
+                          updateExecutorResource('name', e.target.value)
+                        }}
+                        placeholder="my-repository"
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                    </ValidationField>
+
+                    <ValidationField label="Workflow">
+                      <input
+                        type="text"
+                        value={(executor.spec?.workflow as string) || ''}
+                        onChange={(e) => updateExecutorField('workflow', e.target.value)}
+                        placeholder=".github/workflows/task.yml"
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                    </ValidationField>
+
+                    <ValidationField label="Ref">
+                      <input
+                        type="text"
+                        value={(executor.spec?.ref as string) || ''}
+                        onChange={(e) => updateExecutorField('ref', e.target.value)}
+                        placeholder="main"
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                    </ValidationField>
+
+                    <ValidationField label="Inputs">
+                      <div className="space-y-2">
+                        {githubInputs.map((input) => (
+                          <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                            <input
+                              type="text"
+                              value={input.key}
+                              onChange={(e) => updateExecutorInput(input.id, e.target.value, input.value)}
+                              placeholder="Input name"
+                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                            />
+                            <input
+                              type="text"
+                              value={input.value}
+                              onChange={(e) => updateExecutorInput(input.id, input.key, e.target.value)}
+                              placeholder="Input value"
+                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                            />
+                            <button
+                              onClick={() => removeExecutorInput(input.id)}
+                              className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                             >
-                              <option value="">Select an integration...</option>
-                              {getAllIntegrations()
-                                .filter(integration => integration.spec?.type === 'github')
-                                .map((integration) => (
-                                  <option key={integration.metadata?.id} value={integration.metadata?.name}>
-                                    {integration.metadata?.name}
-                                  </option>
-                                ))}
-                            </select>
-                            {getAllIntegrations().filter(int => int.spec?.type === 'github').length === 0 && (
-                              <div className="text-xs text-zinc-500 mt-1">
-                                No GitHub integrations available. Create one in canvas settings.
-                              </div>
-                            )}
-                          </ValidationField>
+                              <MaterialSymbol name="delete" size="sm" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          onClick={addExecutorInput}
+                          className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        >
+                          <MaterialSymbol name="add" size="sm" />
+                          Add Input
+                        </button>
+                      </div>
+                    </ValidationField>
+                  </div>
+                )}
 
-                          <ValidationField label="Repository Name">
+                {executor.type === 'http' && (
+                  <div className="space-y-4">
+                    <ValidationField label="URL">
+                      <input
+                        type="text"
+                        value={(executor.spec?.url as string) || ''}
+                        onChange={(e) => updateExecutorField('url', e.target.value)}
+                        placeholder="https://api.example.com/endpoint"
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                    </ValidationField>
+
+                    <ValidationField label="Payload (JSON)">
+                      <textarea
+                        value={payloadDisplay}
+                        onChange={(e) => {
+                          setPayloadDisplay(e.target.value);
+                          try {
+                            const parsed = JSON.parse(e.target.value);
+                            updateExecutorField('payload', parsed);
+                          } catch {
+                            // Keep the display value but don't update payload until valid JSON
+                          }
+                        }}
+                        placeholder='{\n  "key1": "value1",\n  "key2": "{{ inputs.KEY2 }}"\n}'
+                        rows={6}
+                        className="nodrag w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500 font-mono"
+                      />
+                    </ValidationField>
+
+                    <ValidationField label="Headers">
+                      <div className="space-y-2">
+                        {httpHeaders.map((header) => (
+                          <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
                             <input
                               type="text"
-                              value={(executor.resource?.name as string) || ''}
-                              onChange={(e) => {
-                                if (executor.resource?.type !== 'repository')
-                                  updateExecutorResource('type', 'repository');
-
-                                updateExecutorResource('name', e.target.value)
-                              }}
-                              placeholder="my-repository"
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                              value={header.key}
+                              onChange={(e) => updateExecutorHeader(header.id, e.target.value, header.value)}
+                              placeholder="Header name"
+                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                             />
-                          </ValidationField>
-
-                          <ValidationField label="Workflow">
                             <input
                               type="text"
-                              value={(executor.spec?.workflow as string) || ''}
-                              onChange={(e) => updateExecutorField('workflow', e.target.value)}
-                              placeholder=".github/workflows/task.yml"
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                              value={header.value}
+                              onChange={(e) => updateExecutorHeader(header.id, header.key, e.target.value)}
+                              placeholder="Header value"
+                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                             />
-                          </ValidationField>
+                            <button
+                              onClick={() => removeExecutorHeader(header.id)}
+                              className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
+                            >
+                              <MaterialSymbol name="delete" size="sm" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          onClick={addExecutorHeader}
+                          className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        >
+                          <MaterialSymbol name="add" size="sm" />
+                          Add Header
+                        </button>
+                      </div>
+                    </ValidationField>
 
-                          <ValidationField label="Ref">
-                            <input
-                              type="text"
-                              value={(executor.spec?.ref as string) || ''}
-                              onChange={(e) => updateExecutorField('ref', e.target.value)}
-                              placeholder="main"
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                            />
-                          </ValidationField>
-
-                          <ValidationField label="Inputs">
-                            <div className="space-y-2">
-                              {githubInputs.map((input) => (
-                                <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                                  <input
-                                    type="text"
-                                    value={input.key}
-                                    onChange={(e) => updateExecutorInput(input.id, e.target.value, input.value)}
-                                    placeholder="Input name"
-                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={input.value}
-                                    onChange={(e) => updateExecutorInput(input.id, input.key, e.target.value)}
-                                    placeholder="Input value"
-                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  />
-                                  <button
-                                    onClick={() => removeExecutorInput(input.id)}
-                                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                                  >
-                                    <MaterialSymbol name="delete" size="sm" />
-                                  </button>
-                                </div>
-                              ))}
-                              <button
-                                onClick={addExecutorInput}
-                                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                              >
-                                <MaterialSymbol name="add" size="sm" />
-                                Add Input
-                              </button>
-                            </div>
-                          </ValidationField>
-                        </div>
-                      )}
-
-                      {executor.type === 'http' && (
-                        <div className="space-y-4">
-                          <ValidationField label="URL">
-                            <input
-                              type="text"
-                              value={(executor.spec?.url as string) || ''}
-                              onChange={(e) => updateExecutorField('url', e.target.value)}
-                              placeholder="https://api.example.com/endpoint"
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                            />
-                          </ValidationField>
-
-                          <ValidationField label="Payload (JSON)">
-                            <textarea
-                              value={payloadDisplay}
-                              onChange={(e) => {
-                                setPayloadDisplay(e.target.value);
-                                try {
-                                  const parsed = JSON.parse(e.target.value);
-                                  updateExecutorField('payload', parsed);
-                                } catch {
-                                  // Keep the display value but don't update payload until valid JSON
-                                }
-                              }}
-                              placeholder='{\n  "key1": "value1",\n  "key2": "{{ inputs.KEY2 }}"\n}'
-                              rows={6}
-                              className="nodrag w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500 font-mono"
-                            />
-                          </ValidationField>
-
-                          <ValidationField label="Headers">
-                            <div className="space-y-2">
-                              {httpHeaders.map((header) => (
-                                <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                                  <input
-                                    type="text"
-                                    value={header.key}
-                                    onChange={(e) => updateExecutorHeader(header.id, e.target.value, header.value)}
-                                    placeholder="Header name"
-                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  />
-                                  <input
-                                    type="text"
-                                    value={header.value}
-                                    onChange={(e) => updateExecutorHeader(header.id, header.key, e.target.value)}
-                                    placeholder="Header value"
-                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  />
-                                  <button
-                                    onClick={() => removeExecutorHeader(header.id)}
-                                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                                  >
-                                    <MaterialSymbol name="delete" size="sm" />
-                                  </button>
-                                </div>
-                              ))}
-                              <button
-                                onClick={addExecutorHeader}
-                                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                              >
-                                <MaterialSymbol name="add" size="sm" />
-                                Add Header
-                              </button>
-                            </div>
-                          </ValidationField>
-
-                          <ValidationField label="Response Policy - Success Status Codes">
-                            <input
-                              type="text"
-                              value={responsePolicyStatusCodesDisplay}
-                              onChange={(e) => {
-                                const endsWithComma = e.target.value.endsWith(',');
-                                const codes = e.target.value.split(',').map(code => parseInt(code.trim())).filter(code => !isNaN(code));
-                                updateExecutorNestedField('responsePolicy', 'statusCodes', codes);
-                                setResponsePolicyStatusCodesDisplay(endsWithComma ? codes.join(',') + ',' : codes.join(','));
-                              }}
-                              placeholder="200, 201, 202"
-                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                            />
-                          </ValidationField>
-                        </div>
-                      )}
-                    </div>
-                  }
-                />
-              ) : (
-                <div className="space-y-3">
-                  <button
-                    onClick={addExecutorConfig}
-                    className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                  >
-                    <MaterialSymbol name="add" size="sm" />
-                    Add Executor Configuration
-                  </button>
-                  {validationErrors.executorSpec && (
-                    <div className="text-xs text-red-600 mt-1">
-                      {validationErrors.executorSpec}
-                    </div>
-                  )}
-                </div>
-              )}
+                    <ValidationField label="Response Policy - Success Status Codes">
+                      <input
+                        type="text"
+                        value={responsePolicyStatusCodesDisplay}
+                        onChange={(e) => {
+                          const endsWithComma = e.target.value.endsWith(',');
+                          const codes = e.target.value.split(',').map(code => parseInt(code.trim())).filter(code => !isNaN(code));
+                          updateExecutorNestedField('responsePolicy', 'statusCodes', codes);
+                          setResponsePolicyStatusCodesDisplay(endsWithComma ? codes.join(',') + ',' : codes.join(','));
+                        }}
+                        placeholder="200, 201, 202"
+                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                    </ValidationField>
+                  </div>
+                )}
+              </div>
             </EditableAccordionSection>
           </>
         )}

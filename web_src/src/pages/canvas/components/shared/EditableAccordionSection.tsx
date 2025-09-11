@@ -14,6 +14,7 @@ interface EditableAccordionSectionProps {
   requiredBadge?: boolean;
   children: React.ReactNode;
   validationError?: string;
+  className?: string;
 }
 
 export function EditableAccordionSection({
@@ -27,7 +28,8 @@ export function EditableAccordionSection({
   countLabel,
   requiredBadge = false,
   children,
-  validationError
+  validationError,
+  className
 }: EditableAccordionSectionProps) {
   const titleContent = (
     <div className="flex items-center justify-between w-full">
@@ -58,6 +60,7 @@ export function EditableAccordionSection({
       title={titleContent}
       isOpen={isOpen}
       onToggle={onToggle}
+      className={className}
     >
       <div className="space-y-2">
         {validationError && (
