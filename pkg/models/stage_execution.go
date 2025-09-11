@@ -37,6 +37,9 @@ type StageExecution struct {
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
 	Outputs      datatypes.JSONType[map[string]any]
+	
+	StageEvent   *StageEvent `gorm:"foreignKey:StageEventID;references:ID"`
+	EmittedEvent *Event      `gorm:"-"`
 }
 
 func (e *StageExecution) GetInputs() (map[string]any, error) {

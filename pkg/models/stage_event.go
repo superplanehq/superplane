@@ -47,6 +47,8 @@ type StageEvent struct {
 	CancelledBy *uuid.UUID
 	CancelledAt *time.Time
 	Inputs      datatypes.JSONType[map[string]any]
+	
+	Event *Event `gorm:"foreignKey:EventID;references:ID"`
 }
 
 func (e *StageEvent) UpdateState(state, reason string) error {

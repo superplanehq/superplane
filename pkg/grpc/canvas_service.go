@@ -142,6 +142,11 @@ func (s *CanvasService) ListStageEvents(ctx context.Context, req *pb.ListStageEv
 	return stageevents.ListStageEvents(ctx, canvasID, req.StageIdOrName, req.States, req.StateReasons, req.Limit, req.Before)
 }
 
+func (s *CanvasService) ListStageExecutions(ctx context.Context, req *pb.ListStageExecutionsRequest) (*pb.ListStageExecutionsResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stages.ListStageExecutions(ctx, canvasID, req.StageIdOrName, req.States, req.Results, req.Limit, req.Before)
+}
+
 func (s *CanvasService) DeleteStage(ctx context.Context, req *pb.DeleteStageRequest) (*pb.DeleteStageResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return stages.DeleteStage(ctx, canvasID, req.IdOrName)

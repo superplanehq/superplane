@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -589,9 +590,81 @@ func (s *Stage) DeleteStageEventsInTransaction(tx *gorm.DB) error {
 	return nil
 }
 
+func (s *Stage) ListExecutionsWithLimitAndBefore(states []string, results []string, limit int, before *time.Time) ([]StageExecution, error) {
+	var executions []StageExecution
+	query := database.Conn().
+		Preload("StageEvent", func(db *gorm.DB) *gorm.DB {
+			return db.Preload("Event")
+		}).
+		Where("stage_id = ?", s.ID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
+	if len(results) > 0 {
+		query = query.Where("result IN ?", results)
+	}
+
+	if before != nil {
+		query = query.Where("created_at < ?", before)
+	}
+
+	err := query.Order("created_at DESC").Limit(limit).Find(&executions).Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(executions) > 0 {
+		executionIDs := make([]string, len(executions))
+		for i, execution := range executions {
+			executionIDs[i] = execution.ID.String()
+		}
+
+		var emittedEvents []Event
+		err := database.Conn().
+			Raw("SELECT * FROM events WHERE raw->'execution'->>'id' IN (?)", executionIDs).
+			Find(&emittedEvents).Error
+
+		if err == nil {
+			mapEmittedEventsToExecutions(emittedEvents, executions)
+		}
+	}
+
+	return executions, nil
+}
+
 func (s *Stage) DeleteConnectionsInTransaction(tx *gorm.DB) error {
 	if err := tx.Unscoped().Where("target_id = ? AND target_type = ?", s.ID, ConnectionTargetTypeStage).Delete(&Connection{}).Error; err != nil {
 		return fmt.Errorf("failed to delete connections: %v", err)
 	}
 	return nil
+}
+
+func mapEmittedEventsToExecutions(emittedEvents []Event, executions []StageExecution) {
+	emittedEventMap := make(map[string]*Event)
+	for i, event := range emittedEvents {
+		var executionData map[string]interface{}
+		if err := json.Unmarshal(event.Raw, &executionData); err != nil {
+			continue
+		}
+
+		execution, ok := executionData["execution"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		executionID, ok := execution["id"].(string)
+		if !ok {
+			continue
+		}
+
+		emittedEventMap[executionID] = &emittedEvents[i]
+	}
+
+	for i, execution := range executions {
+		if emittedEvent, exists := emittedEventMap[execution.ID.String()]; exists {
+			executions[i].EmittedEvent = emittedEvent
+		}
+	}
 }

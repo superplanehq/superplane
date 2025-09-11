@@ -70,6 +70,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSuperplane.Superplane_UpdateStage_FullMethodName:                  {Resource: "stage", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_DeleteStage_FullMethodName:                  {Resource: "stage", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListStages_FullMethodName:                   {Resource: "stage", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_ListStageExecutions_FullMethodName:          {Resource: "stageexecution", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_CreateConnectionGroup_FullMethodName:        {Resource: "connectiongroup", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_UpdateConnectionGroup_FullMethodName:        {Resource: "connectiongroup", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_DeleteConnectionGroup_FullMethodName:        {Resource: "connectiongroup", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}},
