@@ -1727,7 +1727,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               isModified={isSectionModified(executor, 'executor')}
               onRevert={revertSection}
               countLabel="executor"
-              className="rounded-lg"
+              className={!openSections.includes('executor') ? 'rounded-b-2xl border-b-0' : ''}
             >
               <div className="space-y-4">
                 {/* Executor Label - Universal field for all executor types */}

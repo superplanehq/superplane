@@ -11,7 +11,7 @@ interface AccordionItemProps {
 
 export const AccordionItem = memo(function AccordionItem({ id, title, children, isOpen, onToggle, className }: AccordionItemProps) {
   return (
-    <div className="border-b border-zinc-200 dark:border-zinc-700">
+    <div className="border-b border-zinc-200 dark:border-zinc-700 last:border-b-0">
       <button
         className={`w-full px-4 py-3 text-left flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${className || ''}`}
         onClick={() => onToggle(id)}
