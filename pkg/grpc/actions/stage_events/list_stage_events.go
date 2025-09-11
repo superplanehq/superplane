@@ -20,7 +20,7 @@ const (
 	MaxLimit     = 50
 )
 
-func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit int32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
+func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit uint32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
 	err := actions.ValidateUUIDs(stageIdOrName)
 	var stage *models.Stage
 	if err != nil {
@@ -171,7 +171,6 @@ func serializeStageEvents(in []models.StageEvent) ([]*pb.StageEvent, error) {
 	return out, nil
 }
 
-// TODO: very inefficient way of querying the approvals/execution that we should fix later
 func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 	e := pb.StageEvent{
 		Id:          in.ID.String(),
@@ -183,7 +182,6 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		Approvals:   []*pb.StageEventApproval{},
 		Inputs:      []*pb.KeyValuePair{},
 		Name:        in.Name,
-		EventId:     in.EventID.String(),
 	}
 
 	if in.CancelledBy != nil {
@@ -192,16 +190,6 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 	if in.CancelledAt != nil {
 		e.CancelledAt = timestamppb.New(*in.CancelledAt)
 	}
-
-	//
-	// Add execution
-	//
-	execution, err := serializeStageEventExecution(in)
-	if err != nil {
-		return nil, err
-	}
-
-	e.Execution = execution
 
 	//
 	// Add inputs

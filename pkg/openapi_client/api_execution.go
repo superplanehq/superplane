@@ -19,93 +19,111 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"reflect"
 )
 
 
-// EventAPIService EventAPI service
-type EventAPIService service
+// ExecutionAPIService ExecutionAPI service
+type ExecutionAPIService service
 
-type ApiSuperplaneListEventsRequest struct {
+type ApiSuperplaneListStageExecutionsRequest struct {
 	ctx context.Context
-	ApiService *EventAPIService
+	ApiService *ExecutionAPIService
 	canvasIdOrName string
-	sourceType *string
-	sourceId *string
+	stageIdOrName string
+	states *[]string
+	results *[]string
 	limit *int64
 	before *time.Time
 }
 
-func (r ApiSuperplaneListEventsRequest) SourceType(sourceType string) ApiSuperplaneListEventsRequest {
-	r.sourceType = &sourceType
+func (r ApiSuperplaneListStageExecutionsRequest) States(states []string) ApiSuperplaneListStageExecutionsRequest {
+	r.states = &states
 	return r
 }
 
-func (r ApiSuperplaneListEventsRequest) SourceId(sourceId string) ApiSuperplaneListEventsRequest {
-	r.sourceId = &sourceId
+func (r ApiSuperplaneListStageExecutionsRequest) Results(results []string) ApiSuperplaneListStageExecutionsRequest {
+	r.results = &results
 	return r
 }
 
-func (r ApiSuperplaneListEventsRequest) Limit(limit int64) ApiSuperplaneListEventsRequest {
+func (r ApiSuperplaneListStageExecutionsRequest) Limit(limit int64) ApiSuperplaneListStageExecutionsRequest {
 	r.limit = &limit
 	return r
 }
 
-func (r ApiSuperplaneListEventsRequest) Before(before time.Time) ApiSuperplaneListEventsRequest {
+func (r ApiSuperplaneListStageExecutionsRequest) Before(before time.Time) ApiSuperplaneListStageExecutionsRequest {
 	r.before = &before
 	return r
 }
 
-func (r ApiSuperplaneListEventsRequest) Execute() (*SuperplaneListEventsResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneListEventsExecute(r)
+func (r ApiSuperplaneListStageExecutionsRequest) Execute() (*SuperplaneListStageExecutionsResponse, *http.Response, error) {
+	return r.ApiService.SuperplaneListStageExecutionsExecute(r)
 }
 
 /*
-SuperplaneListEvents List events
+SuperplaneListStageExecutions List executions
 
-Returns a list of events with optional filtering by source type and source ID
+Returns a list of all executions for the specified stage (canvas can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
- @return ApiSuperplaneListEventsRequest
+ @param stageIdOrName
+ @return ApiSuperplaneListStageExecutionsRequest
 */
-func (a *EventAPIService) SuperplaneListEvents(ctx context.Context, canvasIdOrName string) ApiSuperplaneListEventsRequest {
-	return ApiSuperplaneListEventsRequest{
+func (a *ExecutionAPIService) SuperplaneListStageExecutions(ctx context.Context, canvasIdOrName string, stageIdOrName string) ApiSuperplaneListStageExecutionsRequest {
+	return ApiSuperplaneListStageExecutionsRequest{
 		ApiService: a,
 		ctx: ctx,
 		canvasIdOrName: canvasIdOrName,
+		stageIdOrName: stageIdOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneListEventsResponse
-func (a *EventAPIService) SuperplaneListEventsExecute(r ApiSuperplaneListEventsRequest) (*SuperplaneListEventsResponse, *http.Response, error) {
+//  @return SuperplaneListStageExecutionsResponse
+func (a *ExecutionAPIService) SuperplaneListStageExecutionsExecute(r ApiSuperplaneListStageExecutionsRequest) (*SuperplaneListStageExecutionsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListEventsResponse
+		localVarReturnValue  *SuperplaneListStageExecutionsResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EventAPIService.SuperplaneListEvents")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ExecutionAPIService.SuperplaneListStageExecutions")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/events"
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/executions"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"stageIdOrName"+"}", url.PathEscape(parameterValueToString(r.stageIdOrName, "stageIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.sourceType != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "sourceType", r.sourceType, "", "")
-	} else {
-		var defaultValue string = "EVENT_SOURCE_TYPE_UNKNOWN"
-		r.sourceType = &defaultValue
+	if r.states != nil {
+		t := *r.states
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "states", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "states", t, "form", "multi")
+		}
 	}
-	if r.sourceId != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "sourceId", r.sourceId, "", "")
+	if r.results != nil {
+		t := *r.results
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "results", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "results", t, "form", "multi")
+		}
 	}
 	if r.limit != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")

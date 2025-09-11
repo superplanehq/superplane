@@ -33,10 +33,9 @@ const (
 	Superplane_ListStages_FullMethodName                   = "/Superplane.Superplane/ListStages"
 	Superplane_ListEventSources_FullMethodName             = "/Superplane.Superplane/ListEventSources"
 	Superplane_ListConnectionGroups_FullMethodName         = "/Superplane.Superplane/ListConnectionGroups"
+	Superplane_ListStageExecutions_FullMethodName          = "/Superplane.Superplane/ListStageExecutions"
 	Superplane_ListStageEvents_FullMethodName              = "/Superplane.Superplane/ListStageEvents"
 	Superplane_ListEvents_FullMethodName                   = "/Superplane.Superplane/ListEvents"
-	Superplane_BulkListEvents_FullMethodName               = "/Superplane.Superplane/BulkListEvents"
-	Superplane_BulkListStageEvents_FullMethodName          = "/Superplane.Superplane/BulkListStageEvents"
 	Superplane_ListConnectionGroupFieldSets_FullMethodName = "/Superplane.Superplane/ListConnectionGroupFieldSets"
 	Superplane_UpdateStage_FullMethodName                  = "/Superplane.Superplane/UpdateStage"
 	Superplane_DeleteStage_FullMethodName                  = "/Superplane.Superplane/DeleteStage"
@@ -68,10 +67,9 @@ type SuperplaneClient interface {
 	ListStages(ctx context.Context, in *ListStagesRequest, opts ...grpc.CallOption) (*ListStagesResponse, error)
 	ListEventSources(ctx context.Context, in *ListEventSourcesRequest, opts ...grpc.CallOption) (*ListEventSourcesResponse, error)
 	ListConnectionGroups(ctx context.Context, in *ListConnectionGroupsRequest, opts ...grpc.CallOption) (*ListConnectionGroupsResponse, error)
+	ListStageExecutions(ctx context.Context, in *ListStageExecutionsRequest, opts ...grpc.CallOption) (*ListStageExecutionsResponse, error)
 	ListStageEvents(ctx context.Context, in *ListStageEventsRequest, opts ...grpc.CallOption) (*ListStageEventsResponse, error)
 	ListEvents(ctx context.Context, in *ListEventsRequest, opts ...grpc.CallOption) (*ListEventsResponse, error)
-	BulkListEvents(ctx context.Context, in *BulkListEventsRequest, opts ...grpc.CallOption) (*BulkListEventsResponse, error)
-	BulkListStageEvents(ctx context.Context, in *BulkListStageEventsRequest, opts ...grpc.CallOption) (*BulkListStageEventsResponse, error)
 	ListConnectionGroupFieldSets(ctx context.Context, in *ListConnectionGroupFieldSetsRequest, opts ...grpc.CallOption) (*ListConnectionGroupFieldSetsResponse, error)
 	UpdateStage(ctx context.Context, in *UpdateStageRequest, opts ...grpc.CallOption) (*UpdateStageResponse, error)
 	DeleteStage(ctx context.Context, in *DeleteStageRequest, opts ...grpc.CallOption) (*DeleteStageResponse, error)
@@ -233,6 +231,16 @@ func (c *superplaneClient) ListConnectionGroups(ctx context.Context, in *ListCon
 	return out, nil
 }
 
+func (c *superplaneClient) ListStageExecutions(ctx context.Context, in *ListStageExecutionsRequest, opts ...grpc.CallOption) (*ListStageExecutionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListStageExecutionsResponse)
+	err := c.cc.Invoke(ctx, Superplane_ListStageExecutions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *superplaneClient) ListStageEvents(ctx context.Context, in *ListStageEventsRequest, opts ...grpc.CallOption) (*ListStageEventsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListStageEventsResponse)
@@ -247,26 +255,6 @@ func (c *superplaneClient) ListEvents(ctx context.Context, in *ListEventsRequest
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListEventsResponse)
 	err := c.cc.Invoke(ctx, Superplane_ListEvents_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *superplaneClient) BulkListEvents(ctx context.Context, in *BulkListEventsRequest, opts ...grpc.CallOption) (*BulkListEventsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BulkListEventsResponse)
-	err := c.cc.Invoke(ctx, Superplane_BulkListEvents_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *superplaneClient) BulkListStageEvents(ctx context.Context, in *BulkListStageEventsRequest, opts ...grpc.CallOption) (*BulkListStageEventsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BulkListStageEventsResponse)
-	err := c.cc.Invoke(ctx, Superplane_BulkListStageEvents_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -401,10 +389,9 @@ type SuperplaneServer interface {
 	ListStages(context.Context, *ListStagesRequest) (*ListStagesResponse, error)
 	ListEventSources(context.Context, *ListEventSourcesRequest) (*ListEventSourcesResponse, error)
 	ListConnectionGroups(context.Context, *ListConnectionGroupsRequest) (*ListConnectionGroupsResponse, error)
+	ListStageExecutions(context.Context, *ListStageExecutionsRequest) (*ListStageExecutionsResponse, error)
 	ListStageEvents(context.Context, *ListStageEventsRequest) (*ListStageEventsResponse, error)
 	ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error)
-	BulkListEvents(context.Context, *BulkListEventsRequest) (*BulkListEventsResponse, error)
-	BulkListStageEvents(context.Context, *BulkListStageEventsRequest) (*BulkListStageEventsResponse, error)
 	ListConnectionGroupFieldSets(context.Context, *ListConnectionGroupFieldSetsRequest) (*ListConnectionGroupFieldSetsResponse, error)
 	UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error)
 	DeleteStage(context.Context, *DeleteStageRequest) (*DeleteStageResponse, error)
@@ -467,17 +454,14 @@ func (UnimplementedSuperplaneServer) ListEventSources(context.Context, *ListEven
 func (UnimplementedSuperplaneServer) ListConnectionGroups(context.Context, *ListConnectionGroupsRequest) (*ListConnectionGroupsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListConnectionGroups not implemented")
 }
+func (UnimplementedSuperplaneServer) ListStageExecutions(context.Context, *ListStageExecutionsRequest) (*ListStageExecutionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListStageExecutions not implemented")
+}
 func (UnimplementedSuperplaneServer) ListStageEvents(context.Context, *ListStageEventsRequest) (*ListStageEventsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListStageEvents not implemented")
 }
 func (UnimplementedSuperplaneServer) ListEvents(context.Context, *ListEventsRequest) (*ListEventsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListEvents not implemented")
-}
-func (UnimplementedSuperplaneServer) BulkListEvents(context.Context, *BulkListEventsRequest) (*BulkListEventsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BulkListEvents not implemented")
-}
-func (UnimplementedSuperplaneServer) BulkListStageEvents(context.Context, *BulkListStageEventsRequest) (*BulkListStageEventsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BulkListStageEvents not implemented")
 }
 func (UnimplementedSuperplaneServer) ListConnectionGroupFieldSets(context.Context, *ListConnectionGroupFieldSetsRequest) (*ListConnectionGroupFieldSetsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListConnectionGroupFieldSets not implemented")
@@ -784,6 +768,24 @@ func _Superplane_ListConnectionGroups_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_ListStageExecutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListStageExecutionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).ListStageExecutions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_ListStageExecutions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).ListStageExecutions(ctx, req.(*ListStageExecutionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Superplane_ListStageEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListStageEventsRequest)
 	if err := dec(in); err != nil {
@@ -816,42 +818,6 @@ func _Superplane_ListEvents_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SuperplaneServer).ListEvents(ctx, req.(*ListEventsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Superplane_BulkListEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BulkListEventsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SuperplaneServer).BulkListEvents(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Superplane_BulkListEvents_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SuperplaneServer).BulkListEvents(ctx, req.(*BulkListEventsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Superplane_BulkListStageEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BulkListStageEventsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SuperplaneServer).BulkListStageEvents(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Superplane_BulkListStageEvents_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SuperplaneServer).BulkListStageEvents(ctx, req.(*BulkListStageEventsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1118,20 +1084,16 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Superplane_ListConnectionGroups_Handler,
 		},
 		{
+			MethodName: "ListStageExecutions",
+			Handler:    _Superplane_ListStageExecutions_Handler,
+		},
+		{
 			MethodName: "ListStageEvents",
 			Handler:    _Superplane_ListStageEvents_Handler,
 		},
 		{
 			MethodName: "ListEvents",
 			Handler:    _Superplane_ListEvents_Handler,
-		},
-		{
-			MethodName: "BulkListEvents",
-			Handler:    _Superplane_BulkListEvents_Handler,
-		},
-		{
-			MethodName: "BulkListStageEvents",
-			Handler:    _Superplane_BulkListStageEvents_Handler,
 		},
 		{
 			MethodName: "ListConnectionGroupFieldSets",

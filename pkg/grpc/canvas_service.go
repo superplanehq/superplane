@@ -185,13 +185,3 @@ func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsReques
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return events.ListEvents(ctx, canvasID, req.SourceType, req.SourceId, req.Limit, req.Before)
 }
-
-func (s *CanvasService) BulkListEvents(ctx context.Context, req *pb.BulkListEventsRequest) (*pb.BulkListEventsResponse, error) {
-	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return events.BulkListEvents(ctx, canvasID, req.Sources, req.LimitPerSource, req.Before)
-}
-
-func (s *CanvasService) BulkListStageEvents(ctx context.Context, req *pb.BulkListStageEventsRequest) (*pb.BulkListStageEventsResponse, error) {
-	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return stageevents.BulkListStageEvents(ctx, canvasID, req.Stages, req.LimitPerStage, req.Before, req.States, req.StateReasons)
-}

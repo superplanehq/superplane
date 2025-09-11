@@ -612,7 +612,7 @@
             "in": "query",
             "required": false,
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           {
             "name": "before",
@@ -624,86 +624,6 @@
         ],
         "tags": [
           "Event"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/events/bulk": {
-      "post": {
-        "summary": "Bulk list events",
-        "description": "Returns events for multiple sources in a single request to optimize loading performance",
-        "operationId": "Superplane_BulkListEvents",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneBulkListEventsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SuperplaneBulkListEventsBody"
-            }
-          }
-        ],
-        "tags": [
-          "Event"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/stage-events/bulk": {
-      "post": {
-        "summary": "Bulk list stage events",
-        "description": "Returns stage events for multiple stages in a single request to optimize loading performance",
-        "operationId": "Superplane_BulkListStageEvents",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneBulkListStageEventsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SuperplaneBulkListStageEventsBody"
-            }
-          }
-        ],
-        "tags": [
-          "Stage"
         ]
       }
     },
@@ -969,7 +889,7 @@
             "in": "query",
             "required": false,
             "type": "integer",
-            "format": "int32"
+            "format": "int64"
           },
           {
             "name": "before",
@@ -1085,6 +1005,90 @@
         ],
         "tags": [
           "Stage"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/executions": {
+      "get": {
+        "summary": "List executions",
+        "description": "Returns a list of all executions for the specified stage (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_ListStageExecutions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListStageExecutionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "stageIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "states",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STATE_UNKNOWN",
+                "STATE_PENDING",
+                "STATE_STARTED",
+                "STATE_FINISHED",
+                "STATE_CANCELLED"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "results",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "RESULT_UNKNOWN",
+                "RESULT_PASSED",
+                "RESULT_FAILED"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "Execution"
         ]
       }
     },
@@ -3400,82 +3404,6 @@
         }
       }
     },
-    "SuperplaneBulkListEventsBody": {
-      "type": "object",
-      "properties": {
-        "sources": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneEventSourceItemRequest"
-          }
-        },
-        "limitPerSource": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "before": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "SuperplaneBulkListEventsResponse": {
-      "type": "object",
-      "properties": {
-        "results": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneEventSourceItemResult"
-          }
-        }
-      }
-    },
-    "SuperplaneBulkListStageEventsBody": {
-      "type": "object",
-      "properties": {
-        "stages": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneStageEventItemRequest"
-          }
-        },
-        "states": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/SuperplaneStageEventState"
-          }
-        },
-        "stateReasons": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/SuperplaneStageEventStateReason"
-          }
-        },
-        "limitPerStage": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "before": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "SuperplaneBulkListStageEventsResponse": {
-      "type": "object",
-      "properties": {
-        "results": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneStageEventItemResult"
-          }
-        }
-      }
-    },
     "SuperplaneCancelStageEventBody": {
       "type": "object"
     },
@@ -3899,35 +3827,6 @@
         }
       }
     },
-    "SuperplaneEventSourceItemRequest": {
-      "type": "object",
-      "properties": {
-        "sourceId": {
-          "type": "string"
-        },
-        "sourceType": {
-          "$ref": "#/definitions/SuperplaneEventSourceType"
-        }
-      }
-    },
-    "SuperplaneEventSourceItemResult": {
-      "type": "object",
-      "properties": {
-        "sourceId": {
-          "type": "string"
-        },
-        "sourceType": {
-          "$ref": "#/definitions/SuperplaneEventSourceType"
-        },
-        "events": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneEvent"
-          }
-        }
-      }
-    },
     "SuperplaneEventSourceMetadata": {
       "type": "object",
       "properties": {
@@ -4028,6 +3927,12 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneExecutionResource"
           }
+        },
+        "emmitedEvent": {
+          "$ref": "#/definitions/SuperplaneEvent"
+        },
+        "stageEvent": {
+          "$ref": "#/definitions/SuperplaneStageEvent"
         }
       }
     },
@@ -4226,6 +4131,17 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneEvent"
           }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -4238,6 +4154,40 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneStageEvent"
           }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneListStageExecutionsResponse": {
+      "type": "object",
+      "properties": {
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneExecution"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -4359,9 +4309,6 @@
             "$ref": "#/definitions/SuperplaneStageEventApproval"
           }
         },
-        "execution": {
-          "$ref": "#/definitions/SuperplaneExecution"
-        },
         "inputs": {
           "type": "array",
           "items": {
@@ -4372,8 +4319,8 @@
         "name": {
           "type": "string"
         },
-        "eventId": {
-          "type": "string"
+        "triggerEvent": {
+          "$ref": "#/definitions/SuperplaneEvent"
         },
         "cancelledBy": {
           "type": "string"
@@ -4393,29 +4340,6 @@
         "approvedAt": {
           "type": "string",
           "format": "date-time"
-        }
-      }
-    },
-    "SuperplaneStageEventItemRequest": {
-      "type": "object",
-      "properties": {
-        "stageIdOrName": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneStageEventItemResult": {
-      "type": "object",
-      "properties": {
-        "stageId": {
-          "type": "string"
-        },
-        "events": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneStageEvent"
-          }
         }
       }
     },

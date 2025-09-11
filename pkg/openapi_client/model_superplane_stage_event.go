@@ -28,10 +28,9 @@ type SuperplaneStageEvent struct {
 	StateReason *SuperplaneStageEventStateReason `json:"stateReason,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	Approvals []SuperplaneStageEventApproval `json:"approvals,omitempty"`
-	Execution *SuperplaneExecution `json:"execution,omitempty"`
 	Inputs []SuperplaneKeyValuePair `json:"inputs,omitempty"`
 	Name *string `json:"name,omitempty"`
-	EventId *string `json:"eventId,omitempty"`
+	TriggerEvent *SuperplaneEvent `json:"triggerEvent,omitempty"`
 	CancelledBy *string `json:"cancelledBy,omitempty"`
 	CancelledAt *time.Time `json:"cancelledAt,omitempty"`
 }
@@ -289,38 +288,6 @@ func (o *SuperplaneStageEvent) SetApprovals(v []SuperplaneStageEventApproval) {
 	o.Approvals = v
 }
 
-// GetExecution returns the Execution field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetExecution() SuperplaneExecution {
-	if o == nil || IsNil(o.Execution) {
-		var ret SuperplaneExecution
-		return ret
-	}
-	return *o.Execution
-}
-
-// GetExecutionOk returns a tuple with the Execution field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetExecutionOk() (*SuperplaneExecution, bool) {
-	if o == nil || IsNil(o.Execution) {
-		return nil, false
-	}
-	return o.Execution, true
-}
-
-// HasExecution returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasExecution() bool {
-	if o != nil && !IsNil(o.Execution) {
-		return true
-	}
-
-	return false
-}
-
-// SetExecution gets a reference to the given SuperplaneExecution and assigns it to the Execution field.
-func (o *SuperplaneStageEvent) SetExecution(v SuperplaneExecution) {
-	o.Execution = &v
-}
-
 // GetInputs returns the Inputs field value if set, zero value otherwise.
 func (o *SuperplaneStageEvent) GetInputs() []SuperplaneKeyValuePair {
 	if o == nil || IsNil(o.Inputs) {
@@ -385,36 +352,36 @@ func (o *SuperplaneStageEvent) SetName(v string) {
 	o.Name = &v
 }
 
-// GetEventId returns the EventId field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetEventId() string {
-	if o == nil || IsNil(o.EventId) {
-		var ret string
+// GetTriggerEvent returns the TriggerEvent field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetTriggerEvent() SuperplaneEvent {
+	if o == nil || IsNil(o.TriggerEvent) {
+		var ret SuperplaneEvent
 		return ret
 	}
-	return *o.EventId
+	return *o.TriggerEvent
 }
 
-// GetEventIdOk returns a tuple with the EventId field value if set, nil otherwise
+// GetTriggerEventOk returns a tuple with the TriggerEvent field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetEventIdOk() (*string, bool) {
-	if o == nil || IsNil(o.EventId) {
+func (o *SuperplaneStageEvent) GetTriggerEventOk() (*SuperplaneEvent, bool) {
+	if o == nil || IsNil(o.TriggerEvent) {
 		return nil, false
 	}
-	return o.EventId, true
+	return o.TriggerEvent, true
 }
 
-// HasEventId returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasEventId() bool {
-	if o != nil && !IsNil(o.EventId) {
+// HasTriggerEvent returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasTriggerEvent() bool {
+	if o != nil && !IsNil(o.TriggerEvent) {
 		return true
 	}
 
 	return false
 }
 
-// SetEventId gets a reference to the given string and assigns it to the EventId field.
-func (o *SuperplaneStageEvent) SetEventId(v string) {
-	o.EventId = &v
+// SetTriggerEvent gets a reference to the given SuperplaneEvent and assigns it to the TriggerEvent field.
+func (o *SuperplaneStageEvent) SetTriggerEvent(v SuperplaneEvent) {
+	o.TriggerEvent = &v
 }
 
 // GetCancelledBy returns the CancelledBy field value if set, zero value otherwise.
@@ -512,17 +479,14 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Approvals) {
 		toSerialize["approvals"] = o.Approvals
 	}
-	if !IsNil(o.Execution) {
-		toSerialize["execution"] = o.Execution
-	}
 	if !IsNil(o.Inputs) {
 		toSerialize["inputs"] = o.Inputs
 	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
 	}
-	if !IsNil(o.EventId) {
-		toSerialize["eventId"] = o.EventId
+	if !IsNil(o.TriggerEvent) {
+		toSerialize["triggerEvent"] = o.TriggerEvent
 	}
 	if !IsNil(o.CancelledBy) {
 		toSerialize["cancelledBy"] = o.CancelledBy

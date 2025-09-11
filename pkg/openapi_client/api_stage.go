@@ -156,128 +156,6 @@ func (a *StageAPIService) SuperplaneApproveStageEventExecute(r ApiSuperplaneAppr
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSuperplaneBulkListStageEventsRequest struct {
-	ctx context.Context
-	ApiService *StageAPIService
-	canvasIdOrName string
-	body *SuperplaneBulkListStageEventsBody
-}
-
-func (r ApiSuperplaneBulkListStageEventsRequest) Body(body SuperplaneBulkListStageEventsBody) ApiSuperplaneBulkListStageEventsRequest {
-	r.body = &body
-	return r
-}
-
-func (r ApiSuperplaneBulkListStageEventsRequest) Execute() (*SuperplaneBulkListStageEventsResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneBulkListStageEventsExecute(r)
-}
-
-/*
-SuperplaneBulkListStageEvents Bulk list stage events
-
-Returns stage events for multiple stages in a single request to optimize loading performance
-
- @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
- @return ApiSuperplaneBulkListStageEventsRequest
-*/
-func (a *StageAPIService) SuperplaneBulkListStageEvents(ctx context.Context, canvasIdOrName string) ApiSuperplaneBulkListStageEventsRequest {
-	return ApiSuperplaneBulkListStageEventsRequest{
-		ApiService: a,
-		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
-	}
-}
-
-// Execute executes the request
-//  @return SuperplaneBulkListStageEventsResponse
-func (a *StageAPIService) SuperplaneBulkListStageEventsExecute(r ApiSuperplaneBulkListStageEventsRequest) (*SuperplaneBulkListStageEventsResponse, *http.Response, error) {
-	var (
-		localVarHTTPMethod   = http.MethodPost
-		localVarPostBody     interface{}
-		formFiles            []formFile
-		localVarReturnValue  *SuperplaneBulkListStageEventsResponse
-	)
-
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "StageAPIService.SuperplaneBulkListStageEvents")
-	if err != nil {
-		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
-	}
-
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stage-events/bulk"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := url.Values{}
-	localVarFormParams := url.Values{}
-	if r.body == nil {
-		return localVarReturnValue, nil, reportError("body is required and must be specified")
-	}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	// body params
-	localVarPostBody = r.body
-	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(req)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-			var v GooglerpcStatus
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
-					newErr.model = v
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := &GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
 type ApiSuperplaneCancelStageEventRequest struct {
 	ctx context.Context
 	ApiService *StageAPIService
@@ -767,7 +645,7 @@ type ApiSuperplaneListStageEventsRequest struct {
 	stageIdOrName string
 	states *[]string
 	stateReasons *[]string
-	limit *int32
+	limit *int64
 	before *time.Time
 }
 
@@ -781,7 +659,7 @@ func (r ApiSuperplaneListStageEventsRequest) StateReasons(stateReasons []string)
 	return r
 }
 
-func (r ApiSuperplaneListStageEventsRequest) Limit(limit int32) ApiSuperplaneListStageEventsRequest {
+func (r ApiSuperplaneListStageEventsRequest) Limit(limit int64) ApiSuperplaneListStageEventsRequest {
 	r.limit = &limit
 	return r
 }
