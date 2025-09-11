@@ -550,6 +550,7 @@ export type SuperplaneEvent = {
 export type SuperplaneEventSource = {
     metadata?: SuperplaneEventSourceMetadata;
     spec?: SuperplaneEventSourceSpec;
+    status?: SuperplaneEventSourceStatus;
 };
 
 export type SuperplaneEventSourceMetadata = {
@@ -565,6 +566,11 @@ export type SuperplaneEventSourceSpec = {
     integration?: IntegrationsIntegrationRef;
     resource?: IntegrationsResourceRef;
     events?: Array<EventSourceEventType>;
+};
+
+export type SuperplaneEventSourceStatus = {
+    queueItemsCount?: number;
+    lastEvents?: Array<SuperplaneStageEvent>;
 };
 
 export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
@@ -719,6 +725,7 @@ export type SuperplaneResetEventSourceKeyResponse = {
 export type SuperplaneStage = {
     metadata?: SuperplaneStageMetadata;
     spec?: SuperplaneStageSpec;
+    status?: SuperplaneStageStatus;
 };
 
 export type SuperplaneStageEvent = {
@@ -761,6 +768,13 @@ export type SuperplaneStageSpec = {
     inputMappings?: Array<SuperplaneInputMapping>;
     outputs?: Array<SuperplaneOutputDefinition>;
     secrets?: Array<SuperplaneValueDefinition>;
+};
+
+export type SuperplaneStageStatus = {
+    lastExecution?: SuperplaneExecution;
+    lastWaitingEvent?: SuperplaneStageEvent;
+    lastPendingEvent?: SuperplaneStageEvent;
+    queueItemsCount?: number;
 };
 
 export type SuperplaneUpdateConnectionGroupBody = {

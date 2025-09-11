@@ -22,6 +22,7 @@ var _ MappedNullable = &SuperplaneEventSource{}
 type SuperplaneEventSource struct {
 	Metadata *SuperplaneEventSourceMetadata `json:"metadata,omitempty"`
 	Spec *SuperplaneEventSourceSpec `json:"spec,omitempty"`
+	Status *SuperplaneEventSourceStatus `json:"status,omitempty"`
 }
 
 // NewSuperplaneEventSource instantiates a new SuperplaneEventSource object
@@ -105,6 +106,38 @@ func (o *SuperplaneEventSource) SetSpec(v SuperplaneEventSourceSpec) {
 	o.Spec = &v
 }
 
+// GetStatus returns the Status field value if set, zero value otherwise.
+func (o *SuperplaneEventSource) GetStatus() SuperplaneEventSourceStatus {
+	if o == nil || IsNil(o.Status) {
+		var ret SuperplaneEventSourceStatus
+		return ret
+	}
+	return *o.Status
+}
+
+// GetStatusOk returns a tuple with the Status field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneEventSource) GetStatusOk() (*SuperplaneEventSourceStatus, bool) {
+	if o == nil || IsNil(o.Status) {
+		return nil, false
+	}
+	return o.Status, true
+}
+
+// HasStatus returns a boolean if a field has been set.
+func (o *SuperplaneEventSource) HasStatus() bool {
+	if o != nil && !IsNil(o.Status) {
+		return true
+	}
+
+	return false
+}
+
+// SetStatus gets a reference to the given SuperplaneEventSourceStatus and assigns it to the Status field.
+func (o *SuperplaneEventSource) SetStatus(v SuperplaneEventSourceStatus) {
+	o.Status = &v
+}
+
 func (o SuperplaneEventSource) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o SuperplaneEventSource) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Spec) {
 		toSerialize["spec"] = o.Spec
+	}
+	if !IsNil(o.Status) {
+		toSerialize["status"] = o.Status
 	}
 	return toSerialize, nil
 }

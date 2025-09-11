@@ -412,8 +412,14 @@ message EventSource {
     FilterOperator filter_operator = 3;
   }
 
+  message Status {
+    uint32 queue_items_count = 1;
+    repeated StageEvent last_events = 2;
+  }
+
   Metadata metadata = 1;
   Spec spec = 2;
+  Status status = 3;
 }
 
 message DescribeStageRequest {
@@ -600,6 +606,7 @@ message Stage {
 
   Metadata metadata = 1;
   Spec spec = 2;
+  Status status = 3;
 }
 
 message OutputDefinition {

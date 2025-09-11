@@ -133,6 +133,7 @@ docs/SuperplaneEvent.md
 docs/SuperplaneEventSource.md
 docs/SuperplaneEventSourceMetadata.md
 docs/SuperplaneEventSourceSpec.md
+docs/SuperplaneEventSourceStatus.md
 docs/SuperplaneEventSourceType.md
 docs/SuperplaneEventState.md
 docs/SuperplaneExecution.md
@@ -167,6 +168,7 @@ docs/SuperplaneStageEventState.md
 docs/SuperplaneStageEventStateReason.md
 docs/SuperplaneStageMetadata.md
 docs/SuperplaneStageSpec.md
+docs/SuperplaneStageStatus.md
 docs/SuperplaneUpdateConnectionGroupBody.md
 docs/SuperplaneUpdateConnectionGroupResponse.md
 docs/SuperplaneUpdateEventSourceBody.md
@@ -292,6 +294,7 @@ model_superplane_event.go
 model_superplane_event_source.go
 model_superplane_event_source_metadata.go
 model_superplane_event_source_spec.go
+model_superplane_event_source_status.go
 model_superplane_event_source_type.go
 model_superplane_event_state.go
 model_superplane_execution.go
@@ -326,6 +329,7 @@ model_superplane_stage_event_state.go
 model_superplane_stage_event_state_reason.go
 model_superplane_stage_metadata.go
 model_superplane_stage_spec.go
+model_superplane_stage_status.go
 model_superplane_update_connection_group_body.go
 model_superplane_update_connection_group_response.go
 model_superplane_update_event_source_body.go

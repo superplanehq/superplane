@@ -3824,6 +3824,9 @@
         },
         "spec": {
           "$ref": "#/definitions/SuperplaneEventSourceSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/SuperplaneEventSourceStatus"
         }
       }
     },
@@ -3866,6 +3869,22 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/EventSourceEventType"
+          }
+        }
+      }
+    },
+    "SuperplaneEventSourceStatus": {
+      "type": "object",
+      "properties": {
+        "queueItemsCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "lastEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneStageEvent"
           }
         }
       }
@@ -4277,6 +4296,9 @@
         },
         "spec": {
           "$ref": "#/definitions/SuperplaneStageSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/SuperplaneStageStatus"
         }
       }
     },
@@ -4436,6 +4458,24 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneValueDefinition"
           }
+        }
+      }
+    },
+    "SuperplaneStageStatus": {
+      "type": "object",
+      "properties": {
+        "lastExecution": {
+          "$ref": "#/definitions/SuperplaneExecution"
+        },
+        "lastWaitingEvent": {
+          "$ref": "#/definitions/SuperplaneStageEvent"
+        },
+        "lastPendingEvent": {
+          "$ref": "#/definitions/SuperplaneStageEvent"
+        },
+        "queueItemsCount": {
+          "type": "integer",
+          "format": "int64"
         }
       }
     },
