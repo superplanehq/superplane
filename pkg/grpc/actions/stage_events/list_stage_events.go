@@ -23,30 +23,10 @@ const (
 )
 
 type listAndCountEventsResult struct {
-	events   []models.StageEvent
+	events     []models.StageEvent
 	totalCount int64
 	listErr    error
 	countErr   error
-}
-
-func listAndCountEventsInParallel(stage *models.Stage, states, stateReasons []string, limit int, beforeTime *time.Time) *listAndCountEventsResult {
-	result := &listAndCountEventsResult{}
-	var wg sync.WaitGroup
-	
-	wg.Add(2)
-	
-	go func() {
-		defer wg.Done()
-		result.events, result.listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, limit, beforeTime)
-	}()
-	
-	go func() {
-		defer wg.Done()
-		result.totalCount, result.countErr = stage.CountEvents(states, stateReasons)
-	}()
-	
-	wg.Wait()
-	return result
 }
 
 func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State, pbStateReasons []pb.StageEvent_StateReason, limit uint32, before *timestamppb.Timestamp) (*pb.ListStageEventsResponse, error) {
@@ -85,11 +65,11 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 	}
 
 	result := listAndCountEventsInParallel(stage, states, stateReasons, validatedLimit, beforeTime)
-	
+
 	if result.listErr != nil {
 		return nil, result.listErr
 	}
-	
+
 	if result.countErr != nil {
 		return nil, result.countErr
 	}
@@ -100,7 +80,7 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 	}
 
 	hasNextPage := int64(len(result.events)) == int64(validatedLimit) && result.totalCount > int64(validatedLimit)
-	
+
 	var lastTimestamp *timestamppb.Timestamp
 	if len(result.events) > 0 {
 		lastEvent := result.events[len(result.events)-1]
@@ -115,6 +95,26 @@ func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string,
 	}
 
 	return response, nil
+}
+
+func listAndCountEventsInParallel(stage *models.Stage, states, stateReasons []string, limit int, beforeTime *time.Time) *listAndCountEventsResult {
+	result := &listAndCountEventsResult{}
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		result.events, result.listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, limit, beforeTime)
+	}()
+
+	go func() {
+		defer wg.Done()
+		result.totalCount, result.countErr = stage.CountEvents(states, stateReasons)
+	}()
+
+	wg.Wait()
+	return result
 }
 
 func validateStageEventStates(in []pb.StageEvent_State) ([]string, error) {
