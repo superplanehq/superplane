@@ -286,8 +286,55 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     return errors;
   };
 
-  const validateAllFields = () => {
+  const validateExecutor = useCallback((executor: SuperplaneExecutor): Record<string, string> => {
     const errors: Record<string, string> = {};
+
+    if (!executor.type || executor.type === '') {
+      errors.executorType = 'Executor type is required';
+      return errors;
+    }
+
+    if (!executor.spec || Object.keys(executor.spec).length === 0) {
+      errors.executorSpec = 'Executor configuration is required';
+      return errors;
+    }
+    if (executor.type === 'semaphore') {
+      if (!executor.integration?.name) {
+        errors.executorIntegration = 'Semaphore integration is required';
+      }
+      if (!executor.resource?.name) {
+        errors.executorProject = 'Project name is required';
+      }
+      if (!executor.spec.ref) {
+        errors.executorRef = 'Ref (branch/tag) is required';
+      }
+      if (!executor.spec.pipelineFile) {
+        errors.executorPipelineFile = 'Pipeline file is required';
+      }
+    } else if (executor.type === 'github') {
+      if (!executor.integration?.name) {
+        errors.executorIntegration = 'GitHub integration is required';
+      }
+      if (!executor.resource?.name) {
+        errors.executorRepository = 'Repository name is required';
+      }
+      if (!executor.spec.workflow) {
+        errors.executorWorkflow = 'Workflow file is required';
+      }
+      if (!executor.spec.ref) {
+        errors.executorRef = 'Ref (branch/tag) is required';
+      }
+    } else if (executor.type === 'http') {
+      if (!executor.spec.url || !/^https?:\/\//.test(executor.spec.url as string)) {
+        errors.executorUrl = 'Valid URL is required';
+      }
+    }
+
+    return errors;
+  }, []);
+
+  const validateAllFields = () => {
+    let errors: Record<string, string> = {};
 
     // Validate all arrays
     inputs.forEach((input, index) => {
@@ -392,52 +439,21 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     });
 
     // Comprehensive executor validation
-    if (!executor.type || executor.type === '') {
-      errors.executorType = 'Executor type is required';
-    } else {
-      // Validate executor spec exists
-      if (!executor.spec || Object.keys(executor.spec).length === 0) {
-        errors.executorSpec = 'Executor configuration is required';
-      } else {
-        // Type-specific validation
-        if (executor.type === 'semaphore') {
-          if (!executor.integration?.name) {
-            errors.executorIntegration = 'Semaphore integration is required';
-          }
-          if (!executor.resource?.name) {
-            errors.executorProject = 'Project name is required';
-          }
-          if (!executor.spec.ref) {
-            errors.executorRef = 'Ref (branch/tag) is required';
-          }
-          if (!executor.spec.pipelineFile) {
-            errors.executorPipelineFile = 'Pipeline file is required';
-          }
-        } else if (executor.type === 'github') {
-          if (!executor.integration?.name) {
-            errors.executorIntegration = 'GitHub integration is required';
-          }
-          if (!executor.resource?.name) {
-            errors.executorRepository = 'Repository name is required';
-          }
-          if (!executor.spec.workflow) {
-            errors.executorWorkflow = 'Workflow file is required';
-          }
-          if (!executor.spec.ref) {
-            errors.executorRef = 'Ref (branch/tag) is required';
-          }
-        } else if (executor.type === 'http') {
-          if (!executor.spec.url) {
-            errors.executorUrl = 'URL is required';
-          }
-        }
-      }
-    }
+    const executorErrors = validateExecutor(executor);
+    errors = {
+      ...errors,
+      ...executorErrors
+    };
 
     setValidationErrors(errors);
 
     return Object.keys(errors).length === 0;
   };
+
+  const isExecutorMisconfigured = useCallback(() => {
+    const errors = validateExecutor(executor);
+    return Object.keys(errors).length > 0;
+  }, [executor, validateExecutor]);
 
   // Shared state management
   const {
@@ -464,12 +480,33 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       isValid: true
     },
     onDataChange,
-    validateAllFields
+    validateAllFields: () => {
+      const executorErrors = validateExecutor(executor);
+
+      if (Object.keys(executorErrors).length > 0) {
+        setOpenSections(prev => [...prev, 'executor']);
+      }
+      return validateAllFields();
+    },
   });
 
   // Initialize open sections
   useEffect(() => {
-    setOpenSections(['general']);
+    const sectionsToOpen = ['general'];
+
+    const connectionsNeedConfiguration = connections.length === 0;
+    if (connectionsNeedConfiguration) {
+      sectionsToOpen.push('connections');
+    }
+
+    const executorErrors = validateExecutor(executor);
+    if (Object.keys(executorErrors).length > 0) {
+      sectionsToOpen.push('executor');
+      setValidationErrors(executorErrors);
+    }
+
+    setOpenSections(sectionsToOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setOpenSections]);
 
   // Connection management
@@ -961,6 +998,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               count={connections.length}
               countLabel="connections"
+              hasError={connections.length === 0 || Object.keys(validationErrors).some(key => key.startsWith('connection_'))}
             >
               {connections.map((connection, index) => (
                 <div key={index}>
@@ -1728,9 +1766,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               countLabel="executor"
               className={!openSections.includes('executor') ? 'rounded-b-2xl border-b-0' : ''}
+              hasError={isExecutorMisconfigured() || Object.keys(validationErrors).some(key => key.startsWith('executor'))}
             >
               <div className="space-y-4">
-                {/* Executor Label - Universal field for all executor types */}
                 <ValidationField label="Executor name">
                   <input
                     type="text"
@@ -1744,11 +1782,17 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                 {executor.type === 'semaphore' && (
                   <div className="space-y-4">
-                    <ValidationField label="Integration">
+                    <ValidationField
+                      label="Integration"
+                      error={validationErrors.executorIntegration}
+                    >
                       <select
                         value={executor.integration?.name || ''}
                         onChange={(e) => updateExecutorIntegration(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorIntegration
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       >
                         <option value="">Select an integration...</option>
                         {getAllIntegrations()
@@ -1820,23 +1864,35 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       </ValidationField>
                     )}
 
-                    <ValidationField label="Ref">
+                    <ValidationField
+                      label="Ref"
+                      error={validationErrors.executorRef}
+                    >
                       <input
                         type="text"
                         value={(executor.spec?.ref as string) || ''}
                         onChange={(e) => updateExecutorField('ref', e.target.value)}
                         placeholder="refs/heads/main"
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorRef
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
                     </ValidationField>
 
-                    <ValidationField label="Pipeline File">
+                    <ValidationField
+                      label="Pipeline File"
+                      error={validationErrors.executorPipelineFile}
+                    >
                       <input
                         type="text"
                         value={(executor.spec?.pipelineFile as string) || ''}
                         onChange={(e) => updateExecutorField('pipelineFile', e.target.value)}
                         placeholder=".semaphore/semaphore.yml"
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorPipelineFile
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
                     </ValidationField>
 
@@ -1880,11 +1936,17 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                 {executor.type === 'github' && (
                   <div className="space-y-4">
-                    <ValidationField label="Integration">
+                    <ValidationField
+                      label="Integration"
+                      error={validationErrors.executorIntegration}
+                    >
                       <select
                         value={executor.integration?.name || ''}
                         onChange={(e) => updateExecutorIntegration(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorIntegration
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       >
                         <option value="">Select an integration...</option>
                         {getAllIntegrations()
@@ -1902,7 +1964,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       )}
                     </ValidationField>
 
-                    <ValidationField label="Repository Name">
+                    <ValidationField
+                      label="Repository Name"
+                      error={validationErrors.executorRepository}
+                    >
                       <input
                         type="text"
                         value={(executor.resource?.name as string) || ''}
@@ -1913,27 +1978,42 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                           updateExecutorResource('name', e.target.value)
                         }}
                         placeholder="my-repository"
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorRepository
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
                     </ValidationField>
 
-                    <ValidationField label="Workflow">
+                    <ValidationField
+                      label="Workflow"
+                      error={validationErrors.executorWorkflow}
+                    >
                       <input
                         type="text"
                         value={(executor.spec?.workflow as string) || ''}
                         onChange={(e) => updateExecutorField('workflow', e.target.value)}
                         placeholder=".github/workflows/task.yml"
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorWorkflow
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
                     </ValidationField>
 
-                    <ValidationField label="Ref">
+                    <ValidationField
+                      label="Ref"
+                      error={validationErrors.executorRef}
+                    >
                       <input
                         type="text"
                         value={(executor.spec?.ref as string) || ''}
                         onChange={(e) => updateExecutorField('ref', e.target.value)}
                         placeholder="main"
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorRef
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
                     </ValidationField>
 
@@ -1977,13 +2057,19 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                 {executor.type === 'http' && (
                   <div className="space-y-4">
-                    <ValidationField label="URL">
+                    <ValidationField
+                      label="URL"
+                      error={validationErrors.executorUrl}
+                    >
                       <input
                         type="text"
                         value={(executor.spec?.url as string) || ''}
                         onChange={(e) => updateExecutorField('url', e.target.value)}
                         placeholder="https://api.example.com/endpoint"
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorUrl
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
                     </ValidationField>
 

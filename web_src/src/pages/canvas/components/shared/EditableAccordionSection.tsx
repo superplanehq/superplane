@@ -15,6 +15,7 @@ interface EditableAccordionSectionProps {
   children: React.ReactNode;
   validationError?: string;
   className?: string;
+  hasError?: boolean;
 }
 
 export function EditableAccordionSection({
@@ -29,12 +30,13 @@ export function EditableAccordionSection({
   requiredBadge = false,
   children,
   validationError,
-  className
+  className,
+  hasError = false
 }: EditableAccordionSectionProps) {
   const titleContent = (
     <div className="flex items-center justify-between w-full">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-zinc-600 dark:text-zinc-100">{title}</span>
+        <span className={`text-sm ${hasError ? 'text-red-600 dark:text-red-400' : 'text-zinc-600 dark:text-zinc-100'}`}>{title}</span>
         <RevertButton
           sectionId={id}
           isModified={isModified}
