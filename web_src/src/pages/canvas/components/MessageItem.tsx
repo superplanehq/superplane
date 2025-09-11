@@ -280,7 +280,6 @@ const MessageItem = React.memo(({
                     showDetailsTab={true}
                     eventId={event.id}
                     timestamp={event.receivedAt}
-                    state={event.state}
                     eventType={event.type}
                     sourceName={event.sourceName}
                     headers={plainEventHeaders}

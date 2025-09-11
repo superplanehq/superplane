@@ -204,11 +204,16 @@ func Test__ListStageEvents(t *testing.T) {
 	t.Run("test filtering with new response fields", func(t *testing.T) {
 		r := support.Setup(t)
 
+		//
+		// Create 1 pending and 1 processed stage event
+		//
 		event1 := support.CreateStageEvent(t, r.Source, r.Stage)
 		event2 := support.CreateStageEvent(t, r.Source, r.Stage)
-
 		require.NoError(t, event1.UpdateState(models.StageEventStateProcessed, ""))
 
+		//
+		// A single pending event is returned when listing for pending
+		//
 		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{protos.StageEvent_STATE_PENDING}, []protos.StageEvent_StateReason{}, 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
@@ -218,7 +223,21 @@ func Test__ListStageEvents(t *testing.T) {
 		assert.NotNil(t, res.LastTimestamp)
 		assert.Equal(t, event2.ID.String(), res.Events[0].Id)
 
+		//
+		// No waiting events are returned when listing for waiting
+		//
 		res, err = ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{protos.StageEvent_STATE_WAITING}, []protos.StageEvent_StateReason{}, 0, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Empty(t, res.Events)
+		assert.Zero(t, res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.LastTimestamp)
+
+		//
+		// A single processed event is returned when listing for processed
+		//
+		res, err = ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{protos.StageEvent_STATE_PROCESSED}, []protos.StageEvent_StateReason{}, 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Events, 1)

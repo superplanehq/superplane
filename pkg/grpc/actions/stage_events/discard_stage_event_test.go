@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
@@ -16,8 +17,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-const StageEventCancelledRoutingKey = "stage-event-cancelled"
 
 func Test__DiscardStageEvent(t *testing.T) {
 	r := support.Setup(t)
@@ -54,7 +53,7 @@ func Test__DiscardStageEvent(t *testing.T) {
 		newEvent := support.CreateStageEvent(t, r.Source, r.Stage)
 
 		amqpURL, _ := config.RabbitMQURL()
-		testconsumer := testconsumer.New(amqpURL, StageEventCancelledRoutingKey)
+		testconsumer := testconsumer.New(amqpURL, messages.StageEventDiscardedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
@@ -81,6 +80,7 @@ func Test__DiscardStageEvent(t *testing.T) {
 
 		// Try to discard it again
 		_, err = DiscardStageEvent(ctx, r.Canvas.ID.String(), r.Stage.ID.String(), event.ID.String())
+		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

@@ -90,7 +90,7 @@ func (e *StageEvent) Approve(requesterID uuid.UUID) error {
 }
 
 func (e *StageEvent) Discard(requesterID uuid.UUID) error {
-	if e.StateReason == StageEventStateDiscarded {
+	if e.State == StageEventStateDiscarded {
 		return ErrEventAlreadyDiscarded
 	}
 
@@ -98,40 +98,15 @@ func (e *StageEvent) Discard(requesterID uuid.UUID) error {
 		return ErrEventCannotBeDiscarded
 	}
 
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		execution, err := FindExecutionByStageEventID(e.ID)
-		if err != nil && !strings.Contains(err.Error(), "record not found") {
-			return err
-		}
-
-		if execution != nil && execution.State != ExecutionFinished && execution.State != ExecutionCancelled {
-			execution.State = ExecutionCancelled
-			err = tx.Save(execution).Error
-			if err != nil {
-				return err
-			}
-		}
-
-		err = e.UpdateStateInTransaction(tx, StageEventStateDiscarded, "")
-		if err != nil {
-			return err
-		}
-
-		now := time.Now()
-		err = tx.Model(e).
-			Clauses(clause.Returning{}).
-			Update("discarded_by", requesterID).
-			Update("discarded_at", now).
-			Error
-		if err != nil {
-			return err
-		}
-
-		e.DiscardedBy = &requesterID
-		e.DiscardedAt = &now
-
-		return nil
-	})
+	now := time.Now()
+	return database.Conn().
+		Model(e).
+		Clauses(clause.Returning{}).
+		Update("state", StageEventStateDiscarded).
+		Update("state_reason", "").
+		Update("discarded_by", requesterID).
+		Update("discarded_at", &now).
+		Error
 }
 
 func (e *StageEvent) FindApprovals() ([]StageEventApproval, error) {

@@ -58,11 +58,11 @@ func DiscardStageEvent(ctx context.Context, canvasID string, stageIdOrName strin
 		return nil, err
 	}
 
-	logger.Infof("event %s cancelled", event.ID)
+	logger.Infof("event %s discarded", event.ID)
 
-	err = messages.NewStageEventCancelledMessage(canvasID, event).Publish()
+	err = messages.NewStageEventDiscardedMessage(canvasID, event).Publish()
 	if err != nil {
-		logger.Errorf("failed to publish event cancelled message: %v", err)
+		logger.Errorf("failed to publish event discarded message: %v", err)
 	}
 
 	serialized, err := serializeStageEvent(*event)

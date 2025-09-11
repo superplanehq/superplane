@@ -12,7 +12,7 @@ type StageEventDiscardedMessage struct {
 	message *pb.StageEventDiscarded
 }
 
-func NewStageEventCancelledMessage(canvasId string, stageEvent *models.StageEvent) StageEventDiscardedMessage {
+func NewStageEventDiscardedMessage(canvasId string, stageEvent *models.StageEvent) StageEventDiscardedMessage {
 	return StageEventDiscardedMessage{
 		message: &pb.StageEventDiscarded{
 			CanvasId:  canvasId,
