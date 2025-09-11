@@ -47,7 +47,7 @@ type StageEvent struct {
 	CancelledBy *uuid.UUID
 	CancelledAt *time.Time
 	Inputs      datatypes.JSONType[map[string]any]
-	
+
 	Event *Event `gorm:"foreignKey:EventID;references:ID"`
 }
 
@@ -254,57 +254,4 @@ func FindStageEventsWaitingForTimeWindow() ([]StageEventWithConditions, error) {
 	}
 
 	return events, nil
-}
-
-func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs []uuid.UUID, limitPerStage int, before *time.Time, states []string, stateReasons []string) (map[string][]StageEvent, error) {
-	if len(stageIDs) == 0 {
-		return map[string][]StageEvent{}, nil
-	}
-
-	var events []StageEvent
-
-	if len(states) == 0 {
-		states = []string{
-			StageEventStatePending,
-			StageEventStateWaiting,
-			StageEventStateProcessed,
-		}
-	}
-
-	query := database.Conn().
-		Where("stage_id IN ?", stageIDs).
-		Where("state IN ?", states)
-
-	if len(stateReasons) > 0 {
-		query = query.Where("state_reason IN ?", stateReasons)
-	}
-
-	if before != nil {
-		query = query.Where("created_at < ?", before)
-	}
-
-	query = query.Order("stage_id, created_at DESC")
-
-	err := query.Find(&events).Error
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[string][]StageEvent)
-	stageCounters := make(map[string]int)
-
-	for _, event := range events {
-		stageKey := event.StageID.String()
-
-		if limitPerStage > 0 {
-			if stageCounters[stageKey] >= limitPerStage {
-				continue
-			}
-			stageCounters[stageKey]++
-		}
-
-		result[stageKey] = append(result[stageKey], event)
-	}
-
-	return result, nil
 }

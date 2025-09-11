@@ -62,6 +62,7 @@ func Test__ListStageEvents(t *testing.T) {
 			"VERSION": "v1",
 		})
 
+		// execution should not be showed in list_stage_events
 		execution, err := models.CreateStageExecution(r.Canvas.ID, r.Stage.ID, eventWithExecution.ID)
 		require.NoError(t, err)
 		require.NoError(t, eventWithExecution.UpdateState(models.StageEventStateWaiting, models.StageEventStateReasonExecution))
@@ -76,32 +77,13 @@ func Test__ListStageEvents(t *testing.T) {
 		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), states, []protos.StageEvent_StateReason{}, 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
-		require.Len(t, res.Events, 3)
-		assert.Equal(t, uint32(3), res.TotalCount)
+		require.Len(t, res.Events, 2)
+		assert.Equal(t, uint32(2), res.TotalCount)
 		assert.False(t, res.HasNextPage)
 		assert.NotNil(t, res.LastTimestamp)
 
-		// event with execution
-		e := res.Events[0]
-		assert.NotEmpty(t, e.Id)
-		assert.NotEmpty(t, e.CreatedAt)
-		assert.Equal(t, r.Source.ID.String(), e.SourceId)
-		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, e.SourceType)
-		assert.Equal(t, protos.StageEvent_STATE_WAITING, e.State)
-		assert.Equal(t, protos.StageEvent_STATE_REASON_EXECUTION, e.StateReason)
-		require.Len(t, e.Approvals, 0)
-		require.Len(t, e.Inputs, 1)
-		assert.Equal(t, "VERSION", e.Inputs[0].Name)
-		assert.Equal(t, "v1", e.Inputs[0].Value)
-		assert.Equal(t, "", e.Name)
-
-		require.NotNil(t, e.TriggerEvent)
-		assert.Equal(t, "push", e.TriggerEvent.Type)
-		assert.Equal(t, protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, e.TriggerEvent.SourceType)
-		assert.Equal(t, r.Source.ID.String(), e.TriggerEvent.SourceId)
-
 		// event with approvals
-		e = res.Events[1]
+		e := res.Events[0]
 		assert.NotEmpty(t, e.Id)
 		assert.NotEmpty(t, e.CreatedAt)
 		assert.Equal(t, r.Source.ID.String(), e.SourceId)
@@ -122,7 +104,7 @@ func Test__ListStageEvents(t *testing.T) {
 		assert.Equal(t, r.Source.ID.String(), e.TriggerEvent.SourceId)
 
 		// event with no approvals
-		e = res.Events[2]
+		e = res.Events[1]
 		assert.NotEmpty(t, e.Id)
 		assert.NotEmpty(t, e.CreatedAt)
 		assert.Equal(t, r.Source.ID.String(), e.SourceId)
