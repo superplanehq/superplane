@@ -65,7 +65,7 @@ func Test__ListStageEvents(t *testing.T) {
 		// execution should not be showed in list_stage_events
 		execution, err := models.CreateStageExecution(r.Canvas.ID, r.Stage.ID, eventWithExecution.ID)
 		require.NoError(t, err)
-		require.NoError(t, eventWithExecution.UpdateState(models.StageEventStateWaiting, models.StageEventStateReasonExecution))
+		require.NoError(t, eventWithExecution.UpdateState(models.StageEventStateProcessed, ""))
 		require.NoError(t, execution.UpdateOutputs(map[string]any{
 			"VERSION": "v1",
 			"VALUE_1": "value1",
@@ -207,7 +207,7 @@ func Test__ListStageEvents(t *testing.T) {
 		event1 := support.CreateStageEvent(t, r.Source, r.Stage)
 		event2 := support.CreateStageEvent(t, r.Source, r.Stage)
 
-		require.NoError(t, event1.UpdateState(models.StageEventStateWaiting, models.StageEventStateReasonExecution))
+		require.NoError(t, event1.UpdateState(models.StageEventStateProcessed, ""))
 
 		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{protos.StageEvent_STATE_PENDING}, []protos.StageEvent_StateReason{}, 0, nil)
 		require.NoError(t, err)

@@ -16,21 +16,18 @@ const (
 	StageEventStatePending   = "pending"
 	StageEventStateWaiting   = "waiting"
 	StageEventStateProcessed = "processed"
+	StageEventStateDiscarded = "discarded"
 
 	StageEventStateReasonApproval   = "approval"
 	StageEventStateReasonTimeWindow = "time-window"
-	StageEventStateReasonExecution  = "execution"
-	StageEventStateReasonConnection = "connection"
-	StageEventStateReasonCancelled  = "cancelled"
-	StageEventStateReasonUnhealthy  = "unhealthy"
 	StageEventStateReasonStuck      = "stuck"
 	StageEventStateReasonTimeout    = "timeout"
 )
 
 var (
 	ErrEventAlreadyApprovedByRequester = fmt.Errorf("event already approved by requester")
-	ErrEventAlreadyCancelled           = fmt.Errorf("event already cancelled")
-	ErrEventCannotBeCancelled          = fmt.Errorf("event cannot be cancelled")
+	ErrEventAlreadyDiscarded           = fmt.Errorf("event already discarded")
+	ErrEventCannotBeDiscarded          = fmt.Errorf("event cannot be discarded")
 )
 
 type StageEvent struct {
@@ -44,8 +41,8 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
-	CancelledBy *uuid.UUID
-	CancelledAt *time.Time
+	DiscardedBy *uuid.UUID
+	DiscardedAt *time.Time
 	Inputs      datatypes.JSONType[map[string]any]
 
 	Event *Event `gorm:"foreignKey:EventID;references:ID"`
@@ -92,13 +89,13 @@ func (e *StageEvent) Approve(requesterID uuid.UUID) error {
 	return nil
 }
 
-func (e *StageEvent) Cancel(requesterID uuid.UUID) error {
-	if e.StateReason == StageEventStateReasonCancelled {
-		return ErrEventAlreadyCancelled
+func (e *StageEvent) Discard(requesterID uuid.UUID) error {
+	if e.StateReason == StageEventStateDiscarded {
+		return ErrEventAlreadyDiscarded
 	}
 
 	if e.State == StageEventStateProcessed {
-		return ErrEventCannotBeCancelled
+		return ErrEventCannotBeDiscarded
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -115,7 +112,7 @@ func (e *StageEvent) Cancel(requesterID uuid.UUID) error {
 			}
 		}
 
-		err = e.UpdateStateInTransaction(tx, StageEventStateProcessed, StageEventStateReasonCancelled)
+		err = e.UpdateStateInTransaction(tx, StageEventStateDiscarded, "")
 		if err != nil {
 			return err
 		}
@@ -123,15 +120,15 @@ func (e *StageEvent) Cancel(requesterID uuid.UUID) error {
 		now := time.Now()
 		err = tx.Model(e).
 			Clauses(clause.Returning{}).
-			Update("cancelled_by", requesterID).
-			Update("cancelled_at", now).
+			Update("discarded_by", requesterID).
+			Update("discarded_at", now).
 			Error
 		if err != nil {
 			return err
 		}
 
-		e.CancelledBy = &requesterID
-		e.CancelledAt = &now
+		e.DiscardedBy = &requesterID
+		e.DiscardedAt = &now
 
 		return nil
 	})

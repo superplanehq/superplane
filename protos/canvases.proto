@@ -312,14 +312,14 @@ service Superplane {
     };
   }
 
-  rpc CancelStageEvent(CancelStageEventRequest) returns (CancelStageEventResponse) {
+  rpc DiscardStageEvent(DiscardStageEventRequest) returns (DiscardStageEventResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/cancel"
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/discard"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Cancel a stage event";
-      description: "Cancels the specified stage event (canvas can be referenced by ID or name)";
+      summary: "Discards a stage event";
+      description: "Discards the specified stage event (canvas can be referenced by ID or name)";
       tags: "Stage";
     };
   }
@@ -414,7 +414,7 @@ message EventSource {
 
   message Status {
     uint32 queue_items_count = 1;
-    repeated StageEvent last_events = 2;
+    repeated Event last_events = 2;
   }
 
   Metadata metadata = 1;
@@ -797,19 +797,16 @@ message StageEvent {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_WAITING = 2;
-    STATE_PROCESSED = 4;
+    STATE_PROCESSED = 3;
+    STATE_DISCARDED = 4;
   }
 
   enum StateReason {
     STATE_REASON_UNKNOWN = 0;
     STATE_REASON_APPROVAL = 1;
     STATE_REASON_TIME_WINDOW = 2;
-    STATE_REASON_EXECUTION = 3;
-    STATE_REASON_CONNECTION = 4;
-    STATE_REASON_CANCELLED = 5;
-    STATE_REASON_UNHEALTHY = 6;
-    STATE_REASON_STUCK = 7;
-    STATE_REASON_TIMEOUT = 8;
+    STATE_REASON_STUCK = 3;
+    STATE_REASON_TIMEOUT = 4;
   }
 
   string id = 1;
@@ -822,8 +819,8 @@ message StageEvent {
   repeated KeyValuePair inputs = 8;
   string name = 9;
   Event trigger_event = 10;
-  string cancelled_by = 11;
-  google.protobuf.Timestamp cancelled_at = 12;
+  string discarded_by = 11;
+  google.protobuf.Timestamp discarded_at = 12;
 }
 
 message KeyValuePair {
@@ -898,13 +895,13 @@ message ApproveStageEventResponse {
   StageEvent event = 1;
 }
 
-message CancelStageEventRequest {
+message DiscardStageEventRequest {
   string stage_id_or_name = 1;
   string canvas_id_or_name = 2;
   string event_id = 3;
 }
 
-message CancelStageEventResponse {
+message DiscardStageEventResponse {
   StageEvent event = 1;
 }
 
@@ -1042,7 +1039,7 @@ message StageEventApproved {
   google.protobuf.Timestamp timestamp = 5;
 }
 
-message StageEventCancelled {
+message StageEventDiscarded {
   string canvas_id = 1;
   string stage_id = 2;
   string event_id = 3;

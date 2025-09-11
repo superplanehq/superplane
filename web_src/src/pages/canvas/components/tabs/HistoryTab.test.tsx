@@ -2,17 +2,17 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HistoryTab } from './HistoryTab';
-import { StageWithEventQueue } from '../../store/types';
+import { Stage } from '../../store/types';
 
 vi.mock('@/hooks/useCanvasData');
 
-const mockStage: StageWithEventQueue = {
+const mockStage: Stage = {
   metadata: {
     id: 'stage-1',
     name: 'Test Stage',
   },
   queue: [],
-  events: [],
+  executions: [],
 };
 
 const mockUseStageQueueEvents = {
@@ -56,9 +56,7 @@ describe('HistoryTab', () => {
         organizationId="org-1"
         canvasId="canvas-1"
         approveStageEvent={vi.fn()}
-        isFetchingNextConnectedEvents={false}
-        fetchNextConnectedEvents={vi.fn()}
-        cancelStageEvent={vi.fn()}
+        discardStageEvent={vi.fn()}
       />
     );
 
@@ -73,9 +71,7 @@ describe('HistoryTab', () => {
         organizationId="org-1"
         canvasId="canvas-1"
         approveStageEvent={vi.fn()}
-        isFetchingNextConnectedEvents={false}
-        fetchNextConnectedEvents={vi.fn()}
-        cancelStageEvent={vi.fn()}
+        discardStageEvent={vi.fn()}
       />
     );
 

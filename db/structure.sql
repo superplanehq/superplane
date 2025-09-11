@@ -2,9 +2,9 @@
 -- PostgreSQL database dump
 --
 
-\restrict MWmKJTh3v9oh8htLVrbW0CSSLGvnbNUHoQxE2hg7NaF6dHHPrQmfSTaLFMlMNV8
+\restrict t7RwotVueHtgxoAdUTmqI5u9dMGQsSTD6cRZO2HM7Zfh4crYMHobNX0jkhEvZVY
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
@@ -401,8 +401,8 @@ CREATE TABLE public.stage_events (
     created_at timestamp without time zone NOT NULL,
     inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
     name text,
-    cancelled_by uuid,
-    cancelled_at timestamp without time zone
+    discarded_by uuid,
+    discarded_at timestamp without time zone
 );
 
 
@@ -1105,15 +1105,15 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MWmKJTh3v9oh8htLVrbW0CSSLGvnbNUHoQxE2hg7NaF6dHHPrQmfSTaLFMlMNV8
+\unrestrict t7RwotVueHtgxoAdUTmqI5u9dMGQsSTD6cRZO2HM7Zfh4crYMHobNX0jkhEvZVY
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 064poHNocEhBHOXbAuejZ5Zc1ClYr8yXW8G49hZwS7p7T0RUkJ4Mf0m9JbvN5cw
+\restrict 3U8BO1B50l0qWUlnz8Weoi6T1ao4KO0QyTF5jKVVRA42l5OmgERThWKGOFv0den
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
@@ -1133,7 +1133,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250904120548	f
+20250911161549	f
 \.
 
 
@@ -1141,5 +1141,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 064poHNocEhBHOXbAuejZ5Zc1ClYr8yXW8G49hZwS7p7T0RUkJ4Mf0m9JbvN5cw
+\unrestrict 3U8BO1B50l0qWUlnz8Weoi6T1ao4KO0QyTF5jKVVRA42l5OmgERThWKGOFv0den
 

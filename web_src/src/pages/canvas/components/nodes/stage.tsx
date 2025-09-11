@@ -5,7 +5,7 @@ import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useUpdateStage, useCreateStage, useDeleteStage } from '@/hooks/useCanvasData';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -87,7 +87,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const pendingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_PENDING' && !event.execution)
+      ?.filter(event => event.state === 'STATE_PENDING')
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
@@ -98,7 +98,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const waitingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_WAITING' && !event.execution)
+      ?.filter(event => event.state === 'STATE_WAITING')
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
@@ -114,10 +114,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   );
 
   const allExecutions = useMemo(() =>
-    currentStage?.queue?.flatMap(event => event.execution as SuperplaneExecution)
-      .filter(execution => execution)
-      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
-    [currentStage?.queue]
+    currentStage?.executions
+      ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
+    [currentStage?.executions]
   );
 
   const allFinishedExecutions = useMemo(() =>
@@ -133,7 +132,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   // If there is a running execution, use it as the last execution
   const lastExecution = runningExecution || allFinishedExecutions.at(0);
-  const lastExecutionEvent = currentStage?.queue?.find(event => event.execution?.id === lastExecution?.id);
+  const lastExecutionEvent = currentStage?.queue?.find(event => event.id === lastExecution?.stageEvent?.id);
   const lastInputsCount = lastExecutionEvent?.inputs?.length || 0;
   const lastOutputsCount = lastExecution?.outputs?.length || 0;
 

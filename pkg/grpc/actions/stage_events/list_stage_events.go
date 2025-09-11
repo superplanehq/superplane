@@ -172,14 +172,6 @@ func protoToStateReason(stateReason pb.StageEvent_StateReason) (string, error) {
 		return models.StageEventStateReasonApproval, nil
 	case pb.StageEvent_STATE_REASON_TIME_WINDOW:
 		return models.StageEventStateReasonTimeWindow, nil
-	case pb.StageEvent_STATE_REASON_EXECUTION:
-		return models.StageEventStateReasonExecution, nil
-	case pb.StageEvent_STATE_REASON_CONNECTION:
-		return models.StageEventStateReasonConnection, nil
-	case pb.StageEvent_STATE_REASON_CANCELLED:
-		return models.StageEventStateReasonCancelled, nil
-	case pb.StageEvent_STATE_REASON_UNHEALTHY:
-		return models.StageEventStateReasonUnhealthy, nil
 	case pb.StageEvent_STATE_REASON_STUCK:
 		return models.StageEventStateReasonStuck, nil
 	case pb.StageEvent_STATE_REASON_TIMEOUT:
@@ -197,6 +189,8 @@ func protoToState(state pb.StageEvent_State) (string, error) {
 		return models.StageEventStateWaiting, nil
 	case pb.StageEvent_STATE_PROCESSED:
 		return models.StageEventStateProcessed, nil
+	case pb.StageEvent_STATE_DISCARDED:
+		return models.StageEventStateDiscarded, nil
 	default:
 		return "", fmt.Errorf("invalid state: %v", state)
 	}
@@ -229,11 +223,11 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		Name:        in.Name,
 	}
 
-	if in.CancelledBy != nil {
-		e.CancelledBy = in.CancelledBy.String()
+	if in.DiscardedBy != nil {
+		e.DiscardedBy = in.DiscardedBy.String()
 	}
-	if in.CancelledAt != nil {
-		e.CancelledAt = timestamppb.New(*in.CancelledAt)
+	if in.DiscardedAt != nil {
+		e.DiscardedAt = timestamppb.New(*in.DiscardedAt)
 	}
 
 	//
@@ -269,51 +263,6 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 	return &e, nil
 }
 
-func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error) {
-	execution, err := models.FindExecutionByStageEventID(event.ID)
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-
-		return nil, nil
-	}
-
-	e := &pb.Execution{
-		Id:        execution.ID.String(),
-		State:     executionStateToProto(execution.State),
-		Result:    actions.ExecutionResultToProto(execution.Result),
-		CreatedAt: timestamppb.New(*execution.CreatedAt),
-		Outputs:   []*pb.OutputValue{},
-		Resources: []*pb.ExecutionResource{},
-	}
-
-	if execution.StartedAt != nil {
-		e.StartedAt = timestamppb.New(*execution.StartedAt)
-	}
-
-	if execution.FinishedAt != nil {
-		e.FinishedAt = timestamppb.New(*execution.FinishedAt)
-	}
-
-	for k, v := range execution.Outputs.Data() {
-		e.Outputs = append(e.Outputs, &pb.OutputValue{Name: k, Value: v.(string)})
-	}
-
-	resources, err := execution.Resources()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, r := range resources {
-		e.Resources = append(e.Resources, &pb.ExecutionResource{
-			Id: r.ExternalID,
-		})
-	}
-
-	return e, nil
-}
-
 func executionStateToProto(state string) pb.Execution_State {
 	switch state {
 	case models.ExecutionPending:
@@ -337,6 +286,8 @@ func stateToProto(state string) pb.StageEvent_State {
 		return pb.StageEvent_STATE_WAITING
 	case models.StageEventStateProcessed:
 		return pb.StageEvent_STATE_PROCESSED
+	case models.StageEventStateDiscarded:
+		return pb.StageEvent_STATE_DISCARDED
 	default:
 		return pb.StageEvent_STATE_UNKNOWN
 	}
@@ -348,14 +299,6 @@ func stateReasonToProto(stateReason string) pb.StageEvent_StateReason {
 		return pb.StageEvent_STATE_REASON_APPROVAL
 	case models.StageEventStateReasonTimeWindow:
 		return pb.StageEvent_STATE_REASON_TIME_WINDOW
-	case models.StageEventStateReasonExecution:
-		return pb.StageEvent_STATE_REASON_EXECUTION
-	case models.StageEventStateReasonConnection:
-		return pb.StageEvent_STATE_REASON_CONNECTION
-	case models.StageEventStateReasonCancelled:
-		return pb.StageEvent_STATE_REASON_CANCELLED
-	case models.StageEventStateReasonUnhealthy:
-		return pb.StageEvent_STATE_REASON_UNHEALTHY
 	case models.StageEventStateReasonStuck:
 		return pb.StageEvent_STATE_REASON_STUCK
 	case models.StageEventStateReasonTimeout:

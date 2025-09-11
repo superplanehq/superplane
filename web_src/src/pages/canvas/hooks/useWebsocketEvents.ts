@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import useWebSocket from 'react-use-websocket';
 import { EventMap, ServerEvent } from '../types/events';
 import { useCanvasStore } from "../store/canvasStore";
-import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from '../store/types';
+import { ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from '../store/types';
 import { pollConnectionGroupUntilNoPending, pollEventSourceUntilNoPending, pollStageUntilNoPending } from '../utils/eventSourcePolling';
 import { stageUpdateQueue } from '../utils/stageUpdateQueue';
 import { SuperplaneEventSource } from '@/api-client';
@@ -64,11 +64,12 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
     // Declare variables outside of case statements to avoid lexical declaration errors
     let newEventPayload: EventMap['new_stage_event'];
     let approvedEventPayload: EventMap['stage_event_approved'];
+    let discardedEventPayload: EventMap['stage_event_discarded'];
     let executionFinishedPayload: EventMap['execution_finished']
     let executionStartedPayload: EventMap['execution_started']
     let eventSourceWithNewEvent: EventSourceWithEvents | undefined;
     let connectionGroupWithNewEvent: ConnectionGroupWithEvents | undefined;
-    let stageWithNewEvent: StageWithEventQueue | undefined;
+    let stageWithNewEvent: Stage | undefined;
     let eventSource: SuperplaneEventSource;
     
     // Route the event to the appropriate handler
@@ -137,9 +138,9 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
         approvedEventPayload = payload as EventMap['stage_event_approved'];
         stageUpdateQueue.enqueue(approvedEventPayload.stage_id, () => syncStageEvents(canvasId, approvedEventPayload.stage_id));
         break;
-      case 'stage_event_cancelled':
-        approvedEventPayload = payload as EventMap['stage_event_cancelled'];
-        stageUpdateQueue.enqueue(approvedEventPayload.stage_id, () => syncStageEvents(canvasId, approvedEventPayload.stage_id));
+      case 'stage_event_discarded':
+        discardedEventPayload = payload as EventMap['stage_event_discarded'];
+        stageUpdateQueue.enqueue(discardedEventPayload.stage_id, () => syncStageEvents(canvasId, discardedEventPayload.stage_id));
         break;
       case 'execution_finished':
         executionFinishedPayload = payload as EventMap['execution_finished'];

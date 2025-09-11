@@ -1,20 +1,18 @@
-import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
+import { Stage } from "../../store/types";
 import { ExecutionTimeline } from '../ExecutionTimeline';
-import { SuperplaneStageEvent, SuperplaneEvent } from "@/api-client";
+import { SuperplaneStageEvent, SuperplaneExecution } from "@/api-client";
 import MessageItem from '../MessageItem';
 
 interface ActivityTabProps {
-  selectedStage: StageWithEventQueue;
+  selectedStage: Stage;
   pendingEvents: SuperplaneStageEvent[];
   waitingEvents: SuperplaneStageEvent[];
-  partialExecutions: ExecutionWithEvent[];
+  partialExecutions: SuperplaneExecution[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
-  cancelStageEvent: (stageEventId: string, stageId: string) => void;
+  discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
   organizationId: string;
-  connectionEventsById: Record<string, SuperplaneEvent>;
-  eventsByExecutionId: Record<string, SuperplaneEvent>;
 }
 
 export const ActivityTab = ({
@@ -23,12 +21,10 @@ export const ActivityTab = ({
   waitingEvents,
   partialExecutions,
   approveStageEvent,
-  cancelStageEvent,
+  discardStageEvent,
   executionRunning,
   onChangeTab,
-  organizationId,
-  connectionEventsById,
-  eventsByExecutionId
+  organizationId
 }: ActivityTabProps) => {
   const queueCount = pendingEvents.length + waitingEvents.length;
 
@@ -47,9 +43,7 @@ export const ActivityTab = ({
         <ExecutionTimeline
           executions={partialExecutions.slice(0, 3)}
           organizationId={organizationId}
-          connectionEventsById={connectionEventsById}
-          eventsByExecutionId={eventsByExecutionId}
-          onCancel={(eventId) => cancelStageEvent(eventId, selectedStage.metadata!.id!)}
+          onCancel={(eventId) => discardStageEvent(eventId, selectedStage.metadata!.id!)}
         />
       </div>
 
@@ -72,7 +66,7 @@ export const ActivityTab = ({
             [...pendingEvents, ...waitingEvents]
               .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
               .map((event) => {
-                const sourceEvent = connectionEventsById[event.eventId || ''];
+                const sourceEvent = event.triggerEvent;
                 const plainEventPayload = sourceEvent?.raw;
                 const plainEventHeaders = sourceEvent?.headers;
 
@@ -82,7 +76,7 @@ export const ActivityTab = ({
                     event={event}
                     selectedStage={selectedStage}
                     onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
-                    onCancel={(eventId) => cancelStageEvent(eventId, selectedStage.metadata!.id!)}
+                    onCancel={(eventId) => discardStageEvent(eventId, selectedStage.metadata!.id!)}
                     executionRunning={executionRunning}
                     sourceEvent={sourceEvent}
                     plainEventPayload={plainEventPayload}

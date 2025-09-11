@@ -21,7 +21,7 @@ var _ MappedNullable = &SuperplaneEventSourceStatus{}
 // SuperplaneEventSourceStatus struct for SuperplaneEventSourceStatus
 type SuperplaneEventSourceStatus struct {
 	QueueItemsCount *int64 `json:"queueItemsCount,omitempty"`
-	LastEvents []SuperplaneStageEvent `json:"lastEvents,omitempty"`
+	LastEvents []SuperplaneEvent `json:"lastEvents,omitempty"`
 }
 
 // NewSuperplaneEventSourceStatus instantiates a new SuperplaneEventSourceStatus object
@@ -74,9 +74,9 @@ func (o *SuperplaneEventSourceStatus) SetQueueItemsCount(v int64) {
 }
 
 // GetLastEvents returns the LastEvents field value if set, zero value otherwise.
-func (o *SuperplaneEventSourceStatus) GetLastEvents() []SuperplaneStageEvent {
+func (o *SuperplaneEventSourceStatus) GetLastEvents() []SuperplaneEvent {
 	if o == nil || IsNil(o.LastEvents) {
-		var ret []SuperplaneStageEvent
+		var ret []SuperplaneEvent
 		return ret
 	}
 	return o.LastEvents
@@ -84,7 +84,7 @@ func (o *SuperplaneEventSourceStatus) GetLastEvents() []SuperplaneStageEvent {
 
 // GetLastEventsOk returns a tuple with the LastEvents field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSourceStatus) GetLastEventsOk() ([]SuperplaneStageEvent, bool) {
+func (o *SuperplaneEventSourceStatus) GetLastEventsOk() ([]SuperplaneEvent, bool) {
 	if o == nil || IsNil(o.LastEvents) {
 		return nil, false
 	}
@@ -100,8 +100,8 @@ func (o *SuperplaneEventSourceStatus) HasLastEvents() bool {
 	return false
 }
 
-// SetLastEvents gets a reference to the given []SuperplaneStageEvent and assigns it to the LastEvents field.
-func (o *SuperplaneEventSourceStatus) SetLastEvents(v []SuperplaneStageEvent) {
+// SetLastEvents gets a reference to the given []SuperplaneEvent and assigns it to the LastEvents field.
+func (o *SuperplaneEventSourceStatus) SetLastEvents(v []SuperplaneEvent) {
 	o.LastEvents = v
 }
 

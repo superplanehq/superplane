@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
-import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from './types';
+import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from './types';
 import { SuperplaneCanvas, SuperplaneStageEventState, SuperplaneStageEventStateReason } from "@/api-client/types.gen";
-import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneCancelStageEvent } from '@/api-client';
+import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneDiscardStageEvent } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
@@ -11,7 +11,6 @@ import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSource
 
 const SYNC_EVENTS_LIMIT = 5;
 const SYNC_STAGE_EVENTS_LIMIT = 20;
-const SYNC_STAGE_EVENTS_ACTIVITY_LIMIT = 5;
 
 type SyncStageEventRequest = {
   states: SuperplaneStageEventState[]
@@ -58,7 +57,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow({ autoLayout: true });
   },
 
-  addStage: (stage: StageWithEventQueue, draft = false, autoLayout = false) => {
+  addStage: (stage: Stage, draft = false, autoLayout = false) => {
     set((state) => ({
       stages: [...state.stages, {
         ...stage,
@@ -81,10 +80,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
-  updateStage: (stage: StageWithEventQueue) => {
+  updateStage: (stage: Stage) => {
     set((state) => ({
       stages: state.stages.map((s) => s.metadata!.id === stage.metadata!.id ? {
-        ...stage, queue: s.queue, events: s.events
+        ...stage, queue: s.queue, executions: s.executions
       } : s)
     }));
     get().syncToReactFlow();
@@ -164,8 +163,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }));
   },
 
-  cancelStageEvent: (stageEventId: string, stageId: string) => {
-    superplaneCancelStageEvent(withOrganizationHeader({
+  discardStageEvent: async (stageEventId: string, stageId: string) => {
+    await superplaneDiscardStageEvent(withOrganizationHeader({
       path: {
         canvasIdOrName: get().canvas.metadata!.id!,
         stageIdOrName: stageId,
@@ -229,11 +228,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // Since we can have older events waiting and the queue and they must appear in the node and in the sidebar (Activity tab)
     const processedEventsState: SyncStageEventRequest = { states: ['STATE_PROCESSED'], limit: SYNC_EVENTS_LIMIT }
     const waitingForConditionState: SyncStageEventRequest = { states: ['STATE_WAITING'], stateReasons: ['STATE_REASON_APPROVAL', 'STATE_REASON_TIME_WINDOW'], limit: SYNC_STAGE_EVENTS_LIMIT }
-    const waitingForExecutionState: SyncStageEventRequest = {
-      states: ['STATE_WAITING', 'STATE_PENDING'],
-      stateReasons: ['STATE_REASON_EXECUTION'],
-      limit: SYNC_STAGE_EVENTS_ACTIVITY_LIMIT
-    }
     const pendingState: SyncStageEventRequest = {
       states: ['STATE_PENDING'],
       limit: SYNC_STAGE_EVENTS_LIMIT
@@ -241,7 +235,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const requestingStates = [
       processedEventsState,
       waitingForConditionState,
-      waitingForExecutionState,
       pendingState
     ]
 

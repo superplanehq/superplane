@@ -31,19 +31,19 @@ type listAndCountResult struct {
 func listAndCountExecutionsInParallel(stage *models.Stage, states, results []string, limit int, beforeTime *time.Time) *listAndCountResult {
 	result := &listAndCountResult{}
 	var wg sync.WaitGroup
-	
+
 	wg.Add(2)
-	
+
 	go func() {
 		defer wg.Done()
 		result.executions, result.listErr = stage.ListExecutionsWithLimitAndBefore(states, results, limit, beforeTime)
 	}()
-	
+
 	go func() {
 		defer wg.Done()
 		result.totalCount, result.countErr = stage.CountExecutions(states, results)
 	}()
-	
+
 	wg.Wait()
 	return result
 }
@@ -83,11 +83,11 @@ func ListStageExecutions(ctx context.Context, canvasID string, stageIdOrName str
 	}
 
 	result := listAndCountExecutionsInParallel(stage, states, results, validatedLimit, beforeTime)
-	
+
 	if result.listErr != nil {
 		return nil, result.listErr
 	}
-	
+
 	if result.countErr != nil {
 		return nil, result.countErr
 	}
@@ -98,7 +98,7 @@ func ListStageExecutions(ctx context.Context, canvasID string, stageIdOrName str
 	}
 
 	hasNextPage := int64(len(result.executions)) == int64(validatedLimit) && result.totalCount > int64(validatedLimit)
-	
+
 	var lastTimestamp *timestamppb.Timestamp
 	if len(result.executions) > 0 {
 		lastExecution := result.executions[len(result.executions)-1]
@@ -317,11 +317,11 @@ func serializeStageEventForExecution(stageEvent models.StageEvent) (*pb.StageEve
 		Name:        stageEvent.Name,
 	}
 
-	if stageEvent.CancelledBy != nil {
-		e.CancelledBy = stageEvent.CancelledBy.String()
+	if stageEvent.DiscardedBy != nil {
+		e.DiscardedBy = stageEvent.DiscardedBy.String()
 	}
-	if stageEvent.CancelledAt != nil {
-		e.CancelledAt = timestamppb.New(*stageEvent.CancelledAt)
+	if stageEvent.DiscardedAt != nil {
+		e.DiscardedAt = timestamppb.New(*stageEvent.DiscardedAt)
 	}
 
 	for k, v := range stageEvent.Inputs.Data() {
@@ -396,14 +396,6 @@ func stageEventStateReasonModelToProto(stateReason string) pb.StageEvent_StateRe
 		return pb.StageEvent_STATE_REASON_APPROVAL
 	case models.StageEventStateReasonTimeWindow:
 		return pb.StageEvent_STATE_REASON_TIME_WINDOW
-	case models.StageEventStateReasonExecution:
-		return pb.StageEvent_STATE_REASON_EXECUTION
-	case models.StageEventStateReasonConnection:
-		return pb.StageEvent_STATE_REASON_CONNECTION
-	case models.StageEventStateReasonCancelled:
-		return pb.StageEvent_STATE_REASON_CANCELLED
-	case models.StageEventStateReasonUnhealthy:
-		return pb.StageEvent_STATE_REASON_UNHEALTHY
 	case models.StageEventStateReasonStuck:
 		return pb.StageEvent_STATE_REASON_STUCK
 	case models.StageEventStateReasonTimeout:

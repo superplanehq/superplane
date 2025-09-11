@@ -16,8 +16,8 @@ interface RunItemProps {
   queuedOn?: string;
   approvedOn?: string;
   approvedBy?: string;
-  cancelledOn?: string;
-  cancelledBy?: string;
+  discardedOn?: string;
+  discardedBy?: string;
   sourceEvent?: SuperplaneEvent;
   emmitedEvent?: SuperplaneEvent;
   onCancel: () => void;
@@ -36,8 +36,8 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   queuedOn,
   approvedOn,
   approvedBy,
-  cancelledOn,
-  cancelledBy,
+  discardedOn,
+  discardedBy,
   sourceEvent,
   emmitedEvent,
   onCancel,
@@ -222,7 +222,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         {isExpanded && (
           <div className="mt-3 space-y-4 text-left">
             {/* Run Section */}
-            {(state === 'STATE_CANCELLED' && (cancelledOn || cancelledBy)) && (
+            {(state === 'STATE_CANCELLED' && (discardedOn || discardedBy)) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Run
@@ -245,15 +245,15 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                         })}
                       </span>
                     </div>
-                    {cancelledOn && (
+                    {discardedOn && (
                       <div className="flex items-center gap-1">
                         <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
                         <span className="text-xs text-gray-500 dark:text-zinc-400">
-                          Cancelled on {new Date(cancelledOn).toLocaleDateString('en-US', {
+                          Discarded on {new Date(discardedOn).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric'
-                          })} {new Date(cancelledOn).toLocaleTimeString('en-US', {
+                          })} {new Date(discardedOn).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',
@@ -262,11 +262,11 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                         </span>
                       </div>
                     )}
-                    {cancelledBy && (
+                    {discardedBy && (
                       <div className="flex items-center gap-1">
                         <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
                         <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{cancelledBy}</span>
+                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{discardedBy}</span>
                         </span>
                       </div>
                     )}
@@ -286,7 +286,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                     showDetailsTab={false}
                     eventId={emmitedEvent?.id}
                     timestamp={emmitedEvent?.receivedAt}
-                    state={emmitedEvent?.state}
                     eventType={emmitedEvent?.type}
                     sourceName={emmitedEvent?.sourceName}
                     headers={emmitedEventHeaders}
@@ -366,7 +365,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                   showDetailsTab={true}
                   eventId={sourceEvent.id}
                   timestamp={sourceEvent.receivedAt}
-                  state={sourceEvent.state}
                   eventType={sourceEvent.type}
                   sourceName={sourceEvent.sourceName}
                   headers={sourceEventHeaders}

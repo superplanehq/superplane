@@ -434,7 +434,8 @@ const (
 	StageEvent_STATE_UNKNOWN   StageEvent_State = 0
 	StageEvent_STATE_PENDING   StageEvent_State = 1
 	StageEvent_STATE_WAITING   StageEvent_State = 2
-	StageEvent_STATE_PROCESSED StageEvent_State = 4
+	StageEvent_STATE_PROCESSED StageEvent_State = 3
+	StageEvent_STATE_DISCARDED StageEvent_State = 4
 )
 
 // Enum value maps for StageEvent_State.
@@ -443,13 +444,15 @@ var (
 		0: "STATE_UNKNOWN",
 		1: "STATE_PENDING",
 		2: "STATE_WAITING",
-		4: "STATE_PROCESSED",
+		3: "STATE_PROCESSED",
+		4: "STATE_DISCARDED",
 	}
 	StageEvent_State_value = map[string]int32{
 		"STATE_UNKNOWN":   0,
 		"STATE_PENDING":   1,
 		"STATE_WAITING":   2,
-		"STATE_PROCESSED": 4,
+		"STATE_PROCESSED": 3,
+		"STATE_DISCARDED": 4,
 	}
 )
 
@@ -486,12 +489,8 @@ const (
 	StageEvent_STATE_REASON_UNKNOWN     StageEvent_StateReason = 0
 	StageEvent_STATE_REASON_APPROVAL    StageEvent_StateReason = 1
 	StageEvent_STATE_REASON_TIME_WINDOW StageEvent_StateReason = 2
-	StageEvent_STATE_REASON_EXECUTION   StageEvent_StateReason = 3
-	StageEvent_STATE_REASON_CONNECTION  StageEvent_StateReason = 4
-	StageEvent_STATE_REASON_CANCELLED   StageEvent_StateReason = 5
-	StageEvent_STATE_REASON_UNHEALTHY   StageEvent_StateReason = 6
-	StageEvent_STATE_REASON_STUCK       StageEvent_StateReason = 7
-	StageEvent_STATE_REASON_TIMEOUT     StageEvent_StateReason = 8
+	StageEvent_STATE_REASON_STUCK       StageEvent_StateReason = 3
+	StageEvent_STATE_REASON_TIMEOUT     StageEvent_StateReason = 4
 )
 
 // Enum value maps for StageEvent_StateReason.
@@ -500,23 +499,15 @@ var (
 		0: "STATE_REASON_UNKNOWN",
 		1: "STATE_REASON_APPROVAL",
 		2: "STATE_REASON_TIME_WINDOW",
-		3: "STATE_REASON_EXECUTION",
-		4: "STATE_REASON_CONNECTION",
-		5: "STATE_REASON_CANCELLED",
-		6: "STATE_REASON_UNHEALTHY",
-		7: "STATE_REASON_STUCK",
-		8: "STATE_REASON_TIMEOUT",
+		3: "STATE_REASON_STUCK",
+		4: "STATE_REASON_TIMEOUT",
 	}
 	StageEvent_StateReason_value = map[string]int32{
 		"STATE_REASON_UNKNOWN":     0,
 		"STATE_REASON_APPROVAL":    1,
 		"STATE_REASON_TIME_WINDOW": 2,
-		"STATE_REASON_EXECUTION":   3,
-		"STATE_REASON_CONNECTION":  4,
-		"STATE_REASON_CANCELLED":   5,
-		"STATE_REASON_UNHEALTHY":   6,
-		"STATE_REASON_STUCK":       7,
-		"STATE_REASON_TIMEOUT":     8,
+		"STATE_REASON_STUCK":       3,
+		"STATE_REASON_TIMEOUT":     4,
 	}
 )
 
@@ -3859,8 +3850,8 @@ type StageEvent struct {
 	Inputs        []*KeyValuePair        `protobuf:"bytes,8,rep,name=inputs,proto3" json:"inputs,omitempty"`
 	Name          string                 `protobuf:"bytes,9,opt,name=name,proto3" json:"name,omitempty"`
 	TriggerEvent  *Event                 `protobuf:"bytes,10,opt,name=trigger_event,json=triggerEvent,proto3" json:"trigger_event,omitempty"`
-	CancelledBy   string                 `protobuf:"bytes,11,opt,name=cancelled_by,json=cancelledBy,proto3" json:"cancelled_by,omitempty"`
-	CancelledAt   *timestamp.Timestamp   `protobuf:"bytes,12,opt,name=cancelled_at,json=cancelledAt,proto3" json:"cancelled_at,omitempty"`
+	DiscardedBy   string                 `protobuf:"bytes,11,opt,name=discarded_by,json=discardedBy,proto3" json:"discarded_by,omitempty"`
+	DiscardedAt   *timestamp.Timestamp   `protobuf:"bytes,12,opt,name=discarded_at,json=discardedAt,proto3" json:"discarded_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3965,16 +3956,16 @@ func (x *StageEvent) GetTriggerEvent() *Event {
 	return nil
 }
 
-func (x *StageEvent) GetCancelledBy() string {
+func (x *StageEvent) GetDiscardedBy() string {
 	if x != nil {
-		return x.CancelledBy
+		return x.DiscardedBy
 	}
 	return ""
 }
 
-func (x *StageEvent) GetCancelledAt() *timestamp.Timestamp {
+func (x *StageEvent) GetDiscardedAt() *timestamp.Timestamp {
 	if x != nil {
-		return x.CancelledAt
+		return x.DiscardedAt
 	}
 	return nil
 }
@@ -4551,7 +4542,7 @@ func (x *ApproveStageEventResponse) GetEvent() *StageEvent {
 	return nil
 }
 
-type CancelStageEventRequest struct {
+type DiscardStageEventRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	StageIdOrName  string                 `protobuf:"bytes,1,opt,name=stage_id_or_name,json=stageIdOrName,proto3" json:"stage_id_or_name,omitempty"`
 	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
@@ -4560,20 +4551,20 @@ type CancelStageEventRequest struct {
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *CancelStageEventRequest) Reset() {
-	*x = CancelStageEventRequest{}
+func (x *DiscardStageEventRequest) Reset() {
+	*x = DiscardStageEventRequest{}
 	mi := &file_canvases_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CancelStageEventRequest) String() string {
+func (x *DiscardStageEventRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CancelStageEventRequest) ProtoMessage() {}
+func (*DiscardStageEventRequest) ProtoMessage() {}
 
-func (x *CancelStageEventRequest) ProtoReflect() protoreflect.Message {
+func (x *DiscardStageEventRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_canvases_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -4585,53 +4576,53 @@ func (x *CancelStageEventRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CancelStageEventRequest.ProtoReflect.Descriptor instead.
-func (*CancelStageEventRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use DiscardStageEventRequest.ProtoReflect.Descriptor instead.
+func (*DiscardStageEventRequest) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{70}
 }
 
-func (x *CancelStageEventRequest) GetStageIdOrName() string {
+func (x *DiscardStageEventRequest) GetStageIdOrName() string {
 	if x != nil {
 		return x.StageIdOrName
 	}
 	return ""
 }
 
-func (x *CancelStageEventRequest) GetCanvasIdOrName() string {
+func (x *DiscardStageEventRequest) GetCanvasIdOrName() string {
 	if x != nil {
 		return x.CanvasIdOrName
 	}
 	return ""
 }
 
-func (x *CancelStageEventRequest) GetEventId() string {
+func (x *DiscardStageEventRequest) GetEventId() string {
 	if x != nil {
 		return x.EventId
 	}
 	return ""
 }
 
-type CancelStageEventResponse struct {
+type DiscardStageEventResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Event         *StageEvent            `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CancelStageEventResponse) Reset() {
-	*x = CancelStageEventResponse{}
+func (x *DiscardStageEventResponse) Reset() {
+	*x = DiscardStageEventResponse{}
 	mi := &file_canvases_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CancelStageEventResponse) String() string {
+func (x *DiscardStageEventResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CancelStageEventResponse) ProtoMessage() {}
+func (*DiscardStageEventResponse) ProtoMessage() {}
 
-func (x *CancelStageEventResponse) ProtoReflect() protoreflect.Message {
+func (x *DiscardStageEventResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_canvases_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -4643,12 +4634,12 @@ func (x *CancelStageEventResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CancelStageEventResponse.ProtoReflect.Descriptor instead.
-func (*CancelStageEventResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use DiscardStageEventResponse.ProtoReflect.Descriptor instead.
+func (*DiscardStageEventResponse) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{71}
 }
 
-func (x *CancelStageEventResponse) GetEvent() *StageEvent {
+func (x *DiscardStageEventResponse) GetEvent() *StageEvent {
 	if x != nil {
 		return x.Event
 	}
@@ -5907,7 +5898,7 @@ func (x *StageEventApproved) GetTimestamp() *timestamp.Timestamp {
 	return nil
 }
 
-type StageEventCancelled struct {
+type StageEventDiscarded struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
 	StageId       string                 `protobuf:"bytes,2,opt,name=stage_id,json=stageId,proto3" json:"stage_id,omitempty"`
@@ -5918,20 +5909,20 @@ type StageEventCancelled struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StageEventCancelled) Reset() {
-	*x = StageEventCancelled{}
+func (x *StageEventDiscarded) Reset() {
+	*x = StageEventDiscarded{}
 	mi := &file_canvases_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StageEventCancelled) String() string {
+func (x *StageEventDiscarded) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StageEventCancelled) ProtoMessage() {}
+func (*StageEventDiscarded) ProtoMessage() {}
 
-func (x *StageEventCancelled) ProtoReflect() protoreflect.Message {
+func (x *StageEventDiscarded) ProtoReflect() protoreflect.Message {
 	mi := &file_canvases_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -5943,40 +5934,40 @@ func (x *StageEventCancelled) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StageEventCancelled.ProtoReflect.Descriptor instead.
-func (*StageEventCancelled) Descriptor() ([]byte, []int) {
+// Deprecated: Use StageEventDiscarded.ProtoReflect.Descriptor instead.
+func (*StageEventDiscarded) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{93}
 }
 
-func (x *StageEventCancelled) GetCanvasId() string {
+func (x *StageEventDiscarded) GetCanvasId() string {
 	if x != nil {
 		return x.CanvasId
 	}
 	return ""
 }
 
-func (x *StageEventCancelled) GetStageId() string {
+func (x *StageEventDiscarded) GetStageId() string {
 	if x != nil {
 		return x.StageId
 	}
 	return ""
 }
 
-func (x *StageEventCancelled) GetEventId() string {
+func (x *StageEventDiscarded) GetEventId() string {
 	if x != nil {
 		return x.EventId
 	}
 	return ""
 }
 
-func (x *StageEventCancelled) GetSourceId() string {
+func (x *StageEventDiscarded) GetSourceId() string {
 	if x != nil {
 		return x.SourceId
 	}
 	return ""
 }
 
-func (x *StageEventCancelled) GetTimestamp() *timestamp.Timestamp {
+func (x *StageEventDiscarded) GetTimestamp() *timestamp.Timestamp {
 	if x != nil {
 		return x.Timestamp
 	}
@@ -6494,7 +6485,7 @@ func (x *EventSource_EventType) GetFilterOperator() FilterOperator {
 type EventSource_Status struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	QueueItemsCount uint32                 `protobuf:"varint,1,opt,name=queue_items_count,json=queueItemsCount,proto3" json:"queue_items_count,omitempty"`
-	LastEvents      []*StageEvent          `protobuf:"bytes,2,rep,name=last_events,json=lastEvents,proto3" json:"last_events,omitempty"`
+	LastEvents      []*Event               `protobuf:"bytes,2,rep,name=last_events,json=lastEvents,proto3" json:"last_events,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -6536,7 +6527,7 @@ func (x *EventSource_Status) GetQueueItemsCount() uint32 {
 	return 0
 }
 
-func (x *EventSource_Status) GetLastEvents() []*StageEvent {
+func (x *EventSource_Status) GetLastEvents() []*Event {
 	if x != nil {
 		return x.LastEvents
 	}
@@ -7162,7 +7153,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"D\n" +
 	"\x16DescribeCanvasResponse\x12*\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\xf0\x06\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\xeb\x06\n" +
 	"\vEventSource\x12<\n" +
 	"\bmetadata\x18\x01 \x01(\v2 .Superplane.EventSource.MetadataR\bmetadata\x120\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1c.Superplane.EventSource.SpecR\x04spec\x126\n" +
@@ -7183,10 +7174,10 @@ const file_canvases_proto_rawDesc = "" +
 	"\tEventType\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12,\n" +
 	"\afilters\x18\x02 \x03(\v2\x12.Superplane.FilterR\afilters\x12C\n" +
-	"\x0ffilter_operator\x18\x03 \x01(\x0e2\x1a.Superplane.FilterOperatorR\x0efilterOperator\x1am\n" +
+	"\x0ffilter_operator\x18\x03 \x01(\x0e2\x1a.Superplane.FilterOperatorR\x0efilterOperator\x1ah\n" +
 	"\x06Status\x12*\n" +
-	"\x11queue_items_count\x18\x01 \x01(\rR\x0fqueueItemsCount\x127\n" +
-	"\vlast_events\x18\x02 \x03(\v2\x16.Superplane.StageEventR\n" +
+	"\x11queue_items_count\x18\x01 \x01(\rR\x0fqueueItemsCount\x122\n" +
+	"\vlast_events\x18\x02 \x03(\v2\x11.Superplane.EventR\n" +
 	"lastEvents\"_\n" +
 	"\x14DescribeStageRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
@@ -7453,7 +7444,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xa8\a\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xcc\x06\n" +
 	"\n" +
 	"StageEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -7469,23 +7460,20 @@ const file_canvases_proto_rawDesc = "" +
 	"\x04name\x18\t \x01(\tR\x04name\x126\n" +
 	"\rtrigger_event\x18\n" +
 	" \x01(\v2\x11.Superplane.EventR\ftriggerEvent\x12!\n" +
-	"\fcancelled_by\x18\v \x01(\tR\vcancelledBy\x12=\n" +
-	"\fcancelled_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\vcancelledAt\"U\n" +
+	"\fdiscarded_by\x18\v \x01(\tR\vdiscardedBy\x12=\n" +
+	"\fdiscarded_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\vdiscardedAt\"j\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
 	"\rSTATE_WAITING\x10\x02\x12\x13\n" +
-	"\x0fSTATE_PROCESSED\x10\x04\"\x83\x02\n" +
+	"\x0fSTATE_PROCESSED\x10\x03\x12\x13\n" +
+	"\x0fSTATE_DISCARDED\x10\x04\"\x92\x01\n" +
 	"\vStateReason\x12\x18\n" +
 	"\x14STATE_REASON_UNKNOWN\x10\x00\x12\x19\n" +
 	"\x15STATE_REASON_APPROVAL\x10\x01\x12\x1c\n" +
-	"\x18STATE_REASON_TIME_WINDOW\x10\x02\x12\x1a\n" +
-	"\x16STATE_REASON_EXECUTION\x10\x03\x12\x1b\n" +
-	"\x17STATE_REASON_CONNECTION\x10\x04\x12\x1a\n" +
-	"\x16STATE_REASON_CANCELLED\x10\x05\x12\x1a\n" +
-	"\x16STATE_REASON_UNHEALTHY\x10\x06\x12\x16\n" +
-	"\x12STATE_REASON_STUCK\x10\a\x12\x18\n" +
-	"\x14STATE_REASON_TIMEOUT\x10\b\"8\n" +
+	"\x18STATE_REASON_TIME_WINDOW\x10\x02\x12\x16\n" +
+	"\x12STATE_REASON_STUCK\x10\x03\x12\x18\n" +
+	"\x14STATE_REASON_TIMEOUT\x10\x04\"8\n" +
 	"\fKeyValuePair\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"7\n" +
@@ -7545,12 +7533,12 @@ const file_canvases_proto_rawDesc = "" +
 	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12\x19\n" +
 	"\bevent_id\x18\x03 \x01(\tR\aeventId\"I\n" +
 	"\x19ApproveStageEventResponse\x12,\n" +
-	"\x05event\x18\x01 \x01(\v2\x16.Superplane.StageEventR\x05event\"\x88\x01\n" +
-	"\x17CancelStageEventRequest\x12'\n" +
+	"\x05event\x18\x01 \x01(\v2\x16.Superplane.StageEventR\x05event\"\x89\x01\n" +
+	"\x18DiscardStageEventRequest\x12'\n" +
 	"\x10stage_id_or_name\x18\x01 \x01(\tR\rstageIdOrName\x12)\n" +
 	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12\x19\n" +
-	"\bevent_id\x18\x03 \x01(\tR\aeventId\"H\n" +
-	"\x18CancelStageEventResponse\x12,\n" +
+	"\bevent_id\x18\x03 \x01(\tR\aeventId\"I\n" +
+	"\x19DiscardStageEventResponse\x12,\n" +
 	"\x05event\x18\x01 \x01(\v2\x16.Superplane.StageEventR\x05event\"T\n" +
 	"\x0eAddUserRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x17\n" +
@@ -7649,7 +7637,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\bevent_id\x18\x03 \x01(\tR\aeventId\x12\x1b\n" +
 	"\tsource_id\x18\x04 \x01(\tR\bsourceId\x128\n" +
 	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xbf\x01\n" +
-	"\x13StageEventCancelled\x12\x1b\n" +
+	"\x13StageEventDiscarded\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x19\n" +
 	"\bstage_id\x18\x02 \x01(\tR\astageId\x12\x19\n" +
 	"\bevent_id\x18\x03 \x01(\tR\aeventId\x12\x1b\n" +
@@ -7685,7 +7673,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x19EVENT_SOURCE_TYPE_UNKNOWN\x10\x00\x12\"\n" +
 	"\x1eEVENT_SOURCE_TYPE_EVENT_SOURCE\x10\x01\x12\x1b\n" +
 	"\x17EVENT_SOURCE_TYPE_STAGE\x10\x02\x12&\n" +
-	"\"EVENT_SOURCE_TYPE_CONNECTION_GROUP\x10\x032\xdc;\n" +
+	"\"EVENT_SOURCE_TYPE_CONNECTION_GROUP\x10\x032\xe3;\n" +
 	"\n" +
 	"Superplane\x12\xa5\x01\n" +
 	"\fListCanvases\x12\x1f.Superplane.ListCanvasesRequest\x1a .Superplane.ListCanvasesResponse\"R\x92A7\n" +
@@ -7739,9 +7727,9 @@ const file_canvases_proto_rawDesc = "" +
 	"\x15DeleteConnectionGroup\x12(.Superplane.DeleteConnectionGroupRequest\x1a).Superplane.DeleteConnectionGroupResponse\"\xcb\x01\x92A}\n" +
 	"\x0fConnectionGroup\x12\x19Delete a connection group\x1aODeletes the specified connection group (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02E*C/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}\x12\xb4\x02\n" +
 	"\x11ApproveStageEvent\x12$.Superplane.ApproveStageEventRequest\x1a%.Superplane.ApproveStageEventResponse\"\xd1\x01\x92Ak\n" +
-	"\x05Stage\x12\x15Approve a stage event\x1aKApproves the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02]:\x01*\"X/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve\x12\xae\x02\n" +
-	"\x10CancelStageEvent\x12#.Superplane.CancelStageEventRequest\x1a$.Superplane.CancelStageEventResponse\"\xce\x01\x92Ai\n" +
-	"\x05Stage\x12\x14Cancel a stage event\x1aJCancels the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02\\:\x01*\"W/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/cancel\x12\xb4\x01\n" +
+	"\x05Stage\x12\x15Approve a stage event\x1aKApproves the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02]:\x01*\"X/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve\x12\xb5\x02\n" +
+	"\x11DiscardStageEvent\x12$.Superplane.DiscardStageEventRequest\x1a%.Superplane.DiscardStageEventResponse\"\xd2\x01\x92Al\n" +
+	"\x05Stage\x12\x16Discards a stage event\x1aKDiscards the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02]:\x01*\"X/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/discard\x12\xb4\x01\n" +
 	"\aAddUser\x12\x1a.Superplane.AddUserRequest\x1a\x1b.Superplane.AddUserResponse\"p\x92A8\n" +
 	"\x06Canvas\x12\x16Add a user to a canvas\x1a\x16Add a user to a canvas\x82\xd3\xe4\x93\x02/:\x01*\"*/api/v1/canvases/{canvas_id_or_name}/users\x12\xcf\x01\n" +
 	"\n" +
@@ -7848,8 +7836,8 @@ var file_canvases_proto_goTypes = []any{
 	(*StageEventApproval)(nil),                   // 80: Superplane.StageEventApproval
 	(*ApproveStageEventRequest)(nil),             // 81: Superplane.ApproveStageEventRequest
 	(*ApproveStageEventResponse)(nil),            // 82: Superplane.ApproveStageEventResponse
-	(*CancelStageEventRequest)(nil),              // 83: Superplane.CancelStageEventRequest
-	(*CancelStageEventResponse)(nil),             // 84: Superplane.CancelStageEventResponse
+	(*DiscardStageEventRequest)(nil),             // 83: Superplane.DiscardStageEventRequest
+	(*DiscardStageEventResponse)(nil),            // 84: Superplane.DiscardStageEventResponse
 	(*AddUserRequest)(nil),                       // 85: Superplane.AddUserRequest
 	(*AddUserResponse)(nil),                      // 86: Superplane.AddUserResponse
 	(*RemoveUserRequest)(nil),                    // 87: Superplane.RemoveUserRequest
@@ -7871,7 +7859,7 @@ var file_canvases_proto_goTypes = []any{
 	(*StageEventCreated)(nil),                    // 103: Superplane.StageEventCreated
 	(*EventCreated)(nil),                         // 104: Superplane.EventCreated
 	(*StageEventApproved)(nil),                   // 105: Superplane.StageEventApproved
-	(*StageEventCancelled)(nil),                  // 106: Superplane.StageEventCancelled
+	(*StageEventDiscarded)(nil),                  // 106: Superplane.StageEventDiscarded
 	(*StageExecutionCreated)(nil),                // 107: Superplane.StageExecutionCreated
 	(*StageExecutionStarted)(nil),                // 108: Superplane.StageExecutionStarted
 	(*StageExecutionFinished)(nil),               // 109: Superplane.StageExecutionFinished
@@ -7968,7 +7956,7 @@ var file_canvases_proto_depIdxs = []int32{
 	80,  // 69: Superplane.StageEvent.approvals:type_name -> Superplane.StageEventApproval
 	74,  // 70: Superplane.StageEvent.inputs:type_name -> Superplane.KeyValuePair
 	97,  // 71: Superplane.StageEvent.trigger_event:type_name -> Superplane.Event
-	128, // 72: Superplane.StageEvent.cancelled_at:type_name -> google.protobuf.Timestamp
+	128, // 72: Superplane.StageEvent.discarded_at:type_name -> google.protobuf.Timestamp
 	10,  // 73: Superplane.ListStageExecutionsRequest.states:type_name -> Superplane.Execution.State
 	11,  // 74: Superplane.ListStageExecutionsRequest.results:type_name -> Superplane.Execution.Result
 	128, // 75: Superplane.ListStageExecutionsRequest.before:type_name -> google.protobuf.Timestamp
@@ -7985,7 +7973,7 @@ var file_canvases_proto_depIdxs = []int32{
 	73,  // 86: Superplane.Execution.stage_event:type_name -> Superplane.StageEvent
 	128, // 87: Superplane.StageEventApproval.approved_at:type_name -> google.protobuf.Timestamp
 	73,  // 88: Superplane.ApproveStageEventResponse.event:type_name -> Superplane.StageEvent
-	73,  // 89: Superplane.CancelStageEventResponse.event:type_name -> Superplane.StageEvent
+	73,  // 89: Superplane.DiscardStageEventResponse.event:type_name -> Superplane.StageEvent
 	2,   // 90: Superplane.ListEventsRequest.source_type:type_name -> Superplane.EventSourceType
 	128, // 91: Superplane.ListEventsRequest.before:type_name -> google.protobuf.Timestamp
 	97,  // 92: Superplane.ListEventsResponse.events:type_name -> Superplane.Event
@@ -8004,7 +7992,7 @@ var file_canvases_proto_depIdxs = []int32{
 	2,   // 105: Superplane.EventCreated.source_type:type_name -> Superplane.EventSourceType
 	128, // 106: Superplane.EventCreated.timestamp:type_name -> google.protobuf.Timestamp
 	128, // 107: Superplane.StageEventApproved.timestamp:type_name -> google.protobuf.Timestamp
-	128, // 108: Superplane.StageEventCancelled.timestamp:type_name -> google.protobuf.Timestamp
+	128, // 108: Superplane.StageEventDiscarded.timestamp:type_name -> google.protobuf.Timestamp
 	128, // 109: Superplane.StageExecutionCreated.timestamp:type_name -> google.protobuf.Timestamp
 	128, // 110: Superplane.StageExecutionStarted.timestamp:type_name -> google.protobuf.Timestamp
 	128, // 111: Superplane.StageExecutionFinished.timestamp:type_name -> google.protobuf.Timestamp
@@ -8016,7 +8004,7 @@ var file_canvases_proto_depIdxs = []int32{
 	113, // 117: Superplane.EventSource.Spec.events:type_name -> Superplane.EventSource.EventType
 	40,  // 118: Superplane.EventSource.EventType.filters:type_name -> Superplane.Filter
 	1,   // 119: Superplane.EventSource.EventType.filter_operator:type_name -> Superplane.FilterOperator
-	73,  // 120: Superplane.EventSource.Status.last_events:type_name -> Superplane.StageEvent
+	97,  // 120: Superplane.EventSource.Status.last_events:type_name -> Superplane.Event
 	128, // 121: Superplane.ConnectionGroup.Metadata.created_at:type_name -> google.protobuf.Timestamp
 	128, // 122: Superplane.ConnectionGroup.Metadata.updated_at:type_name -> google.protobuf.Timestamp
 	43,  // 123: Superplane.ConnectionGroup.Spec.connections:type_name -> Superplane.Connection
@@ -8060,7 +8048,7 @@ var file_canvases_proto_depIdxs = []int32{
 	33,  // 161: Superplane.Superplane.UpdateConnectionGroup:input_type -> Superplane.UpdateConnectionGroupRequest
 	93,  // 162: Superplane.Superplane.DeleteConnectionGroup:input_type -> Superplane.DeleteConnectionGroupRequest
 	81,  // 163: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
-	83,  // 164: Superplane.Superplane.CancelStageEvent:input_type -> Superplane.CancelStageEventRequest
+	83,  // 164: Superplane.Superplane.DiscardStageEvent:input_type -> Superplane.DiscardStageEventRequest
 	85,  // 165: Superplane.Superplane.AddUser:input_type -> Superplane.AddUserRequest
 	87,  // 166: Superplane.Superplane.RemoveUser:input_type -> Superplane.RemoveUserRequest
 	14,  // 167: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
@@ -8088,7 +8076,7 @@ var file_canvases_proto_depIdxs = []int32{
 	34,  // 189: Superplane.Superplane.UpdateConnectionGroup:output_type -> Superplane.UpdateConnectionGroupResponse
 	94,  // 190: Superplane.Superplane.DeleteConnectionGroup:output_type -> Superplane.DeleteConnectionGroupResponse
 	82,  // 191: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
-	84,  // 192: Superplane.Superplane.CancelStageEvent:output_type -> Superplane.CancelStageEventResponse
+	84,  // 192: Superplane.Superplane.DiscardStageEvent:output_type -> Superplane.DiscardStageEventResponse
 	86,  // 193: Superplane.Superplane.AddUser:output_type -> Superplane.AddUserResponse
 	88,  // 194: Superplane.Superplane.RemoveUser:output_type -> Superplane.RemoveUserResponse
 	167, // [167:195] is the sub-list for method output_type

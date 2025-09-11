@@ -1,37 +1,34 @@
-import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
+import { Stage } from "../../store/types";
 import { SuperplaneStageEvent, SuperplaneEvent, SuperplaneExecution } from "@/api-client";
 import MessageItem from '../MessageItem';
 import { RunItem } from './RunItem';
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import { useOrganizationUsersForCanvas, useStageQueueEvents, useStageEvents } from '@/hooks/useCanvasData';
+import { useOrganizationUsersForCanvas, useStageQueueEvents, useStageExecutions } from '@/hooks/useCanvasData';
 import { ControlledTabs, Tab } from '@/components/Tabs/tabs';
 import {
   formatDuration,
   getMinApprovedAt,
   getApprovalsNames,
-  getCancelledByName,
+  getDiscardedByName,
   mapExecutionOutputs,
   mapExecutionEventInputs,
   createUserDisplayNames
 } from '../../utils/stageEventUtils';
 
 interface HistoryTabProps {
-  selectedStage: StageWithEventQueue;
+  selectedStage: Stage;
   organizationId: string;
   canvasId: string;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
-  cancelStageEvent: (stageEventId: string, stageId: string) => void;
-  connectionEventsById?: Record<string, SuperplaneEvent>;
-  isFetchingNextConnectedEvents: boolean;
-  fetchNextConnectedEvents: () => void;
+  discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
 }
 
-export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, cancelStageEvent, connectionEventsById, isFetchingNextConnectedEvents, fetchNextConnectedEvents }: HistoryTabProps) => {
+export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, discardStageEvent }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
     type: 'execution' | 'stage_event' | 'discarded_event';
     timestamp: string;
-    data: ExecutionWithEvent | SuperplaneStageEvent | SuperplaneEvent;
+    data: SuperplaneExecution | SuperplaneStageEvent | SuperplaneEvent;
   };
 
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
@@ -46,60 +43,46 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     hasNextPage: hasNextQueuePage,
     isFetchingNextPage: isFetchingNextQueuePage,
     refetch: refetchQueueEvents
-  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PENDING', 'STATE_WAITING']);
+  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PENDING', 'STATE_WAITING', 'STATE_DISCARDED']);
 
+
+
+
+
+  // Fetch executions directly from the API
   const {
-    data: finishedEventsData,
-    fetchNextPage: fetchNextFinishedPage,
-    hasNextPage: hasNextFinishedPage,
-    isFetchingNextPage: isFetchingNextFinishedPage,
-    refetch: refetchFinishedEvents
-  } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PROCESSED']);
+    data: executionsData
+  } = useStageExecutions(canvasId, selectedStage.metadata!.id!);
 
-  const {
-    data: stagePlainEventsData,
-    fetchNextPage: fetchNextStagePage,
-    hasNextPage: hasNextStagePage,
-    isFetchingNextPage: isFetchingNextStagePage,
-    refetch: refetchStageEvents
-  } = useStageEvents(canvasId, selectedStage.metadata!.id!);
+  const allExecutions = useMemo(() =>
+    executionsData?.pages.flatMap(page => page.executions) || [],
+    [executionsData?.pages]
+  );
 
-  const eventsByExecutionId = useMemo(() => {
-    const emittedEventsById: Record<string, SuperplaneEvent> = {};
+  const allFinishedExecutions = useMemo(() =>
+    allExecutions.filter(execution => execution.state === 'STATE_FINISHED')
+      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()),
+    [allExecutions]
+  );
 
-    stagePlainEventsData?.pages.flatMap(page => page.events)?.forEach(event => {
-      const execution = event.raw?.execution as SuperplaneExecution;
-      if (execution?.id) {
-        emittedEventsById[execution.id || ''] = event;
-      }
-    })
-
-    return emittedEventsById;
-  }, [stagePlainEventsData?.pages]);
-
-  const allFinishedExecutions = useMemo(() => (finishedEventsData?.pages.flatMap(page => page.events) || [])
-    .filter(event => event.execution)
-    .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
-    .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [finishedEventsData]);
-
-  const allPendingOrRunningExecutions = useMemo(() => (queueEventsData?.pages.flatMap(page => page.events) || [])
-    .filter(event => event.execution && (event.execution.state === 'STATE_STARTED' || event.execution.state === 'STATE_PENDING'))
-    .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
-    .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()), [queueEventsData]);
+  const allPendingOrRunningExecutions = useMemo(() =>
+    allExecutions.filter(execution => execution.state === 'STATE_STARTED' || execution.state === 'STATE_PENDING')
+      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()),
+    [allExecutions]
+  );
 
 
-  // Refetch queries when selectedStage.events or .queue changes
+  // Refetch queries when selectedStage.queue or executions changes
   // That means there was a new event or a new queue event since
   // those small arrays are updated near real time
   useEffect(() => {
     refetchQueueEvents();
-    refetchFinishedEvents();
-    refetchStageEvents();
-  }, [selectedStage.events, selectedStage.queue, refetchQueueEvents, refetchFinishedEvents, refetchStageEvents]);
+  }, [selectedStage.queue, selectedStage.executions, refetchQueueEvents]);
 
   const createTimeline = (): TimelineItem[] => {
     const items: TimelineItem[] = [];
 
+    // Add executions to timeline
     (allFinishedExecutions.concat(allPendingOrRunningExecutions)).forEach(execution => {
       if (execution?.createdAt) {
         items.push({
@@ -110,35 +93,16 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
       }
     });
 
-    const allStageEvents = (finishedEventsData?.pages.flatMap(page => page.events) || []).concat(
-      queueEventsData?.pages.flatMap(page => page.events)?.filter(event => !event.execution) || []
-    );
-
-    const executionEventIds = new Set(allFinishedExecutions.map(exec => exec.event?.id).filter(Boolean));
-    const orphanedStageEvents = allStageEvents.filter(event => !executionEventIds.has(event.id));
-
-    orphanedStageEvents.forEach(event => {
-      if (event?.createdAt) {
+    // Add queue events (pending/waiting) to timeline
+    queueEventsData?.pages.flatMap(page => page.events)?.forEach(stageEvent => {
+      if (stageEvent?.createdAt) {
         items.push({
           type: 'stage_event',
-          timestamp: event.createdAt,
-          data: event
+          timestamp: stageEvent.createdAt,
+          data: stageEvent
         });
       }
     });
-
-    // Add discarded events from connectionEventsById
-    if (connectionEventsById) {
-      Object.values(connectionEventsById).forEach(plainEvent => {
-        if (plainEvent?.state === 'STATE_DISCARDED' && plainEvent?.receivedAt && plainEvent.sourceId !== selectedStage.metadata?.id) {
-          items.push({
-            type: 'discarded_event',
-            timestamp: plainEvent.receivedAt,
-            data: plainEvent
-          });
-        }
-      });
-    }
 
     return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   };
@@ -148,8 +112,7 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
   const filterTabs: Tab[] = [
     { id: 'all', label: 'All' },
     { id: 'runs', label: 'Runs' },
-    { id: 'queue', label: 'Queue' },
-    { id: 'events', label: 'Events' }
+    { id: 'queue', label: 'Queue' }
   ];
 
   const timeline = createTimeline();
@@ -163,8 +126,6 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
         filtered = filtered.filter(item => item.type === 'execution');
       } else if (activeFilter === 'queue') {
         filtered = filtered.filter(item => item.type === 'stage_event');
-      } else if (activeFilter === 'events') {
-        filtered = filtered.filter(item => item.type === 'discarded_event');
       }
     }
 
@@ -173,9 +134,9 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item => {
         if (item.type === 'execution') {
-          const execution = item.data as ExecutionWithEvent;
+          const execution = item.data as SuperplaneExecution;
           return (
-            execution.event?.name?.toLowerCase().includes(query) ||
+            execution.stageEvent?.name?.toLowerCase().includes(query) ||
             execution.id?.toLowerCase().includes(query) ||
             execution.state?.toLowerCase().includes(query) ||
             execution.result?.toLowerCase().includes(query)
@@ -186,12 +147,6 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
             stageEvent.name?.toLowerCase().includes(query) ||
             stageEvent.id?.toLowerCase().includes(query) ||
             stageEvent.state?.toLowerCase().includes(query)
-          );
-        } else if (item.type === 'discarded_event') {
-          const plainEvent = item.data as SuperplaneEvent;
-          return (
-            plainEvent.id?.toLowerCase().includes(query) ||
-            plainEvent.state?.toLowerCase().includes(query)
           );
         }
         return false;
@@ -209,31 +164,16 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     if (hasNextQueuePage && !isFetchingNextQueuePage) {
       fetchNextQueuePage();
     }
-    if (hasNextStagePage && !isFetchingNextStagePage) {
-      fetchNextStagePage();
-    }
-    if (hasNextFinishedPage && !isFetchingNextFinishedPage) {
-      fetchNextFinishedPage();
-    }
 
-    // Fetch next connected events
-    fetchNextConnectedEvents();
   }, [
     timelineLimit,
     hasNextQueuePage,
     isFetchingNextQueuePage,
-    hasNextStagePage,
-    isFetchingNextStagePage,
-    fetchNextConnectedEvents,
     fetchNextQueuePage,
-    fetchNextStagePage,
-    hasNextFinishedPage,
-    isFetchingNextFinishedPage,
-    fetchNextFinishedPage
   ]);
 
-  const hasMoreItems = (filteredTimeline.length >= timelineLimit) && ((timeline.length > timelineLimit) || hasNextQueuePage || hasNextStagePage);
-  const isLoadingMore = isFetchingNextQueuePage || isFetchingNextStagePage || isFetchingNextConnectedEvents;
+  const hasMoreItems = (filteredTimeline.length >= timelineLimit) && ((timeline.length > timelineLimit) || hasNextQueuePage);
+  const isLoadingMore = isFetchingNextQueuePage;
 
   return (
     <div className="p-6">
@@ -279,14 +219,14 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
           <>
             {filteredTimeline.map((item) => {
               if (item.type === 'execution') {
-                const execution = item.data as ExecutionWithEvent;
-                const sourceEvent = connectionEventsById?.[execution.event.eventId || ''];
-                const emmitedEvent = eventsByExecutionId?.[execution.id || ''];
+                const execution = item.data as SuperplaneExecution;
+                const sourceEvent = (execution.stageEvent as any)?.raw;
+                const emmitedEvent = execution.emmitedEvent;
 
                 return (
                   <RunItem
                     key={execution.id!}
-                    title={execution.event.name || execution.id || 'Execution'}
+                    title={execution.stageEvent?.name || execution.id || 'Execution'}
                     runId={execution.id}
                     inputs={mapExecutionEventInputs(execution)}
                     outputs={mapExecutionOutputs(execution)}
@@ -296,22 +236,22 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     executionDuration={formatDuration(execution.startedAt || execution.createdAt, execution.finishedAt)}
                     approvedOn={getMinApprovedAt(execution)}
                     approvedBy={getApprovalsNames(execution, userDisplayNames)}
-                    queuedOn={execution.event.createdAt}
-                    cancelledOn={execution.event.cancelledAt}
-                    cancelledBy={getCancelledByName(execution, userDisplayNames)}
+                    queuedOn={execution.stageEvent?.createdAt}
+                    discardedOn={execution.stageEvent?.discardedAt}
+                    discardedBy={getDiscardedByName(execution, userDisplayNames)}
                     eventId={sourceEvent?.id}
                     sourceEvent={sourceEvent}
                     emmitedEvent={emmitedEvent}
-                    onCancel={() => cancelStageEvent(execution.event.id!, selectedStage.metadata!.id!)}
+                    onCancel={() => discardStageEvent(execution.stageEvent?.id!, selectedStage.metadata!.id!)}
                   />
                 );
               }
               if (item.type === 'stage_event') {
                 const stageEvent = item.data as SuperplaneStageEvent;
-                const sourceEvent = connectionEventsById?.[stageEvent.eventId || ''];
-                const plainEventPayload = connectionEventsById?.[stageEvent.eventId || '']?.raw;
-                const plainEventHeaders = connectionEventsById?.[stageEvent.eventId || '']?.headers;
-                const approvalAndCancelledData = { event: stageEvent } as ExecutionWithEvent;
+                const sourceEvent = stageEvent.triggerEvent;
+                const plainEventPayload = sourceEvent?.raw;
+                const plainEventHeaders = sourceEvent?.headers;
+                const approvalAndCancelledData = { event: stageEvent } as SuperplaneExecution;
 
                 return (
                   <MessageItem
@@ -320,30 +260,14 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     selectedStage={selectedStage}
                     executionRunning={false}
                     onApprove={stageEvent.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
-                    onCancel={(eventId) => cancelStageEvent(eventId, selectedStage.metadata!.id!)}
+                    onCancel={(eventId) => discardStageEvent(eventId, selectedStage.metadata!.id!)}
                     plainEventPayload={plainEventPayload}
                     plainEventHeaders={plainEventHeaders}
                     sourceEvent={sourceEvent}
                     approvedOn={getMinApprovedAt(approvalAndCancelledData)}
                     approvedBy={getApprovalsNames(approvalAndCancelledData, userDisplayNames)}
-                    cancelledOn={stageEvent.cancelledAt}
-                    cancelledBy={getCancelledByName(approvalAndCancelledData, userDisplayNames)}
-                  />
-                );
-              }
-              if (item.type === 'discarded_event') {
-                const plainEvent = item.data as SuperplaneEvent;
-                // Get payload from the plain event's raw data
-                const plainEventPayload = plainEvent.raw;
-                const plainEventHeaders = plainEvent.headers
-
-                return (
-                  <MessageItem
-                    key={plainEvent.id}
-                    event={plainEvent}
-                    executionRunning={false}
-                    plainEventPayload={plainEventPayload}
-                    plainEventHeaders={plainEventHeaders}
+                    discardedOn={stageEvent.discardedAt}
+                    discardedBy={getDiscardedByName(approvalAndCancelledData, userDisplayNames)}
                   />
                 );
               }

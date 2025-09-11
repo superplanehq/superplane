@@ -1,31 +1,26 @@
-import { ExecutionWithEvent } from "../store/types";
 import { RunItem } from "./tabs/RunItem";
 import { useOrganizationUsersForCanvas } from "../../../hooks/useCanvasData";
 import { useMemo } from "react";
-import { SuperplaneEvent } from "@/api-client";
+import { SuperplaneExecution } from "@/api-client";
 import {
   formatDuration,
   getMinApprovedAt,
   getApprovalsNames,
-  getCancelledByName,
+  getDiscardedByName,
   mapExecutionOutputs,
   mapExecutionEventInputs,
   createUserDisplayNames
 } from "../utils/stageEventUtils";
 
 interface ExecutionTimelineProps {
-  executions: ExecutionWithEvent[];
+  executions: SuperplaneExecution[];
   organizationId: string;
-  connectionEventsById: Record<string, SuperplaneEvent>;
-  eventsByExecutionId: Record<string, SuperplaneEvent>;
   onCancel: (eventId: string) => void;
 }
 
 export const ExecutionTimeline = ({
   executions,
   organizationId,
-  connectionEventsById,
-  eventsByExecutionId,
   onCancel
 }: ExecutionTimelineProps) => {
   // Fetch organization users to resolve user IDs to names
@@ -47,13 +42,13 @@ export const ExecutionTimeline = ({
     <div className="space-y-3">
       {
         executions.map((execution) => {
-          const sourceEvent = connectionEventsById[execution.event.eventId || ''];
-          const emmitedEvent = eventsByExecutionId[execution.id || ''];
+          const sourceEvent = (execution.stageEvent as any)?.raw;
+          const emmitedEvent = execution.emmitedEvent;
 
           return (
             <RunItem
               key={execution.id!}
-              title={execution.event.name || execution.id || 'Execution'}
+              title={execution.stageEvent?.name || execution.id || 'Execution'}
               runId={execution.id}
               inputs={mapExecutionEventInputs(execution)}
               outputs={mapExecutionOutputs(execution)}
@@ -63,13 +58,13 @@ export const ExecutionTimeline = ({
               executionDuration={formatDuration(execution.startedAt || execution.createdAt, execution.finishedAt)}
               approvedOn={getMinApprovedAt(execution)}
               approvedBy={getApprovalsNames(execution, userDisplayNames)}
-              queuedOn={execution.event.createdAt}
-              cancelledOn={execution.event.cancelledAt}
-              cancelledBy={getCancelledByName(execution, userDisplayNames)}
+              queuedOn={execution.stageEvent?.createdAt}
+              discardedOn={execution.stageEvent?.discardedAt}
+              discardedBy={getDiscardedByName(execution, userDisplayNames)}
               eventId={sourceEvent?.id}
               sourceEvent={sourceEvent}
               emmitedEvent={emmitedEvent}
-              onCancel={() => onCancel(execution.event.id!)}
+              onCancel={() => onCancel(execution.stageEvent?.id!)}
             />
           );
         })

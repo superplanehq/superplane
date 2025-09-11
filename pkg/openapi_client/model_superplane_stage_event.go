@@ -31,8 +31,8 @@ type SuperplaneStageEvent struct {
 	Inputs []SuperplaneKeyValuePair `json:"inputs,omitempty"`
 	Name *string `json:"name,omitempty"`
 	TriggerEvent *SuperplaneEvent `json:"triggerEvent,omitempty"`
-	CancelledBy *string `json:"cancelledBy,omitempty"`
-	CancelledAt *time.Time `json:"cancelledAt,omitempty"`
+	DiscardedBy *string `json:"discardedBy,omitempty"`
+	DiscardedAt *time.Time `json:"discardedAt,omitempty"`
 }
 
 // NewSuperplaneStageEvent instantiates a new SuperplaneStageEvent object
@@ -384,68 +384,68 @@ func (o *SuperplaneStageEvent) SetTriggerEvent(v SuperplaneEvent) {
 	o.TriggerEvent = &v
 }
 
-// GetCancelledBy returns the CancelledBy field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetCancelledBy() string {
-	if o == nil || IsNil(o.CancelledBy) {
+// GetDiscardedBy returns the DiscardedBy field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetDiscardedBy() string {
+	if o == nil || IsNil(o.DiscardedBy) {
 		var ret string
 		return ret
 	}
-	return *o.CancelledBy
+	return *o.DiscardedBy
 }
 
-// GetCancelledByOk returns a tuple with the CancelledBy field value if set, nil otherwise
+// GetDiscardedByOk returns a tuple with the DiscardedBy field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetCancelledByOk() (*string, bool) {
-	if o == nil || IsNil(o.CancelledBy) {
+func (o *SuperplaneStageEvent) GetDiscardedByOk() (*string, bool) {
+	if o == nil || IsNil(o.DiscardedBy) {
 		return nil, false
 	}
-	return o.CancelledBy, true
+	return o.DiscardedBy, true
 }
 
-// HasCancelledBy returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasCancelledBy() bool {
-	if o != nil && !IsNil(o.CancelledBy) {
+// HasDiscardedBy returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasDiscardedBy() bool {
+	if o != nil && !IsNil(o.DiscardedBy) {
 		return true
 	}
 
 	return false
 }
 
-// SetCancelledBy gets a reference to the given string and assigns it to the CancelledBy field.
-func (o *SuperplaneStageEvent) SetCancelledBy(v string) {
-	o.CancelledBy = &v
+// SetDiscardedBy gets a reference to the given string and assigns it to the DiscardedBy field.
+func (o *SuperplaneStageEvent) SetDiscardedBy(v string) {
+	o.DiscardedBy = &v
 }
 
-// GetCancelledAt returns the CancelledAt field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetCancelledAt() time.Time {
-	if o == nil || IsNil(o.CancelledAt) {
+// GetDiscardedAt returns the DiscardedAt field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetDiscardedAt() time.Time {
+	if o == nil || IsNil(o.DiscardedAt) {
 		var ret time.Time
 		return ret
 	}
-	return *o.CancelledAt
+	return *o.DiscardedAt
 }
 
-// GetCancelledAtOk returns a tuple with the CancelledAt field value if set, nil otherwise
+// GetDiscardedAtOk returns a tuple with the DiscardedAt field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetCancelledAtOk() (*time.Time, bool) {
-	if o == nil || IsNil(o.CancelledAt) {
+func (o *SuperplaneStageEvent) GetDiscardedAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.DiscardedAt) {
 		return nil, false
 	}
-	return o.CancelledAt, true
+	return o.DiscardedAt, true
 }
 
-// HasCancelledAt returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasCancelledAt() bool {
-	if o != nil && !IsNil(o.CancelledAt) {
+// HasDiscardedAt returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasDiscardedAt() bool {
+	if o != nil && !IsNil(o.DiscardedAt) {
 		return true
 	}
 
 	return false
 }
 
-// SetCancelledAt gets a reference to the given time.Time and assigns it to the CancelledAt field.
-func (o *SuperplaneStageEvent) SetCancelledAt(v time.Time) {
-	o.CancelledAt = &v
+// SetDiscardedAt gets a reference to the given time.Time and assigns it to the DiscardedAt field.
+func (o *SuperplaneStageEvent) SetDiscardedAt(v time.Time) {
+	o.DiscardedAt = &v
 }
 
 func (o SuperplaneStageEvent) MarshalJSON() ([]byte, error) {
@@ -488,11 +488,11 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.TriggerEvent) {
 		toSerialize["triggerEvent"] = o.TriggerEvent
 	}
-	if !IsNil(o.CancelledBy) {
-		toSerialize["cancelledBy"] = o.CancelledBy
+	if !IsNil(o.DiscardedBy) {
+		toSerialize["discardedBy"] = o.DiscardedBy
 	}
-	if !IsNil(o.CancelledAt) {
-		toSerialize["cancelledAt"] = o.CancelledAt
+	if !IsNil(o.DiscardedAt) {
+		toSerialize["discardedAt"] = o.DiscardedAt
 	}
 	return toSerialize, nil
 }

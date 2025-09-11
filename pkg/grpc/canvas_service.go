@@ -127,9 +127,9 @@ func (s *CanvasService) ApproveStageEvent(ctx context.Context, req *pb.ApproveSt
 	return stageevents.ApproveStageEvent(ctx, canvasID, req.StageIdOrName, req.EventId)
 }
 
-func (s *CanvasService) CancelStageEvent(ctx context.Context, req *pb.CancelStageEventRequest) (*pb.CancelStageEventResponse, error) {
+func (s *CanvasService) DiscardStageEvent(ctx context.Context, req *pb.DiscardStageEventRequest) (*pb.DiscardStageEventResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return stageevents.CancelStageEvent(ctx, canvasID, req.StageIdOrName, req.EventId)
+	return stageevents.DiscardStageEvent(ctx, canvasID, req.StageIdOrName, req.EventId)
 }
 
 func (s *CanvasService) ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
