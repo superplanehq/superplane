@@ -77,7 +77,7 @@ export function SemaphoreIntegrationForm({
             <MaterialSymbol name="info" size="md" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-medium text-gray-900 dark:text-white">Connect Semaphore with your Semaphore API Token</div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">Connect Semaphore with your API Token</div>
             <p className="text-sm text-zinc-700 dark:text-zinc-300 mt-1">
               To connect Semaphore, create an API Token in your Semaphore settings and paste it below.
             </p>
