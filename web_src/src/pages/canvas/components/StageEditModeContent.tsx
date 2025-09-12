@@ -16,6 +16,7 @@ import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
+import { showErrorToast } from '@/utils/toast';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -150,7 +151,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         ...prev,
         [parsedError.field]: parsedError.message
       }));
+
     }
+
+    showErrorToast(errorMessage);
   }, [parseApiErrorMessage]);
 
   // Expose handleApiError to global scope for stage.tsx to call

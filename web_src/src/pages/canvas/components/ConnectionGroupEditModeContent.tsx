@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ConnectionGroupNodeType } from '@/canvas/types/flow';
 import { SuperplaneConnection, GroupByField, SpecTimeoutBehavior } from '@/api-client/types.gen';
 import { useEditModeState } from '../hooks/useEditModeState';
@@ -9,10 +9,12 @@ import { EditableAccordionSection } from './shared/EditableAccordionSection';
 import { InlineEditor } from './shared/InlineEditor';
 import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
+import { showErrorToast } from '@/utils/toast';
 
 interface ConnectionGroupEditModeContentProps {
   data: ConnectionGroupNodeType['data'];
   currentConnectionGroupId?: string;
+  apiError?: string | null;
   onDataChange?: (data: {
     name: string;
     description?: string;
@@ -24,13 +26,35 @@ interface ConnectionGroupEditModeContentProps {
   }) => void;
 }
 
-export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId, onDataChange }: ConnectionGroupEditModeContentProps) {
+export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId, apiError, onDataChange }: ConnectionGroupEditModeContentProps) {
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [groupByFields, setGroupByFields] = useState<GroupByField[]>(data.groupBy?.fields || []);
   const [timeout, setTimeout] = useState<number | undefined>(undefined);
   const [timeoutBehavior, setTimeoutBehavior] = useState<SpecTimeoutBehavior>('TIMEOUT_BEHAVIOR_DROP');
 
   useValidation();
+
+  const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
+    if (!errorMessage) return null;
+
+    return {
+      field: 'general',
+      message: errorMessage
+    };
+  }, []);
+
+  const handleApiError = useCallback((errorMessage: string) => {
+    const parsedError = parseApiErrorMessage(errorMessage);
+    if (parsedError) {
+      showErrorToast(parsedError.message);
+    }
+  }, [parseApiErrorMessage]);
+
+  useEffect(() => {
+    if (apiError) {
+      handleApiError(apiError);
+    }
+  }, [apiError, handleApiError]);
 
   const validateGroupByField = (field: GroupByField): string[] => {
     const errors: string[] = [];
