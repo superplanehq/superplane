@@ -829,17 +829,15 @@ message StageEvent {
   }
 
   string id = 1;
-  string source_id = 2;
-  Connection.Type source_type = 3;
-  State state = 4;
-  StateReason state_reason = 5;
-  google.protobuf.Timestamp created_at = 6;
-  repeated StageEventApproval approvals = 7;
-  repeated KeyValuePair inputs = 8;
-  string name = 9;
-  Event trigger_event = 10;
-  string discarded_by = 11;
-  google.protobuf.Timestamp discarded_at = 12;
+  State state = 2;
+  StateReason state_reason = 3;
+  google.protobuf.Timestamp created_at = 4;
+  repeated StageEventApproval approvals = 5;
+  repeated KeyValuePair inputs = 6;
+  string name = 7;
+  Event trigger_event = 8;
+  string discarded_by = 9;
+  google.protobuf.Timestamp discarded_at = 10;
 }
 
 message KeyValuePair {

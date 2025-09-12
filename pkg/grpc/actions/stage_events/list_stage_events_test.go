@@ -86,8 +86,6 @@ func Test__ListStageEvents(t *testing.T) {
 		e := res.Events[0]
 		assert.NotEmpty(t, e.Id)
 		assert.NotEmpty(t, e.CreatedAt)
-		assert.Equal(t, r.Source.ID.String(), e.SourceId)
-		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, e.SourceType)
 		assert.Equal(t, protos.StageEvent_STATE_PENDING, e.State)
 		assert.Equal(t, protos.StageEvent_STATE_REASON_UNKNOWN, e.StateReason)
 		require.Len(t, e.Approvals, 1)
@@ -107,8 +105,6 @@ func Test__ListStageEvents(t *testing.T) {
 		e = res.Events[1]
 		assert.NotEmpty(t, e.Id)
 		assert.NotEmpty(t, e.CreatedAt)
-		assert.Equal(t, r.Source.ID.String(), e.SourceId)
-		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, e.SourceType)
 		assert.Equal(t, protos.StageEvent_STATE_PENDING, e.State)
 		assert.Equal(t, protos.StageEvent_STATE_REASON_UNKNOWN, e.StateReason)
 		require.Len(t, e.Approvals, 0)

@@ -266,7 +266,8 @@ var listStageEventsCmd = &cobra.Command{
 		fmt.Printf("Found %d events:\n\n", len(response.Events))
 		for i, event := range response.Events {
 			fmt.Printf("%d. Event ID: %s\n", i+1, *event.Id)
-			fmt.Printf("   Source: %s (%s)\n", *event.SourceId, *event.SourceType)
+			fmt.Printf("   Type: %s\n", *event.TriggerEvent.Type)
+			fmt.Printf("   Source: %s (%s)\n", *event.TriggerEvent.SourceName, *event.TriggerEvent.SourceType)
 			fmt.Printf("   State: %s (%s)\n", *event.State, *event.StateReason)
 			fmt.Printf("   Created: %s\n", *event.CreatedAt)
 

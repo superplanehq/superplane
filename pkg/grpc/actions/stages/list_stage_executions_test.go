@@ -305,8 +305,6 @@ func TestListStageExecutions(t *testing.T) {
 		assert.Equal(t, "deploy-main", exec.StageEvent.Name)
 		assert.Equal(t, protos.StageEvent_STATE_PROCESSED, exec.StageEvent.State)
 		assert.Equal(t, protos.StageEvent_STATE_REASON_UNKNOWN, exec.StageEvent.StateReason)
-		assert.Equal(t, r.Source.ID.String(), exec.StageEvent.SourceId)
-		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, exec.StageEvent.SourceType)
 		assert.NotNil(t, exec.StageEvent.CreatedAt)
 
 		require.Len(t, exec.StageEvent.Inputs, 2)

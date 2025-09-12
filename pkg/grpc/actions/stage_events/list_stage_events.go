@@ -229,8 +229,6 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		State:       stateToProto(in.State),
 		StateReason: stateReasonToProto(in.StateReason),
 		CreatedAt:   timestamppb.New(*in.CreatedAt),
-		SourceId:    in.SourceID.String(),
-		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
 		Inputs:      []*pb.KeyValuePair{},
 		Name:        in.Name,

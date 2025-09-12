@@ -22,8 +22,6 @@ var _ MappedNullable = &SuperplaneStageEvent{}
 // SuperplaneStageEvent struct for SuperplaneStageEvent
 type SuperplaneStageEvent struct {
 	Id *string `json:"id,omitempty"`
-	SourceId *string `json:"sourceId,omitempty"`
-	SourceType *SuperplaneConnectionType `json:"sourceType,omitempty"`
 	State *SuperplaneStageEventState `json:"state,omitempty"`
 	StateReason *SuperplaneStageEventStateReason `json:"stateReason,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
@@ -41,8 +39,6 @@ type SuperplaneStageEvent struct {
 // will change when the set of required properties is changed
 func NewSuperplaneStageEvent() *SuperplaneStageEvent {
 	this := SuperplaneStageEvent{}
-	var sourceType SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
-	this.SourceType = &sourceType
 	var state SuperplaneStageEventState = SUPERPLANESTAGEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
 	var stateReason SuperplaneStageEventStateReason = SUPERPLANESTAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
@@ -55,8 +51,6 @@ func NewSuperplaneStageEvent() *SuperplaneStageEvent {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneStageEventWithDefaults() *SuperplaneStageEvent {
 	this := SuperplaneStageEvent{}
-	var sourceType SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
-	this.SourceType = &sourceType
 	var state SuperplaneStageEventState = SUPERPLANESTAGEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
 	var stateReason SuperplaneStageEventStateReason = SUPERPLANESTAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
@@ -94,70 +88,6 @@ func (o *SuperplaneStageEvent) HasId() bool {
 // SetId gets a reference to the given string and assigns it to the Id field.
 func (o *SuperplaneStageEvent) SetId(v string) {
 	o.Id = &v
-}
-
-// GetSourceId returns the SourceId field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetSourceId() string {
-	if o == nil || IsNil(o.SourceId) {
-		var ret string
-		return ret
-	}
-	return *o.SourceId
-}
-
-// GetSourceIdOk returns a tuple with the SourceId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetSourceIdOk() (*string, bool) {
-	if o == nil || IsNil(o.SourceId) {
-		return nil, false
-	}
-	return o.SourceId, true
-}
-
-// HasSourceId returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasSourceId() bool {
-	if o != nil && !IsNil(o.SourceId) {
-		return true
-	}
-
-	return false
-}
-
-// SetSourceId gets a reference to the given string and assigns it to the SourceId field.
-func (o *SuperplaneStageEvent) SetSourceId(v string) {
-	o.SourceId = &v
-}
-
-// GetSourceType returns the SourceType field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetSourceType() SuperplaneConnectionType {
-	if o == nil || IsNil(o.SourceType) {
-		var ret SuperplaneConnectionType
-		return ret
-	}
-	return *o.SourceType
-}
-
-// GetSourceTypeOk returns a tuple with the SourceType field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetSourceTypeOk() (*SuperplaneConnectionType, bool) {
-	if o == nil || IsNil(o.SourceType) {
-		return nil, false
-	}
-	return o.SourceType, true
-}
-
-// HasSourceType returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasSourceType() bool {
-	if o != nil && !IsNil(o.SourceType) {
-		return true
-	}
-
-	return false
-}
-
-// SetSourceType gets a reference to the given SuperplaneConnectionType and assigns it to the SourceType field.
-func (o *SuperplaneStageEvent) SetSourceType(v SuperplaneConnectionType) {
-	o.SourceType = &v
 }
 
 // GetState returns the State field value if set, zero value otherwise.
@@ -460,12 +390,6 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
-	}
-	if !IsNil(o.SourceId) {
-		toSerialize["sourceId"] = o.SourceId
-	}
-	if !IsNil(o.SourceType) {
-		toSerialize["sourceType"] = o.SourceType
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State

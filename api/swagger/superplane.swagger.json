@@ -4392,12 +4392,6 @@
         "id": {
           "type": "string"
         },
-        "sourceId": {
-          "type": "string"
-        },
-        "sourceType": {
-          "$ref": "#/definitions/SuperplaneConnectionType"
-        },
         "state": {
           "$ref": "#/definitions/SuperplaneStageEventState"
         },

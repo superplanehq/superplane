@@ -43,7 +43,7 @@ export const FlowRenderer: React.FC = () => {
 
     stages.forEach(stage => {
       const executionsRunning = stage.executions?.filter(execution => execution?.state === 'STATE_STARTED') || [];
-      const sourceIdStageIdPairs = executionsRunning.map(execution => `${execution.stageEvent?.sourceId}-${stage.metadata?.id}`);
+      const sourceIdStageIdPairs = executionsRunning.map(execution => `${execution.stageEvent?.triggerEvent?.sourceId}-${stage.metadata?.id}`);
       const isRunning = sourceIdStageIdPairs.length > 0;
 
       if (isRunning) {

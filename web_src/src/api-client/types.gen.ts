@@ -747,8 +747,6 @@ export type SuperplaneStage = {
 
 export type SuperplaneStageEvent = {
     id?: string;
-    sourceId?: string;
-    sourceType?: SuperplaneConnectionType;
     state?: SuperplaneStageEventState;
     stateReason?: SuperplaneStageEventStateReason;
     createdAt?: string;
