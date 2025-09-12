@@ -609,9 +609,7 @@ func (s *Stage) CountExecutions(states []string, results []string) (int64, error
 func (s *Stage) CountEvents(states, stateReasons []string) (int64, error) {
 	query := database.Conn().
 		Model(&StageEvent{}).
-		Where("stage_events.stage_id = ?", s.ID).
-		Joins("LEFT JOIN stage_executions ON stage_executions.stage_event_id = stage_events.id").
-		Where("stage_executions.stage_event_id is NULL")
+		Where("stage_events.stage_id = ?", s.ID)
 
 	if len(states) > 0 {
 		query = query.Where("stage_events.state IN ?", states)
@@ -786,7 +784,7 @@ func getQueueInfoForStages(stageIDs []uuid.UUID) (map[uuid.UUID]int, map[uuid.UU
 
 	for _, event := range queueEvents {
 		counts[event.StageID]++
-		
+
 		stageEvent := StageEvent{
 			ID:          event.ID,
 			Name:        event.Name,
@@ -799,7 +797,7 @@ func getQueueInfoForStages(stageIDs []uuid.UUID) (map[uuid.UUID]int, map[uuid.UU
 			StateReason: event.StateReason,
 			CreatedAt:   event.CreatedAt,
 		}
-		
+
 		if _, exists := items[event.StageID]; !exists {
 			items[event.StageID] = []StageEvent{}
 		}

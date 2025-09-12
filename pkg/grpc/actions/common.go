@@ -388,9 +388,9 @@ func SerializeEvent(in models.Event) (*pb.Event, error) {
 		Id:         in.ID.String(),
 		SourceId:   in.SourceID.String(),
 		SourceName: in.SourceName,
-		SourceType: StringToEventSourceType(in.SourceType),
+		SourceType: EventSourceTypeToProto(in.SourceType),
 		Type:       in.Type,
-		State:      StringToEventStateProto(in.State),
+		State:      EventStateToProto(in.State),
 		ReceivedAt: timestamppb.New(*in.ReceivedAt),
 	}
 
@@ -423,7 +423,7 @@ func SerializeEvent(in models.Event) (*pb.Event, error) {
 	return event, nil
 }
 
-func StringToEventSourceType(sourceType string) pb.EventSourceType {
+func EventSourceTypeToProto(sourceType string) pb.EventSourceType {
 	switch sourceType {
 	case models.SourceTypeEventSource:
 		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
@@ -436,7 +436,20 @@ func StringToEventSourceType(sourceType string) pb.EventSourceType {
 	}
 }
 
-func StringToEventStateProto(state string) pb.Event_State {
+func ProtoToEventSourceType(sourceType pb.EventSourceType) string {
+	switch sourceType {
+	case pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE:
+		return models.SourceTypeEventSource
+	case pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE:
+		return models.SourceTypeStage
+	case pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP:
+		return models.SourceTypeConnectionGroup
+	default:
+		return ""
+	}
+}
+
+func EventStateToProto(state string) pb.Event_State {
 	switch state {
 	case models.EventStatePending:
 		return pb.Event_STATE_PENDING
