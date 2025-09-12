@@ -2,6 +2,7 @@ package eventsources
 
 import (
 	"context"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -30,9 +31,23 @@ func ListEventSources(ctx context.Context, canvasID string) (*pb.ListEventSource
 }
 
 func serializeEventSources(eventSources []models.EventSource) ([]*pb.EventSource, error) {
+	if len(eventSources) == 0 {
+		return []*pb.EventSource{}, nil
+	}
+
+	statusInfo, err := models.GetEventSourcesStatusInfo(eventSources)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get event source status info: %w", err)
+	}
+
 	sources := []*pb.EventSource{}
 	for _, source := range eventSources {
-		protoSource, err := serializeEventSource(source)
+		var sourceStatus *models.EventSourceStatusInfo
+		if info, exists := statusInfo[source.ID]; exists {
+			sourceStatus = info
+		}
+
+		protoSource, err := serializeEventSource(source, sourceStatus)
 		if err != nil {
 			return nil, err
 		}

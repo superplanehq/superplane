@@ -15,6 +15,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func ValidateUUIDs(ids ...string) error {
@@ -379,4 +381,70 @@ func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.
 	}
 
 	return models.DomainTypeOrganization, &canvas.OrganizationID, nil
+}
+
+func SerializeEvent(in models.Event) (*pb.Event, error) {
+	event := &pb.Event{
+		Id:         in.ID.String(),
+		SourceId:   in.SourceID.String(),
+		SourceName: in.SourceName,
+		SourceType: StringToEventSourceType(in.SourceType),
+		Type:       in.Type,
+		State:      StringToEventStateProto(in.State),
+		ReceivedAt: timestamppb.New(*in.ReceivedAt),
+	}
+
+	if len(in.Raw) > 0 {
+		data, err := in.GetData()
+		if err != nil {
+			return nil, err
+		}
+
+		event.Raw, err = structpb.NewStruct(data)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(in.Headers) > 0 {
+		headers, err := in.GetHeaders()
+		if err != nil {
+			return nil, err
+		}
+
+		event.Headers, err = structpb.NewStruct(headers)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return event, nil
+}
+
+func StringToEventSourceType(sourceType string) pb.EventSourceType {
+	switch sourceType {
+	case models.SourceTypeEventSource:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
+	case models.SourceTypeStage:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE
+	case models.SourceTypeConnectionGroup:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP
+	default:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN
+	}
+}
+
+func StringToEventStateProto(state string) pb.Event_State {
+	switch state {
+	case models.EventStatePending:
+		return pb.Event_STATE_PENDING
+	case models.EventStateProcessed:
+		return pb.Event_STATE_PROCESSED
+	case models.EventStateDiscarded:
+		return pb.Event_STATE_DISCARDED
+	default:
+		return pb.Event_STATE_UNKNOWN
+	}
 }
