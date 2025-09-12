@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { ConnectionGroupNodeType } from '@/canvas/types/flow';
@@ -20,6 +20,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [connectionGroupName, setConnectionGroupName] = useState(props.data.name || '');
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
   const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
@@ -89,6 +90,8 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     const isNewConnectionGroup = !currentConnectionGroup.metadata?.id || isTemporaryId;
 
     try {
+      setApiError(null);
+
       if (isNewConnectionGroup) {
 
         const result = await createConnectionGroupMutation.mutateAsync({
@@ -145,7 +148,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       setEditingConnectionGroup(null);
       setCurrentFormData(null);
     } catch (error) {
-      console.error(`Failed to ${isNewConnectionGroup ? 'create' : 'update'} connection group:`, error);
+      setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
     }
   };
 
@@ -160,7 +163,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
   const handleDiscardConnectionGroup = async () => {
     if (currentConnectionGroup?.metadata?.id) {
-      const isTemporaryId = /^\\d+$/.test(currentConnectionGroup.metadata.id);
+      const isTemporaryId = /^\d+$/.test(currentConnectionGroup.metadata.id);
       const isRealConnectionGroup = !isTemporaryId;
 
       if (isRealConnectionGroup) {
@@ -197,7 +200,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     }
   };
 
-  const handleYamlApply = (updatedData: unknown) => {
+  const handleYamlApply = useCallback((updatedData: unknown) => {
     // Handle YAML data application for connection group
     const yamlData = updatedData as SuperplaneConnectionGroup;
 
@@ -221,7 +224,12 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
         isValid: currentFormData.isValid // Keep current validation state
       });
     }
-  };
+  }, [currentFormData, connectionGroupName, connectionGroupDescription]);
+
+  const handleDataChange = useCallback((data: { name: string; description?: string; connections: SuperplaneConnection[]; groupByFields: GroupByField[]; timeout?: number; timeoutBehavior?: SpecTimeoutBehavior; isValid: boolean }) => {
+    setCurrentFormData(data);
+    setApiError(null);
+  }, []);
 
   const borderColor = useMemo(() => {
     if (isPartiallyBroken) {
@@ -334,7 +342,8 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
             })
           }}
           currentConnectionGroupId={props.id}
-          onDataChange={setCurrentFormData}
+          apiError={apiError}
+          onDataChange={handleDataChange}
         />
       ) : (
         <>
