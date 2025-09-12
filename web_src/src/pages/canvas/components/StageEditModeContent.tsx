@@ -16,6 +16,7 @@ import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
+import { Button } from '@/components/Button/button';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -34,6 +35,7 @@ interface StageEditModeContentProps {
     inputMappings: SuperplaneInputMapping[];
     isValid: boolean
   }) => void;
+  onTriggerSectionValidation?: { current: ((hasFieldErrors?: boolean) => void) | null };
 }
 
 interface ParameterWithId {
@@ -43,7 +45,7 @@ interface ParameterWithId {
 }
 
 
-export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, onDataChange }: StageEditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, onDataChange, onTriggerSectionValidation }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -83,7 +85,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   });
   const [httpHeaders, setHttpHeaders] = useState<ParameterWithId[]>(() => {
     const headers = executor.spec?.headers as Record<string, string>;
-    console.log(executor.spec);
     if (!headers) return [];
     return Object.entries(headers).map(([key, value], index) => ({
       id: `header_${Date.now()}_${index}`,
@@ -129,6 +130,22 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
     if (!errorMessage) return null;
 
+    const repositoryNotFoundMatch = errorMessage.match(/repository\s+([^\s]+)\s+not\s+found/i);
+    if (repositoryNotFoundMatch) {
+      return {
+        field: 'repository',
+        message: `Repository "${repositoryNotFoundMatch[1]}" not found`
+      };
+    }
+
+    const workflowNotFoundMatch = errorMessage.match(/workflow\s+([^\s]+)\s+not\s+found/i);
+    if (workflowNotFoundMatch) {
+      return {
+        field: 'workflow',
+        message: `Workflow "${workflowNotFoundMatch[1]}" not found`
+      };
+    }
+
     // Check for project not found error
     const projectNotFoundMatch = errorMessage.match(/project\s+([^\s]+)\s+not\s+found/i);
     if (projectNotFoundMatch) {
@@ -149,8 +166,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         ...prev,
         [parsedError.field]: parsedError.message
       }));
+
+      onTriggerSectionValidation?.current?.(true);
     }
-  }, [parseApiErrorMessage]);
+  }, [parseApiErrorMessage, onTriggerSectionValidation]);
 
   // Expose handleApiError to global scope for stage.tsx to call
   useEffect(() => {
@@ -294,10 +313,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       return errors;
     }
 
-    if (!executor.spec || Object.keys(executor.spec).length === 0) {
-      errors.executorSpec = 'Executor configuration is required';
-      return errors;
-    }
     if (executor.type === 'semaphore') {
       if (!executor.integration?.name) {
         errors.executorIntegration = 'Semaphore integration is required';
@@ -305,10 +320,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       if (!executor.resource?.name) {
         errors.executorProject = 'Project name is required';
       }
-      if (!executor.spec.ref) {
+      if (!executor.spec?.ref) {
         errors.executorRef = 'Ref (branch/tag) is required';
       }
-      if (!executor.spec.pipelineFile) {
+      if (!executor.spec?.pipelineFile) {
         errors.executorPipelineFile = 'Pipeline file is required';
       }
     } else if (executor.type === 'github') {
@@ -318,15 +333,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       if (!executor.resource?.name) {
         errors.executorRepository = 'Repository name is required';
       }
-      if (!executor.spec.workflow) {
+      if (!executor.spec?.workflow) {
         errors.executorWorkflow = 'Workflow file is required';
       }
-      if (!executor.spec.ref) {
+      if (!executor.spec?.ref) {
         errors.executorRef = 'Ref (branch/tag) is required';
       }
     } else if (executor.type === 'http') {
       const urlRegex = /^https?:\/\/(www\.)?([-a-zA-Z0-9@:%._+~#=]{1,256}(\.[a-zA-Z0-9()]{1,6})?|(\d{1,3}\.){3}\d{1,3})(:\d+)?([-a-zA-Z0-9()@:%_+.~#?&//=]*)?/;
-      if (!executor.spec.url || !urlRegex.test(executor.spec.url as string)) {
+      if (!executor.spec?.url || !urlRegex.test(executor.spec.url as string)) {
         errors.executorUrl = 'Valid URL is required';
       }
     }
@@ -491,6 +506,35 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     },
   });
 
+  const triggerSectionValidation = useCallback((hasFieldErrors: boolean = false) => {
+    const sectionsToOpen = [...openSections];
+
+    const connectionsNeedConfiguration = connections.length === 0;
+    if (connectionsNeedConfiguration && !sectionsToOpen.includes('connections')) {
+      sectionsToOpen.push('connections');
+    }
+
+    const executorErrors = validateExecutor(executor);
+    if (Object.keys(executorErrors).length > 0 || hasFieldErrors) {
+      if (!sectionsToOpen.includes('executor')) {
+        sectionsToOpen.push('executor');
+      }
+      setValidationErrors(prev => ({
+        ...prev,
+        ...executorErrors
+      }));
+    }
+
+    setOpenSections(sectionsToOpen);
+  }, [connections.length, executor, openSections, setOpenSections, setValidationErrors, validateExecutor]);
+
+  // Expose the trigger function to parent
+  useEffect(() => {
+    if (onTriggerSectionValidation) {
+      onTriggerSectionValidation.current = triggerSectionValidation;
+    }
+  }, [triggerSectionValidation, onTriggerSectionValidation]);
+
   // Initialize open sections
   useEffect(() => {
     const sectionsToOpen = ['general'];
@@ -501,6 +545,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
 
     const executorErrors = validateExecutor(executor);
+
     if (Object.keys(executorErrors).length > 0) {
       sectionsToOpen.push('executor');
       setValidationErrors(executorErrors);
@@ -1767,7 +1812,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               countLabel="executor"
               className={!openSections.includes('executor') ? 'rounded-b-2xl border-b-0' : ''}
-              hasError={isExecutorMisconfigured() || Object.keys(validationErrors).some(key => key.startsWith('executor'))}
+              hasError={
+                isExecutorMisconfigured() ||
+                Object.keys(validationErrors).some(key => key.startsWith('executor')) ||
+                Object.values(fieldErrors).some(Boolean)
+              }
             >
               <div className="space-y-4">
                 <ValidationField label="Executor name">
@@ -1813,7 +1862,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                     <ValidationField
                       label="Project Name"
-                      error={fieldErrors.project}
+                      error={validationErrors.executorProject || fieldErrors.project}
                     >
                       <input
                         type="text"
@@ -1967,7 +2016,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                     <ValidationField
                       label="Repository Name"
-                      error={validationErrors.executorRepository}
+                      error={validationErrors.executorRepository || fieldErrors.repository}
                     >
                       <input
                         type="text"
@@ -1977,6 +2026,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             updateExecutorResource('type', 'repository');
 
                           updateExecutorResource('name', e.target.value)
+
+                          setFieldErrors(prev => ({ ...prev, repository: '' }));
                         }}
                         placeholder="my-repository"
                         className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorRepository
@@ -1988,12 +2039,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                     <ValidationField
                       label="Workflow"
-                      error={validationErrors.executorWorkflow}
+                      error={validationErrors.executorWorkflow || fieldErrors.workflow}
                     >
                       <input
                         type="text"
                         value={(executor.spec?.workflow as string) || ''}
-                        onChange={(e) => updateExecutorField('workflow', e.target.value)}
+                        onChange={(e) => {
+                          updateExecutorField('workflow', e.target.value);
+                          setFieldErrors(prev => ({ ...prev, workflow: '' }));
+                        }}
                         placeholder=".github/workflows/task.yml"
                         className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorWorkflow
                           ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
@@ -2144,6 +2198,35 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     </ValidationField>
                   </div>
                 )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 pb-3">
+                <Button
+                  className='flex items-center border-0'
+                  outline
+                  onClick={() => {
+                    setOpenSections(prev => prev.filter(section => section !== 'executor'));
+                  }}
+                >
+                  <MaterialSymbol name="close" size="sm" data-slot="icon" />
+                </Button>
+                <Button
+                  className='flex items-center'
+                  color="white"
+                  onClick={() => {
+                    const executorErrors = validateExecutor(executor);
+                    if (Object.keys(executorErrors).length === 0) {
+                      setOpenSections(prev => prev.filter(section => section !== 'executor'));
+                    } else {
+                      setValidationErrors(prev => ({
+                        ...prev,
+                        ...executorErrors
+                      }));
+                    }
+                  }}
+                >
+                  <MaterialSymbol name="check" size="sm" data-slot="icon" />
+                </Button>
               </div>
             </EditableAccordionSection>
           </>

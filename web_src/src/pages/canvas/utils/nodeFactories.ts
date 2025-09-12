@@ -24,7 +24,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
         return {
           type: 'semaphore',
           integration: {
-            name: 'semaphore',
+            name: '',
           },
           resource: {
             type: 'project',
@@ -35,7 +35,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
         return {
           type: 'github',
           integration: {
-            name: 'github',
+            name: '',
           },
           resource: {
             type: 'repository',
