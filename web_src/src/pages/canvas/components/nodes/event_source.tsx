@@ -58,7 +58,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   const generateEventSourceName = (resourceName: string) => {
     if (!resourceName) return '';
-    return `Listen ${resourceName}`;
+    return `Listen to: ${resourceName}`;
   };
 
   const validateEventSourceName = (name: string) => {
