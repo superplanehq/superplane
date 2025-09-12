@@ -325,7 +325,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         errors.executorRef = 'Ref (branch/tag) is required';
       }
     } else if (executor.type === 'http') {
-      if (!executor.spec.url || !/^https?:\/\//.test(executor.spec.url as string)) {
+      const urlRegex = /^https?:\/\/(www\.)?([-a-zA-Z0-9@:%._+~#=]{1,256}(\.[a-zA-Z0-9()]{1,6})?|(\d{1,3}\.){3}\d{1,3})(:\d+)?([-a-zA-Z0-9()@:%_+.~#?&//=]*)?/;
+      if (!executor.spec.url || !urlRegex.test(executor.spec.url as string)) {
         errors.executorUrl = 'Valid URL is required';
       }
     }

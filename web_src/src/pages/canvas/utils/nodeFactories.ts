@@ -45,6 +45,9 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
       case 'http':
         return {
           type: 'http',
+          spec: {
+            url: '',
+          },
         };
       default:
         return { type: '', spec: {} };
