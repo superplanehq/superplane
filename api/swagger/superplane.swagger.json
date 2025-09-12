@@ -3432,6 +3432,38 @@
       ],
       "default": "TIMEOUT_BEHAVIOR_NONE"
     },
+    "StatusHistory": {
+      "type": "object",
+      "properties": {
+        "received": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "recentItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneEvent"
+          }
+        }
+      }
+    },
+    "StatusQueue": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneStageEvent"
+          }
+        }
+      }
+    },
     "SuperplaneAddUserBody": {
       "type": "object",
       "properties": {
@@ -3937,16 +3969,8 @@
     "SuperplaneEventSourceStatus": {
       "type": "object",
       "properties": {
-        "queueItemsCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "lastEvents": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneEvent"
-          }
+        "history": {
+          "$ref": "#/definitions/StatusHistory"
         }
       }
     },
@@ -4524,15 +4548,8 @@
         "lastExecution": {
           "$ref": "#/definitions/SuperplaneExecution"
         },
-        "lastWaitingEvent": {
-          "$ref": "#/definitions/SuperplaneStageEvent"
-        },
-        "lastPendingEvent": {
-          "$ref": "#/definitions/SuperplaneStageEvent"
-        },
-        "queueItemsCount": {
-          "type": "integer",
-          "format": "int64"
+        "queue": {
+          "$ref": "#/definitions/StatusQueue"
         }
       }
     },

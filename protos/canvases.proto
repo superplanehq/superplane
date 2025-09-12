@@ -425,8 +425,12 @@ message EventSource {
   }
 
   message Status {
-    uint32 queue_items_count = 1;
-    repeated Event last_events = 2;
+    message History {
+      uint32 received = 1;
+      repeated Event recent_items = 2;
+    }
+
+    History history = 1;
   }
 
   Metadata metadata = 1;
@@ -610,10 +614,13 @@ message Stage {
   }
 
   message Status {
+    message Queue {
+      uint32 total = 1;
+      repeated StageEvent items = 2;
+    }
+
     Execution last_execution = 1;
-    StageEvent last_waiting_event = 2;
-    StageEvent last_pending_event = 3;
-    uint32 queue_items_count = 4;
+    Queue queue = 2;
   }
 
   Metadata metadata = 1;

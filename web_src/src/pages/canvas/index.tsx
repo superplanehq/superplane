@@ -122,13 +122,7 @@ export function Canvas() {
     rawConnectionGroups: SuperplaneConnectionGroup[]
   ) => {
     const stages: Stage[] = rawStages.map(stage => {
-      const queue = [];
-      if (stage.status?.lastWaitingEvent) {
-        queue.push(stage.status.lastWaitingEvent);
-      }
-      if (stage.status?.lastPendingEvent) {
-        queue.push(stage.status.lastPendingEvent);
-      }
+      const queue = stage.status?.queue?.items || [];
       
       const executions = [];
       if (stage.status?.lastExecution) {

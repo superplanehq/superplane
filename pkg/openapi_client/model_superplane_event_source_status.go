@@ -20,8 +20,7 @@ var _ MappedNullable = &SuperplaneEventSourceStatus{}
 
 // SuperplaneEventSourceStatus struct for SuperplaneEventSourceStatus
 type SuperplaneEventSourceStatus struct {
-	QueueItemsCount *int64 `json:"queueItemsCount,omitempty"`
-	LastEvents []SuperplaneEvent `json:"lastEvents,omitempty"`
+	History *StatusHistory `json:"history,omitempty"`
 }
 
 // NewSuperplaneEventSourceStatus instantiates a new SuperplaneEventSourceStatus object
@@ -41,68 +40,36 @@ func NewSuperplaneEventSourceStatusWithDefaults() *SuperplaneEventSourceStatus {
 	return &this
 }
 
-// GetQueueItemsCount returns the QueueItemsCount field value if set, zero value otherwise.
-func (o *SuperplaneEventSourceStatus) GetQueueItemsCount() int64 {
-	if o == nil || IsNil(o.QueueItemsCount) {
-		var ret int64
+// GetHistory returns the History field value if set, zero value otherwise.
+func (o *SuperplaneEventSourceStatus) GetHistory() StatusHistory {
+	if o == nil || IsNil(o.History) {
+		var ret StatusHistory
 		return ret
 	}
-	return *o.QueueItemsCount
+	return *o.History
 }
 
-// GetQueueItemsCountOk returns a tuple with the QueueItemsCount field value if set, nil otherwise
+// GetHistoryOk returns a tuple with the History field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSourceStatus) GetQueueItemsCountOk() (*int64, bool) {
-	if o == nil || IsNil(o.QueueItemsCount) {
+func (o *SuperplaneEventSourceStatus) GetHistoryOk() (*StatusHistory, bool) {
+	if o == nil || IsNil(o.History) {
 		return nil, false
 	}
-	return o.QueueItemsCount, true
+	return o.History, true
 }
 
-// HasQueueItemsCount returns a boolean if a field has been set.
-func (o *SuperplaneEventSourceStatus) HasQueueItemsCount() bool {
-	if o != nil && !IsNil(o.QueueItemsCount) {
+// HasHistory returns a boolean if a field has been set.
+func (o *SuperplaneEventSourceStatus) HasHistory() bool {
+	if o != nil && !IsNil(o.History) {
 		return true
 	}
 
 	return false
 }
 
-// SetQueueItemsCount gets a reference to the given int64 and assigns it to the QueueItemsCount field.
-func (o *SuperplaneEventSourceStatus) SetQueueItemsCount(v int64) {
-	o.QueueItemsCount = &v
-}
-
-// GetLastEvents returns the LastEvents field value if set, zero value otherwise.
-func (o *SuperplaneEventSourceStatus) GetLastEvents() []SuperplaneEvent {
-	if o == nil || IsNil(o.LastEvents) {
-		var ret []SuperplaneEvent
-		return ret
-	}
-	return o.LastEvents
-}
-
-// GetLastEventsOk returns a tuple with the LastEvents field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneEventSourceStatus) GetLastEventsOk() ([]SuperplaneEvent, bool) {
-	if o == nil || IsNil(o.LastEvents) {
-		return nil, false
-	}
-	return o.LastEvents, true
-}
-
-// HasLastEvents returns a boolean if a field has been set.
-func (o *SuperplaneEventSourceStatus) HasLastEvents() bool {
-	if o != nil && !IsNil(o.LastEvents) {
-		return true
-	}
-
-	return false
-}
-
-// SetLastEvents gets a reference to the given []SuperplaneEvent and assigns it to the LastEvents field.
-func (o *SuperplaneEventSourceStatus) SetLastEvents(v []SuperplaneEvent) {
-	o.LastEvents = v
+// SetHistory gets a reference to the given StatusHistory and assigns it to the History field.
+func (o *SuperplaneEventSourceStatus) SetHistory(v StatusHistory) {
+	o.History = &v
 }
 
 func (o SuperplaneEventSourceStatus) MarshalJSON() ([]byte, error) {
@@ -115,11 +82,8 @@ func (o SuperplaneEventSourceStatus) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneEventSourceStatus) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.QueueItemsCount) {
-		toSerialize["queueItemsCount"] = o.QueueItemsCount
-	}
-	if !IsNil(o.LastEvents) {
-		toSerialize["lastEvents"] = o.LastEvents
+	if !IsNil(o.History) {
+		toSerialize["history"] = o.History
 	}
 	return toSerialize, nil
 }

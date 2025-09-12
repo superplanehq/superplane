@@ -354,6 +354,16 @@ export type SpecGroupBy = {
 
 export type SpecTimeoutBehavior = 'TIMEOUT_BEHAVIOR_NONE' | 'TIMEOUT_BEHAVIOR_DROP' | 'TIMEOUT_BEHAVIOR_EMIT';
 
+export type StatusHistory = {
+    received?: number;
+    recentItems?: Array<SuperplaneEvent>;
+};
+
+export type StatusQueue = {
+    total?: number;
+    items?: Array<SuperplaneStageEvent>;
+};
+
 export type SuperplaneAddUserBody = {
     userId?: string;
 };
@@ -577,8 +587,7 @@ export type SuperplaneEventSourceSpec = {
 };
 
 export type SuperplaneEventSourceStatus = {
-    queueItemsCount?: number;
-    lastEvents?: Array<SuperplaneEvent>;
+    history?: StatusHistory;
 };
 
 export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
@@ -780,9 +789,7 @@ export type SuperplaneStageSpec = {
 
 export type SuperplaneStageStatus = {
     lastExecution?: SuperplaneExecution;
-    lastWaitingEvent?: SuperplaneStageEvent;
-    lastPendingEvent?: SuperplaneStageEvent;
-    queueItemsCount?: number;
+    queue?: StatusQueue;
 };
 
 export type SuperplaneUpdateConnectionGroupBody = {

@@ -657,3 +657,154 @@ func mapEmittedEventsToExecutions(emittedEvents []Event, executions []StageExecu
 		}
 	}
 }
+
+type StageStatusInfo struct {
+	StageID       uuid.UUID
+	LastExecution *StageExecution
+	QueueTotal    int
+	QueueItems    []StageEvent
+}
+
+func GetStagesStatusInfo(stages []Stage) (map[uuid.UUID]*StageStatusInfo, error) {
+	statusMap := make(map[uuid.UUID]*StageStatusInfo)
+
+	if len(stages) == 0 {
+		return statusMap, nil
+	}
+
+	stageIDs := make([]uuid.UUID, len(stages))
+	for i, stage := range stages {
+		stageIDs[i] = stage.ID
+		statusMap[stage.ID] = &StageStatusInfo{
+			StageID:    stage.ID,
+			QueueItems: []StageEvent{},
+		}
+	}
+
+	lastExecutions, err := getLastExecutionsForStages(stageIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	queueCounts, queueItems, err := getQueueInfoForStages(stageIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for stageID, execution := range lastExecutions {
+		if status, exists := statusMap[stageID]; exists {
+			status.LastExecution = execution
+		}
+	}
+
+	for stageID, count := range queueCounts {
+		if status, exists := statusMap[stageID]; exists {
+			status.QueueTotal = count
+		}
+	}
+
+	for stageID, items := range queueItems {
+		if status, exists := statusMap[stageID]; exists {
+			status.QueueItems = items
+		}
+	}
+
+	return statusMap, nil
+}
+
+func getLastExecutionsForStages(stageIDs []uuid.UUID) (map[uuid.UUID]*StageExecution, error) {
+	executions := make(map[uuid.UUID]*StageExecution)
+
+	var results []StageExecution
+
+	err := database.Conn().
+		Preload("StageEvent", func(db *gorm.DB) *gorm.DB {
+			return db.Preload("Event")
+		}).
+		Raw(`
+			SELECT * FROM stage_executions 
+			WHERE id IN (
+				SELECT DISTINCT ON (stage_id) id
+				FROM stage_executions 
+				WHERE stage_id IN ?
+				ORDER BY stage_id, created_at DESC
+			)
+		`, stageIDs).
+		Find(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range results {
+		executions[result.StageID] = &result
+	}
+
+	return executions, nil
+}
+
+func getQueueInfoForStages(stageIDs []uuid.UUID) (map[uuid.UUID]int, map[uuid.UUID][]StageEvent, error) {
+	counts := make(map[uuid.UUID]int)
+	items := make(map[uuid.UUID][]StageEvent)
+
+	var queueEvents []struct {
+		StageID     uuid.UUID
+		ID          uuid.UUID
+		Name        string
+		EventID     uuid.UUID
+		SourceID    uuid.UUID
+		SourceName  string
+		SourceType  string
+		State       string
+		StateReason string
+		CreatedAt   *time.Time
+	}
+
+	err := database.Conn().
+		Raw(`
+			SELECT 
+				stage_id,
+				id,
+				name,
+				event_id,
+				source_id,
+				source_name,
+				source_type,
+				state,
+				state_reason,
+				created_at
+			FROM stage_events
+			WHERE stage_id IN ? 
+				AND state IN (?, ?)
+			ORDER BY stage_id, created_at ASC
+		`, stageIDs, StageEventStatePending, StageEventStateWaiting).
+		Find(&queueEvents).Error
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, event := range queueEvents {
+		counts[event.StageID]++
+		
+		stageEvent := StageEvent{
+			ID:          event.ID,
+			Name:        event.Name,
+			StageID:     event.StageID,
+			EventID:     event.EventID,
+			SourceID:    event.SourceID,
+			SourceName:  event.SourceName,
+			SourceType:  event.SourceType,
+			State:       event.State,
+			StateReason: event.StateReason,
+			CreatedAt:   event.CreatedAt,
+		}
+		
+		if _, exists := items[event.StageID]; !exists {
+			items[event.StageID] = []StageEvent{}
+		}
+		items[event.StageID] = append(items[event.StageID], stageEvent)
+	}
+
+	return counts, items, nil
+}

@@ -132,7 +132,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   // If there is a running execution, use it as the last execution
   const lastExecution = runningExecution || allFinishedExecutions.at(0);
-  const lastExecutionEvent = currentStage?.queue?.find(event => event.id === lastExecution?.stageEvent?.id);
+  const lastExecutionEvent = lastExecution?.stageEvent;
   const lastInputsCount = lastExecutionEvent?.inputs?.length || 0;
   const lastOutputsCount = lastExecution?.outputs?.length || 0;
 

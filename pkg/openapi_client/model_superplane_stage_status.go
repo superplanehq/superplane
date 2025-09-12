@@ -21,9 +21,7 @@ var _ MappedNullable = &SuperplaneStageStatus{}
 // SuperplaneStageStatus struct for SuperplaneStageStatus
 type SuperplaneStageStatus struct {
 	LastExecution *SuperplaneExecution `json:"lastExecution,omitempty"`
-	LastWaitingEvent *SuperplaneStageEvent `json:"lastWaitingEvent,omitempty"`
-	LastPendingEvent *SuperplaneStageEvent `json:"lastPendingEvent,omitempty"`
-	QueueItemsCount *int64 `json:"queueItemsCount,omitempty"`
+	Queue *StatusQueue `json:"queue,omitempty"`
 }
 
 // NewSuperplaneStageStatus instantiates a new SuperplaneStageStatus object
@@ -75,100 +73,36 @@ func (o *SuperplaneStageStatus) SetLastExecution(v SuperplaneExecution) {
 	o.LastExecution = &v
 }
 
-// GetLastWaitingEvent returns the LastWaitingEvent field value if set, zero value otherwise.
-func (o *SuperplaneStageStatus) GetLastWaitingEvent() SuperplaneStageEvent {
-	if o == nil || IsNil(o.LastWaitingEvent) {
-		var ret SuperplaneStageEvent
+// GetQueue returns the Queue field value if set, zero value otherwise.
+func (o *SuperplaneStageStatus) GetQueue() StatusQueue {
+	if o == nil || IsNil(o.Queue) {
+		var ret StatusQueue
 		return ret
 	}
-	return *o.LastWaitingEvent
+	return *o.Queue
 }
 
-// GetLastWaitingEventOk returns a tuple with the LastWaitingEvent field value if set, nil otherwise
+// GetQueueOk returns a tuple with the Queue field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageStatus) GetLastWaitingEventOk() (*SuperplaneStageEvent, bool) {
-	if o == nil || IsNil(o.LastWaitingEvent) {
+func (o *SuperplaneStageStatus) GetQueueOk() (*StatusQueue, bool) {
+	if o == nil || IsNil(o.Queue) {
 		return nil, false
 	}
-	return o.LastWaitingEvent, true
+	return o.Queue, true
 }
 
-// HasLastWaitingEvent returns a boolean if a field has been set.
-func (o *SuperplaneStageStatus) HasLastWaitingEvent() bool {
-	if o != nil && !IsNil(o.LastWaitingEvent) {
+// HasQueue returns a boolean if a field has been set.
+func (o *SuperplaneStageStatus) HasQueue() bool {
+	if o != nil && !IsNil(o.Queue) {
 		return true
 	}
 
 	return false
 }
 
-// SetLastWaitingEvent gets a reference to the given SuperplaneStageEvent and assigns it to the LastWaitingEvent field.
-func (o *SuperplaneStageStatus) SetLastWaitingEvent(v SuperplaneStageEvent) {
-	o.LastWaitingEvent = &v
-}
-
-// GetLastPendingEvent returns the LastPendingEvent field value if set, zero value otherwise.
-func (o *SuperplaneStageStatus) GetLastPendingEvent() SuperplaneStageEvent {
-	if o == nil || IsNil(o.LastPendingEvent) {
-		var ret SuperplaneStageEvent
-		return ret
-	}
-	return *o.LastPendingEvent
-}
-
-// GetLastPendingEventOk returns a tuple with the LastPendingEvent field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStageStatus) GetLastPendingEventOk() (*SuperplaneStageEvent, bool) {
-	if o == nil || IsNil(o.LastPendingEvent) {
-		return nil, false
-	}
-	return o.LastPendingEvent, true
-}
-
-// HasLastPendingEvent returns a boolean if a field has been set.
-func (o *SuperplaneStageStatus) HasLastPendingEvent() bool {
-	if o != nil && !IsNil(o.LastPendingEvent) {
-		return true
-	}
-
-	return false
-}
-
-// SetLastPendingEvent gets a reference to the given SuperplaneStageEvent and assigns it to the LastPendingEvent field.
-func (o *SuperplaneStageStatus) SetLastPendingEvent(v SuperplaneStageEvent) {
-	o.LastPendingEvent = &v
-}
-
-// GetQueueItemsCount returns the QueueItemsCount field value if set, zero value otherwise.
-func (o *SuperplaneStageStatus) GetQueueItemsCount() int64 {
-	if o == nil || IsNil(o.QueueItemsCount) {
-		var ret int64
-		return ret
-	}
-	return *o.QueueItemsCount
-}
-
-// GetQueueItemsCountOk returns a tuple with the QueueItemsCount field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStageStatus) GetQueueItemsCountOk() (*int64, bool) {
-	if o == nil || IsNil(o.QueueItemsCount) {
-		return nil, false
-	}
-	return o.QueueItemsCount, true
-}
-
-// HasQueueItemsCount returns a boolean if a field has been set.
-func (o *SuperplaneStageStatus) HasQueueItemsCount() bool {
-	if o != nil && !IsNil(o.QueueItemsCount) {
-		return true
-	}
-
-	return false
-}
-
-// SetQueueItemsCount gets a reference to the given int64 and assigns it to the QueueItemsCount field.
-func (o *SuperplaneStageStatus) SetQueueItemsCount(v int64) {
-	o.QueueItemsCount = &v
+// SetQueue gets a reference to the given StatusQueue and assigns it to the Queue field.
+func (o *SuperplaneStageStatus) SetQueue(v StatusQueue) {
+	o.Queue = &v
 }
 
 func (o SuperplaneStageStatus) MarshalJSON() ([]byte, error) {
@@ -184,14 +118,8 @@ func (o SuperplaneStageStatus) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.LastExecution) {
 		toSerialize["lastExecution"] = o.LastExecution
 	}
-	if !IsNil(o.LastWaitingEvent) {
-		toSerialize["lastWaitingEvent"] = o.LastWaitingEvent
-	}
-	if !IsNil(o.LastPendingEvent) {
-		toSerialize["lastPendingEvent"] = o.LastPendingEvent
-	}
-	if !IsNil(o.QueueItemsCount) {
-		toSerialize["queueItemsCount"] = o.QueueItemsCount
+	if !IsNil(o.Queue) {
+		toSerialize["queue"] = o.Queue
 	}
 	return toSerialize, nil
 }
