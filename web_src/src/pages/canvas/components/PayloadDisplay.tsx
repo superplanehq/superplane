@@ -9,7 +9,6 @@ interface PayloadDisplayProps {
   // Details tab props
   eventId?: string;
   timestamp?: string;
-  state?: string;
   eventType?: string;
   sourceName?: string;
   showDetailsTab?: boolean;
@@ -26,7 +25,6 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   payload,
   eventId,
   timestamp,
-  state,
   eventType,
   sourceName,
   showDetailsTab = false,
@@ -56,41 +54,6 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>(getDefaultTab());
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // State configuration for details tab
-  const getStateConfig = () => {
-    switch (state) {
-      case 'STATE_PENDING':
-        return {
-          dotColor: 'bg-yellow-500',
-          textColor: 'text-yellow-700 dark:text-yellow-400',
-          label: 'Pending',
-          animate: true,
-        };
-      case 'STATE_DISCARDED':
-        return {
-          dotColor: 'bg-zinc-500',
-          textColor: 'text-zinc-600 dark:text-zinc-400',
-          label: 'Discarded',
-          animate: false,
-        };
-      case 'STATE_PROCESSED':
-        return {
-          dotColor: 'bg-green-500',
-          textColor: 'text-green-600 dark:text-green-400',
-          label: 'Forwarded',
-          animate: false,
-        };
-      default:
-        return {
-          dotColor: 'bg-gray-500',
-          textColor: 'text-gray-600 dark:text-gray-400',
-          label: 'Unknown',
-          animate: false,
-        };
-    }
-  };
-
-  const stateConfig = getStateConfig();
 
   const formatTimestamp = () => {
     if (!timestamp) return 'N/A';
@@ -138,15 +101,6 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-6 text-sm">
               <div>
-                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">STATE</div>
-                <div className="text-blue-600 dark:text-blue-400 text-xs font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 ${stateConfig.dotColor} ${stateConfig.animate ? 'animate-pulse' : ''} ${rounded ? 'rounded-full' : 'rounded'} flex-shrink-0`}></div>
-                    <span className={`text-xs font-medium ${stateConfig.textColor}`}>{stateConfig.label}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
                 <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">RECEIVED ON</div>
                 <div className="text-xs text-gray-900 dark:text-zinc-200">{formatTimestamp()}</div>
               </div>
@@ -156,13 +110,11 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
               </div>
               <div>
                 <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">TYPE</div>
-                <div className="text-xs font-medium">{eventType || 'webhook'}</div>
+                <div className="text-xs text-gray-900 dark:text-zinc-200 font-medium">{eventType || 'webhook'}</div>
               </div>
-              <div className="col-span-2">
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">EVENT ID</div>
-                  <div className="font-mono text-xs text-gray-900 dark:text-zinc-200 break-all">{eventId}</div>
-                </div>
+              <div>
+                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">EVENT ID</div>
+                <div className="font-mono text-xs text-gray-900 dark:text-zinc-200 break-all">{eventId}</div>
               </div>
             </div>
           </div>

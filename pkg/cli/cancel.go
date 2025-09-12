@@ -7,10 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cancelEventCmd = &cobra.Command{
+var discardEventCmd = &cobra.Command{
 	Use:     "event [EVENT_ID]",
-	Short:   "Cancel a stage event",
-	Long:    `Cancel a pending stage event that is waiting for execution.`,
+	Short:   "Discard a stage event",
+	Long:    `Discards a stage event from the queue`,
 	Aliases: []string{"events"},
 	Args:    cobra.ExactArgs(1),
 
@@ -22,29 +22,27 @@ var cancelEventCmd = &cobra.Command{
 
 		c := DefaultClient()
 
-		response, _, err := c.StageAPI.SuperplaneCancelStageEvent(context.Background(), canvasIDOrName, stageIDOrName, eventID).
+		response, _, err := c.StageAPI.SuperplaneDiscardStageEvent(context.Background(), canvasIDOrName, stageIDOrName, eventID).
 			Body(map[string]any{}).
 			Execute()
 
 		Check(err)
 
-		fmt.Printf("Event '%s' cancelled successfully.\n", *response.Event.Id)
+		fmt.Printf("Event '%s' discarded successfully.\n", *response.Event.Id)
 	},
 }
 
-// Root cancel command
-var cancelCmd = &cobra.Command{
-	Use:   "cancel",
-	Short: "Cancel resources that are pending execution",
-	Long:  `Cancel events or other resources that are pending execution.`,
+var discardCmd = &cobra.Command{
+	Use:   "discard",
+	Short: "Discard resources",
 }
 
 func init() {
-	cancelEventCmd.Flags().String("canvas-id", "", "Canvas ID")
-	cancelEventCmd.Flags().String("canvas-name", "", "Canvas name")
-	cancelEventCmd.Flags().String("stage-id", "", "Stage ID")
-	cancelEventCmd.Flags().String("stage-name", "", "Stage name")
+	discardEventCmd.Flags().String("canvas-id", "", "Canvas ID")
+	discardEventCmd.Flags().String("canvas-name", "", "Canvas name")
+	discardEventCmd.Flags().String("stage-id", "", "Stage ID")
+	discardEventCmd.Flags().String("stage-name", "", "Stage name")
 
-	RootCmd.AddCommand(cancelCmd)
-	cancelCmd.AddCommand(cancelEventCmd)
+	RootCmd.AddCommand(discardCmd)
+	discardCmd.AddCommand(discardEventCmd)
 }

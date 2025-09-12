@@ -137,6 +137,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		stage.Spec.Inputs,
 		stage.Spec.Outputs,
 		stage.Spec.InputMappings,
+		nil,
 	)
 
 	if err != nil {
@@ -268,6 +269,7 @@ func serializeStage(
 	inputs []*pb.InputDefinition,
 	outputs []*pb.OutputDefinition,
 	inputMappings []*pb.InputMapping,
+	statusInfo *models.StageStatusInfo,
 ) (*pb.Stage, error) {
 	executor, err := serializeExecutor(stage)
 	if err != nil {
@@ -284,7 +286,7 @@ func serializeStage(
 		secrets = append(secrets, serializeValueDefinition(valueDef))
 	}
 
-	return &pb.Stage{
+	pbStage := &pb.Stage{
 		Metadata: &pb.Stage_Metadata{
 			Id:          stage.ID.String(),
 			Name:        stage.Name,
@@ -301,7 +303,36 @@ func serializeStage(
 			InputMappings: inputMappings,
 			Secrets:       secrets,
 		},
-	}, nil
+	}
+
+	if statusInfo != nil {
+		status := &pb.Stage_Status{
+			Queue: &pb.Stage_Status_Queue{
+				Total: uint32(statusInfo.QueueTotal),
+				Items: []*pb.StageEvent{},
+			},
+		}
+
+		for _, event := range statusInfo.QueueItems {
+			pbEvent, err := serializeStageEventForExecution(event)
+			if err != nil {
+				return nil, err
+			}
+			status.Queue.Items = append(status.Queue.Items, pbEvent)
+		}
+
+		if statusInfo.LastExecution != nil {
+			lastExec, err := serializeExecution(*statusInfo.LastExecution)
+			if err != nil {
+				return nil, err
+			}
+			status.LastExecution = lastExec
+		}
+
+		pbStage.Status = status
+	}
+
+	return pbStage, nil
 }
 
 func serializeInputs(in []models.InputDefinition) []*pb.InputDefinition {
@@ -487,6 +518,15 @@ func serializeExecutor(stage models.Stage) (*pb.Executor, error) {
 }
 
 func serializeStages(stages []models.Stage) ([]*pb.Stage, error) {
+	if len(stages) == 0 {
+		return []*pb.Stage{}, nil
+	}
+
+	statusInfo, err := models.GetStagesStatusInfo(stages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stage status info: %w", err)
+	}
+
 	s := []*pb.Stage{}
 	for _, stage := range stages {
 		connections, err := models.ListConnections(stage.ID, models.ConnectionTargetTypeStage)
@@ -499,19 +539,25 @@ func serializeStages(stages []models.Stage) ([]*pb.Stage, error) {
 			return nil, err
 		}
 
-		stage, err := serializeStage(
+		var stageStatus *models.StageStatusInfo
+		if info, exists := statusInfo[stage.ID]; exists {
+			stageStatus = info
+		}
+
+		serializedStage, err := serializeStage(
 			stage,
 			serialized,
 			serializeInputs(stage.Inputs),
 			serializeOutputs(stage.Outputs),
 			serializeInputMappings(stage.InputMappings),
+			stageStatus,
 		)
 
 		if err != nil {
 			return nil, err
 		}
 
-		s = append(s, stage)
+		s = append(s, serializedStage)
 	}
 
 	return s, nil

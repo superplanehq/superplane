@@ -1,6 +1,6 @@
 import { useCanvasStore } from '../store/canvasStore';
 import { NodeType, createEmptyNode, CreateNodeParams } from './nodeFactories';
-import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from '../store/types';
+import { ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from '../store/types';
 
 /**
  * Hook that provides modular node handling functionality
@@ -21,10 +21,10 @@ export const useNodeHandlers = (canvasId: string) => {
       switch (nodeType) {
         case 'stage': {
           const stage = createEmptyNode('stage', params);
-          const stageWithEventQueue: StageWithEventQueue = {
+          const stageWithEventQueue: Stage = {
             ...stage,
             queue: [],
-            events: [],
+            executions: [],
             isDraft: true
           };
           addStage(stageWithEventQueue, true); // true = draft mode

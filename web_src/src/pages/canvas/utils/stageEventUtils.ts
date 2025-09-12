@@ -1,4 +1,4 @@
-import { ExecutionWithEvent } from '../store/types';
+import { SuperplaneExecution } from '@/api-client';
 
 export const formatRelativeTime = (dateString: string | undefined, abbreviated?: boolean) => {
   if (!dateString) return 'N/A'
@@ -128,21 +128,21 @@ interface Approval {
   approvedBy?: string;
 }
 
-export const getMinApprovedAt = (execution: ExecutionWithEvent) => {
-  if (!execution.event.approvals?.length)
+export const getMinApprovedAt = (execution: SuperplaneExecution) => {
+  if (!execution.stageEvent?.approvals?.length)
     return undefined;
 
-  return execution.event.approvals.reduce((min: string, approval: Approval) => {
+  return execution.stageEvent?.approvals.reduce((min: string, approval: Approval) => {
     if (approval.approvedAt && new Date(approval.approvedAt).getTime() < new Date(min).getTime()) {
       return approval.approvedAt;
     }
     return min;
-  }, execution.event.approvals[0].approvedAt!);
+  }, execution.stageEvent?.approvals[0].approvedAt!);
 };
 
-export const getApprovalsNames = (execution: ExecutionWithEvent, userDisplayNames: Record<string, string>) => {
+export const getApprovalsNames = (execution: SuperplaneExecution, userDisplayNames: Record<string, string>) => {
   const names: string[] = [];
-  execution.event.approvals?.forEach((approval: Approval) => {
+  execution.stageEvent?.approvals?.forEach((approval: Approval) => {
     if (approval.approvedBy) {
       names.push(userDisplayNames[approval.approvedBy]);
     }
@@ -150,14 +150,14 @@ export const getApprovalsNames = (execution: ExecutionWithEvent, userDisplayName
   return names.join(', ');
 };
 
-export const getCancelledByName = (execution: ExecutionWithEvent, userDisplayNames: Record<string, string>) => {
-  if (!execution.event.cancelledBy) {
+export const getDiscardedByName = (execution: SuperplaneExecution, userDisplayNames: Record<string, string>) => {
+  if (!execution.stageEvent?.discardedBy) {
     return undefined;
   }
-  return userDisplayNames[execution.event.cancelledBy] || execution.event.cancelledBy;
+  return userDisplayNames[execution.stageEvent?.discardedBy] || execution.stageEvent?.discardedBy;
 };
 
-export const mapExecutionOutputs = (execution: ExecutionWithEvent) => {
+export const mapExecutionOutputs = (execution: SuperplaneExecution) => {
   const map: Record<string, string> = {};
   execution.outputs?.forEach((output) => {
     if (!output.name) {
@@ -170,9 +170,9 @@ export const mapExecutionOutputs = (execution: ExecutionWithEvent) => {
   return map;
 };
 
-export const mapExecutionEventInputs = (execution: ExecutionWithEvent) => {
+export const mapExecutionEventInputs = (execution: SuperplaneExecution) => {
   const map: Record<string, string> = {};
-  execution.event.inputs?.forEach((input) => {
+  execution.stageEvent?.inputs?.forEach((input) => {
     if (!input.name) {
       return;
     }

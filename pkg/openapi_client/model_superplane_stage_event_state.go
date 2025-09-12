@@ -25,6 +25,7 @@ const (
 	SUPERPLANESTAGEEVENTSTATE_STATE_PENDING SuperplaneStageEventState = "STATE_PENDING"
 	SUPERPLANESTAGEEVENTSTATE_STATE_WAITING SuperplaneStageEventState = "STATE_WAITING"
 	SUPERPLANESTAGEEVENTSTATE_STATE_PROCESSED SuperplaneStageEventState = "STATE_PROCESSED"
+	SUPERPLANESTAGEEVENTSTATE_STATE_DISCARDED SuperplaneStageEventState = "STATE_DISCARDED"
 )
 
 // All allowed values of SuperplaneStageEventState enum
@@ -33,6 +34,7 @@ var AllowedSuperplaneStageEventStateEnumValues = []SuperplaneStageEventState{
 	"STATE_PENDING",
 	"STATE_WAITING",
 	"STATE_PROCESSED",
+	"STATE_DISCARDED",
 }
 
 func (v *SuperplaneStageEventState) UnmarshalJSON(src []byte) error {

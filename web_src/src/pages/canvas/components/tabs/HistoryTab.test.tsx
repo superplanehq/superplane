@@ -2,17 +2,17 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HistoryTab } from './HistoryTab';
-import { StageWithEventQueue } from '../../store/types';
+import { Stage } from '../../store/types';
 
 vi.mock('@/hooks/useCanvasData');
 
-const mockStage: StageWithEventQueue = {
+const mockStage: Stage = {
   metadata: {
     id: 'stage-1',
     name: 'Test Stage',
   },
   queue: [],
-  events: [],
+  executions: [],
 };
 
 const mockUseStageQueueEvents = {
@@ -31,10 +31,19 @@ const mockUseStageEvents = {
   refetch: vi.fn(),
 };
 
+const mockUseStageExecutions = {
+  data: { pages: [] },
+  fetchNextPage: vi.fn(),
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  refetch: vi.fn(),
+};
+
 vi.mock('@/hooks/useCanvasData', () => ({
   useOrganizationUsersForCanvas: vi.fn(() => ({ data: [] })),
   useStageQueueEvents: vi.fn(() => mockUseStageQueueEvents),
   useStageEvents: vi.fn(() => mockUseStageEvents),
+  useStageExecutions: vi.fn(() => mockUseStageExecutions),
 }));
 
 const renderWithQueryClient = (component: React.ReactElement) => {
@@ -56,9 +65,8 @@ describe('HistoryTab', () => {
         organizationId="org-1"
         canvasId="canvas-1"
         approveStageEvent={vi.fn()}
-        isFetchingNextConnectedEvents={false}
-        fetchNextConnectedEvents={vi.fn()}
-        cancelStageEvent={vi.fn()}
+        discardStageEvent={vi.fn()}
+        cancelStageExecution={vi.fn()}
       />
     );
 
@@ -73,9 +81,8 @@ describe('HistoryTab', () => {
         organizationId="org-1"
         canvasId="canvas-1"
         approveStageEvent={vi.fn()}
-        isFetchingNextConnectedEvents={false}
-        fetchNextConnectedEvents={vi.fn()}
-        cancelStageEvent={vi.fn()}
+        discardStageEvent={vi.fn()}
+        cancelStageExecution={vi.fn()}
       />
     );
 

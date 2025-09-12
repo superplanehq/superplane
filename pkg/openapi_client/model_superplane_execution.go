@@ -29,6 +29,8 @@ type SuperplaneExecution struct {
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	Outputs []SuperplaneOutputValue `json:"outputs,omitempty"`
 	Resources []SuperplaneExecutionResource `json:"resources,omitempty"`
+	EmittedEvent *SuperplaneEvent `json:"emittedEvent,omitempty"`
+	StageEvent *SuperplaneStageEvent `json:"stageEvent,omitempty"`
 }
 
 // NewSuperplaneExecution instantiates a new SuperplaneExecution object
@@ -312,6 +314,70 @@ func (o *SuperplaneExecution) SetResources(v []SuperplaneExecutionResource) {
 	o.Resources = v
 }
 
+// GetEmittedEvent returns the EmittedEvent field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetEmittedEvent() SuperplaneEvent {
+	if o == nil || IsNil(o.EmittedEvent) {
+		var ret SuperplaneEvent
+		return ret
+	}
+	return *o.EmittedEvent
+}
+
+// GetEmittedEventOk returns a tuple with the EmittedEvent field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetEmittedEventOk() (*SuperplaneEvent, bool) {
+	if o == nil || IsNil(o.EmittedEvent) {
+		return nil, false
+	}
+	return o.EmittedEvent, true
+}
+
+// HasEmittedEvent returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasEmittedEvent() bool {
+	if o != nil && !IsNil(o.EmittedEvent) {
+		return true
+	}
+
+	return false
+}
+
+// SetEmittedEvent gets a reference to the given SuperplaneEvent and assigns it to the EmittedEvent field.
+func (o *SuperplaneExecution) SetEmittedEvent(v SuperplaneEvent) {
+	o.EmittedEvent = &v
+}
+
+// GetStageEvent returns the StageEvent field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetStageEvent() SuperplaneStageEvent {
+	if o == nil || IsNil(o.StageEvent) {
+		var ret SuperplaneStageEvent
+		return ret
+	}
+	return *o.StageEvent
+}
+
+// GetStageEventOk returns a tuple with the StageEvent field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetStageEventOk() (*SuperplaneStageEvent, bool) {
+	if o == nil || IsNil(o.StageEvent) {
+		return nil, false
+	}
+	return o.StageEvent, true
+}
+
+// HasStageEvent returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasStageEvent() bool {
+	if o != nil && !IsNil(o.StageEvent) {
+		return true
+	}
+
+	return false
+}
+
+// SetStageEvent gets a reference to the given SuperplaneStageEvent and assigns it to the StageEvent field.
+func (o *SuperplaneExecution) SetStageEvent(v SuperplaneStageEvent) {
+	o.StageEvent = &v
+}
+
 func (o SuperplaneExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -345,6 +411,12 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Resources) {
 		toSerialize["resources"] = o.Resources
+	}
+	if !IsNil(o.EmittedEvent) {
+		toSerialize["emittedEvent"] = o.EmittedEvent
+	}
+	if !IsNil(o.StageEvent) {
+		toSerialize["stageEvent"] = o.StageEvent
 	}
 	return toSerialize, nil
 }

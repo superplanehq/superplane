@@ -25,7 +25,6 @@ const (
 	SUPERPLANEEXECUTIONSTATE_STATE_PENDING SuperplaneExecutionState = "STATE_PENDING"
 	SUPERPLANEEXECUTIONSTATE_STATE_STARTED SuperplaneExecutionState = "STATE_STARTED"
 	SUPERPLANEEXECUTIONSTATE_STATE_FINISHED SuperplaneExecutionState = "STATE_FINISHED"
-	SUPERPLANEEXECUTIONSTATE_STATE_CANCELLED SuperplaneExecutionState = "STATE_CANCELLED"
 )
 
 // All allowed values of SuperplaneExecutionState enum
@@ -34,7 +33,6 @@ var AllowedSuperplaneExecutionStateEnumValues = []SuperplaneExecutionState{
 	"STATE_PENDING",
 	"STATE_STARTED",
 	"STATE_FINISHED",
-	"STATE_CANCELLED",
 }
 
 func (v *SuperplaneExecutionState) UnmarshalJSON(src []byte) error {

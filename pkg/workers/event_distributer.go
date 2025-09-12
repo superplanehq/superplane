@@ -47,7 +47,7 @@ func (e *EventDistributer) Start() error {
 		{messages.DeliveryHubCanvasExchange, messages.EventCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.StageEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageEventCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.StageEventApprovedRoutingKey, e.createHandler(eventdistributer.HandleStageEventApproved)},
-		{messages.DeliveryHubCanvasExchange, messages.StageEventCancelledRoutingKey, e.createHandler(eventdistributer.HandleStageEventCancelled)},
+		{messages.DeliveryHubCanvasExchange, messages.StageEventDiscardedRoutingKey, e.createHandler(eventdistributer.HandleStageEventDiscarded)},
 		{messages.DeliveryHubCanvasExchange, messages.EventSourceCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventSourceCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.ExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleExecutionCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.ExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleExecutionStarted)},

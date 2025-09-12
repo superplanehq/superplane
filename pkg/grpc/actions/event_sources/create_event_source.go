@@ -90,7 +90,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, err
 	}
 
-	protoSource, err := serializeEventSource(*eventSource)
+	protoSource, err := serializeEventSource(*eventSource, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func validateEventTypes(spec *pb.EventSource_Spec) ([]models.EventType, error) {
 	return out, nil
 }
 
-func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, error) {
+func serializeEventSource(eventSource models.EventSource, statusInfo *models.EventSourceStatusInfo) (*pb.EventSource, error) {
 	spec := &pb.EventSource_Spec{
 		Events: []*pb.EventSource_EventType{},
 	}
@@ -176,7 +176,7 @@ func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, erro
 		}
 	}
 
-	return &pb.EventSource{
+	pbEventSource := &pb.EventSource{
 		Metadata: &pb.EventSource_Metadata{
 			Id:          eventSource.ID.String(),
 			Name:        eventSource.Name,
@@ -186,5 +186,26 @@ func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, erro
 			UpdatedAt:   timestamppb.New(*eventSource.UpdatedAt),
 		},
 		Spec: spec,
-	}, nil
+	}
+
+	if statusInfo != nil {
+		status := &pb.EventSource_Status{
+			History: &pb.EventSource_Status_History{
+				Received:    uint32(statusInfo.ReceivedCount),
+				RecentItems: []*pb.Event{},
+			},
+		}
+
+		for _, event := range statusInfo.RecentEvents {
+			pbEvent, err := actions.SerializeEvent(event)
+			if err != nil {
+				return nil, err
+			}
+			status.History.RecentItems = append(status.History.RecentItems, pbEvent)
+		}
+
+		pbEventSource.Status = status
+	}
+
+	return pbEventSource, nil
 }

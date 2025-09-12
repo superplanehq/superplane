@@ -42,12 +42,8 @@ export const FlowRenderer: React.FC = () => {
     const runningEdges = new Set<string>();
 
     stages.forEach(stage => {
-      const allExecutions = stage.queue?.flatMap(event => ({ ...event.execution, sourceId: event.sourceId }))
-        .filter(execution => execution)
-        .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [];
-
-      const executionsRunning = allExecutions.filter(execution => execution?.state === 'STATE_STARTED');
-      const sourceIdStageIdPairs = executionsRunning.map(execution => `${execution.sourceId}-${stage.metadata?.id}`);
+      const executionsRunning = stage.executions?.filter(execution => execution?.state === 'STATE_STARTED') || [];
+      const sourceIdStageIdPairs = executionsRunning.map(execution => `${execution.stageEvent?.triggerEvent?.sourceId}-${stage.metadata?.id}`);
       const isRunning = sourceIdStageIdPairs.length > 0;
 
       if (isRunning) {

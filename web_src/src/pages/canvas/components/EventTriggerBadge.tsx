@@ -18,7 +18,7 @@ export const EventTriggerBadge: React.FC<EventTriggerBadgeProps> = ({
 }) => {
   const { nodes } = useCanvasStore(state => state);
 
-  const eventSourceNode = useMemo(() => nodes.find(node => node.id === lastExecutionEvent?.sourceId), [nodes, lastExecutionEvent?.sourceId]);
+  const eventSourceNode = useMemo(() => nodes.find(node => node.id === lastExecutionEvent?.triggerEvent?.sourceId), [nodes, lastExecutionEvent?.triggerEvent?.sourceId]);
 
   if (!lastExecutionEvent?.id) return null;
 

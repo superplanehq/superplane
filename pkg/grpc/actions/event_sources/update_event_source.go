@@ -105,7 +105,7 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, err
 	}
 
-	serialized, err := serializeEventSource(*eventSource)
+	serialized, err := serializeEventSource(*eventSource, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package eventsources
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -24,7 +25,17 @@ func DescribeEventSource(ctx context.Context, canvasID string, idOrName string) 
 		return nil, err
 	}
 
-	protoSource, err := serializeEventSource(*source)
+	statusInfo, err := models.GetEventSourcesStatusInfo([]models.EventSource{*source})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get event source status info: %w", err)
+	}
+
+	var sourceStatus *models.EventSourceStatusInfo
+	if info, exists := statusInfo[source.ID]; exists {
+		sourceStatus = info
+	}
+
+	protoSource, err := serializeEventSource(*source, sourceStatus)
 	if err != nil {
 		return nil, err
 	}

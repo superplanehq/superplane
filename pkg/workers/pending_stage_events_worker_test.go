@@ -69,8 +69,8 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		event, err = models.FindStageEventByID(event.ID.String(), stage.ID.String())
 		require.NoError(t, err)
-		require.Equal(t, models.StageEventStateWaiting, event.State)
-		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
+		require.Equal(t, models.StageEventStateProcessed, event.State)
+
 		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
@@ -172,8 +172,8 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		event, err = models.FindStageEventByID(event.ID.String(), stage.ID.String())
 		require.NoError(t, err)
-		require.Equal(t, models.StageEventStateWaiting, event.State)
-		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
+		require.Equal(t, models.StageEventStateProcessed, event.State)
+
 		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
@@ -294,12 +294,12 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		//
-		// Verify that a new execution record was created and event moves to waiting(execution)
+		// Verify that a new execution record was created and event moves to processed
 		//
 		event, err = models.FindStageEventByID(event.ID.String(), stage.ID.String())
 		require.NoError(t, err)
-		require.Equal(t, models.StageEventStateWaiting, event.State)
-		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
+		require.Equal(t, models.StageEventStateProcessed, event.State)
+
 		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
@@ -343,8 +343,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		event, err = models.FindStageEventByID(event.ID.String(), stage.ID.String())
 		require.NoError(t, err)
-		require.Equal(t, models.StageEventStateWaiting, event.State)
-		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
+		require.Equal(t, models.StageEventStateProcessed, event.State)
 
 		//
 		// Add another pending event for this stage,

@@ -16,21 +16,18 @@ const (
 	StageEventStatePending   = "pending"
 	StageEventStateWaiting   = "waiting"
 	StageEventStateProcessed = "processed"
+	StageEventStateDiscarded = "discarded"
 
 	StageEventStateReasonApproval   = "approval"
 	StageEventStateReasonTimeWindow = "time-window"
-	StageEventStateReasonExecution  = "execution"
-	StageEventStateReasonConnection = "connection"
-	StageEventStateReasonCancelled  = "cancelled"
-	StageEventStateReasonUnhealthy  = "unhealthy"
 	StageEventStateReasonStuck      = "stuck"
 	StageEventStateReasonTimeout    = "timeout"
 )
 
 var (
 	ErrEventAlreadyApprovedByRequester = fmt.Errorf("event already approved by requester")
-	ErrEventAlreadyCancelled           = fmt.Errorf("event already cancelled")
-	ErrEventCannotBeCancelled          = fmt.Errorf("event cannot be cancelled")
+	ErrEventAlreadyDiscarded           = fmt.Errorf("event already discarded")
+	ErrEventCannotBeDiscarded          = fmt.Errorf("event cannot be discarded")
 )
 
 type StageEvent struct {
@@ -44,9 +41,11 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
-	CancelledBy *uuid.UUID
-	CancelledAt *time.Time
+	DiscardedBy *uuid.UUID
+	DiscardedAt *time.Time
 	Inputs      datatypes.JSONType[map[string]any]
+
+	Event *Event `gorm:"foreignKey:EventID;references:ID"`
 }
 
 func (e *StageEvent) UpdateState(state, reason string) error {
@@ -90,49 +89,24 @@ func (e *StageEvent) Approve(requesterID uuid.UUID) error {
 	return nil
 }
 
-func (e *StageEvent) Cancel(requesterID uuid.UUID) error {
-	if e.StateReason == StageEventStateReasonCancelled {
-		return ErrEventAlreadyCancelled
+func (e *StageEvent) Discard(requesterID uuid.UUID) error {
+	if e.State == StageEventStateDiscarded {
+		return ErrEventAlreadyDiscarded
 	}
 
 	if e.State == StageEventStateProcessed {
-		return ErrEventCannotBeCancelled
+		return ErrEventCannotBeDiscarded
 	}
 
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		execution, err := FindExecutionByStageEventID(e.ID)
-		if err != nil && !strings.Contains(err.Error(), "record not found") {
-			return err
-		}
-
-		if execution != nil && execution.State != ExecutionFinished && execution.State != ExecutionCancelled {
-			execution.State = ExecutionCancelled
-			err = tx.Save(execution).Error
-			if err != nil {
-				return err
-			}
-		}
-
-		err = e.UpdateStateInTransaction(tx, StageEventStateProcessed, StageEventStateReasonCancelled)
-		if err != nil {
-			return err
-		}
-
-		now := time.Now()
-		err = tx.Model(e).
-			Clauses(clause.Returning{}).
-			Update("cancelled_by", requesterID).
-			Update("cancelled_at", now).
-			Error
-		if err != nil {
-			return err
-		}
-
-		e.CancelledBy = &requesterID
-		e.CancelledAt = &now
-
-		return nil
-	})
+	now := time.Now()
+	return database.Conn().
+		Model(e).
+		Clauses(clause.Returning{}).
+		Update("state", StageEventStateDiscarded).
+		Update("state_reason", "").
+		Update("discarded_by", requesterID).
+		Update("discarded_at", &now).
+		Error
 }
 
 func (e *StageEvent) FindApprovals() ([]StageEventApproval, error) {
@@ -252,57 +226,4 @@ func FindStageEventsWaitingForTimeWindow() ([]StageEventWithConditions, error) {
 	}
 
 	return events, nil
-}
-
-func BulkListStageEventsByCanvasIDAndMultipleStages(canvasID uuid.UUID, stageIDs []uuid.UUID, limitPerStage int, before *time.Time, states []string, stateReasons []string) (map[string][]StageEvent, error) {
-	if len(stageIDs) == 0 {
-		return map[string][]StageEvent{}, nil
-	}
-
-	var events []StageEvent
-
-	if len(states) == 0 {
-		states = []string{
-			StageEventStatePending,
-			StageEventStateWaiting,
-			StageEventStateProcessed,
-		}
-	}
-
-	query := database.Conn().
-		Where("stage_id IN ?", stageIDs).
-		Where("state IN ?", states)
-
-	if len(stateReasons) > 0 {
-		query = query.Where("state_reason IN ?", stateReasons)
-	}
-
-	if before != nil {
-		query = query.Where("created_at < ?", before)
-	}
-
-	query = query.Order("stage_id, created_at DESC")
-
-	err := query.Find(&events).Error
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[string][]StageEvent)
-	stageCounters := make(map[string]int)
-
-	for _, event := range events {
-		stageKey := event.StageID.String()
-
-		if limitPerStage > 0 {
-			if stageCounters[stageKey] >= limitPerStage {
-				continue
-			}
-			stageCounters[stageKey]++
-		}
-
-		result[stageKey] = append(result[stageKey], event)
-	}
-
-	return result, nil
 }

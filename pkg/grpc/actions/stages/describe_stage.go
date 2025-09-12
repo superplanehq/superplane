@@ -36,12 +36,23 @@ func DescribeStage(ctx context.Context, canvasID string, idOrName string) (*pb.D
 		return nil, err
 	}
 
+	statusInfo, err := models.GetStagesStatusInfo([]models.Stage{*stage})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stage status info: %w", err)
+	}
+
+	var stageStatus *models.StageStatusInfo
+	if info, exists := statusInfo[stage.ID]; exists {
+		stageStatus = info
+	}
+
 	serialized, err := serializeStage(
 		*stage,
 		conn,
 		serializeInputs(stage.Inputs),
 		serializeOutputs(stage.Outputs),
 		serializeInputMappings(stage.InputMappings),
+		stageStatus,
 	)
 
 	if err != nil {

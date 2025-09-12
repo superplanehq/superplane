@@ -1,15 +1,15 @@
 import { SuperplaneValueDefinition } from "@/api-client";
-import { StageWithEventQueue } from "../../store/types";
+import { Stage } from "../../store/types";
 import { useState } from "react";
 
 interface SettingsTabProps {
-  selectedStage: StageWithEventQueue;
+  selectedStage: Stage;
 }
 
 export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
   const [viewMode, setViewMode] = useState<'form' | 'yaml'>('form');
 
-  const convertToYaml = (obj: StageWithEventQueue): string => {
+  const convertToYaml = (obj: Stage): string => {
     const yamlify = (value: string | number | boolean | object | null | undefined, indent: number = 0): string => {
       const spaces = '  '.repeat(indent);
 
