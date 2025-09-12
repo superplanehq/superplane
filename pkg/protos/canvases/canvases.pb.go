@@ -4236,7 +4236,7 @@ type Execution struct {
 	FinishedAt    *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
 	Outputs       []*OutputValue         `protobuf:"bytes,7,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	Resources     []*ExecutionResource   `protobuf:"bytes,8,rep,name=resources,proto3" json:"resources,omitempty"`
-	EmmitedEvent  *Event                 `protobuf:"bytes,9,opt,name=emmited_event,json=emmitedEvent,proto3" json:"emmited_event,omitempty"`
+	EmittedEvent  *Event                 `protobuf:"bytes,9,opt,name=emitted_event,json=emittedEvent,proto3" json:"emitted_event,omitempty"`
 	StageEvent    *StageEvent            `protobuf:"bytes,10,opt,name=stage_event,json=stageEvent,proto3" json:"stage_event,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -4328,9 +4328,9 @@ func (x *Execution) GetResources() []*ExecutionResource {
 	return nil
 }
 
-func (x *Execution) GetEmmitedEvent() *Event {
+func (x *Execution) GetEmittedEvent() *Event {
 	if x != nil {
-		return x.EmmitedEvent
+		return x.EmittedEvent
 	}
 	return nil
 }
@@ -7769,7 +7769,7 @@ const file_canvases_proto_rawDesc = "" +
 	"finishedAt\x121\n" +
 	"\aoutputs\x18\a \x03(\v2\x17.Superplane.OutputValueR\aoutputs\x12;\n" +
 	"\tresources\x18\b \x03(\v2\x1d.Superplane.ExecutionResourceR\tresources\x126\n" +
-	"\remmited_event\x18\t \x01(\v2\x11.Superplane.EventR\femmitedEvent\x127\n" +
+	"\remitted_event\x18\t \x01(\v2\x11.Superplane.EventR\femittedEvent\x127\n" +
 	"\vstage_event\x18\n" +
 	" \x01(\v2\x16.Superplane.StageEventR\n" +
 	"stageEvent\"T\n" +
@@ -8250,7 +8250,7 @@ var file_canvases_proto_depIdxs = []int32{
 	133, // 82: Superplane.Execution.finished_at:type_name -> google.protobuf.Timestamp
 	75,  // 83: Superplane.Execution.outputs:type_name -> Superplane.OutputValue
 	79,  // 84: Superplane.Execution.resources:type_name -> Superplane.ExecutionResource
-	99,  // 85: Superplane.Execution.emmited_event:type_name -> Superplane.Event
+	99,  // 85: Superplane.Execution.emitted_event:type_name -> Superplane.Event
 	73,  // 86: Superplane.Execution.stage_event:type_name -> Superplane.StageEvent
 	133, // 87: Superplane.StageEventApproval.approved_at:type_name -> google.protobuf.Timestamp
 	73,  // 88: Superplane.ApproveStageEventResponse.event:type_name -> Superplane.StageEvent

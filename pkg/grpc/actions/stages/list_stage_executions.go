@@ -260,7 +260,7 @@ func serializeExecution(execution models.StageExecution) (*pb.Execution, error) 
 		if err != nil {
 			return nil, err
 		}
-		e.EmmitedEvent = serializedEvent
+		e.EmittedEvent = serializedEvent
 	}
 
 	if execution.StageEvent != nil {

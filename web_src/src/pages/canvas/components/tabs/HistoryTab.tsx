@@ -1,5 +1,5 @@
 import { Stage } from "../../store/types";
-import { SuperplaneStageEvent, SuperplaneEvent, SuperplaneExecution } from "@/api-client";
+import { SuperplaneStageEvent, SuperplaneExecution } from "@/api-client";
 import MessageItem from '../MessageItem';
 import { RunItem } from './RunItem';
 import { useCallback, useMemo, useState, useEffect } from 'react';
@@ -27,9 +27,9 @@ interface HistoryTabProps {
 export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, discardStageEvent, cancelStageExecution }: HistoryTabProps) => {
   // Create a unified timeline by merging executions, stage events, and discarded events
   type TimelineItem = {
-    type: 'execution' | 'stage_event' | 'discarded_event';
+    type: 'execution' | 'stage_event';
     timestamp: string;
-    data: SuperplaneExecution | SuperplaneStageEvent | SuperplaneEvent;
+    data: SuperplaneExecution | SuperplaneStageEvent;
   };
 
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
@@ -45,10 +45,6 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
     isFetchingNextPage: isFetchingNextQueuePage,
     refetch: refetchQueueEvents
   } = useStageQueueEvents(canvasId, selectedStage.metadata!.id!, ['STATE_PENDING', 'STATE_WAITING', 'STATE_DISCARDED']);
-
-
-
-
 
   // Fetch executions directly from the API
   const {
@@ -221,8 +217,8 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
             {filteredTimeline.map((item) => {
               if (item.type === 'execution') {
                 const execution = item.data as SuperplaneExecution;
-                const sourceEvent = (execution.stageEvent as any)?.raw;
-                const emmitedEvent = execution.emmitedEvent;
+                const sourceEvent = (execution.stageEvent as any)?.triggerEvent;
+                const emittedEvent = execution.emittedEvent;
 
                 return (
                   <RunItem
@@ -242,7 +238,7 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     discardedBy={getDiscardedByName(execution, userDisplayNames)}
                     eventId={sourceEvent?.id}
                     sourceEvent={sourceEvent}
-                    emmitedEvent={emmitedEvent}
+                    emittedEvent={emittedEvent}
                     onCancel={() => cancelStageExecution(execution.id!, selectedStage.metadata!.id!)}
                   />
                 );

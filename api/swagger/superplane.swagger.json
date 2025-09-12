@@ -4032,7 +4032,7 @@
             "$ref": "#/definitions/SuperplaneExecutionResource"
           }
         },
-        "emmitedEvent": {
+        "emittedEvent": {
           "$ref": "#/definitions/SuperplaneEvent"
         },
         "stageEvent": {

@@ -43,7 +43,7 @@ export const ExecutionTimeline = ({
       {
         executions.map((execution) => {
           const sourceEvent = execution.stageEvent?.triggerEvent;
-          const emmitedEvent = execution.emmitedEvent;
+          const emittedEvent = execution.emittedEvent;
 
           return (
             <RunItem
@@ -63,7 +63,7 @@ export const ExecutionTimeline = ({
               discardedBy={getDiscardedByName(execution, userDisplayNames)}
               eventId={sourceEvent?.id}
               sourceEvent={sourceEvent}
-              emmitedEvent={emmitedEvent}
+              emittedEvent={emittedEvent}
               onCancel={() => onCancel(execution.id!)}
             />
           );

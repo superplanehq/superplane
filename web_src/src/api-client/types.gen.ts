@@ -603,7 +603,7 @@ export type SuperplaneExecution = {
     finishedAt?: string;
     outputs?: Array<SuperplaneOutputValue>;
     resources?: Array<SuperplaneExecutionResource>;
-    emmitedEvent?: SuperplaneEvent;
+    emittedEvent?: SuperplaneEvent;
     stageEvent?: SuperplaneStageEvent;
 };
 

@@ -19,7 +19,7 @@ interface RunItemProps {
   discardedOn?: string;
   discardedBy?: string;
   sourceEvent?: SuperplaneEvent;
-  emmitedEvent?: SuperplaneEvent;
+  emittedEvent?: SuperplaneEvent;
   onCancel: () => void;
 }
 
@@ -39,7 +39,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   discardedOn,
   discardedBy,
   sourceEvent,
-  emmitedEvent,
+  emittedEvent,
   onCancel,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
@@ -50,8 +50,8 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
 
   const sourceEventPayload = useMemo(() => sourceEvent?.raw, [sourceEvent]);
   const sourceEventHeaders = useMemo(() => sourceEvent?.headers, [sourceEvent]);
-  const emmitedEventPayload = useMemo(() => emmitedEvent?.raw, [emmitedEvent]);
-  const emmitedEventHeaders = useMemo(() => emmitedEvent?.headers, [emmitedEvent]);
+  const emittedEventPayload = useMemo(() => emittedEvent?.raw, [emittedEvent]);
+  const emittedEventHeaders = useMemo(() => emittedEvent?.headers, [emittedEvent]);
 
   const renderStatusBadge = (): JSX.Element => {
     switch (state) {
@@ -278,7 +278,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             )}
 
             {/* Run Details Section */}
-            {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0 || (emmitedEvent && (emmitedEventPayload || emmitedEventHeaders))) && (
+            {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0 || (emittedEvent && (emittedEventPayload || emittedEventHeaders))) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   {(state === 'STATE_FINISHED' && result === 'RESULT_CANCELLED') ? 'Event' : 'Run'}
@@ -286,12 +286,12 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                 <div>
                   <PayloadDisplay
                     showDetailsTab={false}
-                    eventId={emmitedEvent?.id}
-                    timestamp={emmitedEvent?.receivedAt}
-                    eventType={emmitedEvent?.type}
-                    sourceName={emmitedEvent?.sourceName}
-                    headers={emmitedEventHeaders}
-                    payload={emmitedEventPayload}
+                    eventId={emittedEvent?.id}
+                    timestamp={emittedEvent?.receivedAt}
+                    eventType={emittedEvent?.type}
+                    sourceName={emittedEvent?.sourceName}
+                    headers={emittedEventHeaders}
+                    payload={emittedEventPayload}
                     inputs={inputs}
                     outputs={outputs}
                     rounded={false}
