@@ -1237,7 +1237,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     onChange={() => handleValueModeChange('lastExecution', actualMappingIndex, input)}
                                                     className="w-4 h-4"
                                                   />
-                                                  From Last Execution
+                                                  Inherit value from last execution
                                                 </label>
                                               </div>
                                             </div>
