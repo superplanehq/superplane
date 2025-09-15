@@ -6,13 +6,14 @@ interface AccordionItemProps {
   children: React.ReactNode;
   isOpen: boolean;
   onToggle: (id: string) => void;
+  className?: string;
 }
 
-export const AccordionItem = memo(function AccordionItem({ id, title, children, isOpen, onToggle }: AccordionItemProps) {
+export const AccordionItem = memo(function AccordionItem({ id, title, children, isOpen, onToggle, className }: AccordionItemProps) {
   return (
-    <div className="border-b border-zinc-200 dark:border-zinc-700">
+    <div className="border-b border-zinc-200 dark:border-zinc-700 last:border-b-0">
       <button
-        className="w-full px-4 py-3 text-left flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+        className={`w-full px-4 py-3 text-left flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${className || ''}`}
         onClick={() => onToggle(id)}
       >
         <div className={`${isOpen ? 'font-bold' : 'font-normal'} text-zinc-900 dark:text-zinc-100 w-full`}>{title}</div>
