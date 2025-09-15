@@ -1,7 +1,7 @@
 package messages
 
 import (
-	"github.com/superplanehq/superplane/pkg/grpc/actions/events"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -19,7 +19,7 @@ func NewEventCreatedMessage(canvasId string, event *models.Event) EventCreatedMe
 			CanvasId:   canvasId,
 			SourceId:   event.SourceID.String(),
 			EventId:    event.ID.String(),
-			SourceType: events.StringToEventSourceType(event.SourceType),
+			SourceType: actions.EventSourceTypeToProto(event.SourceType),
 			Timestamp:  timestamppb.Now(),
 		},
 	}

@@ -96,7 +96,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		err = w.Tick()
 		require.NoError(t, err)
 		require.Eventually(t, func() bool {
-			e, err := models.FindExecutionByID(execution.ID)
+			e, err := models.FindExecutionByID(execution.ID, stage.ID)
 			if err != nil {
 				return false
 			}
@@ -180,7 +180,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		err = w.Tick()
 		require.NoError(t, err)
 		require.Eventually(t, func() bool {
-			e, err := models.FindExecutionByID(execution.ID)
+			e, err := models.FindExecutionByID(execution.ID, stageWithOutput.ID)
 			if err != nil {
 				return false
 			}
@@ -218,7 +218,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		err = w.Tick()
 		require.NoError(t, err)
 		require.Eventually(t, func() bool {
-			e, err := models.FindExecutionByID(execution.ID)
+			e, err := models.FindExecutionByID(execution.ID, stage.ID)
 			if err != nil {
 				return false
 			}

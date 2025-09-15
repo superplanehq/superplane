@@ -24,6 +24,7 @@ const (
 	EXECUTIONRESULT_RESULT_UNKNOWN ExecutionResult = "RESULT_UNKNOWN"
 	EXECUTIONRESULT_RESULT_PASSED ExecutionResult = "RESULT_PASSED"
 	EXECUTIONRESULT_RESULT_FAILED ExecutionResult = "RESULT_FAILED"
+	EXECUTIONRESULT_RESULT_CANCELLED ExecutionResult = "RESULT_CANCELLED"
 )
 
 // All allowed values of ExecutionResult enum
@@ -31,6 +32,7 @@ var AllowedExecutionResultEnumValues = []ExecutionResult{
 	"RESULT_UNKNOWN",
 	"RESULT_PASSED",
 	"RESULT_FAILED",
+	"RESULT_CANCELLED",
 }
 
 func (v *ExecutionResult) UnmarshalJSON(src []byte) error {

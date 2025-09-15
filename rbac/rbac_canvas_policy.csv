@@ -4,6 +4,7 @@ p,role:canvas_viewer,canvas:{CANVAS_ID},eventsource,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},stage,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},stageevent,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},event,read
+p,role:canvas_viewer,canvas:{CANVAS_ID},stageexecution,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},connectiongroup,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},connectiongroupfieldset,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},secret,read
@@ -23,6 +24,9 @@ p,role:canvas_admin,canvas:{CANVAS_ID},integration,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,create
 p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,update
 p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,delete
+p,role:canvas_admin,canvas:{CANVAS_ID},stageexecution,create
+p,role:canvas_admin,canvas:{CANVAS_ID},stageexecution,update
+p,role:canvas_admin,canvas:{CANVAS_ID},stageexecution,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},connectiongroup,create
 p,role:canvas_admin,canvas:{CANVAS_ID},connectiongroup,update
 p,role:canvas_admin,canvas:{CANVAS_ID},connectiongroup,delete
@@ -30,7 +34,7 @@ p,role:canvas_admin,canvas:{CANVAS_ID},stage,create
 p,role:canvas_admin,canvas:{CANVAS_ID},stage,update
 p,role:canvas_admin,canvas:{CANVAS_ID},stage,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},stageevent,approve
-p,role:canvas_admin,canvas:{CANVAS_ID},stageevent,cancel
+p,role:canvas_admin,canvas:{CANVAS_ID},stageevent,discard
 p,role:canvas_admin,canvas:{CANVAS_ID},secret,create
 p,role:canvas_admin,canvas:{CANVAS_ID},secret,update
 p,role:canvas_admin,canvas:{CANVAS_ID},secret,delete

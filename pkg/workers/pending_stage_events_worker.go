@@ -81,14 +81,12 @@ func (w *PendingStageEventsWorker) ProcessEvent(stage *models.Stage, event *mode
 
 	//
 	// Check if another execution is already in progress.
-	// TODO: this could probably be built into the query that we do above.
 	//
 	_, err := models.FindExecutionInState(event.StageID, []string{
 		models.ExecutionPending,
 		models.ExecutionStarted,
 	})
 
-	// TODO: move to waiting state too?
 	if err == nil {
 		logger.Infof("Another execution is already in progress - skipping %s", event.ID)
 		return nil
@@ -121,7 +119,7 @@ func (w *PendingStageEventsWorker) ProcessEvent(stage *models.Stage, event *mode
 
 		logger.Infof("Created stage execution %s", execution.ID)
 
-		if err := event.UpdateStateInTransaction(tx, models.StageEventStateWaiting, models.StageEventStateReasonExecution); err != nil {
+		if err := event.UpdateStateInTransaction(tx, models.StageEventStateProcessed, ""); err != nil {
 			return fmt.Errorf("error updating event state: %v", err)
 		}
 

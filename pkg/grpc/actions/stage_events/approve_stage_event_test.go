@@ -59,8 +59,6 @@ func Test__ApproveStageEvent(t *testing.T) {
 		require.NotNil(t, res)
 		require.NotNil(t, res.Event)
 		assert.Equal(t, event.ID.String(), res.Event.Id)
-		assert.Equal(t, r.Source.ID.String(), res.Event.SourceId)
-		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, res.Event.SourceType)
 		assert.Equal(t, protos.StageEvent_STATE_PENDING, res.Event.State)
 		assert.NotNil(t, res.Event.CreatedAt)
 		require.Len(t, res.Event.Approvals, 1)
