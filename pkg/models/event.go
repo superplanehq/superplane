@@ -305,9 +305,15 @@ func FilterEvents(canvasID uuid.UUID, sourceType string, sourceID string, limit 
 	var events []Event
 
 	query := database.Conn().
-		Where("canvas_id = ?", canvasID).
-		Where("source_type = ?", sourceType).
-		Where("source_id = ?", sourceID)
+		Where("canvas_id = ?", canvasID)
+
+	if sourceType != "" {
+		query = query.Where("source_type = ?", sourceType)
+	}
+
+	if sourceID != "" {
+		query = query.Where("source_id = ?", sourceID)
+	}
 
 	if before != nil {
 		query = query.Where("received_at < ?", before)

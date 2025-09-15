@@ -9,6 +9,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -19,12 +21,22 @@ const (
 	DefaultLimit = 50
 )
 
-func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
+func ListEvents(ctx context.Context, canvasID string, protoSourceType pb.EventSourceType, sourceID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
+	sourceType := actions.ProtoToEventSourceType(protoSourceType)
+	if sourceType == "" {
+		return nil, status.Error(codes.InvalidArgument, "invalid source type")
+	}
+
+	id, err := uuid.Parse(sourceID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid source ID")
+	}
+
 	limit = getLimit(limit)
 	result := listAndCountEventsInParallel(
 		uuid.MustParse(canvasID),
-		actions.ProtoToEventSourceType(sourceType),
-		sourceID,
+		sourceType,
+		id,
 		int(limit),
 		getBefore(before),
 	)
@@ -72,7 +84,7 @@ func (r *listAndCountEventsResult) lastTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
-func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType, sourceID string, limit int, beforeTime *time.Time) *listAndCountEventsResult {
+func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType string, sourceID uuid.UUID, limit int, beforeTime *time.Time) *listAndCountEventsResult {
 	result := &listAndCountEventsResult{}
 	var wg sync.WaitGroup
 
@@ -80,12 +92,12 @@ func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType, sourceID strin
 
 	go func() {
 		defer wg.Done()
-		result.events, result.listErr = models.FilterEvents(canvasID, sourceType, sourceID, limit, beforeTime)
+		result.events, result.listErr = models.FilterEvents(canvasID, sourceType, sourceID.String(), limit, beforeTime)
 	}()
 
 	go func() {
 		defer wg.Done()
-		result.totalCount, result.countErr = models.CountEvents(canvasID, sourceType, sourceID)
+		result.totalCount, result.countErr = models.CountEvents(canvasID, sourceType, sourceID.String())
 	}()
 
 	wg.Wait()

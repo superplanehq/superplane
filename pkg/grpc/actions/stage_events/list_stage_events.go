@@ -103,7 +103,7 @@ func listAndCountEventsInParallel(stage *models.Stage, states, stateReasons []st
 
 	go func() {
 		defer wg.Done()
-		result.events, result.listErr = stage.ListEventsWithLimitAndBefore(states, stateReasons, int(limit), beforeTime)
+		result.events, result.listErr = stage.FilterEvents(states, stateReasons, int(limit), beforeTime)
 	}()
 
 	go func() {

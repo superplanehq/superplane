@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -74,7 +75,22 @@ func Test__ListStageEvents(t *testing.T) {
 		execution, err = models.FindExecutionByID(execution.ID, execution.StageID)
 		require.NoError(t, err)
 
-		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), states, []protos.StageEvent_StateReason{}, 0, nil)
+		// List processed events (event with execution)
+		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []pb.StageEvent_State{pb.StageEvent_STATE_PROCESSED}, []protos.StageEvent_StateReason{}, 0, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Events, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+		assert.Equal(t, eventWithExecution.ID.String(), res.Events[0].Id)
+		assert.NotEmpty(t, res.Events[0].CreatedAt)
+		assert.Equal(t, pb.StageEvent_STATE_PROCESSED, res.Events[0].State)
+		assert.Empty(t, res.Events[0].Approvals)
+		assert.NotEmpty(t, res.Events[0].Inputs)
+
+		// List pending events (waiting and not waiting for approval)
+		res, err = ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []pb.StageEvent_State{pb.StageEvent_STATE_PENDING, pb.StageEvent_STATE_WAITING}, []protos.StageEvent_StateReason{}, 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Events, 2)
