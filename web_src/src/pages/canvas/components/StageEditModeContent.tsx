@@ -16,7 +16,7 @@ import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
-import CloseAndCheckButtons from './shared/CloseAndCheckButtons';
+import { showErrorToast } from '@/utils/toast';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -166,9 +166,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         ...prev,
         [parsedError.field]: parsedError.message
       }));
-
       onTriggerSectionValidation?.current?.(true);
     }
+    showErrorToast(errorMessage);
   }, [parseApiErrorMessage, onTriggerSectionValidation]);
 
   // Expose handleApiError to global scope for stage.tsx to call
@@ -260,11 +260,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     const nameErrors = validateName(secret.name, secrets, index);
     errors.push(...nameErrors);
 
-    if (!secret.valueFrom && (!secret.value || secret.value.trim() === '')) {
-      errors.push('Secret value is required');
-    }
-
-    if (secret.valueFrom && secret.valueFrom.secret) {
+    if (!secret.valueFrom || !secret.valueFrom.secret) {
+      errors.push('Secret must reference an existing secret');
+    } else {
       if (!secret.valueFrom.secret.name || secret.valueFrom.secret.name.trim() === '') {
         errors.push('Secret reference name is required');
       }
@@ -593,7 +591,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const secretsEditor = useArrayEditor({
     items: secrets,
     setItems: setSecrets,
-    createNewItem: () => ({ name: '', value: '' }),
+    createNewItem: () => ({ name: '', valueFrom: { secret: { name: '', key: '' } } }),
     validateItem: validateSecret,
     setValidationErrors,
     errorPrefix: 'secret'
@@ -739,11 +737,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   };
 
   // Helper functions for executor
-
-  const updateSecretMode = (index: number, useValueFrom: boolean) => {
-    secretsEditor.updateItem(index, 'value', useValueFrom ? undefined : '');
-    secretsEditor.updateItem(index, 'valueFrom', useValueFrom ? { secret: { name: '', key: '' } } : undefined);
-  };
 
   const updateConditionType = (index: number, type: SuperplaneConditionType) => {
     const newCondition: SuperplaneCondition = { type };
@@ -1647,7 +1640,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             type="text"
                             value={secret.name || ''}
                             onChange={(e) => secretsEditor.updateItem(index, 'name', e.target.value)}
-                            placeholder="Secret name"
+                            placeholder="eg. MY_SECRET"
                             className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
                               ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                               : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
@@ -1655,139 +1648,109 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                           />
                         </ValidationField>
 
-                        <ValidationField label="Value Source">
-                          <div className="mb-2">
-                            <ControlledTabs className="text-left m-0 max-w-[221px]"
-                              tabs={[
-                                {
-                                  id: 'direct',
-                                  label: 'Direct Value',
-                                },
-                                {
-                                  id: 'secret',
-                                  label: 'From Secret',
-                                },
-                              ]}
-                              variant="pills"
-                              activeTab={!secret.valueFrom ? 'direct' : 'secret'}
-                              onTabChange={(tabId) => updateSecretMode(index, tabId === 'secret')}
-                            />
-                          </div>
-
-                          {!secret.valueFrom ? (
-                            <input
-                              type="password"
-                              value={secret.value || ''}
-                              onChange={(e) => secretsEditor.updateItem(index, 'value', e.target.value)}
-                              placeholder="Secret value"
+                        <div className="space-y-2">
+                          <ValidationField label="Reference Secret">
+                            <select
+                              value={secret.valueFrom?.secret?.name || ''}
+                              onChange={(e) => {
+                                const selectedSecretName = e.target.value;
+                                secretsEditor.updateItem(index, 'valueFrom', {
+                                  ...secret.valueFrom,
+                                  secret: {
+                                    ...secret.valueFrom?.secret,
+                                    name: selectedSecretName,
+                                    key: ''
+                                  }
+                                });
+                              }}
                               className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
                                 ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                                 : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
                                 }`}
-                            />
-                          ) : (
-                            <div className="space-y-2">
-                              <ValidationField label="Secret Name">
-                                <select
-                                  value={secret.valueFrom?.secret?.name || ''}
-                                  onChange={(e) => {
-                                    const selectedSecretName = e.target.value;
-                                    secretsEditor.updateItem(index, 'valueFrom', {
-                                      ...secret.valueFrom,
-                                      secret: {
-                                        ...secret.valueFrom?.secret,
-                                        name: selectedSecretName,
-                                        key: ''
-                                      }
-                                    });
-                                  }}
-                                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  disabled={loadingCanvasSecrets || loadingOrganizationSecrets}
-                                >
-                                  <option value="">
-                                    {loadingCanvasSecrets || loadingOrganizationSecrets
-                                      ? 'Loading secrets...'
-                                      : 'Select a secret...'}
+                              disabled={loadingCanvasSecrets || loadingOrganizationSecrets}
+                            >
+                              <option value="">
+                                {loadingCanvasSecrets || loadingOrganizationSecrets
+                                  ? 'Loading secrets...'
+                                  : 'Select a secret...'}
+                              </option>
+                              {(() => {
+                                if (loadingCanvasSecrets || loadingOrganizationSecrets) {
+                                  return null;
+                                }
+
+                                const allSecrets = getAllSecrets();
+                                if (allSecrets.length === 0) {
+                                  return (
+                                    <option value="" disabled>
+                                      No secrets available
+                                    </option>
+                                  );
+                                }
+
+                                const canvasSecretsFiltered = allSecrets.filter(s => s.source === 'Canvas');
+                                const orgSecretsFiltered = allSecrets.filter(s => s.source === 'Organization');
+
+                                return (
+                                  <>
+                                    {canvasSecretsFiltered.length > 0 && (
+                                      <optgroup label="Canvas Secrets">
+                                        {canvasSecretsFiltered.map(secretItem => (
+                                          <option key={`canvas-${secretItem.name}`} value={secretItem.name}>
+                                            {secretItem.name}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                    {orgSecretsFiltered.length > 0 && (
+                                      <optgroup label="Organization Secrets">
+                                        {orgSecretsFiltered.map(secretItem => (
+                                          <option key={`org-${secretItem.name}`} value={secretItem.name}>
+                                            {secretItem.name}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </select>
+                          </ValidationField>
+                          <ValidationField label="Key">
+                            <select
+                              value={secret.valueFrom?.secret?.key || ''}
+                              onChange={(e) => secretsEditor.updateItem(index, 'valueFrom', {
+                                ...secret.valueFrom,
+                                secret: { ...secret.valueFrom?.secret, key: e.target.value }
+                              })}
+                              className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              disabled={!secret.valueFrom?.secret?.name || loadingCanvasSecrets || loadingOrganizationSecrets}
+                            >
+                              <option value="">
+                                {!secret.valueFrom?.secret?.name
+                                  ? 'Select a secret first...'
+                                  : 'Select a key...'}
+                              </option>
+                              {secret.valueFrom?.secret?.name && (() => {
+                                const availableKeys = getSecretKeys(secret.valueFrom.secret.name);
+
+                                if (availableKeys.length === 0) {
+                                  return (
+                                    <option value="" disabled>
+                                      No keys available in this secret
+                                    </option>
+                                  );
+                                }
+
+                                return availableKeys.map(key => (
+                                  <option key={key} value={key}>
+                                    {key}
                                   </option>
-                                  {(() => {
-                                    if (loadingCanvasSecrets || loadingOrganizationSecrets) {
-                                      return null;
-                                    }
-
-                                    const allSecrets = getAllSecrets();
-                                    if (allSecrets.length === 0) {
-                                      return (
-                                        <option value="" disabled>
-                                          No secrets available
-                                        </option>
-                                      );
-                                    }
-
-                                    const canvasSecretsFiltered = allSecrets.filter(s => s.source === 'Canvas');
-                                    const orgSecretsFiltered = allSecrets.filter(s => s.source === 'Organization');
-
-                                    return (
-                                      <>
-                                        {canvasSecretsFiltered.length > 0 && (
-                                          <optgroup label="Canvas Secrets">
-                                            {canvasSecretsFiltered.map(secretItem => (
-                                              <option key={`canvas-${secretItem.name}`} value={secretItem.name}>
-                                                {secretItem.name}
-                                              </option>
-                                            ))}
-                                          </optgroup>
-                                        )}
-                                        {orgSecretsFiltered.length > 0 && (
-                                          <optgroup label="Organization Secrets">
-                                            {orgSecretsFiltered.map(secretItem => (
-                                              <option key={`org-${secretItem.name}`} value={secretItem.name}>
-                                                {secretItem.name}
-                                              </option>
-                                            ))}
-                                          </optgroup>
-                                        )}
-                                      </>
-                                    );
-                                  })()}
-                                </select>
-                              </ValidationField>
-                              <ValidationField label="Secret Key">
-                                <select
-                                  value={secret.valueFrom?.secret?.key || ''}
-                                  onChange={(e) => secretsEditor.updateItem(index, 'valueFrom', {
-                                    ...secret.valueFrom,
-                                    secret: { ...secret.valueFrom?.secret, key: e.target.value }
-                                  })}
-                                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  disabled={!secret.valueFrom?.secret?.name || loadingCanvasSecrets || loadingOrganizationSecrets}
-                                >
-                                  <option value="">
-                                    {!secret.valueFrom?.secret?.name
-                                      ? 'Select a secret first...'
-                                      : 'Select a key...'}
-                                  </option>
-                                  {secret.valueFrom?.secret?.name && (() => {
-                                    const availableKeys = getSecretKeys(secret.valueFrom.secret.name);
-
-                                    if (availableKeys.length === 0) {
-                                      return (
-                                        <option value="" disabled>
-                                          No keys available in this secret
-                                        </option>
-                                      );
-                                    }
-
-                                    return availableKeys.map(key => (
-                                      <option key={key} value={key}>
-                                        {key}
-                                      </option>
-                                    ));
-                                  })()}
-                                </select>
-                              </ValidationField>
-                            </div>
-                          )}
-                        </ValidationField>
+                                ));
+                              })()}
+                            </select>
+                          </ValidationField>
+                        </div>
                       </div>
                     }
                   />
@@ -2199,22 +2162,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   </div>
                 )}
               </div>
-
-              <CloseAndCheckButtons
-                onCancel={() => {
-                  setOpenSections(prev => prev.filter(section => section !== 'executor'));
-                }}
-                onConfirm={() => {
-                  const executorErrors = validateExecutor(executor);
-                  if (Object.keys(executorErrors).length === 0) {
-                    setOpenSections(prev => prev.filter(section => section !== 'executor'));
-                  } else {
-                    setValidationErrors(prev => ({
-                      ...prev,
-                      ...executorErrors
-                    }));
-                  }
-                }} />
             </EditableAccordionSection>
           </>
         )}
