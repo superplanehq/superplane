@@ -496,6 +496,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       sectionsToOpen.push('connections');
     }
 
+    const inputErrors = Object.keys(validationErrors).some(key => key.startsWith('input_'));
+    if (inputErrors && !sectionsToOpen.includes('inputs')) {
+      sectionsToOpen.push('inputs');
+    }
+
     const executorErrors = validateExecutor(executor);
     if (Object.keys(executorErrors).length > 0 || hasFieldErrors) {
       if (!sectionsToOpen.includes('executor')) {
@@ -508,7 +513,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
 
     setOpenSections(sectionsToOpen);
-  }, [connections.length, executor, openSections, setOpenSections, setValidationErrors, validateExecutor]);
+  }, [connections.length, executor, openSections, setOpenSections, setValidationErrors, validateExecutor, validationErrors]);
 
   // Expose the trigger function to parent
   useEffect(() => {
@@ -524,6 +529,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     const connectionsNeedConfiguration = connections.length === 0;
     if (connectionsNeedConfiguration) {
       sectionsToOpen.push('connections');
+    }
+
+    const inputErrors = Object.keys(validationErrors).some(key => key.startsWith('input_'));
+    if (inputErrors) {
+      sectionsToOpen.push('inputs');
     }
 
     const executorErrors = validateExecutor(executor);
@@ -1109,6 +1119,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               count={inputs.length}
               countLabel="inputs"
+              hasError={Object.keys(validationErrors).some(key => key.startsWith('input_'))}
             >
               {inputs.map((input, index) => {
                 // Get mappings for this specific input
