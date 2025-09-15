@@ -18,6 +18,7 @@ import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
 import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
 import { showErrorToast } from '@/utils/toast';
+import debounce from 'lodash.debounce';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -327,6 +328,57 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     return errors;
   }, []);
 
+  const validateInputMappings = useCallback((currentErrors: Record<string, string>) => {
+    const inputMappingErrors = new Map<string, string[]>();
+
+    inputMappings.forEach((mapping, index) => {
+      const mappingErrors: string[] = [];
+      if (!mapping.when?.triggeredBy?.connection) {
+        mappingErrors.push('Trigger connection is required');
+      }
+
+      if (inputs.length > 0) {
+        const mappingInputNames = mapping.values?.map(v => v.name) || [];
+        const missingInputs = inputs
+          .map(input => input.name)
+          .filter(inputName => inputName && !mappingInputNames.includes(inputName));
+
+        missingInputs.forEach(inputName => {
+          if (inputName) {
+            const inputIndex = inputs.findIndex(inp => inp.name === inputName);
+            if (inputIndex !== -1) {
+              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
+              currentErrors.push(`Missing in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
+              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
+            }
+          }
+        });
+      }
+
+      if (mapping.values) {
+        mapping.values.forEach((value) => {
+          const hasStaticValue = value.value !== undefined && value.value !== '';
+          const hasEventDataValue = value.valueFrom?.eventData?.expression !== undefined && value.valueFrom.eventData.expression !== '';
+          const hasLastExecutionValue = value.valueFrom?.lastExecution?.results !== undefined && value.valueFrom.lastExecution.results.length > 0;
+
+          if (!hasStaticValue && !hasEventDataValue && !hasLastExecutionValue) {
+            const inputIndex = inputs.findIndex(inp => inp.name === value.name);
+            if (inputIndex !== -1) {
+              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
+              currentErrors.push(`No value defined in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
+              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
+            }
+          }
+        });
+      }
+
+      if (mappingErrors.length > 0) {
+        currentErrors[`inputMapping_${index}`] = mappingErrors.join(', ');
+      }
+    });
+    return inputMappingErrors;
+  }, [inputMappings, inputs]);
+
   const validateAllFields = () => {
     let errors: Record<string, string> = {};
 
@@ -372,58 +424,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       }
     });
 
-    // Validate input mappings and track input-specific errors
-    const inputMappingErrors = new Map<string, string[]>();
-
-    inputMappings.forEach((mapping, index) => {
-      const mappingErrors: string[] = [];
-      if (!mapping.when?.triggeredBy?.connection) {
-        mappingErrors.push('Trigger connection is required');
-      }
-
-      // Check if all inputs are included in the mapping
-      if (inputs.length > 0) {
-        const mappingInputNames = mapping.values?.map(v => v.name) || [];
-        const missingInputs = inputs
-          .map(input => input.name)
-          .filter(inputName => inputName && !mappingInputNames.includes(inputName));
-
-        // Add missing input errors to individual inputs
-        missingInputs.forEach(inputName => {
-          if (inputName) {
-            const inputIndex = inputs.findIndex(inp => inp.name === inputName);
-            if (inputIndex !== -1) {
-              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
-              currentErrors.push(`Missing in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
-              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
-            }
-          }
-        });
-      }
-
-      // Check if all mapping values have either value or valueFrom defined
-      if (mapping.values) {
-        mapping.values.forEach((value) => {
-          const hasStaticValue = value.value !== undefined && value.value !== '';
-          const hasEventDataValue = value.valueFrom?.eventData?.expression !== undefined && value.valueFrom.eventData.expression !== '';
-          const hasLastExecutionValue = value.valueFrom?.lastExecution?.results !== undefined && value.valueFrom.lastExecution.results.length > 0;
-
-          if (!hasStaticValue && !hasEventDataValue && !hasLastExecutionValue) {
-            const inputIndex = inputs.findIndex(inp => inp.name === value.name);
-            if (inputIndex !== -1) {
-              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
-              currentErrors.push(`No value defined in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
-              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
-            }
-          }
-        });
-      }
-
-      // Only add mapping-level errors for connection issues
-      if (mappingErrors.length > 0) {
-        errors[`inputMapping_${index}`] = mappingErrors.join(', ');
-      }
-    });
+    const inputMappingErrors = validateInputMappings(errors);
 
     // Add input-specific mapping errors to the validation errors
     inputMappingErrors.forEach((errorList, inputKey) => {
@@ -443,6 +444,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     return Object.keys(errors).length === 0;
   };
+
+  const debouncedValidateAllFields = debounce(validateAllFields, 100);
+
 
   const isExecutorMisconfigured = useCallback(() => {
     const errors = validateExecutor(executor);
@@ -1116,17 +1120,25 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   <div key={`input-${currentStageId}-${index}`}>
                     <InlineEditor
                       isEditing={inputsEditor.editingIndex === index}
-                      onSave={inputsEditor.saveEdit}
+                      onSave={() => {
+                        if (validationErrors[`input_${index}`])
+                          return;
+
+                        inputsEditor.saveEdit()
+                      }}
                       onCancel={() => inputsEditor.cancelEdit(index, (item) => {
                         if (!item.name || item.name.trim() === '') {
                           return true;
                         }
 
-                        const isNewInput = index >= originalData.inputs.length ||
-                          !originalData.inputs[index] ||
-                          originalData.inputs[index].name !== item.name;
+                        const allInputMappingsAreEmpty = inputMappings.every(mapping =>
+                          mapping.values
+                            ?.filter(value => value.name === input.name)
+                            ?.every(value => value.value === '' && !value.valueFrom)
+                        );
 
-                        return isNewInput;
+
+                        return allInputMappingsAreEmpty;
                       })}
                       onEdit={() => inputsEditor.startEdit(index)}
                       onDelete={() => handleInputDelete(index, input)}
@@ -1158,7 +1170,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             <input
                               type="text"
                               value={input.name || ''}
-                              onChange={(e) => handleInputNameChange(e.target.value, index, input)}
+                              onChange={(e) => {
+                                handleInputNameChange(e.target.value, index, input)
+                                debouncedValidateAllFields();
+                              }}
                               placeholder="Input name"
                               className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
                                 ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
