@@ -36,8 +36,8 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
         return 'processed';
       case 'STATE_PENDING':
         return 'pending';
-      case 'STATE_DISCARDED':
-        return 'discarded';
+      case 'STATE_REJECTED':
+        return 'rejected';
       default:
         return 'pending';
     }
@@ -55,12 +55,12 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
           label: 'Pending',
           animate: true,
         };
-      case 'discarded':
+      case 'rejected':
         return {
           bgColor: 'bg-zinc-100/50 dark:bg-zinc-900/20',
           textColor: 'text-zinc-600 dark:text-zinc-400',
           icon: 'cancel',
-          label: 'Discarded',
+          label: 'Rejected',
           animate: false,
         };
       case 'processed':

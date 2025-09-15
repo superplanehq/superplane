@@ -29,7 +29,7 @@ interface EventSourceSidebarProps {
 }
 
 export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSourceSidebarProps) => {
-  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
+  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(600);
   const [activeTab, setActiveTab] = useState<TabType>('history');
   const canvasId = useCanvasStore(state => state.canvasId) || '';
 
@@ -48,6 +48,9 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
   const allEvents = useMemo(() => {
     return eventsData?.pages.flatMap(page => page.events) || [];
   }, [eventsData]);
+
+  // Get total count from any page response (all pages have the same totalCount)
+  const totalEventsCount = eventsData?.pages[0]?.totalCount ?? 0;
 
   useEffect(() => {
     if ((selectedEventSource?.events?.length || 0) > 0 && allEvents.length > 0) {
@@ -112,7 +115,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSource
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
-                Event History ({allEvents.length})
+                Event History ({totalEventsCount})
               </h3>
             </div>
 

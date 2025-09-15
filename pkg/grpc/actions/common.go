@@ -396,13 +396,14 @@ func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.
 
 func SerializeEvent(in models.Event) (*pb.Event, error) {
 	event := &pb.Event{
-		Id:         in.ID.String(),
-		SourceId:   in.SourceID.String(),
-		SourceName: in.SourceName,
-		SourceType: EventSourceTypeToProto(in.SourceType),
-		Type:       in.Type,
-		State:      EventStateToProto(in.State),
-		ReceivedAt: timestamppb.New(*in.ReceivedAt),
+		Id:          in.ID.String(),
+		SourceId:    in.SourceID.String(),
+		SourceName:  in.SourceName,
+		SourceType:  EventSourceTypeToProto(in.SourceType),
+		Type:        in.Type,
+		State:       EventStateToProto(in.State),
+		StateReason: EventStateReasonToProto(in.StateReason),
+		ReceivedAt:  timestamppb.New(*in.ReceivedAt),
 	}
 
 	if len(in.Raw) > 0 {
@@ -466,7 +467,7 @@ func EventStateToProto(state string) pb.Event_State {
 		return pb.Event_STATE_PENDING
 	case models.EventStateProcessed:
 		return pb.Event_STATE_PROCESSED
-	case models.EventStateRejected:
+	case models.EventStateRejected, models.EventStateDiscarded:
 		return pb.Event_STATE_REJECTED
 	default:
 		return pb.Event_STATE_UNKNOWN

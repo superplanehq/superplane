@@ -432,8 +432,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 {currentEventSource.events.slice(0, 3).map((event) => {
                   // Map event states to our EventState type
                   let eventState: EventState = 'pending';
-                  if (event.state === 'STATE_DISCARDED') {
-                    eventState = 'discarded';
+                  if (event.state === 'STATE_REJECTED') {
+                    eventState = 'rejected';
                   } else if (event.state === 'STATE_PROCESSED') {
                     eventState = 'processed';
                   }

@@ -33,7 +33,7 @@ interface SidebarProps {
 export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStageEvent, cancelStageExecution }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState('activity');
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
-  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
+  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(600);
   const queryClient = useQueryClient();
 
   // Wrapper function to handle approval with query invalidation
