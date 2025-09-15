@@ -24,7 +24,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
         return {
           type: 'semaphore',
           integration: {
-            name: 'semaphore',
+            name: '',
           },
           resource: {
             type: 'project',
@@ -35,7 +35,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
         return {
           type: 'github',
           integration: {
-            name: 'github',
+            name: '',
           },
           resource: {
             type: 'repository',
@@ -45,6 +45,9 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
       case 'http':
         return {
           type: 'http',
+          spec: {
+            url: '',
+          },
         };
       default:
         return { type: '', spec: {} };
