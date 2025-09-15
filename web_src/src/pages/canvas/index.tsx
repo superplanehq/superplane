@@ -20,7 +20,7 @@ export function Canvas() {
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, selectedEventSourceId, cleanSelectedEventSourceId, editingStageId, stages, eventSources, connectionGroups, approveStageEvent, discardStageEvent, cancelStageExecution, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, selectedEventSourceId, cleanSelectedEventSourceId, editingStageId, stages, eventSources, connectionGroups, approveStageEvent, discardStageEvent, cancelStageExecution, fitViewNode, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(false);
