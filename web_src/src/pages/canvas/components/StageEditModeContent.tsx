@@ -16,7 +16,7 @@ import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
-import { Button } from '@/components/Button/button';
+import CloseAndCheckButtons from './shared/CloseAndCheckButtons';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -2200,34 +2200,21 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 pb-3">
-                <Button
-                  className='flex items-center border-0'
-                  outline
-                  onClick={() => {
+              <CloseAndCheckButtons
+                onCancel={() => {
+                  setOpenSections(prev => prev.filter(section => section !== 'executor'));
+                }}
+                onConfirm={() => {
+                  const executorErrors = validateExecutor(executor);
+                  if (Object.keys(executorErrors).length === 0) {
                     setOpenSections(prev => prev.filter(section => section !== 'executor'));
-                  }}
-                >
-                  <MaterialSymbol name="close" size="sm" data-slot="icon" />
-                </Button>
-                <Button
-                  className='flex items-center'
-                  color="white"
-                  onClick={() => {
-                    const executorErrors = validateExecutor(executor);
-                    if (Object.keys(executorErrors).length === 0) {
-                      setOpenSections(prev => prev.filter(section => section !== 'executor'));
-                    } else {
-                      setValidationErrors(prev => ({
-                        ...prev,
-                        ...executorErrors
-                      }));
-                    }
-                  }}
-                >
-                  <MaterialSymbol name="check" size="sm" data-slot="icon" />
-                </Button>
-              </div>
+                  } else {
+                    setValidationErrors(prev => ({
+                      ...prev,
+                      ...executorErrors
+                    }));
+                  }
+                }} />
             </EditableAccordionSection>
           </>
         )}
