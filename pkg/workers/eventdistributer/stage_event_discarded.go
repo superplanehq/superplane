@@ -10,17 +10,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func HandleStageEventCancelled(messageBody []byte, wsHub *ws.Hub) error {
-	log.Debugf("Received stage_event_cancelled event")
+func HandleStageEventDiscarded(messageBody []byte, wsHub *ws.Hub) error {
+	log.Debugf("Received stage_event_discarded event")
 
-	var msg pb.StageEventCancelled
+	var msg pb.StageEventDiscarded
 	if err := proto.Unmarshal(messageBody, &msg); err != nil {
-		log.Errorf("Failed to unmarshal StageEventCancelled message: %v", err)
+		log.Errorf("Failed to unmarshal StageEventDiscarded message: %v", err)
 		return err
 	}
 
 	wsEventJSON, err := json.Marshal(map[string]any{
-		"event": "stage_event_cancelled",
+		"event": "stage_event_discarded",
 		"payload": map[string]any{
 			"id":        msg.EventId,
 			"stage_id":  msg.StageId,
@@ -34,7 +34,7 @@ func HandleStageEventCancelled(messageBody []byte, wsHub *ws.Hub) error {
 	}
 
 	wsHub.BroadcastToCanvas(msg.CanvasId, wsEventJSON)
-	log.Debugf("Broadcasted stage_event_cancelled event to canvas %s", msg.CanvasId)
+	log.Debugf("Broadcasted stage_event_discarded event to canvas %s", msg.CanvasId)
 
 	return nil
 }

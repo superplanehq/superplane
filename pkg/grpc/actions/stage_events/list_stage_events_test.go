@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -40,6 +41,9 @@ func Test__ListStageEvents(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Events)
+		assert.Equal(t, uint32(0), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.LastTimestamp)
 	})
 
 	t.Run("stage with stage events - list", func(t *testing.T) {
@@ -59,74 +63,199 @@ func Test__ListStageEvents(t *testing.T) {
 			"VERSION": "v1",
 		})
 
+		// execution should not be showed in list_stage_events
 		execution, err := models.CreateStageExecution(r.Canvas.ID, r.Stage.ID, eventWithExecution.ID)
 		require.NoError(t, err)
-		require.NoError(t, eventWithExecution.UpdateState(models.StageEventStateWaiting, models.StageEventStateReasonExecution))
+		require.NoError(t, eventWithExecution.UpdateState(models.StageEventStateProcessed, ""))
 		require.NoError(t, execution.UpdateOutputs(map[string]any{
 			"VERSION": "v1",
 			"VALUE_1": "value1",
 		}))
 
-		execution, err = models.FindExecutionByID(execution.ID)
+		execution, err = models.FindExecutionByID(execution.ID, execution.StageID)
 		require.NoError(t, err)
 
-		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), states, []protos.StageEvent_StateReason{}, 0, nil)
+		// List processed events (event with execution)
+		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []pb.StageEvent_State{pb.StageEvent_STATE_PROCESSED}, []protos.StageEvent_StateReason{}, 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
-		require.Len(t, res.Events, 3)
+		require.Len(t, res.Events, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+		assert.Equal(t, eventWithExecution.ID.String(), res.Events[0].Id)
+		assert.NotEmpty(t, res.Events[0].CreatedAt)
+		assert.Equal(t, pb.StageEvent_STATE_PROCESSED, res.Events[0].State)
+		assert.Empty(t, res.Events[0].Approvals)
+		assert.NotEmpty(t, res.Events[0].Inputs)
 
-		// event with execution
+		// List pending events (waiting and not waiting for approval)
+		res, err = ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []pb.StageEvent_State{pb.StageEvent_STATE_PENDING, pb.StageEvent_STATE_WAITING}, []protos.StageEvent_StateReason{}, 0, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Events, 2)
+		assert.Equal(t, uint32(2), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+
+		// event with approvals
 		e := res.Events[0]
 		assert.NotEmpty(t, e.Id)
 		assert.NotEmpty(t, e.CreatedAt)
-		assert.Equal(t, r.Source.ID.String(), e.SourceId)
-		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, e.SourceType)
-		assert.Equal(t, protos.StageEvent_STATE_WAITING, e.State)
-		assert.Equal(t, protos.StageEvent_STATE_REASON_EXECUTION, e.StateReason)
-		require.NotNil(t, e.Execution)
-		assert.Equal(t, execution.ID.String(), e.Execution.Id)
-		assert.Equal(t, protos.Execution_STATE_PENDING, e.Execution.State)
-		assert.Equal(t, protos.Execution_RESULT_UNKNOWN, e.Execution.Result)
-		assert.NotNil(t, e.Execution.CreatedAt)
-		assert.Nil(t, e.Execution.StartedAt)
-		assert.Nil(t, e.Execution.FinishedAt)
-		require.Len(t, e.Approvals, 0)
-		require.Len(t, e.Inputs, 1)
-		assert.Equal(t, "VERSION", e.Inputs[0].Name)
-		assert.Equal(t, "v1", e.Inputs[0].Value)
-		require.Len(t, e.Execution.Outputs, 2)
-		assert.Contains(t, e.Execution.Outputs, &protos.OutputValue{Name: "VERSION", Value: "v1"})
-		assert.Contains(t, e.Execution.Outputs, &protos.OutputValue{Name: "VALUE_1", Value: "value1"})
-		assert.Equal(t, "", e.Name)
-
-		// event with approvals
-		e = res.Events[1]
-		assert.NotEmpty(t, e.Id)
-		assert.NotEmpty(t, e.CreatedAt)
-		assert.Equal(t, r.Source.ID.String(), e.SourceId)
-		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, e.SourceType)
 		assert.Equal(t, protos.StageEvent_STATE_PENDING, e.State)
 		assert.Equal(t, protos.StageEvent_STATE_REASON_UNKNOWN, e.StateReason)
 		require.Len(t, e.Approvals, 1)
 		assert.Equal(t, userID.String(), e.Approvals[0].ApprovedBy)
 		assert.NotEmpty(t, userID, e.Approvals[0].ApprovedAt)
-		require.Nil(t, e.Execution)
 		require.Len(t, e.Inputs, 1)
 		assert.Equal(t, "VERSION", e.Inputs[0].Name)
 		assert.Equal(t, "v1", e.Inputs[0].Value)
 		assert.Equal(t, "", e.Name)
 
+		require.NotNil(t, e.TriggerEvent)
+		assert.Equal(t, "push", e.TriggerEvent.Type)
+		assert.Equal(t, protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, e.TriggerEvent.SourceType)
+		assert.Equal(t, r.Source.ID.String(), e.TriggerEvent.SourceId)
+
 		// event with no approvals
-		e = res.Events[2]
+		e = res.Events[1]
 		assert.NotEmpty(t, e.Id)
 		assert.NotEmpty(t, e.CreatedAt)
-		assert.Equal(t, r.Source.ID.String(), e.SourceId)
-		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, e.SourceType)
 		assert.Equal(t, protos.StageEvent_STATE_PENDING, e.State)
 		assert.Equal(t, protos.StageEvent_STATE_REASON_UNKNOWN, e.StateReason)
 		require.Len(t, e.Approvals, 0)
-		require.Nil(t, e.Execution)
 		require.Len(t, e.Inputs, 0)
 		assert.Equal(t, "", e.Name)
+
+		require.NotNil(t, e.TriggerEvent)
+		assert.Equal(t, "push", e.TriggerEvent.Type)
+		assert.Equal(t, protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, e.TriggerEvent.SourceType)
+		assert.Equal(t, r.Source.ID.String(), e.TriggerEvent.SourceId)
+	})
+
+	t.Run("stage events include trigger event data", func(t *testing.T) {
+		r := support.Setup(t)
+
+		event, err := models.CreateEvent(r.Source.ID, r.Canvas.ID, r.Source.Name, models.SourceTypeEventSource, "webhook.received", []byte(`{"branch": "main", "commit": "abc123"}`), []byte(`{"x-github-event": "push"}`))
+		require.NoError(t, err)
+
+		stageEvent, err := models.CreateStageEvent(r.Stage.ID, event, models.StageEventStatePending, "", map[string]any{"branch": "main", "commit": "abc123"}, "deploy-main")
+		require.NoError(t, err)
+
+		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{}, []protos.StageEvent_StateReason{}, 0, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Events, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+
+		e := res.Events[0]
+
+		assert.Equal(t, stageEvent.ID.String(), e.Id)
+		assert.Equal(t, "deploy-main", e.Name)
+		assert.Equal(t, protos.StageEvent_STATE_PENDING, e.State)
+
+		require.Len(t, e.Inputs, 2)
+		inputMap := make(map[string]string)
+		for _, input := range e.Inputs {
+			inputMap[input.Name] = input.Value
+		}
+		assert.Equal(t, "main", inputMap["branch"])
+		assert.Equal(t, "abc123", inputMap["commit"])
+
+		require.NotNil(t, e.TriggerEvent)
+		assert.Equal(t, event.ID.String(), e.TriggerEvent.Id)
+		assert.Equal(t, "webhook.received", e.TriggerEvent.Type)
+		assert.Equal(t, protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, e.TriggerEvent.SourceType)
+		assert.Equal(t, r.Source.ID.String(), e.TriggerEvent.SourceId)
+		assert.Equal(t, r.Source.Name, e.TriggerEvent.SourceName)
+		assert.Equal(t, protos.Event_STATE_PENDING, e.TriggerEvent.State)
+		assert.NotNil(t, e.TriggerEvent.ReceivedAt)
+
+		require.NotNil(t, e.TriggerEvent.Raw)
+		assert.Equal(t, "main", e.TriggerEvent.Raw.Fields["branch"].GetStringValue())
+		assert.Equal(t, "abc123", e.TriggerEvent.Raw.Fields["commit"].GetStringValue())
+
+		require.NotNil(t, e.TriggerEvent.Headers)
+		assert.Equal(t, "push", e.TriggerEvent.Headers.Fields["x-github-event"].GetStringValue())
+	})
+
+	t.Run("test pagination with hasNextPage", func(t *testing.T) {
+		r := support.Setup(t)
+
+		for i := 0; i < 10; i++ {
+			support.CreateStageEvent(t, r.Source, r.Stage)
+		}
+
+		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{}, []protos.StageEvent_StateReason{}, 5, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Events, 5)
+		assert.Equal(t, uint32(10), res.TotalCount)
+		assert.True(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+
+		res, err = ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{}, []protos.StageEvent_StateReason{}, 10, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Events, 10)
+		assert.Equal(t, uint32(10), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+
+		res, err = ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{}, []protos.StageEvent_StateReason{}, 15, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Events, 10)
+		assert.Equal(t, uint32(10), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+	})
+
+	t.Run("test filtering with new response fields", func(t *testing.T) {
+		r := support.Setup(t)
+
+		//
+		// Create 1 pending and 1 processed stage event
+		//
+		event1 := support.CreateStageEvent(t, r.Source, r.Stage)
+		event2 := support.CreateStageEvent(t, r.Source, r.Stage)
+		require.NoError(t, event1.UpdateState(models.StageEventStateProcessed, ""))
+
+		//
+		// A single pending event is returned when listing for pending
+		//
+		res, err := ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{protos.StageEvent_STATE_PENDING}, []protos.StageEvent_StateReason{}, 0, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Events, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+		assert.Equal(t, event2.ID.String(), res.Events[0].Id)
+
+		//
+		// No waiting events are returned when listing for waiting
+		//
+		res, err = ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{protos.StageEvent_STATE_WAITING}, []protos.StageEvent_StateReason{}, 0, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Empty(t, res.Events)
+		assert.Zero(t, res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.Nil(t, res.LastTimestamp)
+
+		//
+		// A single processed event is returned when listing for processed
+		//
+		res, err = ListStageEvents(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), []protos.StageEvent_State{protos.StageEvent_STATE_PROCESSED}, []protos.StageEvent_StateReason{}, 0, nil)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Events, 1)
+		assert.Equal(t, uint32(1), res.TotalCount)
+		assert.False(t, res.HasNextPage)
+		assert.NotNil(t, res.LastTimestamp)
+		assert.Equal(t, event1.ID.String(), res.Events[0].Id)
 	})
 }

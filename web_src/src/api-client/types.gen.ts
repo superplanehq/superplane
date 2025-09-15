@@ -20,7 +20,7 @@ export type EventSourceEventType = {
     filterOperator?: SuperplaneFilterOperator;
 };
 
-export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
+export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
 
 export type GroupByField = {
     name?: string;
@@ -356,6 +356,16 @@ export type SpecGroupBy = {
 
 export type SpecTimeoutBehavior = 'TIMEOUT_BEHAVIOR_NONE' | 'TIMEOUT_BEHAVIOR_DROP' | 'TIMEOUT_BEHAVIOR_EMIT';
 
+export type StatusHistory = {
+    received?: number;
+    recentItems?: Array<SuperplaneEvent>;
+};
+
+export type StatusQueue = {
+    total?: number;
+    items?: Array<SuperplaneStageEvent>;
+};
+
 export type SuperplaneAddUserBody = {
     userId?: string;
 };
@@ -372,34 +382,12 @@ export type SuperplaneApproveStageEventResponse = {
     event?: SuperplaneStageEvent;
 };
 
-export type SuperplaneBulkListEventsBody = {
-    sources?: Array<SuperplaneEventSourceItemRequest>;
-    limitPerSource?: number;
-    before?: string;
-};
-
-export type SuperplaneBulkListEventsResponse = {
-    results?: Array<SuperplaneEventSourceItemResult>;
-};
-
-export type SuperplaneBulkListStageEventsBody = {
-    stages?: Array<SuperplaneStageEventItemRequest>;
-    states?: Array<SuperplaneStageEventState>;
-    stateReasons?: Array<SuperplaneStageEventStateReason>;
-    limitPerStage?: number;
-    before?: string;
-};
-
-export type SuperplaneBulkListStageEventsResponse = {
-    results?: Array<SuperplaneStageEventItemResult>;
-};
-
-export type SuperplaneCancelStageEventBody = {
+export type SuperplaneCancelStageExecutionBody = {
     [key: string]: unknown;
 };
 
-export type SuperplaneCancelStageEventResponse = {
-    event?: SuperplaneStageEvent;
+export type SuperplaneCancelStageExecutionResponse = {
+    execution?: SuperplaneExecution;
 };
 
 export type SuperplaneCanvas = {
@@ -555,6 +543,14 @@ export type SuperplaneDescribeStageResponse = {
     stage?: SuperplaneStage;
 };
 
+export type SuperplaneDiscardStageEventBody = {
+    [key: string]: unknown;
+};
+
+export type SuperplaneDiscardStageEventResponse = {
+    event?: SuperplaneStageEvent;
+};
+
 export type SuperplaneEvent = {
     id?: string;
     sourceId?: string;
@@ -587,17 +583,7 @@ export type SuperplaneEventRejection = {
 export type SuperplaneEventSource = {
     metadata?: SuperplaneEventSourceMetadata;
     spec?: SuperplaneEventSourceSpec;
-};
-
-export type SuperplaneEventSourceItemRequest = {
-    sourceId?: string;
-    sourceType?: SuperplaneEventSourceType;
-};
-
-export type SuperplaneEventSourceItemResult = {
-    sourceId?: string;
-    sourceType?: SuperplaneEventSourceType;
-    events?: Array<SuperplaneEvent>;
+    status?: SuperplaneEventSourceStatus;
 };
 
 export type SuperplaneEventSourceMetadata = {
@@ -615,6 +601,10 @@ export type SuperplaneEventSourceSpec = {
     events?: Array<EventSourceEventType>;
 };
 
+export type SuperplaneEventSourceStatus = {
+    history?: StatusHistory;
+};
+
 export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
 
 export type SuperplaneEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_REJECTED' | 'STATE_PROCESSED';
@@ -630,13 +620,14 @@ export type SuperplaneExecution = {
     finishedAt?: string;
     outputs?: Array<SuperplaneOutputValue>;
     resources?: Array<SuperplaneExecutionResource>;
+    stageEvent?: SuperplaneStageEvent;
 };
 
 export type SuperplaneExecutionResource = {
     id?: string;
 };
 
-export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED' | 'STATE_CANCELLED';
+export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
 
 export type SuperplaneExecutor = {
     type?: string;
@@ -709,10 +700,23 @@ export type SuperplaneListEventSourcesResponse = {
 
 export type SuperplaneListEventsResponse = {
     events?: Array<SuperplaneEvent>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
 };
 
 export type SuperplaneListStageEventsResponse = {
     events?: Array<SuperplaneStageEvent>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
+};
+
+export type SuperplaneListStageExecutionsResponse = {
+    executions?: Array<SuperplaneExecution>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
 };
 
 export type SuperplaneListStagesResponse = {
@@ -758,22 +762,20 @@ export type SuperplaneResetEventSourceKeyResponse = {
 export type SuperplaneStage = {
     metadata?: SuperplaneStageMetadata;
     spec?: SuperplaneStageSpec;
+    status?: SuperplaneStageStatus;
 };
 
 export type SuperplaneStageEvent = {
     id?: string;
-    sourceId?: string;
-    sourceType?: SuperplaneConnectionType;
     state?: SuperplaneStageEventState;
     stateReason?: SuperplaneStageEventStateReason;
     createdAt?: string;
     approvals?: Array<SuperplaneStageEventApproval>;
-    execution?: SuperplaneExecution;
     inputs?: Array<SuperplaneKeyValuePair>;
     name?: string;
-    eventId?: string;
-    cancelledBy?: string;
-    cancelledAt?: string;
+    triggerEvent?: SuperplaneEvent;
+    discardedBy?: string;
+    discardedAt?: string;
 };
 
 export type SuperplaneStageEventApproval = {
@@ -781,18 +783,9 @@ export type SuperplaneStageEventApproval = {
     approvedAt?: string;
 };
 
-export type SuperplaneStageEventItemRequest = {
-    stageIdOrName?: string;
-};
+export type SuperplaneStageEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED' | 'STATE_DISCARDED';
 
-export type SuperplaneStageEventItemResult = {
-    stageId?: string;
-    events?: Array<SuperplaneStageEvent>;
-};
-
-export type SuperplaneStageEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED';
-
-export type SuperplaneStageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_STUCK' | 'STATE_REASON_TIMEOUT';
+export type SuperplaneStageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_STUCK' | 'STATE_REASON_TIMEOUT';
 
 export type SuperplaneStageMetadata = {
     id?: string;
@@ -810,6 +803,11 @@ export type SuperplaneStageSpec = {
     inputMappings?: Array<SuperplaneInputMapping>;
     outputs?: Array<SuperplaneOutputDefinition>;
     secrets?: Array<SuperplaneValueDefinition>;
+};
+
+export type SuperplaneStageStatus = {
+    lastExecution?: SuperplaneExecution;
+    queue?: StatusQueue;
 };
 
 export type SuperplaneUpdateConnectionGroupBody = {
@@ -1358,33 +1356,6 @@ export type SuperplaneListEventsResponses = {
 
 export type SuperplaneListEventsResponse2 = SuperplaneListEventsResponses[keyof SuperplaneListEventsResponses];
 
-export type SuperplaneBulkListEventsData = {
-    body: SuperplaneBulkListEventsBody;
-    path: {
-        canvasIdOrName: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/events/bulk';
-};
-
-export type SuperplaneBulkListEventsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type SuperplaneBulkListEventsError = SuperplaneBulkListEventsErrors[keyof SuperplaneBulkListEventsErrors];
-
-export type SuperplaneBulkListEventsResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneBulkListEventsResponse;
-};
-
-export type SuperplaneBulkListEventsResponse2 = SuperplaneBulkListEventsResponses[keyof SuperplaneBulkListEventsResponses];
-
 export type SuperplaneListEventRejectionsData = {
     body?: never;
     path: {
@@ -1414,33 +1385,6 @@ export type SuperplaneListEventRejectionsResponses = {
 };
 
 export type SuperplaneListEventRejectionsResponse2 = SuperplaneListEventRejectionsResponses[keyof SuperplaneListEventRejectionsResponses];
-
-export type SuperplaneBulkListStageEventsData = {
-    body: SuperplaneBulkListStageEventsBody;
-    path: {
-        canvasIdOrName: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/stage-events/bulk';
-};
-
-export type SuperplaneBulkListStageEventsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type SuperplaneBulkListStageEventsError = SuperplaneBulkListStageEventsErrors[keyof SuperplaneBulkListStageEventsErrors];
-
-export type SuperplaneBulkListStageEventsResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneBulkListStageEventsResponse;
-};
-
-export type SuperplaneBulkListStageEventsResponse2 = SuperplaneBulkListStageEventsResponses[keyof SuperplaneBulkListStageEventsResponses];
 
 export type SuperplaneListStagesData = {
     body?: never;
@@ -1587,8 +1531,8 @@ export type SuperplaneListStageEventsData = {
         stageIdOrName: string;
     };
     query?: {
-        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED'>;
-        stateReasons?: Array<'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_STUCK' | 'STATE_REASON_TIMEOUT'>;
+        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED' | 'STATE_DISCARDED'>;
+        stateReasons?: Array<'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_STUCK' | 'STATE_REASON_TIMEOUT'>;
         limit?: number;
         before?: string;
     };
@@ -1642,34 +1586,96 @@ export type SuperplaneApproveStageEventResponses = {
 
 export type SuperplaneApproveStageEventResponse2 = SuperplaneApproveStageEventResponses[keyof SuperplaneApproveStageEventResponses];
 
-export type SuperplaneCancelStageEventData = {
-    body: SuperplaneCancelStageEventBody;
+export type SuperplaneDiscardStageEventData = {
+    body: SuperplaneDiscardStageEventBody;
     path: {
         canvasIdOrName: string;
         stageIdOrName: string;
         eventId: string;
     };
     query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/cancel';
+    url: '/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/discard';
 };
 
-export type SuperplaneCancelStageEventErrors = {
+export type SuperplaneDiscardStageEventErrors = {
     /**
      * An unexpected error response.
      */
     default: GooglerpcStatus;
 };
 
-export type SuperplaneCancelStageEventError = SuperplaneCancelStageEventErrors[keyof SuperplaneCancelStageEventErrors];
+export type SuperplaneDiscardStageEventError = SuperplaneDiscardStageEventErrors[keyof SuperplaneDiscardStageEventErrors];
 
-export type SuperplaneCancelStageEventResponses = {
+export type SuperplaneDiscardStageEventResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneCancelStageEventResponse;
+    200: SuperplaneDiscardStageEventResponse;
 };
 
-export type SuperplaneCancelStageEventResponse2 = SuperplaneCancelStageEventResponses[keyof SuperplaneCancelStageEventResponses];
+export type SuperplaneDiscardStageEventResponse2 = SuperplaneDiscardStageEventResponses[keyof SuperplaneDiscardStageEventResponses];
+
+export type SuperplaneListStageExecutionsData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        stageIdOrName: string;
+    };
+    query?: {
+        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED'>;
+        results?: Array<'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED'>;
+        limit?: number;
+        before?: string;
+    };
+    url: '/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/executions';
+};
+
+export type SuperplaneListStageExecutionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneListStageExecutionsError = SuperplaneListStageExecutionsErrors[keyof SuperplaneListStageExecutionsErrors];
+
+export type SuperplaneListStageExecutionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListStageExecutionsResponse;
+};
+
+export type SuperplaneListStageExecutionsResponse2 = SuperplaneListStageExecutionsResponses[keyof SuperplaneListStageExecutionsResponses];
+
+export type SuperplaneCancelStageExecutionData = {
+    body: SuperplaneCancelStageExecutionBody;
+    path: {
+        canvasIdOrName: string;
+        stageIdOrName: string;
+        executionId: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/executions/{executionId}/cancel';
+};
+
+export type SuperplaneCancelStageExecutionErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneCancelStageExecutionError = SuperplaneCancelStageExecutionErrors[keyof SuperplaneCancelStageExecutionErrors];
+
+export type SuperplaneCancelStageExecutionResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneCancelStageExecutionResponse;
+};
+
+export type SuperplaneCancelStageExecutionResponse2 = SuperplaneCancelStageExecutionResponses[keyof SuperplaneCancelStageExecutionResponses];
 
 export type SuperplaneAddUserData = {
     body: SuperplaneAddUserBody;

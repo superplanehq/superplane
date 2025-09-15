@@ -58,7 +58,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   const generateEventSourceName = (resourceName: string) => {
     if (!resourceName) return '';
-    return `Listen ${resourceName}`;
+    return `Listen to: ${resourceName}`;
   };
 
   const validateEventSourceName = (name: string) => {
@@ -425,7 +425,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           {currentEventSource?.events?.length ? (
             <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center w-full justify-between mb-2 py-2">
-                <div className="text-sm  font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.events?.length || 0})</div>
+                <div className="text-sm  font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.status?.history?.received || 0})</div>
               </div>
 
               <div className="space-y-2">

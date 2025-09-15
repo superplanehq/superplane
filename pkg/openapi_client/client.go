@@ -58,6 +58,8 @@ type APIClient struct {
 
 	EventSourceAPI *EventSourceAPIService
 
+	ExecutionAPI *ExecutionAPIService
+
 	GroupsAPI *GroupsAPIService
 
 	IntegrationAPI *IntegrationAPIService
@@ -95,6 +97,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.ConnectionGroupAPI = (*ConnectionGroupAPIService)(&c.common)
 	c.EventAPI = (*EventAPIService)(&c.common)
 	c.EventSourceAPI = (*EventSourceAPIService)(&c.common)
+	c.ExecutionAPI = (*ExecutionAPIService)(&c.common)
 	c.GroupsAPI = (*GroupsAPIService)(&c.common)
 	c.IntegrationAPI = (*IntegrationAPIService)(&c.common)
 	c.MeAPI = (*MeAPIService)(&c.common)

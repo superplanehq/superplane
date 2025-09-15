@@ -1,6 +1,6 @@
 import { SuperplaneConnectionGroup, SuperplaneEventSource, SuperplaneStageEvent } from "@/api-client/types.gen";
 import { AllNodeType, EdgeType } from "../types/flow";
-import { EventSourceWithEvents, StageWithEventQueue } from "../store/types";
+import { EventSourceWithEvents, Stage } from "../store/types";
 import { ConnectionLineType, Edge, MarkerType } from "@xyflow/react";
 import { DEFAULT_HEIGHT, DEFAULT_WIDTH } from "./constants";
 import { ElkExtendedEdge, ElkNode } from "elkjs";
@@ -43,7 +43,7 @@ export const transformEventSourcesToNodes = (
 };
 
 export const transformStagesToNodes = (
-  stages: StageWithEventQueue[],
+  stages: Stage[],
   nodePositions: NodePositions,
   approveStageEvent: (eventId: string, stageId: string) => void
 ): AllNodeType[] => {
@@ -100,7 +100,7 @@ export const transformConnectionGroupsToNodes = (
 };
 
 export const transformToEdges = (
-  stages: StageWithEventQueue[],
+  stages: Stage[],
   connectionGroups: SuperplaneConnectionGroup[],
   eventSources: SuperplaneEventSource[]
 ): EdgeType[] => {

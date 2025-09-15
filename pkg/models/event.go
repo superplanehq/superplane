@@ -299,20 +299,17 @@ func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr str
 	return events, nil
 }
 
-func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int, before *time.Time) ([]Event, error) {
+func FilterEvents(canvasID uuid.UUID, sourceType string, sourceID string, limit int, before *time.Time) ([]Event, error) {
 	var events []Event
 
-	query := database.Conn().Where("canvas_id = ?", canvasID)
+	query := database.Conn().
+		Where("canvas_id = ?", canvasID)
 
 	if sourceType != "" {
 		query = query.Where("source_type = ?", sourceType)
 	}
 
-	if sourceIDStr != "" {
-		sourceID, err := uuid.Parse(sourceIDStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid source ID: %v", err)
-		}
+	if sourceID != "" {
 		query = query.Where("source_id = ?", sourceID)
 	}
 
@@ -321,7 +318,6 @@ func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType strin
 	}
 
 	query = query.Order("received_at DESC").Limit(limit)
-
 	err := query.Find(&events).Error
 	if err != nil {
 		return nil, err
@@ -330,97 +326,20 @@ func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType strin
 	return events, nil
 }
 
-func BulkListEventsByCanvasIDAndSource(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int) ([]Event, error) {
-	var events []Event
+func CountEvents(canvasID uuid.UUID, sourceType string, sourceID string) (int64, error) {
+	query := database.Conn().
+		Model(&Event{}).
+		Where("canvas_id = ?", canvasID).
+		Where("source_type = ?", sourceType).
+		Where("source_id = ?", sourceID)
 
-	query := database.Conn().Where("canvas_id = ?", canvasID)
-
-	if sourceType != "" {
-		query = query.Where("source_type = ?", sourceType)
-	}
-
-	if sourceIDStr != "" {
-		sourceID, err := uuid.Parse(sourceIDStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid source ID: %v", err)
-		}
-		query = query.Where("source_id = ?", sourceID)
-	}
-
-	query = query.Order("received_at DESC")
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	err := query.Find(&events).Error
+	var count int64
+	err := query.Count(&count).Error
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	return events, nil
-}
-
-func BulkListEventsByCanvasIDAndMultipleSources(canvasID uuid.UUID, sourceFilters []SourceFilter, limitPerSource int, before *time.Time) (map[string][]Event, error) {
-	if len(sourceFilters) == 0 {
-		return map[string][]Event{}, nil
-	}
-
-	var events []Event
-	query := database.Conn().Where("canvas_id = ?", canvasID)
-
-	var conditions []string
-	var args []interface{}
-
-	for _, filter := range sourceFilters {
-		if filter.SourceID != "" {
-			sourceID, err := uuid.Parse(filter.SourceID)
-			if err != nil {
-				return nil, fmt.Errorf("invalid source ID %s: %v", filter.SourceID, err)
-			}
-			condition := "(source_type = ? AND source_id = ?)"
-			conditions = append(conditions, condition)
-			args = append(args, filter.SourceType, sourceID)
-		} else {
-			condition := "(source_type = ?)"
-			conditions = append(conditions, condition)
-			args = append(args, filter.SourceType)
-		}
-	}
-
-	if len(conditions) > 0 {
-		whereClause := strings.Join(conditions, " OR ")
-		query = query.Where(whereClause, args...)
-	}
-
-	if before != nil {
-		query = query.Where("received_at < ?", before)
-	}
-
-	query = query.Order("source_id, source_type, received_at DESC")
-
-	err := query.Find(&events).Error
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[string][]Event)
-	sourceCounters := make(map[string]int)
-
-	for _, event := range events {
-		sourceKey := fmt.Sprintf("%s|%s", event.SourceType, event.SourceID.String())
-
-		if limitPerSource > 0 {
-			if sourceCounters[sourceKey] >= limitPerSource {
-				continue
-			}
-			sourceCounters[sourceKey]++
-		}
-
-		result[sourceKey] = append(result[sourceKey], event)
-	}
-
-	return result, nil
+	return count, nil
 }
 
 // CompileBooleanExpression compiles a boolean expression.

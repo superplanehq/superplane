@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CancelStageEvent(ctx context.Context, canvasID string, stageIdOrName string, eventID string) (*pb.CancelStageEventResponse, error) {
+func DiscardStageEvent(ctx context.Context, canvasID string, stageIdOrName string, eventID string) (*pb.DiscardStageEventResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -48,12 +48,9 @@ func CancelStageEvent(ctx context.Context, canvasID string, stageIdOrName string
 		return nil, err
 	}
 
-	err = event.Cancel(uuid.MustParse(userID))
+	err = event.Discard(uuid.MustParse(userID))
 	if err != nil {
-		if errors.Is(err, models.ErrEventAlreadyCancelled) {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
-		if errors.Is(err, models.ErrEventCannotBeCancelled) {
+		if errors.Is(err, models.ErrEventAlreadyDiscarded) || errors.Is(err, models.ErrEventCannotBeDiscarded) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
@@ -61,20 +58,20 @@ func CancelStageEvent(ctx context.Context, canvasID string, stageIdOrName string
 		return nil, err
 	}
 
-	logger.Infof("event %s cancelled", event.ID)
+	logger.Infof("event %s discarded", event.ID)
 
-	err = messages.NewStageEventCancelledMessage(canvasID, event).Publish()
+	err = messages.NewStageEventDiscardedMessage(canvasID, event).Publish()
 	if err != nil {
-		logger.Errorf("failed to publish event cancelled message: %v", err)
+		logger.Errorf("failed to publish event discarded message: %v", err)
 	}
 
-	serialized, err := serializeStageEvent(*event)
+	serialized, err := actions.SerializeStageEvent(*event)
 	if err != nil {
 		logger.Errorf("failed to serialize stage event: %v", err)
 		return nil, err
 	}
 
-	return &pb.CancelStageEventResponse{
+	return &pb.DiscardStageEventResponse{
 		Event: serialized,
 	}, nil
 }

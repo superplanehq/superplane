@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/events"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"google.golang.org/protobuf/proto"
@@ -25,7 +25,7 @@ func HandleEventCreated(messageBody []byte, wsHub *ws.Hub) error {
 			"id":          pbMsg.EventId,
 			"canvas_id":   pbMsg.CanvasId,
 			"source_id":   pbMsg.SourceId,
-			"source_type": events.ProtoToEventSourceType(pbMsg.SourceType),
+			"source_type": actions.ProtoToEventSourceType(pbMsg.SourceType),
 			"timestamp":   pbMsg.Timestamp.AsTime(),
 		},
 	})

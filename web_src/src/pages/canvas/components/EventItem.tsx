@@ -49,22 +49,25 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
     switch (stateType) {
       case 'pending':
         return {
-          dotColor: 'bg-yellow-500',
+          bgColor: 'bg-yellow-100/50',
           textColor: 'text-yellow-700 dark:text-yellow-400',
+          icon: 'schedule',
           label: 'Pending',
           animate: true,
         };
       case 'discarded':
         return {
-          dotColor: 'bg-zinc-500',
+          bgColor: 'bg-zinc-100/50 dark:bg-zinc-900/20',
           textColor: 'text-zinc-600 dark:text-zinc-400',
+          icon: 'cancel',
           label: 'Discarded',
           animate: false,
         };
       case 'processed':
         return {
-          dotColor: 'bg-green-500',
+          bgColor: 'bg-green-100/50 dark:bg-green-900/20',
           textColor: 'text-green-600 dark:text-green-400',
+          icon: 'check_circle',
           label: 'Forwarded',
           animate: false,
         };
@@ -74,22 +77,20 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
   const stateConfig = getStateConfig();
 
 
-  const getTruncatedUrl = () => {
-    // Create a truncated version of the event ID to simulate a URL
-    if (eventId.length > 30) {
-      return eventId.substring(0, 27) + '...';
-    }
-    return eventId;
-  };
-
-
   return (
     <div className="border bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-lg text-left">
       <div className="p-3">
         <div className="cursor-pointer flex items-center justify-between" onClick={toggleExpand}>
           <div className="flex items-center gap-2 truncate pr-2">
-            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${stateConfig.dotColor} ${stateConfig.animate ? 'animate-pulse' : ''}`}></div>
-            <span className="font-medium truncate text-sm dark:text-white font-mono">{getTruncatedUrl()}</span>
+            {/* State badge */}
+            <span className={`inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline ${stateConfig.bgColor} ${stateConfig.textColor}`}>
+              <span className={`material-symbols-outlined select-none inline-flex items-center justify-center !text-base ${stateConfig.animate ? 'animate-pulse' : ''}`} aria-hidden="true">{stateConfig.icon}</span>
+              <span className="uppercase">{stateConfig.label}</span>
+            </span>
+            {/* Event type badge */}
+            <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-blue-100/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+              <span>{eventType || 'webhook'}</span>
+            </span>
           </div>
           <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap text-right">{formatRelativeTime(timestamp, true)}</span>
           <div className="flex items-center gap-3">
@@ -107,7 +108,6 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
             payload={payload}
             eventId={eventId}
             timestamp={timestamp}
-            state={state}
             eventType={eventType}
             sourceName={sourceName}
             showDetailsTab={true}

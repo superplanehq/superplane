@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,16 +14,21 @@ import (
 )
 
 const (
-	ExecutionPending   = "pending"
-	ExecutionStarted   = "started"
-	ExecutionFinished  = "finished"
-	ExecutionCancelled = "cancelled"
+	ExecutionPending  = "pending"
+	ExecutionStarted  = "started"
+	ExecutionFinished = "finished"
 
 	ExecutionResourcePending  = "pending"
 	ExecutionResourceFinished = "finished"
 
-	ResultPassed = "passed"
-	ResultFailed = "failed"
+	ResultPassed    = "passed"
+	ResultFailed    = "failed"
+	ResultCancelled = "cancelled"
+)
+
+var (
+	ErrExecutionAlreadyCancelled  = errors.New("execution already cancelled")
+	ErrExecutionCannotBeCancelled = errors.New("execution cannot be cancelled")
 )
 
 type StageExecution struct {
@@ -37,6 +43,31 @@ type StageExecution struct {
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
 	Outputs      datatypes.JSONType[map[string]any]
+	CancelledAt  *time.Time
+	CancelledBy  *uuid.UUID
+
+	StageEvent *StageEvent `gorm:"foreignKey:StageEventID;references:ID"`
+}
+
+func (e *StageExecution) Cancel(userID uuid.UUID) error {
+	if e.State == ExecutionFinished {
+		return ErrExecutionCannotBeCancelled
+	}
+
+	if e.CancelledAt != nil {
+		return ErrExecutionAlreadyCancelled
+	}
+
+	now := time.Now()
+	return database.Conn().Model(e).
+		Clauses(clause.Returning{}).
+		Update("state", ExecutionFinished).
+		Update("result", ResultCancelled).
+		Update("updated_at", &now).
+		Update("finished_at", &now).
+		Update("cancelled_at", &now).
+		Update("cancelled_by", &userID).
+		Error
 }
 
 func (e *StageExecution) GetInputs() (map[string]any, error) {
@@ -189,7 +220,23 @@ func (e *StageExecution) IntegrationResource(externalID string) (*ExecutionInteg
 	return &r, nil
 }
 
-func FindExecutionByID(id uuid.UUID) (*StageExecution, error) {
+func FindExecutionByID(id, stageID uuid.UUID) (*StageExecution, error) {
+	var execution StageExecution
+
+	err := database.Conn().
+		Where("id = ?", id).
+		Where("stage_id = ?", stageID).
+		First(&execution).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
+func FindUnscopedExecutionByID(id uuid.UUID) (*StageExecution, error) {
 	var execution StageExecution
 
 	err := database.Conn().

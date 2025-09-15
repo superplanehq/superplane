@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4nAxD1eA7xt4KISmlxkal3YcBOrgzuDnVARgpgsyFsfv8TpvAuxwqIOOdbkddcp
+\restrict 9JHpcUBgZhdlMhZbBWFbGvyHT7YRrR8IoSbFzPsCnEHe2XbEtw6pynCPluzXYqI
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -418,8 +418,8 @@ CREATE TABLE public.stage_events (
     created_at timestamp without time zone NOT NULL,
     inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
     name text,
-    cancelled_by uuid,
-    cancelled_at timestamp without time zone
+    discarded_by uuid,
+    discarded_at timestamp without time zone
 );
 
 
@@ -438,7 +438,9 @@ CREATE TABLE public.stage_executions (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     started_at timestamp without time zone,
-    finished_at timestamp without time zone
+    finished_at timestamp without time zone,
+    cancelled_at timestamp without time zone,
+    cancelled_by uuid
 );
 
 
@@ -834,6 +836,13 @@ CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at)
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1152,13 +1161,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4nAxD1eA7xt4KISmlxkal3YcBOrgzuDnVARgpgsyFsfv8TpvAuxwqIOOdbkddcp
+\unrestrict 9JHpcUBgZhdlMhZbBWFbGvyHT7YRrR8IoSbFzPsCnEHe2XbEtw6pynCPluzXYqI
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 92nFumVKFHyxHVfPgUnVDBlRdacBR3mff5Fwbb7gp8R1isxraToxh9hSlTb7BsA
+\restrict 4ydC80NFQSbgTKMyxtZ4KUbR74P1Pqp0CKLLR6kti74M3TnyrBHh2gOOJsYQzrq
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1180,7 +1189,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250910175252	f
+20250915181443	f
 \.
 
 
@@ -1188,5 +1197,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 92nFumVKFHyxHVfPgUnVDBlRdacBR3mff5Fwbb7gp8R1isxraToxh9hSlTb7BsA
+\unrestrict 4ydC80NFQSbgTKMyxtZ4KUbR74P1Pqp0CKLLR6kti74M3TnyrBHh2gOOJsYQzrq
 

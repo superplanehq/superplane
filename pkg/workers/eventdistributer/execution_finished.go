@@ -26,7 +26,7 @@ func HandleExecutionFinished(messageBody []byte, wsHub *ws.Hub) error {
 		return err
 	}
 
-	execution, err := models.FindExecutionByID(executionID)
+	execution, err := models.FindExecutionByID(executionID, uuid.MustParse(executionFinished.StageId))
 	if err != nil {
 		return err
 	}

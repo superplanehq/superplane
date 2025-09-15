@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button } from '@/components/Button/button';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import CloseAndCheckButtons from './CloseAndCheckButtons';
 
 interface InlineEditorProps {
   isEditing: boolean;
@@ -29,15 +29,7 @@ export function InlineEditor({
     return (
       <div className={`border border-zinc-200 dark:border-zinc-700 rounded-lg p-3 space-y-3 ${className}`}>
         {editForm}
-        <div className="flex justify-end gap-2 pt-2">
-          <Button outline onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button color="blue" onClick={onSave}>
-            <MaterialSymbol name="save" size="sm" data-slot="icon" />
-            Save
-          </Button>
-        </div>
+        <CloseAndCheckButtons onCancel={onCancel} onConfirm={onSave} />
       </div>
     );
   }

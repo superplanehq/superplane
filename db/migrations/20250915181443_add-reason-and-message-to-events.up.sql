@@ -1,4 +1,3 @@
-
 BEGIN;
 
 ALTER TABLE events

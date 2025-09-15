@@ -1,11 +1,11 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useUpdateStage, useCreateStage, useDeleteStage } from '@/hooks/useCanvasData';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -36,6 +36,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [stageName, setStageName] = useState(props.data.name || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
+  const triggerSectionValidationRef = useRef<(() => void) | null>(null);
   const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
   const nodes = useCanvasStore(state => state.nodes);
@@ -87,7 +88,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const pendingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_PENDING' && !event.execution)
+      ?.filter(event => event.state === 'STATE_PENDING')
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
@@ -98,7 +99,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const waitingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_WAITING' && !event.execution)
+      ?.filter(event => event.state === 'STATE_WAITING')
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
@@ -114,15 +115,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   );
 
   const allExecutions = useMemo(() =>
-    currentStage?.queue?.flatMap(event => event.execution as SuperplaneExecution)
-      .filter(execution => execution)
-      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
-    [currentStage?.queue]
+    currentStage?.executions
+      ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
+    [currentStage?.executions]
   );
 
   const allFinishedExecutions = useMemo(() =>
     allExecutions
-      .filter(execution => execution?.state === 'STATE_FINISHED' || execution?.state === 'STATE_CANCELLED')
+      .filter(execution => execution?.state === 'STATE_FINISHED')
     , [allExecutions]
   );
 
@@ -133,7 +133,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   // If there is a running execution, use it as the last execution
   const lastExecution = runningExecution || allFinishedExecutions.at(0);
-  const lastExecutionEvent = currentStage?.queue?.find(event => event.execution?.id === lastExecution?.id);
+  const lastExecutionEvent = lastExecution?.stageEvent;
   const lastInputsCount = lastExecutionEvent?.inputs?.length || 0;
   const lastOutputsCount = lastExecution?.outputs?.length || 0;
 
@@ -154,13 +154,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         if (result === 'RESULT_FAILED') {
           return <MaterialSymbol name="cancel" size="lg" className="text-red-600 mr-2" />;
         }
-        return <MaterialSymbol name="check_circle" size="lg" className="text-green-600 mr-2" />; case 'STATE_PENDING':
+        if (result === 'RESULT_CANCELLED') {
+          return <MaterialSymbol name="block" size="lg" className="text-gray-600 dark:text-gray-400 mr-2" />;
+        }
+        return <MaterialSymbol name="check_circle" size="lg" className="text-green-600 mr-2" />;
+      case 'STATE_PENDING':
         return (
           <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 mr-2 animate-spin" />
-        );
-      case 'STATE_CANCELLED':
-        return (
-          <MaterialSymbol name="block" size="lg" className="text-gray-600 dark:text-gray-400 mr-2" />
         );
       default:
         return (
@@ -189,6 +189,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
 
     if (!currentFormData.isValid) {
+      triggerSectionValidationRef?.current?.();
       return;
     }
 
@@ -366,11 +367,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         if (result === 'RESULT_FAILED') {
           return 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-700';
         }
+        if (result === 'RESULT_CANCELLED') {
+          return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
+        }
         return 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-700';
       case 'STATE_PENDING':
         return 'bg-yellow-50 dark:bg-yellow-900/50 border-yellow-200 dark:border-yellow-700';
-      case 'STATE_CANCELLED':
-        return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
       default:
         return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
     }
@@ -541,6 +543,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             canvasId={canvasId}
             organizationId={organizationId!}
             onDataChange={handleDataChange}
+            onTriggerSectionValidation={triggerSectionValidationRef}
           />
         ) : (
           <>

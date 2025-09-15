@@ -35,7 +35,7 @@ func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvas
 		return nil, status.Error(codes.Internal, "error updating key")
 	}
 
-	protoSource, err := serializeEventSource(*source)
+	protoSource, err := serializeEventSource(*source, nil)
 	if err != nil {
 		return nil, err
 	}
