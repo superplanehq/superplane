@@ -11,6 +11,7 @@ import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { ConfirmDialog } from './ConfirmDialog';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { useCanvasStore } from '../store/canvasStore';
+import { showErrorToast } from '@/utils/toast';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -228,6 +229,8 @@ export function EventSourceEditModeContent({
     if (apiError) {
       const parsedErrors = parseApiError(apiError);
       setApiValidationErrors(parsedErrors);
+
+      showErrorToast(apiError);
     } else {
       setApiValidationErrors({});
     }

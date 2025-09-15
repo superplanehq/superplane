@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
@@ -36,6 +36,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [stageName, setStageName] = useState(props.data.name || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
+  const triggerSectionValidationRef = useRef<(() => void) | null>(null);
   const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
   const nodes = useCanvasStore(state => state.nodes);
@@ -188,6 +189,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
 
     if (!currentFormData.isValid) {
+      triggerSectionValidationRef?.current?.();
       return;
     }
 
@@ -541,6 +543,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             canvasId={canvasId}
             organizationId={organizationId!}
             onDataChange={handleDataChange}
+            onTriggerSectionValidation={triggerSectionValidationRef}
           />
         ) : (
           <>
