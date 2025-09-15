@@ -17,6 +17,7 @@ import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/components/Button/button';
+import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -1379,7 +1380,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             {/* Outputs Section */}
             <EditableAccordionSection
               id="outputs"
-              title="Outputs"
+              title={
+                <div className="flex items-center gap-2">
+                  Outputs
+                  <OutputsHelpTooltip executorType={executor?.type} />
+                </div>
+              }
               isOpen={openSections.includes('outputs')}
               onToggle={handleAccordionToggle}
               isModified={isSectionModified(outputs, 'outputs')}
