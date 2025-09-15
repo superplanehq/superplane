@@ -13,6 +13,7 @@ package openapi_client
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // checks if the SuperplaneListEventRejectionsResponse type satisfies the MappedNullable interface at compile time
@@ -21,6 +22,9 @@ var _ MappedNullable = &SuperplaneListEventRejectionsResponse{}
 // SuperplaneListEventRejectionsResponse struct for SuperplaneListEventRejectionsResponse
 type SuperplaneListEventRejectionsResponse struct {
 	Rejections []SuperplaneEventRejection `json:"rejections,omitempty"`
+	TotalCount *int64 `json:"totalCount,omitempty"`
+	HasNextPage *bool `json:"hasNextPage,omitempty"`
+	LastTimestamp *time.Time `json:"lastTimestamp,omitempty"`
 }
 
 // NewSuperplaneListEventRejectionsResponse instantiates a new SuperplaneListEventRejectionsResponse object
@@ -72,6 +76,102 @@ func (o *SuperplaneListEventRejectionsResponse) SetRejections(v []SuperplaneEven
 	o.Rejections = v
 }
 
+// GetTotalCount returns the TotalCount field value if set, zero value otherwise.
+func (o *SuperplaneListEventRejectionsResponse) GetTotalCount() int64 {
+	if o == nil || IsNil(o.TotalCount) {
+		var ret int64
+		return ret
+	}
+	return *o.TotalCount
+}
+
+// GetTotalCountOk returns a tuple with the TotalCount field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneListEventRejectionsResponse) GetTotalCountOk() (*int64, bool) {
+	if o == nil || IsNil(o.TotalCount) {
+		return nil, false
+	}
+	return o.TotalCount, true
+}
+
+// HasTotalCount returns a boolean if a field has been set.
+func (o *SuperplaneListEventRejectionsResponse) HasTotalCount() bool {
+	if o != nil && !IsNil(o.TotalCount) {
+		return true
+	}
+
+	return false
+}
+
+// SetTotalCount gets a reference to the given int64 and assigns it to the TotalCount field.
+func (o *SuperplaneListEventRejectionsResponse) SetTotalCount(v int64) {
+	o.TotalCount = &v
+}
+
+// GetHasNextPage returns the HasNextPage field value if set, zero value otherwise.
+func (o *SuperplaneListEventRejectionsResponse) GetHasNextPage() bool {
+	if o == nil || IsNil(o.HasNextPage) {
+		var ret bool
+		return ret
+	}
+	return *o.HasNextPage
+}
+
+// GetHasNextPageOk returns a tuple with the HasNextPage field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneListEventRejectionsResponse) GetHasNextPageOk() (*bool, bool) {
+	if o == nil || IsNil(o.HasNextPage) {
+		return nil, false
+	}
+	return o.HasNextPage, true
+}
+
+// HasHasNextPage returns a boolean if a field has been set.
+func (o *SuperplaneListEventRejectionsResponse) HasHasNextPage() bool {
+	if o != nil && !IsNil(o.HasNextPage) {
+		return true
+	}
+
+	return false
+}
+
+// SetHasNextPage gets a reference to the given bool and assigns it to the HasNextPage field.
+func (o *SuperplaneListEventRejectionsResponse) SetHasNextPage(v bool) {
+	o.HasNextPage = &v
+}
+
+// GetLastTimestamp returns the LastTimestamp field value if set, zero value otherwise.
+func (o *SuperplaneListEventRejectionsResponse) GetLastTimestamp() time.Time {
+	if o == nil || IsNil(o.LastTimestamp) {
+		var ret time.Time
+		return ret
+	}
+	return *o.LastTimestamp
+}
+
+// GetLastTimestampOk returns a tuple with the LastTimestamp field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneListEventRejectionsResponse) GetLastTimestampOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.LastTimestamp) {
+		return nil, false
+	}
+	return o.LastTimestamp, true
+}
+
+// HasLastTimestamp returns a boolean if a field has been set.
+func (o *SuperplaneListEventRejectionsResponse) HasLastTimestamp() bool {
+	if o != nil && !IsNil(o.LastTimestamp) {
+		return true
+	}
+
+	return false
+}
+
+// SetLastTimestamp gets a reference to the given time.Time and assigns it to the LastTimestamp field.
+func (o *SuperplaneListEventRejectionsResponse) SetLastTimestamp(v time.Time) {
+	o.LastTimestamp = &v
+}
+
 func (o SuperplaneListEventRejectionsResponse) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -84,6 +184,15 @@ func (o SuperplaneListEventRejectionsResponse) ToMap() (map[string]interface{}, 
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Rejections) {
 		toSerialize["rejections"] = o.Rejections
+	}
+	if !IsNil(o.TotalCount) {
+		toSerialize["totalCount"] = o.TotalCount
+	}
+	if !IsNil(o.HasNextPage) {
+		toSerialize["hasNextPage"] = o.HasNextPage
+	}
+	if !IsNil(o.LastTimestamp) {
+		toSerialize["lastTimestamp"] = o.LastTimestamp
 	}
 	return toSerialize, nil
 }

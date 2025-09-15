@@ -1036,10 +1036,10 @@ message EventRejection {
   }
 
   string id = 1;
-  string event_id = 2;
-  string component_type = 3;
-  string component_id = 4;
-  string component_name = 5;
+  Event event = 2;
+  Connection.Type target_type = 3;
+  string target_id = 4;
+  string target_name = 5;
   RejectionReason reason = 6;
   string message = 7;
   google.protobuf.Timestamp rejected_at = 8;
@@ -1047,12 +1047,17 @@ message EventRejection {
 
 message ListEventRejectionsRequest {
   string canvas_id_or_name = 1;
-  string component_type = 2;
-  string component_id = 3;
+  Connection.Type target_type = 2;
+  string target_id = 3;
+  uint32 limit = 4;
+  google.protobuf.Timestamp before = 5;
 }
 
 message ListEventRejectionsResponse {
   repeated EventRejection rejections = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
 }
 
 message StageCreated {

@@ -654,16 +654,37 @@
             "type": "string"
           },
           {
-            "name": "componentType",
+            "name": "targetType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "TYPE_UNKNOWN",
+              "TYPE_EVENT_SOURCE",
+              "TYPE_STAGE",
+              "TYPE_CONNECTION_GROUP"
+            ],
+            "default": "TYPE_UNKNOWN"
+          },
+          {
+            "name": "targetId",
             "in": "query",
             "required": false,
             "type": "string"
           },
           {
-            "name": "componentId",
+            "name": "limit",
             "in": "query",
             "required": false,
-            "type": "string"
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
           }
         ],
         "tags": [
@@ -3974,16 +3995,16 @@
         "id": {
           "type": "string"
         },
-        "eventId": {
+        "event": {
+          "$ref": "#/definitions/SuperplaneEvent"
+        },
+        "targetType": {
+          "$ref": "#/definitions/SuperplaneConnectionType"
+        },
+        "targetId": {
           "type": "string"
         },
-        "componentType": {
-          "type": "string"
-        },
-        "componentId": {
-          "type": "string"
-        },
-        "componentName": {
+        "targetName": {
           "type": "string"
         },
         "reason": {
@@ -4319,6 +4340,17 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneEventRejection"
           }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

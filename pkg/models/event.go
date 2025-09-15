@@ -23,12 +23,6 @@ const (
 	EventStateRejected  = "rejected"
 	EventStateProcessed = "processed"
 
-	//
-	// Here for backwards compatibility.
-	// This state was renamed to 'rejected'
-	//
-	EventStateDiscarded = "discarded"
-
 	EventStateReasonFiltered     = "filtered"
 	EventStateReasonError        = "error"
 	EventStateReasonNotConnected = "not-connected"

@@ -22,10 +22,10 @@ var _ MappedNullable = &SuperplaneEventRejection{}
 // SuperplaneEventRejection struct for SuperplaneEventRejection
 type SuperplaneEventRejection struct {
 	Id *string `json:"id,omitempty"`
-	EventId *string `json:"eventId,omitempty"`
-	ComponentType *string `json:"componentType,omitempty"`
-	ComponentId *string `json:"componentId,omitempty"`
-	ComponentName *string `json:"componentName,omitempty"`
+	Event *SuperplaneEvent `json:"event,omitempty"`
+	TargetType *SuperplaneConnectionType `json:"targetType,omitempty"`
+	TargetId *string `json:"targetId,omitempty"`
+	TargetName *string `json:"targetName,omitempty"`
 	Reason *EventRejectionRejectionReason `json:"reason,omitempty"`
 	Message *string `json:"message,omitempty"`
 	RejectedAt *time.Time `json:"rejectedAt,omitempty"`
@@ -37,6 +37,8 @@ type SuperplaneEventRejection struct {
 // will change when the set of required properties is changed
 func NewSuperplaneEventRejection() *SuperplaneEventRejection {
 	this := SuperplaneEventRejection{}
+	var targetType SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
+	this.TargetType = &targetType
 	var reason EventRejectionRejectionReason = EVENTREJECTIONREJECTIONREASON_REJECTION_REASON_UNKNOWN
 	this.Reason = &reason
 	return &this
@@ -47,6 +49,8 @@ func NewSuperplaneEventRejection() *SuperplaneEventRejection {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneEventRejectionWithDefaults() *SuperplaneEventRejection {
 	this := SuperplaneEventRejection{}
+	var targetType SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
+	this.TargetType = &targetType
 	var reason EventRejectionRejectionReason = EVENTREJECTIONREJECTIONREASON_REJECTION_REASON_UNKNOWN
 	this.Reason = &reason
 	return &this
@@ -84,132 +88,132 @@ func (o *SuperplaneEventRejection) SetId(v string) {
 	o.Id = &v
 }
 
-// GetEventId returns the EventId field value if set, zero value otherwise.
-func (o *SuperplaneEventRejection) GetEventId() string {
-	if o == nil || IsNil(o.EventId) {
-		var ret string
+// GetEvent returns the Event field value if set, zero value otherwise.
+func (o *SuperplaneEventRejection) GetEvent() SuperplaneEvent {
+	if o == nil || IsNil(o.Event) {
+		var ret SuperplaneEvent
 		return ret
 	}
-	return *o.EventId
+	return *o.Event
 }
 
-// GetEventIdOk returns a tuple with the EventId field value if set, nil otherwise
+// GetEventOk returns a tuple with the Event field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventRejection) GetEventIdOk() (*string, bool) {
-	if o == nil || IsNil(o.EventId) {
+func (o *SuperplaneEventRejection) GetEventOk() (*SuperplaneEvent, bool) {
+	if o == nil || IsNil(o.Event) {
 		return nil, false
 	}
-	return o.EventId, true
+	return o.Event, true
 }
 
-// HasEventId returns a boolean if a field has been set.
-func (o *SuperplaneEventRejection) HasEventId() bool {
-	if o != nil && !IsNil(o.EventId) {
+// HasEvent returns a boolean if a field has been set.
+func (o *SuperplaneEventRejection) HasEvent() bool {
+	if o != nil && !IsNil(o.Event) {
 		return true
 	}
 
 	return false
 }
 
-// SetEventId gets a reference to the given string and assigns it to the EventId field.
-func (o *SuperplaneEventRejection) SetEventId(v string) {
-	o.EventId = &v
+// SetEvent gets a reference to the given SuperplaneEvent and assigns it to the Event field.
+func (o *SuperplaneEventRejection) SetEvent(v SuperplaneEvent) {
+	o.Event = &v
 }
 
-// GetComponentType returns the ComponentType field value if set, zero value otherwise.
-func (o *SuperplaneEventRejection) GetComponentType() string {
-	if o == nil || IsNil(o.ComponentType) {
-		var ret string
+// GetTargetType returns the TargetType field value if set, zero value otherwise.
+func (o *SuperplaneEventRejection) GetTargetType() SuperplaneConnectionType {
+	if o == nil || IsNil(o.TargetType) {
+		var ret SuperplaneConnectionType
 		return ret
 	}
-	return *o.ComponentType
+	return *o.TargetType
 }
 
-// GetComponentTypeOk returns a tuple with the ComponentType field value if set, nil otherwise
+// GetTargetTypeOk returns a tuple with the TargetType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventRejection) GetComponentTypeOk() (*string, bool) {
-	if o == nil || IsNil(o.ComponentType) {
+func (o *SuperplaneEventRejection) GetTargetTypeOk() (*SuperplaneConnectionType, bool) {
+	if o == nil || IsNil(o.TargetType) {
 		return nil, false
 	}
-	return o.ComponentType, true
+	return o.TargetType, true
 }
 
-// HasComponentType returns a boolean if a field has been set.
-func (o *SuperplaneEventRejection) HasComponentType() bool {
-	if o != nil && !IsNil(o.ComponentType) {
+// HasTargetType returns a boolean if a field has been set.
+func (o *SuperplaneEventRejection) HasTargetType() bool {
+	if o != nil && !IsNil(o.TargetType) {
 		return true
 	}
 
 	return false
 }
 
-// SetComponentType gets a reference to the given string and assigns it to the ComponentType field.
-func (o *SuperplaneEventRejection) SetComponentType(v string) {
-	o.ComponentType = &v
+// SetTargetType gets a reference to the given SuperplaneConnectionType and assigns it to the TargetType field.
+func (o *SuperplaneEventRejection) SetTargetType(v SuperplaneConnectionType) {
+	o.TargetType = &v
 }
 
-// GetComponentId returns the ComponentId field value if set, zero value otherwise.
-func (o *SuperplaneEventRejection) GetComponentId() string {
-	if o == nil || IsNil(o.ComponentId) {
+// GetTargetId returns the TargetId field value if set, zero value otherwise.
+func (o *SuperplaneEventRejection) GetTargetId() string {
+	if o == nil || IsNil(o.TargetId) {
 		var ret string
 		return ret
 	}
-	return *o.ComponentId
+	return *o.TargetId
 }
 
-// GetComponentIdOk returns a tuple with the ComponentId field value if set, nil otherwise
+// GetTargetIdOk returns a tuple with the TargetId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventRejection) GetComponentIdOk() (*string, bool) {
-	if o == nil || IsNil(o.ComponentId) {
+func (o *SuperplaneEventRejection) GetTargetIdOk() (*string, bool) {
+	if o == nil || IsNil(o.TargetId) {
 		return nil, false
 	}
-	return o.ComponentId, true
+	return o.TargetId, true
 }
 
-// HasComponentId returns a boolean if a field has been set.
-func (o *SuperplaneEventRejection) HasComponentId() bool {
-	if o != nil && !IsNil(o.ComponentId) {
+// HasTargetId returns a boolean if a field has been set.
+func (o *SuperplaneEventRejection) HasTargetId() bool {
+	if o != nil && !IsNil(o.TargetId) {
 		return true
 	}
 
 	return false
 }
 
-// SetComponentId gets a reference to the given string and assigns it to the ComponentId field.
-func (o *SuperplaneEventRejection) SetComponentId(v string) {
-	o.ComponentId = &v
+// SetTargetId gets a reference to the given string and assigns it to the TargetId field.
+func (o *SuperplaneEventRejection) SetTargetId(v string) {
+	o.TargetId = &v
 }
 
-// GetComponentName returns the ComponentName field value if set, zero value otherwise.
-func (o *SuperplaneEventRejection) GetComponentName() string {
-	if o == nil || IsNil(o.ComponentName) {
+// GetTargetName returns the TargetName field value if set, zero value otherwise.
+func (o *SuperplaneEventRejection) GetTargetName() string {
+	if o == nil || IsNil(o.TargetName) {
 		var ret string
 		return ret
 	}
-	return *o.ComponentName
+	return *o.TargetName
 }
 
-// GetComponentNameOk returns a tuple with the ComponentName field value if set, nil otherwise
+// GetTargetNameOk returns a tuple with the TargetName field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventRejection) GetComponentNameOk() (*string, bool) {
-	if o == nil || IsNil(o.ComponentName) {
+func (o *SuperplaneEventRejection) GetTargetNameOk() (*string, bool) {
+	if o == nil || IsNil(o.TargetName) {
 		return nil, false
 	}
-	return o.ComponentName, true
+	return o.TargetName, true
 }
 
-// HasComponentName returns a boolean if a field has been set.
-func (o *SuperplaneEventRejection) HasComponentName() bool {
-	if o != nil && !IsNil(o.ComponentName) {
+// HasTargetName returns a boolean if a field has been set.
+func (o *SuperplaneEventRejection) HasTargetName() bool {
+	if o != nil && !IsNil(o.TargetName) {
 		return true
 	}
 
 	return false
 }
 
-// SetComponentName gets a reference to the given string and assigns it to the ComponentName field.
-func (o *SuperplaneEventRejection) SetComponentName(v string) {
-	o.ComponentName = &v
+// SetTargetName gets a reference to the given string and assigns it to the TargetName field.
+func (o *SuperplaneEventRejection) SetTargetName(v string) {
+	o.TargetName = &v
 }
 
 // GetReason returns the Reason field value if set, zero value otherwise.
@@ -321,17 +325,17 @@ func (o SuperplaneEventRejection) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
 	}
-	if !IsNil(o.EventId) {
-		toSerialize["eventId"] = o.EventId
+	if !IsNil(o.Event) {
+		toSerialize["event"] = o.Event
 	}
-	if !IsNil(o.ComponentType) {
-		toSerialize["componentType"] = o.ComponentType
+	if !IsNil(o.TargetType) {
+		toSerialize["targetType"] = o.TargetType
 	}
-	if !IsNil(o.ComponentId) {
-		toSerialize["componentId"] = o.ComponentId
+	if !IsNil(o.TargetId) {
+		toSerialize["targetId"] = o.TargetId
 	}
-	if !IsNil(o.ComponentName) {
-		toSerialize["componentName"] = o.ComponentName
+	if !IsNil(o.TargetName) {
+		toSerialize["targetName"] = o.TargetName
 	}
 	if !IsNil(o.Reason) {
 		toSerialize["reason"] = o.Reason

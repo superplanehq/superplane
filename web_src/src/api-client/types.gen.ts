@@ -571,10 +571,10 @@ export type SuperplaneEvent = {
 
 export type SuperplaneEventRejection = {
     id?: string;
-    eventId?: string;
-    componentType?: string;
-    componentId?: string;
-    componentName?: string;
+    event?: SuperplaneEvent;
+    targetType?: SuperplaneConnectionType;
+    targetId?: string;
+    targetName?: string;
     reason?: EventRejectionRejectionReason;
     message?: string;
     rejectedAt?: string;
@@ -692,6 +692,9 @@ export type SuperplaneListConnectionGroupsResponse = {
 
 export type SuperplaneListEventRejectionsResponse = {
     rejections?: Array<SuperplaneEventRejection>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
 };
 
 export type SuperplaneListEventSourcesResponse = {
@@ -1362,8 +1365,10 @@ export type SuperplaneListEventRejectionsData = {
         canvasIdOrName: string;
     };
     query?: {
-        componentType?: string;
-        componentId?: string;
+        targetType?: 'TYPE_UNKNOWN' | 'TYPE_EVENT_SOURCE' | 'TYPE_STAGE' | 'TYPE_CONNECTION_GROUP';
+        targetId?: string;
+        limit?: number;
+        before?: string;
     };
     url: '/api/v1/canvases/{canvasIdOrName}/rejections';
 };

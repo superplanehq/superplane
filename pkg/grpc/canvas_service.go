@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
@@ -14,8 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type CanvasService struct {
@@ -201,10 +198,5 @@ func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsReques
 
 func (s *CanvasService) ListEventRejections(ctx context.Context, req *pb.ListEventRejectionsRequest) (*pb.ListEventRejectionsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	componentID, err := uuid.Parse(req.ComponentId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid component id")
-	}
-
-	return canvases.ListEventRejections(ctx, canvasID, req.ComponentType, componentID)
+	return canvases.ListEventRejections(ctx, canvasID, req.TargetType, req.TargetId, req.Limit, req.Before)
 }

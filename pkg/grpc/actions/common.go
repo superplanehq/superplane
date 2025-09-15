@@ -95,7 +95,7 @@ func ValidateConnections(canvasID string, connections []*pb.Connection) ([]model
 		cs = append(cs, models.Connection{
 			SourceID:       *sourceID,
 			SourceName:     connection.Name,
-			SourceType:     protoToConnectionType(connection.Type),
+			SourceType:     ProtoToConnectionType(connection.Type),
 			FilterOperator: ProtoToFilterOperator(connection.FilterOperator),
 			Filters:        filters,
 		})
@@ -163,7 +163,7 @@ func validateHeaderFilter(filter *pb.HeaderFilter) (*models.Filter, error) {
 	}, nil
 }
 
-func protoToConnectionType(t pb.Connection_Type) string {
+func ProtoToConnectionType(t pb.Connection_Type) string {
 	switch t {
 	case pb.Connection_TYPE_STAGE:
 		return models.SourceTypeStage
@@ -467,7 +467,7 @@ func EventStateToProto(state string) pb.Event_State {
 		return pb.Event_STATE_PENDING
 	case models.EventStateProcessed:
 		return pb.Event_STATE_PROCESSED
-	case models.EventStateRejected, models.EventStateDiscarded:
+	case models.EventStateRejected:
 		return pb.Event_STATE_REJECTED
 	default:
 		return pb.Event_STATE_UNKNOWN

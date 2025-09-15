@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 
@@ -606,17 +607,29 @@ type ApiSuperplaneListEventRejectionsRequest struct {
 	ctx context.Context
 	ApiService *CanvasAPIService
 	canvasIdOrName string
-	componentType *string
-	componentId *string
+	targetType *string
+	targetId *string
+	limit *int64
+	before *time.Time
 }
 
-func (r ApiSuperplaneListEventRejectionsRequest) ComponentType(componentType string) ApiSuperplaneListEventRejectionsRequest {
-	r.componentType = &componentType
+func (r ApiSuperplaneListEventRejectionsRequest) TargetType(targetType string) ApiSuperplaneListEventRejectionsRequest {
+	r.targetType = &targetType
 	return r
 }
 
-func (r ApiSuperplaneListEventRejectionsRequest) ComponentId(componentId string) ApiSuperplaneListEventRejectionsRequest {
-	r.componentId = &componentId
+func (r ApiSuperplaneListEventRejectionsRequest) TargetId(targetId string) ApiSuperplaneListEventRejectionsRequest {
+	r.targetId = &targetId
+	return r
+}
+
+func (r ApiSuperplaneListEventRejectionsRequest) Limit(limit int64) ApiSuperplaneListEventRejectionsRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiSuperplaneListEventRejectionsRequest) Before(before time.Time) ApiSuperplaneListEventRejectionsRequest {
+	r.before = &before
 	return r
 }
 
@@ -663,11 +676,20 @@ func (a *CanvasAPIService) SuperplaneListEventRejectionsExecute(r ApiSuperplaneL
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.componentType != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "componentType", r.componentType, "", "")
+	if r.targetType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "targetType", r.targetType, "", "")
+	} else {
+		var defaultValue string = "TYPE_UNKNOWN"
+		r.targetType = &defaultValue
 	}
-	if r.componentId != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "componentId", r.componentId, "", "")
+	if r.targetId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "targetId", r.targetId, "", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
+	}
+	if r.before != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

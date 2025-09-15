@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9JHpcUBgZhdlMhZbBWFbGvyHT7YRrR8IoSbFzPsCnEHe2XbEtw6pynCPluzXYqI
+\restrict fKYlVLv4VZuIzQRaR1gFhzQCJQUYPCi0kIAZPzb96QeeHnbhNn1MqFiMvwC6SMo
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -197,8 +197,8 @@ CREATE TABLE public.connections (
 CREATE TABLE public.event_rejections (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     event_id uuid NOT NULL,
-    component_type character varying(64) NOT NULL,
-    component_id uuid NOT NULL,
+    target_type character varying(64) NOT NULL,
+    target_id uuid NOT NULL,
     reason character varying(64) NOT NULL,
     message text,
     rejected_at timestamp without time zone DEFAULT now() NOT NULL
@@ -836,13 +836,6 @@ CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at)
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -878,17 +871,17 @@ CREATE INDEX idx_connection_groups_deleted_at ON public.connection_groups USING 
 
 
 --
--- Name: idx_event_rejections_component; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_event_rejections_component ON public.event_rejections USING btree (component_type, component_id);
-
-
---
 -- Name: idx_event_rejections_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_event_rejections_event_id ON public.event_rejections USING btree (event_id);
+
+
+--
+-- Name: idx_event_rejections_target; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_rejections_target ON public.event_rejections USING btree (target_type, target_id);
 
 
 --
@@ -1161,13 +1154,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9JHpcUBgZhdlMhZbBWFbGvyHT7YRrR8IoSbFzPsCnEHe2XbEtw6pynCPluzXYqI
+\unrestrict fKYlVLv4VZuIzQRaR1gFhzQCJQUYPCi0kIAZPzb96QeeHnbhNn1MqFiMvwC6SMo
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 4ydC80NFQSbgTKMyxtZ4KUbR74P1Pqp0CKLLR6kti74M3TnyrBHh2gOOJsYQzrq
+\restrict zoDaMqcoofd39OdHE5Hqyw4YsEjFAbb0wr9ouklidjJD5mwbHdESgPc5CHCBe51
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1197,5 +1190,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4ydC80NFQSbgTKMyxtZ4KUbR74P1Pqp0CKLLR6kti74M3TnyrBHh2gOOJsYQzrq
+\unrestrict zoDaMqcoofd39OdHE5Hqyw4YsEjFAbb0wr9ouklidjJD5mwbHdESgPc5CHCBe51
 
