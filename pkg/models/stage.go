@@ -530,7 +530,7 @@ func (s *Stage) DeleteStageEventsInTransaction(tx *gorm.DB) error {
 	return nil
 }
 
-func (s *Stage) ListExecutionsWithLimitAndBefore(states []string, results []string, limit int, before *time.Time) ([]StageExecution, error) {
+func (s *Stage) FilterExecutions(states []string, results []string, limit int, before *time.Time) ([]StageExecution, error) {
 	var executions []StageExecution
 	query := database.Conn().
 		Preload("StageEvent", func(db *gorm.DB) *gorm.DB {

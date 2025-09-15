@@ -100,7 +100,7 @@ func listAndCountExecutionsInParallel(stage *models.Stage, states, results []str
 
 	go func() {
 		defer wg.Done()
-		result.executions, result.listErr = stage.ListExecutionsWithLimitAndBefore(states, results, int(limit), beforeTime)
+		result.executions, result.listErr = stage.FilterExecutions(states, results, int(limit), beforeTime)
 	}()
 
 	go func() {
