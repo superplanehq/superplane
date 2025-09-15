@@ -565,7 +565,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const inputsEditor = useArrayEditor({
     items: inputs,
     setItems: setInputs,
-    createNewItem: () => ({ name: '', description: '' }),
+    createNewItem: () => ({ name: `INPUT_${inputs.length + 1}`, description: '' }),
     validateItem: validateInput,
     setValidationErrors,
     errorPrefix: 'input'
@@ -574,7 +574,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const outputsEditor = useArrayEditor({
     items: outputs,
     setItems: setOutputs,
-    createNewItem: () => ({ name: '', description: '', required: false }),
+    createNewItem: () => ({ name: `OUTPUT_${outputs.length + 1}`, description: '', required: false }),
     validateItem: validateOutput,
     setValidationErrors,
     errorPrefix: 'output'
@@ -1012,6 +1012,86 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     setInputMappings(newMappings);
   };
 
+  const handleConnectionSave = useCallback(() => {
+    const savedConnection = connectionsEditor.editingIndex !== null ?
+      connections[connectionsEditor.editingIndex] : null;
+
+    connectionsEditor.saveEdit();
+
+    if (savedConnection?.name && inputs.length > 0) {
+      const existingMapping = inputMappings.find(mapping =>
+        mapping.when?.triggeredBy?.connection === savedConnection.name
+      );
+
+      if (!existingMapping) {
+        const newMapping = {
+          when: { triggeredBy: { connection: savedConnection.name } },
+          values: inputs.map(input => ({
+            name: input.name,
+            value: ''
+          }))
+        };
+        setInputMappings(prev => [...prev, newMapping]);
+      }
+    }
+  }, [connectionsEditor, connections, inputs, inputMappings, setInputMappings]);
+
+  const handleConnectionDelete = useCallback((index: number, connection: SuperplaneConnection) => {
+    const connectionName = connection.name;
+
+    connectionsEditor.removeItem(index);
+
+    if (connectionName) {
+      const updatedMappings = inputMappings.filter(mapping =>
+        mapping.when?.triggeredBy?.connection !== connectionName
+      );
+      setInputMappings(updatedMappings);
+    }
+  }, [connectionsEditor, inputMappings, setInputMappings]);
+
+  const handleInputDelete = useCallback((index: number, input: SuperplaneInputDefinition) => {
+    const inputName = input.name;
+
+    inputsEditor.removeItem(index);
+
+    if (inputName) {
+      const updatedMappings = inputMappings.map(mapping => ({
+        ...mapping,
+        values: mapping.values?.filter(value => value.name !== inputName && value.name !== '') || []
+      }))
+        .filter(mapping => mapping.values?.length > 0);
+      setInputMappings(updatedMappings);
+    }
+  }, [inputsEditor, inputMappings, setInputMappings]);
+
+  const handleInputAdd = useCallback(() => {
+    inputsEditor.addItem();
+
+    if (connections.length > 0) {
+      const inputsCount = inputs.length;
+      const newInputName = `INPUT_${inputsCount + 1}`;
+
+
+      if (inputMappings.length === 0) {
+        const newMappings = connections.map(connection => ({
+          when: { triggeredBy: { connection: connection.name } },
+          values: [{ name: newInputName, value: '' }]
+        }));
+        setInputMappings(newMappings);
+        return;
+      }
+
+      const updatedMappings = inputMappings.map(mapping => ({
+        ...mapping,
+        values: [
+          ...(mapping.values || []),
+          { name: newInputName, value: '' }
+        ]
+      }));
+      setInputMappings(updatedMappings);
+    }
+  }, [inputsEditor, connections, inputMappings, setInputMappings, inputs]);
+
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
       <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-1')}>
@@ -1044,7 +1124,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 <div key={index}>
                   <InlineEditor
                     isEditing={connectionsEditor.editingIndex === index}
-                    onSave={connectionsEditor.saveEdit}
+                    onSave={handleConnectionSave}
                     onCancel={() => connectionsEditor.cancelEdit(index, (item) => {
                       if (!item.name || item.name.trim() === '') {
                         return true;
@@ -1066,7 +1146,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       return false;
                     })}
                     onEdit={() => connectionsEditor.startEdit(index)}
-                    onDelete={() => connectionsEditor.removeItem(index)}
+                    onDelete={() => handleConnectionDelete(index, connection)}
                     displayName={connection.name || `Connection ${index + 1}`}
                     badge={connection.type && (
                       <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
@@ -1139,22 +1219,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         return isNewInput;
                       })}
                       onEdit={() => inputsEditor.startEdit(index)}
-                      onDelete={() => {
-                        const inputName = input.name;
-
-                        inputsEditor.removeItem(index);
-
-                        if (inputName) {
-                          const updatedMappings = inputMappings.map(mapping => ({
-                            ...mapping,
-                            values: mapping.values?.filter(value => value.name !== inputName) || []
-                          })).filter(mapping =>
-                            // Remove mappings that have no values left
-                            mapping.values && mapping.values.length > 0
-                          );
-                          setInputMappings(updatedMappings);
-                        }
-                      }}
+                      onDelete={() => handleInputDelete(index, input)}
                       displayName={input.name || `Input ${index + 1}`}
                       badge={
                         <div className="flex items-center gap-2">
@@ -1339,28 +1404,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                           </>
                                         )
                                       }
-                                      {/* Remove Input from Mapping Button */}
-                                      <div className="flex justify-end">
-                                        <button
-                                          onClick={() => inputMappingHandlers.handleRemoveMapping(actualMappingIndex)}
-                                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs"
-                                        >
-                                          Remove from Mapping
-                                        </button>
-                                      </div>
                                     </div>
                                   </div>
                                 );
                               })}
                             </div>
                           </div>
-                          <button
-                            onClick={() => inputMappingHandlers.handleAddMapping(input)}
-                            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                          >
-                            <MaterialSymbol name="add" size="sm" />
-                            Add Mapping
-                          </button>
                         </div>
                       }
                     />
@@ -1368,7 +1417,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 );
               })}
               <button
-                onClick={inputsEditor.addItem}
+                onClick={handleInputAdd}
                 className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
               >
                 <MaterialSymbol name="add" size="sm" />
