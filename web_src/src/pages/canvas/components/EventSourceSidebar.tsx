@@ -8,6 +8,7 @@ import { EventItem } from "./EventItem";
 import { useIntegrations } from "../hooks/useIntegrations";
 import { useCanvasStore } from "../store/canvasStore";
 import { useEventSourceEvents } from "@/hooks/useCanvasData";
+import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { SidebarTabs } from './SidebarTabs';
@@ -26,10 +27,11 @@ interface EventSourceSidebarProps {
     eventSourceType?: string;
   };
   onClose: () => void;
+  initialWidth?: number;
 }
 
-export const EventSourceSidebar = ({ selectedEventSource, onClose }: EventSourceSidebarProps) => {
-  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
+export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth = DEFAULT_SIDEBAR_WIDTH }: EventSourceSidebarProps) => {
+  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(initialWidth);
   const [activeTab, setActiveTab] = useState<TabType>('history');
   const canvasId = useCanvasStore(state => state.canvasId) || '';
 

@@ -13,16 +13,17 @@ import { useNodeHandlers } from "./utils/nodeHandlers";
 import { NodeType } from "./utils/nodeFactories";
 import { withOrganizationHeader } from "../../utils/withOrganizationHeader";
 import { useAutoLayout } from "./hooks/useAutoLayout";
+import { DEFAULT_SIDEBAR_WIDTH } from "./utils/constants";
 
 
 export function Canvas() {
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, selectedEventSourceId, cleanSelectedEventSourceId, editingStageId, stages, eventSources, approveStageEvent, discardStageEvent, cancelStageExecution, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, selectedEventSourceId, cleanSelectedEventSourceId, editingStageId, stages, eventSources, connectionGroups, approveStageEvent, discardStageEvent, cancelStageExecution, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
+  const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(false);
   const [canvasName, setCanvasName] = useState<string>('');
 
   useEffect(() => {
@@ -32,6 +33,14 @@ export function Canvas() {
       document.title = 'Superplane';
     }
   }, [canvasName]);
+
+  // Set initial component sidebar state based on canvas contents
+  useEffect(() => {
+    if (!isLoading) {
+      const hasCanvasComponents = stages.length > 0 || eventSources.length > 0 || connectionGroups.length > 0;
+      setIsComponentSidebarOpen(!hasCanvasComponents);
+    }
+  }, [isLoading, stages.length, eventSources.length, connectionGroups.length]);
 
   const getActiveViewFromHash = (): CanvasView => {
     const hash = location.hash.substring(1);
@@ -292,17 +301,17 @@ export function Canvas() {
             {!isComponentSidebarOpen && (
               <button
                 onClick={() => setIsComponentSidebarOpen(true)}
-                className="fixed top-16 left-4 z-30 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-50 transition-all duration-300 flex items-center gap-2"
+                className="fixed top-16 left-4 z-30 px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 rounded-md shadow-md hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all duration-300 flex items-center gap-2"
                 title="Open Components"
               >
-                <span className="text-medium font-semibold text-gray-700">Components</span>
-                <span style={{ fontSize: '1.2rem' }} className="material-symbols-outlined text-gray-600 -scale-x-100">menu_open</span>
+                <span className="text-medium font-semibold text-gray-700 dark:text-zinc-100">Components</span>
+                <span style={{ fontSize: '1.2rem' }} className="material-symbols-outlined text-gray-600 dark:text-zinc-300 -scale-x-100">menu_open</span>
               </button>
             )}
 
             <FlowRenderer />
-            {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} discardStageEvent={discardStageEvent} cancelStageExecution={cancelStageExecution} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
-            {selectedEventSource && <EventSourceSidebar selectedEventSource={selectedEventSource} onClose={() => cleanSelectedEventSourceId()} />}
+            {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} discardStageEvent={discardStageEvent} cancelStageExecution={cancelStageExecution} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} initialWidth={DEFAULT_SIDEBAR_WIDTH} />}
+            {selectedEventSource && <EventSourceSidebar selectedEventSource={selectedEventSource} onClose={() => cleanSelectedEventSourceId()} initialWidth={DEFAULT_SIDEBAR_WIDTH} />}
           </div>
         ) : (
           <div className="h-[calc(100%-2.7rem)] p-6 bg-zinc-50 dark:bg-zinc-950" >
