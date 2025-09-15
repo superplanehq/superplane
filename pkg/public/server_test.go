@@ -470,7 +470,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 200, response.Code)
-		execution, err := models.FindExecutionByID(execution.ID)
+		execution, err := models.FindExecutionByID(execution.ID, execution.StageID)
 		require.NoError(t, err)
 		assert.Equal(t, outputs, execution.Outputs.Data())
 	})
@@ -486,7 +486,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 200, response.Code)
-		execution, err := models.FindExecutionByID(execution.ID)
+		execution, err := models.FindExecutionByID(execution.ID, execution.StageID)
 		require.NoError(t, err)
 		assert.Equal(t, outputs, execution.Outputs.Data())
 	})
@@ -511,7 +511,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 200, response.Code)
-		execution, err := models.FindExecutionByID(execution.ID)
+		execution, err := models.FindExecutionByID(execution.ID, execution.StageID)
 		require.NoError(t, err)
 		assert.Equal(t, map[string]any{"sha": "078fc8755c051", "version": "v1.0.0"}, execution.Outputs.Data())
 	})

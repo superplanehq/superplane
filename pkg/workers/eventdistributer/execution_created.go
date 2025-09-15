@@ -25,7 +25,7 @@ func HandleExecutionCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to parse execution ID: %w", err)
 	}
 
-	execution, err := models.FindExecutionByID(executionID)
+	execution, err := models.FindExecutionByID(executionID, uuid.MustParse(pbMsg.StageId))
 	if err != nil {
 		return fmt.Errorf("failed to find execution in database: %w", err)
 	}
