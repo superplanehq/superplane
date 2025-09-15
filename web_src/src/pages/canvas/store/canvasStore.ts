@@ -467,19 +467,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ handleDragging: data });
   },
 
-  // Flow instance reference
-  fitViewNodeRef: null as ((nodeId: string) => void) | null,
-  
-  setFitViewNodeRef: (fitViewNodeFn: (nodeId: string) => void) => {
-    set({ fitViewNodeRef: fitViewNodeFn });
-  },
-
-  fitViewNode: (nodeId: string) => {
-    const { fitViewNodeRef } = get();
-    if (fitViewNodeRef) {
-      fitViewNodeRef(nodeId);
-    }
-  },
 
   updateEventSourceKey: (eventSourceId: string, key: string) => {
     set((state) => ({
