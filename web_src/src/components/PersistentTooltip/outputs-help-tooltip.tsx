@@ -41,25 +41,46 @@ export function OutputsHelpTooltip({ className = '', executorType }: OutputsHelp
   const renderGitHubSection = () => (
     <div className="mb-6">
       <p className="text-xs mb-3 text-zinc-600 dark:text-zinc-400">
-        Add this step to your GitHub workflow to push outputs using OIDC:
+        Add these steps to your GitHub workflow to push outputs using OIDC. The GITHUB_ID_TOKEN must be generated in a previous step, like in the example below:
       </p>
       <pre className="bg-zinc-100 dark:bg-zinc-900 p-3 rounded text-xs overflow-x-auto mb-2">
         {`# Add to your .github/workflows/*.yml
-- name: Push outputs to Superplane
-  run: |
-    curl \\
-      "https://app.superplane.com/api/v1/outputs" \\
-      -X POST \\
-      -H "Content-Type: application/json" \\
-      -H "Authorization: Bearer $GITHUB_ID_TOKEN" \\
-      --data '{
-        "execution_id": "'$SUPERPLANE_EXECUTION_ID'",
-        "external_id": "'$GITHUB_RUN_ID'",
-        "outputs": {
-          "DEPLOY_URL": "https://app-staging.example.com",
-          "HEALTH_CHECK": "passing"
-        }
-      }'`}
+permissions:
+  id-token: write
+
+jobs:
+  your-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install OIDC Client
+        run: npm install @actions/core@1.6.0 @actions/http-client
+        
+      - name: Get Id Token
+        uses: actions/github-script@v7
+        id: idToken
+        with:
+          script: |
+            let token = await core.getIDToken('superplane')
+            core.setOutput('token', token)
+            
+      - name: Push outputs to Superplane
+        run: |
+          curl \\
+            "https://app.superplane.com/api/v1/outputs" \\
+            -X POST \\
+            -H "Content-Type: application/json" \\
+            -H "Authorization: Bearer $GITHUB_ID_TOKEN" \\
+            --data '{
+              "execution_id": "'$SUPERPLANE_EXECUTION_ID'",
+              "external_id": "'$GITHUB_RUN_ID'",
+              "outputs": {
+                "DEPLOY_URL": "https://app-staging.example.com",
+                "HEALTH_CHECK": "passing"
+              }
+            }'
+        env:
+          GITHUB_ID_TOKEN: \${{ steps.idToken.outputs.token }}
+          SUPERPLANE_EXECUTION_ID: \${{ inputs.superplane_execution_id }}`}
       </pre>
     </div>
   );
