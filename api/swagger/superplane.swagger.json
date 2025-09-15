@@ -4032,9 +4032,6 @@
             "$ref": "#/definitions/SuperplaneExecutionResource"
           }
         },
-        "emittedEvent": {
-          "$ref": "#/definitions/SuperplaneEvent"
-        },
         "stageEvent": {
           "$ref": "#/definitions/SuperplaneStageEvent"
         }

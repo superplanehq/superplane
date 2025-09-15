@@ -889,8 +889,7 @@ message Execution {
   google.protobuf.Timestamp finished_at = 6;
   repeated OutputValue outputs = 7;
   repeated ExecutionResource resources = 8;
-  Event emitted_event = 9;
-  StageEvent stage_event = 10;
+  StageEvent stage_event = 9;
 }
 
 message ExecutionResource {

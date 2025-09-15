@@ -218,7 +218,6 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
               if (item.type === 'execution') {
                 const execution = item.data as SuperplaneExecution;
                 const sourceEvent = (execution.stageEvent as any)?.triggerEvent;
-                const emittedEvent = execution.emittedEvent;
 
                 return (
                   <RunItem
@@ -238,7 +237,6 @@ export const HistoryTab = ({ selectedStage, organizationId, canvasId, approveSta
                     discardedBy={getDiscardedByName(execution, userDisplayNames)}
                     eventId={sourceEvent?.id}
                     sourceEvent={sourceEvent}
-                    emittedEvent={emittedEvent}
                     onCancel={() => cancelStageExecution(execution.id!, selectedStage.metadata!.id!)}
                   />
                 );

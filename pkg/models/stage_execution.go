@@ -46,8 +46,7 @@ type StageExecution struct {
 	CancelledAt  *time.Time
 	CancelledBy  *uuid.UUID
 
-	StageEvent   *StageEvent `gorm:"foreignKey:StageEventID;references:ID"`
-	EmittedEvent *Event      `gorm:"-"`
+	StageEvent *StageEvent `gorm:"foreignKey:StageEventID;references:ID"`
 }
 
 func (e *StageExecution) Cancel(userID uuid.UUID) error {

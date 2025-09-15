@@ -120,10 +120,6 @@ func TestListStageExecutions(t *testing.T) {
 		err = execution.Start()
 		require.NoError(t, err)
 
-		emittedEvent, err := execution.Finish(r.Stage, models.ResultPassed)
-		require.NoError(t, err)
-		require.NotNil(t, emittedEvent)
-
 		res, err := ListStageExecutions(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), nil, []protos.Execution_Result{protos.Execution_RESULT_PASSED}, 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
@@ -137,12 +133,6 @@ func TestListStageExecutions(t *testing.T) {
 		assert.Equal(t, protos.Execution_STATE_FINISHED, exec.State)
 		assert.NotNil(t, exec.StartedAt)
 		assert.NotNil(t, exec.FinishedAt)
-
-		require.NotNil(t, exec.EmittedEvent)
-		assert.Equal(t, emittedEvent.ID.String(), exec.EmittedEvent.Id)
-		assert.Equal(t, "execution_finished", exec.EmittedEvent.Type)
-		assert.Equal(t, protos.EventSourceType_EVENT_SOURCE_TYPE_STAGE, exec.EmittedEvent.SourceType)
-		assert.Equal(t, r.Stage.Name, exec.EmittedEvent.SourceName)
 
 		require.NotNil(t, exec.StageEvent)
 		assert.Equal(t, stageEvent.ID.String(), exec.StageEvent.Id)
@@ -254,9 +244,6 @@ func TestListStageExecutions(t *testing.T) {
 		err = execution.UpdateOutputs(outputs)
 		require.NoError(t, err)
 
-		emittedEvent, err := execution.Finish(r.Stage, models.ResultPassed)
-		require.NoError(t, err)
-
 		res, err := ListStageExecutions(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String(), nil, nil, 0, nil)
 		require.NoError(t, err)
 		require.NotNil(t, res)
@@ -281,24 +268,6 @@ func TestListStageExecutions(t *testing.T) {
 		}
 		assert.Equal(t, "deploy-456", outputMap["deployment_id"])
 		assert.Equal(t, "https://app.example.com", outputMap["url"])
-
-		require.NotNil(t, exec.EmittedEvent)
-		assert.Equal(t, emittedEvent.ID.String(), exec.EmittedEvent.Id)
-		assert.Equal(t, "execution_finished", exec.EmittedEvent.Type)
-		assert.Equal(t, protos.EventSourceType_EVENT_SOURCE_TYPE_STAGE, exec.EmittedEvent.SourceType)
-		assert.Equal(t, r.Stage.ID.String(), exec.EmittedEvent.SourceId)
-		assert.Equal(t, r.Stage.Name, exec.EmittedEvent.SourceName)
-		assert.Equal(t, protos.Event_STATE_PENDING, exec.EmittedEvent.State)
-		assert.NotNil(t, exec.EmittedEvent.ReceivedAt)
-		assert.NotNil(t, exec.EmittedEvent.Raw)
-
-		require.NotNil(t, exec.EmittedEvent.Raw)
-		require.NotNil(t, exec.EmittedEvent.Raw.Fields)
-		assert.NotNil(t, exec.EmittedEvent.Raw.Fields["execution"])
-		executionData := exec.EmittedEvent.Raw.Fields["execution"].GetStructValue()
-		require.NotNil(t, executionData)
-		assert.Equal(t, execution.ID.String(), executionData.Fields["id"].GetStringValue())
-		assert.Equal(t, "passed", executionData.Fields["result"].GetStringValue())
 
 		require.NotNil(t, exec.StageEvent)
 		assert.Equal(t, stageEvent.ID.String(), exec.StageEvent.Id)

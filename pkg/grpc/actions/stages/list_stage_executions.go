@@ -255,14 +255,6 @@ func serializeExecution(execution models.StageExecution) (*pb.Execution, error) 
 		})
 	}
 
-	if execution.EmittedEvent != nil {
-		serializedEvent, err := serializeEvent(*execution.EmittedEvent)
-		if err != nil {
-			return nil, err
-		}
-		e.EmittedEvent = serializedEvent
-	}
-
 	if execution.StageEvent != nil {
 		serializedStageEvent, err := serializeStageEventForExecution(*execution.StageEvent)
 		if err != nil {

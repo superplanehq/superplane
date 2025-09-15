@@ -29,7 +29,6 @@ type SuperplaneExecution struct {
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	Outputs []SuperplaneOutputValue `json:"outputs,omitempty"`
 	Resources []SuperplaneExecutionResource `json:"resources,omitempty"`
-	EmittedEvent *SuperplaneEvent `json:"emittedEvent,omitempty"`
 	StageEvent *SuperplaneStageEvent `json:"stageEvent,omitempty"`
 }
 
@@ -314,38 +313,6 @@ func (o *SuperplaneExecution) SetResources(v []SuperplaneExecutionResource) {
 	o.Resources = v
 }
 
-// GetEmittedEvent returns the EmittedEvent field value if set, zero value otherwise.
-func (o *SuperplaneExecution) GetEmittedEvent() SuperplaneEvent {
-	if o == nil || IsNil(o.EmittedEvent) {
-		var ret SuperplaneEvent
-		return ret
-	}
-	return *o.EmittedEvent
-}
-
-// GetEmittedEventOk returns a tuple with the EmittedEvent field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneExecution) GetEmittedEventOk() (*SuperplaneEvent, bool) {
-	if o == nil || IsNil(o.EmittedEvent) {
-		return nil, false
-	}
-	return o.EmittedEvent, true
-}
-
-// HasEmittedEvent returns a boolean if a field has been set.
-func (o *SuperplaneExecution) HasEmittedEvent() bool {
-	if o != nil && !IsNil(o.EmittedEvent) {
-		return true
-	}
-
-	return false
-}
-
-// SetEmittedEvent gets a reference to the given SuperplaneEvent and assigns it to the EmittedEvent field.
-func (o *SuperplaneExecution) SetEmittedEvent(v SuperplaneEvent) {
-	o.EmittedEvent = &v
-}
-
 // GetStageEvent returns the StageEvent field value if set, zero value otherwise.
 func (o *SuperplaneExecution) GetStageEvent() SuperplaneStageEvent {
 	if o == nil || IsNil(o.StageEvent) {
@@ -411,9 +378,6 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Resources) {
 		toSerialize["resources"] = o.Resources
-	}
-	if !IsNil(o.EmittedEvent) {
-		toSerialize["emittedEvent"] = o.EmittedEvent
 	}
 	if !IsNil(o.StageEvent) {
 		toSerialize["stageEvent"] = o.StageEvent

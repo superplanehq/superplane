@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
@@ -556,22 +555,6 @@ func (s *Stage) ListExecutionsWithLimitAndBefore(states []string, results []stri
 		return nil, err
 	}
 
-	if len(executions) > 0 {
-		executionIDs := make([]string, len(executions))
-		for i, execution := range executions {
-			executionIDs[i] = execution.ID.String()
-		}
-
-		var emittedEvents []Event
-		err := database.Conn().
-			Raw("SELECT * FROM events WHERE raw->'execution'->>'id' IN (?)", executionIDs).
-			Find(&emittedEvents).Error
-
-		if err == nil {
-			mapEmittedEventsToExecutions(emittedEvents, executions)
-		}
-	}
-
 	return executions, nil
 }
 
@@ -607,14 +590,14 @@ func (s *Stage) CountExecutions(states []string, results []string) (int64, error
 func (s *Stage) CountEvents(states, stateReasons []string) (int64, error) {
 	query := database.Conn().
 		Model(&StageEvent{}).
-		Where("stage_events.stage_id = ?", s.ID)
+		Where("stage_id = ?", s.ID)
 
 	if len(states) > 0 {
-		query = query.Where("stage_events.state IN ?", states)
+		query = query.Where("state IN ?", states)
 	}
 
 	if len(stateReasons) > 0 {
-		query = query.Where("stage_events.state_reason IN ?", stateReasons)
+		query = query.Where("state_reason IN ?", stateReasons)
 	}
 
 	var count int64
@@ -624,34 +607,6 @@ func (s *Stage) CountEvents(states, stateReasons []string) (int64, error) {
 	}
 
 	return count, nil
-}
-
-func mapEmittedEventsToExecutions(emittedEvents []Event, executions []StageExecution) {
-	emittedEventMap := make(map[string]*Event)
-	for i, event := range emittedEvents {
-		var executionData map[string]interface{}
-		if err := json.Unmarshal(event.Raw, &executionData); err != nil {
-			continue
-		}
-
-		execution, ok := executionData["execution"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		executionID, ok := execution["id"].(string)
-		if !ok {
-			continue
-		}
-
-		emittedEventMap[executionID] = &emittedEvents[i]
-	}
-
-	for i, execution := range executions {
-		if emittedEvent, exists := emittedEventMap[execution.ID.String()]; exists {
-			executions[i].EmittedEvent = emittedEvent
-		}
-	}
 }
 
 type StageStatusInfo struct {
