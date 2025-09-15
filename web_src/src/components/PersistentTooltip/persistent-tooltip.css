@@ -1,0 +1,33 @@
+/* Custom Tippy theme for light/dark mode support */
+.tippy-box[data-theme~='light-border'] {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  z-index: 9999 !important;
+}
+
+.tippy-box[data-theme~='light-border'] .tippy-content {
+  padding: 0 !important;
+}
+
+.tippy-box[data-theme~='light-border'] .tippy-arrow {
+  color: rgb(228 228 231) !important; /* zinc-200 */
+}
+
+/* Dark mode arrow */
+.dark .tippy-box[data-theme~='light-border'] .tippy-arrow {
+  color: rgb(63 63 70) !important; /* zinc-700 */
+}
+
+/* Ensure the tooltip content respects the container styles */
+.tippy-box[data-theme~='light-border'] .tippy-content > div {
+  margin: 0;
+}
+
+/* Ensure close button is clickable */
+.tippy-box[data-theme~='light-border'] button {
+  pointer-events: auto;
+  position: relative;
+  z-index: 10000;
+}
