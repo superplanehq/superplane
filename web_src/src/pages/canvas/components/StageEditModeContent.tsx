@@ -210,27 +210,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   const getAllIntegrations = () => [...canvasIntegrations, ...orgIntegrations];
 
-  // Helper function to ensure all inputs are included in input mappings
-  const ensureAllInputsInMappings = useCallback((mappings: SuperplaneInputMapping[], allInputs: SuperplaneInputDefinition[]) => {
-    return mappings.map(mapping => {
-      const existingValues = mapping.values || [];
-      const missingInputs = allInputs.filter(inp =>
-        inp.name && !existingValues.some(v => v.name === inp.name)
-      );
-
-      const additionalValues = missingInputs.map(inp => ({
-        name: inp.name,
-        value: ''
-      }));
-
-      return {
-        ...mapping,
-        values: [...existingValues, ...additionalValues]
-      };
-    });
-  }, []);
-
-
   const getSecretKeys = (secretName: string) => {
     const allSecrets = getAllSecrets();
     const selectedSecret = allSecrets.find(secret => secret.name === secretName);
@@ -676,20 +655,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  // Auto-update input mappings when inputs change
-  useEffect(() => {
-    if (inputMappings.length > 0) {
-      const updatedMappings = ensureAllInputsInMappings(inputMappings, inputs);
-      // Only update if there are actual changes to prevent infinite loops
-      const hasChanges = updatedMappings.some((mapping, index) =>
-        mapping.values?.length !== inputMappings[index]?.values?.length
-      );
-      if (hasChanges) {
-        setInputMappings(updatedMappings);
-      }
-    }
-  }, [inputs, inputMappings, ensureAllInputsInMappings]);
-
   // Notify parent of data changes
   useEffect(() => {
     if (onDataChange) {
@@ -890,70 +855,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
   };
 
-  const handleTriggerConnectionChange = (selectedConnection: string, actualMappingIndex: number, input: SuperplaneInputDefinition, mapping: SuperplaneInputMapping) => {
-    const newMappings = [...inputMappings];
-    const currentInputValue = mapping.values?.find(v => v.name === input.name);
-
-    if (!currentInputValue) return;
-
-    const existingMappingIndex = newMappings.findIndex((m, idx) =>
-      idx !== actualMappingIndex &&
-      m.when?.triggeredBy?.connection === selectedConnection &&
-      selectedConnection !== ''
-    );
-    const mappingExists = existingMappingIndex !== -1 && selectedConnection !== '';
-
-    if (mappingExists) {
-      const existingValues = newMappings[existingMappingIndex].values || [];
-      const valueExists = existingValues.some(v => v.name === input.name);
-
-      if (!valueExists) {
-        newMappings[existingMappingIndex].values = [...existingValues, currentInputValue];
-      } else {
-        newMappings[existingMappingIndex].values = existingValues.map(v =>
-          v.name === input.name ? currentInputValue : v
-        );
-      }
-
-      const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
-
-      if (updatedOriginalValues.length === 0) {
-        newMappings.splice(actualMappingIndex, 1);
-      } else {
-        newMappings[actualMappingIndex].values = updatedOriginalValues;
-      }
-      setInputMappings(newMappings);
-      return;
-    }
-
-
-    if (selectedConnection === '') {
-      newMappings[actualMappingIndex] = {
-        ...newMappings[actualMappingIndex],
-        when: {
-          ...newMappings[actualMappingIndex].when,
-          triggeredBy: { connection: selectedConnection }
-        }
-      };
-    } else {
-      newMappings[actualMappingIndex].when = {
-        triggeredBy: { connection: selectedConnection }
-      };
-
-      newMappings[actualMappingIndex].values = inputs.map(input => ({
-        name: input.name,
-        value: ''
-      }));
-    }
-    setInputMappings(newMappings);
-
-  };
 
   const handleInputNameChange = (newName: string, index: number, input: SuperplaneInputDefinition) => {
     const oldName = input.name;
     inputsEditor.updateItem(index, 'name', newName);
 
-    if (oldName && newName !== oldName) {
+    if (newName !== oldName) {
       const updatedMappings = inputMappings.map(mapping => ({
         ...mapping,
         values: mapping.values?.map(value =>
@@ -990,7 +897,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           value: undefined,
           valueFrom: {
             eventData: {
-              connection: '',
+              connection: newMappings[actualMappingIndex].when?.triggeredBy?.connection,
               expression: values[valueIndex]?.value || ''
             }
           }
@@ -1002,7 +909,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           value: undefined,
           valueFrom: {
             lastExecution: {
-              results: []
+              results: [
+                'RESULT_PASSED',
+                'RESULT_FAILED'
+              ]
             }
           }
         };
@@ -1282,26 +1192,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                   <div key={actualMappingIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
                                     <div className="space-y-3">
                                       {/* Trigger Connection */}
-                                      <ValidationField
-                                        label="Triggered by Connection"
-                                        error={validationErrors[`inputMapping_${actualMappingIndex}`]}
-                                      >
-                                        <select
-                                          value={mapping.when?.triggeredBy?.connection || ''}
-                                          onChange={(e) => handleTriggerConnectionChange(e.target.value, actualMappingIndex, input, mapping)}
-                                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${actualMappingIndex}`]
-                                            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                                            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                                            }`}
-                                        >
-                                          <option value="">Select trigger connection</option>
-                                          {connections
-                                            .filter(conn => mapping.when?.triggeredBy?.connection === conn.name || !inputMappings.some(mapping => mapping.when?.triggeredBy?.connection === conn.name))
-                                            .map((conn, connIndex) => (
-                                              <option key={connIndex} value={conn.name}>{conn.name}</option>
-                                            ))}
-                                        </select>
-                                      </ValidationField>
+                                      <div className="space-y-1">
+                                        <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                                          Triggered by Connection
+                                        </label>
+                                        <div className="px-3 py-2 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-md text-zinc-900 dark:text-zinc-100 text-sm">
+                                          {mapping.when?.triggeredBy?.connection || 'No connection assigned'}
+                                        </div>
+                                      </div>
 
                                       {/* Value Mode Toggle */}
                                       {
@@ -1345,29 +1243,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                             </div>
                                             {inputValue?.valueFrom?.eventData ? (
                                               /* Event Data Mode */
-                                              <div className="space-y-2">
-                                                <div>
-                                                  <label className="block text-xs font-medium mb-1">Data Source Connection</label>
-                                                  <select
-                                                    value={inputValue.valueFrom.eventData.connection || ''}
-                                                    onChange={(e) => inputMappingHandlers.handleEventDataConnectionChange(e.target.value, actualMappingIndex, input.name)}
-                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                                  >
-                                                    <option value="">Select data source</option>
-                                                    {connections.map((conn, connIndex) => (
-                                                      <option key={connIndex} value={conn.name}>{conn.name}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                                <div>
-                                                  <label className="block text-xs font-medium mb-1">Expression</label>
-                                                  <input
-                                                    value={inputValue.valueFrom.eventData.expression || ''}
-                                                    onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
-                                                    placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
-                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                                  />
-                                                </div>
+                                              <div>
+                                                <label className="block text-xs font-medium mb-1">Expression</label>
+                                                <input
+                                                  value={inputValue.valueFrom.eventData.expression || ''}
+                                                  onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
+                                                  placeholder="eg. $.commit[0].message"
+                                                  className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                                />
                                               </div>
                                             ) : inputValue?.valueFrom?.lastExecution ? (
                                               /* Last Execution Mode */
