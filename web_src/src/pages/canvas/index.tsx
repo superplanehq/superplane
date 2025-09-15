@@ -224,14 +224,7 @@ export function Canvas() {
         setTimeout(async () => {
           const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
           await applyElkAutoLayout(latestNodes, latestEdges);
-          setTimeout(() => {
-            fitViewNode(nodeId);
-          }, 200);
         }, 50);
-      } else {
-        setTimeout(() => {
-          fitViewNode(nodeId);
-        }, 100);
       }
     } catch (error) {
       console.error(`Failed to add node of type ${nodeType}:`, error);
