@@ -111,6 +111,7 @@ func (v *Validator) checkInputMappings() error {
 		func() error { return v.checkValidInputDefinitionReferences() },
 		func() error { return v.checkNoDuplicateValueDefinitions() },
 		func() error { return v.checkValidConnectionReferences() },
+		func() error { return v.checkAllInputsHaveMappingsForAllConnections() },
 	)
 }
 
@@ -273,6 +274,37 @@ func (v *Validator) SerializeOutputs() []models.OutputDefinition {
 	}
 
 	return outputs
+}
+
+func (v *Validator) checkAllInputsHaveMappingsForAllConnections() error {
+	if len(v.Inputs) == 0 {
+		return nil
+	}
+
+	if v.HasWhenLessMapping() {
+		return nil
+	}
+
+	//
+	// Ensure every connection has a mapping
+	// (The existing checkAllInputsAreDefined function ensures each mapping has all inputs)
+	//
+	for _, connection := range v.Connections {
+		connectionHasMapping := false
+		for _, mapping := range v.InputMappings {
+			if mapping.When != nil && mapping.When.TriggeredBy != nil &&
+				mapping.When.TriggeredBy.Connection == connection.Name {
+				connectionHasMapping = true
+				break
+			}
+		}
+
+		if !connectionHasMapping {
+			return fmt.Errorf("connection %s has no input mapping", connection.Name)
+		}
+	}
+
+	return nil
 }
 
 func (v *Validator) checkInputMappingSpecs() error {
