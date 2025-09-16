@@ -95,7 +95,7 @@ func ValidateConnections(canvasID string, connections []*pb.Connection) ([]model
 		cs = append(cs, models.Connection{
 			SourceID:       *sourceID,
 			SourceName:     connection.Name,
-			SourceType:     protoToConnectionType(connection.Type),
+			SourceType:     ProtoToConnectionType(connection.Type),
 			FilterOperator: ProtoToFilterOperator(connection.FilterOperator),
 			Filters:        filters,
 		})
@@ -163,7 +163,7 @@ func validateHeaderFilter(filter *pb.HeaderFilter) (*models.Filter, error) {
 	}, nil
 }
 
-func protoToConnectionType(t pb.Connection_Type) string {
+func ProtoToConnectionType(t pb.Connection_Type) string {
 	switch t {
 	case pb.Connection_TYPE_STAGE:
 		return models.SourceTypeStage
@@ -267,6 +267,17 @@ func ConnectionTypeToProto(t string) pb.Connection_Type {
 		return pb.Connection_TYPE_CONNECTION_GROUP
 	default:
 		return pb.Connection_TYPE_UNKNOWN
+	}
+}
+
+func RejectionReasonToProto(reason string) pb.EventRejection_RejectionReason {
+	switch reason {
+	case models.EventRejectionReasonFiltered:
+		return pb.EventRejection_REJECTION_REASON_FILTERED
+	case models.EventRejectionReasonError:
+		return pb.EventRejection_REJECTION_REASON_ERROR
+	default:
+		return pb.EventRejection_REJECTION_REASON_UNKNOWN
 	}
 }
 
@@ -385,13 +396,14 @@ func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.
 
 func SerializeEvent(in models.Event) (*pb.Event, error) {
 	event := &pb.Event{
-		Id:         in.ID.String(),
-		SourceId:   in.SourceID.String(),
-		SourceName: in.SourceName,
-		SourceType: EventSourceTypeToProto(in.SourceType),
-		Type:       in.Type,
-		State:      EventStateToProto(in.State),
-		ReceivedAt: timestamppb.New(*in.ReceivedAt),
+		Id:          in.ID.String(),
+		SourceId:    in.SourceID.String(),
+		SourceName:  in.SourceName,
+		SourceType:  EventSourceTypeToProto(in.SourceType),
+		Type:        in.Type,
+		State:       EventStateToProto(in.State),
+		StateReason: EventStateReasonToProto(in.StateReason),
+		ReceivedAt:  timestamppb.New(*in.ReceivedAt),
 	}
 
 	if len(in.Raw) > 0 {
@@ -455,9 +467,103 @@ func EventStateToProto(state string) pb.Event_State {
 		return pb.Event_STATE_PENDING
 	case models.EventStateProcessed:
 		return pb.Event_STATE_PROCESSED
-	case models.EventStateDiscarded:
-		return pb.Event_STATE_DISCARDED
+	case models.EventStateRejected:
+		return pb.Event_STATE_REJECTED
 	default:
 		return pb.Event_STATE_UNKNOWN
+	}
+}
+
+func EventStateReasonToProto(stateReason string) pb.Event_StateReason {
+	switch stateReason {
+	case models.EventStateReasonError:
+		return pb.Event_STATE_REASON_ERROR
+	case models.EventStateReasonFiltered:
+		return pb.Event_STATE_REASON_FILTERED
+	case models.EventStateReasonOk:
+		return pb.Event_STATE_REASON_OK
+	default:
+		return pb.Event_STATE_REASON_UNKNOWN
+	}
+}
+
+func SerializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
+	e := pb.StageEvent{
+		Id:          in.ID.String(),
+		State:       StageEventStateToProto(in.State),
+		StateReason: StageEventStateReasonToProto(in.StateReason),
+		CreatedAt:   timestamppb.New(*in.CreatedAt),
+		Approvals:   []*pb.StageEventApproval{},
+		Inputs:      []*pb.KeyValuePair{},
+		Name:        in.Name,
+	}
+
+	if in.DiscardedBy != nil {
+		e.DiscardedBy = in.DiscardedBy.String()
+	}
+	if in.DiscardedAt != nil {
+		e.DiscardedAt = timestamppb.New(*in.DiscardedAt)
+	}
+
+	//
+	// Add inputs
+	//
+	for k, v := range in.Inputs.Data() {
+		e.Inputs = append(e.Inputs, &pb.KeyValuePair{Name: k, Value: v.(string)})
+	}
+
+	//
+	// Add approvals
+	//
+	approvals, err := in.FindApprovals()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, approval := range approvals {
+		e.Approvals = append(e.Approvals, &pb.StageEventApproval{
+			ApprovedBy: approval.ApprovedBy.String(),
+			ApprovedAt: timestamppb.New(*approval.ApprovedAt),
+		})
+	}
+
+	if in.Event != nil {
+		serializedTriggerEvent, err := SerializeEvent(*in.Event)
+		if err != nil {
+			return nil, err
+		}
+		e.TriggerEvent = serializedTriggerEvent
+	}
+
+	return &e, nil
+}
+
+func StageEventStateToProto(state string) pb.StageEvent_State {
+	switch state {
+	case models.StageEventStatePending:
+		return pb.StageEvent_STATE_PENDING
+	case models.StageEventStateWaiting:
+		return pb.StageEvent_STATE_WAITING
+	case models.StageEventStateProcessed:
+		return pb.StageEvent_STATE_PROCESSED
+	case models.StageEventStateDiscarded:
+		return pb.StageEvent_STATE_DISCARDED
+	default:
+		return pb.StageEvent_STATE_UNKNOWN
+	}
+}
+
+func StageEventStateReasonToProto(stateReason string) pb.StageEvent_StateReason {
+	switch stateReason {
+	case models.StageEventStateReasonApproval:
+		return pb.StageEvent_STATE_REASON_APPROVAL
+	case models.StageEventStateReasonTimeWindow:
+		return pb.StageEvent_STATE_REASON_TIME_WINDOW
+	case models.StageEventStateReasonStuck:
+		return pb.StageEvent_STATE_REASON_STUCK
+	case models.StageEventStateReasonTimeout:
+		return pb.StageEvent_STATE_REASON_TIMEOUT
+	default:
+		return pb.StageEvent_STATE_REASON_UNKNOWN
 	}
 }

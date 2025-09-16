@@ -314,7 +314,7 @@ func serializeStage(
 		}
 
 		for _, event := range statusInfo.QueueItems {
-			pbEvent, err := serializeStageEventForExecution(event)
+			pbEvent, err := actions.SerializeStageEvent(event)
 			if err != nil {
 				return nil, err
 			}
