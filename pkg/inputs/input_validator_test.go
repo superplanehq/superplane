@@ -28,6 +28,14 @@ func Test__InputValidator(t *testing.T) {
 			expectErr:     false,
 		},
 		{
+			name:          "no inputs but has connections - should pass",
+			inputs:        []*superplane.InputDefinition{},
+			outputs:       []*superplane.OutputDefinition{},
+			inputMappings: []*superplane.InputMapping{},
+			connections:   []*superplane.Connection{{Name: "source-1"}, {Name: "source-2"}},
+			expectErr:     false,
+		},
+		{
 			name:       "input name is empty",
 			inputs:     []*superplane.InputDefinition{{Name: ""}},
 			expectErr:  true,
@@ -342,6 +350,99 @@ func Test__InputValidator(t *testing.T) {
 			},
 			expectErr:  true,
 			errMessage: "mapping [0]: value definition [1]: connection source-2 does not exist",
+		},
+		{
+			name:   "missing mapping for one connection",
+			inputs: []*superplane.InputDefinition{{Name: "a"}},
+			inputMappings: []*superplane.InputMapping{
+				{
+					When: &superplane.InputMapping_When{
+						TriggeredBy: &superplane.InputMapping_WhenTriggeredBy{
+							Connection: "source-1",
+						},
+					},
+					Values: []*superplane.ValueDefinition{
+						{Name: "a", Value: "a"},
+					},
+				},
+			},
+			connections: []*superplane.Connection{
+				{Name: "source-1"},
+				{Name: "source-2"},
+			},
+			expectErr:  true,
+			errMessage: "connection source-2 has no input mapping",
+		},
+		{
+			name:   "mapping missing one input definition",
+			inputs: []*superplane.InputDefinition{{Name: "a"}, {Name: "b"}},
+			inputMappings: []*superplane.InputMapping{
+				{
+					When: &superplane.InputMapping_When{
+						TriggeredBy: &superplane.InputMapping_WhenTriggeredBy{
+							Connection: "source-1",
+						},
+					},
+					Values: []*superplane.ValueDefinition{
+						{Name: "a", Value: "a"},
+					},
+				},
+			},
+			connections: []*superplane.Connection{
+				{Name: "source-1"},
+			},
+			expectErr:  true,
+			errMessage: "mapping [0]: input b not defined",
+		},
+		{
+			name:   "all connections mapped with all inputs",
+			inputs: []*superplane.InputDefinition{{Name: "a"}, {Name: "b"}},
+			inputMappings: []*superplane.InputMapping{
+				{
+					When: &superplane.InputMapping_When{
+						TriggeredBy: &superplane.InputMapping_WhenTriggeredBy{
+							Connection: "source-1",
+						},
+					},
+					Values: []*superplane.ValueDefinition{
+						{Name: "a", Value: "a"},
+						{Name: "b", Value: "b"},
+					},
+				},
+				{
+					When: &superplane.InputMapping_When{
+						TriggeredBy: &superplane.InputMapping_WhenTriggeredBy{
+							Connection: "source-2",
+						},
+					},
+					Values: []*superplane.ValueDefinition{
+						{Name: "a", Value: "c"},
+						{Name: "b", Value: "d"},
+					},
+				},
+			},
+			connections: []*superplane.Connection{
+				{Name: "source-1"},
+				{Name: "source-2"},
+			},
+			expectErr: false,
+		},
+		{
+			name:   "when-less mapping with all inputs (bypasses connection validation)",
+			inputs: []*superplane.InputDefinition{{Name: "a"}, {Name: "b"}},
+			inputMappings: []*superplane.InputMapping{
+				{
+					Values: []*superplane.ValueDefinition{
+						{Name: "a", Value: "a"},
+						{Name: "b", Value: "b"},
+					},
+				},
+			},
+			connections: []*superplane.Connection{
+				{Name: "source-1"},
+				{Name: "source-2"},
+			},
+			expectErr: false,
 		},
 	}
 
