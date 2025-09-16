@@ -14,6 +14,7 @@ interface ActivityTabProps {
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
   organizationId: string;
+  isLoading: boolean;
 }
 
 export const ActivityTab = ({
@@ -26,9 +27,23 @@ export const ActivityTab = ({
   cancelStageExecution,
   executionRunning,
   onChangeTab,
-  organizationId
+  organizationId,
+  isLoading
 }: ActivityTabProps) => {
   const queueCount = pendingEvents.length + waitingEvents.length;
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 mb-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+          </div>
+          <p className="text-zinc-600 dark:text-zinc-400 text-sm">Loading activity...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -37,7 +52,7 @@ export const ActivityTab = ({
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Recent Runs</h3>
           <button className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-            onClick={() => onChangeTab('history')}
+            onClick={() => onChangeTab('executions')}
           >
             View all
           </button>
