@@ -595,8 +595,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     items: outputs,
     setItems: setOutputs,
     createNewItem: () => ({ name: `OUTPUT_${outputs.length + 1}`, description: '', required: false }),
-    validateItem: validateOutput,
-    setValidationErrors,
+    validateItem: () => [],
+    setValidationErrors: () => { },
     errorPrefix: 'output'
   });
 
@@ -1392,18 +1392,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 <div key={index}>
                   <InlineEditor
                     isEditing={outputsEditor.editingIndex === index}
-                    onSave={outputsEditor.saveEdit}
-                    onCancel={() => outputsEditor.cancelEdit(index, (item) => {
-                      if (!item.name || item.name.trim() === '') {
-                        return true;
+                    onSave={() => {
+                      const errors = validateAllFields();
+
+                      if (errors[`output_${index}`]) {
+                        return;
                       }
 
-                      const isNewOutput = index >= originalData.outputs.length ||
-                        !originalData.outputs[index] ||
-                        originalData.outputs[index].name !== item.name;
-
-                      return isNewOutput;
-                    })}
+                      outputsEditor.saveEdit()
+                    }}
+                    onCancel={() => outputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
                     onEdit={() => outputsEditor.startEdit(index)}
                     onDelete={() => outputsEditor.removeItem(index)}
                     displayName={output.name || `Output ${index + 1}`}
