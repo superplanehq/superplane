@@ -51,9 +51,6 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
     return eventsData?.pages.flatMap(page => page.events) || [];
   }, [eventsData]);
 
-  // Get total count from any page response (all pages have the same totalCount)
-  const totalEventsCount = eventsData?.pages[0]?.totalCount ?? 0;
-
   useEffect(() => {
     if ((selectedEventSource?.events?.length || 0) > 0 && allEvents.length > 0) {
       const latestBulkEvent = selectedEventSource?.events?.[0];
@@ -117,7 +114,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
-                Event History ({totalEventsCount})
+                Event History ({allEvents.length})
               </h3>
             </div>
 
@@ -134,6 +131,8 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
                     eventId={event.id!}
                     timestamp={event.receivedAt!}
                     state={event.state}
+                    stateReason={event.stateReason}
+                    stateMessage={event.stateMessage}
                     eventType={event.type}
                     sourceName={event.sourceName}
                     headers={event.headers}

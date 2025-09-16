@@ -642,13 +642,13 @@ export const useEventSourceEvents = (canvasId: string, eventSourceId: string) =>
       )
       return {
         events: response.data?.events || [],
-        totalCount: response.data?.totalCount || 0,
-        hasNextPage: response.data?.hasNextPage || false,
-        nextCursor: response.data?.lastTimestamp
+        nextCursor: response.data?.events && response.data.events.length === 20 
+          ? response.data.events[response.data.events.length - 1]?.receivedAt 
+          : undefined
       }
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.nextCursor : undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!eventSourceId

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { SuperplaneEventState } from '@/api-client';
+import { SuperplaneEventState, SuperplaneEventStateReason } from '@/api-client';
 import { formatRelativeTime } from '../utils/stageEventUtils';
 import { PayloadDisplay } from './PayloadDisplay';
 
@@ -8,6 +8,8 @@ interface EventItemProps {
   eventId: string;
   timestamp: string;
   state?: SuperplaneEventState;
+  stateReason?: SuperplaneEventStateReason;
+  stateMessage?: string;
   eventType?: string;
   sourceName?: string;
   headers?: { [key: string]: unknown };
@@ -18,6 +20,8 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
   eventId,
   timestamp,
   state,
+  stateReason,
+  stateMessage,
   eventType,
   sourceName,
   headers,
@@ -76,6 +80,19 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
 
   const stateConfig = getStateConfig();
 
+  // Format state reason for display
+  const formatStateReason = (reason?: SuperplaneEventStateReason) => {
+    switch (reason) {
+      case 'STATE_REASON_FILTERED':
+        return 'Filtered';
+      case 'STATE_REASON_ERROR':
+        return 'Error';
+      case 'STATE_REASON_OK':
+        return 'OK';
+      default:
+        return 'Unknown';
+    }
+  };
 
   return (
     <div className="border bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 rounded-lg text-left">
@@ -103,15 +120,47 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
         </div>
 
         {isExpanded && (
-          <PayloadDisplay 
-            headers={headers}
-            payload={payload}
-            eventId={eventId}
-            timestamp={timestamp}
-            eventType={eventType}
-            sourceName={sourceName}
-            showDetailsTab={true}
-          />
+          <div className="mt-4 space-y-4">
+            {/* Show rejection details for rejected events */}
+            {state === 'STATE_REJECTED' && (stateReason || stateMessage) && (
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3">
+                <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+                  Rejection Details
+                </div>
+                <div className="space-y-2">
+                  {stateReason && (
+                    <div>
+                      <div className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Reason
+                      </div>
+                      <div className="text-sm text-zinc-800 dark:text-zinc-200">
+                        {formatStateReason(stateReason)}
+                      </div>
+                    </div>
+                  )}
+                  {stateMessage && (
+                    <div>
+                      <div className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Message
+                      </div>
+                      <div className="text-sm text-zinc-800 dark:text-zinc-200">
+                        {stateMessage}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <PayloadDisplay
+              headers={headers}
+              payload={payload}
+              eventId={eventId}
+              timestamp={timestamp}
+              eventType={eventType}
+              sourceName={sourceName}
+              showDetailsTab={true}
+            />
+          </div>
         )}
       </div>
     </div>
