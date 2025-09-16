@@ -1,10 +1,7 @@
 import { Stage } from "../../store/types";
 import MessageItem from '../MessageItem';
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import { useOrganizationUsersForCanvas } from '@/hooks/useCanvasData';
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { superplaneListStageEvents } from '@/api-client/sdk.gen';
-import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
+import { useOrganizationUsersForCanvas, useStageQueueEvents } from '@/hooks/useCanvasData';
 import { ControlledTabs, Tab } from '@/components/Tabs/tabs';
 import {
   getMinApprovedAt,
@@ -24,11 +21,6 @@ interface QueueTabProps {
 export const QueueTab = ({ selectedStage, organizationId, canvasId, approveStageEvent, discardStageEvent }: QueueTabProps) => {
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
   const [activeFilter, setActiveFilter] = useState('all');
-
-  // Create query key that includes the filter
-  const createQueryKey = (filter: string) => [
-    'canvas', 'stageEvents', canvasId, selectedStage.metadata?.id || '', filter
-  ];
 
   // Determine which states to filter by based on active filter
   const getStatesFilter = useCallback((filter: string) => {
@@ -52,32 +44,7 @@ export const QueueTab = ({ selectedStage, organizationId, canvasId, approveStage
     isFetchingNextPage,
     refetch,
     isLoading
-  } = useInfiniteQuery({
-    queryKey: createQueryKey(activeFilter),
-    queryFn: async ({ pageParam }) => {
-      const response = await superplaneListStageEvents(
-        withOrganizationHeader({
-          path: { canvasIdOrName: canvasId, stageIdOrName: selectedStage.metadata!.id! },
-          query: {
-            states: getStatesFilter(activeFilter),
-            limit: 20,
-            ...(pageParam && { before: pageParam })
-          }
-        })
-      );
-      return {
-        events: response.data?.events || [],
-        totalCount: response.data?.totalCount || 0,
-        hasNextPage: response.data?.hasNextPage || false,
-        lastTimestamp: response.data?.lastTimestamp
-      };
-    },
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.lastTimestamp : undefined,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!canvasId && !!selectedStage.metadata?.id
-  });
+  } = useStageQueueEvents(canvasId, selectedStage.metadata?.id || '', getStatesFilter(activeFilter));
 
   const allEvents = useMemo(() =>
     eventsData?.pages.flatMap(page => page.events) || [],

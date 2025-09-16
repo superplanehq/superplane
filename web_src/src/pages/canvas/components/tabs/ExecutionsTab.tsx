@@ -1,10 +1,7 @@
 import { Stage } from "../../store/types";
 import { RunItem } from './RunItem';
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import { useOrganizationUsersForCanvas } from '@/hooks/useCanvasData';
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { superplaneListStageExecutions } from '@/api-client/sdk.gen';
-import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
+import { useOrganizationUsersForCanvas, useStageExecutions } from '@/hooks/useCanvasData';
 import { ControlledTabs, Tab } from '@/components/Tabs/tabs';
 import {
   formatDuration,
@@ -26,11 +23,6 @@ interface ExecutionsTabProps {
 export const ExecutionsTab = ({ selectedStage, organizationId, canvasId, cancelStageExecution }: ExecutionsTabProps) => {
   const { data: orgUsers = [] } = useOrganizationUsersForCanvas(organizationId);
   const [activeFilter, setActiveFilter] = useState('all');
-
-  // Create query key that includes the filter
-  const createQueryKey = (filter: string) => [
-    'canvas', 'stageExecutions', canvasId, selectedStage.metadata?.id || '', filter
-  ];
 
   // Determine which results to filter by based on active filter
   const getResultsFilter = useCallback((filter: string) => {
@@ -54,32 +46,7 @@ export const ExecutionsTab = ({ selectedStage, organizationId, canvasId, cancelS
     isFetchingNextPage,
     refetch,
     isLoading
-  } = useInfiniteQuery({
-    queryKey: createQueryKey(activeFilter),
-    queryFn: async ({ pageParam }) => {
-      const response = await superplaneListStageExecutions(
-        withOrganizationHeader({
-          path: { canvasIdOrName: canvasId, stageIdOrName: selectedStage.metadata!.id! },
-          query: {
-            results: getResultsFilter(activeFilter),
-            limit: 20,
-            ...(pageParam && { before: pageParam })
-          }
-        })
-      );
-      return {
-        executions: response.data?.executions || [],
-        totalCount: response.data?.totalCount || 0,
-        hasNextPage: response.data?.hasNextPage || false,
-        lastTimestamp: response.data?.lastTimestamp
-      };
-    },
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.lastTimestamp : undefined,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!canvasId && !!selectedStage.metadata?.id
-  });
+  } = useStageExecutions(canvasId, selectedStage.metadata?.id || '', getResultsFilter(activeFilter));
 
   const allExecutions = useMemo(() =>
     executionsData?.pages.flatMap(page => page.executions) || [],
