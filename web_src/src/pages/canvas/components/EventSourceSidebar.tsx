@@ -48,7 +48,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
 
   // Flatten all pages into a single array
   const allEvents = useMemo(() => {
-    return eventsData?.pages.flatMap((page: any) => page.events) || [];
+    return eventsData?.pages.flatMap(page => page.events) || [];
   }, [eventsData]);
 
   // Get total count from the first page
@@ -65,7 +65,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
       if (latestBulkEvent?.receivedAt && latestQueryEvent?.receivedAt) {
         const bulkTime = new Date(latestBulkEvent.receivedAt);
         const queryTime = new Date(latestQueryEvent.receivedAt);
-        const hasPendingEvents = allEvents.some((event: any) => event.state === 'STATE_PENDING');
+        const hasPendingEvents = allEvents.some((event: SuperplaneEvent) => event.state === 'STATE_PENDING');
         
         if (bulkTime > queryTime || hasPendingEvents) {
           refetchEvents();
@@ -130,7 +130,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
                   <p className="text-sm text-gray-500 mt-2">Loading events...</p>
                 </div>
               ) : allEvents.length > 0 ? (
-                allEvents.map((event: any) => (
+                allEvents.map((event: SuperplaneEvent) => (
                   <EventItem
                     key={event.id}
                     eventId={event.id!}

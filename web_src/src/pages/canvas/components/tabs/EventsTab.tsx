@@ -4,6 +4,7 @@ import { RejectionItem } from '../RejectionItem';
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useEventRejections, useStageEvents, useEvents } from '@/hooks/useCanvasData';
 import { ControlledTabs, Tab } from '@/components/Tabs/tabs';
+import { SuperplaneEvent, SuperplaneEventRejection, SuperplaneStageEvent } from '@/api-client';
 
 interface EventsTabProps {
   selectedStage: Stage;
@@ -52,7 +53,7 @@ export const EventsTab = ({ selectedStage, canvasId }: EventsTabProps) => {
       case 'emitted':
         return emittedEventsData?.pages.flatMap(page => page.events) || [];
       case 'received':
-        return receivedEventsData?.pages.flatMap(page => page.events.map((event: any) => event.triggerEvent).filter(Boolean)) || [];
+        return receivedEventsData?.pages.flatMap(page => page.events.map((event: SuperplaneStageEvent) => event.triggerEvent).filter(Boolean)) || [];
       default:
         return [];
     }
@@ -184,34 +185,34 @@ export const EventsTab = ({ selectedStage, canvasId }: EventsTabProps) => {
           </div>
         ) : (
           <>
-            {allEvents.map((event: any, index: number) => {
-              const eventId = event.id || `event-${index}`;
+            {allEvents.map((event, index: number) => {
+              const eventId = event?.id || `event-${index}`;
 
               // Use RejectionItem for rejected events
               if (activeFilter === 'rejected') {
                 return (
                   <RejectionItem
                     key={eventId}
-                    rejection={event}
+                    rejection={event as SuperplaneEventRejection}
                   />
                 );
               }
 
               // Use EventItem for other event types
-              const sourceEvent = event;
-              const plainEventPayload = sourceEvent?.raw || event.raw;
-              const plainEventHeaders = sourceEvent?.headers || event.headers;
+              const sourceEvent = event as SuperplaneEvent;
+              const plainEventPayload = sourceEvent?.raw;
+              const plainEventHeaders = sourceEvent?.headers;
 
               return (
                 <EventItem
                   key={eventId}
-                  eventId={eventId}
-                  timestamp={sourceEvent?.receivedAt || event.receivedAt}
-                  state={sourceEvent?.state || event.state}
-                  stateReason={sourceEvent?.stateReason || event.stateReason}
-                  stateMessage={sourceEvent?.stateMessage || event.stateMessage}
-                  eventType={sourceEvent?.type || event.type}
-                  sourceName={sourceEvent?.sourceName || event.sourceName}
+                  eventId={eventId!}
+                  timestamp={sourceEvent?.receivedAt!}
+                  state={sourceEvent?.state}
+                  stateReason={sourceEvent?.stateReason}
+                  stateMessage={sourceEvent?.stateMessage}
+                  eventType={sourceEvent?.type}
+                  sourceName={sourceEvent?.sourceName}
                   headers={plainEventHeaders}
                   payload={plainEventPayload}
                   showStateLabel={false}
