@@ -3407,7 +3407,7 @@ export function WorkflowNodeAccordion({
           <div className={`flex items-center gap-2 ${consistentStatuses ? 'visible' : 'hidden'}`}>
             {data.status == 'success' && (
             <Badge color='green' className='!flex !items-center mr-2'>
-                <MaterialSymbol name='check_circle' size='md'/>
+                <MaterialSymbol name='block' size='md'/>
               <span className='uppercase'>Passed</span>
             </Badge>
             )}

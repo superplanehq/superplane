@@ -20,7 +20,7 @@ export interface WorkflowNodeData {
   title: string
   description?: string
   type: 'stage' | 'event' | 'eventSource'
-  status?: 'pending' | 'running' | 'success' | 'error' | 'disabled'
+  status?: 'pending' | 'running' | 'success' | 'error' | 'disabled' | 'cancelled'
   config?: Record<string, any>
   icon?: string
   nodeNumber?: number

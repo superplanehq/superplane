@@ -4,9 +4,10 @@ import clsx from 'clsx';
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
 import { Button } from './lib/Button/button';
 import { Input } from './lib/Input/input';
+import { Textarea } from './lib/Textarea/textarea';
 import { Field, Label } from './lib/Fieldset/fieldset';
 import { Link } from './lib/Link/link';
-import { BadgeButton } from './lib/Badge/badge';
+import { BadgeButton, Badge } from './lib/Badge/badge';
 import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from './lib/Dialog/dialog';
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem, DropdownLabel } from './lib/Dropdown/dropdown';
 import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
@@ -17,6 +18,7 @@ import { EmptyState } from './lib/EmptyState/empty-state';
 export interface EventSourceWorkflowNodeReactFlowData {
   id: string;
   title: string;
+  description?: string;
   cluster?: string;
   events: Array<{
     id: string;
@@ -25,7 +27,15 @@ export interface EventSourceWorkflowNodeReactFlowData {
     enabled?: boolean;
   }>;
   icon?: string;
-  eventSourceType?: 'semaphore' | 'webhook' | 'http';
+  eventSourceType?: 'semaphore' | 'webhook' | 'http' | 'schedule';
+  // For scheduled event sources, show the upcoming execution time
+  nextRunTime?: string; // ISO string
+  // Optional cron schedule (for schedule type)
+  scheduleCron?: string;
+  // Optional rich text payload (stored as HTML)
+  payload?: string;
+  // Whether the schedule is enabled (for schedule type)
+  scheduleEnabled?: boolean;
   selected?: boolean;
   isEditMode?: boolean;
 }
@@ -42,9 +52,31 @@ export function EventSourceWorkflowNodeReactFlow({
   const [isEditMode, setIsEditMode] = useState(data.isEditMode || false);
   const [editData, setEditData] = useState({
     title: data.title,
+    description: data.description || '',
     cluster: data.cluster || '',
-    events: [...data.events]
+    events: [...data.events],
+    scheduleCron: data.scheduleCron || (data.eventSourceType === 'schedule' ? '0 0 * * 1' : ''),
+    payload: data.payload || '',
+    scheduleEnabled: typeof data.scheduleEnabled === 'boolean' ? data.scheduleEnabled : true
   });
+  // Inline editing state (align with WorkflowNodeAccordion pattern)
+  const [editingField, setEditingField] = useState<null | 'title' | 'description'>(null);
+  const [tempTitle, setTempTitle] = useState<string>(editData.title);
+  const [tempDescription, setTempDescription] = useState<string>(editData.description);
+
+  // Helper to format next run label for schedule-based event sources
+  const getNextRunLabel = useCallback(() => {
+    if (!data.nextRunTime) return 'Next run: not scheduled';
+    const now = new Date();
+    const next = new Date(data.nextRunTime);
+    const diffMs = next.getTime() - now.getTime();
+    if (diffMs <= 0) return 'Next run: due now';
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 60) return `Next run: in ${mins}m`;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return `Next run: in ${hours}h ${remMins}m`;
+  }, [data.nextRunTime]);
   
   // Local state for events to persist changes in read-only mode  
   // Enhanced events with status indicators for preview mode
@@ -187,6 +219,25 @@ export function EventSourceWorkflowNodeReactFlow({
     setIconSearchQuery(''); // Reset search when closing modal
   }, []);
 
+  // Pretty-print payload JSON (fallback to raw text)
+  const getPayloadPreview = useCallback(() => {
+    const placeholderObj = {
+      sha: '15990b',
+      name: 'BUG-1982: Connections',
+      image: 'docker-196',
+    };
+    const prettyPlaceholder = JSON.stringify(placeholderObj, null, 2);
+    const raw = (editData.payload || '').trim();
+    if (!raw) return prettyPlaceholder;
+    try {
+      const parsed = JSON.parse(raw);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      // If it's not valid JSON, try to normalize quotes; otherwise return as-is
+      return raw;
+    }
+  }, [editData.payload]);
+
   // Helper function to render icon (Material Symbol or DevOps image)
   const renderIcon = useCallback((iconName: string, size: 'sm' | 'md' | 'lg' = 'lg') => {
     const devopsIcon = devopsIconOptions.find(icon => icon.name === iconName);
@@ -269,8 +320,12 @@ export function EventSourceWorkflowNodeReactFlow({
   const handleCancel = useCallback(() => {
     setEditData({
       title: data.title,
+      description: data.description || '',
       cluster: data.cluster || '',
-      events: [...data.events]
+      events: [...data.events],
+      scheduleCron: data.scheduleCron || (data.eventSourceType === 'schedule' ? '0 0 * * 1' : ''),
+      payload: data.payload || '',
+      scheduleEnabled: typeof data.scheduleEnabled === 'boolean' ? data.scheduleEnabled : true
     });
     setIsEditMode(false);
   }, [data]);
@@ -341,9 +396,295 @@ export function EventSourceWorkflowNodeReactFlow({
     // Note: We don't deselect the node here as React Flow manages that
   }, []);
 
+  // (removed) applyFormat toolbar helper not needed; payload is preview-only
+
+  const handleEdit = useCallback(() => {
+    setIsEditMode(true);
+  }, []);
+
+  const handleFormSave = useCallback(() => {
+    // Persist to data so preview reflects changes immediately
+    if (data) {
+      data.title = editData.title;
+      data.description = editData.description;
+      data.scheduleCron = editData.scheduleCron;
+      data.payload = editData.payload;
+      data.scheduleEnabled = editData.scheduleEnabled;
+    }
+    handleSave();
+  }, [data, editData, handleSave]);
+
+  const handleFormCancel = useCallback(() => {
+    setEditData({
+      title: data.title,
+      description: data.description || '',
+      cluster: data.cluster || '',
+      events: [...data.events],
+      scheduleCron: data.scheduleCron || (data.eventSourceType === 'schedule' ? '*/30 * * * *' : ''),
+      payload: data.payload || '',
+      scheduleEnabled: typeof data.scheduleEnabled === 'boolean' ? data.scheduleEnabled : true
+    });
+    setTempTitle(data.title);
+    setTempDescription(data.description || '');
+    setEditingField(null);
+    handleCancel();
+  }, [data, handleCancel]);
+
+  // Lightweight helpers for cron description and UTC formatting
+  const describeCron = useCallback((expr: string) => {
+    const trimmed = (expr || '').trim();
+    switch (trimmed) {
+      case '* * * * *':
+        return 'Every minute';
+      case '*/5 * * * *':
+        return 'Every 5 minutes';
+      case '*/15 * * * *':
+        return 'Every 15 minutes';
+      case '0 * * * *':
+        return 'At minute 0, every hour';
+      case '0 0 * * *':
+        return 'At 12:00 AM, every day';
+      case '0 0 * * 1':
+        return 'At 12:00 AM, every Monday';
+      default:
+        return 'Custom schedule';
+    }
+  }, []);
+
+  const formatUtc = useCallback((iso?: string) => {
+    if (!iso) return '—';
+    try {
+      const d = new Date(iso);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+    } catch {
+      return '—';
+    }
+  }, []);
+
   // Preview Mode
   console.log('EventSourceWorkflowNode render:', { isEditMode, showSidebar, selected }); // Debug log
   
+  if (isEditMode) {
+    // Edit Mode UI
+    return (
+      <div 
+        className={clsx(
+          'bg-white dark:bg-zinc-800 rounded-lg border-2 relative transition-all duration-200 min-w-[340px]',
+          'border-blue-600 dark:border-zinc-200 ring-2 ring-blue-200 dark:ring-white'
+        )}
+        style={{ width: 340 }}
+        role="form"
+      >
+        {/* Action buttons bar in edit mode */}
+        <div 
+          className="action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Code first to match other components */}
+          <Button type="button" plain className="flex items-center gap-2">
+            <MaterialSymbol name="code" size="md"/>
+            Code
+          </Button>
+          {/* Save (plain style to match) */}
+          <Button plain onClick={handleFormSave} className="flex items-center gap-2">
+            <MaterialSymbol name="save" size="md"/>
+            Save
+          </Button>
+          {/* Cancel */}
+          <Button plain onClick={handleFormCancel} className="flex items-center gap-2">
+            <MaterialSymbol name="close" size="md"/>
+            Cancel
+          </Button>
+
+          {/* More options dropdown */}
+          <Dropdown>
+            <DropdownButton plain className='flex items-center gap-2 !pr-1'>
+              <MaterialSymbol name="more_vert" size="md"/>
+            </DropdownButton>
+            <DropdownMenu anchor="bottom start">
+              <DropdownItem className='flex items-center gap-2'>
+                <MaterialSymbol name="play_arrow" size="md"/>
+                <DropdownLabel>Run</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem className='flex items-center gap-2'>
+                <MaterialSymbol name="tune" size="md"/>
+                <DropdownLabel>Advanced configuration</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem className='flex items-center gap-2'>
+                <MaterialSymbol name="menu_book" size="md"/>
+                <DropdownLabel>Documentation</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem className='flex items-center gap-2 text-red-600 dark:text-red-200' color='red'>
+                <MaterialSymbol name="delete" size="md"/>
+                <DropdownLabel>Delete</DropdownLabel>
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+        {/* Header with inline editable Title */}
+        <div className="p-4 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className='flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10'>
+              {data.eventSourceType === 'schedule' ? (
+                <MaterialSymbol name="schedule" size="lg" className="text-gray-700 dark:text-zinc-300 m-auto" />
+              ) : (
+                <MaterialSymbol name="sensors" size="lg" className="text-gray-700 dark:text-zinc-300 m-auto" />
+              )}
+            </div>
+            <div className="flex flex-col">
+              {/* Inline editable title */}
+              {editingField === 'title' ? (
+                <Input
+                  value={tempTitle}
+                  onChange={(e) => setTempTitle(e.target.value)}
+                  onKeyDown={(e: any) => {
+                    if (e.key === 'Enter') {
+                      setEditData({ ...editData, title: tempTitle });
+                      setEditingField(null);
+                    } else if (e.key === 'Escape') {
+                      setTempTitle(editData.title);
+                      setEditingField(null);
+                    }
+                  }}
+                  onBlur={() => { setEditData({ ...editData, title: tempTitle }); setEditingField(null); }}
+                  className="font-semibold text-gray-900 dark:text-white"
+                  autoFocus
+                />
+              ) : (
+                <div className="group relative">
+                  <div className="flex items-center">
+                    <h3 className="font-semibold text-gray-900 dark:text-white mr-2">{editData.title}</h3>
+                    <button
+                      type="button"
+                      onClick={() => setEditingField('title')}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      aria-label="Edit title"
+                    >
+                      <MaterialSymbol name="edit" size="sm" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div />
+        </div>
+
+        {/* Body Form */}
+        <div className="p-4 space-y-4">
+          {/* Inline editable description */}
+          {editingField === 'description' ? (
+            <div>
+              <Textarea
+                value={tempDescription}
+                onChange={(e: any) => setTempDescription(e.target.value)}
+                onKeyDown={(e: any) => {
+                  if (e.key === 'Escape') {
+                    setTempDescription(editData.description);
+                    setEditingField(null);
+                  }
+                }}
+                onBlur={() => { setEditData({ ...editData, description: tempDescription }); setEditingField(null); }}
+                rows={3}
+              />
+            </div>
+          ) : (
+            <div
+              className="group relative cursor-text"
+              onClick={() => setEditingField('description')}
+              role="button"
+              aria-label="Edit description"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setEditingField('description');
+              }}
+            >
+              <div className="text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
+                {editData.description || 'Add a description...'}
+              </div>
+            </div>
+          )}
+          {/* Removed standalone Name/Description fields to keep inline editing UX */}
+
+          {data.eventSourceType === 'schedule' && (
+            <Field>
+              <div className="flex items-center justify-between">
+                <Label>Schedule</Label>
+                <button
+                  type="button"
+                  onClick={() => setEditData({ ...editData, scheduleEnabled: !editData.scheduleEnabled })}
+                  className="ml-2 cursor-pointer"
+                  aria-label="Toggle schedule enabled"
+                >
+                  <Badge color={editData.scheduleEnabled ? 'blue' : 'zinc'} className='mt-1'>
+                    {editData.scheduleEnabled ? 'Enabled' : 'Paused'}
+                  </Badge>
+                </button>
+              </div>
+              <div className="mb-1 mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+                For help with Crontab syntax, visit
+                {' '}<a className="text-blue-600 dark:text-blue-400" href="https://crontab.guru/" target="_blank" rel="noopener">Crontab Guru</a>.
+              </div>
+              <Input
+                value={editData.scheduleCron}
+                onChange={(e) => setEditData({ ...editData, scheduleCron: e.target.value })}
+                placeholder="e.g. */15 * * * *"
+                className="font-mono text-xs"
+              />
+              <p className="text-xs mt-1 text-zinc-700 dark:text-zinc-300">
+                Translates to: <span className="font-semibold">{describeCron(editData.scheduleCron)}</span>
+              </p>
+              <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                Next scheduled for: <span>{formatUtc(data.nextRunTime)}</span>
+              </p>
+            </Field>
+          )}
+
+          <Field>
+            <div className="flex items-center justify-between">
+              <Label>Payload</Label>
+              <Button
+                type="button"
+                plain
+                className="!p-1"
+                aria-label="Edit payload"
+              >
+                <MaterialSymbol name="edit" size="sm" />
+              </Button>
+            </div>
+            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900/40">
+              <pre className="p-3 font-mono text-xs text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">
+{getPayloadPreview()}
+              </pre>
+            </div>
+            <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Payload preview (read-only).</div>
+          </Field>
+
+          {/* Add new schedule link at bottom (no-op) */}
+          <div className='flex items-center justify-between w-full mt-3'>
+            <div className='flex items-center gap-1'>
+              <Link 
+                href="#" 
+                className="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                onClick={(e) => {
+                  e.preventDefault();
+                }}
+              >
+                <MaterialSymbol name="add" size="sm"/>
+                <span>Add new schedule</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Handles */}
+        <Handle type="target" position={Position.Left} className="w-3 h-3 !bg-primary-500 !border-2 !border-white" />
+        <Handle type="source" position={Position.Right} className="w-3 h-3 !bg-primary-500 !border-2 !border-white" />
+      </div>
+    );
+  }
+
   if (!isEditMode) {
     console.log('Rendering preview mode'); // Debug log
     return (
@@ -356,6 +697,18 @@ export function EventSourceWorkflowNodeReactFlow({
           style={{ width: 320, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
           role="article"
         >
+        {/* Action buttons when selected */}
+        {selected && (
+          <div 
+            className="action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button type="button" plain className="flex items-center gap-2" onClick={handleEdit}>
+              <MaterialSymbol name="edit" size="md"/>
+              Edit
+            </Button>
+          </div>
+        )}
         
         
         {/* Header */}
@@ -380,6 +733,8 @@ export function EventSourceWorkflowNodeReactFlow({
                 <div className='flex items-center content-center bg-zinc-100 dark:bg-zinc-700 rounded-md w-10 h-10'>
                   {data.eventSourceType === 'http' ? (
                     <MaterialSymbol name="rocket_launch" size="lg" className="text-gray-700 dark:text-zinc-300 m-auto" />
+                  ) : data.eventSourceType === 'schedule' ? (
+                    <MaterialSymbol name="schedule" size="lg" className="text-gray-700 dark:text-zinc-300 m-auto" />
                   ) : data.icon === 'semaphore' ? (
                     <img width={24} height={24} className='m-auto' src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
                   ) : data.icon === 'github' ? (
@@ -405,79 +760,75 @@ export function EventSourceWorkflowNodeReactFlow({
           </span>
           </div>
           <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300 mt-4'>
-              <Tippy
-                content={
-                  <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                    <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
-                      Project Configuration
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">Project:</span>
-                        <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded">
-                          semaphore-project
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">Organization:</span>
-                        <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                          {data.icon === 'semaphore' ? 'Semaphore CI' : data.icon === 'github' ? 'GitHub' : 'External Service'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">Status:</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-xs text-green-600 dark:text-green-400">Connected</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                }
-                interactive={true}
-                placement="bottom"
-                trigger="mouseenter"
-                delay={[200, 100]}
-                className="z-50"
-              >
+              {data.eventSourceType === 'schedule' ? (
                 <BadgeButton 
                   color='zinc' 
                   href='#' 
                   className='!text-xs'
                 >
-                  <MaterialSymbol name="assignment" size="md"/> semaphore-project
+                  <MaterialSymbol name="schedule" size="md"/> {getNextRunLabel()}
                 </BadgeButton>
-              </Tippy>
+              ) : (
+                <Tippy
+                  content={
+                    <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                      <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
+                        Project Configuration
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-zinc-600 dark:text-zinc-400">Project:</span>
+                          <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded">
+                            semaphore-project
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-zinc-600 dark:text-zinc-400">Organization:</span>
+                          <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                            {data.icon === 'semaphore' ? 'Semaphore CI' : data.icon === 'github' ? 'GitHub' : 'External Service'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-zinc-600 dark:text-zinc-400">Status:</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-xs text-green-600 dark:text-green-400">Connected</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                  interactive={true}
+                  placement="bottom"
+                  trigger="mouseenter"
+                  delay={[200, 100]}
+                  className="z-50"
+                >
+                  <BadgeButton 
+                    color='zinc' 
+                    href='#' 
+                    className='!text-xs'
+                  >
+                    <MaterialSymbol name="assignment" size="md"/> semaphore-project
+                  </BadgeButton>
+                </Tippy>
+              )}
               
               {/* Event Filters Display - Version 1 (Default) */}
               {eventFiltersVersion === 1 && (
                 appliedFilters.length > 0 ? (
                 <Tippy
                   content={
-                    <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[280px]">
-                      <div className="space-y-1">
-                        {appliedFilters.map((filter) => (
-                          <div>
-                            <div key={filter.id} className="flex items-center justify-between">
-                              <div className="flex items-center gap-1 text-xs bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded">
-                                <span className="text-xs bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
-                                  {filter.value}
-
-                                </span>
-                                <span className="text-zinc-500 dark:text-zinc-400">
-                                    {filter.operator}
-                                </span>
-                              
-                                
-                                <span className="font-mono text-zinc-500 dark:text-zinc-400">
-                                  filter expression
-                                </span>
-                              </div>
-                              </div>
-                              {filter.id !== appliedFilters[appliedFilters.length - 1].id && <span className="mt-1 text-xs block text-center text-zinc-500 dark:text-zinc-400">AND</span>}
-                          </div>
-                          
-                        ))}
+                    <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[260px]">
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2">
+                          <MaterialSymbol name="schedule" size="sm" className="text-zinc-500 dark:text-zinc-400" />
+                          <span className="text-xs text-zinc-700 dark:text-zinc-300">At 12:00 AM, every Monday</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <MaterialSymbol name="schedule" size="sm" className="text-zinc-500 dark:text-zinc-400" />
+                          <span className="text-xs text-zinc-700 dark:text-zinc-300">At minute 0, every hour</span>
+                        </div>
                       </div>
                     </div>
                   }
@@ -492,8 +843,8 @@ export function EventSourceWorkflowNodeReactFlow({
                     href='#' 
                     className='!text-xs'
                   >
-                    <MaterialSymbol name="filter_list" size="md"/>
-                    {appliedFilters.length} Event filters
+                    <MaterialSymbol name="schedule" size="md"/>
+                    {appliedFilters.length} Schedules
                   </BadgeButton>
                 </Tippy>
                 ) : (
@@ -502,8 +853,8 @@ export function EventSourceWorkflowNodeReactFlow({
                     href='#' 
                     className='!text-xs'
                   >
-                    <MaterialSymbol name="podcasts" size="md"/>
-                    All events
+                    <MaterialSymbol name="schedule" size="md"/>
+                    No schedules
                   </BadgeButton>
                 )
               )}
@@ -628,6 +979,13 @@ export function EventSourceWorkflowNodeReactFlow({
             <div className="text-blue-600 dark:text-blue-400 font-medium">
               {data.cluster}
             </div>
+          </div>
+        )}
+
+        {/* Description (if present) */}
+        {data.description && (
+          <div className="px-4 pt-3 text-sm text-zinc-700 dark:text-zinc-300">
+            {data.description}
           </div>
         )}
 

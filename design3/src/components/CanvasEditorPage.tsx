@@ -124,6 +124,48 @@ const initialNodesData = [
       }
     },
   },
+  // New scheduled event source below Sync Cluster
+  {
+    id: 'stage-1-schedule',
+    position: { x: -400, y: 500 },
+    workflowNodeData: {
+      id: 'stage-1-schedule',
+      title: 'Scheduled Sync',
+      description: 'Run scheduled sync to check cluster state',
+      type: 'eventSource',
+      status: 'success',
+      icon: 'schedule',
+      // Custom fields for eventSource rendering
+      eventSourceType: 'schedule',
+      nextRunTime: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+      scheduleCron: '0 0 * * 1',
+      payload: '',
+      nodeNumber: 101,
+      queueIcon: 'schedule',
+      queueTitle: 'next run',
+      runName: 'scheduled-run',
+      triggeredBy: 'Schedule',
+      eventId: 'evt_schedule_1',
+      yamlConfig: {
+        apiVersion: 'v1',
+        kind: 'EventSource',
+        metadata: {
+          name: 'scheduled-sync',
+          canvasId: ''
+        },
+        spec: {
+          cron: '0 0 * * 1',
+          inputs: [],
+          inputMappings: {},
+          outputs: [],
+          executor: {
+            type: 'kubernetes',
+            config: { image: 'node:18', resources: { cpu: '0.2', memory: '256Mi' } }
+          }
+        }
+      }
+    },
+  },
   {
     id: 'stage-2',
     position: { x: 100, y: 120 },
@@ -132,14 +174,14 @@ const initialNodesData = [
       title: 'AI Agent triage',
       description: 'Run AI agent to review and triage the cluster changes',
       type: 'stage',
-      status: 'success',
-      icon: 'openAI',
+      status: 'cancelled',
+      icon: 'openai',
       nodeNumber: 9,
       queueIcon: 'how_to_reg',
-      queueTitle: 'xk9m2n5p8-qr4t7w1z6-bv3c8f2j',
-      runName: 'pl7s4v9y2-we6z3b8c5-fj2k5n8r',
+      queueTitle: 'xk9m2n5p8-qr4t7w1z6-bv3c8f2ja',
+      runName: 'DEBUG NAME',
       triggeredBy: 'Sync Cluster',
-      eventId: 'run_completed_mk8j3n6q9',
+      eventId: 'run_cancelled_pl7s4v9y2',
       yamlConfig: {
         apiVersion: 'v1',
         kind: 'Stage',
@@ -276,7 +318,7 @@ const initialNodesData = [
       description: 'Deploy application to production environment',
       type: 'stage',
       status: 'running',
-      icon: 'semaphore',
+      icon: 'argo-cd',
       nodeNumber: 32,
       queueIcon: 'how_to_reg',
       queueTitle: 'gh3j6l9n2-pq7r4s8t1-wx4y7z0c',
@@ -441,6 +483,17 @@ const initialEdges: WorkflowEdge[] = [
       type: MarkerType.ArrowClosed,
     },
   },
+  // Scheduled Sync -> AI Agent triage
+  {
+    id: 'e1schedule-2',
+    source: 'stage-1-schedule',
+    target: 'stage-2',
+    type: 'bezier',
+    animated: false,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+  },
   {
     id: 'e2-3',
     source: 'stage-2',
@@ -513,8 +566,14 @@ export function CanvasEditorPage({
           data: {
             id: nodeData.workflowNodeData.id,
             title: nodeData.workflowNodeData.title,
+            description: (nodeData.workflowNodeData as any).description || '',
             cluster: 'prod-cluster',
             icon: nodeData.workflowNodeData.icon || 'settings_ethernet',
+            // propagate specialized event source fields when present
+            eventSourceType: (nodeData.workflowNodeData as any).eventSourceType,
+            nextRunTime: (nodeData.workflowNodeData as any).nextRunTime,
+            scheduleCron: (nodeData.workflowNodeData as any).scheduleCron,
+            payload: (nodeData.workflowNodeData as any).payload,
             events: [
               {
                 id: 'event-1',

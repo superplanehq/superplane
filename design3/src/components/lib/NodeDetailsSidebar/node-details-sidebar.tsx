@@ -14,7 +14,7 @@ import { EmptyState } from '../EmptyState';
 interface RunData {
   id: string;
   name: string;
-  status: 'success' | 'running' | 'failed' | 'pending';
+  status: 'success' | 'running' | 'failed' | 'pending' | 'cancelled';
   timestamp: string;
   duration: string;
   project?: string;
@@ -78,21 +78,21 @@ interface NodeDetailsSidebarProps {
 
 const mockRuns2: RunData[] = [
   {
-    id: 'run-2',
-    name: 'alsdkfjl43rlkewj-srlfksdj3r-sdlfkjwer',
-    status: 'running',
-    timestamp: 'Jan 16, 2022 10:23:45',
-    duration: '00h 00m 25s',
-    project: 'Semaphore project',
-    pipeline: 'Pipeline name',
-    queuedAt: 'Jan 16, 2022 10:22:15',
-    conditionMetAt: 'Jan 16, 2022 10:23:30',
-    approvedBy: 'john.doe@example.com',
-    branchTagPr: 'feature/auth-improvements',
+    id: 'pl7s4v9y2-we6z3b8c5-fj2k5n8r',
+    name: 'pl7s4v9y2-we6z3b8c5-fj2k5n8r',
+    status: 'cancelled',
+    timestamp: 'Sep 4, 2025 14:12:00',
+    duration: '00h 05m 12s',
+    project: 'AI Pipeline',
+    pipeline: 'AI Agent',
+    queuedAt: 'Sep 4, 2025 14:10:15',
+    conditionMetAt: 'Sep 4, 2025 14:11:30',
+    approvedBy: 'system',
+    branchTagPr: 'main',
     inputs: {
-      Code: '34234234',
-      Image: 'v.1.3.1',
-      Terraform: '32.32'
+      Model: 'gpt-4',
+      Task: 'triage',
+      Priority: 'high'
     }
   },
   {
@@ -1523,6 +1523,12 @@ export function NodeDetailsSidebar({
                                 <Badge color='blue' className='!flex !items-center'>
                                   <MaterialSymbol name='sync' size='md' className='animate-spin'/>
                                   <span className={consistentStatuses ? 'uppercase' : 'uppercase'}>Running</span>
+                                </Badge>
+                                )}
+                                {run.status == 'cancelled' && (
+                                <Badge color='zinc' className='!flex !items-center'>
+                                  <MaterialSymbol name='block' size='md'/>
+                                  <span className='uppercase'>Cancelled</span>
                                 </Badge>
                                 )}
                                 <div className="flex items-center w-full">
