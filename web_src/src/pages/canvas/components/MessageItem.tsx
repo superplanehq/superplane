@@ -160,10 +160,10 @@ const MessageItem = React.memo(({
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base" aria-hidden="true">block</span>
                 <span className="uppercase">Discarded</span>
               </span>
-            ) : isPlainEvent(event) && event.state === 'STATE_DISCARDED' ? (
+            ) : isPlainEvent(event) && event.state === 'STATE_REJECTED' ? (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base" aria-hidden="true">block</span>
-                <span className="uppercase">Discarded</span>
+                <span className="uppercase">Rejected</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">

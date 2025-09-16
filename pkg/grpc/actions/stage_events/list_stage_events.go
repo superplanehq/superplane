@@ -12,7 +12,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -212,7 +211,7 @@ func protoToState(state pb.StageEvent_State) (string, error) {
 func serializeStageEvents(in []models.StageEvent) ([]*pb.StageEvent, error) {
 	out := []*pb.StageEvent{}
 	for _, i := range in {
-		e, err := serializeStageEvent(i)
+		e, err := actions.SerializeStageEvent(i)
 		if err != nil {
 			return nil, err
 		}
@@ -221,149 +220,4 @@ func serializeStageEvents(in []models.StageEvent) ([]*pb.StageEvent, error) {
 	}
 
 	return out, nil
-}
-
-func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
-	e := pb.StageEvent{
-		Id:          in.ID.String(),
-		State:       stateToProto(in.State),
-		StateReason: stateReasonToProto(in.StateReason),
-		CreatedAt:   timestamppb.New(*in.CreatedAt),
-		Approvals:   []*pb.StageEventApproval{},
-		Inputs:      []*pb.KeyValuePair{},
-		Name:        in.Name,
-	}
-
-	if in.DiscardedBy != nil {
-		e.DiscardedBy = in.DiscardedBy.String()
-	}
-	if in.DiscardedAt != nil {
-		e.DiscardedAt = timestamppb.New(*in.DiscardedAt)
-	}
-
-	//
-	// Add inputs
-	//
-	for k, v := range in.Inputs.Data() {
-		e.Inputs = append(e.Inputs, &pb.KeyValuePair{Name: k, Value: v.(string)})
-	}
-
-	//
-	// Add approvals
-	//
-	approvals, err := in.FindApprovals()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, approval := range approvals {
-		e.Approvals = append(e.Approvals, &pb.StageEventApproval{
-			ApprovedBy: approval.ApprovedBy.String(),
-			ApprovedAt: timestamppb.New(*approval.ApprovedAt),
-		})
-	}
-
-	if in.Event != nil {
-		serializedTriggerEvent, err := serializeEvent(*in.Event)
-		if err != nil {
-			return nil, err
-		}
-		e.TriggerEvent = serializedTriggerEvent
-	}
-
-	return &e, nil
-}
-
-func stateToProto(state string) pb.StageEvent_State {
-	switch state {
-	case models.StageEventStatePending:
-		return pb.StageEvent_STATE_PENDING
-	case models.StageEventStateWaiting:
-		return pb.StageEvent_STATE_WAITING
-	case models.StageEventStateProcessed:
-		return pb.StageEvent_STATE_PROCESSED
-	case models.StageEventStateDiscarded:
-		return pb.StageEvent_STATE_DISCARDED
-	default:
-		return pb.StageEvent_STATE_UNKNOWN
-	}
-}
-
-func stateReasonToProto(stateReason string) pb.StageEvent_StateReason {
-	switch stateReason {
-	case models.StageEventStateReasonApproval:
-		return pb.StageEvent_STATE_REASON_APPROVAL
-	case models.StageEventStateReasonTimeWindow:
-		return pb.StageEvent_STATE_REASON_TIME_WINDOW
-	case models.StageEventStateReasonStuck:
-		return pb.StageEvent_STATE_REASON_STUCK
-	case models.StageEventStateReasonTimeout:
-		return pb.StageEvent_STATE_REASON_TIMEOUT
-	default:
-		return pb.StageEvent_STATE_REASON_UNKNOWN
-	}
-}
-
-func serializeEvent(event models.Event) (*pb.Event, error) {
-	e := &pb.Event{
-		Id:         event.ID.String(),
-		SourceId:   event.SourceID.String(),
-		SourceName: event.SourceName,
-		SourceType: sourceTypeModelToProto(event.SourceType),
-		Type:       event.Type,
-		State:      eventStateModelToProto(event.State),
-		ReceivedAt: timestamppb.New(*event.ReceivedAt),
-	}
-
-	if len(event.Raw) > 0 {
-		data, err := event.GetData()
-		if err != nil {
-			return nil, err
-		}
-
-		e.Raw, err = structpb.NewStruct(data)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if len(event.Headers) > 0 {
-		headers, err := event.GetHeaders()
-		if err != nil {
-			return nil, err
-		}
-
-		e.Headers, err = structpb.NewStruct(headers)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return e, nil
-}
-
-func sourceTypeModelToProto(sourceType string) pb.EventSourceType {
-	switch sourceType {
-	case models.SourceTypeEventSource:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
-	case models.SourceTypeStage:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE
-	case models.SourceTypeConnectionGroup:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP
-	default:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN
-	}
-}
-
-func eventStateModelToProto(state string) pb.Event_State {
-	switch state {
-	case models.EventStatePending:
-		return pb.Event_STATE_PENDING
-	case models.EventStateDiscarded:
-		return pb.Event_STATE_DISCARDED
-	case models.EventStateProcessed:
-		return pb.Event_STATE_PROCESSED
-	default:
-		return pb.Event_STATE_UNKNOWN
-	}
 }

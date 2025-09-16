@@ -81,6 +81,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSuperplane.Superplane_DiscardStageEvent_FullMethodName:            {Resource: "stageevent", Action: "discard", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListStageEvents_FullMethodName:              {Resource: "stageevent", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListEvents_FullMethodName:                   {Resource: "event", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_ListEventRejections_FullMethodName:          {Resource: "event", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListConnectionGroupFieldSets_FullMethodName: {Resource: "connectiongroupfieldset", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 
 		// Groups rules
