@@ -11,7 +11,8 @@ import { SidebarHeader } from "./SidebarHeader";
 import { SidebarTabs } from "./SidebarTabs";
 import { ResizeHandle } from "./ResizeHandle";
 import { ActivityTab } from "./tabs/ActivityTab";
-import { HistoryTab } from "./tabs/HistoryTab";
+import { ExecutionsTab } from "./tabs/ExecutionsTab";
+import { QueueTab } from "./tabs/QueueTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
@@ -85,7 +86,8 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
 
   const tabs = useMemo(() => [
     { key: 'activity', label: 'Activity' },
-    { key: 'history', label: 'History' },
+    { key: 'executions', label: 'Executions' },
+    { key: 'queue', label: 'Queue' },
     { key: 'settings', label: 'Settings' },
   ], []);
 
@@ -99,12 +101,14 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
 
   // Fetch executions directly from the API
   const {
-    data: executionsData
+    data: executionsData,
+    isLoading: executionsLoading
   } = useStageExecutions(canvasId || '', selectedStage.metadata?.id || '');
 
   // Fetch pending and waiting stage events
   const {
-    data: queueEventsData
+    data: queueEventsData,
+    isLoading: queueEventsLoading
   } = useStageQueueEvents(canvasId || '', selectedStage.metadata?.id || '', ['STATE_PENDING', 'STATE_WAITING']);
 
   const partialExecutions = useMemo(() =>
@@ -151,17 +155,25 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
             organizationId={organizationId!}
             discardStageEvent={handleDiscardStageEvent}
             cancelStageExecution={handleCancelStageExecution}
+            isLoading={executionsLoading || queueEventsLoading}
           />
         );
 
-      case 'history':
-        return <HistoryTab
+      case 'executions':
+        return <ExecutionsTab
           canvasId={canvasId!}
-          approveStageEvent={handleApproveStageEvent}
-          organizationId={organizationId!}
           selectedStage={selectedStage}
-          discardStageEvent={handleDiscardStageEvent}
+          organizationId={organizationId!}
           cancelStageExecution={handleCancelStageExecution}
+        />;
+
+      case 'queue':
+        return <QueueTab
+          canvasId={canvasId!}
+          selectedStage={selectedStage}
+          organizationId={organizationId!}
+          approveStageEvent={handleApproveStageEvent}
+          discardStageEvent={handleDiscardStageEvent}
         />;
 
       case 'settings':
