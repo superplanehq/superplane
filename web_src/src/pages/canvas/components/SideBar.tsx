@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Stage } from "../store/types";
 
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
-import { useStageExecutions, useStageQueueEvents, canvasKeys } from "@/hooks/useCanvasData";
+import { useStageExecutions, useStageEvents, canvasKeys } from "@/hooks/useCanvasData";
 import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
 
 import { SidebarHeader } from "./SidebarHeader";
@@ -13,6 +13,7 @@ import { ResizeHandle } from "./ResizeHandle";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { ExecutionsTab } from "./tabs/ExecutionsTab";
 import { QueueTab } from "./tabs/QueueTab";
+import { EventsTab } from "./tabs/EventsTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
@@ -88,6 +89,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
     { key: 'activity', label: 'Activity' },
     { key: 'executions', label: 'Executions' },
     { key: 'queue', label: 'Queue' },
+    { key: 'events', label: 'Events' },
     { key: 'settings', label: 'Settings' },
   ], []);
 
@@ -109,7 +111,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
   const {
     data: queueEventsData,
     isLoading: queueEventsLoading
-  } = useStageQueueEvents(canvasId || '', selectedStage.metadata?.id || '', ['STATE_PENDING', 'STATE_WAITING']);
+  } = useStageEvents(canvasId || '', selectedStage.metadata?.id || '', ['STATE_PENDING', 'STATE_WAITING']);
 
   const partialExecutions = useMemo(() =>
     executionsData?.pages.flatMap(page => page.executions) || [],
@@ -174,6 +176,13 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
           organizationId={organizationId!}
           approveStageEvent={handleApproveStageEvent}
           discardStageEvent={handleDiscardStageEvent}
+        />;
+
+      case 'events':
+        return <EventsTab
+          canvasId={canvasId!}
+          selectedStage={selectedStage}
+          organizationId={organizationId!}
         />;
 
       case 'settings':

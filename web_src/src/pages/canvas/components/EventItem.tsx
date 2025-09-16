@@ -14,6 +14,7 @@ interface EventItemProps {
   sourceName?: string;
   headers?: { [key: string]: unknown };
   payload?: { [key: string]: unknown };
+  showStateLabel?: boolean;
 }
 
 export const EventItem: React.FC<EventItemProps> = React.memo(({
@@ -26,6 +27,7 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
   sourceName,
   headers,
   payload,
+  showStateLabel = true,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
@@ -72,7 +74,7 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
           bgColor: 'bg-green-100/50 dark:bg-green-900/20',
           textColor: 'text-green-600 dark:text-green-400',
           icon: 'check_circle',
-          label: 'Forwarded',
+          label: 'Processed',
           animate: false,
         };
     }
@@ -100,17 +102,19 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
         <div className="cursor-pointer flex items-center justify-between" onClick={toggleExpand}>
           <div className="flex items-center gap-2 truncate pr-2">
             {/* State badge */}
-            <span className={`inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline ${stateConfig.bgColor} ${stateConfig.textColor}`}>
-              <span className={`material-symbols-outlined select-none inline-flex items-center justify-center !text-base ${stateConfig.animate ? 'animate-pulse' : ''}`} aria-hidden="true">{stateConfig.icon}</span>
-              <span className="uppercase">{stateConfig.label}</span>
-            </span>
+            {showStateLabel && (
+              <span className={`inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline ${stateConfig.bgColor} ${stateConfig.textColor}`}>
+                <span className={`material-symbols-outlined select-none inline-flex items-center justify-center !text-base ${stateConfig.animate ? 'animate-pulse' : ''}`} aria-hidden="true">{stateConfig.icon}</span>
+                <span>{stateConfig.label}</span>
+              </span>
+            )}
             {/* Event type badge */}
-            <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-blue-100/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-mono bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
               <span>{eventType || 'webhook'}</span>
             </span>
           </div>
-          <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap text-right">{formatRelativeTime(timestamp, true)}</span>
           <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">{formatRelativeTime(timestamp, true)}</span>
             <MaterialSymbol
               name={isExpanded ? 'expand_less' : 'expand_more'}
               size="xl"
@@ -124,9 +128,6 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
             {/* Show rejection details for rejected events */}
             {state === 'STATE_REJECTED' && (stateReason || stateMessage) && (
               <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg p-3">
-                <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-                  Rejection Details
-                </div>
                 <div className="space-y-2">
                   {stateReason && (
                     <div>
