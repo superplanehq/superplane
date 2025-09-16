@@ -110,8 +110,6 @@ export const QueueTab = ({ selectedStage, organizationId, canvasId, approveStage
           <>
             {allEvents.map((stageEvent) => {
               const sourceEvent = stageEvent.triggerEvent;
-              const plainEventPayload = sourceEvent?.raw;
-              const plainEventHeaders = sourceEvent?.headers;
               const approvalAndCancelledData = { event: stageEvent } as any;
 
               return (
@@ -119,11 +117,8 @@ export const QueueTab = ({ selectedStage, organizationId, canvasId, approveStage
                   key={stageEvent.id}
                   event={stageEvent}
                   selectedStage={selectedStage}
-                  executionRunning={false}
                   onApprove={stageEvent.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
                   onCancel={(eventId) => discardStageEvent(eventId, selectedStage.metadata!.id!)}
-                  plainEventPayload={plainEventPayload}
-                  plainEventHeaders={plainEventHeaders}
                   sourceEvent={sourceEvent}
                   approvedOn={getMinApprovedAt(approvalAndCancelledData)}
                   approvedBy={getApprovalsNames(approvalAndCancelledData, userDisplayNames)}

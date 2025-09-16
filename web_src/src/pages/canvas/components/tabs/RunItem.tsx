@@ -1,7 +1,6 @@
-import React, { JSX, useMemo } from 'react';
+import React, { JSX } from 'react';
 import { ExecutionResult, SuperplaneExecutionState, SuperplaneEvent } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { PayloadDisplay } from '../PayloadDisplay';
 
 interface RunItemProps {
   state: SuperplaneExecutionState;
@@ -45,9 +44,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   const toggleExpand = (): void => {
     setIsExpanded(!isExpanded);
   };
-
-  const sourceEventPayload = useMemo(() => sourceEvent?.raw, [sourceEvent]);
-  const sourceEventHeaders = useMemo(() => sourceEvent?.headers, [sourceEvent]);
 
   const renderStatusBadge = (): JSX.Element => {
     switch (state) {
@@ -273,19 +269,56 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
               </div>
             )}
 
-            {/* Run Details Section */}
-            {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0) && (
+            {/* Inputs Section */}
+            {Object.keys(inputs).length > 0 && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  {(state === 'STATE_FINISHED' && result === 'RESULT_CANCELLED') ? 'Event' : 'Run'}
+                  Inputs
                 </div>
-                <div>
-                  <PayloadDisplay
-                    showDetailsTab={false}
-                    inputs={inputs}
-                    outputs={outputs}
-                    rounded={false}
-                  />
+
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    {Object.entries(inputs).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <MaterialSymbol name="input" size="md" className="text-gray-600 dark:text-zinc-400 flex-shrink-0" />
+                          <span className="text-xs text-gray-800 dark:text-gray-200 font-medium truncate">
+                            {key}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-700 dark:text-gray-300 text-right">
+                          {value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Outputs Section */}
+            {Object.keys(outputs).length > 0 && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                  Outputs
+                </div>
+
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    {Object.entries(outputs).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <MaterialSymbol name="output" size="md" className="text-gray-600 dark:text-zinc-400 flex-shrink-0" />
+                          <span className="text-xs text-gray-800 dark:text-gray-200 font-medium truncate">
+                            {key}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-700 dark:text-gray-300 text-right">
+                          {value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -347,22 +380,40 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             )}
 
             {/* Trigger Event Details Section */}
-            {sourceEvent && (sourceEventPayload || sourceEventHeaders) && (
+            {sourceEvent && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Trigger Event
                 </div>
 
-                <PayloadDisplay
-                  showDetailsTab={true}
-                  eventId={sourceEvent.id}
-                  timestamp={sourceEvent.receivedAt}
-                  eventType={sourceEvent.type}
-                  sourceName={sourceEvent.sourceName}
-                  headers={sourceEventHeaders}
-                  payload={sourceEventPayload}
-                  rounded={false}
-                />
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    {sourceEvent.id && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="tag" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          ID: <span className="text-blue-600 dark:text-blue-400 font-mono">{sourceEvent.id}</span>
+                        </span>
+                      </div>
+                    )}
+                    {sourceEvent.type && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="category" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Type: <span className="text-gray-800 dark:text-gray-200 font-mono">{sourceEvent.type}</span>
+                        </span>
+                      </div>
+                    )}
+                    {sourceEvent.sourceName && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="source" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Source: <span className="text-gray-800 dark:text-gray-200">{sourceEvent.sourceName}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
