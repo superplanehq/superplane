@@ -5,6 +5,7 @@ import { Stage } from "../store/types";
 
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { useStageExecutions, useStageQueueEvents, canvasKeys } from "@/hooks/useCanvasData";
+import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
 
 import { SidebarHeader } from "./SidebarHeader";
 import { SidebarTabs } from "./SidebarTabs";
@@ -28,12 +29,13 @@ interface SidebarProps {
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
   cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
+  initialWidth?: number;
 }
 
-export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStageEvent, cancelStageExecution }: SidebarProps) => {
+export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStageEvent, cancelStageExecution, initialWidth = DEFAULT_SIDEBAR_WIDTH }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState('activity');
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
-  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(600);
+  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(initialWidth);
   const queryClient = useQueryClient();
 
   // Wrapper function to handle approval with query invalidation

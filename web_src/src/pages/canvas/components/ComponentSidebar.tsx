@@ -287,14 +287,13 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between px-4 pt-4 pb-0 sticky top-0">
             <div className="flex items-center gap-3">
-              <Button
-                color='white'
+              <button
                 onClick={onClose}
                 aria-label="Close sidebar"
-                className='!px-1 !py-0'
+                className="px-2 py-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 rounded-md shadow-md hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all duration-300 flex items-center gap-2"
               >
-                <MaterialSymbol name="menu_open" size="lg" />
-              </Button>
+                <MaterialSymbol name="menu_open" size="lg" className="text-gray-600 dark:text-zinc-300" />
+              </button>
 
               <h2 id="sidebar-title" className="text-md font-semibold text-gray-900 dark:text-zinc-100">
                 Components
