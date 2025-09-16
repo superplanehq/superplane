@@ -54,7 +54,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
   const [conditions, setConditions] = useState<SuperplaneCondition[]>(data.conditions || []);
-  const [executor, setExecutor] = useState<SuperplaneExecutor>({ type: data.executor?.type || '', spec: data.executor?.spec || {} });
+  const [executor, setExecutor] = useState<SuperplaneExecutor>({
+    type: data.executor?.type || '',
+    spec: data.executor?.spec || {},
+    resource: data.executor?.resource || {},
+    integration: data.executor?.integration || {},
+  });
   const [inputMappings, setInputMappings] = useState<SuperplaneInputMapping[]>(data.inputMappings || []);
   const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
     ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
