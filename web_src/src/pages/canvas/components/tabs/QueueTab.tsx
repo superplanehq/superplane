@@ -171,13 +171,19 @@ export const QueueTab = ({ selectedStage, organizationId, canvasId, approveStage
 
             {hasNextPage && (
               <div className="flex justify-center pt-4">
-                <button
-                  onClick={handleLoadMore}
-                  disabled={isFetchingNextPage}
-                  className="text-blue-600 text-sm hover:text-blue-700 disabled:text-blue-400 underline transition-colors duration-200 disabled:cursor-not-allowed"
-                >
-                  {isFetchingNextPage ? 'Loading...' : 'Load More'}
-                </button>
+                {isFetchingNextPage ? (
+                  <div className="inline-flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent mr-2"></div>
+                    <span className="text-zinc-600 dark:text-zinc-400 text-sm">Loading more...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleLoadMore}
+                    className="text-blue-600 text-sm hover:text-blue-700 underline transition-colors duration-200"
+                  >
+                    Load More
+                  </button>
+                )}
               </div>
             )}
           </>
