@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fKYlVLv4VZuIzQRaR1gFhzQCJQUYPCi0kIAZPzb96QeeHnbhNn1MqFiMvwC6SMo
+\restrict d0wjNX1MTbwtllrvNXn4uVKAa0cPGce3cyEprUVaCnrOeXgAIvtHvVLtStg9jUd
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -836,6 +836,13 @@ CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at)
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1091,7 +1098,7 @@ ALTER TABLE ONLY public.connections
 --
 
 ALTER TABLE ONLY public.stage_event_approvals
-    ADD CONSTRAINT stage_event_approvals_stage_event_id_fkey FOREIGN KEY (stage_event_id) REFERENCES public.stage_events(id);
+    ADD CONSTRAINT stage_event_approvals_stage_event_id_fkey FOREIGN KEY (stage_event_id) REFERENCES public.stage_events(id) ON DELETE CASCADE;
 
 
 --
@@ -1154,13 +1161,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fKYlVLv4VZuIzQRaR1gFhzQCJQUYPCi0kIAZPzb96QeeHnbhNn1MqFiMvwC6SMo
+\unrestrict d0wjNX1MTbwtllrvNXn4uVKAa0cPGce3cyEprUVaCnrOeXgAIvtHvVLtStg9jUd
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict zoDaMqcoofd39OdHE5Hqyw4YsEjFAbb0wr9ouklidjJD5mwbHdESgPc5CHCBe51
+\restrict okP7aQ2YZfoS11J0CyWJiCxKtih5NNeClLZslnSuGD2FWY6zKEcp9jAUtdm2aaM
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1182,7 +1189,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250915181443	f
+20250916194326	f
 \.
 
 
@@ -1190,5 +1197,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zoDaMqcoofd39OdHE5Hqyw4YsEjFAbb0wr9ouklidjJD5mwbHdESgPc5CHCBe51
+\unrestrict okP7aQ2YZfoS11J0CyWJiCxKtih5NNeClLZslnSuGD2FWY6zKEcp9jAUtdm2aaM
 
