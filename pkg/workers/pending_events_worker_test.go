@@ -41,8 +41,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.EventStateRejected, event.State)
-		assert.Equal(t, models.EventStateReasonNotConnected, event.StateReason)
+		assert.Equal(t, models.EventStateProcessed, event.State)
+		assert.Equal(t, models.EventStateReasonOk, event.StateReason)
 		assert.Empty(t, event.StateMessage)
 	})
 
@@ -636,11 +636,11 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		//
-		// Event is discarded, since the event source used by the executor cannot be used as a connection.
+		// Event is processed, since the event source has no connections configured.
 		//
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.EventStateRejected, event.State)
+		assert.Equal(t, models.EventStateProcessed, event.State)
 
 		//
 		// The execution resource has its state updated.

@@ -697,11 +697,10 @@ func (Event_State) EnumDescriptor() ([]byte, []int) {
 type Event_StateReason int32
 
 const (
-	Event_STATE_REASON_UNKNOWN       Event_StateReason = 0
-	Event_STATE_REASON_FILTERED      Event_StateReason = 1
-	Event_STATE_REASON_ERROR         Event_StateReason = 2
-	Event_STATE_REASON_NOT_CONNECTED Event_StateReason = 3
-	Event_STATE_REASON_OK            Event_StateReason = 4
+	Event_STATE_REASON_UNKNOWN  Event_StateReason = 0
+	Event_STATE_REASON_FILTERED Event_StateReason = 1
+	Event_STATE_REASON_ERROR    Event_StateReason = 2
+	Event_STATE_REASON_OK       Event_StateReason = 3
 )
 
 // Enum value maps for Event_StateReason.
@@ -710,15 +709,13 @@ var (
 		0: "STATE_REASON_UNKNOWN",
 		1: "STATE_REASON_FILTERED",
 		2: "STATE_REASON_ERROR",
-		3: "STATE_REASON_NOT_CONNECTED",
-		4: "STATE_REASON_OK",
+		3: "STATE_REASON_OK",
 	}
 	Event_StateReason_value = map[string]int32{
-		"STATE_REASON_UNKNOWN":       0,
-		"STATE_REASON_FILTERED":      1,
-		"STATE_REASON_ERROR":         2,
-		"STATE_REASON_NOT_CONNECTED": 3,
-		"STATE_REASON_OK":            4,
+		"STATE_REASON_UNKNOWN":  0,
+		"STATE_REASON_FILTERED": 1,
+		"STATE_REASON_ERROR":    2,
+		"STATE_REASON_OK":       3,
 	}
 )
 
@@ -8178,7 +8175,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xc2\x05\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xa1\x05\n" +
 	"\x05Event\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tsource_id\x18\x02 \x01(\tR\bsourceId\x12\x1f\n" +
@@ -8199,13 +8196,12 @@ const file_canvases_proto_rawDesc = "" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x12\n" +
 	"\x0eSTATE_REJECTED\x10\x02\x12\x13\n" +
-	"\x0fSTATE_PROCESSED\x10\x03\"\x8f\x01\n" +
+	"\x0fSTATE_PROCESSED\x10\x03\"o\n" +
 	"\vStateReason\x12\x18\n" +
 	"\x14STATE_REASON_UNKNOWN\x10\x00\x12\x19\n" +
 	"\x15STATE_REASON_FILTERED\x10\x01\x12\x16\n" +
-	"\x12STATE_REASON_ERROR\x10\x02\x12\x1e\n" +
-	"\x1aSTATE_REASON_NOT_CONNECTED\x10\x03\x12\x13\n" +
-	"\x0fSTATE_REASON_OK\x10\x04\"\xcc\x03\n" +
+	"\x12STATE_REASON_ERROR\x10\x02\x12\x13\n" +
+	"\x0fSTATE_REASON_OK\x10\x03\"\xcc\x03\n" +
 	"\x0eEventRejection\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x05event\x18\x02 \x01(\v2\x11.Superplane.EventR\x05event\x12<\n" +

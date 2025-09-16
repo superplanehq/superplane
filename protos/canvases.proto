@@ -1011,8 +1011,7 @@ message Event {
     STATE_REASON_UNKNOWN = 0;
     STATE_REASON_FILTERED = 1;
     STATE_REASON_ERROR = 2;
-    STATE_REASON_NOT_CONNECTED = 3;
-    STATE_REASON_OK = 4;
+    STATE_REASON_OK = 3;
   }
 
   string id = 1;

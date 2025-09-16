@@ -188,10 +188,10 @@ func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *model
 	}
 
 	//
-	// If the source is not connected to any stage, we discard the event.
+	// If the source is not connected to any stage, we mark the event as processed.
 	//
 	if len(connections) == 0 {
-		return event.UpdateState(models.EventStateRejected, models.EventStateReasonNotConnected, "")
+		return event.UpdateState(models.EventStateProcessed, models.EventStateReasonOk, "")
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {

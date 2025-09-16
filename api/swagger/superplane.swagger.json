@@ -4110,7 +4110,6 @@
         "STATE_REASON_UNKNOWN",
         "STATE_REASON_FILTERED",
         "STATE_REASON_ERROR",
-        "STATE_REASON_NOT_CONNECTED",
         "STATE_REASON_OK"
       ],
       "default": "STATE_REASON_UNKNOWN"

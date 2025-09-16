@@ -23,11 +23,10 @@ const (
 	EventStateRejected  = "rejected"
 	EventStateProcessed = "processed"
 
-	EventStateReasonFiltered     = "filtered"
-	EventStateReasonError        = "error"
-	EventStateReasonNotConnected = "not-connected"
-	EventStateReasonOk           = "ok"
-	EventStateReasonUnknown      = "unknown"
+	EventStateReasonFiltered = "filtered"
+	EventStateReasonError    = "error"
+	EventStateReasonOk       = "ok"
+	EventStateReasonUnknown  = "unknown"
 
 	SourceTypeEventSource     = "event-source"
 	SourceTypeStage           = "stage"

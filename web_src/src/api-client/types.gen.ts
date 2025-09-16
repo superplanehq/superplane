@@ -609,7 +609,7 @@ export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOU
 
 export type SuperplaneEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_REJECTED' | 'STATE_PROCESSED';
 
-export type SuperplaneEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_FILTERED' | 'STATE_REASON_ERROR' | 'STATE_REASON_NOT_CONNECTED' | 'STATE_REASON_OK';
+export type SuperplaneEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_FILTERED' | 'STATE_REASON_ERROR' | 'STATE_REASON_OK';
 
 export type SuperplaneExecution = {
     id?: string;

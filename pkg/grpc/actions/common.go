@@ -480,8 +480,6 @@ func EventStateReasonToProto(stateReason string) pb.Event_StateReason {
 		return pb.Event_STATE_REASON_ERROR
 	case models.EventStateReasonFiltered:
 		return pb.Event_STATE_REASON_FILTERED
-	case models.EventStateReasonNotConnected:
-		return pb.Event_STATE_REASON_NOT_CONNECTED
 	case models.EventStateReasonOk:
 		return pb.Event_STATE_REASON_OK
 	default:
