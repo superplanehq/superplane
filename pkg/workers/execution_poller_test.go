@@ -69,7 +69,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	w := NewExecutionPoller(r.Encryptor, r.Registry)
 
 	t.Run("failed resource -> execution fails", func(t *testing.T) {
-		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
+		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
 
 		//
 		// Create failed resource
@@ -128,7 +128,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	})
 
 	t.Run("missing required output -> execution fails", func(t *testing.T) {
-		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
+		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
 
 		executorType, executorSpec, integrationResource := support.Executor(t, r)
 		stageWithOutput, err := builders.NewStageBuilder(r.Registry).
@@ -190,7 +190,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	})
 
 	t.Run("passed resource -> execution passes", func(t *testing.T) {
-		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
+		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
 
 		//
 		// Create execution

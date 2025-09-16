@@ -31,7 +31,10 @@ export function PersistentTooltip({
   const tippyRef = useRef<Instance | null>(null);
 
   const tooltipContent = (
-    <div className={`bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 max-w-2xl ${maxHeight} overflow-y-auto ${className}`}>
+    <div
+      className={`bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 max-w-2xl ${maxHeight} overflow-y-auto ${className}`}
+      onClick={(e) => e.stopPropagation()}
+    >
       {(title || showDismissButton) && (
         <div className="flex justify-between items-start mb-3">
           {title && (
@@ -55,7 +58,7 @@ export function PersistentTooltip({
           )}
         </div>
       )}
-      <div className="prose prose-sm dark:prose-invert text-zinc-700 dark:text-zinc-300">
+      <div className="text-zinc-700 dark:text-zinc-300 font-normal">
         {content}
       </div>
     </div>
@@ -71,7 +74,7 @@ export function PersistentTooltip({
       arrow={true}
       theme="light-border"
       maxWidth={maxWidth}
-      zIndex={9999}
+      zIndex={99999}
       onCreate={(instance) => {
         tippyRef.current = instance;
       }}

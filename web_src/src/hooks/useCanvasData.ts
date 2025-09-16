@@ -39,7 +39,7 @@ export const canvasKeys = {
   eventSource: (canvasId: string, eventSourceId: string) => [...canvasKeys.all, 'eventSource', canvasId, eventSourceId] as const,
   events: (canvasId: string, sourceType: string, sourceId: string) => [...canvasKeys.all, 'events', canvasId, sourceType, sourceId] as const,
   stageEvents: (canvasId: string, stageId: string, states: SuperplaneStageEventState[]) => [...canvasKeys.all, 'stageEvents', canvasId, stageId, states] as const,
-  stageExecutions: (canvasId: string, stageId: string) => [...canvasKeys.all, 'stageExecutions', canvasId, stageId] as const,
+  stageExecutions: (canvasId: string, stageId: string, results?: string[]) => [...canvasKeys.all, 'stageExecutions', canvasId, stageId, results] as const,
   connectionGroups: (canvasId: string) => [...canvasKeys.all, 'connectionGroups', canvasId] as const,
   connectionGroup: (canvasId: string, connectionGroupId: string) => [...canvasKeys.all, 'connectionGroup', canvasId, connectionGroupId] as const,
   integrations: (canvasId?: string) => canvasId ? [...canvasKeys.all, 'integrations', canvasId] as const : ['integrations'] as const,
@@ -701,27 +701,28 @@ export const useStageQueueEvents = (canvasId: string, stageId: string, states: S
       )
       return {
         events: response.data?.events || [],
-        nextCursor: response.data?.events && response.data.events.length === 20 
-          ? response.data.events[response.data.events.length - 1]?.createdAt 
-          : undefined
+        totalCount: response.data?.totalCount || 0,
+        hasNextPage: response.data?.hasNextPage || false,
+        lastTimestamp: response.data?.lastTimestamp
       }
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.lastTimestamp : undefined,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!stageId
   })
 }
 
-export const useStageExecutions = (canvasId: string, stageId: string) => {
+export const useStageExecutions = (canvasId: string, stageId: string, results?: string[]) => {
   return useInfiniteQuery({
-    queryKey: canvasKeys.stageExecutions(canvasId, stageId),
+    queryKey: canvasKeys.stageExecutions(canvasId, stageId, results),
     queryFn: async ({ pageParam }) => {
       const response = await superplaneListStageExecutions(
         withOrganizationHeader({
           path: { canvasIdOrName: canvasId, stageIdOrName: stageId },
           query: {
+            results: results,
             limit: 20,
             ...(pageParam && { before: pageParam })
           }
@@ -729,13 +730,13 @@ export const useStageExecutions = (canvasId: string, stageId: string) => {
       )
       return {
         executions: response.data?.executions || [],
-        nextCursor: response.data?.executions && response.data.executions.length === 20 
-          ? response.data.executions[response.data.executions.length - 1]?.createdAt 
-          : undefined
+        totalCount: response.data?.totalCount || 0,
+        hasNextPage: response.data?.hasNextPage || false,
+        lastTimestamp: response.data?.lastTimestamp
       }
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.lastTimestamp : undefined,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!stageId

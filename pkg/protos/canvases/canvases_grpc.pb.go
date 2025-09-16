@@ -46,6 +46,7 @@ const (
 	Superplane_ApproveStageEvent_FullMethodName            = "/Superplane.Superplane/ApproveStageEvent"
 	Superplane_DiscardStageEvent_FullMethodName            = "/Superplane.Superplane/DiscardStageEvent"
 	Superplane_CancelStageExecution_FullMethodName         = "/Superplane.Superplane/CancelStageExecution"
+	Superplane_ListEventRejections_FullMethodName          = "/Superplane.Superplane/ListEventRejections"
 	Superplane_AddUser_FullMethodName                      = "/Superplane.Superplane/AddUser"
 	Superplane_RemoveUser_FullMethodName                   = "/Superplane.Superplane/RemoveUser"
 )
@@ -81,6 +82,7 @@ type SuperplaneClient interface {
 	ApproveStageEvent(ctx context.Context, in *ApproveStageEventRequest, opts ...grpc.CallOption) (*ApproveStageEventResponse, error)
 	DiscardStageEvent(ctx context.Context, in *DiscardStageEventRequest, opts ...grpc.CallOption) (*DiscardStageEventResponse, error)
 	CancelStageExecution(ctx context.Context, in *CancelStageExecutionRequest, opts ...grpc.CallOption) (*CancelStageExecutionResponse, error)
+	ListEventRejections(ctx context.Context, in *ListEventRejectionsRequest, opts ...grpc.CallOption) (*ListEventRejectionsResponse, error)
 	AddUser(ctx context.Context, in *AddUserRequest, opts ...grpc.CallOption) (*AddUserResponse, error)
 	RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error)
 }
@@ -363,6 +365,16 @@ func (c *superplaneClient) CancelStageExecution(ctx context.Context, in *CancelS
 	return out, nil
 }
 
+func (c *superplaneClient) ListEventRejections(ctx context.Context, in *ListEventRejectionsRequest, opts ...grpc.CallOption) (*ListEventRejectionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListEventRejectionsResponse)
+	err := c.cc.Invoke(ctx, Superplane_ListEventRejections_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *superplaneClient) AddUser(ctx context.Context, in *AddUserRequest, opts ...grpc.CallOption) (*AddUserResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AddUserResponse)
@@ -414,6 +426,7 @@ type SuperplaneServer interface {
 	ApproveStageEvent(context.Context, *ApproveStageEventRequest) (*ApproveStageEventResponse, error)
 	DiscardStageEvent(context.Context, *DiscardStageEventRequest) (*DiscardStageEventResponse, error)
 	CancelStageExecution(context.Context, *CancelStageExecutionRequest) (*CancelStageExecutionResponse, error)
+	ListEventRejections(context.Context, *ListEventRejectionsRequest) (*ListEventRejectionsResponse, error)
 	AddUser(context.Context, *AddUserRequest) (*AddUserResponse, error)
 	RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error)
 }
@@ -505,6 +518,9 @@ func (UnimplementedSuperplaneServer) DiscardStageEvent(context.Context, *Discard
 }
 func (UnimplementedSuperplaneServer) CancelStageExecution(context.Context, *CancelStageExecutionRequest) (*CancelStageExecutionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelStageExecution not implemented")
+}
+func (UnimplementedSuperplaneServer) ListEventRejections(context.Context, *ListEventRejectionsRequest) (*ListEventRejectionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListEventRejections not implemented")
 }
 func (UnimplementedSuperplaneServer) AddUser(context.Context, *AddUserRequest) (*AddUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddUser not implemented")
@@ -1018,6 +1034,24 @@ func _Superplane_CancelStageExecution_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_ListEventRejections_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListEventRejectionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).ListEventRejections(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_ListEventRejections_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).ListEventRejections(ctx, req.(*ListEventRejectionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Superplane_AddUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AddUserRequest)
 	if err := dec(in); err != nil {
@@ -1168,6 +1202,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelStageExecution",
 			Handler:    _Superplane_CancelStageExecution_Handler,
+		},
+		{
+			MethodName: "ListEventRejections",
+			Handler:    _Superplane_ListEventRejections_Handler,
 		},
 		{
 			MethodName: "AddUser",

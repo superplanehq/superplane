@@ -627,6 +627,71 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/rejections": {
+      "get": {
+        "summary": "List event rejections",
+        "description": "Returns a list of events that were rejected by a particular component",
+        "operationId": "Superplane_ListEventRejections",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListEventRejectionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "targetType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "TYPE_UNKNOWN",
+              "TYPE_EVENT_SOURCE",
+              "TYPE_STAGE",
+              "TYPE_CONNECTION_GROUP"
+            ],
+            "default": "TYPE_UNKNOWN"
+          },
+          {
+            "name": "targetId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/stages": {
       "get": {
         "summary": "List stages",
@@ -2654,6 +2719,15 @@
       },
       "title": "Common data structures"
     },
+    "EventRejectionRejectionReason": {
+      "type": "string",
+      "enum": [
+        "REJECTION_REASON_UNKNOWN",
+        "REJECTION_REASON_FILTERED",
+        "REJECTION_REASON_ERROR"
+      ],
+      "default": "REJECTION_REASON_UNKNOWN"
+    },
     "EventSourceEventType": {
       "type": "object",
       "properties": {
@@ -3897,6 +3971,12 @@
         "state": {
           "$ref": "#/definitions/SuperplaneEventState"
         },
+        "stateReason": {
+          "$ref": "#/definitions/SuperplaneEventStateReason"
+        },
+        "stateMessage": {
+          "type": "string"
+        },
         "receivedAt": {
           "type": "string",
           "format": "date-time"
@@ -3906,6 +3986,36 @@
         },
         "headers": {
           "type": "object"
+        }
+      }
+    },
+    "SuperplaneEventRejection": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "event": {
+          "$ref": "#/definitions/SuperplaneEvent"
+        },
+        "targetType": {
+          "$ref": "#/definitions/SuperplaneConnectionType"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "targetName": {
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/definitions/EventRejectionRejectionReason"
+        },
+        "message": {
+          "type": "string"
+        },
+        "rejectedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -3989,10 +4099,20 @@
       "enum": [
         "STATE_UNKNOWN",
         "STATE_PENDING",
-        "STATE_DISCARDED",
+        "STATE_REJECTED",
         "STATE_PROCESSED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneEventStateReason": {
+      "type": "string",
+      "enum": [
+        "STATE_REASON_UNKNOWN",
+        "STATE_REASON_FILTERED",
+        "STATE_REASON_ERROR",
+        "STATE_REASON_OK"
+      ],
+      "default": "STATE_REASON_UNKNOWN"
     },
     "SuperplaneExecution": {
       "type": "object",
@@ -4207,6 +4327,29 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneConnectionGroup"
           }
+        }
+      }
+    },
+    "SuperplaneListEventRejectionsResponse": {
+      "type": "object",
+      "properties": {
+        "rejections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneEventRejection"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

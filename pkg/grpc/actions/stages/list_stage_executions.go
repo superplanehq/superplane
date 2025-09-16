@@ -11,7 +11,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
@@ -256,7 +255,7 @@ func serializeExecution(execution models.StageExecution) (*pb.Execution, error) 
 	}
 
 	if execution.StageEvent != nil {
-		serializedStageEvent, err := serializeStageEventForExecution(*execution.StageEvent)
+		serializedStageEvent, err := actions.SerializeStageEvent(*execution.StageEvent)
 		if err != nil {
 			return nil, err
 		}
@@ -264,141 +263,4 @@ func serializeExecution(execution models.StageExecution) (*pb.Execution, error) 
 	}
 
 	return e, nil
-}
-
-func serializeEvent(event models.Event) (*pb.Event, error) {
-	e := &pb.Event{
-		Id:         event.ID.String(),
-		SourceId:   event.SourceID.String(),
-		SourceName: event.SourceName,
-		SourceType: sourceTypeModelToProto(event.SourceType),
-		Type:       event.Type,
-		State:      eventStateModelToProto(event.State),
-		ReceivedAt: timestamppb.New(*event.ReceivedAt),
-	}
-
-	if len(event.Raw) > 0 {
-		data, err := event.GetData()
-		if err != nil {
-			return nil, err
-		}
-
-		e.Raw, err = structpb.NewStruct(data)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if len(event.Headers) > 0 {
-		headers, err := event.GetHeaders()
-		if err != nil {
-			return nil, err
-		}
-
-		e.Headers, err = structpb.NewStruct(headers)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return e, nil
-}
-
-func serializeStageEventForExecution(stageEvent models.StageEvent) (*pb.StageEvent, error) {
-	e := &pb.StageEvent{
-		Id:          stageEvent.ID.String(),
-		State:       stageEventStateModelToProto(stageEvent.State),
-		StateReason: stageEventStateReasonModelToProto(stageEvent.StateReason),
-		CreatedAt:   timestamppb.New(*stageEvent.CreatedAt),
-		Approvals:   []*pb.StageEventApproval{},
-		Inputs:      []*pb.KeyValuePair{},
-		Name:        stageEvent.Name,
-	}
-
-	if stageEvent.DiscardedBy != nil {
-		e.DiscardedBy = stageEvent.DiscardedBy.String()
-	}
-	if stageEvent.DiscardedAt != nil {
-		e.DiscardedAt = timestamppb.New(*stageEvent.DiscardedAt)
-	}
-
-	for k, v := range stageEvent.Inputs.Data() {
-		e.Inputs = append(e.Inputs, &pb.KeyValuePair{Name: k, Value: v.(string)})
-	}
-
-	approvals, err := stageEvent.FindApprovals()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, approval := range approvals {
-		e.Approvals = append(e.Approvals, &pb.StageEventApproval{
-			ApprovedBy: approval.ApprovedBy.String(),
-			ApprovedAt: timestamppb.New(*approval.ApprovedAt),
-		})
-	}
-
-	if stageEvent.Event != nil {
-		serializedTriggerEvent, err := serializeEvent(*stageEvent.Event)
-		if err != nil {
-			return nil, err
-		}
-		e.TriggerEvent = serializedTriggerEvent
-	}
-
-	return e, nil
-}
-
-func sourceTypeModelToProto(sourceType string) pb.EventSourceType {
-	switch sourceType {
-	case models.SourceTypeEventSource:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
-	case models.SourceTypeStage:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE
-	case models.SourceTypeConnectionGroup:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP
-	default:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN
-	}
-}
-
-func eventStateModelToProto(state string) pb.Event_State {
-	switch state {
-	case models.EventStatePending:
-		return pb.Event_STATE_PENDING
-	case models.EventStateDiscarded:
-		return pb.Event_STATE_DISCARDED
-	case models.EventStateProcessed:
-		return pb.Event_STATE_PROCESSED
-	default:
-		return pb.Event_STATE_UNKNOWN
-	}
-}
-
-func stageEventStateModelToProto(state string) pb.StageEvent_State {
-	switch state {
-	case models.StageEventStatePending:
-		return pb.StageEvent_STATE_PENDING
-	case models.StageEventStateWaiting:
-		return pb.StageEvent_STATE_WAITING
-	case models.StageEventStateProcessed:
-		return pb.StageEvent_STATE_PROCESSED
-	default:
-		return pb.StageEvent_STATE_UNKNOWN
-	}
-}
-
-func stageEventStateReasonModelToProto(stateReason string) pb.StageEvent_StateReason {
-	switch stateReason {
-	case models.StageEventStateReasonApproval:
-		return pb.StageEvent_STATE_REASON_APPROVAL
-	case models.StageEventStateReasonTimeWindow:
-		return pb.StageEvent_STATE_REASON_TIME_WINDOW
-	case models.StageEventStateReasonStuck:
-		return pb.StageEvent_STATE_REASON_STUCK
-	case models.StageEventStateReasonTimeout:
-		return pb.StageEvent_STATE_REASON_TIMEOUT
-	default:
-		return pb.StageEvent_STATE_REASON_UNKNOWN
-	}
 }

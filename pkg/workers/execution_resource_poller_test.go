@@ -50,7 +50,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 	w := NewExecutionResourcePoller(r.Encryptor, r.Registry)
 
 	t.Run("failed pipeline -> execution resource fails", func(t *testing.T) {
-		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
+		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
 
 		//
 		// Create execution
@@ -93,7 +93,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 	})
 
 	t.Run("passed pipeline -> execution resource passes", func(t *testing.T) {
-		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
+		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
 
 		//
 		// Create execution

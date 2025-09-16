@@ -18,7 +18,6 @@ import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
 import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
 import { showErrorToast } from '@/utils/toast';
-import debounce from 'lodash.debounce';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -183,6 +182,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   }, [handleApiError]);
 
   // Helper functions
+  const hasErrorsWithPrefix = useCallback((errors: Record<string, string>, prefixes: string | string[]) => {
+    const prefixArray = Array.isArray(prefixes) ? prefixes : [prefixes];
+    return Object.keys(errors).some(key =>
+      prefixArray.some(prefix => key.startsWith(prefix))
+    );
+  }, []);
+
   const getAllSecrets = () => {
     const allSecrets: Array<{ name: string; source: 'Canvas' | 'Organization'; data: Record<string, string> }> = [];
 
@@ -330,8 +336,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   const validateInputMappings = useCallback((currentErrors: Record<string, string>) => {
     const inputMappingErrors = new Map<string, string[]>();
+    const specificMappingErrors = new Map<string, string>();
 
-    inputMappings.forEach((mapping, index) => {
+    inputMappings.forEach((mapping, mappingIndex) => {
       const mappingErrors: string[] = [];
       if (!mapping.when?.triggeredBy?.connection) {
         mappingErrors.push('Trigger connection is required');
@@ -364,6 +371,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           if (!hasStaticValue && !hasEventDataValue && !hasLastExecutionValue) {
             const inputIndex = inputs.findIndex(inp => inp.name === value.name);
             if (inputIndex !== -1) {
+              const errorKey = `mapping_${mappingIndex}_input_${inputIndex}`;
+              specificMappingErrors.set(errorKey, 'No value defined for this input');
+
               const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
               currentErrors.push(`No value defined in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
               inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
@@ -373,20 +383,25 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       }
 
       if (mappingErrors.length > 0) {
-        currentErrors[`inputMapping_${index}`] = mappingErrors.join(', ');
+        currentErrors[`inputMapping_${mappingIndex}`] = mappingErrors.join(', ');
       }
     });
+
+    specificMappingErrors.forEach((error, key) => {
+      currentErrors[key] = error;
+    });
+
     return inputMappingErrors;
   }, [inputMappings, inputs]);
 
-  const validateAllFields = () => {
+  const validateAllFields = useCallback((showUiErrors: boolean = true) => {
     let errors: Record<string, string> = {};
 
     // Validate all arrays
     inputs.forEach((input, index) => {
       const inputErrors = validateInput(input, index);
       if (inputErrors.length > 0) {
-        errors[`input_${index}`] = inputErrors.join(', ');
+        errors[`input_name_${index}`] = inputErrors.join(', ');
       }
     });
 
@@ -426,11 +441,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     const inputMappingErrors = validateInputMappings(errors);
 
-    // Add input-specific mapping errors to the validation errors
     inputMappingErrors.forEach((errorList, inputKey) => {
-      const existingErrors = errors[inputKey];
-      const newErrors = errorList.join(', ');
-      errors[inputKey] = existingErrors ? `${existingErrors}, ${newErrors}` : newErrors;
+      const mappingKey = inputKey.replace('input_', 'input_mapping_');
+      errors[mappingKey] = errorList.join(', ');
     });
 
     // Comprehensive executor validation
@@ -440,12 +453,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       ...executorErrors
     };
 
-    setValidationErrors(errors);
+    if (showUiErrors) {
+      setValidationErrors(errors);
+    }
 
-    return Object.keys(errors).length === 0;
-  };
+    return errors;
+  }, [inputs, outputs, connections, secrets, conditions, validateInput, validateOutput, validateSecret, validateCondition, validateInputMappings, validateExecutor, executor]);
 
-  const debouncedValidateAllFields = debounce(validateAllFields, 100);
 
 
   const isExecutorMisconfigured = useCallback(() => {
@@ -484,11 +498,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       if (Object.keys(executorErrors).length > 0) {
         setOpenSections(prev => [...prev, 'executor']);
       }
-      return validateAllFields();
+      return Object.keys(validateAllFields(false)).length === 0;
     },
   });
 
   const triggerSectionValidation = useCallback((hasFieldErrors: boolean = false) => {
+    const errors = validateAllFields();
+
     const sectionsToOpen = [...openSections];
 
     const connectionsNeedConfiguration = connections.length === 0;
@@ -496,9 +512,19 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       sectionsToOpen.push('connections');
     }
 
-    const inputErrors = Object.keys(validationErrors).some(key => key.startsWith('input_'));
+    const inputErrors = hasErrorsWithPrefix(errors, ['input_name_', 'input_mapping_']);
     if (inputErrors && !sectionsToOpen.includes('inputs')) {
       sectionsToOpen.push('inputs');
+    }
+
+    const secretErrors = hasErrorsWithPrefix(errors, 'secret_');
+    if (secretErrors && !sectionsToOpen.includes('secrets')) {
+      sectionsToOpen.push('secrets');
+    }
+
+    const outputErrors = hasErrorsWithPrefix(errors, 'output_');
+    if (outputErrors && !sectionsToOpen.includes('outputs')) {
+      sectionsToOpen.push('outputs');
     }
 
     const executorErrors = validateExecutor(executor);
@@ -508,12 +534,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       }
       setValidationErrors(prev => ({
         ...prev,
+        ...errors,
         ...executorErrors
       }));
     }
 
     setOpenSections(sectionsToOpen);
-  }, [connections.length, executor, openSections, setOpenSections, setValidationErrors, validateExecutor, validationErrors]);
+  }, [connections.length, executor, openSections, setOpenSections, setValidationErrors, validateAllFields, validateExecutor, hasErrorsWithPrefix]);
 
   // Expose the trigger function to parent
   useEffect(() => {
@@ -531,7 +558,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       sectionsToOpen.push('connections');
     }
 
-    const inputErrors = Object.keys(validationErrors).some(key => key.startsWith('input_'));
+    const inputErrors = hasErrorsWithPrefix(validationErrors, ['input_name_', 'input_mapping_']);
     if (inputErrors) {
       sectionsToOpen.push('inputs');
     }
@@ -568,8 +595,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     items: outputs,
     setItems: setOutputs,
     createNewItem: () => ({ name: `OUTPUT_${outputs.length + 1}`, description: '', required: false }),
-    validateItem: validateOutput,
-    setValidationErrors,
+    validateItem: () => [],
+    setValidationErrors: () => { },
     errorPrefix: 'output'
   });
 
@@ -1042,7 +1069,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               count={connections.length}
               countLabel="connections"
-              hasError={connections.length === 0 || Object.keys(validationErrors).some(key => key.startsWith('connection_'))}
+              hasError={connections.length === 0 || hasErrorsWithPrefix(validationErrors, 'connection_')}
             >
               {connections.map((connection, index) => (
                 <div key={index}>
@@ -1119,7 +1146,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               count={inputs.length}
               countLabel="inputs"
-              hasError={Object.keys(validationErrors).some(key => key.startsWith('input_'))}
+              hasError={hasErrorsWithPrefix(validationErrors, ['input_name_', 'input_mapping_'])}
             >
               {inputs.map((input, index) => {
                 // Get mappings for this specific input
@@ -1132,25 +1159,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     <InlineEditor
                       isEditing={inputsEditor.editingIndex === index}
                       onSave={() => {
-                        if (validationErrors[`input_${index}`])
+                        const errors = validateAllFields();
+
+                        if (errors[`input_name_${index}`] || errors[`input_mapping_${index}`]) {
                           return;
+                        }
 
                         inputsEditor.saveEdit()
                       }}
-                      onCancel={() => inputsEditor.cancelEdit(index, (item) => {
-                        if (!item.name || item.name.trim() === '') {
-                          return true;
-                        }
-
-                        const allInputMappingsAreEmpty = inputMappings.every(mapping =>
-                          mapping.values
-                            ?.filter(value => value.name === input.name)
-                            ?.every(value => value.value === '' && !value.valueFrom)
-                        );
-
-
-                        return allInputMappingsAreEmpty;
-                      })}
+                      onCancel={() => inputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
                       onEdit={() => inputsEditor.startEdit(index)}
                       onDelete={() => handleInputDelete(index, input)}
                       displayName={input.name || `Input ${index + 1}`}
@@ -1161,13 +1178,22 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               {inputMappingsForInput.length} mapping{inputMappingsForInput.length !== 1 ? 's' : ''}
                             </span>
                           )}
-                          {validationErrors[`input_${index}`] && (
+                          {validationErrors[`input_mapping_${index}`] && (
                             <span
                               className="text-xs bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 px-2 py-0.5 rounded flex items-center gap-1"
-                              title={validationErrors[`input_${index}`]}
+                              title={validationErrors[`input_mapping_${index}`]}
                             >
                               <MaterialSymbol name="error" size="sm" />
                               Mapping Error
+                            </span>
+                          )}
+                          {validationErrors[`input_name_${index}`] && (
+                            <span
+                              className="text-xs bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 px-2 py-0.5 rounded flex items-center gap-1"
+                              title={validationErrors[`input_name_${index}`]}
+                            >
+                              <MaterialSymbol name="error" size="sm" />
+                              Name Error
                             </span>
                           )}
                         </div>
@@ -1176,20 +1202,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <div className="space-y-4">
                           <ValidationField
                             label="Name"
-                            error={validationErrors[`input_${index}`]}
+                            error={validationErrors[`input_name_${index}`]}
                           >
                             <input
                               type="text"
                               value={input.name || ''}
                               onChange={(e) => {
                                 handleInputNameChange(e.target.value, index, input)
-                                debouncedValidateAllFields();
                               }}
                               placeholder="Input name"
-                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
-                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                                }`}
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                             />
                           </ValidationField>
                           <ValidationField label="Description">
@@ -1204,120 +1226,134 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                           {/* Input Mappings for this specific input */}
                           <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
-                            <div className="flex justify-between items-center mb-3">
-                              <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Input Mappings</label>
+                            <ValidationField
+                              label="Input Mappings"
+                              error={validationErrors[`input_mapping_${index}`]}
+                            >
+                              <div className="space-y-3">
+                                {inputMappingsForInput.map((mapping) => {
+                                  const actualMappingIndex = inputMappings.findIndex(m => m === mapping);
+                                  const inputValue = mapping.values?.find(v => v.name === input.name);
+                                  const mappingErrorKey = `mapping_${actualMappingIndex}_input_${index}`;
+                                  const hasMappingError = validationErrors[mappingErrorKey];
 
-                            </div>
-
-                            <div className="space-y-3">
-                              {inputMappingsForInput.map((mapping) => {
-                                const actualMappingIndex = inputMappings.findIndex(m => m === mapping);
-                                const inputValue = mapping.values?.find(v => v.name === input.name);
-
-                                return (
-                                  <div key={actualMappingIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
-                                    <div className="space-y-3">
-                                      {/* Trigger Connection */}
-                                      <div className="space-y-1">
-                                        <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                                          Triggered by Connection
-                                        </label>
-                                        <div className="px-3 py-2 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-md text-zinc-900 dark:text-zinc-100 text-sm">
-                                          {mapping.when?.triggeredBy?.connection || 'No connection assigned'}
+                                  return (
+                                    <div key={actualMappingIndex} className={`p-3 bg-zinc-50 dark:bg-zinc-800 border rounded ${hasMappingError
+                                      ? 'border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20'
+                                      : 'border-zinc-200 dark:border-zinc-600'}`}>
+                                      <div className="space-y-3">
+                                        {/* Trigger Connection */}
+                                        <div className="space-y-1">
+                                          <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                                            Triggered by Connection
+                                          </label>
+                                          <div className="px-3 py-2 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-md text-zinc-900 dark:text-zinc-100 text-sm">
+                                            {mapping.when?.triggeredBy?.connection || 'No connection assigned'}
+                                          </div>
                                         </div>
-                                      </div>
 
-                                      {/* Value Mode Toggle */}
-                                      {
-                                        mapping.when?.triggeredBy?.connection && (
-                                          <>
-                                            <div className="mb-3">
-                                              <div className="space-y-2">
-                                                <label className="flex items-center gap-2 text-sm">
-                                                  <input
-                                                    type="radio"
-                                                    name={`value-mode-${actualMappingIndex}-${input.name}`}
-                                                    checked={!inputValue?.valueFrom}
-                                                    onChange={() => handleValueModeChange('static', actualMappingIndex, input)}
-                                                    className="w-4 h-4"
-                                                  />
-                                                  Static Value
-                                                </label>
+                                        {/* Value Mode Toggle */}
+                                        {
+                                          mapping.when?.triggeredBy?.connection && (
+                                            <>
+                                              <div className="mb-3">
+                                                <div className="space-y-2">
+                                                  <label className="flex items-center gap-2 text-sm">
+                                                    <input
+                                                      type="radio"
+                                                      name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                                      checked={!inputValue?.valueFrom}
+                                                      onChange={() => handleValueModeChange('static', actualMappingIndex, input)}
+                                                      className="w-4 h-4"
+                                                    />
+                                                    Static Value
+                                                  </label>
 
-                                                <label className="flex items-center gap-2 text-sm">
-                                                  <input
-                                                    type="radio"
-                                                    name={`value-mode-${actualMappingIndex}-${input.name}`}
-                                                    checked={!!inputValue?.valueFrom?.eventData}
-                                                    onChange={() => handleValueModeChange('eventData', actualMappingIndex, input)}
-                                                    className="w-4 h-4"
-                                                  />
-                                                  From Event Data
-                                                </label>
+                                                  <label className="flex items-center gap-2 text-sm">
+                                                    <input
+                                                      type="radio"
+                                                      name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                                      checked={!!inputValue?.valueFrom?.eventData}
+                                                      onChange={() => handleValueModeChange('eventData', actualMappingIndex, input)}
+                                                      className="w-4 h-4"
+                                                    />
+                                                    From Event Data
+                                                  </label>
 
-                                                <label className="flex items-center gap-2 text-sm">
-                                                  <input
-                                                    type="radio"
-                                                    name={`value-mode-${actualMappingIndex}-${input.name}`}
-                                                    checked={!!inputValue?.valueFrom?.lastExecution}
-                                                    onChange={() => handleValueModeChange('lastExecution', actualMappingIndex, input)}
-                                                    className="w-4 h-4"
-                                                  />
-                                                  Inherit value from last execution
-                                                </label>
-                                              </div>
-                                            </div>
-                                            {inputValue?.valueFrom?.eventData ? (
-                                              /* Event Data Mode */
-                                              <div>
-                                                <label className="block text-xs font-medium mb-1">Expression</label>
-                                                <input
-                                                  value={inputValue.valueFrom.eventData.expression || ''}
-                                                  onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
-                                                  placeholder="eg. $.commit[0].message"
-                                                  className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                                />
-                                              </div>
-                                            ) : inputValue?.valueFrom?.lastExecution ? (
-                                              /* Last Execution Mode */
-                                              <div className="space-y-2">
-                                                <div>
-                                                  <label className="block text-xs font-medium mb-1">Required Execution Results</label>
-                                                  <div className="space-y-2">
-                                                    {(['RESULT_PASSED', 'RESULT_FAILED'] as const).map((result) => (
-                                                      <label key={result} className="flex items-center gap-2 text-xs">
-                                                        <input
-                                                          type="checkbox"
-                                                          checked={inputValue.valueFrom?.lastExecution?.results?.includes(result) || false}
-                                                          onChange={(e) => inputMappingHandlers.handleLastExecutionChange(result, e.target.checked, actualMappingIndex, input.name)}
-                                                          className="w-3 h-3"
-                                                        />
-                                                        {result.replace('RESULT_', '').toLowerCase()}
-                                                      </label>
-                                                    ))}
-                                                  </div>
+                                                  <label className="flex items-center gap-2 text-sm">
+                                                    <input
+                                                      type="radio"
+                                                      name={`value-mode-${actualMappingIndex}-${input.name}`}
+                                                      checked={!!inputValue?.valueFrom?.lastExecution}
+                                                      onChange={() => handleValueModeChange('lastExecution', actualMappingIndex, input)}
+                                                      className="w-4 h-4"
+                                                    />
+                                                    Inherit value from last execution
+                                                  </label>
                                                 </div>
                                               </div>
-                                            ) : (
-                                              /* Static Value Mode */
-                                              <div>
-                                                <label className="block text-xs font-medium mb-1">Static Value</label>
-                                                <input
-                                                  value={inputValue?.value || ''}
-                                                  onChange={(e) => inputMappingHandlers.handleStaticValueChange(e.target.value, actualMappingIndex, input.name)}
-                                                  placeholder="e.g., production, staging"
-                                                  className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                                />
-                                              </div>
-                                            )}
-                                          </>
-                                        )
-                                      }
+                                              {inputValue?.valueFrom?.eventData ? (
+                                                /* Event Data Mode */
+                                                <div>
+                                                  <label className="block text-xs font-medium mb-1">Expression</label>
+                                                  <input
+                                                    value={inputValue.valueFrom.eventData.expression || ''}
+                                                    onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
+                                                    placeholder="eg. $.commit[0].message"
+                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                                  />
+                                                </div>
+                                              ) : inputValue?.valueFrom?.lastExecution ? (
+                                                /* Last Execution Mode */
+                                                <div className="space-y-2">
+                                                  <div>
+                                                    <label className="block text-xs font-medium mb-1">Required Execution Results</label>
+                                                    <div className="space-y-2">
+                                                      {(['RESULT_PASSED', 'RESULT_FAILED'] as const).map((result) => (
+                                                        <label key={result} className="flex items-center gap-2 text-xs">
+                                                          <input
+                                                            type="checkbox"
+                                                            checked={inputValue.valueFrom?.lastExecution?.results?.includes(result) || false}
+                                                            onChange={(e) => inputMappingHandlers.handleLastExecutionChange(result, e.target.checked, actualMappingIndex, input.name)}
+                                                            className="w-3 h-3"
+                                                          />
+                                                          {result.replace('RESULT_', '').toLowerCase()}
+                                                        </label>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                /* Static Value Mode */
+                                                <div>
+                                                  <label className="block text-xs font-medium mb-1">Static Value</label>
+                                                  <input
+                                                    value={inputValue?.value || ''}
+                                                    onChange={(e) => inputMappingHandlers.handleStaticValueChange(e.target.value, actualMappingIndex, input.name)}
+                                                    placeholder="e.g., production, staging"
+                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                                  />
+                                                </div>
+                                              )}
+                                            </>
+                                          )
+                                        }
+
+                                        {/* Display specific error message for this mapping */}
+                                        {hasMappingError && (
+                                          <div className="mt-2 p-2 bg-red-100 dark:bg-red-800/30 border border-red-200 dark:border-red-700 rounded">
+                                            <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                                              <MaterialSymbol name="error" size="sm" />
+                                              {validationErrors[mappingErrorKey]}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                                  );
+                                })}
+                              </div>
+                            </ValidationField>
                           </div>
                         </div>
                       }
@@ -1350,23 +1386,22 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               count={outputs.length}
               countLabel="outputs"
+              hasError={hasErrorsWithPrefix(validationErrors, 'output_')}
             >
               {outputs.map((output, index) => (
                 <div key={index}>
                   <InlineEditor
                     isEditing={outputsEditor.editingIndex === index}
-                    onSave={outputsEditor.saveEdit}
-                    onCancel={() => outputsEditor.cancelEdit(index, (item) => {
-                      if (!item.name || item.name.trim() === '') {
-                        return true;
+                    onSave={() => {
+                      const errors = validateAllFields();
+
+                      if (errors[`output_${index}`]) {
+                        return;
                       }
 
-                      const isNewOutput = index >= originalData.outputs.length ||
-                        !originalData.outputs[index] ||
-                        originalData.outputs[index].name !== item.name;
-
-                      return isNewOutput;
-                    })}
+                      outputsEditor.saveEdit()
+                    }}
+                    onCancel={() => outputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
                     onEdit={() => outputsEditor.startEdit(index)}
                     onDelete={() => outputsEditor.removeItem(index)}
                     displayName={output.name || `Output ${index + 1}`}
@@ -1574,6 +1609,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               count={secrets.length}
               countLabel="secrets"
+              hasError={hasErrorsWithPrefix(validationErrors, 'secret_')}
             >
               {secrets.map((secret, index) => (
                 <div key={index}>
@@ -1741,7 +1777,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               className={!openSections.includes('executor') ? 'rounded-b-2xl border-b-0' : ''}
               hasError={
                 isExecutorMisconfigured() ||
-                Object.keys(validationErrors).some(key => key.startsWith('executor')) ||
+                hasErrorsWithPrefix(validationErrors, 'executor') ||
                 Object.values(fieldErrors).some(Boolean)
               }
             >
