@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { twMerge } from 'tailwind-merge';
 import { PayloadModal } from './PayloadModal';
+import JsonView from '@uiw/react-json-view';
+import { lightTheme } from '@uiw/react-json-view/light';
+import { darkTheme } from '@uiw/react-json-view/dark';
 
 interface PayloadDisplayProps {
   headers?: { [key: string]: unknown };
@@ -53,6 +56,24 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
 
   const [activeTab, setActiveTab] = useState<TabType>(getDefaultTab());
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    };
+
+    checkDarkMode();
+
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
 
   const formatTimestamp = () => {
@@ -168,9 +189,19 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
             </div>
             <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
               {Object.keys(displayPayload).length > 0 ? (
-                <pre className="text-xs font-mono text-gray-900 dark:text-zinc-200 whitespace-pre-wrap">
-                  {JSON.stringify(displayPayload, null, 2)}
-                </pre>
+                <JsonView
+                  value={displayPayload}
+                  style={{
+                    fontSize: '12px',
+                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                    backgroundColor: 'transparent',
+                    ...(isDarkMode ? darkTheme : lightTheme)
+                  }}
+                  displayDataTypes={false}
+                  displayObjectSize={false}
+                  enableClipboard={false}
+                  collapsed={false}
+                />
               ) : (
                 <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
                   No payload available
