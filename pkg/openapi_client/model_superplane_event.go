@@ -27,6 +27,8 @@ type SuperplaneEvent struct {
 	SourceType *SuperplaneEventSourceType `json:"sourceType,omitempty"`
 	Type *string `json:"type,omitempty"`
 	State *SuperplaneEventState `json:"state,omitempty"`
+	StateReason *SuperplaneEventStateReason `json:"stateReason,omitempty"`
+	StateMessage *string `json:"stateMessage,omitempty"`
 	ReceivedAt *time.Time `json:"receivedAt,omitempty"`
 	Raw map[string]interface{} `json:"raw,omitempty"`
 	Headers map[string]interface{} `json:"headers,omitempty"`
@@ -42,6 +44,8 @@ func NewSuperplaneEvent() *SuperplaneEvent {
 	this.SourceType = &sourceType
 	var state SuperplaneEventState = SUPERPLANEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
+	var stateReason SuperplaneEventStateReason = SUPERPLANEEVENTSTATEREASON_STATE_REASON_UNKNOWN
+	this.StateReason = &stateReason
 	return &this
 }
 
@@ -54,6 +58,8 @@ func NewSuperplaneEventWithDefaults() *SuperplaneEvent {
 	this.SourceType = &sourceType
 	var state SuperplaneEventState = SUPERPLANEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
+	var stateReason SuperplaneEventStateReason = SUPERPLANEEVENTSTATEREASON_STATE_REASON_UNKNOWN
+	this.StateReason = &stateReason
 	return &this
 }
 
@@ -249,6 +255,70 @@ func (o *SuperplaneEvent) SetState(v SuperplaneEventState) {
 	o.State = &v
 }
 
+// GetStateReason returns the StateReason field value if set, zero value otherwise.
+func (o *SuperplaneEvent) GetStateReason() SuperplaneEventStateReason {
+	if o == nil || IsNil(o.StateReason) {
+		var ret SuperplaneEventStateReason
+		return ret
+	}
+	return *o.StateReason
+}
+
+// GetStateReasonOk returns a tuple with the StateReason field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneEvent) GetStateReasonOk() (*SuperplaneEventStateReason, bool) {
+	if o == nil || IsNil(o.StateReason) {
+		return nil, false
+	}
+	return o.StateReason, true
+}
+
+// HasStateReason returns a boolean if a field has been set.
+func (o *SuperplaneEvent) HasStateReason() bool {
+	if o != nil && !IsNil(o.StateReason) {
+		return true
+	}
+
+	return false
+}
+
+// SetStateReason gets a reference to the given SuperplaneEventStateReason and assigns it to the StateReason field.
+func (o *SuperplaneEvent) SetStateReason(v SuperplaneEventStateReason) {
+	o.StateReason = &v
+}
+
+// GetStateMessage returns the StateMessage field value if set, zero value otherwise.
+func (o *SuperplaneEvent) GetStateMessage() string {
+	if o == nil || IsNil(o.StateMessage) {
+		var ret string
+		return ret
+	}
+	return *o.StateMessage
+}
+
+// GetStateMessageOk returns a tuple with the StateMessage field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneEvent) GetStateMessageOk() (*string, bool) {
+	if o == nil || IsNil(o.StateMessage) {
+		return nil, false
+	}
+	return o.StateMessage, true
+}
+
+// HasStateMessage returns a boolean if a field has been set.
+func (o *SuperplaneEvent) HasStateMessage() bool {
+	if o != nil && !IsNil(o.StateMessage) {
+		return true
+	}
+
+	return false
+}
+
+// SetStateMessage gets a reference to the given string and assigns it to the StateMessage field.
+func (o *SuperplaneEvent) SetStateMessage(v string) {
+	o.StateMessage = &v
+}
+
 // GetReceivedAt returns the ReceivedAt field value if set, zero value otherwise.
 func (o *SuperplaneEvent) GetReceivedAt() time.Time {
 	if o == nil || IsNil(o.ReceivedAt) {
@@ -372,6 +442,12 @@ func (o SuperplaneEvent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
+	}
+	if !IsNil(o.StateReason) {
+		toSerialize["stateReason"] = o.StateReason
+	}
+	if !IsNil(o.StateMessage) {
+		toSerialize["stateMessage"] = o.StateMessage
 	}
 	if !IsNil(o.ReceivedAt) {
 		toSerialize["receivedAt"] = o.ReceivedAt

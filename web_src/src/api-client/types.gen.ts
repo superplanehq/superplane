@@ -12,6 +12,8 @@ export type AuthorizationPermission = {
     domainType?: AuthorizationDomainType;
 };
 
+export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
+
 export type EventSourceEventType = {
     type?: string;
     filters?: Array<SuperplaneFilter>;
@@ -556,6 +558,8 @@ export type SuperplaneEvent = {
     sourceType?: SuperplaneEventSourceType;
     type?: string;
     state?: SuperplaneEventState;
+    stateReason?: SuperplaneEventStateReason;
+    stateMessage?: string;
     receivedAt?: string;
     raw?: {
         [key: string]: unknown;
@@ -563,6 +567,17 @@ export type SuperplaneEvent = {
     headers?: {
         [key: string]: unknown;
     };
+};
+
+export type SuperplaneEventRejection = {
+    id?: string;
+    event?: SuperplaneEvent;
+    targetType?: SuperplaneConnectionType;
+    targetId?: string;
+    targetName?: string;
+    reason?: EventRejectionRejectionReason;
+    message?: string;
+    rejectedAt?: string;
 };
 
 export type SuperplaneEventSource = {
@@ -592,7 +607,9 @@ export type SuperplaneEventSourceStatus = {
 
 export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
 
-export type SuperplaneEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_DISCARDED' | 'STATE_PROCESSED';
+export type SuperplaneEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_REJECTED' | 'STATE_PROCESSED';
+
+export type SuperplaneEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_FILTERED' | 'STATE_REASON_ERROR' | 'STATE_REASON_OK';
 
 export type SuperplaneExecution = {
     id?: string;
@@ -671,6 +688,13 @@ export type SuperplaneListConnectionGroupFieldSetsResponse = {
 
 export type SuperplaneListConnectionGroupsResponse = {
     connectionGroups?: Array<SuperplaneConnectionGroup>;
+};
+
+export type SuperplaneListEventRejectionsResponse = {
+    rejections?: Array<SuperplaneEventRejection>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
 };
 
 export type SuperplaneListEventSourcesResponse = {
@@ -1334,6 +1358,38 @@ export type SuperplaneListEventsResponses = {
 };
 
 export type SuperplaneListEventsResponse2 = SuperplaneListEventsResponses[keyof SuperplaneListEventsResponses];
+
+export type SuperplaneListEventRejectionsData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+    };
+    query?: {
+        targetType?: 'TYPE_UNKNOWN' | 'TYPE_EVENT_SOURCE' | 'TYPE_STAGE' | 'TYPE_CONNECTION_GROUP';
+        targetId?: string;
+        limit?: number;
+        before?: string;
+    };
+    url: '/api/v1/canvases/{canvasIdOrName}/rejections';
+};
+
+export type SuperplaneListEventRejectionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneListEventRejectionsError = SuperplaneListEventRejectionsErrors[keyof SuperplaneListEventRejectionsErrors];
+
+export type SuperplaneListEventRejectionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListEventRejectionsResponse;
+};
+
+export type SuperplaneListEventRejectionsResponse2 = SuperplaneListEventRejectionsResponses[keyof SuperplaneListEventRejectionsResponses];
 
 export type SuperplaneListStagesData = {
     body?: never;

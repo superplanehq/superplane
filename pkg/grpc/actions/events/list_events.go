@@ -125,32 +125,6 @@ func getBefore(before *timestamppb.Timestamp) *time.Time {
 	return nil
 }
 
-func EventStateProtoToString(state pb.Event_State) string {
-	switch state {
-	case pb.Event_STATE_PROCESSED:
-		return models.EventStateProcessed
-	case pb.Event_STATE_PENDING:
-		return models.EventStatePending
-	case pb.Event_STATE_DISCARDED:
-		return models.EventStateDiscarded
-	default:
-		return ""
-	}
-}
-
-func StringToEventStateProto(state string) pb.Event_State {
-	switch state {
-	case models.EventStateProcessed:
-		return pb.Event_STATE_PROCESSED
-	case models.EventStatePending:
-		return pb.Event_STATE_PENDING
-	case models.EventStateDiscarded:
-		return pb.Event_STATE_DISCARDED
-	default:
-		return pb.Event_STATE_UNKNOWN
-	}
-}
-
 func serializeEvents(in []models.Event) ([]*pb.Event, error) {
 	out := []*pb.Event{}
 	for _, event := range in {
@@ -165,13 +139,15 @@ func serializeEvents(in []models.Event) ([]*pb.Event, error) {
 
 func serializeEvent(in models.Event) (*pb.Event, error) {
 	event := &pb.Event{
-		Id:         in.ID.String(),
-		SourceId:   in.SourceID.String(),
-		SourceName: in.SourceName,
-		SourceType: actions.EventSourceTypeToProto(in.SourceType),
-		Type:       in.Type,
-		State:      actions.EventStateToProto(in.State),
-		ReceivedAt: timestamppb.New(*in.ReceivedAt),
+		Id:           in.ID.String(),
+		SourceId:     in.SourceID.String(),
+		SourceName:   in.SourceName,
+		SourceType:   actions.EventSourceTypeToProto(in.SourceType),
+		Type:         in.Type,
+		State:        actions.EventStateToProto(in.State),
+		StateReason:  actions.EventStateReasonToProto(in.StateReason),
+		StateMessage: in.StateMessage,
+		ReceivedAt:   timestamppb.New(*in.ReceivedAt),
 	}
 
 	if len(in.Raw) > 0 {

@@ -65,7 +65,7 @@ func ApproveStageEvent(ctx context.Context, canvasID string, stageIdOrName strin
 		logger.Errorf("failed to publish event approved message: %v", err)
 	}
 
-	serialized, err := serializeStageEvent(*event)
+	serialized, err := actions.SerializeStageEvent(*event)
 	if err != nil {
 		logger.Errorf("failed to serialize stage event: %v", err)
 		return nil, err

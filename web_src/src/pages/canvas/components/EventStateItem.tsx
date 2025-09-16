@@ -3,7 +3,7 @@ import { formatFullTimestamp, formatRelativeTime } from '../utils/stageEventUtil
 import Tippy from '@tippyjs/react/headless';
 import 'tippy.js/dist/tippy.css';
 
-export type EventState = 'pending' | 'discarded' | 'processed';
+export type EventState = 'pending' | 'rejected' | 'processed';
 
 interface EventStateItemProps {
   eventId: string;
@@ -28,11 +28,11 @@ export const EventStateItem: React.FC<EventStateItemProps> = ({
           animate: true,
           strikeThrough: false
         };
-      case 'discarded':
+      case 'rejected':
         return {
           dotColor: 'bg-zinc-500',
           textColor: 'text-zinc-600 dark:text-zinc-400',
-          label: 'Discarded',
+          label: 'Rejected',
           animate: false,
           strikeThrough: true
         };
