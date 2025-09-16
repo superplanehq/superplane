@@ -1,7 +1,7 @@
 import { Stage } from "../../store/types";
 import MessageItem from '../MessageItem';
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import { useOrganizationUsersForCanvas, useStageQueueEvents } from '@/hooks/useCanvasData';
+import { useOrganizationUsersForCanvas, useStageEvents } from '@/hooks/useCanvasData';
 import { ControlledTabs, Tab } from '@/components/Tabs/tabs';
 import {
   getMinApprovedAt,
@@ -44,7 +44,7 @@ export const QueueTab = ({ selectedStage, organizationId, canvasId, approveStage
     isFetchingNextPage,
     refetch,
     isLoading
-  } = useStageQueueEvents(canvasId, selectedStage.metadata?.id || '', getStatesFilter(activeFilter));
+  } = useStageEvents(canvasId, selectedStage.metadata?.id || '', getStatesFilter(activeFilter));
 
   const allEvents = useMemo(() =>
     eventsData?.pages.flatMap(page => page.events) || [],
@@ -78,21 +78,18 @@ export const QueueTab = ({ selectedStage, organizationId, canvasId, approveStage
 
   return (
     <div className="p-6">
-      <h3 className="font-bold text-left text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-        Queue ({totalCount})
-      </h3>
-
-      <div className="mt-5 mb-6">
-        <div className="flex items-center justify-end">
-          <div className="flex-shrink-0">
-            <ControlledTabs
-              tabs={filterTabs}
-              activeTab={activeFilter}
-              onTabChange={setActiveFilter}
-              variant="pills"
-              buttonClasses="text-xs"
-            />
-          </div>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="font-bold text-left text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+          Queue ({totalCount})
+        </h3>
+        <div className="flex-shrink-0">
+          <ControlledTabs
+            tabs={filterTabs}
+            activeTab={activeFilter}
+            onTabChange={setActiveFilter}
+            variant="pills"
+            buttonClasses="text-xs"
+          />
         </div>
       </div>
 

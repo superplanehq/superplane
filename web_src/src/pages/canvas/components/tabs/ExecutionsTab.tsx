@@ -80,21 +80,18 @@ export const ExecutionsTab = ({ selectedStage, organizationId, canvasId, cancelS
 
   return (
     <div className="p-6">
-      <h3 className="font-bold text-left text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-        Executions ({totalCount})
-      </h3>
-
-      <div className="mt-5 mb-6">
-        <div className="flex items-center justify-end">
-          <div className="flex-shrink-0">
-            <ControlledTabs
-              tabs={filterTabs}
-              activeTab={activeFilter}
-              onTabChange={setActiveFilter}
-              variant="pills"
-              buttonClasses="text-xs"
-            />
-          </div>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="font-bold text-left text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+          Executions ({totalCount})
+        </h3>
+        <div className="flex-shrink-0">
+          <ControlledTabs
+            tabs={filterTabs}
+            activeTab={activeFilter}
+            onTabChange={setActiveFilter}
+            variant="pills"
+            buttonClasses="text-xs"
+          />
         </div>
       </div>
 

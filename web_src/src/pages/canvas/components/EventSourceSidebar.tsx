@@ -7,7 +7,7 @@ import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import { EventItem } from "./EventItem";
 import { useIntegrations } from "../hooks/useIntegrations";
 import { useCanvasStore } from "../store/canvasStore";
-import { useEventSourceEvents } from "@/hooks/useCanvasData";
+import { useEvents } from "@/hooks/useCanvasData";
 import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
@@ -44,11 +44,16 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
     isFetchingNextPage,
     isLoading: eventsLoading,
     refetch: refetchEvents
-  } = useEventSourceEvents(canvasId, selectedEventSource.metadata?.id || '');
+  } = useEvents(canvasId, 'EVENT_SOURCE_TYPE_EVENT_SOURCE', selectedEventSource.metadata?.id || '');
 
   // Flatten all pages into a single array
   const allEvents = useMemo(() => {
-    return eventsData?.pages.flatMap(page => page.events) || [];
+    return eventsData?.pages.flatMap((page: any) => page.events) || [];
+  }, [eventsData]);
+
+  // Get total count from the first page
+  const totalCount = useMemo(() => {
+    return eventsData?.pages[0]?.totalCount || 0;
   }, [eventsData]);
 
   useEffect(() => {
@@ -60,7 +65,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
       if (latestBulkEvent?.receivedAt && latestQueryEvent?.receivedAt) {
         const bulkTime = new Date(latestBulkEvent.receivedAt);
         const queryTime = new Date(latestQueryEvent.receivedAt);
-        const hasPendingEvents = allEvents.some(event => event.state === 'STATE_PENDING');
+        const hasPendingEvents = allEvents.some((event: any) => event.state === 'STATE_PENDING');
         
         if (bulkTime > queryTime || hasPendingEvents) {
           refetchEvents();
@@ -114,7 +119,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
-                Event History ({allEvents.length})
+                Event History ({totalCount})
               </h3>
             </div>
 
@@ -125,7 +130,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
                   <p className="text-sm text-gray-500 mt-2">Loading events...</p>
                 </div>
               ) : allEvents.length > 0 ? (
-                allEvents.map((event) => (
+                allEvents.map((event: any) => (
                   <EventItem
                     key={event.id}
                     eventId={event.id!}
