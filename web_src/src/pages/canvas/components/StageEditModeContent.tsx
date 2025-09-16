@@ -18,6 +18,7 @@ import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
 import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
 import { showErrorToast } from '@/utils/toast';
+import debounce from 'lodash.debounce';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -210,27 +211,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   const getAllIntegrations = () => [...canvasIntegrations, ...orgIntegrations];
 
-  // Helper function to ensure all inputs are included in input mappings
-  const ensureAllInputsInMappings = useCallback((mappings: SuperplaneInputMapping[], allInputs: SuperplaneInputDefinition[]) => {
-    return mappings.map(mapping => {
-      const existingValues = mapping.values || [];
-      const missingInputs = allInputs.filter(inp =>
-        inp.name && !existingValues.some(v => v.name === inp.name)
-      );
-
-      const additionalValues = missingInputs.map(inp => ({
-        name: inp.name,
-        value: ''
-      }));
-
-      return {
-        ...mapping,
-        values: [...existingValues, ...additionalValues]
-      };
-    });
-  }, []);
-
-
   const getSecretKeys = (secretName: string) => {
     const allSecrets = getAllSecrets();
     const selectedSecret = allSecrets.find(secret => secret.name === secretName);
@@ -348,6 +328,57 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     return errors;
   }, []);
 
+  const validateInputMappings = useCallback((currentErrors: Record<string, string>) => {
+    const inputMappingErrors = new Map<string, string[]>();
+
+    inputMappings.forEach((mapping, index) => {
+      const mappingErrors: string[] = [];
+      if (!mapping.when?.triggeredBy?.connection) {
+        mappingErrors.push('Trigger connection is required');
+      }
+
+      if (inputs.length > 0) {
+        const mappingInputNames = mapping.values?.map(v => v.name) || [];
+        const missingInputs = inputs
+          .map(input => input.name)
+          .filter(inputName => inputName && !mappingInputNames.includes(inputName));
+
+        missingInputs.forEach(inputName => {
+          if (inputName) {
+            const inputIndex = inputs.findIndex(inp => inp.name === inputName);
+            if (inputIndex !== -1) {
+              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
+              currentErrors.push(`Missing in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
+              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
+            }
+          }
+        });
+      }
+
+      if (mapping.values) {
+        mapping.values.forEach((value) => {
+          const hasStaticValue = value.value !== undefined && value.value !== '';
+          const hasEventDataValue = value.valueFrom?.eventData?.expression !== undefined && value.valueFrom.eventData.expression !== '';
+          const hasLastExecutionValue = value.valueFrom?.lastExecution?.results !== undefined && value.valueFrom.lastExecution.results.length > 0;
+
+          if (!hasStaticValue && !hasEventDataValue && !hasLastExecutionValue) {
+            const inputIndex = inputs.findIndex(inp => inp.name === value.name);
+            if (inputIndex !== -1) {
+              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
+              currentErrors.push(`No value defined in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
+              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
+            }
+          }
+        });
+      }
+
+      if (mappingErrors.length > 0) {
+        currentErrors[`inputMapping_${index}`] = mappingErrors.join(', ');
+      }
+    });
+    return inputMappingErrors;
+  }, [inputMappings, inputs]);
+
   const validateAllFields = () => {
     let errors: Record<string, string> = {};
 
@@ -393,58 +424,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       }
     });
 
-    // Validate input mappings and track input-specific errors
-    const inputMappingErrors = new Map<string, string[]>();
-
-    inputMappings.forEach((mapping, index) => {
-      const mappingErrors: string[] = [];
-      if (!mapping.when?.triggeredBy?.connection) {
-        mappingErrors.push('Trigger connection is required');
-      }
-
-      // Check if all inputs are included in the mapping
-      if (inputs.length > 0) {
-        const mappingInputNames = mapping.values?.map(v => v.name) || [];
-        const missingInputs = inputs
-          .map(input => input.name)
-          .filter(inputName => inputName && !mappingInputNames.includes(inputName));
-
-        // Add missing input errors to individual inputs
-        missingInputs.forEach(inputName => {
-          if (inputName) {
-            const inputIndex = inputs.findIndex(inp => inp.name === inputName);
-            if (inputIndex !== -1) {
-              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
-              currentErrors.push(`Missing in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
-              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
-            }
-          }
-        });
-      }
-
-      // Check if all mapping values have either value or valueFrom defined
-      if (mapping.values) {
-        mapping.values.forEach((value) => {
-          const hasStaticValue = value.value !== undefined && value.value !== '';
-          const hasEventDataValue = value.valueFrom?.eventData?.expression !== undefined && value.valueFrom.eventData.expression !== '';
-          const hasLastExecutionValue = value.valueFrom?.lastExecution?.results !== undefined && value.valueFrom.lastExecution.results.length > 0;
-
-          if (!hasStaticValue && !hasEventDataValue && !hasLastExecutionValue) {
-            const inputIndex = inputs.findIndex(inp => inp.name === value.name);
-            if (inputIndex !== -1) {
-              const currentErrors = inputMappingErrors.get(`input_${inputIndex}`) || [];
-              currentErrors.push(`No value defined in mapping for connection "${mapping.when?.triggeredBy?.connection || 'Unknown'}"`);
-              inputMappingErrors.set(`input_${inputIndex}`, currentErrors);
-            }
-          }
-        });
-      }
-
-      // Only add mapping-level errors for connection issues
-      if (mappingErrors.length > 0) {
-        errors[`inputMapping_${index}`] = mappingErrors.join(', ');
-      }
-    });
+    const inputMappingErrors = validateInputMappings(errors);
 
     // Add input-specific mapping errors to the validation errors
     inputMappingErrors.forEach((errorList, inputKey) => {
@@ -464,6 +444,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     return Object.keys(errors).length === 0;
   };
+
+  const debouncedValidateAllFields = debounce(validateAllFields, 100);
+
 
   const isExecutorMisconfigured = useCallback(() => {
     const errors = validateExecutor(executor);
@@ -513,6 +496,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       sectionsToOpen.push('connections');
     }
 
+    const inputErrors = Object.keys(validationErrors).some(key => key.startsWith('input_'));
+    if (inputErrors && !sectionsToOpen.includes('inputs')) {
+      sectionsToOpen.push('inputs');
+    }
+
     const executorErrors = validateExecutor(executor);
     if (Object.keys(executorErrors).length > 0 || hasFieldErrors) {
       if (!sectionsToOpen.includes('executor')) {
@@ -525,7 +513,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
 
     setOpenSections(sectionsToOpen);
-  }, [connections.length, executor, openSections, setOpenSections, setValidationErrors, validateExecutor]);
+  }, [connections.length, executor, openSections, setOpenSections, setValidationErrors, validateExecutor, validationErrors]);
 
   // Expose the trigger function to parent
   useEffect(() => {
@@ -541,6 +529,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     const connectionsNeedConfiguration = connections.length === 0;
     if (connectionsNeedConfiguration) {
       sectionsToOpen.push('connections');
+    }
+
+    const inputErrors = Object.keys(validationErrors).some(key => key.startsWith('input_'));
+    if (inputErrors) {
+      sectionsToOpen.push('inputs');
     }
 
     const executorErrors = validateExecutor(executor);
@@ -565,7 +558,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const inputsEditor = useArrayEditor({
     items: inputs,
     setItems: setInputs,
-    createNewItem: () => ({ name: '', description: '' }),
+    createNewItem: () => ({ name: `INPUT_${inputs.length + 1}`, description: '' }),
     validateItem: validateInput,
     setValidationErrors,
     errorPrefix: 'input'
@@ -574,7 +567,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const outputsEditor = useArrayEditor({
     items: outputs,
     setItems: setOutputs,
-    createNewItem: () => ({ name: '', description: '', required: false }),
+    createNewItem: () => ({ name: `OUTPUT_${outputs.length + 1}`, description: '', required: false }),
     validateItem: validateOutput,
     setValidationErrors,
     errorPrefix: 'output'
@@ -675,20 +668,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
-
-  // Auto-update input mappings when inputs change
-  useEffect(() => {
-    if (inputMappings.length > 0) {
-      const updatedMappings = ensureAllInputsInMappings(inputMappings, inputs);
-      // Only update if there are actual changes to prevent infinite loops
-      const hasChanges = updatedMappings.some((mapping, index) =>
-        mapping.values?.length !== inputMappings[index]?.values?.length
-      );
-      if (hasChanges) {
-        setInputMappings(updatedMappings);
-      }
-    }
-  }, [inputs, inputMappings, ensureAllInputsInMappings]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -890,70 +869,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
   };
 
-  const handleTriggerConnectionChange = (selectedConnection: string, actualMappingIndex: number, input: SuperplaneInputDefinition, mapping: SuperplaneInputMapping) => {
-    const newMappings = [...inputMappings];
-    const currentInputValue = mapping.values?.find(v => v.name === input.name);
-
-    if (!currentInputValue) return;
-
-    const existingMappingIndex = newMappings.findIndex((m, idx) =>
-      idx !== actualMappingIndex &&
-      m.when?.triggeredBy?.connection === selectedConnection &&
-      selectedConnection !== ''
-    );
-    const mappingExists = existingMappingIndex !== -1 && selectedConnection !== '';
-
-    if (mappingExists) {
-      const existingValues = newMappings[existingMappingIndex].values || [];
-      const valueExists = existingValues.some(v => v.name === input.name);
-
-      if (!valueExists) {
-        newMappings[existingMappingIndex].values = [...existingValues, currentInputValue];
-      } else {
-        newMappings[existingMappingIndex].values = existingValues.map(v =>
-          v.name === input.name ? currentInputValue : v
-        );
-      }
-
-      const updatedOriginalValues = (newMappings[actualMappingIndex].values || []).filter(v => v.name !== input.name);
-
-      if (updatedOriginalValues.length === 0) {
-        newMappings.splice(actualMappingIndex, 1);
-      } else {
-        newMappings[actualMappingIndex].values = updatedOriginalValues;
-      }
-      setInputMappings(newMappings);
-      return;
-    }
-
-
-    if (selectedConnection === '') {
-      newMappings[actualMappingIndex] = {
-        ...newMappings[actualMappingIndex],
-        when: {
-          ...newMappings[actualMappingIndex].when,
-          triggeredBy: { connection: selectedConnection }
-        }
-      };
-    } else {
-      newMappings[actualMappingIndex].when = {
-        triggeredBy: { connection: selectedConnection }
-      };
-
-      newMappings[actualMappingIndex].values = inputs.map(input => ({
-        name: input.name,
-        value: ''
-      }));
-    }
-    setInputMappings(newMappings);
-
-  };
 
   const handleInputNameChange = (newName: string, index: number, input: SuperplaneInputDefinition) => {
     const oldName = input.name;
     inputsEditor.updateItem(index, 'name', newName);
 
-    if (oldName && newName !== oldName) {
+    if (newName !== oldName) {
       const updatedMappings = inputMappings.map(mapping => ({
         ...mapping,
         values: mapping.values?.map(value =>
@@ -990,7 +911,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           value: undefined,
           valueFrom: {
             eventData: {
-              connection: '',
+              connection: newMappings[actualMappingIndex].when?.triggeredBy?.connection,
               expression: values[valueIndex]?.value || ''
             }
           }
@@ -1002,7 +923,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           value: undefined,
           valueFrom: {
             lastExecution: {
-              results: []
+              results: [
+                'RESULT_PASSED',
+                'RESULT_FAILED'
+              ]
             }
           }
         };
@@ -1011,6 +935,86 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     newMappings[actualMappingIndex].values = values;
     setInputMappings(newMappings);
   };
+
+  const handleConnectionSave = useCallback(() => {
+    const savedConnection = connectionsEditor.editingIndex !== null ?
+      connections[connectionsEditor.editingIndex] : null;
+
+    connectionsEditor.saveEdit();
+
+    if (savedConnection?.name && inputs.length > 0) {
+      const existingMapping = inputMappings.find(mapping =>
+        mapping.when?.triggeredBy?.connection === savedConnection.name
+      );
+
+      if (!existingMapping) {
+        const newMapping = {
+          when: { triggeredBy: { connection: savedConnection.name } },
+          values: inputs.map(input => ({
+            name: input.name,
+            value: ''
+          }))
+        };
+        setInputMappings(prev => [...prev, newMapping]);
+      }
+    }
+  }, [connectionsEditor, connections, inputs, inputMappings, setInputMappings]);
+
+  const handleConnectionDelete = useCallback((index: number, connection: SuperplaneConnection) => {
+    const connectionName = connection.name;
+
+    connectionsEditor.removeItem(index);
+
+    if (connectionName) {
+      const updatedMappings = inputMappings.filter(mapping =>
+        mapping.when?.triggeredBy?.connection !== connectionName
+      );
+      setInputMappings(updatedMappings);
+    }
+  }, [connectionsEditor, inputMappings, setInputMappings]);
+
+  const handleInputDelete = useCallback((index: number, input: SuperplaneInputDefinition) => {
+    const inputName = input.name;
+
+    inputsEditor.removeItem(index);
+
+    if (inputName) {
+      const updatedMappings = inputMappings.map(mapping => ({
+        ...mapping,
+        values: mapping.values?.filter(value => value.name !== inputName && value.name !== '') || []
+      }))
+        .filter(mapping => mapping.values?.length > 0);
+      setInputMappings(updatedMappings);
+    }
+  }, [inputsEditor, inputMappings, setInputMappings]);
+
+  const handleInputAdd = useCallback(() => {
+    inputsEditor.addItem();
+
+    if (connections.length > 0) {
+      const inputsCount = inputs.length;
+      const newInputName = `INPUT_${inputsCount + 1}`;
+
+
+      if (inputMappings.length === 0) {
+        const newMappings = connections.map(connection => ({
+          when: { triggeredBy: { connection: connection.name } },
+          values: [{ name: newInputName, value: '' }]
+        }));
+        setInputMappings(newMappings);
+        return;
+      }
+
+      const updatedMappings = inputMappings.map(mapping => ({
+        ...mapping,
+        values: [
+          ...(mapping.values || []),
+          { name: newInputName, value: '' }
+        ]
+      }));
+      setInputMappings(updatedMappings);
+    }
+  }, [inputsEditor, connections, inputMappings, setInputMappings, inputs]);
 
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
@@ -1044,7 +1048,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 <div key={index}>
                   <InlineEditor
                     isEditing={connectionsEditor.editingIndex === index}
-                    onSave={connectionsEditor.saveEdit}
+                    onSave={handleConnectionSave}
                     onCancel={() => connectionsEditor.cancelEdit(index, (item) => {
                       if (!item.name || item.name.trim() === '') {
                         return true;
@@ -1066,7 +1070,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       return false;
                     })}
                     onEdit={() => connectionsEditor.startEdit(index)}
-                    onDelete={() => connectionsEditor.removeItem(index)}
+                    onDelete={() => handleConnectionDelete(index, connection)}
                     displayName={connection.name || `Connection ${index + 1}`}
                     badge={connection.type && (
                       <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
@@ -1115,6 +1119,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               onRevert={revertSection}
               count={inputs.length}
               countLabel="inputs"
+              hasError={Object.keys(validationErrors).some(key => key.startsWith('input_'))}
             >
               {inputs.map((input, index) => {
                 // Get mappings for this specific input
@@ -1126,35 +1131,28 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   <div key={`input-${currentStageId}-${index}`}>
                     <InlineEditor
                       isEditing={inputsEditor.editingIndex === index}
-                      onSave={inputsEditor.saveEdit}
+                      onSave={() => {
+                        if (validationErrors[`input_${index}`])
+                          return;
+
+                        inputsEditor.saveEdit()
+                      }}
                       onCancel={() => inputsEditor.cancelEdit(index, (item) => {
                         if (!item.name || item.name.trim() === '') {
                           return true;
                         }
 
-                        const isNewInput = index >= originalData.inputs.length ||
-                          !originalData.inputs[index] ||
-                          originalData.inputs[index].name !== item.name;
+                        const allInputMappingsAreEmpty = inputMappings.every(mapping =>
+                          mapping.values
+                            ?.filter(value => value.name === input.name)
+                            ?.every(value => value.value === '' && !value.valueFrom)
+                        );
 
-                        return isNewInput;
+
+                        return allInputMappingsAreEmpty;
                       })}
                       onEdit={() => inputsEditor.startEdit(index)}
-                      onDelete={() => {
-                        const inputName = input.name;
-
-                        inputsEditor.removeItem(index);
-
-                        if (inputName) {
-                          const updatedMappings = inputMappings.map(mapping => ({
-                            ...mapping,
-                            values: mapping.values?.filter(value => value.name !== inputName) || []
-                          })).filter(mapping =>
-                            // Remove mappings that have no values left
-                            mapping.values && mapping.values.length > 0
-                          );
-                          setInputMappings(updatedMappings);
-                        }
-                      }}
+                      onDelete={() => handleInputDelete(index, input)}
                       displayName={input.name || `Input ${index + 1}`}
                       badge={
                         <div className="flex items-center gap-2">
@@ -1183,7 +1181,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             <input
                               type="text"
                               value={input.name || ''}
-                              onChange={(e) => handleInputNameChange(e.target.value, index, input)}
+                              onChange={(e) => {
+                                handleInputNameChange(e.target.value, index, input)
+                                debouncedValidateAllFields();
+                              }}
                               placeholder="Input name"
                               className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
                                 ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
@@ -1217,26 +1218,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                   <div key={actualMappingIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
                                     <div className="space-y-3">
                                       {/* Trigger Connection */}
-                                      <ValidationField
-                                        label="Triggered by Connection"
-                                        error={validationErrors[`inputMapping_${actualMappingIndex}`]}
-                                      >
-                                        <select
-                                          value={mapping.when?.triggeredBy?.connection || ''}
-                                          onChange={(e) => handleTriggerConnectionChange(e.target.value, actualMappingIndex, input, mapping)}
-                                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${actualMappingIndex}`]
-                                            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                                            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                                            }`}
-                                        >
-                                          <option value="">Select trigger connection</option>
-                                          {connections
-                                            .filter(conn => mapping.when?.triggeredBy?.connection === conn.name || !inputMappings.some(mapping => mapping.when?.triggeredBy?.connection === conn.name))
-                                            .map((conn, connIndex) => (
-                                              <option key={connIndex} value={conn.name}>{conn.name}</option>
-                                            ))}
-                                        </select>
-                                      </ValidationField>
+                                      <div className="space-y-1">
+                                        <label className="block text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                                          Triggered by Connection
+                                        </label>
+                                        <div className="px-3 py-2 bg-zinc-100 dark:bg-zinc-700 border border-zinc-300 dark:border-zinc-600 rounded-md text-zinc-900 dark:text-zinc-100 text-sm">
+                                          {mapping.when?.triggeredBy?.connection || 'No connection assigned'}
+                                        </div>
+                                      </div>
 
                                       {/* Value Mode Toggle */}
                                       {
@@ -1274,35 +1263,20 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     onChange={() => handleValueModeChange('lastExecution', actualMappingIndex, input)}
                                                     className="w-4 h-4"
                                                   />
-                                                  From Last Execution
+                                                  Inherit value from last execution
                                                 </label>
                                               </div>
                                             </div>
                                             {inputValue?.valueFrom?.eventData ? (
                                               /* Event Data Mode */
-                                              <div className="space-y-2">
-                                                <div>
-                                                  <label className="block text-xs font-medium mb-1">Data Source Connection</label>
-                                                  <select
-                                                    value={inputValue.valueFrom.eventData.connection || ''}
-                                                    onChange={(e) => inputMappingHandlers.handleEventDataConnectionChange(e.target.value, actualMappingIndex, input.name)}
-                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                                  >
-                                                    <option value="">Select data source</option>
-                                                    {connections.map((conn, connIndex) => (
-                                                      <option key={connIndex} value={conn.name}>{conn.name}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                                <div>
-                                                  <label className="block text-xs font-medium mb-1">Expression</label>
-                                                  <input
-                                                    value={inputValue.valueFrom.eventData.expression || ''}
-                                                    onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
-                                                    placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
-                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                                  />
-                                                </div>
+                                              <div>
+                                                <label className="block text-xs font-medium mb-1">Expression</label>
+                                                <input
+                                                  value={inputValue.valueFrom.eventData.expression || ''}
+                                                  onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
+                                                  placeholder="eg. $.commit[0].message"
+                                                  className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                                />
                                               </div>
                                             ) : inputValue?.valueFrom?.lastExecution ? (
                                               /* Last Execution Mode */
@@ -1339,28 +1313,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                           </>
                                         )
                                       }
-                                      {/* Remove Input from Mapping Button */}
-                                      <div className="flex justify-end">
-                                        <button
-                                          onClick={() => inputMappingHandlers.handleRemoveMapping(actualMappingIndex)}
-                                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs"
-                                        >
-                                          Remove from Mapping
-                                        </button>
-                                      </div>
                                     </div>
                                   </div>
                                 );
                               })}
                             </div>
                           </div>
-                          <button
-                            onClick={() => inputMappingHandlers.handleAddMapping(input)}
-                            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                          >
-                            <MaterialSymbol name="add" size="sm" />
-                            Add Mapping
-                          </button>
                         </div>
                       }
                     />
@@ -1368,7 +1326,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 );
               })}
               <button
-                onClick={inputsEditor.addItem}
+                onClick={handleInputAdd}
                 className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
               >
                 <MaterialSymbol name="add" size="sm" />
