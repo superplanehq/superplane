@@ -202,7 +202,7 @@ type ExecutionIntegrationResource struct {
 	ExecutionExternalID string
 }
 
-func (e *StageExecution) Finished(resources []ExecutionResource) bool {
+func (e *StageExecution) Finished(resources []*ExecutionResource) bool {
 	for _, r := range resources {
 		if !r.Finished() {
 			return false
@@ -212,7 +212,7 @@ func (e *StageExecution) Finished(resources []ExecutionResource) bool {
 	return true
 }
 
-func (e *StageExecution) GetResult(stage *Stage, resources []ExecutionResource) string {
+func (e *StageExecution) GetResult(stage *Stage, resources []*ExecutionResource) string {
 	for _, r := range resources {
 		if !r.Successful() {
 			return ResultFailed
@@ -427,8 +427,8 @@ func (r *ExecutionResource) ShouldPoll(pollDelay time.Duration) bool {
 	return time.Since(*r.LastPolledAt) >= pollDelay
 }
 
-func (e *StageExecution) Resources() ([]ExecutionResource, error) {
-	var resources []ExecutionResource
+func (e *StageExecution) Resources() ([]*ExecutionResource, error) {
+	var resources []*ExecutionResource
 
 	err := database.Conn().
 		Where("execution_id = ?", e.ID).

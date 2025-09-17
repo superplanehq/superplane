@@ -109,9 +109,11 @@ func (w *ExecutionPoller) CheckExecutionStatus(logger *log.Entry, execution *mod
 	//
 	// Poll the execution resources statuses, if needed.
 	//
-	err = w.updateResourceStatuses(logger, resources)
-	if err != nil {
-		return err
+	for _, resource := range resources {
+		err := w.updateResourceStatus(logger, resource)
+		if err != nil {
+			return err
+		}
 	}
 
 	//
@@ -123,17 +125,6 @@ func (w *ExecutionPoller) CheckExecutionStatus(logger *log.Entry, execution *mod
 
 	result := execution.GetResult(stage, resources)
 	return w.finishExecution(logger, stage, execution, result)
-}
-
-func (w *ExecutionPoller) updateResourceStatuses(logger *log.Entry, resources []models.ExecutionResource) error {
-	for _, resource := range resources {
-		err := w.updateResourceStatus(logger, &resource)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (w *ExecutionPoller) finishExecution(logger *log.Entry, stage *models.Stage, execution *models.StageExecution, result string) error {
@@ -177,7 +168,7 @@ func (w *ExecutionPoller) CancelExecution(logger *log.Entry, execution *models.S
 	return w.finishExecution(logger, stage, execution, models.ResultCancelled)
 }
 
-func (w *ExecutionPoller) cancelResource(logger *log.Entry, resource models.ExecutionResource) error {
+func (w *ExecutionPoller) cancelResource(logger *log.Entry, resource *models.ExecutionResource) error {
 	integration, err := resource.FindIntegration()
 	if err != nil {
 		return err
@@ -248,7 +239,7 @@ func (w *ExecutionPoller) updateResourceStatus(logger *log.Entry, resource *mode
 	// Resource is not finished yet, no need to update anything in the database.
 	// Here, we update the polling metadata to avoid polling too often.
 	//
-	if !resource.Finished() {
+	if !updatedResource.Finished() {
 		logger.Infof("Resource %s not finished yet", resource.Id())
 		return resource.UpdatePollingMetadata()
 	}
@@ -257,8 +248,10 @@ func (w *ExecutionPoller) updateResourceStatus(logger *log.Entry, resource *mode
 	// Resource is finished, update the database.
 	//
 	if updatedResource.Successful() {
+		logger.Infof("Resource %s finished successfully", resource.Id())
 		return resource.Finish(models.ResultPassed)
 	}
 
+	logger.Infof("Resource %s finished with failure", resource.Id())
 	return resource.Finish(models.ResultFailed)
 }
