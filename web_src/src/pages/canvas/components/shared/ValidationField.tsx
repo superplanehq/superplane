@@ -3,7 +3,7 @@ import { Field } from '../Field';
 import { Label } from '../Label';
 
 interface ValidationFieldProps {
-  label: string;
+  label: string | React.ReactNode;
   children: React.ReactNode;
   error?: string;
   required?: boolean;
