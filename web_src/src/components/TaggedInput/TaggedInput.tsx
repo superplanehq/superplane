@@ -132,17 +132,19 @@ export function TaggedInput({
   const handleOptionSelect = (option: TaggedInputOption) => {
     const beforeCursor = value.slice(0, cursorPosition)
     const afterCursor = value.slice(cursorPosition)
-    const lastOpenBrace = beforeCursor.lastIndexOf('${{')
+    const lastFullOpenBrace = beforeCursor.lastIndexOf('${{')
+    const lastSingleDollar = beforeCursor.lastIndexOf('$')
 
     let newValue: string
     let newCursorPos: number
 
-    if (lastOpenBrace !== -1 && lastOpenBrace > beforeCursor.lastIndexOf('}}')) {
-
-      newValue = beforeCursor.slice(0, lastOpenBrace) + option.value + afterCursor
-      newCursorPos = lastOpenBrace + option.value.length
+    if (lastFullOpenBrace !== -1 && lastFullOpenBrace > beforeCursor.lastIndexOf('}}')) {
+      newValue = beforeCursor.slice(0, lastFullOpenBrace) + option.value + afterCursor
+      newCursorPos = lastFullOpenBrace + option.value.length
+    } else if (lastSingleDollar !== -1 && lastSingleDollar > beforeCursor.lastIndexOf('}}')) {
+      newValue = beforeCursor.slice(0, lastSingleDollar) + option.value + afterCursor
+      newCursorPos = lastSingleDollar + option.value.length
     } else {
-
       newValue = beforeCursor + option.value + afterCursor
       newCursorPos = cursorPosition + option.value.length
     }
@@ -150,7 +152,6 @@ export function TaggedInput({
     onChange(newValue)
     setIsOpen(false)
     setQuery('')
-
 
     setTimeout(() => {
       if (inputRef.current) {
