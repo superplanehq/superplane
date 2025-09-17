@@ -12,6 +12,7 @@ import { EditableAccordionSection } from './shared/EditableAccordionSection';
 import { InlineEditor } from './shared/InlineEditor';
 import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
+import { ProTip } from './shared/ProTip';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
@@ -1985,6 +1986,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <ParametersTooltip executorType="semaphore" />
                       </div>
                     }>
+                      <ProTip show={semaphoreParameters.length > 0} />
                       <div className="space-y-2">
                         {semaphoreParameters.map((param) => (
                           <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2119,6 +2121,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <ParametersTooltip executorType="github" />
                       </div>
                     }>
+                      <ProTip show={githubInputs.length > 0} />
                       <div className="space-y-2">
                         {githubInputs.map((input) => (
                           <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2192,7 +2195,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Headers (optional)">
+                    <ValidationField label={
+                      <div className="flex items-center gap-2">
+                        Headers (optional)
+                        <ParametersTooltip executorType="http" />
+                      </div>
+                    }>
+                      <ProTip show={httpHeaders.length > 0} />
                       <div className="space-y-2">
                         {httpHeaders.map((header) => (
                           <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
