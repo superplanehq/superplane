@@ -18,6 +18,7 @@ import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
 import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
+import { ParametersTooltip } from '@/components/Tooltip';
 import { showErrorToast } from '@/utils/toast';
 
 interface StageEditModeContentProps {
@@ -1978,7 +1979,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Pipeline Parameters (optional)">
+                    <ValidationField label={
+                      <div className="flex items-center gap-2">
+                        Pipeline Parameters (optional)
+                        <ParametersTooltip executorType="semaphore" />
+                      </div>
+                    }>
                       <div className="space-y-2">
                         {semaphoreParameters.map((param) => (
                           <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2107,7 +2113,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Inputs (optional)">
+                    <ValidationField label={
+                      <div className="flex items-center gap-2">
+                        Inputs (optional)
+                        <ParametersTooltip executorType="github" />
+                      </div>
+                    }>
                       <div className="space-y-2">
                         {githubInputs.map((input) => (
                           <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
