@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import debounce from 'lodash.debounce';
 import { StageNodeType } from '@/canvas/types/flow';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
 import { useSecrets } from '../hooks/useSecrets';
@@ -11,12 +12,14 @@ import { EditableAccordionSection } from './shared/EditableAccordionSection';
 import { InlineEditor } from './shared/InlineEditor';
 import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
+import { ProTip } from './shared/ProTip';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
 import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
+import { ParametersTooltip } from '@/components/Tooltip';
 import { showErrorToast } from '@/utils/toast';
 
 interface StageEditModeContentProps {
@@ -24,6 +27,8 @@ interface StageEditModeContentProps {
   currentStageId?: string;
   canvasId: string;
   organizationId: string;
+  isNewStage?: boolean;
+  dirtyByUser?: boolean;
   onDataChange?: (data: {
     name: string;
     description?: string;
@@ -37,6 +42,7 @@ interface StageEditModeContentProps {
     isValid: boolean
   }) => void;
   onTriggerSectionValidation?: { current: ((hasFieldErrors?: boolean) => void) | null };
+  onStageNameChange?: (name: string) => void;
 }
 
 interface ParameterWithId {
@@ -46,7 +52,7 @@ interface ParameterWithId {
 }
 
 
-export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, onDataChange, onTriggerSectionValidation }: StageEditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -99,6 +105,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }));
   });
   const [nextIdCounter, setNextIdCounter] = useState(1);
+  const resourceInputRef = useRef<HTMLInputElement>(null);
+  const hasAutoFocused = useRef(false);
 
   const generateId = useCallback(() => {
     const id = `param_${nextIdCounter}`;
@@ -227,6 +235,41 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     const selectedSecret = allSecrets.find(secret => secret.name === secretName);
     return selectedSecret ? Object.keys(selectedSecret.data) : [];
   };
+
+  const generateStageName = (resourceName: string, resourceType?: string) => {
+    if (!resourceName || !resourceType) return '';
+    return `Run: ${resourceName}`;
+  };
+
+  // Debounced auto-generation to prevent input interference
+  const debouncedAutoGeneration = useCallback(
+    debounce((resourceName: string, resourceType: string) => {
+      if (isNewStage && !dirtyByUser && onStageNameChange) {
+        const generatedName = generateStageName(resourceName, resourceType);
+        if (generatedName) {
+          onStageNameChange(generatedName);
+        }
+      }
+    }, 300),
+    [isNewStage, dirtyByUser, onStageNameChange]
+  );
+
+  // Auto focus on resource input for new stages (only once)
+  useEffect(() => {
+    if (isNewStage && executor.resource?.type && !hasAutoFocused.current) {
+      const attemptFocus = () => {
+        if (resourceInputRef.current) {
+          resourceInputRef.current.focus();
+          hasAutoFocused.current = true;
+        } else {
+          // Retry if element not ready yet
+          setTimeout(attemptFocus, 100);
+        }
+      };
+
+      setTimeout(attemptFocus, 200);
+    }
+  }, [isNewStage, executor.resource?.type]);
 
   // Validation functions
   const validateInput = (input: SuperplaneInputDefinition, index: number): string[] => {
@@ -507,6 +550,29 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     },
   });
 
+  // Auto-select first available integration for new stages
+  useEffect(() => {
+    if (isNewStage && executor.type && !executor.integration?.name && validationErrors.executorIntegration) {
+      const availableIntegrations = [...canvasIntegrations, ...orgIntegrations];
+      const firstIntegration = availableIntegrations.find(int => int.spec?.type === executor.type);
+
+      if (firstIntegration?.metadata?.name) {
+        setExecutor(prev => ({
+          ...prev,
+          integration: {
+            name: firstIntegration.metadata?.name,
+            domainType: firstIntegration.metadata?.domainType
+          }
+        }));
+        setValidationErrors(prev => ({
+          ...prev,
+          executorIntegration: ''
+        }));
+      }
+    }
+  }, [isNewStage, executor.type, executor.integration?.name, canvasIntegrations, orgIntegrations, validationErrors.executorIntegration, setValidationErrors]);
+
+
   const triggerSectionValidation = useCallback((hasFieldErrors: boolean = false) => {
     const errors = validateAllFields();
 
@@ -570,14 +636,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     const executorErrors = validateExecutor(executor);
 
-    if (Object.keys(executorErrors).length > 0) {
+    if (Object.keys(executorErrors).length > 0 || (isNewStage && executor.resource?.type)) {
       sectionsToOpen.push('executor');
       setValidationErrors(executorErrors);
     }
 
     setOpenSections(sectionsToOpen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setOpenSections]);
+  }, [setOpenSections, isNewStage, executor.resource?.type]);
 
   // Connection management
   const connectionManager = useConnectionManager({
@@ -1771,17 +1837,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               }
             >
               <div className="space-y-4">
-                <ValidationField label="Executor name">
-                  <input
-                    type="text"
-                    value={executor.name || ''}
-                    onChange={(e) => setExecutor(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="${{ inputs.VERSION }} deployment"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-
-                </ValidationField>
-
                 {executor.type === 'semaphore' && (
                   <div className="space-y-4">
                     <ValidationField
@@ -1817,6 +1872,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       error={validationErrors.executorProject || fieldErrors.project}
                     >
                       <input
+                        ref={resourceInputRef}
                         type="text"
                         value={(executor.resource?.name as string) || ''}
                         onChange={(e) => {
@@ -1824,6 +1880,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             updateExecutorResource('type', 'project');
 
                           updateExecutorResource('name', e.target.value);
+
+                          debouncedAutoGeneration(e.target.value, 'project');
+
                           if (fieldErrors.project) {
                             setFieldErrors(prev => {
                               // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1850,7 +1909,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         ]}
                         variant="pills"
                         activeTab={semaphoreExecutionType}
-                        onTabChange={(tabId) => updateSemaphoreExecutionType(tabId as 'workflow' | 'task')}
+                        onTabChange={(tabId) => {
+                          if (tabId === 'task')
+                            updateExecutorField('task', 'my-task')
+                          updateSemaphoreExecutionType(tabId as 'workflow' | 'task')
+                        }}
                       />
                     </ValidationField>
 
@@ -1898,7 +1961,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Parameters">
+                    <ValidationField label={
+                      <div className="flex items-center gap-2">
+                        Pipeline Parameters (optional)
+                        <ParametersTooltip executorType="semaphore" />
+                      </div>
+                    }>
+                      <ProTip show={semaphoreParameters.length > 0} />
                       <div className="space-y-2">
                         {semaphoreParameters.map((param) => (
                           <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -1971,13 +2040,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       error={validationErrors.executorRepository || fieldErrors.repository}
                     >
                       <input
+                        ref={resourceInputRef}
                         type="text"
                         value={(executor.resource?.name as string) || ''}
                         onChange={(e) => {
                           if (executor.resource?.type !== 'repository')
                             updateExecutorResource('type', 'repository');
 
-                          updateExecutorResource('name', e.target.value)
+                          updateExecutorResource('name', e.target.value);
+
+                          debouncedAutoGeneration(e.target.value, 'repository');
 
                           setFieldErrors(prev => ({ ...prev, repository: '' }));
                         }}
@@ -2024,7 +2096,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Inputs">
+                    <ValidationField label={
+                      <div className="flex items-center gap-2">
+                        Inputs (optional)
+                        <ParametersTooltip executorType="github" />
+                      </div>
+                    }>
+                      <ProTip show={githubInputs.length > 0} />
                       <div className="space-y-2">
                         {githubInputs.map((input) => (
                           <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2098,7 +2176,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Headers">
+                    <ValidationField label={
+                      <div className="flex items-center gap-2">
+                        Headers (optional)
+                        <ParametersTooltip executorType="http" />
+                      </div>
+                    }>
+                      <ProTip show={httpHeaders.length > 0} />
                       <div className="space-y-2">
                         {httpHeaders.map((header) => (
                           <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2149,6 +2233,19 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
                   </div>
+                )}
+
+                {/* Unified Execution Name Field - appears for all executor types */}
+                {executor.type && (
+                  <ValidationField label="Execution name (optional)">
+                    <input
+                      type="text"
+                      value={executor.name || ''}
+                      onChange={(e) => setExecutor(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder={executor.type === 'http' ? 'API call' : '${{ inputs.VERSION }} deployment'}
+                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                    />
+                  </ValidationField>
                 )}
               </div>
             </EditableAccordionSection>

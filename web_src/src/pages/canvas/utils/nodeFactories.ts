@@ -30,6 +30,10 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
             type: 'project',
             name: '',
           },
+          spec: {
+            ref: 'refs/heads/main',
+            pipelineFile: '.semaphore/semaphore.yml',
+          }
         };
       case 'github':
         return {
@@ -39,8 +43,12 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
           },
           resource: {
             type: 'repository',
-            name: 'my-repository',
+            name: '',
           },
+          spec: {
+            ref: 'main',
+            workflow: '.github/workflows/main.yml',
+          }
         };
       case 'http':
         return {

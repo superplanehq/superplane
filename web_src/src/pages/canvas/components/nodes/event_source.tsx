@@ -428,7 +428,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 <div className="text-sm  font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.status?.history?.received || 0})</div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {currentEventSource.events.slice(0, 3).map((event) => {
                   // Map event states to our EventState type
                   let eventState: EventState = 'pending';
@@ -441,9 +441,9 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                   return (
                     <EventStateItem
                       key={event.id}
-                      eventId={event.id!}
                       state={eventState}
                       receivedAt={event.receivedAt}
+                      eventType={event.type}
                     />
                   );
                 })}
