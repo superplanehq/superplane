@@ -57,6 +57,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [connectionFilterErrors, setConnectionFilterErrors] = useState<Record<number, number[]>>({});
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
   const [conditions, setConditions] = useState<SuperplaneCondition[]>(data.conditions || []);
@@ -1035,8 +1036,36 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   };
 
   const handleConnectionSave = useCallback(() => {
-    const savedConnection = connectionsEditor.editingIndex !== null ?
-      connections[connectionsEditor.editingIndex] : null;
+    const savedConnectionIndex = connectionsEditor.editingIndex;
+    const savedConnection = savedConnectionIndex !== null ?
+      connections[savedConnectionIndex] : null;
+
+    if (savedConnection && savedConnectionIndex !== null) {
+      const connectionErrors = connectionManager.validateConnection(savedConnection);
+      if (connectionErrors.length > 0) {
+        setValidationErrors(prev => ({
+          ...prev,
+          [`connection_${savedConnectionIndex}`]: connectionErrors.join(', ')
+        }));
+        setConnectionFilterErrors(prev => ({
+          ...prev,
+          [savedConnectionIndex]: connectionManager.getConnectionFilterErrors(savedConnection)
+        }));
+        return;
+      } else {
+        setValidationErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[`connection_${savedConnectionIndex}`];
+          return newErrors;
+        });
+
+        setConnectionFilterErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[savedConnectionIndex];
+          return newErrors;
+        });
+      }
+    }
 
     connectionsEditor.saveEdit();
 
@@ -1056,7 +1085,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         setInputMappings(prev => [...prev, newMapping]);
       }
     }
-  }, [connectionsEditor, connections, inputs, inputMappings, setInputMappings]);
+  }, [connectionsEditor, connections, inputs, inputMappings, setInputMappings, connectionManager, setValidationErrors]);
 
   const handleConnectionDelete = useCallback((index: number, connection: SuperplaneConnection) => {
     const connectionName = connection.name;
@@ -1147,26 +1176,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   <InlineEditor
                     isEditing={connectionsEditor.editingIndex === index}
                     onSave={handleConnectionSave}
-                    onCancel={() => connectionsEditor.cancelEdit(index, (item) => {
-                      if (!item.name || item.name.trim() === '') {
-                        return true;
-                      }
-
-                      if (item.filters && item.filters.length > 0) {
-                        const hasIncompleteFilters = item.filters.some(filter => {
-                          if (filter.type === 'FILTER_TYPE_DATA') {
-                            return !filter.data?.expression || filter.data.expression.trim() === '';
-                          }
-                          if (filter.type === 'FILTER_TYPE_HEADER') {
-                            return !filter.header?.expression || filter.header.expression.trim() === '';
-                          }
-                          return false;
-                        });
-                        return hasIncompleteFilters;
-                      }
-
-                      return false;
-                    })}
+                    onCancel={() => connectionsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
                     onEdit={() => connectionsEditor.startEdit(index)}
                     onDelete={() => handleConnectionDelete(index, connection)}
                     displayName={connection.name || `Connection ${index + 1}`}
@@ -1186,6 +1196,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         onFilterOperatorToggle={connectionManager.toggleFilterOperator}
                         currentEntityId={currentStageId}
                         validationError={validationErrors[`connection_${index}`]}
+                        filterErrors={connectionFilterErrors[index] || []}
                         showFilters={true}
                         existingConnections={connections}
                       />
