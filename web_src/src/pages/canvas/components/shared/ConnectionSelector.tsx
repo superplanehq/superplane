@@ -100,6 +100,9 @@ export function ConnectionSelector({
               <FiltersTooltip />
             </div>
           </div>
+          <div className="mb-3 text-xs text-zinc-600 dark:text-zinc-400">
+            Pro tip: You can use <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> expressions to build expressions
+          </div>
           <div className="space-y-2">
             {(connection.filters || []).map((filter, filterIndex) => {
               const hasError = filterErrors.includes(filterIndex + 1); // Convert to 1-based index for comparison
@@ -109,7 +112,7 @@ export function ConnectionSelector({
                   <div className={`flex gap-2 items-center p-2 rounded ${hasError
                     ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'
                     : 'bg-zinc-50 dark:bg-zinc-800'
-                  }`}>
+                    }`}>
                     <select
                       value={filter.type || 'FILTER_TYPE_DATA'}
                       onChange={(e) => {
@@ -127,7 +130,7 @@ export function ConnectionSelector({
                       className={`px-2 py-1 border rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 ${hasError
                         ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                         : 'border-zinc-300 dark:border-zinc-600'
-                      }`}
+                        }`}
                     >
                       <option value="FILTER_TYPE_DATA">Data</option>
                       <option value="FILTER_TYPE_HEADER">Header</option>
@@ -149,17 +152,17 @@ export function ConnectionSelector({
                         }
                         onFilterUpdate(index, filterIndex, updates);
                       }}
-                      placeholder="Filter expression"
+                      placeholder={filter.type === 'FILTER_TYPE_DATA' ? 'eg. $.execution.result=="passed"' : 'eg. headers["name"]=="value"'}
                       className={`flex-1 px-2 py-1 border rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 ${hasError
                         ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                         : 'border-zinc-300 dark:border-zinc-600'
-                      }`}
+                        }`}
                     />
                     <button
                       onClick={() => onFilterRemove(index, filterIndex)}
-                      className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                      className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <span className="material-symbols-outlined text-sm!">delete</span>
                     </button>
                   </div>
                   {hasError && (
