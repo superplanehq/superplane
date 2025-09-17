@@ -259,7 +259,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         if (resourceInputRef.current) {
           resourceInputRef.current.focus();
           hasAutoFocused.current = true;
-          console.log('Auto focused on resource input');
         } else {
           // Retry if element not ready yet
           setTimeout(attemptFocus, 100);
@@ -548,6 +547,28 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       return Object.keys(validateAllFields(false)).length === 0;
     },
   });
+
+  // Auto-select first available integration for new stages
+  useEffect(() => {
+    if (isNewStage && executor.type && !executor.integration?.name && validationErrors.executorIntegration) {
+      const availableIntegrations = [...canvasIntegrations, ...orgIntegrations];
+      const firstIntegration = availableIntegrations.find(int => int.spec?.type === executor.type);
+
+      if (firstIntegration?.metadata?.name) {
+        setExecutor(prev => ({
+          ...prev,
+          integration: {
+            name: firstIntegration.metadata?.name,
+            domainType: firstIntegration.metadata?.domainType
+          }
+        }));
+        setValidationErrors(prev => ({
+          ...prev,
+          executorIntegration: ''
+        }));
+      }
+    }
+  }, [isNewStage, executor.type, executor.integration?.name, canvasIntegrations, orgIntegrations, validationErrors.executorIntegration, setValidationErrors]);
 
 
   const triggerSectionValidation = useCallback((hasFieldErrors: boolean = false) => {
