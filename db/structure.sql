@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FzB2OWwb4eVV1WObfgddzc8KDgVRiEjgrO2HOa5KvBpliuY34TIWl7yvS1P5GVV
+\restrict VCascHXdu6a17mXEhJIVViLeSe7u1SAlC2URwpoQTsqd5vfcrYgNCdR3ODGWwiM
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -260,7 +260,6 @@ CREATE TABLE public.execution_resources (
     result character varying(64) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    retry_count integer DEFAULT 0 NOT NULL,
     last_polled_at timestamp without time zone
 );
 
@@ -1154,13 +1153,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FzB2OWwb4eVV1WObfgddzc8KDgVRiEjgrO2HOa5KvBpliuY34TIWl7yvS1P5GVV
+\unrestrict VCascHXdu6a17mXEhJIVViLeSe7u1SAlC2URwpoQTsqd5vfcrYgNCdR3ODGWwiM
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict agrpLT80EaIldtMhPA1hnBAcIiaAAe9znsUoYy8N60XC6lKvFK8kFpxuqCcg2Lt
+\restrict crZHkDmr9G2p54uxs8jUCMLfJ0gxgJX2K357esTgJedlMckbMbFHpEONTTntijy
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1190,5 +1189,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict agrpLT80EaIldtMhPA1hnBAcIiaAAe9znsUoYy8N60XC6lKvFK8kFpxuqCcg2Lt
+\unrestrict crZHkDmr9G2p54uxs8jUCMLfJ0gxgJX2K357esTgJedlMckbMbFHpEONTTntijy
 
