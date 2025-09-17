@@ -1937,7 +1937,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         ]}
                         variant="pills"
                         activeTab={semaphoreExecutionType}
-                        onTabChange={(tabId) => updateSemaphoreExecutionType(tabId as 'workflow' | 'task')}
+                        onTabChange={(tabId) => {
+                          if (tabId === 'task')
+                            updateExecutorField('task', 'my-task')
+                          updateSemaphoreExecutionType(tabId as 'workflow' | 'task')
+                        }}
                       />
                     </ValidationField>
 
