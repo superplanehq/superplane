@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict d0wjNX1MTbwtllrvNXn4uVKAa0cPGce3cyEprUVaCnrOeXgAIvtHvVLtStg9jUd
+\restrict hiMJToddoYOQohtlYXEKTYMx8eUUpsXcdNj8NDGsiFeouwvb8xOIB6m6WVeUfKe
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -261,7 +261,7 @@ CREATE TABLE public.execution_resources (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     retry_count integer DEFAULT 0 NOT NULL,
-    last_retry_at timestamp without time zone
+    last_polled_at timestamp without time zone
 );
 
 
@@ -836,13 +836,6 @@ CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at)
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1161,13 +1154,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict d0wjNX1MTbwtllrvNXn4uVKAa0cPGce3cyEprUVaCnrOeXgAIvtHvVLtStg9jUd
+\unrestrict hiMJToddoYOQohtlYXEKTYMx8eUUpsXcdNj8NDGsiFeouwvb8xOIB6m6WVeUfKe
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict okP7aQ2YZfoS11J0CyWJiCxKtih5NNeClLZslnSuGD2FWY6zKEcp9jAUtdm2aaM
+\restrict ksqN0IP4E3KtvpSeK4sxTU1nZBdMqGkdPsSEiFJ5N8KbIzGF6vnGKfHChFp9bmd
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1189,7 +1182,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250916194326	f
+20250917194419	f
 \.
 
 
@@ -1197,5 +1190,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict okP7aQ2YZfoS11J0CyWJiCxKtih5NNeClLZslnSuGD2FWY6zKEcp9jAUtdm2aaM
+\unrestrict ksqN0IP4E3KtvpSeK4sxTU1nZBdMqGkdPsSEiFJ5N8KbIzGF6vnGKfHChFp9bmd
 

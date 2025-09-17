@@ -64,6 +64,16 @@ func (i *SemaphoreResourceManager) Status(resourceType, id string, _ integration
 	}
 }
 
+func (i *SemaphoreResourceManager) Cancel(resourceType, id string, _ integrations.Resource) error {
+	switch resourceType {
+	case ResourceTypeWorkflow:
+		return i.stopWorkflow(id)
+
+	default:
+		return fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}
+
 func (i *SemaphoreResourceManager) Get(resourceType, id string) (integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeProject:
@@ -397,6 +407,16 @@ func (i *SemaphoreResourceManager) getWorkflow(id string) (integrations.Resource
 	return &workflow, nil
 }
 
+func (i *SemaphoreResourceManager) stopWorkflow(id string) error {
+	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows/%s/terminate", i.URL, id)
+	_, err := i.execRequest(http.MethodPost, URL, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (i *SemaphoreResourceManager) getPipeline(id string) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", i.URL, id)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
@@ -670,7 +690,7 @@ func (i *SemaphoreResourceManager) createSemaphoreNotification(name string, opti
 func (i *SemaphoreResourceManager) CleanupWebhook(parentResource integrations.Resource, webhook integrations.Resource) error {
 	// For Semaphore, we need to delete both the notification and the associated secret
 	// We'll use DELETE HTTP method to clean up the resources
-	
+
 	// Delete notification
 	if webhook.Type() == ResourceTypeNotification {
 		notificationURL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", i.URL, webhook.Id())

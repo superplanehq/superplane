@@ -49,6 +49,15 @@ type StageExecution struct {
 	StageEvent *StageEvent `gorm:"foreignKey:StageEventID;references:ID"`
 }
 
+func (e *StageExecution) IsTimedOut(now time.Time, timeout time.Duration) bool {
+	if e.StartedAt == nil {
+		return false
+	}
+
+	runningDuration := now.Sub(*e.StartedAt)
+	return runningDuration > timeout
+}
+
 func (e *StageExecution) Cancel(userID uuid.UUID) error {
 	if e.State == ExecutionFinished {
 		return ErrExecutionCannotBeCancelled
@@ -61,10 +70,7 @@ func (e *StageExecution) Cancel(userID uuid.UUID) error {
 	now := time.Now()
 	return database.Conn().Model(e).
 		Clauses(clause.Returning{}).
-		Update("state", ExecutionFinished).
-		Update("result", ResultCancelled).
 		Update("updated_at", &now).
-		Update("finished_at", &now).
 		Update("cancelled_at", &now).
 		Update("cancelled_by", &userID).
 		Error
@@ -194,6 +200,31 @@ type ExecutionIntegrationResource struct {
 	IntegrationURL      string
 	ParentExternalID    string
 	ExecutionExternalID string
+}
+
+func (e *StageExecution) Finished(resources []ExecutionResource) bool {
+	for _, r := range resources {
+		if !r.Finished() {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (e *StageExecution) GetResult(stage *Stage, resources []ExecutionResource) string {
+	for _, r := range resources {
+		if !r.Successful() {
+			return ResultFailed
+		}
+	}
+
+	missingOutputs := stage.MissingRequiredOutputs(e.Outputs.Data())
+	if len(missingOutputs) > 0 {
+		return ResultFailed
+	}
+
+	return ResultPassed
 }
 
 func (e *StageExecution) IntegrationResource(externalID string) (*ExecutionIntegrationResource, error) {
@@ -330,13 +361,28 @@ type ExecutionResource struct {
 	StageID          uuid.UUID
 	ParentResourceID uuid.UUID
 	ExternalID       string
-	Type             string
+	ResourceType     string `gorm:"column:type"`
 	State            string
 	Result           string
-	RetryCount       int `gorm:"default:0"`
-	LastRetryAt      *time.Time
+	LastPolledAt     *time.Time
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
+}
+
+func (r *ExecutionResource) Finished() bool {
+	return r.State == ExecutionResourceFinished
+}
+
+func (r *ExecutionResource) Successful() bool {
+	return r.Result == ResultPassed
+}
+
+func (r *ExecutionResource) Id() string {
+	return r.ExternalID
+}
+
+func (r *ExecutionResource) Type() string {
+	return r.ResourceType
 }
 
 func PendingExecutionResources() ([]ExecutionResource, error) {
@@ -364,27 +410,21 @@ func (e *ExecutionResource) Finish(result string) error {
 		Error
 }
 
-func (e *ExecutionResource) IncrementRetryCount() error {
-	now := time.Now()
+func (e *ExecutionResource) UpdatePollingTimestamp() error {
 	return database.Conn().
 		Model(e).
 		Clauses(clause.Returning{}).
-		Update("retry_count", e.RetryCount+1).
-		Update("last_retry_at", &now).
-		Update("updated_at", &now).
+		Update("last_polled_at", time.Now()).
+		Update("updated_at", time.Now()).
 		Error
 }
 
-func (e *ExecutionResource) ShouldRetry(maxRetries int, retryDelay time.Duration) bool {
-	if e.RetryCount >= maxRetries {
-		return false
-	}
-
-	if e.LastRetryAt == nil {
+func (e *ExecutionResource) ShouldPoll(pollDelay time.Duration) bool {
+	if e.LastPolledAt == nil {
 		return true
 	}
 
-	return time.Since(*e.LastRetryAt) >= retryDelay
+	return time.Since(*e.LastPolledAt) >= pollDelay
 }
 
 func (e *StageExecution) Resources() ([]ExecutionResource, error) {
@@ -457,7 +497,7 @@ func (e *StageExecution) AddResource(externalID string, externalType string, par
 		StageID:          e.StageID,
 		ParentResourceID: parentResourceID,
 		ExternalID:       externalID,
-		Type:             externalType,
+		ResourceType:     externalType,
 		State:            ExecutionResourcePending,
 	}
 

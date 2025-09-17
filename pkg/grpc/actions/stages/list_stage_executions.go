@@ -239,6 +239,10 @@ func serializeExecution(execution models.StageExecution) (*pb.Execution, error) 
 		e.FinishedAt = timestamppb.New(*execution.FinishedAt)
 	}
 
+	if execution.CancelledAt != nil {
+		e.CancelledAt = timestamppb.New(*execution.CancelledAt)
+	}
+
 	for k, v := range execution.Outputs.Data() {
 		e.Outputs = append(e.Outputs, &pb.OutputValue{Name: k, Value: v.(string)})
 	}

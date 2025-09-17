@@ -835,8 +835,6 @@ message StageEvent {
     STATE_REASON_UNKNOWN = 0;
     STATE_REASON_APPROVAL = 1;
     STATE_REASON_TIME_WINDOW = 2;
-    STATE_REASON_STUCK = 3;
-    STATE_REASON_TIMEOUT = 4;
   }
 
   string id = 1;
@@ -897,10 +895,11 @@ message Execution {
   Result result = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp started_at = 5;
-  google.protobuf.Timestamp finished_at = 6;
-  repeated OutputValue outputs = 7;
-  repeated ExecutionResource resources = 8;
-  StageEvent stage_event = 9;
+  google.protobuf.Timestamp cancelled_at = 6;
+  google.protobuf.Timestamp finished_at = 7;
+  repeated OutputValue outputs = 8;
+  repeated ExecutionResource resources = 9;
+  StageEvent stage_event = 10;
 }
 
 message ExecutionResource {

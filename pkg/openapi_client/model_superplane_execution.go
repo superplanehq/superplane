@@ -26,6 +26,7 @@ type SuperplaneExecution struct {
 	Result *ExecutionResult `json:"result,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
+	CancelledAt *time.Time `json:"cancelledAt,omitempty"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	Outputs []SuperplaneOutputValue `json:"outputs,omitempty"`
 	Resources []SuperplaneExecutionResource `json:"resources,omitempty"`
@@ -217,6 +218,38 @@ func (o *SuperplaneExecution) SetStartedAt(v time.Time) {
 	o.StartedAt = &v
 }
 
+// GetCancelledAt returns the CancelledAt field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetCancelledAt() time.Time {
+	if o == nil || IsNil(o.CancelledAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.CancelledAt
+}
+
+// GetCancelledAtOk returns a tuple with the CancelledAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetCancelledAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.CancelledAt) {
+		return nil, false
+	}
+	return o.CancelledAt, true
+}
+
+// HasCancelledAt returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasCancelledAt() bool {
+	if o != nil && !IsNil(o.CancelledAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetCancelledAt gets a reference to the given time.Time and assigns it to the CancelledAt field.
+func (o *SuperplaneExecution) SetCancelledAt(v time.Time) {
+	o.CancelledAt = &v
+}
+
 // GetFinishedAt returns the FinishedAt field value if set, zero value otherwise.
 func (o *SuperplaneExecution) GetFinishedAt() time.Time {
 	if o == nil || IsNil(o.FinishedAt) {
@@ -369,6 +402,9 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.StartedAt) {
 		toSerialize["startedAt"] = o.StartedAt
+	}
+	if !IsNil(o.CancelledAt) {
+		toSerialize["cancelledAt"] = o.CancelledAt
 	}
 	if !IsNil(o.FinishedAt) {
 		toSerialize["finishedAt"] = o.FinishedAt
