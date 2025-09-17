@@ -27,6 +27,7 @@
     "@tippyjs/react": "^4.2.6",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.15.18",
+    "@uiw/react-json-view": "^2.0.0-alpha.37",
     "@xyflow/react": "^12.6.1",
     "clsx": "^2.1.1",
     "elkjs": "^0.10.0",

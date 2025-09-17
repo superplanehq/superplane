@@ -24,6 +24,7 @@ import {
   superplaneListEvents,
   superplaneListStageEvents,
   superplaneListStageExecutions,
+  superplaneListEventRejections,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState } from '../api-client/types.gen'
@@ -43,6 +44,7 @@ export const canvasKeys = {
   connectionGroups: (canvasId: string) => [...canvasKeys.all, 'connectionGroups', canvasId] as const,
   connectionGroup: (canvasId: string, connectionGroupId: string) => [...canvasKeys.all, 'connectionGroup', canvasId, connectionGroupId] as const,
   integrations: (canvasId?: string) => canvasId ? [...canvasKeys.all, 'integrations', canvasId] as const : ['integrations'] as const,
+  eventRejections: (canvasId: string, targetType: string, targetId: string) => [...canvasKeys.all, 'eventRejections', canvasId, targetType, targetId] as const,
 }
 
 export const useCanvasRoles = (canvasId: string) => {
@@ -625,16 +627,16 @@ export const useIntegrations = () => {
 }
 
 // Event-related hooks
-export const useEventSourceEvents = (canvasId: string, eventSourceId: string) => {
+export const useEvents = (canvasId: string, sourceType: string, sourceId: string) => {
   return useInfiniteQuery({
-    queryKey: canvasKeys.events(canvasId, 'EVENT_SOURCE_TYPE_EVENT_SOURCE', eventSourceId),
+    queryKey: canvasKeys.events(canvasId, sourceType, sourceId),
     queryFn: async ({ pageParam }) => {
       const response = await superplaneListEvents(
         withOrganizationHeader({
           path: { canvasIdOrName: canvasId },
           query: {
-            sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE',
-            sourceId: eventSourceId,
+            sourceType,
+            sourceId,
             limit: 20,
             ...(pageParam && { before: pageParam })
           }
@@ -642,50 +644,22 @@ export const useEventSourceEvents = (canvasId: string, eventSourceId: string) =>
       )
       return {
         events: response.data?.events || [],
-        nextCursor: response.data?.events && response.data.events.length === 20 
-          ? response.data.events[response.data.events.length - 1]?.receivedAt 
-          : undefined
+        totalCount: response.data?.totalCount || 0,
+        hasNextPage: response.data?.hasNextPage || false,
+        lastTimestamp: response.data?.lastTimestamp
       }
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.lastTimestamp : undefined,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!canvasId && !!eventSourceId
+    enabled: !!canvasId && !!sourceType && !!sourceId
   })
 }
 
-export const useStageEvents = (canvasId: string, stageId: string) => {
-  return useInfiniteQuery({
-    queryKey: canvasKeys.events(canvasId, 'EVENT_SOURCE_TYPE_STAGE', stageId),
-    queryFn: async ({ pageParam }) => {
-      const response = await superplaneListEvents(
-        withOrganizationHeader({
-          path: { canvasIdOrName: canvasId },
-          query: {
-            sourceType: 'EVENT_SOURCE_TYPE_STAGE',
-            sourceId: stageId,
-            limit: 20,
-            ...(pageParam && { before: pageParam })
-          }
-        })
-      )
-      return {
-        events: response.data?.events || [],
-        nextCursor: response.data?.events && response.data.events.length === 20 
-          ? response.data.events[response.data.events.length - 1]?.receivedAt 
-          : undefined
-      }
-    },
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!canvasId && !!stageId
-  })
-}
 
-export const useStageQueueEvents = (canvasId: string, stageId: string, states: SuperplaneStageEventState[]) => {
+
+export const useStageEvents = (canvasId: string, stageId: string, states: SuperplaneStageEventState[]) => {
   return useInfiniteQuery({
     queryKey: canvasKeys.stageEvents(canvasId, stageId, states),
     queryFn: async ({ pageParam }) => {
@@ -740,5 +714,35 @@ export const useStageExecutions = (canvasId: string, stageId: string, results?: 
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!stageId
+  })
+}
+
+export const useEventRejections = (canvasId: string, targetType: string, targetId: string) => {
+  return useInfiniteQuery({
+    queryKey: canvasKeys.eventRejections(canvasId, targetType, targetId),
+    queryFn: async ({ pageParam }) => {
+      const response = await superplaneListEventRejections(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          query: {
+            targetType,
+            targetId,
+            limit: 20,
+            ...(pageParam && { before: pageParam })
+          }
+        })
+      )
+      return {
+        rejections: response.data?.rejections || [],
+        totalCount: response.data?.totalCount || 0,
+        hasNextPage: response.data?.hasNextPage || false,
+        lastTimestamp: response.data?.lastTimestamp
+      }
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.lastTimestamp : undefined,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && !!targetType && !!targetId
   })
 }

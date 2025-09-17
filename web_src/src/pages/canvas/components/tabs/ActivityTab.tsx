@@ -25,7 +25,6 @@ export const ActivityTab = ({
   approveStageEvent,
   discardStageEvent,
   cancelStageExecution,
-  executionRunning,
   onChangeTab,
   organizationId,
   isLoading
@@ -84,8 +83,6 @@ export const ActivityTab = ({
               .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
               .map((event) => {
                 const sourceEvent = event.triggerEvent;
-                const plainEventPayload = sourceEvent?.raw;
-                const plainEventHeaders = sourceEvent?.headers;
 
                 return (
                   <MessageItem
@@ -94,10 +91,7 @@ export const ActivityTab = ({
                     selectedStage={selectedStage}
                     onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
                     onCancel={(eventId) => discardStageEvent(eventId, selectedStage.metadata!.id!)}
-                    executionRunning={executionRunning}
                     sourceEvent={sourceEvent}
-                    plainEventPayload={plainEventPayload}
-                    plainEventHeaders={plainEventHeaders}
                   />
                 );
               })
