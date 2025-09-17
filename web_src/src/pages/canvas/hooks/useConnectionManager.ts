@@ -75,18 +75,18 @@ export function useConnectionManager({ connections, setConnections, currentEntit
 
   const validateConnection = useCallback((connection: SuperplaneConnection): string[] => {
     const errors: string[] = [];
-    
+
     if (!connection.name || connection.name.trim() === '') {
       errors.push('Connection name is required');
     }
-    
+
     if (!connection.type) {
       errors.push('Connection type is required');
     }
-    
+
     if (connection.filters && connection.filters.length > 0) {
       const emptyFilters: number[] = [];
-      
+
       connection.filters.forEach((filter, index) => {
         if (filter.type === 'FILTER_TYPE_DATA') {
           if (!filter.data?.expression || filter.data.expression.trim() === '') {
@@ -98,7 +98,7 @@ export function useConnectionManager({ connections, setConnections, currentEntit
           }
         }
       });
-      
+
       if (emptyFilters.length > 0) {
         if (emptyFilters.length === 1) {
           errors.push(`Filter ${emptyFilters[0]} is incomplete - all filter fields must be filled`);
@@ -107,8 +107,28 @@ export function useConnectionManager({ connections, setConnections, currentEntit
         }
       }
     }
-    
+
     return errors;
+  }, []);
+
+  const getConnectionFilterErrors = useCallback((connection: SuperplaneConnection): number[] => {
+    const emptyFilters: number[] = [];
+
+    if (connection.filters && connection.filters.length > 0) {
+      connection.filters.forEach((filter, index) => {
+        if (filter.type === 'FILTER_TYPE_DATA') {
+          if (!filter.data?.expression || filter.data.expression.trim() === '') {
+            emptyFilters.push(index + 1);
+          }
+        } else if (filter.type === 'FILTER_TYPE_HEADER') {
+          if (!filter.header?.expression || filter.header.expression.trim() === '') {
+            emptyFilters.push(index + 1);
+          }
+        }
+      });
+    }
+
+    return emptyFilters;
   }, []);
 
   return {
@@ -118,6 +138,7 @@ export function useConnectionManager({ connections, setConnections, currentEntit
     removeFilter,
     toggleFilterOperator,
     validateConnection,
+    getConnectionFilterErrors,
     getConnectionOptions
   };
 }
