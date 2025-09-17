@@ -400,9 +400,9 @@ func PendingExecutionResources() ([]ExecutionResource, error) {
 	return resources, nil
 }
 
-func (e *ExecutionResource) Finish(result string) error {
+func (r *ExecutionResource) Finish(result string) error {
 	return database.Conn().
-		Model(e).
+		Model(r).
 		Clauses(clause.Returning{}).
 		Update("state", ExecutionResourceFinished).
 		Update("result", result).
@@ -410,21 +410,21 @@ func (e *ExecutionResource) Finish(result string) error {
 		Error
 }
 
-func (e *ExecutionResource) UpdatePollingTimestamp() error {
+func (r *ExecutionResource) UpdatePollingMetadata() error {
 	return database.Conn().
-		Model(e).
+		Model(r).
 		Clauses(clause.Returning{}).
 		Update("last_polled_at", time.Now()).
 		Update("updated_at", time.Now()).
 		Error
 }
 
-func (e *ExecutionResource) ShouldPoll(pollDelay time.Duration) bool {
-	if e.LastPolledAt == nil {
+func (r *ExecutionResource) ShouldPoll(pollDelay time.Duration) bool {
+	if r.LastPolledAt == nil {
 		return true
 	}
 
-	return time.Since(*e.LastPolledAt) >= pollDelay
+	return time.Since(*r.LastPolledAt) >= pollDelay
 }
 
 func (e *StageExecution) Resources() ([]ExecutionResource, error) {
@@ -442,13 +442,13 @@ func (e *StageExecution) Resources() ([]ExecutionResource, error) {
 	return resources, nil
 }
 
-func (e *ExecutionResource) FindIntegration() (*Integration, error) {
+func (r *ExecutionResource) FindIntegration() (*Integration, error) {
 	var integration Integration
 
 	err := database.Conn().
 		Table("resources").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
-		Where("resources.id = ?", e.ParentResourceID).
+		Where("resources.id = ?", r.ParentResourceID).
 		Select("integrations.*").
 		First(&integration).
 		Error
@@ -460,11 +460,11 @@ func (e *ExecutionResource) FindIntegration() (*Integration, error) {
 	return &integration, nil
 }
 
-func (e *ExecutionResource) FindParentResource() (*Resource, error) {
+func (r *ExecutionResource) FindParentResource() (*Resource, error) {
 	var resource Resource
 
 	err := database.Conn().
-		Where("id = ?", e.ParentResourceID).
+		Where("id = ?", r.ParentResourceID).
 		First(&resource).
 		Error
 

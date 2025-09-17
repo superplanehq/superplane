@@ -102,11 +102,12 @@ func (w *ExecutionPoller) CheckExecutionStatus(logger *log.Entry, execution *mod
 	// something went wrong, just finish the execution with an error.
 	//
 	if len(resources) == 0 {
+		logger.Errorf("Execution started but has no resources - marking it as failed")
 		return w.finishExecution(logger, stage, execution, models.ResultFailed)
 	}
 
 	//
-	// Poll the execution resources statuses, updating them in the database.
+	// Poll the execution resources statuses, if needed.
 	//
 	err = w.updateResourceStatuses(logger, resources)
 	if err != nil {
@@ -218,7 +219,6 @@ func (w *ExecutionPoller) updateResourceStatus(logger *log.Entry, resource *mode
 
 	//
 	// We don't poll on every iteration to avoid rate limiting issues with third-party APIs.
-	// If we shouldn't check the status yet, just return what we currently have.
 	//
 	if !resource.ShouldPoll(ExecutionResourcePollingInterval) {
 		return nil
@@ -246,10 +246,11 @@ func (w *ExecutionPoller) updateResourceStatus(logger *log.Entry, resource *mode
 
 	//
 	// Resource is not finished yet, no need to update anything in the database.
+	// Here, we update the polling metadata to avoid polling too often.
 	//
 	if !resource.Finished() {
 		logger.Infof("Resource %s not finished yet", resource.Id())
-		return resource.UpdatePollingTimestamp()
+		return resource.UpdatePollingMetadata()
 	}
 
 	//
