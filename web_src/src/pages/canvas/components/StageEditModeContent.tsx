@@ -1081,26 +1081,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   <InlineEditor
                     isEditing={connectionsEditor.editingIndex === index}
                     onSave={handleConnectionSave}
-                    onCancel={() => connectionsEditor.cancelEdit(index, (item) => {
-                      if (!item.name || item.name.trim() === '') {
-                        return true;
-                      }
-
-                      if (item.filters && item.filters.length > 0) {
-                        const hasIncompleteFilters = item.filters.some(filter => {
-                          if (filter.type === 'FILTER_TYPE_DATA') {
-                            return !filter.data?.expression || filter.data.expression.trim() === '';
-                          }
-                          if (filter.type === 'FILTER_TYPE_HEADER') {
-                            return !filter.header?.expression || filter.header.expression.trim() === '';
-                          }
-                          return false;
-                        });
-                        return hasIncompleteFilters;
-                      }
-
-                      return false;
-                    })}
+                    onCancel={() => connectionsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
                     onEdit={() => connectionsEditor.startEdit(index)}
                     onDelete={() => handleConnectionDelete(index, connection)}
                     displayName={connection.name || `Connection ${index + 1}`}
