@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import debounce from 'lodash.debounce';
 import { StageNodeType } from '@/canvas/types/flow';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
 import { useSecrets } from '../hooks/useSecrets';
@@ -24,6 +25,8 @@ interface StageEditModeContentProps {
   currentStageId?: string;
   canvasId: string;
   organizationId: string;
+  isNewStage?: boolean;
+  dirtyByUser?: boolean;
   onDataChange?: (data: {
     name: string;
     description?: string;
@@ -37,6 +40,7 @@ interface StageEditModeContentProps {
     isValid: boolean
   }) => void;
   onTriggerSectionValidation?: { current: ((hasFieldErrors?: boolean) => void) | null };
+  onStageNameChange?: (name: string) => void;
 }
 
 interface ParameterWithId {
@@ -46,7 +50,7 @@ interface ParameterWithId {
 }
 
 
-export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, onDataChange, onTriggerSectionValidation }: StageEditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -99,6 +103,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }));
   });
   const [nextIdCounter, setNextIdCounter] = useState(1);
+  const resourceInputRef = useRef<HTMLInputElement>(null);
+  const hasAutoFocused = useRef(false);
 
   const generateId = useCallback(() => {
     const id = `param_${nextIdCounter}`;
@@ -227,6 +233,42 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     const selectedSecret = allSecrets.find(secret => secret.name === secretName);
     return selectedSecret ? Object.keys(selectedSecret.data) : [];
   };
+
+  const generateStageName = (resourceName: string, resourceType?: string) => {
+    if (!resourceName || !resourceType) return '';
+    return `Run: ${resourceName}`;
+  };
+
+  // Debounced auto-generation to prevent input interference
+  const debouncedAutoGeneration = useCallback(
+    debounce((resourceName: string, resourceType: string) => {
+      if (isNewStage && !dirtyByUser && onStageNameChange) {
+        const generatedName = generateStageName(resourceName, resourceType);
+        if (generatedName) {
+          onStageNameChange(generatedName);
+        }
+      }
+    }, 300),
+    [isNewStage, dirtyByUser, onStageNameChange]
+  );
+
+  // Auto focus on resource input for new stages (only once)
+  useEffect(() => {
+    if (isNewStage && executor.resource?.type && !hasAutoFocused.current) {
+      const attemptFocus = () => {
+        if (resourceInputRef.current) {
+          resourceInputRef.current.focus();
+          hasAutoFocused.current = true;
+          console.log('Auto focused on resource input');
+        } else {
+          // Retry if element not ready yet
+          setTimeout(attemptFocus, 100);
+        }
+      };
+
+      setTimeout(attemptFocus, 200);
+    }
+  }, [isNewStage, executor.resource?.type]);
 
   // Validation functions
   const validateInput = (input: SuperplaneInputDefinition, index: number): string[] => {
@@ -507,6 +549,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     },
   });
 
+
   const triggerSectionValidation = useCallback((hasFieldErrors: boolean = false) => {
     const errors = validateAllFields();
 
@@ -570,14 +613,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     const executorErrors = validateExecutor(executor);
 
-    if (Object.keys(executorErrors).length > 0) {
+    if (Object.keys(executorErrors).length > 0 || (isNewStage && executor.resource?.type)) {
       sectionsToOpen.push('executor');
       setValidationErrors(executorErrors);
     }
 
     setOpenSections(sectionsToOpen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setOpenSections]);
+  }, [setOpenSections, isNewStage, executor.resource?.type]);
 
   // Connection management
   const connectionManager = useConnectionManager({
@@ -1836,6 +1879,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       error={validationErrors.executorProject || fieldErrors.project}
                     >
                       <input
+                        ref={resourceInputRef}
                         type="text"
                         value={(executor.resource?.name as string) || ''}
                         onChange={(e) => {
@@ -1843,6 +1887,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                             updateExecutorResource('type', 'project');
 
                           updateExecutorResource('name', e.target.value);
+
+                          debouncedAutoGeneration(e.target.value, 'project');
+
                           if (fieldErrors.project) {
                             setFieldErrors(prev => {
                               // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1990,13 +2037,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       error={validationErrors.executorRepository || fieldErrors.repository}
                     >
                       <input
+                        ref={resourceInputRef}
                         type="text"
                         value={(executor.resource?.name as string) || ''}
                         onChange={(e) => {
                           if (executor.resource?.type !== 'repository')
                             updateExecutorResource('type', 'repository');
 
-                          updateExecutorResource('name', e.target.value)
+                          updateExecutorResource('name', e.target.value);
+
+                          debouncedAutoGeneration(e.target.value, 'repository');
 
                           setFieldErrors(prev => ({ ...prev, repository: '' }));
                         }}
