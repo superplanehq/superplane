@@ -2292,7 +2292,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       value={executor.name || ''}
                       onChange={(value) => setExecutor(prev => ({ ...prev, name: value }))}
                       options={getInputOptions()}
-                      placeholder={executor.type === 'http' ? 'API call' : '${{ inputs.VERSION }} deployment'}
+                      placeholder={'${{ inputs.VERSION }} deployment'}
                       className="text-sm"
                     />
                     <ProTip show />
