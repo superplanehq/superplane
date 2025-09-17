@@ -1040,11 +1040,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     const savedConnection = savedConnectionIndex !== null ?
       connections[savedConnectionIndex] : null;
 
-    // Validate the connection before saving
     if (savedConnection && savedConnectionIndex !== null) {
       const connectionErrors = connectionManager.validateConnection(savedConnection);
       if (connectionErrors.length > 0) {
-        // Update validation errors to show filter-specific errors
         setValidationErrors(prev => ({
           ...prev,
           [`connection_${savedConnectionIndex}`]: connectionErrors.join(', ')
@@ -1053,15 +1051,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           ...prev,
           [savedConnectionIndex]: connectionManager.getConnectionFilterErrors(savedConnection)
         }));
-        return; // Don't save if there are validation errors
+        return;
       } else {
-        // Clear any existing validation errors for this connection
         setValidationErrors(prev => {
           const newErrors = { ...prev };
           delete newErrors[`connection_${savedConnectionIndex}`];
           return newErrors;
         });
-        // Clear filter errors for this connection
+
         setConnectionFilterErrors(prev => {
           const newErrors = { ...prev };
           delete newErrors[savedConnectionIndex];
