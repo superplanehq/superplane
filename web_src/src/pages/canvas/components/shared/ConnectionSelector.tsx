@@ -2,6 +2,7 @@ import { SuperplaneConnection, SuperplaneConnectionType, SuperplaneFilter } from
 import { ValidationField } from './ValidationField';
 import { useConnectionOptions } from '../../hooks/useConnectionOptions';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { FiltersTooltip } from './FiltersTooltip';
 
 interface ConnectionSelectorProps {
   connection: SuperplaneConnection;
@@ -94,7 +95,10 @@ export function ConnectionSelector({
       {showFilters && (
         <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
           <div className="flex justify-between items-center mb-2">
-            <label className="text-sm font-medium text-gray-900 dark:text-zinc-100">Filters</label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-900 dark:text-zinc-100">Filters</label>
+              <FiltersTooltip />
+            </div>
           </div>
           <div className="space-y-2">
             {(connection.filters || []).map((filter, filterIndex) => {
