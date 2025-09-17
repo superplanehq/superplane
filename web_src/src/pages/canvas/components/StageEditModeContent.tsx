@@ -1854,17 +1854,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               }
             >
               <div className="space-y-4">
-                <ValidationField label="Executor name">
-                  <input
-                    type="text"
-                    value={executor.name || ''}
-                    onChange={(e) => setExecutor(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="${{ inputs.VERSION }} deployment"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-
-                </ValidationField>
-
                 {executor.type === 'semaphore' && (
                   <div className="space-y-4">
                     <ValidationField
@@ -1989,7 +1978,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Parameters">
+                    <ValidationField label="Pipeline Parameters (optional)">
                       <div className="space-y-2">
                         {semaphoreParameters.map((param) => (
                           <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2118,7 +2107,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Inputs">
+                    <ValidationField label="Inputs (optional)">
                       <div className="space-y-2">
                         {githubInputs.map((input) => (
                           <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2192,7 +2181,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Headers">
+                    <ValidationField label="Headers (optional)">
                       <div className="space-y-2">
                         {httpHeaders.map((header) => (
                           <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2243,6 +2232,19 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
                   </div>
+                )}
+
+                {/* Unified Execution Name Field - appears for all executor types */}
+                {executor.type && (
+                  <ValidationField label="Execution name (optional)">
+                    <input
+                      type="text"
+                      value={executor.name || ''}
+                      onChange={(e) => setExecutor(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder={executor.type === 'http' ? 'API call' : '${{ inputs.VERSION }} deployment'}
+                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                    />
+                  </ValidationField>
                 )}
               </div>
             </EditableAccordionSection>
