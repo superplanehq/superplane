@@ -40,6 +40,7 @@ export function EventSourceEditModeContent({
   shouldValidate = false,
   onValidationResult
 }: EventSourceEditModeContentProps) {
+  const setFocusedNodeId = useCanvasStore(state => state.setFocusedNodeId);
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
   const [resourceType, setResourceType] = useState(data.resource?.type);
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
@@ -440,7 +441,12 @@ curl -X POST \\
   };
 
   return (
-    <div className="w-full h-full text-left border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+    <div className="w-full h-full text-left border-t border-gray-200 dark:border-gray-700" onClick={(e) => {
+      e.stopPropagation();
+      if (data.id) {
+        setFocusedNodeId(data.id);
+      }
+    }}>
       <div className="">
         {requireIntegration && availableIntegrations.length === 0 && (
           <IntegrationZeroState

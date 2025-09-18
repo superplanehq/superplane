@@ -201,22 +201,27 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setFocusedNodeId: (stageId: string | null) => {
     set({ focusedNodeId: stageId });
+    get().syncToReactFlow();
   },
 
   cleanFocusedNodeId: () => {
     set({ focusedNodeId: null });
+    get().syncToReactFlow();
   },
 
   setEditingStage: (stageId: string | null) => {
     set({ editingStageId: stageId });
+    get().syncToReactFlow();
   },
 
   setEditingEventSource: (eventSourceId: string | null) => {
     set({ editingEventSourceId: eventSourceId });
+    get().syncToReactFlow();
   },
 
   setEditingConnectionGroup: (connectionGroupId: string | null) => {
     set({ editingConnectionGroupId: connectionGroupId });
+    get().syncToReactFlow();
   },
 
   updateWebSocketConnectionStatus: (status) => {
@@ -376,12 +381,22 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   syncToReactFlow: async (options?: { autoLayout?: boolean }) => {
-    const { stages, connectionGroups, eventSources, nodePositions, approveStageEvent } = get();
+    const {
+      stages,
+      connectionGroups,
+      eventSources,
+      nodePositions,
+      approveStageEvent,
+      editingStageId,
+      editingEventSourceId,
+      editingConnectionGroupId,
+      focusedNodeId
+    } = get();
 
     // Use the transformer functions from flowTransformers.ts
-    const stageNodes = transformStagesToNodes(stages, nodePositions, approveStageEvent);
-    const connectionGroupNodes = transformConnectionGroupsToNodes(connectionGroups, nodePositions);
-    const eventSourceNodes = transformEventSourcesToNodes(eventSources, nodePositions);
+    const stageNodes = transformStagesToNodes(stages, nodePositions, approveStageEvent, editingStageId, focusedNodeId);
+    const connectionGroupNodes = transformConnectionGroupsToNodes(connectionGroups, nodePositions, editingConnectionGroupId, focusedNodeId);
+    const eventSourceNodes = transformEventSourcesToNodes(eventSources, nodePositions, editingEventSourceId, focusedNodeId);
 
     // Get edges based on connections
     const edges = transformToEdges(stages, connectionGroups, eventSources);
