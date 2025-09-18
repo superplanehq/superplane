@@ -132,7 +132,7 @@ export function Canvas() {
   ) => {
     const stages: Stage[] = rawStages.map(stage => {
       const queue = stage.status?.queue?.items || [];
-      
+
       const executions = [];
       if (stage.status?.lastExecution) {
         executions.push(stage.status.lastExecution);
