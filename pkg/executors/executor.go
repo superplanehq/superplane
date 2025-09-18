@@ -13,6 +13,7 @@ type ExecutionParameters struct {
 	ExecutionID string
 	StageID     string
 	Token       string
+	OutputNames []string
 }
 
 type Response interface {

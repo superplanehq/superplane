@@ -391,6 +391,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       if (!executor.spec?.url || !urlRegex.test(executor.spec.url as string)) {
         errors.executorUrl = 'Valid URL is required';
       }
+    } else if (executor.type === 'noop') {
+      // NoOp executor doesn't require any configuration
     }
 
     return errors;
@@ -650,14 +652,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     const executorErrors = validateExecutor(executor);
 
-    if (Object.keys(executorErrors).length > 0 || (isNewStage && executor.resource?.type)) {
+    if (Object.keys(executorErrors).length > 0 || (isNewStage && executor.resource?.type && executor.type !== 'noop')) {
       sectionsToOpen.push('executor');
       setValidationErrors(executorErrors);
     }
 
     setOpenSections(sectionsToOpen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setOpenSections, isNewStage, executor.resource?.type]);
+  }, [setOpenSections, isNewStage, executor.resource?.type, executor.type]);
 
   // Connection management
   const connectionManager = useConnectionManager({

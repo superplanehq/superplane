@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/executors/http"
+	"github.com/superplanehq/superplane/pkg/executors/noop"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
@@ -61,6 +62,7 @@ func (r *Registry) Init() {
 	// Register the executors
 	//
 	r.Executors[models.ExecutorTypeHTTP] = http.NewHTTPExecutor()
+	r.Executors[models.ExecutorTypeNoOp] = noop.NewNoOpExecutor()
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {
