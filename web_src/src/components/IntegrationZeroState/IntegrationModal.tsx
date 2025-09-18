@@ -15,7 +15,7 @@ import { useSecrets, useCreateSecret } from '../../pages/canvas/hooks/useSecrets
 import { GitHubIntegrationForm } from './GitHubIntegrationForm';
 import { SemaphoreIntegrationForm } from './SemaphoreIntegrationForm';
 import { ApiTokenForm } from './ApiTokenForm';
-import { useIntegrationForm } from './useIntegrationForm';
+import { NEW_SECRET_NAME, useIntegrationForm } from './useIntegrationForm';
 
 interface IntegrationModalProps {
   open: boolean;
@@ -48,8 +48,6 @@ export function IntegrationModal({
     setIntegrationData,
     apiTokenTab,
     setApiTokenTab,
-    newSecretName,
-    setNewSecretName,
     newSecretToken,
     setNewSecretToken,
     errors,
@@ -84,14 +82,14 @@ export function IntegrationModal({
           const secretData = {
             name: `${integrationData.name.trim()}-api-key`,
             environmentVariables: [{
-              name: newSecretName,
+              name: NEW_SECRET_NAME,
               value: newSecretToken
             }]
           };
 
           await createSecretMutation.mutateAsync(secretData);
           secretName = secretData.name;
-          secretKey = newSecretName;
+          secretKey = NEW_SECRET_NAME;
         } catch {
           setErrors({ apiToken: 'Failed to create a secret, please try to create secret manually and import' });
           return;
@@ -150,8 +148,6 @@ export function IntegrationModal({
             setErrors={setErrors}
             apiTokenTab={apiTokenTab}
             setApiTokenTab={setApiTokenTab}
-            newSecretName={newSecretName}
-            setNewSecretName={setNewSecretName}
             newSecretToken={newSecretToken}
             setNewSecretToken={setNewSecretToken}
             secrets={secrets}
@@ -165,8 +161,6 @@ export function IntegrationModal({
             setErrors={setErrors}
             apiTokenTab={apiTokenTab}
             setApiTokenTab={setApiTokenTab}
-            newSecretName={newSecretName}
-            setNewSecretName={setNewSecretName}
             newSecretToken={newSecretToken}
             setNewSecretToken={setNewSecretToken}
             secrets={secrets}
@@ -181,8 +175,6 @@ export function IntegrationModal({
           setErrors={setErrors}
           apiTokenTab={apiTokenTab}
           setApiTokenTab={setApiTokenTab}
-          newSecretName={newSecretName}
-          setNewSecretName={setNewSecretName}
           newSecretToken={newSecretToken}
           setNewSecretToken={setNewSecretToken}
           secrets={secrets}
