@@ -200,7 +200,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   setFocusedNodeId: (stageId: string | null) => {
-    set({ focusedNodeId: stageId });
+    const allNodes = get().nodes;
+    const updatedNodes = allNodes.map(node => {
+      if (node.id === stageId) {
+        return { ...node, selected: true };
+      }
+      return { ...node, selected: false };
+    });
+    set({ nodes: updatedNodes, focusedNodeId: stageId });
   },
 
   cleanFocusedNodeId: () => {

@@ -22,6 +22,7 @@ import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
 import { ParametersTooltip } from '@/components/Tooltip';
 import { showErrorToast } from '@/utils/toast';
 import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
+import { NodeContentWrapper } from './shared/NodeContentWrapper';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -1155,7 +1156,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   }, [inputsEditor, connections, inputMappings, setInputMappings, inputs]);
 
   return (
-    <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
+    <NodeContentWrapper nodeId={currentStageId}>
       <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-1')}>
         {/* Show zero state if executor type requires integrations but none are available */}
         {requireIntegration && !hasRequiredIntegrations && (
@@ -2321,6 +2322,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           </>
         )}
       </div>
-    </div>
+    </NodeContentWrapper>
   );
 }
