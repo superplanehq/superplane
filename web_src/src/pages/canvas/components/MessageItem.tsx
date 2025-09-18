@@ -132,6 +132,18 @@ const MessageItem = React.memo(({
                 {getRelativeTime()}
               </span>
             )}
+            {event.state === 'STATE_PENDING' && onCancel && (
+              <span
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCancel();
+                }}
+                className="text-xs text-black dark:text-zinc-400 cursor-pointer underline"
+              >
+                Discard
+              </span>
+            )}
             <MaterialSymbol
               name={isExpanded ? 'expand_less' : 'expand_more'}
               size="xl"
@@ -358,11 +370,10 @@ const MessageItem = React.memo(({
               <MaterialSymbol name="schedule" size="md" className="text-orange-700 dark:text-orange-200 mr-2" />
               <span className="text-xs text-gray-700 dark:text-zinc-400">{formatTimeWindow()}</span>
             </div>
-            <span onClick={() => onCancel?.(event.id || '')} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Cancel</span>
+            <span onClick={() => onCancel?.(event.id || '')} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Discard</span>
           </div>
         </div>
       )}
-
 
       {isDropdownOpen && (
         <div

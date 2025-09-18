@@ -20,8 +20,6 @@ export function ApiTokenForm({
   setErrors,
   apiTokenTab,
   setApiTokenTab,
-  newSecretName,
-  setNewSecretName,
   newSecretToken,
   setNewSecretToken,
   secrets,
@@ -153,26 +151,9 @@ export function ApiTokenForm({
               </Text>
 
               <Field className='flex items-start gap-3 w-full'>
-                <div className='w-50'>
+                <div className='w-full'>
                   <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
-                    Key name
-                  </Label>
-                  <Input
-                    type="text"
-                    value={newSecretName}
-                    onChange={(e) => {
-                      setNewSecretName(e.target.value);
-                      if (errors.secretName) {
-                        setErrors(prev => ({ ...prev, secretName: undefined }));
-                      }
-                    }}
-                    className="w-full"
-                  />
-                  {errors.secretName && <ErrorMessage>{errors.secretName}</ErrorMessage>}
-                </div>
-                <div className='w-50'>
-                  <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
-                    Value
+                    Secret Value
                   </Label>
                   <Input
                     type="password"
