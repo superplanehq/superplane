@@ -22,6 +22,8 @@ export type EventSourceEventType = {
 
 export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
 
+export type ExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR' | 'RESULT_REASON_MISSING_OUTPUTS';
+
 export type GroupByField = {
     name?: string;
     expression?: string;
@@ -615,6 +617,8 @@ export type SuperplaneExecution = {
     id?: string;
     state?: SuperplaneExecutionState;
     result?: ExecutionResult;
+    resultReason?: ExecutionResultReason;
+    resultMessage?: string;
     createdAt?: string;
     startedAt?: string;
     cancelledAt?: string;

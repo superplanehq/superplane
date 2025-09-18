@@ -24,6 +24,9 @@ const (
 	ResultPassed    = "passed"
 	ResultFailed    = "failed"
 	ResultCancelled = "cancelled"
+
+	ResultReasonError          = "error"
+	ResultReasonMissingOutputs = "missing-outputs"
 )
 
 var (
@@ -32,19 +35,21 @@ var (
 )
 
 type StageExecution struct {
-	ID           uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID     uuid.UUID
-	StageID      uuid.UUID
-	StageEventID uuid.UUID
-	State        string
-	Result       string
-	CreatedAt    *time.Time
-	UpdatedAt    *time.Time
-	StartedAt    *time.Time
-	FinishedAt   *time.Time
-	Outputs      datatypes.JSONType[map[string]any]
-	CancelledAt  *time.Time
-	CancelledBy  *uuid.UUID
+	ID            uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID      uuid.UUID
+	StageID       uuid.UUID
+	StageEventID  uuid.UUID
+	State         string
+	Result        string
+	ResultReason  string
+	ResultMessage string
+	CreatedAt     *time.Time
+	UpdatedAt     *time.Time
+	StartedAt     *time.Time
+	FinishedAt    *time.Time
+	Outputs       datatypes.JSONType[map[string]any]
+	CancelledAt   *time.Time
+	CancelledBy   *uuid.UUID
 
 	StageEvent *StageEvent `gorm:"foreignKey:StageEventID;references:ID"`
 }
@@ -121,18 +126,18 @@ func (e *StageExecution) Start() error {
 		Error
 }
 
-func (e *StageExecution) Finish(stage *Stage, result string) (*Event, error) {
+func (e *StageExecution) Finish(stage *Stage, result, reason, message string) (*Event, error) {
 	var event *Event
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		event, err = e.FinishInTransaction(tx, stage, result)
+		event, err = e.FinishInTransaction(tx, stage, result, reason, message)
 		return err
 	})
 
 	return event, err
 }
 
-func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result string) (*Event, error) {
+func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result, reason, message string) (*Event, error) {
 	now := time.Now()
 
 	//
@@ -141,6 +146,8 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 	err := tx.Model(e).
 		Clauses(clause.Returning{}).
 		Update("result", result).
+		Update("result_reason", reason).
+		Update("result_message", message).
 		Update("state", ExecutionFinished).
 		Update("updated_at", &now).
 		Update("finished_at", &now).
@@ -212,19 +219,19 @@ func (e *StageExecution) Finished(resources []*ExecutionResource) bool {
 	return true
 }
 
-func (e *StageExecution) GetResult(stage *Stage, resources []*ExecutionResource) string {
+func (e *StageExecution) GetResult(stage *Stage, resources []*ExecutionResource) (string, string, string) {
 	for _, r := range resources {
 		if !r.Successful() {
-			return ResultFailed
+			return ResultFailed, ResultReasonError, fmt.Sprintf("%s failed: %s", r.Type(), r.Id())
 		}
 	}
 
 	missingOutputs := stage.MissingRequiredOutputs(e.Outputs.Data())
 	if len(missingOutputs) > 0 {
-		return ResultFailed
+		return ResultFailed, ResultReasonMissingOutputs, fmt.Sprintf("missing outputs: %v", missingOutputs)
 	}
 
-	return ResultPassed
+	return ResultPassed, "", ""
 }
 
 func (e *StageExecution) IntegrationResource(externalID string) (*ExecutionIntegrationResource, error) {

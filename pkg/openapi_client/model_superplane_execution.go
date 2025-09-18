@@ -24,6 +24,8 @@ type SuperplaneExecution struct {
 	Id *string `json:"id,omitempty"`
 	State *SuperplaneExecutionState `json:"state,omitempty"`
 	Result *ExecutionResult `json:"result,omitempty"`
+	ResultReason *ExecutionResultReason `json:"resultReason,omitempty"`
+	ResultMessage *string `json:"resultMessage,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	CancelledAt *time.Time `json:"cancelledAt,omitempty"`
@@ -43,6 +45,8 @@ func NewSuperplaneExecution() *SuperplaneExecution {
 	this.State = &state
 	var result ExecutionResult = EXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
+	var resultReason ExecutionResultReason = EXECUTIONRESULTREASON_RESULT_REASON_OK
+	this.ResultReason = &resultReason
 	return &this
 }
 
@@ -55,6 +59,8 @@ func NewSuperplaneExecutionWithDefaults() *SuperplaneExecution {
 	this.State = &state
 	var result ExecutionResult = EXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
+	var resultReason ExecutionResultReason = EXECUTIONRESULTREASON_RESULT_REASON_OK
+	this.ResultReason = &resultReason
 	return &this
 }
 
@@ -152,6 +158,70 @@ func (o *SuperplaneExecution) HasResult() bool {
 // SetResult gets a reference to the given ExecutionResult and assigns it to the Result field.
 func (o *SuperplaneExecution) SetResult(v ExecutionResult) {
 	o.Result = &v
+}
+
+// GetResultReason returns the ResultReason field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetResultReason() ExecutionResultReason {
+	if o == nil || IsNil(o.ResultReason) {
+		var ret ExecutionResultReason
+		return ret
+	}
+	return *o.ResultReason
+}
+
+// GetResultReasonOk returns a tuple with the ResultReason field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetResultReasonOk() (*ExecutionResultReason, bool) {
+	if o == nil || IsNil(o.ResultReason) {
+		return nil, false
+	}
+	return o.ResultReason, true
+}
+
+// HasResultReason returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasResultReason() bool {
+	if o != nil && !IsNil(o.ResultReason) {
+		return true
+	}
+
+	return false
+}
+
+// SetResultReason gets a reference to the given ExecutionResultReason and assigns it to the ResultReason field.
+func (o *SuperplaneExecution) SetResultReason(v ExecutionResultReason) {
+	o.ResultReason = &v
+}
+
+// GetResultMessage returns the ResultMessage field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetResultMessage() string {
+	if o == nil || IsNil(o.ResultMessage) {
+		var ret string
+		return ret
+	}
+	return *o.ResultMessage
+}
+
+// GetResultMessageOk returns a tuple with the ResultMessage field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetResultMessageOk() (*string, bool) {
+	if o == nil || IsNil(o.ResultMessage) {
+		return nil, false
+	}
+	return o.ResultMessage, true
+}
+
+// HasResultMessage returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasResultMessage() bool {
+	if o != nil && !IsNil(o.ResultMessage) {
+		return true
+	}
+
+	return false
+}
+
+// SetResultMessage gets a reference to the given string and assigns it to the ResultMessage field.
+func (o *SuperplaneExecution) SetResultMessage(v string) {
+	o.ResultMessage = &v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
@@ -396,6 +466,12 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Result) {
 		toSerialize["result"] = o.Result
+	}
+	if !IsNil(o.ResultReason) {
+		toSerialize["resultReason"] = o.ResultReason
+	}
+	if !IsNil(o.ResultMessage) {
+		toSerialize["resultMessage"] = o.ResultMessage
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt

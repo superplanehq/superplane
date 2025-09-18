@@ -890,16 +890,24 @@ message Execution {
     RESULT_CANCELLED = 3;
   }
 
+  enum ResultReason {
+    RESULT_REASON_OK = 0;
+    RESULT_REASON_ERROR = 1;
+    RESULT_REASON_MISSING_OUTPUTS = 2;
+  }
+
   string id = 1;
   State state = 2;
   Result result = 3;
-  google.protobuf.Timestamp created_at = 4;
-  google.protobuf.Timestamp started_at = 5;
-  google.protobuf.Timestamp cancelled_at = 6;
-  google.protobuf.Timestamp finished_at = 7;
-  repeated OutputValue outputs = 8;
-  repeated ExecutionResource resources = 9;
-  StageEvent stage_event = 10;
+  ResultReason result_reason = 4;
+  string result_message = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp started_at = 7;
+  google.protobuf.Timestamp cancelled_at = 8;
+  google.protobuf.Timestamp finished_at = 9;
+  repeated OutputValue outputs = 10;
+  repeated ExecutionResource resources = 11;
+  StageEvent stage_event = 12;
 }
 
 message ExecutionResource {

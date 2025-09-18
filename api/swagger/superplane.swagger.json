@@ -2754,6 +2754,15 @@
       ],
       "default": "RESULT_UNKNOWN"
     },
+    "ExecutionResultReason": {
+      "type": "string",
+      "enum": [
+        "RESULT_REASON_OK",
+        "RESULT_REASON_ERROR",
+        "RESULT_REASON_MISSING_OUTPUTS"
+      ],
+      "default": "RESULT_REASON_OK"
+    },
     "GroupByField": {
       "type": "object",
       "properties": {
@@ -4123,6 +4132,12 @@
         },
         "result": {
           "$ref": "#/definitions/ExecutionResult"
+        },
+        "resultReason": {
+          "$ref": "#/definitions/ExecutionResultReason"
+        },
+        "resultMessage": {
+          "type": "string"
         },
         "createdAt": {
           "type": "string",
