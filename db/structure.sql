@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VCascHXdu6a17mXEhJIVViLeSe7u1SAlC2URwpoQTsqd5vfcrYgNCdR3ODGWwiM
+\restrict AhJtjeMQDsU8dMO1jRbOySm3EkUjyPi3k12wmTB7r7W6bVQbUlQ2SAFf4GRT9jx
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -439,7 +439,9 @@ CREATE TABLE public.stage_executions (
     started_at timestamp without time zone,
     finished_at timestamp without time zone,
     cancelled_at timestamp without time zone,
-    cancelled_by uuid
+    cancelled_by uuid,
+    result_reason character varying(64),
+    result_message text
 );
 
 
@@ -1153,13 +1155,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VCascHXdu6a17mXEhJIVViLeSe7u1SAlC2URwpoQTsqd5vfcrYgNCdR3ODGWwiM
+\unrestrict AhJtjeMQDsU8dMO1jRbOySm3EkUjyPi3k12wmTB7r7W6bVQbUlQ2SAFf4GRT9jx
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict crZHkDmr9G2p54uxs8jUCMLfJ0gxgJX2K357esTgJedlMckbMbFHpEONTTntijy
+\restrict BZNa4MMueVYeFCg022Y55fssPL4Br96RpZeMWJJeHtwrExfWuwyniI76qsaIPZV
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1181,7 +1183,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250917194419	f
+20250918143015	f
 \.
 
 
@@ -1189,5 +1191,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict crZHkDmr9G2p54uxs8jUCMLfJ0gxgJX2K357esTgJedlMckbMbFHpEONTTntijy
+\unrestrict BZNa4MMueVYeFCg022Y55fssPL4Br96RpZeMWJJeHtwrExfWuwyniI76qsaIPZV
 

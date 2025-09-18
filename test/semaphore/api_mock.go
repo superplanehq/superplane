@@ -67,7 +67,7 @@ func (s *SemaphoreAPIMock) Init() error {
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/workflows") {
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1alpha/plumber-workflows") {
 			s.DescribeWorkflow(w, r)
 			return
 		}
@@ -126,7 +126,7 @@ func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	data, _ := json.Marshal(semaphore.Workflow{InitialPplID: pipeline.ID})
+	data, _ := json.Marshal(semaphore.WorkflowResponse{Workflow: &semaphore.Workflow{InitialPplID: pipeline.ID}})
 	w.Write(data)
 }
 

@@ -29,6 +29,7 @@ docs/EventSourceAPI.md
 docs/EventSourceEventType.md
 docs/ExecutionAPI.md
 docs/ExecutionResult.md
+docs/ExecutionResultReason.md
 docs/GooglerpcStatus.md
 docs/GroupByField.md
 docs/GroupsAPI.md
@@ -204,6 +205,7 @@ model_authorization_permission.go
 model_event_rejection_rejection_reason.go
 model_event_source_event_type.go
 model_execution_result.go
+model_execution_result_reason.go
 model_googlerpc_status.go
 model_group_by_field.go
 model_groups_add_user_to_group_body.go

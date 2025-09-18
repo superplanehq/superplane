@@ -348,7 +348,7 @@ func Test__ExecutionPoller(t *testing.T) {
 				return false
 			}
 
-			return e.State == models.ExecutionFinished && e.Result == models.ResultCancelled
+			return e.State == models.ExecutionFinished && e.Result == models.ResultCancelled && e.ResultReason == models.ResultReasonUser
 		}, 5*time.Second, 200*time.Millisecond)
 
 		//
@@ -431,7 +431,7 @@ func Test__ExecutionPoller(t *testing.T) {
 				return false
 			}
 
-			return e.State == models.ExecutionFinished && e.Result == models.ResultCancelled
+			return e.State == models.ExecutionFinished && e.Result == models.ResultCancelled && e.ResultReason == models.ResultReasonTimeout
 		}, 5*time.Second, 200*time.Millisecond)
 
 		//

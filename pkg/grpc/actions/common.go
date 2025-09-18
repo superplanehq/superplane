@@ -43,6 +43,21 @@ func ExecutionResultToProto(result string) pb.Execution_Result {
 	}
 }
 
+func ExecutionResultReasonToProto(reason string) pb.Execution_ResultReason {
+	switch reason {
+	case models.ResultReasonError:
+		return pb.Execution_RESULT_REASON_ERROR
+	case models.ResultReasonMissingOutputs:
+		return pb.Execution_RESULT_REASON_MISSING_OUTPUTS
+	case models.ResultReasonTimeout:
+		return pb.Execution_RESULT_REASON_TIMEOUT
+	case models.ResultReasonUser:
+		return pb.Execution_RESULT_REASON_USER
+	default:
+		return pb.Execution_RESULT_REASON_OK
+	}
+}
+
 func FindConnectionSourceID(canvasID string, connection *pb.Connection) (*uuid.UUID, error) {
 	switch connection.Type {
 	case pb.Connection_TYPE_STAGE:

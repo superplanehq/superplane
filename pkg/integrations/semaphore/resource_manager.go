@@ -47,13 +47,13 @@ func (i *SemaphoreResourceManager) Status(resourceType, id string, _ integration
 	case ResourceTypeWorkflow:
 		resource, err := i.getWorkflow(id)
 		if err != nil {
-			return nil, fmt.Errorf("workflow %s not found", id)
+			return nil, fmt.Errorf("workflow %s not found: %v", id, err)
 		}
 
 		workflow := resource.(*Workflow)
 		resource, err = i.getPipeline(workflow.InitialPplID)
 		if err != nil {
-			return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
+			return nil, fmt.Errorf("pipeline %s not found: %v", workflow.InitialPplID, err)
 		}
 
 		pipeline := resource.(*Pipeline)
@@ -392,19 +392,19 @@ func (i *SemaphoreResourceManager) listProjects() ([]integrations.Resource, erro
 }
 
 func (i *SemaphoreResourceManager) getWorkflow(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v2/workflows/%s", i.URL, id)
+	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows/%s", i.URL, id)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var workflow Workflow
+	var workflow WorkflowResponse
 	err = json.Unmarshal(responseBody, &workflow)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	return &workflow, nil
+	return workflow.Workflow, nil
 }
 
 func (i *SemaphoreResourceManager) stopWorkflow(id string) error {
@@ -496,6 +496,10 @@ func (i *SemaphoreResourceManager) execRequest(method string, url string, body i
 	}
 
 	return responseBody, nil
+}
+
+type WorkflowResponse struct {
+	Workflow *Workflow `json:"workflow"`
 }
 
 type Workflow struct {
