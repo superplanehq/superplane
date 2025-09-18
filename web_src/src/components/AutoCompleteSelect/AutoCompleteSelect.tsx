@@ -85,16 +85,16 @@ export function AutoCompleteSelect({
     setTimeout(() => {
       setQuery('')
       setIsOpen(false)
-    }, 50)
+    }, 150)
   }
 
   const handleOptionSelect = (optionValue: string) => {
     onChange(optionValue)
-    setIsOpen(false)
-    setQuery('')
     setTimeout(() => {
       inputRef.current?.blur()
-    }, 50)
+      setQuery('')
+      setIsOpen(false)
+    }, 150)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
