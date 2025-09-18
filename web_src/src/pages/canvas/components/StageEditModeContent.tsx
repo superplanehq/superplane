@@ -21,6 +21,7 @@ import { twMerge } from 'tailwind-merge';
 import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
 import { ParametersTooltip } from '@/components/Tooltip';
 import { showErrorToast } from '@/utils/toast';
+import { useCanvasStore } from '../store/canvasStore';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -53,6 +54,8 @@ interface ParameterWithId {
 
 
 export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange }: StageEditModeContentProps) {
+  const setFocusedNodeId = useCanvasStore(state => state.setFocusedNodeId);
+
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -1144,7 +1147,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   }, [inputsEditor, connections, inputMappings, setInputMappings, inputs]);
 
   return (
-    <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
+    <div className="w-full h-full text-left" onClick={(e) => {
+      e.stopPropagation();
+      if (currentStageId) {
+        setFocusedNodeId(currentStageId);
+      }
+    }}>
       <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-1')}>
         {/* Show zero state if executor type requires integrations but none are available */}
         {requireIntegration && !hasRequiredIntegrations && (
