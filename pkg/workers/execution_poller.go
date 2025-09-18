@@ -68,7 +68,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	//
 	if execution.CancelledAt != nil {
 		logger.Info("Execution cancelled")
-		return w.CancelExecution(logger, execution)
+		return w.CancelExecution(logger, execution, models.ResultReasonUser)
 	}
 
 	//
@@ -76,7 +76,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	//
 	if execution.IsTimedOut(w.nowFunc(), w.ExecutionTimeout) {
 		logger.Info("Execution timed out")
-		return w.CancelExecution(logger, execution)
+		return w.CancelExecution(logger, execution, models.ResultReasonTimeout)
 	}
 
 	//
@@ -102,8 +102,8 @@ func (w *ExecutionPoller) CheckExecutionStatus(logger *log.Entry, execution *mod
 	// something went wrong, just finish the execution with an error.
 	//
 	if len(resources) == 0 {
-		logger.Errorf("Execution started but has no resources - marking it as failed")
-		return w.finishExecution(logger, stage, execution, models.ResultFailed)
+		logger.Error("Execution started but no external resources were created")
+		return w.finishExecution(logger, stage, execution, models.ResultFailed, models.ResultReasonError, "Execution started but no external resources were created")
 	}
 
 	//
@@ -123,12 +123,12 @@ func (w *ExecutionPoller) CheckExecutionStatus(logger *log.Entry, execution *mod
 		return nil
 	}
 
-	result := execution.GetResult(stage, resources)
-	return w.finishExecution(logger, stage, execution, result)
+	result, reason, message := execution.GetResult(stage, resources)
+	return w.finishExecution(logger, stage, execution, result, reason, message)
 }
 
-func (w *ExecutionPoller) finishExecution(logger *log.Entry, stage *models.Stage, execution *models.StageExecution, result string) error {
-	event, err := execution.Finish(stage, result)
+func (w *ExecutionPoller) finishExecution(logger *log.Entry, stage *models.Stage, execution *models.StageExecution, result, reason, message string) error {
+	event, err := execution.Finish(stage, result, reason, message)
 	if err != nil {
 		logger.Errorf("Error finishing execution: %v", err)
 		return err
@@ -147,7 +147,7 @@ func (w *ExecutionPoller) finishExecution(logger *log.Entry, stage *models.Stage
 	return nil
 }
 
-func (w *ExecutionPoller) CancelExecution(logger *log.Entry, execution *models.StageExecution) error {
+func (w *ExecutionPoller) CancelExecution(logger *log.Entry, execution *models.StageExecution, reason string) error {
 	resources, err := execution.Resources()
 	if err != nil {
 		return err
@@ -165,7 +165,7 @@ func (w *ExecutionPoller) CancelExecution(logger *log.Entry, execution *models.S
 		return err
 	}
 
-	return w.finishExecution(logger, stage, execution, models.ResultCancelled)
+	return w.finishExecution(logger, stage, execution, models.ResultCancelled, reason, "")
 }
 
 func (w *ExecutionPoller) cancelResource(logger *log.Entry, resource *models.ExecutionResource) error {

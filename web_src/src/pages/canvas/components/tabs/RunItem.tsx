@@ -1,14 +1,17 @@
 import React, { JSX } from 'react';
-import { ExecutionResult, SuperplaneExecutionState, SuperplaneEvent } from '@/api-client';
+import { ExecutionResult, ExecutionResultReason, SuperplaneExecutionState, SuperplaneEvent, SuperplaneExecutionResource } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 interface RunItemProps {
   state: SuperplaneExecutionState;
   result: ExecutionResult;
+  resultReason?: ExecutionResultReason;
+  resultMessage?: string;
   title: string;
   runId?: string;
   inputs: Record<string, string>;
   outputs: Record<string, string>;
+  resources?: SuperplaneExecutionResource[];
   timestamp: string;
   executionDuration?: string;
   eventId?: string;
@@ -19,18 +22,22 @@ interface RunItemProps {
   discardedBy?: string;
   sourceEvent?: SuperplaneEvent;
   cancelledAt?: string;
+  finishedAt?: string;
   onCancel: () => void;
 }
 
 export const RunItem: React.FC<RunItemProps> = React.memo(({
   state,
   result,
+  resultReason,
+  resultMessage,
   title,
   runId,
   timestamp,
   executionDuration,
   inputs,
   outputs,
+  resources,
   eventId,
   queuedOn,
   approvedOn,
@@ -39,6 +46,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   discardedBy,
   sourceEvent,
   cancelledAt,
+  finishedAt,
   onCancel,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
@@ -218,29 +226,65 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         {isExpanded && (
           <div className="mt-3 space-y-4 text-left">
             {/* Run Section */}
-            {(cancelledAt || (state === 'STATE_FINISHED' && result === 'RESULT_CANCELLED' && (discardedOn || discardedBy))) && (
-              <div className="space-y-3">
-                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  Run
-                </div>
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                Run
+              </div>
 
-                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1">
-                      <MaterialSymbol name="calendar_today" size="md" className="text-gray-600 dark:text-zinc-400" />
-                      <span className="text-xs text-gray-500 dark:text-zinc-400">
-                        Started on {new Date(timestamp).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })} {new Date(timestamp).toLocaleTimeString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: false
-                        })}
-                      </span>
-                    </div>
+              <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <MaterialSymbol name="calendar_today" size="md" className="text-gray-600 dark:text-zinc-400" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                      Started on {new Date(timestamp).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })} {new Date(timestamp).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                      })}
+                    </span>
+                  </div>
+                    {finishedAt && state === 'STATE_FINISHED' && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="event_available" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Finished on {new Date(finishedAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(finishedAt).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {executionDuration && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="timer" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Duration: <span className="text-gray-800 dark:text-gray-200 font-medium">{executionDuration}</span>
+                        </span>
+                      </div>
+                    )}
+                  <div className="flex items-center gap-1">
+                    <MaterialSymbol name="info" size="md" className="text-gray-600 dark:text-zinc-400" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                      State: <span className="text-gray-800 dark:text-gray-200 font-medium">{state.replace('STATE_', '').toLowerCase()}</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MaterialSymbol name="info" size="md" className="text-gray-600 dark:text-zinc-400" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                      Result: <span className="text-gray-800 dark:text-gray-200 font-medium">{result.replace('RESULT_', '').toLowerCase()}</span>
+                    </span>
+                  </div>
                     {discardedOn && (
                       <div className="flex items-center gap-1">
                         <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
@@ -283,10 +327,68 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                         </span>
                       </div>
                     )}
+                    {result === 'RESULT_FAILED' && resultReason && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="info" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Reason: <span className="text-gray-800 dark:text-gray-200 font-medium">{resultReason.replace('RESULT_REASON_', '').toLowerCase().replace('_', ' ')}</span>
+                        </span>
+                      </div>
+                    )}
+                    {result === 'RESULT_FAILED' && resultMessage && (
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <MaterialSymbol name="message" size="md" className="text-gray-600 dark:text-zinc-400" />
+                          <span className="text-xs text-gray-500 dark:text-zinc-400">Message</span>
+                        </div>
+                        <div className="text-xs text-gray-800 dark:text-gray-200 pl-6 break-words">
+                          {resultMessage}
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Resources Sub-Section */}
+                  {resources && resources.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-600">
+                      <div className="text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                        External Resources
+                      </div>
+                      <div className="space-y-2">
+                        {resources.map((resource) => (
+                          <div key={resource.id} className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MaterialSymbol name="inventory_2" size="sm" className="text-gray-500 dark:text-zinc-400 flex-shrink-0" />
+                              <div className="text-xs text-gray-800 dark:text-gray-200 font-medium break-all">
+                                {resource.id}
+                              </div>
+                            </div>
+                            <div className="pl-6 space-y-1">
+                              {resource.type && (
+                                <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                  Type: {resource.type}
+                                </div>
+                              )}
+                              <div className="space-y-1">
+                                {resource.state && (
+                                  <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                    State: <span className="font-medium">{resource.state.toLowerCase()}</span>
+                                  </div>
+                                )}
+                                {resource.result && (
+                                  <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                    Result: <span className="font-medium">{resource.result.toLowerCase()}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
 
             {/* Inputs Section */}
             {Object.keys(inputs).length > 0 && (
