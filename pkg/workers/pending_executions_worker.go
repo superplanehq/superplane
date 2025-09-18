@@ -168,8 +168,6 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte,
 		return err
 	}
 
-	logger.Infof("Finished execution: %s", result)
-
 	err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 	if err != nil {
 		return fmt.Errorf("error publishing execution finished message: %v", err)

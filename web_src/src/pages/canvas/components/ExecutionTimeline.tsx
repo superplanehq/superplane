@@ -53,6 +53,8 @@ export const ExecutionTimeline = ({
               outputs={mapExecutionOutputs(execution)}
               state={execution.state || 'STATE_UNKNOWN'}
               result={execution.result || 'RESULT_UNKNOWN'}
+              resultReason={execution.resultReason}
+              resultMessage={execution.resultMessage}
               timestamp={execution.createdAt || new Date().toISOString()}
               executionDuration={formatDuration(execution.startedAt || execution.createdAt, execution.finishedAt)}
               approvedOn={getMinApprovedAt(execution)}
@@ -63,6 +65,7 @@ export const ExecutionTimeline = ({
               eventId={sourceEvent?.id}
               sourceEvent={sourceEvent}
               cancelledAt={execution.cancelledAt}
+              finishedAt={execution.finishedAt}
               onCancel={() => onCancel(execution.id!)}
             />
           );
