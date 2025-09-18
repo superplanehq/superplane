@@ -21,7 +21,8 @@ import { twMerge } from 'tailwind-merge';
 import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
 import { ParametersTooltip } from '@/components/Tooltip';
 import { showErrorToast } from '@/utils/toast';
-import { useCanvasStore } from '../store/canvasStore';
+import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
+import { NodeContentWrapper } from './shared/NodeContentWrapper';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -54,8 +55,6 @@ interface ParameterWithId {
 
 
 export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange }: StageEditModeContentProps) {
-  const setFocusedNodeId = useCanvasStore(state => state.setFocusedNodeId);
-
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -233,6 +232,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   };
 
   const getAllIntegrations = () => [...canvasIntegrations, ...orgIntegrations];
+
+  // Helper function to generate input options for TaggedInput
+  const getInputOptions = (): TaggedInputOption[] => {
+    return inputs.map(input => ({
+      id: input.name || '',
+      label: input.name || '',
+      value: `\${{ inputs.${input.name} }}`,
+      description: input.description || 'Stage input'
+    })).filter(option => option.id); // Only include inputs with names
+  };
 
   const getSecretKeys = (secretName: string) => {
     const allSecrets = getAllSecrets();
@@ -1147,12 +1156,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   }, [inputsEditor, connections, inputMappings, setInputMappings, inputs]);
 
   return (
-    <div className="w-full h-full text-left" onClick={(e) => {
-      e.stopPropagation();
-      if (currentStageId) {
-        setFocusedNodeId(currentStageId);
-      }
-    }}>
+    <NodeContentWrapper nodeId={currentStageId}>
       <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-1')}>
         {/* Show zero state if executor type requires integrations but none are available */}
         {requireIntegration && !hasRequiredIntegrations && (
@@ -1197,7 +1201,28 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       <ConnectionSelector
                         connection={connection}
                         index={index}
-                        onConnectionUpdate={connectionManager.updateConnection}
+                        onConnectionUpdate={(index, type, name) => {
+                          connectionManager.updateConnection(index, type, name);
+                          setInputMappings(prev => {
+                            const updatedMappings = prev.map(mapping => {
+                              if (mapping.when?.triggeredBy?.connection === connection.name) {
+                                const values = mapping.values?.map(value => {
+                                  if (value.valueFrom && value.valueFrom?.eventData?.connection === connection.name) {
+                                    return { ...value, valueFrom: { ...value.valueFrom, eventData: { ...value.valueFrom.eventData, connection: name } } };
+                                  }
+                                  return value;
+                                });
+                                return {
+                                  ...mapping,
+                                  when: { triggeredBy: { connection: name } },
+                                  values
+                                };
+                              }
+                              return mapping;
+                            });
+                            return updatedMappings;
+                          });
+                        }}
                         onFilterAdd={connectionManager.addFilter}
                         onFilterUpdate={connectionManager.updateFilter}
                         onFilterRemove={connectionManager.removeFilter}
@@ -1393,7 +1418,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     value={inputValue.valueFrom.eventData.expression || ''}
                                                     onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
                                                     placeholder="eg. $.commit[0].message"
-                                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                                    className="w-full px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
                                                   />
                                                 </div>
                                               ) : inputValue?.valueFrom?.lastExecution ? (
@@ -2014,15 +2039,17 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               value={param.key}
                               onChange={(e) => updateExecutorParameter(param.id, e.target.value, param.value)}
                               placeholder="Parameter name"
-                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                              className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
                             />
-                            <input
-                              type="text"
-                              value={param.value}
-                              onChange={(e) => updateExecutorParameter(param.id, param.key, e.target.value)}
-                              placeholder="Parameter value"
-                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                            />
+                            <div className="w-2/3">
+                              <TaggedInput
+                                value={param.value}
+                                onChange={(value) => updateExecutorParameter(param.id, param.key, value)}
+                                options={getInputOptions()}
+                                placeholder="Parameter value"
+                                className="text-sm"
+                              />
+                            </div>
                             <button
                               onClick={() => removeExecutorParameter(param.id)}
                               className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
@@ -2149,15 +2176,17 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               value={input.key}
                               onChange={(e) => updateExecutorInput(input.id, e.target.value, input.value)}
                               placeholder="Input name"
-                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                              className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
                             />
-                            <input
-                              type="text"
-                              value={input.value}
-                              onChange={(e) => updateExecutorInput(input.id, input.key, e.target.value)}
-                              placeholder="Input value"
-                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                            />
+                            <div className="w-2/3">
+                              <TaggedInput
+                                value={input.value}
+                                onChange={(value) => updateExecutorInput(input.id, input.key, value)}
+                                options={getInputOptions()}
+                                placeholder="Input value"
+                                className="text-sm"
+                              />
+                            </div>
                             <button
                               onClick={() => removeExecutorInput(input.id)}
                               className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
@@ -2229,15 +2258,17 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               value={header.key}
                               onChange={(e) => updateExecutorHeader(header.id, e.target.value, header.value)}
                               placeholder="Header name"
-                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                              className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                             />
-                            <input
-                              type="text"
-                              value={header.value}
-                              onChange={(e) => updateExecutorHeader(header.id, header.key, e.target.value)}
-                              placeholder="Header value"
-                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                            />
+                            <div className="w-2/3">
+                              <TaggedInput
+                                value={header.value}
+                                onChange={(value) => updateExecutorHeader(header.id, header.key, value)}
+                                options={getInputOptions()}
+                                placeholder="Header value"
+                                className="text-sm"
+                              />
+                            </div>
                             <button
                               onClick={() => removeExecutorHeader(header.id)}
                               className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
@@ -2276,13 +2307,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 {/* Unified Execution Name Field - appears for all executor types */}
                 {executor.type && (
                   <ValidationField label="Execution name (optional)">
-                    <input
-                      type="text"
+                    <TaggedInput
                       value={executor.name || ''}
-                      onChange={(e) => setExecutor(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder={executor.type === 'http' ? 'API call' : '${{ inputs.VERSION }} deployment'}
-                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      onChange={(value) => setExecutor(prev => ({ ...prev, name: value }))}
+                      options={getInputOptions()}
+                      placeholder={'${{ inputs.VERSION }} deployment'}
+                      className="text-sm"
                     />
+                    <ProTip show />
                   </ValidationField>
                 )}
               </div>
@@ -2290,6 +2322,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           </>
         )}
       </div>
-    </div>
+    </NodeContentWrapper>
   );
 }

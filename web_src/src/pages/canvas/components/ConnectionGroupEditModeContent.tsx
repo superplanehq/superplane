@@ -10,7 +10,7 @@ import { InlineEditor } from './shared/InlineEditor';
 import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
 import { showErrorToast } from '@/utils/toast';
-import { useCanvasStore } from '../store/canvasStore';
+import { NodeContentWrapper } from './shared/NodeContentWrapper';
 
 interface ConnectionGroupEditModeContentProps {
   data: ConnectionGroupNodeType['data'];
@@ -28,7 +28,6 @@ interface ConnectionGroupEditModeContentProps {
 }
 
 export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId, apiError, onDataChange }: ConnectionGroupEditModeContentProps) {
-  const setFocusedNodeId = useCanvasStore(state => state.setFocusedNodeId);
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [groupByFields, setGroupByFields] = useState<GroupByField[]>(data.groupBy?.fields || []);
   const [timeout, setTimeout] = useState<number | undefined>(undefined);
@@ -230,12 +229,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
   };
 
   return (
-    <div className="w-full h-full text-left" onClick={(e) => {
-      e.stopPropagation();
-      if (currentConnectionGroupId) {
-        setFocusedNodeId(currentConnectionGroupId);
-      }
-    }}>
+    <NodeContentWrapper nodeId={currentConnectionGroupId}>
       <div className="">
         {/* Connections Section */}
         <EditableAccordionSection
@@ -404,6 +398,6 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
           </div>
         </EditableAccordionSection>
       </div>
-    </div>
+    </NodeContentWrapper>
   );
 }

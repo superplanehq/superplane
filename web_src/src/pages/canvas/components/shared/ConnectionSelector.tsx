@@ -3,6 +3,7 @@ import { ValidationField } from './ValidationField';
 import { useConnectionOptions } from '../../hooks/useConnectionOptions';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { FiltersTooltip } from './FiltersTooltip';
+import { AutoCompleteSelect, type AutoCompleteOption } from '@/components/AutoCompleteSelect';
 
 interface ConnectionSelectorProps {
   connection: SuperplaneConnection;
@@ -35,36 +36,15 @@ export function ConnectionSelector({
 }: ConnectionSelectorProps) {
   const { getConnectionOptions } = useConnectionOptions(currentEntityId, existingConnections);
 
-  const renderConnectionOptions = () => {
+  const getAutoCompleteOptions = (): AutoCompleteOption[] => {
     const options = getConnectionOptions(index);
 
-    if (options.length === 0 && connection.type) {
-      return (
-        <option value="" disabled>
-          No connections available
-        </option>
-      );
-    }
-
-    const groupedOptions: Record<string, typeof options> = {};
-
-    // Group options by their group property
-    options.forEach(option => {
-      if (!groupedOptions[option.group]) {
-        groupedOptions[option.group] = [];
-      }
-      groupedOptions[option.group].push(option);
-    });
-
-    return Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
-      <optgroup key={groupName} label={groupName}>
-        {groupOptions.map(option => (
-          <option key={option.value} value={`${option.type}\u001F${option.value}`}>
-            {option.label}
-          </option>
-        ))}
-      </optgroup>
-    ));
+    return options.map(option => ({
+      value: `${option.type}\u001F${option.value}`,
+      label: option.label,
+      group: option.group,
+      type: option.type
+    }));
   };
 
   return (
@@ -73,22 +53,16 @@ export function ConnectionSelector({
         label="Connection"
         error={validationError}
       >
-        <select
+        <AutoCompleteSelect
+          options={getAutoCompleteOptions()}
           value={`${connection.type}\u001F${connection.name}`}
-          onChange={(e) => {
-            const [type, name] = e.target.value.split('\u001F');
+          onChange={(value) => {
+            const [type, name] = value.split('\u001F');
             onConnectionUpdate(index, type as SuperplaneConnectionType, name)
           }}
-          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationError
-            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-            }`}
-        >
-          <option value="">
-            {connection.type ? 'Select a connection...' : 'Select connection type first'}
-          </option>
-          {renderConnectionOptions()}
-        </select>
+          placeholder={connection.type ? 'Select a connection...' : 'Select connection type first'}
+          error={!!validationError}
+        />
       </ValidationField>
 
       {/* Filters Section */}

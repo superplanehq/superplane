@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ConnectionSelector } from './ConnectionSelector'
 import { SuperplaneConnection } from '@/api-client/types.gen'
 import * as useConnectionOptionsModule from '../../hooks/useConnectionOptions'
@@ -38,7 +39,9 @@ describe('ConnectionSelector', () => {
     })
   })
 
-  it('should use deduplicated options from useConnectionOptions hook', () => {
+  it('should use deduplicated options from useConnectionOptions hook', async () => {
+    const user = userEvent.setup()
+
     // Setup mock data that's already deduplicated (as our hook should provide)
     const mockDeduplicatedOptions = [
       {
@@ -71,16 +74,18 @@ describe('ConnectionSelector', () => {
 
     render(<ConnectionSelector {...mockProps} />)
 
-    // Get all options within the select
+    // Focus the combobox input to open the dropdown
+    const combobox = screen.getByRole('combobox')
+    await user.click(combobox)
+
+    // Now get all options within the dropdown
     const allOptions = screen.getAllByRole('option')
 
-    // Extract the text content of all options (excluding the default "Select..." option)
-    const optionTexts = allOptions
-      .map((option: HTMLElement) => option.textContent)
-      .filter((text: string | null) => text && !text.includes('Select')) as string[]
-
     // Should have 4 unique options
-    expect(optionTexts).toHaveLength(4)
+    expect(allOptions).toHaveLength(4)
+
+    // Extract the text content of all options
+    const optionTexts = allOptions.map((option: HTMLElement) => option.textContent?.trim()).filter(Boolean) as string[]
 
     // Check that there are no duplicate option texts
     const uniqueOptionTexts = [...new Set(optionTexts)]
@@ -97,7 +102,9 @@ describe('ConnectionSelector', () => {
     expect(httpPartyStageCount).toBe(1)
   })
 
-  it('should render correct option groups', () => {
+  it('should render correct option groups', async () => {
+    const user = userEvent.setup()
+
     const mockOptions = [
       {
         value: 'stage1',
@@ -117,17 +124,31 @@ describe('ConnectionSelector', () => {
 
     render(<ConnectionSelector {...mockProps} />)
 
-    // Check that optgroups are rendered with correct labels
-    expect(screen.getByRole('group', { name: 'Stages' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Event Sources' })).toBeInTheDocument()
+    // Focus the combobox input to open the dropdown
+    const combobox = screen.getByRole('combobox')
+    await user.click(combobox)
+
+    // Check that group labels are rendered (these appear as text content, not role="group")
+    expect(screen.getByText('Stages')).toBeInTheDocument()
+    expect(screen.getByText('Event Sources')).toBeInTheDocument()
+
+    // Check that options are rendered
+    expect(screen.getByRole('option', { name: 'Stage 1' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Source 1' })).toBeInTheDocument()
   })
 
-  it('should render empty state when no connections are available', () => {
+  it('should render empty state when no connections are available', async () => {
+    const user = userEvent.setup()
+
     mockGetConnectionOptions.mockReturnValue([])
 
     const connectionWithType = { ...mockConnection, type: 'TYPE_STAGE' as const }
 
     render(<ConnectionSelector {...mockProps} connection={connectionWithType} />)
+
+    // Focus the combobox input to open the dropdown
+    const combobox = screen.getByRole('combobox')
+    await user.click(combobox)
 
     expect(screen.getByText('No connections available')).toBeInTheDocument()
   })
@@ -186,7 +207,9 @@ describe('ConnectionSelector', () => {
     expect(mockGetConnectionOptions).toHaveBeenCalledWith(2)
   })
 
-  it('should not render existing connections as options', () => {
+  it('should not render existing connections as options', async () => {
+    const user = userEvent.setup()
+
     const existingConnections = [
       { name: 'Already Selected Stage', type: 'TYPE_STAGE' as const, filters: [] },
       { name: 'Already Selected Source', type: 'TYPE_EVENT_SOURCE' as const, filters: [] }
@@ -222,10 +245,14 @@ describe('ConnectionSelector', () => {
       />
     )
 
+    // Focus the combobox input to open the dropdown
+    const combobox = screen.getByRole('combobox')
+    await user.click(combobox)
+
     const allOptions = screen.getAllByRole('option')
     const optionTexts = allOptions
-      .map((option: HTMLElement) => option.textContent)
-      .filter((text: string | null) => text && !text.includes('Select')) as string[]
+      .map((option: HTMLElement) => option.textContent?.trim())
+      .filter(Boolean) as string[]
 
     expect(optionTexts).toContain('Available Stage 1')
     expect(optionTexts).toContain('Available Stage 2')
@@ -237,7 +264,9 @@ describe('ConnectionSelector', () => {
     expect(optionTexts).toHaveLength(3)
   })
 
-  it('should allow current connection to be selected when editing', () => {
+  it('should allow current connection to be selected when editing', async () => {
+    const user = userEvent.setup()
+
     const existingConnections = [
       { name: 'Current Connection', type: 'TYPE_STAGE' as const, filters: [] }, // Index 0 - being edited
       { name: 'Other Connection', type: 'TYPE_STAGE' as const, filters: [] }    // Index 1 - should be excluded
@@ -269,14 +298,16 @@ describe('ConnectionSelector', () => {
       />
     )
 
-    const allOptions = screen.getAllByRole('option')
-    const optionTexts = allOptions
-      .map((option: HTMLElement) => option.textContent)
-      .filter((text: string | null) => text && !text.includes('Select')) as string[]
+    // Focus the combobox input to open the dropdown
+    const combobox = screen.getByRole('combobox')
+    await user.click(combobox)
 
-    expect(optionTexts).toContain('Current Connection')
-    expect(optionTexts).toContain('Available Connection')
-    expect(optionTexts).not.toContain('Other Connection')
+    // Check that the specific options are present
+    expect(screen.getByRole('option', { name: /Current Connection/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Available Connection/ })).toBeInTheDocument()
+
+    // Check that Other Connection is not present
+    expect(screen.queryByRole('option', { name: /Other Connection/ })).not.toBeInTheDocument()
     expect(mockGetConnectionOptions).toHaveBeenCalledWith(0)
   })
 })
