@@ -44,6 +44,7 @@ interface StageEditModeContentProps {
   }) => void;
   onTriggerSectionValidation?: { current: ((hasFieldErrors?: boolean) => void) | null };
   onStageNameChange?: (name: string) => void;
+  integrationError?: boolean;
 }
 
 interface ParameterWithId {
@@ -53,7 +54,7 @@ interface ParameterWithId {
 }
 
 
-export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange }: StageEditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange, integrationError = false }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -1164,6 +1165,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             label={getZeroStateLabel()}
             canvasId={canvasId}
             organizationId={organizationId}
+            hasError={integrationError}
           />
         )}
 
