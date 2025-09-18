@@ -939,9 +939,7 @@
               "enum": [
                 "STATE_REASON_UNKNOWN",
                 "STATE_REASON_APPROVAL",
-                "STATE_REASON_TIME_WINDOW",
-                "STATE_REASON_STUCK",
-                "STATE_REASON_TIMEOUT"
+                "STATE_REASON_TIME_WINDOW"
               ]
             },
             "collectionFormat": "multi"
@@ -4134,6 +4132,10 @@
           "type": "string",
           "format": "date-time"
         },
+        "cancelledAt": {
+          "type": "string",
+          "format": "date-time"
+        },
         "finishedAt": {
           "type": "string",
           "format": "date-time"
@@ -4599,9 +4601,7 @@
       "enum": [
         "STATE_REASON_UNKNOWN",
         "STATE_REASON_APPROVAL",
-        "STATE_REASON_TIME_WINDOW",
-        "STATE_REASON_STUCK",
-        "STATE_REASON_TIMEOUT"
+        "STATE_REASON_TIME_WINDOW"
       ],
       "default": "STATE_REASON_UNKNOWN"
     },

@@ -53,13 +53,6 @@ func CancelStageExecution(ctx context.Context, canvasID string, stageIdOrName st
 		return nil, err
 	}
 
-	//
-	// TODO
-	//
-	// Right now, we are not cancelling the execution resources as part of the execution cancellation process.
-	// That will be addressed in https://github.com/superplanehq/superplane/issues/233
-	//
-
 	err = execution.Cancel(uuid.MustParse(userID))
 	if err != nil {
 		if errors.Is(err, models.ErrExecutionAlreadyCancelled) || errors.Is(err, models.ErrExecutionCannotBeCancelled) {

@@ -617,6 +617,7 @@ export type SuperplaneExecution = {
     result?: ExecutionResult;
     createdAt?: string;
     startedAt?: string;
+    cancelledAt?: string;
     finishedAt?: string;
     outputs?: Array<SuperplaneOutputValue>;
     resources?: Array<SuperplaneExecutionResource>;
@@ -788,7 +789,7 @@ export type SuperplaneStageEventApproval = {
 
 export type SuperplaneStageEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED' | 'STATE_DISCARDED';
 
-export type SuperplaneStageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_STUCK' | 'STATE_REASON_TIMEOUT';
+export type SuperplaneStageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW';
 
 export type SuperplaneStageMetadata = {
     id?: string;
@@ -1537,7 +1538,7 @@ export type SuperplaneListStageEventsData = {
     };
     query?: {
         states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED' | 'STATE_DISCARDED'>;
-        stateReasons?: Array<'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_STUCK' | 'STATE_REASON_TIMEOUT'>;
+        stateReasons?: Array<'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW'>;
         limit?: number;
         before?: string;
     };

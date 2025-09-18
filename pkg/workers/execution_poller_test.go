@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
@@ -68,7 +69,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
 	w := NewExecutionPoller(r.Encryptor, r.Registry)
 
-	t.Run("failed resource -> execution fails", func(t *testing.T) {
+	t.Run("execution is updated without polling", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
 
 		//
@@ -86,6 +87,69 @@ func Test__ExecutionPoller(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultFailed))
 
+		testconsumer := testconsumer.New(amqpURL, messages.ExecutionFinishedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
+		//
+		// Trigger worker and verify execution goes to the finished state.
+		//
+		err = w.Tick()
+		require.NoError(t, err)
+		require.Eventually(t, func() bool {
+			e, err := models.FindExecutionByID(execution.ID, stage.ID)
+			if err != nil {
+				return false
+			}
+
+			return e.State == models.ExecutionFinished && e.Result == models.ResultFailed
+		}, 5*time.Second, 200*time.Millisecond)
+
+		//
+		// Verify that new pending event for stage completion is created.
+		//
+		list, err := models.ListEventsBySourceID(stage.ID)
+		require.NoError(t, err)
+		require.Len(t, list, 1)
+		assert.Equal(t, list[0].State, models.StageEventStatePending)
+		assert.Equal(t, list[0].SourceID, stage.ID)
+		assert.Equal(t, list[0].SourceType, models.SourceTypeStage)
+		e, err := unmarshalCompletionEvent(list[0].Raw)
+		require.NoError(t, err)
+		assert.Equal(t, models.ExecutionFinishedEventType, e.Type)
+		assert.Equal(t, stage.ID.String(), e.Stage.ID)
+		assert.Equal(t, execution.ID.String(), e.Execution.ID)
+		assert.Equal(t, models.ResultFailed, e.Execution.Result)
+		assert.Empty(t, e.Outputs)
+		assert.Equal(t, map[string]any{"version": "v1"}, e.Inputs)
+		assert.NotEmpty(t, e.Execution.CreatedAt)
+		assert.NotEmpty(t, e.Execution.StartedAt)
+		assert.NotEmpty(t, e.Execution.FinishedAt)
+		require.True(t, testconsumer.HasReceivedMessage())
+	})
+
+	t.Run("execution is updated with polling", func(t *testing.T) {
+		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
+
+		//
+		// Create resource
+		//
+		workflowID := uuid.New().String()
+		execution := support.CreateExecutionWithData(t, r.Source, stage,
+			[]byte(`{"ref":"v1"}`),
+			[]byte(`{"ref":"v1"}`),
+			map[string]any{"version": "v1"},
+		)
+
+		require.NoError(t, execution.Start())
+		_, err := execution.AddResource(workflowID, "workflow", resource.ID)
+		require.NoError(t, err)
+
+		//
+		// Mock Semaphore response when polling.
+		//
+		pipelineID := uuid.New().String()
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultFailed)
 		testconsumer := testconsumer.New(amqpURL, messages.ExecutionFinishedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
@@ -241,6 +305,167 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
 		assert.Equal(t, models.ResultPassed, e.Execution.Result)
+		assert.Empty(t, e.Outputs)
+		assert.Equal(t, map[string]any{"version": "v1"}, e.Inputs)
+		assert.NotEmpty(t, e.Execution.CreatedAt)
+		assert.NotEmpty(t, e.Execution.StartedAt)
+		assert.NotEmpty(t, e.Execution.FinishedAt)
+		require.True(t, testconsumer.HasReceivedMessage())
+	})
+
+	t.Run("cancelled execution -> execution cancelled", func(t *testing.T) {
+		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
+
+		//
+		// Create execution
+		//
+		workflowID := uuid.New().String()
+		execution := support.CreateExecutionWithData(t, r.Source, stage,
+			[]byte(`{"ref":"v1"}`),
+			[]byte(`{"ref":"v1"}`),
+			map[string]any{"version": "v1"},
+		)
+
+		require.NoError(t, execution.Start())
+		_, err = execution.AddResource(workflowID, "workflow", resource.ID)
+		require.NoError(t, err)
+
+		// Cancel the execution
+		require.NoError(t, execution.Cancel(r.User))
+
+		testconsumer := testconsumer.New(amqpURL, messages.ExecutionFinishedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
+		//
+		// Trigger worker and verify execution goes to the cancelled state.
+		//
+		err = w.Tick()
+		require.NoError(t, err)
+		require.Eventually(t, func() bool {
+			e, err := models.FindExecutionByID(execution.ID, stage.ID)
+			if err != nil {
+				return false
+			}
+
+			return e.State == models.ExecutionFinished && e.Result == models.ResultCancelled
+		}, 5*time.Second, 200*time.Millisecond)
+
+		//
+		// Verify that all execution resources were also cancelled.
+		//
+		require.Eventually(t, func() bool {
+			resources, err := execution.Resources()
+			if err != nil || len(resources) == 0 {
+				return false
+			}
+
+			for _, resource := range resources {
+				if resource.Result != models.ResultCancelled {
+					return false
+				}
+			}
+			return true
+		}, 5*time.Second, 200*time.Millisecond)
+
+		//
+		// Verify that new pending event for stage completion is created.
+		//
+		list, err := models.ListEventsBySourceID(stage.ID)
+		require.NoError(t, err)
+		require.Len(t, list, 1)
+		assert.Equal(t, list[0].State, models.StageEventStatePending)
+		assert.Equal(t, list[0].SourceID, stage.ID)
+		assert.Equal(t, list[0].SourceType, models.SourceTypeStage)
+		e, err := unmarshalCompletionEvent(list[0].Raw)
+		require.NoError(t, err)
+		assert.Equal(t, models.ExecutionFinishedEventType, e.Type)
+		assert.Equal(t, stage.ID.String(), e.Stage.ID)
+		assert.Equal(t, execution.ID.String(), e.Execution.ID)
+		assert.Equal(t, models.ResultCancelled, e.Execution.Result)
+		assert.Empty(t, e.Outputs)
+		assert.Equal(t, map[string]any{"version": "v1"}, e.Inputs)
+		assert.NotEmpty(t, e.Execution.CreatedAt)
+		assert.NotEmpty(t, e.Execution.StartedAt)
+		assert.NotEmpty(t, e.Execution.FinishedAt)
+		require.True(t, testconsumer.HasReceivedMessage())
+	})
+
+	t.Run("timed out execution -> execution cancelled", func(t *testing.T) {
+		require.NoError(t, database.Conn().Exec(`truncate table event_rejections, events`).Error)
+
+		//
+		// Create execution
+		//
+		workflowID := uuid.New().String()
+		execution := support.CreateExecutionWithData(t, r.Source, stage,
+			[]byte(`{"ref":"v1"}`),
+			[]byte(`{"ref":"v1"}`),
+			map[string]any{"version": "v1"},
+		)
+
+		require.NoError(t, execution.Start())
+		_, err = execution.AddResource(workflowID, "workflow", resource.ID)
+		require.NoError(t, err)
+
+		// Create a worker with a very short timeout and mock nowFunc to simulate timeout
+		testWorker := NewExecutionPoller(r.Encryptor, r.Registry)
+		testWorker.ExecutionTimeout = 1 * time.Second
+		// Mock the now function to make the execution appear timed out
+		testWorker.nowFunc = func() time.Time {
+			return execution.StartedAt.Add(2 * time.Second)
+		}
+
+		testconsumer := testconsumer.New(amqpURL, messages.ExecutionFinishedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
+		//
+		// Trigger worker and verify execution goes to the cancelled state due to timeout.
+		//
+		err = testWorker.Tick()
+		require.NoError(t, err)
+		require.Eventually(t, func() bool {
+			e, err := models.FindExecutionByID(execution.ID, stage.ID)
+			if err != nil {
+				return false
+			}
+
+			return e.State == models.ExecutionFinished && e.Result == models.ResultCancelled
+		}, 5*time.Second, 200*time.Millisecond)
+
+		//
+		// Verify that all execution resources were also cancelled.
+		//
+		require.Eventually(t, func() bool {
+			resources, err := execution.Resources()
+			if err != nil || len(resources) == 0 {
+				return false
+			}
+
+			for _, resource := range resources {
+				if resource.Result != models.ResultCancelled {
+					return false
+				}
+			}
+			return true
+		}, 5*time.Second, 200*time.Millisecond)
+
+		//
+		// Verify that new pending event for stage completion is created.
+		//
+		list, err := models.ListEventsBySourceID(stage.ID)
+		require.NoError(t, err)
+		require.Len(t, list, 1)
+		assert.Equal(t, list[0].State, models.StageEventStatePending)
+		assert.Equal(t, list[0].SourceID, stage.ID)
+		assert.Equal(t, list[0].SourceType, models.SourceTypeStage)
+		e, err := unmarshalCompletionEvent(list[0].Raw)
+		require.NoError(t, err)
+		assert.Equal(t, models.ExecutionFinishedEventType, e.Type)
+		assert.Equal(t, stage.ID.String(), e.Stage.ID)
+		assert.Equal(t, execution.ID.String(), e.Execution.ID)
+		assert.Equal(t, models.ResultCancelled, e.Execution.Result)
 		assert.Empty(t, e.Outputs)
 		assert.Equal(t, map[string]any{"version": "v1"}, e.Inputs)
 		assert.NotEmpty(t, e.Execution.CreatedAt)
