@@ -12,6 +12,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { useCanvasStore } from '../store/canvasStore';
 import { showErrorToast } from '@/utils/toast';
+import { FilterTooltip } from './FilterTooltip';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -84,13 +85,14 @@ export function EventSourceEditModeContent({
 
   // Filter management functions
   const addEventType = useCallback(() => {
+    const defaultType = eventSourceType === 'github' ? 'push' : eventSourceType === 'semaphore' ? 'pipeline_done' : '';
     const newEventType: EventSourceEventType = {
-      type: '',
+      type: defaultType,
       filters: [],
       filterOperator: 'FILTER_OPERATOR_AND'
     };
     setEventTypes(prev => [...prev, newEventType]);
-  }, []);
+  }, [eventSourceType]);
 
   const updateEventType = useCallback((index: number, updates: Partial<EventSourceEventType>) => {
     setEventTypes(prev => prev.map((eventType, i) =>
@@ -103,9 +105,15 @@ export function EventSourceEditModeContent({
   }, []);
 
   const addFilter = useCallback((eventTypeIndex: number) => {
+    const defaultExpression = eventSourceType === 'github'
+      ? '$.ref == "refs/heads/main"'
+      : eventSourceType === 'semaphore'
+        ? '$.pipeline.state == "done"'
+        : '';
+
     const newFilter: SuperplaneFilter = {
       type: 'FILTER_TYPE_DATA',
-      data: { expression: '' }
+      data: { expression: defaultExpression }
     };
 
     setEventTypes(prev => prev.map((eventType, i) =>
@@ -114,7 +122,7 @@ export function EventSourceEditModeContent({
         filters: [...(eventType.filters || []), newFilter]
       } : eventType
     ));
-  }, []);
+  }, [eventSourceType]);
 
   const updateFilter = useCallback((eventTypeIndex: number, filterIndex: number, updates: Partial<SuperplaneFilter>) => {
     setEventTypes(prev => prev.map((eventType, i) =>
@@ -733,8 +741,16 @@ curl -X POST \\
 
                 {/* Filters Section */}
                 <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
-                  <div className="flex justify-between items-center mb-2">
+                  <div className="flex justify-start items-center mb-2">
                     <label className="text-sm font-medium text-gray-900 dark:text-zinc-100">Filters</label>
+                    <FilterTooltip>
+                      <div className="flex items-center ml-2">
+                        <MaterialSymbol name="help" size="sm" className="text-zinc-400 hover:text-zinc-600 cursor-help" />
+                      </div>
+                    </FilterTooltip>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Pro tip: Use <a href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Expr</a> to parse payload data
                   </div>
                   <div className="space-y-2">
                     {(eventType.filters || []).map((filter, filterIndex) => (
