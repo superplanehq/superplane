@@ -52,6 +52,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
+  const [integrationError, setIntegrationError] = useState(false);
   const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
@@ -81,6 +82,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return true;
   };
 
+  const validateIntegrationRequirement = () => {
+    const requireIntegration = ['semaphore', 'github'].includes(eventSourceType);
+
+    if (!requireIntegration) {
+      return true; // Integration not required for webhook type
+    }
+
+    const typeIntegrations = canvasIntegrations.filter(int => int.spec?.type === eventSourceType);
+    return typeIntegrations.length > 0;
+  };
+
   const handleEditClick = () => {
     setIsEditMode(true);
     setEditingEventSource(props.id);
@@ -102,11 +114,21 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       return;
     }
 
+    let basicValidationPassed = true;
+
+
     if (!validateEventSourceName(eventSourceName)) {
-      return;
+      basicValidationPassed = false;
     }
 
-    if (eventSourceType === 'webhook' || validationPassed === true) {
+    if (!validateIntegrationRequirement()) {
+      setIntegrationError(true);
+      const integrationTypeLabel = eventSourceType;
+      setApiError(`${integrationTypeLabel} integration is required but not configured. Please add a ${integrationTypeLabel} integration to continue.`);
+      basicValidationPassed = false;
+    }
+
+    if ((eventSourceType === 'webhook' || validationPassed === true) && basicValidationPassed) {
       proceedWithSave();
     }
     setValidationPassed(null);
@@ -162,6 +184,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       setIsEditMode(false);
       setEditingEventSource(null);
       setCurrentFormData(null);
+      setIntegrationError(false);
     } catch (error) {
       setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
     }
@@ -171,6 +194,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setIsEditMode(false);
     setEditingEventSource(null);
     setCurrentFormData(null);
+    setIntegrationError(false);
 
     setEventSourceName(props.data.name);
     setEventSourceDescription(props.data.description || '');
@@ -291,6 +315,13 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   }, [eventSourceKey, eventSourceType, isNewNode, props.id, currentEventSource, props.data.name, props.data.description, setEditingEventSource, setNodes, setFocusedNodeId]);
 
+  const getBorderClass = () => {
+    if (props.selected || focusedNodeId === props.id) {
+      return 'border-blue-400';
+    }
+    return 'border-gray-200 dark:border-gray-700';
+  };
+
   const handleNodeClick = () => {
     if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {
       selectEventSourceId(currentEventSource.metadata.id);
@@ -299,7 +330,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   return (
     <div
-      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected || focusedNodeId === props.id ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative cursor-pointer`}
+      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
       style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
       onClick={handleNodeClick}
     >
@@ -419,6 +450,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           apiError={apiError}
           shouldValidate={true}
           onValidationResult={setValidationPassed}
+          integrationError={integrationError}
         />
       ) : (
         <>

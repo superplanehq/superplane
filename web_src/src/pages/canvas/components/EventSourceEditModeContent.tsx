@@ -29,6 +29,7 @@ interface EventSourceEditModeContentProps {
   apiError?: string | null;
   shouldValidate?: boolean;
   onValidationResult?: (isValid: boolean) => void;
+  integrationError?: boolean;
 }
 
 export function EventSourceEditModeContent({
@@ -42,7 +43,8 @@ export function EventSourceEditModeContent({
   onDelete,
   apiError,
   shouldValidate = false,
-  onValidationResult
+  onValidationResult,
+  integrationError = false
 }: EventSourceEditModeContentProps) {
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
   const [resourceType, setResourceType] = useState(data.resource?.type);
@@ -459,6 +461,7 @@ curl -X POST \\
             label={zeroStateLabel}
             canvasId={canvasId}
             organizationId={organizationId}
+            hasError={integrationError}
           />
         )}
 
