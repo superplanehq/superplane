@@ -10,6 +10,7 @@ import { InlineEditor } from './shared/InlineEditor';
 import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
 import { showErrorToast } from '@/utils/toast';
+import { NodeContentWrapper } from './shared/NodeContentWrapper';
 
 interface ConnectionGroupEditModeContentProps {
   data: ConnectionGroupNodeType['data'];
@@ -228,7 +229,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
   };
 
   return (
-    <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
+    <NodeContentWrapper nodeId={currentConnectionGroupId}>
       <div className="">
         {/* Connections Section */}
         <EditableAccordionSection
@@ -397,6 +398,6 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
           </div>
         </EditableAccordionSection>
       </div>
-    </div>
+    </NodeContentWrapper>
   );
 }

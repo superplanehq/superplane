@@ -13,6 +13,7 @@ import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { useCanvasStore } from '../store/canvasStore';
 import { showErrorToast } from '@/utils/toast';
 import { FilterTooltip } from './FilterTooltip';
+import { NodeContentWrapper } from './shared/NodeContentWrapper';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -20,6 +21,7 @@ interface EventSourceEditModeContentProps {
   organizationId: string;
   eventSourceType?: string;
   eventSourceKey?: string;
+  nodeId?: string;
   onDataChange?: (data: {
     spec: SuperplaneEventSourceSpec
   }) => void;
@@ -35,6 +37,7 @@ export function EventSourceEditModeContent({
   organizationId,
   eventSourceType = 'webhook',
   eventSourceKey,
+  nodeId,
   onDataChange,
   onDelete,
   apiError,
@@ -448,7 +451,7 @@ curl -X POST \\
   };
 
   return (
-    <div className="w-full h-full text-left border-t border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+    <NodeContentWrapper nodeId={nodeId} className="border-t border-gray-200 dark:border-gray-700">
       <div className="">
         {requireIntegration && availableIntegrations.length === 0 && (
           <IntegrationZeroState
@@ -668,9 +671,7 @@ curl -X POST \\
                                 style={{ height: '370px' }}
                               />
                               <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(webhookExampleCode);
-                                }}
+                                onClick={() => navigator.clipboard.writeText(webhookExampleCode)}
                                 className="absolute top-2 right-2 p-1 text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 bg-white dark:bg-zinc-700 rounded border border-gray-200 dark:border-gray-600 h-6 w-6 flex items-center"
                               >
                                 <MaterialSymbol name="content_copy" size="sm" />
@@ -852,6 +853,6 @@ curl -X POST \\
         onConfirm={handleRegenerateKey}
         onCancel={() => setShowRegenerateConfirm(false)}
       />
-    </div>
+    </NodeContentWrapper>
   );
 }
