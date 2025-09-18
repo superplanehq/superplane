@@ -10,7 +10,6 @@ import { InlineEditor } from './shared/InlineEditor';
 import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
 import { showErrorToast } from '@/utils/toast';
-import { useCanvasStore } from '../store/canvasStore';
 
 interface ConnectionGroupEditModeContentProps {
   data: ConnectionGroupNodeType['data'];
@@ -28,7 +27,6 @@ interface ConnectionGroupEditModeContentProps {
 }
 
 export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId, apiError, onDataChange }: ConnectionGroupEditModeContentProps) {
-  const setFocusedNodeId = useCanvasStore(state => state.setFocusedNodeId);
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [groupByFields, setGroupByFields] = useState<GroupByField[]>(data.groupBy?.fields || []);
   const [timeout, setTimeout] = useState<number | undefined>(undefined);
@@ -230,12 +228,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
   };
 
   return (
-    <div className="w-full h-full text-left" onClick={(e) => {
-      e.stopPropagation();
-      if (currentConnectionGroupId) {
-        setFocusedNodeId(currentConnectionGroupId);
-      }
-    }}>
+    <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
       <div className="">
         {/* Connections Section */}
         <EditableAccordionSection
