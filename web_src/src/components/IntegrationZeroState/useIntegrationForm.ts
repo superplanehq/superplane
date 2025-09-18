@@ -7,6 +7,8 @@ interface UseIntegrationFormProps {
   integrations: any[];
 }
 
+export const NEW_SECRET_NAME = 'my-api-token';
+
 export function useIntegrationForm({ integrationType, integrations }: UseIntegrationFormProps) {
   const [integrationData, setIntegrationData] = useState<IntegrationData>({
     orgUrl: '',
@@ -18,7 +20,6 @@ export function useIntegrationForm({ integrationType, integrations }: UseIntegra
   });
   
   const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new');
-  const [newSecretName, setNewSecretName] = useState('my-api-token');
   const [newSecretToken, setNewSecretToken] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -39,7 +40,7 @@ export function useIntegrationForm({ integrationType, integrations }: UseIntegra
     }
     
     if (apiTokenTab === 'new') {
-      if (!newSecretName.trim()) {
+      if (!NEW_SECRET_NAME.trim()) {
         newErrors.secretName = 'Field cannot be empty';
       }
       if (!newSecretToken.trim()) {
@@ -61,7 +62,6 @@ export function useIntegrationForm({ integrationType, integrations }: UseIntegra
       name: '',
       apiToken: { secretName: '', secretKey: '' }
     });
-    setNewSecretName('my-api-token');
     setNewSecretToken('');
     setApiTokenTab('new');
     setErrors({});
@@ -72,8 +72,6 @@ export function useIntegrationForm({ integrationType, integrations }: UseIntegra
     setIntegrationData,
     apiTokenTab,
     setApiTokenTab,
-    newSecretName,
-    setNewSecretName,
     newSecretToken,
     setNewSecretToken,
     errors,
