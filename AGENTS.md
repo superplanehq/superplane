@@ -16,6 +16,7 @@
 - One-shot backend tests: `make test` (Golang).
 - Targeted backend tests: `make test TEST_PACKAGES=./pkg/workers`
 - After updating UI code, always run `npm run build` to verify everything is correct
+- After updating GoLang code, always lint it with `make lint`
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
   - `make pb.gen` to regenerate protobuf files
   - `make openapi.spec.gen` to generate OpenAPI spec for the API
@@ -24,6 +25,5 @@
 
 ## Coding Style & Naming Conventions
 
-- GoLang: always lint the code with `make lint`
 - Tests end with _test.go
 - Always prefer early returns over else blocks when possible

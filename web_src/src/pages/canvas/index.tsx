@@ -34,13 +34,13 @@ export function Canvas() {
     }
   }, [canvasName]);
 
-  // Set initial component sidebar state based on canvas contents
+  // Set initial component sidebar state based on canvas contents only on initial load
   useEffect(() => {
     if (!isLoading) {
       const hasCanvasComponents = stages.length > 0 || eventSources.length > 0 || connectionGroups.length > 0;
       setIsComponentSidebarOpen(!hasCanvasComponents);
     }
-  }, [isLoading, stages.length, eventSources.length, connectionGroups.length]);
+  }, [isLoading]); // Only run when loading state changes, not when canvas contents change
 
   const getActiveViewFromHash = (): CanvasView => {
     const hash = location.hash.substring(1);
