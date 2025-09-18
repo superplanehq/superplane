@@ -49,6 +49,10 @@ func ExecutionResultReasonToProto(reason string) pb.Execution_ResultReason {
 		return pb.Execution_RESULT_REASON_ERROR
 	case models.ResultReasonMissingOutputs:
 		return pb.Execution_RESULT_REASON_MISSING_OUTPUTS
+	case models.ResultReasonTimeout:
+		return pb.Execution_RESULT_REASON_TIMEOUT
+	case models.ResultReasonUser:
+		return pb.Execution_RESULT_REASON_USER
 	default:
 		return pb.Execution_RESULT_REASON_OK
 	}

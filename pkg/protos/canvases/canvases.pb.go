@@ -642,6 +642,8 @@ const (
 	Execution_RESULT_REASON_OK              Execution_ResultReason = 0
 	Execution_RESULT_REASON_ERROR           Execution_ResultReason = 1
 	Execution_RESULT_REASON_MISSING_OUTPUTS Execution_ResultReason = 2
+	Execution_RESULT_REASON_TIMEOUT         Execution_ResultReason = 3
+	Execution_RESULT_REASON_USER            Execution_ResultReason = 4
 )
 
 // Enum value maps for Execution_ResultReason.
@@ -650,11 +652,15 @@ var (
 		0: "RESULT_REASON_OK",
 		1: "RESULT_REASON_ERROR",
 		2: "RESULT_REASON_MISSING_OUTPUTS",
+		3: "RESULT_REASON_TIMEOUT",
+		4: "RESULT_REASON_USER",
 	}
 	Execution_ResultReason_value = map[string]int32{
 		"RESULT_REASON_OK":              0,
 		"RESULT_REASON_ERROR":           1,
 		"RESULT_REASON_MISSING_OUTPUTS": 2,
+		"RESULT_REASON_TIMEOUT":         3,
+		"RESULT_REASON_USER":            4,
 	}
 )
 
@@ -8179,7 +8185,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xa1\a\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xd5\a\n" +
 	"\tExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x121\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1b.Superplane.Execution.StateR\x05state\x124\n" +
@@ -8207,11 +8213,13 @@ const file_canvases_proto_rawDesc = "" +
 	"\x0eRESULT_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rRESULT_PASSED\x10\x01\x12\x11\n" +
 	"\rRESULT_FAILED\x10\x02\x12\x14\n" +
-	"\x10RESULT_CANCELLED\x10\x03\"`\n" +
+	"\x10RESULT_CANCELLED\x10\x03\"\x93\x01\n" +
 	"\fResultReason\x12\x14\n" +
 	"\x10RESULT_REASON_OK\x10\x00\x12\x17\n" +
 	"\x13RESULT_REASON_ERROR\x10\x01\x12!\n" +
-	"\x1dRESULT_REASON_MISSING_OUTPUTS\x10\x02\"e\n" +
+	"\x1dRESULT_REASON_MISSING_OUTPUTS\x10\x02\x12\x19\n" +
+	"\x15RESULT_REASON_TIMEOUT\x10\x03\x12\x16\n" +
+	"\x12RESULT_REASON_USER\x10\x04\"e\n" +
 	"\x11ExecutionResource\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +

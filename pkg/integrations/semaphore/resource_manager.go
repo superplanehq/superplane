@@ -47,13 +47,13 @@ func (i *SemaphoreResourceManager) Status(resourceType, id string, _ integration
 	case ResourceTypeWorkflow:
 		resource, err := i.getWorkflow(id)
 		if err != nil {
-			return nil, fmt.Errorf("workflow %s not found", id)
+			return nil, fmt.Errorf("workflow %s not found: %v", id, err)
 		}
 
 		workflow := resource.(*Workflow)
 		resource, err = i.getPipeline(workflow.InitialPplID)
 		if err != nil {
-			return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
+			return nil, fmt.Errorf("pipeline %s not found: %v", workflow.InitialPplID, err)
 		}
 
 		pipeline := resource.(*Pipeline)

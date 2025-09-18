@@ -68,7 +68,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	//
 	if execution.CancelledAt != nil {
 		logger.Info("Execution cancelled")
-		return w.CancelExecution(logger, execution)
+		return w.CancelExecution(logger, execution, models.ResultReasonUser)
 	}
 
 	//
@@ -76,7 +76,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	//
 	if execution.IsTimedOut(w.nowFunc(), w.ExecutionTimeout) {
 		logger.Info("Execution timed out")
-		return w.CancelExecution(logger, execution)
+		return w.CancelExecution(logger, execution, models.ResultReasonTimeout)
 	}
 
 	//
@@ -147,7 +147,7 @@ func (w *ExecutionPoller) finishExecution(logger *log.Entry, stage *models.Stage
 	return nil
 }
 
-func (w *ExecutionPoller) CancelExecution(logger *log.Entry, execution *models.StageExecution) error {
+func (w *ExecutionPoller) CancelExecution(logger *log.Entry, execution *models.StageExecution, reason string) error {
 	resources, err := execution.Resources()
 	if err != nil {
 		return err
@@ -165,7 +165,7 @@ func (w *ExecutionPoller) CancelExecution(logger *log.Entry, execution *models.S
 		return err
 	}
 
-	return w.finishExecution(logger, stage, execution, models.ResultCancelled, "", "")
+	return w.finishExecution(logger, stage, execution, models.ResultCancelled, reason, "")
 }
 
 func (w *ExecutionPoller) cancelResource(logger *log.Entry, resource *models.ExecutionResource) error {

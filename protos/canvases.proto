@@ -894,6 +894,8 @@ message Execution {
     RESULT_REASON_OK = 0;
     RESULT_REASON_ERROR = 1;
     RESULT_REASON_MISSING_OUTPUTS = 2;
+    RESULT_REASON_TIMEOUT = 3;
+    RESULT_REASON_USER = 4;
   }
 
   string id = 1;

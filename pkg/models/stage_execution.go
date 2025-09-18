@@ -26,6 +26,8 @@ const (
 	ResultCancelled = "cancelled"
 
 	ResultReasonError          = "error"
+	ResultReasonTimeout        = "timeout"
+	ResultReasonUser           = "user"
 	ResultReasonMissingOutputs = "missing-outputs"
 )
 

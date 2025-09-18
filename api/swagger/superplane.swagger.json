@@ -2759,7 +2759,9 @@
       "enum": [
         "RESULT_REASON_OK",
         "RESULT_REASON_ERROR",
-        "RESULT_REASON_MISSING_OUTPUTS"
+        "RESULT_REASON_MISSING_OUTPUTS",
+        "RESULT_REASON_TIMEOUT",
+        "RESULT_REASON_USER"
       ],
       "default": "RESULT_REASON_OK"
     },
