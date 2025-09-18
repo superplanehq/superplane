@@ -13,7 +13,9 @@ interface NodePositions {
 
 export const transformEventSourcesToNodes = (
   eventSources: EventSourceWithEvents[],
-  nodePositions: NodePositions
+  nodePositions: NodePositions,
+  editingEventSourceId?: string | null,
+  focusedNodeId?: string | null
 ): AllNodeType[] => {
   return eventSources.map((es, idx) => {
     const lastEvents = es.events
@@ -23,12 +25,16 @@ export const transformEventSourcesToNodes = (
           return timeB - timeA;
         }).slice(0, 3)
       : [];
-    
+
+    const nodeId = es.metadata?.id || '';
+    const isEditing = editingEventSourceId === nodeId;
+    const isFocused = focusedNodeId === nodeId;
+
     return ({
-      id: es.metadata?.id || '',
+      id: nodeId,
       type: 'event_source',
       data: {
-        id: es.metadata?.id || '',
+        id: nodeId,
         name: es.metadata?.name,
         description: es.metadata?.description,
         eventFilters: es.eventFilters,
@@ -37,7 +43,8 @@ export const transformEventSourcesToNodes = (
         resource: es.spec?.resource,
         eventSourceType: es.eventSourceType,
       },
-      position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
+      position: nodePositions[nodeId] || { x: 0, y: idx * 320 },
+      zIndex: isEditing ? 1000 : (isFocused ? 500 : 1),
     }) as unknown as AllNodeType;
   });
 };
@@ -45,58 +52,76 @@ export const transformEventSourcesToNodes = (
 export const transformStagesToNodes = (
   stages: Stage[],
   nodePositions: NodePositions,
-  approveStageEvent: (eventId: string, stageId: string) => void
+  approveStageEvent: (eventId: string, stageId: string) => void,
+  editingStageId?: string | null,
+  focusedNodeId?: string | null
 ): AllNodeType[] => {
-  return stages.map((st, idx) => ({
-    id: st.metadata?.id || '',
-    type: 'stage',
-    data: {
-      name: st.metadata?.name || '',
-      labels: [],
-      status: "",
-      description: st.metadata?.description || '',
-      icon: "storage",
-      queues: st.queue || [],
-      connections: st.spec?.connections || [],
-      conditions: st.spec?.conditions || [],
-      outputs: st.spec?.outputs || [],
-      inputs: st.spec?.inputs || [],
-      inputMappings: st.spec?.inputMappings || [],
-      secrets: st.spec?.secrets || [],
-      executor: st.spec?.executor,
-      approveStageEvent: (event: SuperplaneStageEvent) => {
-        approveStageEvent(event.id!, st.metadata?.id || '');
+  return stages.map((st, idx) => {
+    const nodeId = st.metadata?.id || '';
+    const isEditing = editingStageId === nodeId;
+    const isFocused = focusedNodeId === nodeId;
+
+    return ({
+      id: nodeId,
+      type: 'stage',
+      data: {
+        name: st.metadata?.name || '',
+        labels: [],
+        status: "",
+        description: st.metadata?.description || '',
+        icon: "storage",
+        queues: st.queue || [],
+        connections: st.spec?.connections || [],
+        conditions: st.spec?.conditions || [],
+        outputs: st.spec?.outputs || [],
+        inputs: st.spec?.inputs || [],
+        inputMappings: st.spec?.inputMappings || [],
+        secrets: st.spec?.secrets || [],
+        executor: st.spec?.executor,
+        approveStageEvent: (event: SuperplaneStageEvent) => {
+          approveStageEvent(event.id!, nodeId);
+        },
+        isDraft: st.isDraft || false
       },
-      isDraft: st.isDraft || false
-    },
-    position: nodePositions[st.metadata?.id || ''] || {
-      x: 600 * ((st.spec?.connections?.length || 1)),
-      y: (idx - 1) * 400
-    },
-  } as unknown as AllNodeType));
+      position: nodePositions[nodeId] || {
+        x: 600 * ((st.spec?.connections?.length || 1)),
+        y: (idx - 1) * 400
+      },
+      zIndex: isEditing ? 1000 : (isFocused ? 500 : 1),
+    } as unknown as AllNodeType);
+  });
 };
 
 export const transformConnectionGroupsToNodes = (
   connectionGroups: SuperplaneConnectionGroup[],
-  nodePositions: NodePositions
+  nodePositions: NodePositions,
+  editingConnectionGroupId?: string | null,
+  focusedNodeId?: string | null
 ): AllNodeType[] => {
-  return connectionGroups.map((g, idx) => ({
-    id: g.metadata?.id || '',
-    type: 'connection_group',
-    data: {
-      id: g.metadata?.id || '',
-      name: g.metadata?.name || '',
-      description: g.metadata?.description || '',
-      connections: g.spec?.connections || [],
-      groupBy: g.spec?.groupBy || [],
-    },
-    position: nodePositions[g.metadata?.id || ''] || {
-      x: 600 * ((g.spec?.connections?.length || 1)),
-      y: (idx - 1) * 400
-    },
-    width: DEFAULT_WIDTH,
-    height: DEFAULT_HEIGHT,
-  } as unknown as AllNodeType));
+  return connectionGroups.map((g, idx) => {
+    const nodeId = g.metadata?.id || '';
+    const isEditing = editingConnectionGroupId === nodeId;
+    const isFocused = focusedNodeId === nodeId;
+
+    return ({
+      id: nodeId,
+      type: 'connection_group',
+      data: {
+        id: nodeId,
+        name: g.metadata?.name || '',
+        description: g.metadata?.description || '',
+        connections: g.spec?.connections || [],
+        groupBy: g.spec?.groupBy || [],
+      },
+      position: nodePositions[nodeId] || {
+        x: 600 * ((g.spec?.connections?.length || 1)),
+        y: (idx - 1) * 400
+      },
+      width: DEFAULT_WIDTH,
+      height: DEFAULT_HEIGHT,
+      zIndex: isEditing ? 1000 : (isFocused ? 500 : 1),
+    } as unknown as AllNodeType);
+  });
 };
 
 export const transformToEdges = (

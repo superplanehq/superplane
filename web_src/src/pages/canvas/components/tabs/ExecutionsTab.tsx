@@ -131,6 +131,7 @@ export const ExecutionsTab = ({ selectedStage, organizationId, canvasId, cancelS
                   discardedBy={getDiscardedByName(execution, userDisplayNames)}
                   eventId={sourceEvent?.id}
                   sourceEvent={sourceEvent}
+                  cancelledAt={execution.cancelledAt}
                   onCancel={() => cancelStageExecution(execution.id!, selectedStage.metadata!.id!)}
                 />
               );

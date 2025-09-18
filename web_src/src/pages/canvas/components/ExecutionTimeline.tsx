@@ -62,6 +62,7 @@ export const ExecutionTimeline = ({
               discardedBy={getDiscardedByName(execution, userDisplayNames)}
               eventId={sourceEvent?.id}
               sourceEvent={sourceEvent}
+              cancelledAt={execution.cancelledAt}
               onCancel={() => onCancel(execution.id!)}
             />
           );

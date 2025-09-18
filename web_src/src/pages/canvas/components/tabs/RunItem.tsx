@@ -18,6 +18,7 @@ interface RunItemProps {
   discardedOn?: string;
   discardedBy?: string;
   sourceEvent?: SuperplaneEvent;
+  cancelledAt?: string;
   onCancel: () => void;
 }
 
@@ -37,6 +38,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   discardedOn,
   discardedBy,
   sourceEvent,
+  cancelledAt,
   onCancel,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
@@ -160,7 +162,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                   </div>
                 )}
               </div>
-              {['STATE_PENDING', 'STATE_STARTED'].includes(state) && (
+              {['STATE_PENDING', 'STATE_STARTED'].includes(state) && !cancelledAt && (
                 <span onClick={(e) => {
                   e.stopPropagation();
                   onCancel?.()
@@ -216,7 +218,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         {isExpanded && (
           <div className="mt-3 space-y-4 text-left">
             {/* Run Section */}
-            {(state === 'STATE_FINISHED' && result === 'RESULT_CANCELLED' && (discardedOn || discardedBy)) && (
+            {(cancelledAt || (state === 'STATE_FINISHED' && result === 'RESULT_CANCELLED' && (discardedOn || discardedBy))) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Run
@@ -248,6 +250,23 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                             day: 'numeric',
                             year: 'numeric'
                           })} {new Date(discardedOn).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {cancelledAt && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Cancelled on {new Date(cancelledAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(cancelledAt).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',

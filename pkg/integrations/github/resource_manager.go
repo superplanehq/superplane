@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
@@ -194,6 +195,32 @@ func (i *GitHubResourceManager) Status(resourceType, id string, parentResource i
 	default:
 		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
 	}
+}
+
+func (i *GitHubResourceManager) Cancel(resourceType, id string, parentResource integrations.Resource) error {
+	switch resourceType {
+	case ResourceTypeWorkflow:
+		return i.stopWorkflowRun(parentResource, id)
+	default:
+		return fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}
+
+func (i *GitHubResourceManager) stopWorkflowRun(parentResource integrations.Resource, id string) error {
+	runID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	//
+	// GitHub SDK returns an error even though it got a 202 response back :)
+	//
+	response, err := i.client.Actions.CancelWorkflowRunByID(context.Background(), i.Owner, parentResource.Name(), runID)
+	if response.StatusCode == http.StatusAccepted {
+		return nil
+	}
+
+	return fmt.Errorf("Cancel request for %s received status code %d: %v", id, response.StatusCode, err)
 }
 
 func (i *GitHubResourceManager) getRepository(repoName string) (integrations.Resource, error) {
