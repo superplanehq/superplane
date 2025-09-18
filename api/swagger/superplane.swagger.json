@@ -4179,6 +4179,15 @@
       "properties": {
         "id": {
           "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
         }
       }
     },

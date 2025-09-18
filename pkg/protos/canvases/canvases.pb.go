@@ -4489,6 +4489,9 @@ func (x *Execution) GetStageEvent() *StageEvent {
 type ExecutionResource struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	State         string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	Result        string                 `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4526,6 +4529,27 @@ func (*ExecutionResource) Descriptor() ([]byte, []int) {
 func (x *ExecutionResource) GetId() string {
 	if x != nil {
 		return x.Id
+	}
+	return ""
+}
+
+func (x *ExecutionResource) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *ExecutionResource) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *ExecutionResource) GetResult() string {
+	if x != nil {
+		return x.Result
 	}
 	return ""
 }
@@ -8187,9 +8211,12 @@ const file_canvases_proto_rawDesc = "" +
 	"\fResultReason\x12\x14\n" +
 	"\x10RESULT_REASON_OK\x10\x00\x12\x17\n" +
 	"\x13RESULT_REASON_ERROR\x10\x01\x12!\n" +
-	"\x1dRESULT_REASON_MISSING_OUTPUTS\x10\x02\"#\n" +
+	"\x1dRESULT_REASON_MISSING_OUTPUTS\x10\x02\"e\n" +
 	"\x11ExecutionResource\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"r\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +
+	"\x05state\x18\x03 \x01(\tR\x05state\x12\x16\n" +
+	"\x06result\x18\x04 \x01(\tR\x06result\"r\n" +
 	"\x12StageEventApproval\x12\x1f\n" +
 	"\vapproved_by\x18\x01 \x01(\tR\n" +
 	"approvedBy\x12;\n" +

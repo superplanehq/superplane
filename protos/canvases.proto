@@ -912,6 +912,9 @@ message Execution {
 
 message ExecutionResource {
   string id = 1;
+  string type = 2;
+  string state = 3;
+  string result = 4;
 }
 
 message StageEventApproval {

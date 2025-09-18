@@ -256,7 +256,10 @@ func serializeExecution(execution models.StageExecution) (*pb.Execution, error) 
 
 	for _, r := range resources {
 		e.Resources = append(e.Resources, &pb.ExecutionResource{
-			Id: r.ExternalID,
+			Id:     r.ExternalID,
+			Type:   r.ResourceType,
+			State:  r.State,
+			Result: r.Result,
 		})
 	}
 

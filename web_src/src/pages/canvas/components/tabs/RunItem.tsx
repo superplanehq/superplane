@@ -1,5 +1,5 @@
 import React, { JSX } from 'react';
-import { ExecutionResult, ExecutionResultReason, SuperplaneExecutionState, SuperplaneEvent } from '@/api-client';
+import { ExecutionResult, ExecutionResultReason, SuperplaneExecutionState, SuperplaneEvent, SuperplaneExecutionResource } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 interface RunItemProps {
@@ -11,6 +11,7 @@ interface RunItemProps {
   runId?: string;
   inputs: Record<string, string>;
   outputs: Record<string, string>;
+  resources?: SuperplaneExecutionResource[];
   timestamp: string;
   executionDuration?: string;
   eventId?: string;
@@ -36,6 +37,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   executionDuration,
   inputs,
   outputs,
+  resources,
   eventId,
   queuedOn,
   approvedOn,
@@ -345,6 +347,46 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                       </div>
                     )}
                   </div>
+
+                  {/* Resources Sub-Section */}
+                  {resources && resources.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-600">
+                      <div className="text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                        External Resources
+                      </div>
+                      <div className="space-y-2">
+                        {resources.map((resource) => (
+                          <div key={resource.id} className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MaterialSymbol name="inventory_2" size="sm" className="text-gray-500 dark:text-zinc-400 flex-shrink-0" />
+                              <div className="text-xs text-gray-800 dark:text-gray-200 font-medium break-all">
+                                {resource.id}
+                              </div>
+                            </div>
+                            <div className="pl-6 space-y-1">
+                              {resource.type && (
+                                <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                  Type: {resource.type}
+                                </div>
+                              )}
+                              <div className="space-y-1">
+                                {resource.state && (
+                                  <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                    State: <span className="font-medium">{resource.state.toLowerCase()}</span>
+                                  </div>
+                                )}
+                                {resource.result && (
+                                  <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                    Result: <span className="font-medium">{resource.result.toLowerCase()}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

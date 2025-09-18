@@ -630,6 +630,9 @@ export type SuperplaneExecution = {
 
 export type SuperplaneExecutionResource = {
     id?: string;
+    type?: string;
+    state?: string;
+    result?: string;
 };
 
 export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';

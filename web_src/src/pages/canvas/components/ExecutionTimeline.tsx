@@ -51,6 +51,7 @@ export const ExecutionTimeline = ({
               runId={execution.id}
               inputs={mapExecutionEventInputs(execution)}
               outputs={mapExecutionOutputs(execution)}
+              resources={execution.resources}
               state={execution.state || 'STATE_UNKNOWN'}
               result={execution.result || 'RESULT_UNKNOWN'}
               resultReason={execution.resultReason}
