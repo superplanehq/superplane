@@ -22,8 +22,6 @@ export interface BaseIntegrationFormProps {
   setErrors: React.Dispatch<React.SetStateAction<FormErrors>>;
   apiTokenTab: 'existing' | 'new';
   setApiTokenTab: React.Dispatch<React.SetStateAction<'existing' | 'new'>>;
-  newSecretName: string;
-  setNewSecretName: React.Dispatch<React.SetStateAction<string>>;
   newSecretToken: string;
   setNewSecretToken: React.Dispatch<React.SetStateAction<string>>;
   secrets: any[];

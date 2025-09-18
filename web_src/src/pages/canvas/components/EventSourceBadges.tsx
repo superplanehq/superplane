@@ -21,6 +21,8 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
     0
   ) || 0;
 
+  const totalEventTypes = currentEventSource?.spec?.events?.length || 0;
+
   const getResourceTypeLabel = useCallback(() => {
     if (eventSourceType === 'github') return 'Repository';
     if (eventSourceType === 'semaphore') return 'Project';
@@ -68,10 +70,14 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
       });
     }
 
-    if (totalFilters > 0) {
+    if (totalFilters > 0 || totalEventTypes > 0) {
+      const filterText = totalFilters > 0
+        ? `${totalFilters} Event ${totalFilters === 1 ? 'filter' : 'filters'}`
+        : `${totalEventTypes} Event ${totalEventTypes === 1 ? 'type' : 'types'}`;
+
       badges.push({
         icon: 'filter_list',
-        text: `${totalFilters} Event ${totalFilters === 1 ? 'filter' : 'filters'}`,
+        text: filterText,
         tooltip: (
           <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[280px]">
             <div className="space-y-3">
@@ -107,7 +113,7 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
     }
 
     return badges;
-  }, [resourceName, cleanResourceName, totalFilters, currentEventSource, integration, getResourceTypeLabel, getFilterTypeLabel, getFilterExpression]);
+  }, [resourceName, cleanResourceName, totalFilters, totalEventTypes, currentEventSource, integration, getResourceTypeLabel, getFilterTypeLabel, getFilterExpression]);
 
   if (badgeItems.length === 0) return null;
 
