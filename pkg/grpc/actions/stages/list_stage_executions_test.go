@@ -111,7 +111,7 @@ func TestListStageExecutions(t *testing.T) {
 		// Create a finished(passed) execution
 		execution := support.CreateExecution(t, r.Source, r.Stage)
 		require.NoError(t, execution.Start())
-		_, err := execution.Finish(r.Stage, models.ResultPassed)
+		_, err := execution.Finish(r.Stage, models.ResultPassed, "", "")
 		require.NoError(t, err)
 
 		// Just 1 passed execution is returned

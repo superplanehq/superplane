@@ -120,8 +120,11 @@ export const ExecutionsTab = ({ selectedStage, organizationId, canvasId, cancelS
                   runId={execution.id}
                   inputs={mapExecutionEventInputs(execution)}
                   outputs={mapExecutionOutputs(execution)}
+                  resources={execution.resources}
                   state={execution.state || 'STATE_UNKNOWN'}
                   result={execution.result || 'RESULT_UNKNOWN'}
+                  resultReason={execution.resultReason}
+                  resultMessage={execution.resultMessage}
                   timestamp={execution.createdAt || new Date().toISOString()}
                   executionDuration={formatDuration(execution.startedAt || execution.createdAt, execution.finishedAt)}
                   approvedOn={getMinApprovedAt(execution)}
@@ -132,6 +135,7 @@ export const ExecutionsTab = ({ selectedStage, organizationId, canvasId, cancelS
                   eventId={sourceEvent?.id}
                   sourceEvent={sourceEvent}
                   cancelledAt={execution.cancelledAt}
+                  finishedAt={execution.finishedAt}
                   onCancel={() => cancelStageExecution(execution.id!, selectedStage.metadata!.id!)}
                 />
               );

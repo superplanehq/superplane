@@ -415,6 +415,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       {isEditMode ? (
         <EventSourceEditModeContent
           key={yamlUpdateCounter}
+          nodeId={props.id}
           data={{
             ...props.data,
             name: eventSourceName,

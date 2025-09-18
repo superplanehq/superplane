@@ -65,14 +65,12 @@ func Test_HTTP__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		response, err := executor.Execute(spec, executors.ExecutionParameters{
+		_, err = executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 		})
 
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.False(t, response.Successful())
+		require.ErrorContains(t, err, "invalid HTTP response: status code 400 not in allowed codes")
 	})
 
 	t.Run("body contains spec payload", func(t *testing.T) {
@@ -177,14 +175,12 @@ func Test_HTTP__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		response, err := executor.Execute(spec, executors.ExecutionParameters{
+		_, err = executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 		})
 
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.False(t, response.Successful())
+		require.ErrorContains(t, err, "invalid HTTP response: status code 200 not in allowed codes")
 	})
 
 	t.Run("missing response policy in JSON handles gracefully", func(t *testing.T) {
@@ -196,15 +192,12 @@ func Test_HTTP__Execute(t *testing.T) {
 
 		jsonSpec := `{"url": "` + server.URL + `", "headers": {}, "payload": {}}`
 
-		response, err := executor.Execute([]byte(jsonSpec), executors.ExecutionParameters{
+		_, err := executor.Execute([]byte(jsonSpec), executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 		})
 
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		// With missing response policy, allowedCodes should be empty, so any status code should be unsuccessful
-		require.False(t, response.Successful())
+		require.ErrorContains(t, err, "invalid HTTP response: status code 200 not in allowed codes")
 	})
 
 	t.Run("panic regression test - nil response policy access", func(t *testing.T) {
@@ -218,14 +211,12 @@ func Test_HTTP__Execute(t *testing.T) {
 
 		// This should not panic and should handle gracefully
 		require.NotPanics(t, func() {
-			response, err := executor.Execute([]byte(jsonSpec), executors.ExecutionParameters{
+			_, err := executor.Execute([]byte(jsonSpec), executors.ExecutionParameters{
 				StageID:     stageID.String(),
 				ExecutionID: executionID.String(),
 			})
 
-			require.NoError(t, err)
-			require.NotNil(t, response)
-			require.False(t, response.Successful())
+			require.ErrorContains(t, err, "invalid HTTP response: status code 200 not in allowed codes")
 		})
 	})
 }
