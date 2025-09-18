@@ -2026,7 +2026,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 options={getInputOptions()}
                                 placeholder="Parameter value"
                                 className="text-sm"
-                                variant="inline"
                               />
                             </div>
                             <button
@@ -2164,7 +2163,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 options={getInputOptions()}
                                 placeholder="Input value"
                                 className="text-sm"
-                                variant="inline"
                               />
                             </div>
                             <button
@@ -2247,7 +2245,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 options={getInputOptions()}
                                 placeholder="Header value"
                                 className="text-sm"
-                                variant="inline"
                               />
                             </div>
                             <button

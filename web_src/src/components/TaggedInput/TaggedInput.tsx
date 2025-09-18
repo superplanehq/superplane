@@ -17,14 +17,8 @@ export interface TaggedInputProps {
   className?: string
   error?: boolean
   disabled?: boolean
-  variant?: 'default' | 'inline' // New prop to control display style
 }
 
-interface ParsedSegment {
-  type: 'text' | 'tag'
-  content: string
-  originalValue?: string // For tags, the original ${{ }} value
-}
 
 let timeoutId: NodeJS.Timeout | undefined
 
@@ -35,8 +29,7 @@ export function TaggedInput({
   placeholder = 'Enter value...',
   className,
   error = false,
-  disabled = false,
-  variant = 'default'
+  disabled = false
 }: TaggedInputProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -44,49 +37,6 @@ export function TaggedInput({
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const parseValue = (inputValue: string): ParsedSegment[] => {
-    const segments: ParsedSegment[] = []
-    const regex = /\$\{\{\s*([^}]+)\s*\}\}/g
-    let lastIndex = 0
-    let match
-
-    while ((match = regex.exec(inputValue)) !== null) {
-
-      if (match.index > lastIndex) {
-        const textContent = inputValue.slice(lastIndex, match.index)
-        if (textContent) {
-          segments.push({
-            type: 'text',
-            content: textContent
-          })
-        }
-      }
-
-
-      segments.push({
-        type: 'tag',
-        content: match[1].trim(),
-        originalValue: match[0]
-      })
-
-      lastIndex = regex.lastIndex
-    }
-
-
-    if (lastIndex < inputValue.length) {
-      const remainingText = inputValue.slice(lastIndex)
-      if (remainingText) {
-        segments.push({
-          type: 'text',
-          content: remainingText
-        })
-      }
-    }
-
-    return segments
-  }
-
-  const segments = parseValue(value)
 
   const filteredOptions = query === ''
     ? options
@@ -119,7 +69,7 @@ export function TaggedInput({
     setQuery(getCurrentExpression())
 
 
-    if (isTypingExpression(newValue) || variant === 'inline') {
+    if (isTypingExpression(newValue)) {
       if (timeoutId) {
         clearTimeout(timeoutId)
       }
@@ -181,8 +131,7 @@ export function TaggedInput({
       clearTimeout(timeoutId)
     }
 
-
-    if (variant === 'inline' && value.endsWith('$')) {
+    if (value.endsWith('$')) {
       setIsOpen(true)
       setQuery('')
     }
@@ -197,14 +146,6 @@ export function TaggedInput({
     }, 200)
   }
 
-  const removeTag = (tagIndex: number) => {
-    const tagSegments = segments.filter(s => s.type === 'tag')
-    if (tagIndex < tagSegments.length) {
-      const tagToRemove = tagSegments[tagIndex]
-      const newValue = value.replace(tagToRemove.originalValue || '', '')
-      onChange(newValue)
-    }
-  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -243,39 +184,6 @@ export function TaggedInput({
 
   return (
     <div className="relative">
-      {/* Tag Display (shows parsed segments as visual tags) - only for default variant */}
-      {variant === 'default' && segments.length > 0 && segments.some(s => s.type === 'tag') && (
-        <div className="flex flex-wrap gap-1 mb-2 p-2 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded">
-          {segments.map((segment, index) => {
-            if (segment.type === 'tag') {
-              const tagIndex = segments.slice(0, index + 1).filter(s => s.type === 'tag').length - 1
-              return (
-                <div
-                  key={index}
-                  className="inline-flex items-center bg-blue-100 dark:bg-blue-800/30 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs font-medium border border-blue-200 dark:border-blue-700"
-                >
-                  <span className="font-mono">{segment.originalValue}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tagIndex)}
-                    className="ml-1 text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100"
-                  >
-                    <MaterialSymbol name="close" size="sm" />
-                  </button>
-                </div>
-              )
-            } else if (segment.content.trim()) {
-              return (
-                <span key={index} className="inline-flex items-center bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-1 rounded text-xs">
-                  "{segment.content}"
-                </span>
-              )
-            }
-            return null
-          })}
-        </div>
-      )}
-
       {/* Input Field */}
       <div className="relative flex items-center">
         <input
@@ -297,10 +205,7 @@ export function TaggedInput({
               ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
               : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500',
             disabled && 'opacity-50 cursor-not-allowed',
-
-            variant === 'inline' && segments.some(s => s.type === 'tag') && 'text-transparent caret-zinc-900 dark:caret-zinc-100 relative',
-
-            value ? 'pr-10' : 'pr-8', // More space when both buttons are visible
+            value ? 'pr-10' : 'pr-8',
             className,
             'text-xs'
           )}
@@ -334,46 +239,6 @@ export function TaggedInput({
         )}
       </div>
 
-      {/* Inline Tag Overlay - only for inline variant */}
-      {variant === 'inline' && segments.length > 0 && segments.some(s => s.type === 'tag') && (
-        <div className={twMerge(
-          'absolute inset-0 flex items-center py-2 pointer-events-none z-10 bg-transparent overflow-hidden',
-          value ? 'px-3 pr-10' : 'px-3 pr-8' // Match input padding
-        )}>
-          <div className="flex items-center flex-nowrap gap-0 text-xs overflow-hidden font-mono max-w-full">
-            {segments.map((segment, index) => {
-              if (segment.type === 'tag') {
-                return (
-                  <span
-                    key={index}
-                    className="inline-flex items-center bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-200 px-1 py-0.5 rounded text-xs font-medium border border-blue-200 dark:border-blue-600 flex-shrink-0 max-w-fit"
-                    style={{
-                      width: `${Math.min((segment.originalValue?.length || 0) * 0.6, 20)}em`,
-                      minWidth: 'fit-content'
-                    }}
-                  >
-                    <span className="truncate">{segment.originalValue}</span>
-                  </span>
-                )
-              } else if (segment.content.trim()) {
-                return (
-                  <span
-                    key={index}
-                    className="text-zinc-700 dark:text-zinc-300 text-xs whitespace-nowrap truncate flex-shrink"
-                    style={{
-                      width: `${Math.min(segment.content.length * 0.6, 10)}em`,
-                      maxWidth: `${Math.min(segment.content.length * 0.6, 10)}em`
-                    }}
-                  >
-                    {segment.content}
-                  </span>
-                )
-              }
-              return null
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Autocomplete Dropdown */}
       {isOpen && (
