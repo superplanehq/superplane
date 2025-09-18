@@ -516,13 +516,6 @@ func (s *Stage) DeleteStageExecutionsInTransaction(tx *gorm.DB) error {
 }
 
 func (s *Stage) DeleteStageEventsInTransaction(tx *gorm.DB) error {
-	// Delete events associated with stage events
-	if err := tx.Unscoped().
-		Where("id IN (SELECT event_id FROM stage_events WHERE stage_id = ?)", s.ID).
-		Delete(&Event{}).Error; err != nil {
-		return fmt.Errorf("failed to delete events: %v", err)
-	}
-
 	if err := tx.Unscoped().Where("stage_id = ?", s.ID).Delete(&StageEvent{}).Error; err != nil {
 		return fmt.Errorf("failed to delete stage events: %v", err)
 	}
