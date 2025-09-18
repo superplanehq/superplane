@@ -79,18 +79,22 @@ export function AutoCompleteSelect({
   }
 
   const handleInputBlur = (e: React.FocusEvent) => {
-    // Don't close if clicking on the dropdown
     if (listRef.current?.contains(e.relatedTarget as Node)) {
       return
     }
-    setQuery('')
+    setTimeout(() => {
+      setQuery('')
+      setIsOpen(false)
+    }, 50)
   }
 
   const handleOptionSelect = (optionValue: string) => {
     onChange(optionValue)
     setIsOpen(false)
     setQuery('')
-    inputRef.current?.blur()
+    setTimeout(() => {
+      inputRef.current?.blur()
+    }, 50)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
