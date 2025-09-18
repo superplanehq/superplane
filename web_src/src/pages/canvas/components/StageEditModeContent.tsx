@@ -1200,7 +1200,28 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       <ConnectionSelector
                         connection={connection}
                         index={index}
-                        onConnectionUpdate={connectionManager.updateConnection}
+                        onConnectionUpdate={(index, type, name) => {
+                          connectionManager.updateConnection(index, type, name);
+                          setInputMappings(prev => {
+                            const updatedMappings = prev.map(mapping => {
+                              if (mapping.when?.triggeredBy?.connection === connection.name) {
+                                const values = mapping.values?.map(value => {
+                                  if (value.valueFrom && value.valueFrom?.eventData?.connection === connection.name) {
+                                    return { ...value, valueFrom: { ...value.valueFrom, eventData: { ...value.valueFrom.eventData, connection: name } } };
+                                  }
+                                  return value;
+                                });
+                                return {
+                                  ...mapping,
+                                  when: { triggeredBy: { connection: name } },
+                                  values
+                                };
+                              }
+                              return mapping;
+                            });
+                            return updatedMappings;
+                          });
+                        }}
                         onFilterAdd={connectionManager.addFilter}
                         onFilterUpdate={connectionManager.updateFilter}
                         onFilterRemove={connectionManager.removeFilter}
