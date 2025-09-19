@@ -22,6 +22,7 @@ const (
 	Integrations_ListIntegrations_FullMethodName    = "/Superplane.Integrations.Integrations/ListIntegrations"
 	Integrations_DescribeIntegration_FullMethodName = "/Superplane.Integrations.Integrations/DescribeIntegration"
 	Integrations_CreateIntegration_FullMethodName   = "/Superplane.Integrations.Integrations/CreateIntegration"
+	Integrations_UpdateIntegration_FullMethodName   = "/Superplane.Integrations.Integrations/UpdateIntegration"
 )
 
 // IntegrationsClient is the client API for Integrations service.
@@ -31,6 +32,7 @@ type IntegrationsClient interface {
 	ListIntegrations(ctx context.Context, in *ListIntegrationsRequest, opts ...grpc.CallOption) (*ListIntegrationsResponse, error)
 	DescribeIntegration(ctx context.Context, in *DescribeIntegrationRequest, opts ...grpc.CallOption) (*DescribeIntegrationResponse, error)
 	CreateIntegration(ctx context.Context, in *CreateIntegrationRequest, opts ...grpc.CallOption) (*CreateIntegrationResponse, error)
+	UpdateIntegration(ctx context.Context, in *UpdateIntegrationRequest, opts ...grpc.CallOption) (*UpdateIntegrationResponse, error)
 }
 
 type integrationsClient struct {
@@ -71,6 +73,16 @@ func (c *integrationsClient) CreateIntegration(ctx context.Context, in *CreateIn
 	return out, nil
 }
 
+func (c *integrationsClient) UpdateIntegration(ctx context.Context, in *UpdateIntegrationRequest, opts ...grpc.CallOption) (*UpdateIntegrationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateIntegrationResponse)
+	err := c.cc.Invoke(ctx, Integrations_UpdateIntegration_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IntegrationsServer is the server API for Integrations service.
 // All implementations should embed UnimplementedIntegrationsServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type IntegrationsServer interface {
 	ListIntegrations(context.Context, *ListIntegrationsRequest) (*ListIntegrationsResponse, error)
 	DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error)
 	CreateIntegration(context.Context, *CreateIntegrationRequest) (*CreateIntegrationResponse, error)
+	UpdateIntegration(context.Context, *UpdateIntegrationRequest) (*UpdateIntegrationResponse, error)
 }
 
 // UnimplementedIntegrationsServer should be embedded to have
@@ -95,6 +108,9 @@ func (UnimplementedIntegrationsServer) DescribeIntegration(context.Context, *Des
 }
 func (UnimplementedIntegrationsServer) CreateIntegration(context.Context, *CreateIntegrationRequest) (*CreateIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateIntegration not implemented")
+}
+func (UnimplementedIntegrationsServer) UpdateIntegration(context.Context, *UpdateIntegrationRequest) (*UpdateIntegrationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateIntegration not implemented")
 }
 func (UnimplementedIntegrationsServer) testEmbeddedByValue() {}
 
@@ -170,6 +186,24 @@ func _Integrations_CreateIntegration_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Integrations_UpdateIntegration_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateIntegrationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IntegrationsServer).UpdateIntegration(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Integrations_UpdateIntegration_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IntegrationsServer).UpdateIntegration(ctx, req.(*UpdateIntegrationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Integrations_ServiceDesc is the grpc.ServiceDesc for Integrations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -188,6 +222,10 @@ var Integrations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateIntegration",
 			Handler:    _Integrations_CreateIntegration_Handler,
+		},
+		{
+			MethodName: "UpdateIntegration",
+			Handler:    _Integrations_UpdateIntegration_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
