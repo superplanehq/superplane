@@ -174,7 +174,9 @@ export const Button = forwardRef(function Button(
   const classes = clsx(
     className,
     styles.base,
-    outline ? styles.outline : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
+    outline ? styles.outline : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc']),
+    // Handle cursor styling with data attributes for better specificity
+    'data-disabled:!cursor-not-allowed !cursor-pointer'
   )
 
   return 'href' in props ? (
@@ -182,7 +184,7 @@ export const Button = forwardRef(function Button(
       <TouchTarget>{children}</TouchTarget>
     </Link>
   ) : (
-    <Headless.Button {...props} className={clsx(classes, 'cursor-default')} ref={ref}>
+    <Headless.Button {...props} className={classes} ref={ref}>
       <TouchTarget>{children}</TouchTarget>
     </Headless.Button>
   )
