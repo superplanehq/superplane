@@ -19,6 +19,7 @@ import { EventStateItem, EventState } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
 import { EventSourceZeroState } from '../EventSourceZeroState';
 import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
+import { EmitEventModal } from '../EmitEventModal';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -54,6 +55,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
   const [integrationError, setIntegrationError] = useState(false);
+  const [showEmitEventModal, setShowEmitEventModal] = useState(false);
   const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
@@ -377,6 +379,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
       {/* Header Section */}
       <div className="px-4 py-4 justify-between items-start">
+        <div className="flex items-start justify-between w-full">
         <div className="flex items-start flex-1 min-w-0">
           <div className='max-w-8 mt-1 flex items-center justify-center'>
             {EventSourceImageMap[eventSourceType as keyof typeof EventSourceImageMap]}
@@ -411,6 +414,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               />}
             </div>
           </div>
+        </div>
+        {!isEditMode && currentEventSource?.metadata?.id && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowEmitEventModal(true);
+            }}
+            className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+            title="Emit a test event"
+          >
+            <MaterialSymbol name="send" size="sm" />
+          </button>
+        )}
         </div>
         {!isEditMode && (
           <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
@@ -516,6 +532,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         onConfirm={handleDiscardEventSource}
         onCancel={() => setShowDiscardConfirm(false)}
       />
+
+      {currentEventSource?.metadata?.id && (
+        <EmitEventModal
+          isOpen={showEmitEventModal}
+          onClose={() => setShowEmitEventModal(false)}
+          sourceId={currentEventSource.metadata.id}
+          sourceName={currentEventSource.metadata.name || ''}
+          sourceType="event_source"
+          lastEvent={currentEventSource.events?.[0]}
+        />
+      )}
     </div>
   );
 }

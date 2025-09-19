@@ -196,6 +196,12 @@ func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsReques
 	return events.ListEvents(ctx, canvasID, req.SourceType, req.SourceId, req.Limit, req.Before)
 }
 
+func (s *CanvasService) CreateEvent(ctx context.Context, req *pb.CreateEventRequest) (*pb.CreateEventResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	rawData := req.Raw.AsMap()
+	return events.CreateEvent(ctx, canvasID, req.SourceType, req.SourceId, req.Type, rawData)
+}
+
 func (s *CanvasService) ListEventRejections(ctx context.Context, req *pb.ListEventRejectionsRequest) (*pb.ListEventRejectionsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return canvases.ListEventRejections(ctx, canvasID, req.TargetType, req.TargetId, req.Limit, req.Before)

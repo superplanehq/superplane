@@ -22,6 +22,7 @@ import { twMerge } from 'tailwind-merge';
 import { StageQueueSection } from '../StageQueueSection';
 import { EventTriggerBadge } from '../EventTriggerBadge';
 import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
+import { EmitEventModal } from '../EmitEventModal';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
@@ -40,6 +41,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const [stageNameDirtyByUser, setStageNameDirtyByUser] = useState(false);
   const [integrationError, setIntegrationError] = useState(false);
+  const [showEmitEventModal, setShowEmitEventModal] = useState(false);
   const triggerSectionValidationRef = useRef<(() => void) | null>(null);
   const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
@@ -554,6 +556,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
         {/* Header Section */}
         <div className={twMerge('px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>
+          <div className="flex items-start justify-between w-full">
           <div className="flex items-start flex-1 min-w-0">
             <div className='max-w-8 mt-1 flex items-center justify-center'>
               {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
@@ -587,6 +590,19 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 />}
               </div>
             </div>
+          </div>
+          {!isEditMode && currentStage?.metadata?.id && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEmitEventModal(true);
+              }}
+              className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+              title="Emit a test event"
+            >
+              <MaterialSymbol name="send" size="sm" />
+            </button>
+          )}
           </div>
           {!isEditMode && (
             <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{stageDescription || ''}</div>
@@ -723,6 +739,16 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           onConfirm={handleDiscardStage}
           onCancel={() => setShowDiscardConfirm(false)}
         />
+
+        {currentStage?.metadata?.id && (
+          <EmitEventModal
+            isOpen={showEmitEventModal}
+            onClose={() => setShowEmitEventModal(false)}
+            sourceId={currentStage.metadata.id}
+            sourceName={currentStage.metadata.name || ''}
+            sourceType="stage"
+          />
+        )}
       </div>
 
     </div>

@@ -124,6 +124,8 @@ docs/SuperplaneCreateCanvasRequest.md
 docs/SuperplaneCreateCanvasResponse.md
 docs/SuperplaneCreateConnectionGroupBody.md
 docs/SuperplaneCreateConnectionGroupResponse.md
+docs/SuperplaneCreateEventBody.md
+docs/SuperplaneCreateEventResponse.md
 docs/SuperplaneCreateEventSourceBody.md
 docs/SuperplaneCreateEventSourceResponse.md
 docs/SuperplaneCreateStageBody.md
@@ -293,6 +295,8 @@ model_superplane_create_canvas_request.go
 model_superplane_create_canvas_response.go
 model_superplane_create_connection_group_body.go
 model_superplane_create_connection_group_response.go
+model_superplane_create_event_body.go
+model_superplane_create_event_response.go
 model_superplane_create_event_source_body.go
 model_superplane_create_event_source_response.go
 model_superplane_create_stage_body.go

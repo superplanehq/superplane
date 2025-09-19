@@ -12,6 +12,7 @@ import { EditModeActionButtons } from '../EditModeActionButtons';
 import { twMerge } from 'tailwind-merge';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { createConnectionGroupDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
+import { EmitEventModal } from '../EmitEventModal';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
@@ -22,6 +23,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [showEmitEventModal, setShowEmitEventModal] = useState(false);
   const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
@@ -304,6 +306,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
       {/* Header Section */}
       <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-start justify-between w-full">
         <div className="flex items-start flex-1 min-w-0">
           <div className='max-w-8 mt-1 flex items-center justify-center'>
             <MaterialSymbol name="account_tree" size="lg" />
@@ -337,6 +340,19 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
               />}
             </div>
           </div>
+        </div>
+        {!isEditMode && currentConnectionGroup?.metadata?.id && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowEmitEventModal(true);
+            }}
+            className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+            title="Emit a test event"
+          >
+            <MaterialSymbol name="send" size="sm" />
+          </button>
+        )}
         </div>
         {!isEditMode && (
           <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || ''}</div>
@@ -439,6 +455,17 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
         onConfirm={handleDiscardConnectionGroup}
         onCancel={() => setShowDiscardConfirm(false)}
       />
+
+      {currentConnectionGroup?.metadata?.id && (
+        <EmitEventModal
+          isOpen={showEmitEventModal}
+          onClose={() => setShowEmitEventModal(false)}
+          sourceId={currentConnectionGroup.metadata.id}
+          sourceName={currentConnectionGroup.metadata.name || ''}
+          sourceType="connection_group"
+          lastEvent={currentConnectionGroup.events?.[0]}
+        />
+      )}
     </div>
   );
 }
