@@ -11,6 +11,7 @@ import { InlineEditable } from '../InlineEditable';
 import { EditModeActionButtons } from '../EditModeActionButtons';
 import { twMerge } from 'tailwind-merge';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { createConnectionGroupDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
@@ -200,42 +201,17 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     }
   };
 
-  const generateUniqueConnectionGroupNameCopy = (baseName: string): string => {
-    const allConnectionGroupNames = allConnectionGroups.map(cg => cg.metadata?.name?.toLowerCase() || '');
-    let copyName = `${baseName}-copy`;
-    let copyNumber = 1;
-
-    if (allConnectionGroupNames.includes(copyName.toLowerCase())) {
-      while (allConnectionGroupNames.includes(`${copyName}-${copyNumber}`.toLowerCase())) {
-        copyNumber++;
-      }
-      copyName = `${copyName}-${copyNumber}`;
-    }
-
-    return copyName;
-  };
-
   const handleDuplicateConnectionGroup = () => {
     if (!currentConnectionGroup) return;
 
-    const duplicateName = generateUniqueConnectionGroupNameCopy(currentConnectionGroup.metadata?.name || 'Connection Group');
-
-    const duplicatedConnectionGroup = {
-      ...currentConnectionGroup,
-      metadata: {
-        ...currentConnectionGroup.metadata,
-        id: Date.now().toString(),
-        name: duplicateName,
-      },
-      events: []
-    };
-
+    const duplicatedConnectionGroup = createConnectionGroupDuplicate(currentConnectionGroup, allConnectionGroups);
     addConnectionGroup(duplicatedConnectionGroup, true);
 
-    setTimeout(() => {
-      setFocusedNodeId(duplicatedConnectionGroup.metadata?.id || '');
-      setEditingConnectionGroup(duplicatedConnectionGroup.metadata?.id || '');
-    }, 100);
+    focusAndEditNode(
+      duplicatedConnectionGroup.metadata?.id || '',
+      setFocusedNodeId,
+      setEditingConnectionGroup
+    );
   };
 
   const handleYamlApply = useCallback((updatedData: unknown) => {

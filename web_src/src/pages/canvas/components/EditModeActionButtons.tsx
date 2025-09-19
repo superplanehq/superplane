@@ -75,17 +75,22 @@ export function EditModeActionButtons({
             Cancel
           </button>
 
+          {!isNewNode && onDuplicate && (
+            <button
+              onClick={onDuplicate}
+              className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              title="Duplicate"
+            >
+              <MaterialSymbol name="content_copy" size="md" />
+              Duplicate
+            </button>
+          )}
+
           {!isNewNode && <Dropdown>
             <DropdownButton plain className='flex items-center gap-2'>
               <MaterialSymbol name="more_vert" size="md" />
             </DropdownButton>
             <DropdownMenu anchor="bottom start">
-              {onDuplicate && (
-                <DropdownItem className='flex items-center gap-2' onClick={onDuplicate}>
-                  <MaterialSymbol name="content_copy" size="md" />
-                  <DropdownLabel>Duplicate</DropdownLabel>
-                </DropdownItem>
-              )}
               <DropdownItem className='flex items-center gap-2' onClick={onDiscard}>
                 <MaterialSymbol name="delete" size="md" />
                 <DropdownLabel>Delete</DropdownLabel>
@@ -122,17 +127,22 @@ export function EditModeActionButtons({
         Edit
       </button>
 
+      {onDuplicate && (
+        <button
+          onClick={onDuplicate}
+          className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+          title="Duplicate"
+        >
+          <MaterialSymbol name="content_copy" size="md" />
+          Duplicate
+        </button>
+      )}
+
       <Dropdown>
         <DropdownButton plain className='flex items-center gap-2'>
           <MaterialSymbol name="more_vert" size="md" />
         </DropdownButton>
         <DropdownMenu anchor="bottom start">
-          {onDuplicate && (
-            <DropdownItem className='flex items-center gap-2' onClick={onDuplicate}>
-              <MaterialSymbol name="content_copy" size="md" />
-              <DropdownLabel>Duplicate</DropdownLabel>
-            </DropdownItem>
-          )}
           <DropdownItem className='flex items-center gap-2' onClick={onDiscard}>
             <MaterialSymbol name="delete" size="md" />
             <DropdownLabel>Delete</DropdownLabel>

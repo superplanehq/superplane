@@ -21,6 +21,7 @@ import { IOTooltip } from './IOTooltip';
 import { twMerge } from 'tailwind-merge';
 import { StageQueueSection } from '../StageQueueSection';
 import { EventTriggerBadge } from '../EventTriggerBadge';
+import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
@@ -375,44 +376,17 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
-  const generateUniqueStageNameCopy = (baseName: string): string => {
-    const allStageNames = allStages.map(stage => stage.metadata?.name?.toLowerCase() || '');
-    let copyName = `${baseName}-copy`;
-    let copyNumber = 1;
-
-    if (allStageNames.includes(copyName.toLowerCase())) {
-      while (allStageNames.includes(`${copyName}-${copyNumber}`.toLowerCase())) {
-        copyNumber++;
-      }
-      copyName = `${copyName}-${copyNumber}`;
-    }
-
-    return copyName;
-  };
-
   const handleDuplicateStage = () => {
     if (!currentStage) return;
 
-    const duplicateName = generateUniqueStageNameCopy(currentStage.metadata?.name || 'Stage');
-
-    const duplicatedStage = {
-      ...currentStage,
-      metadata: {
-        ...currentStage.metadata,
-        id: Date.now().toString(),
-        name: duplicateName,
-      },
-      queue: [],
-      executions: [],
-      isDraft: true
-    };
-
+    const duplicatedStage = createStageDuplicate(currentStage, allStages);
     addStage(duplicatedStage, true, true);
 
-    setTimeout(() => {
-      setFocusedNodeId(duplicatedStage.metadata?.id || '');
-      setEditingStage(duplicatedStage.metadata?.id || '');
-    }, 100);
+    focusAndEditNode(
+      duplicatedStage.metadata?.id || '',
+      setFocusedNodeId,
+      setEditingStage
+    );
   };
 
   const handleYamlApply = (updatedData: unknown) => {

@@ -18,6 +18,7 @@ import { useIntegrations } from '../../hooks/useIntegrations';
 import { EventStateItem, EventState } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
 import { EventSourceZeroState } from '../EventSourceZeroState';
+import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -247,42 +248,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
-  const generateUniqueEventSourceNameCopy = (baseName: string): string => {
-    const allEventSourceNames = allEventSources.map(es => es.metadata?.name?.toLowerCase() || '');
-    let copyName = `${baseName}-copy`;
-    let copyNumber = 1;
-
-    if (allEventSourceNames.includes(copyName.toLowerCase())) {
-      while (allEventSourceNames.includes(`${copyName}-${copyNumber}`.toLowerCase())) {
-        copyNumber++;
-      }
-      copyName = `${copyName}-${copyNumber}`;
-    }
-
-    return copyName;
-  };
-
   const handleDuplicateEventSource = () => {
     if (!currentEventSource) return;
 
-    const duplicateName = generateUniqueEventSourceNameCopy(currentEventSource.metadata?.name || 'Event Source');
-
-    const duplicatedEventSource = {
-      ...currentEventSource,
-      metadata: {
-        ...currentEventSource.metadata,
-        id: Date.now().toString(),
-        name: duplicateName,
-      },
-      events: []
-    };
-
+    const duplicatedEventSource = createEventSourceDuplicate(currentEventSource, allEventSources);
     addEventSource(duplicatedEventSource, true);
 
-    setTimeout(() => {
-      setFocusedNodeId(duplicatedEventSource.metadata?.id || '');
-      setEditingEventSource(duplicatedEventSource.metadata?.id || '');
-    }, 100);
+    focusAndEditNode(
+      duplicatedEventSource.metadata?.id || '',
+      setFocusedNodeId,
+      setEditingEventSource
+    );
   };
 
   const handleYamlApply = (updatedData: unknown) => {
