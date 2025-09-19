@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { 
+import {
   integrationsListIntegrations,
   integrationsCreateIntegration,
   integrationsDescribeIntegration,
+  integrationsUpdateIntegration,
 } from '../../../api-client/sdk.gen'
 import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
-import type { IntegrationsCreateIntegrationData } from '../../../api-client/types.gen'
+import type { IntegrationsCreateIntegrationData, IntegrationsUpdateIntegrationData } from '../../../api-client/types.gen'
 
 export const integrationKeys = {
   all: ['integrations'] as const,
@@ -108,21 +109,53 @@ export const useCreateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_
   })
 }
 
-export const useUpdateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", _integrationId: string) => {
+export const useUpdateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (params: UpdateIntegrationParams) => {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      return { success: true, integrationId: params.id }
+      const integration: IntegrationsUpdateIntegrationData['body'] = {
+        domainId,
+        domainType,
+        integration: {
+          metadata: {
+            name: params.name,
+            domainId: domainId,
+            domainType: domainType,
+          },
+          spec: {
+            type: params.type,
+            url: params.url,
+            auth: {
+              use: params.authType,
+              ...(params.authType === 'AUTH_TYPE_TOKEN' && params.tokenSecretName && {
+                token: {
+                  valueFrom: {
+                    secret: {
+                      name: params.tokenSecretName,
+                      key: params.tokenSecretKey || 'token'
+                    }
+                  }
+                }
+              })
+            }
+          }
+        }
+      }
+
+      return await integrationsUpdateIntegration(withOrganizationHeader({
+        body: integration,
+        path: {
+          idOrName: integrationId
+        }
+      }))
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ 
-        queryKey: integrationKeys.byDomain(domainId, domainType) 
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.byDomain(domainId, domainType)
       })
-      queryClient.invalidateQueries({ 
-        queryKey: integrationKeys.detail(domainId, domainType, data.integrationId) 
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.detail(domainId, domainType, integrationId)
       })
     }
   })
