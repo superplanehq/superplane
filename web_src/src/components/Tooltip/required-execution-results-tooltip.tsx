@@ -1,27 +1,27 @@
-import Tippy from '@tippyjs/react/headless';
-import { ReactElement } from 'react';
+import Tippy from '@tippyjs/react';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import 'tippy.js/dist/tippy.css';
 
 interface RequiredExecutionResultsTooltipProps {
-  children: React.ReactNode;
+  className?: string;
 }
 
-export function RequiredExecutionResultsTooltip({ children }: RequiredExecutionResultsTooltipProps) {
+export function RequiredExecutionResultsTooltip({ className = '' }: RequiredExecutionResultsTooltipProps) {
   return (
-    <div className="flex items-center gap-2">
-      <Tippy
-        render={() => (
-          <div className="min-w-[300px] max-w-sm">
-            <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 text-sm z-50">
-              <div className="font-semibold mb-3 text-zinc-900 dark:text-zinc-100">Required Execution Results - tooltip</div>
-            </div>
-          </div>
-        )}
-        placement="top"
-        interactive={true}
-        delay={200}
+    <Tippy
+      content="Set the input's value to what it was in the last execution. You can specify whether to use the value from a passed, failed, or any previous execution."
+      placement="top"
+      arrow={true}
+      theme="dark"
+      maxWidth={300}
+    >
+      <div
+        className={`text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-help ${className}`}
+        role="button"
+        tabIndex={0}
       >
-        {children as ReactElement}
-      </Tippy>
-    </div>
+        <MaterialSymbol name="help" size="sm" />
+      </div>
+    </Tippy>
   );
 }

@@ -9,7 +9,7 @@ interface ExecutionNameTooltipProps {
 export function ExecutionNameTooltip({ className = '' }: ExecutionNameTooltipProps) {
   return (
     <Tippy
-      content="Execution Name - tooltip"
+      content="Configure a display name for all executions within this stage. You can use stage inputs as variables and combine them with static text. If not set, the Execution ID will be used as the display name."
       placement="top"
       arrow={true}
       theme="dark"

@@ -9,7 +9,7 @@ interface WorkflowTooltipProps {
 export function WorkflowTooltip({ className = '' }: WorkflowTooltipProps) {
   return (
     <Tippy
-      content="Workflow - tooltip"
+      content="The path to the GitHub Actions workflow file in your repository (e.g., .github/workflows/main.yml)."
       placement="top"
       arrow={true}
       theme="dark"

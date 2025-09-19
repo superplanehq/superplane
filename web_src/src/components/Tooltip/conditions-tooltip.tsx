@@ -9,7 +9,7 @@ interface ConditionsTooltipProps {
 export function ConditionsTooltip({ className = '' }: ConditionsTooltipProps) {
   return (
     <Tippy
-      content="Conditions - tooltip"
+      content="Set requirements that must be satisfied before execution starts, like manual approvals or time windows."
       placement="top"
       arrow={true}
       theme="dark"

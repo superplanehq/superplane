@@ -18,6 +18,7 @@ import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
+import { OutputsTooltip } from '@/components/Tooltip/outputs-tooltip';
 import { OutputsHelpTooltip } from '@/components/Tooltip/outputs-help-tooltip';
 import { ParametersTooltip } from '@/components/Tooltip';
 import { ConnectionsTooltip } from '@/components/Tooltip/connections-tooltip';
@@ -26,13 +27,10 @@ import { ConditionsTooltip } from '@/components/Tooltip/conditions-tooltip';
 import { SecretsTooltip } from '@/components/Tooltip/secrets-tooltip';
 import { ExecutorTooltip } from '@/components/Tooltip/executor-tooltip';
 import { InputMappingsTooltip } from '@/components/Tooltip/input-mappings-tooltip';
-import { ProjectNameTooltip } from '@/components/Tooltip/project-name-tooltip';
-import { ExecutionTypeTooltip } from '@/components/Tooltip/execution-type-tooltip';
 import { RefTooltip } from '@/components/Tooltip/ref-tooltip';
 import { TaskTooltip } from '@/components/Tooltip/task-tooltip';
 import { WorkflowTooltip } from '@/components/Tooltip/workflow-tooltip';
 import { PipelineFileTooltip } from '@/components/Tooltip/pipeline-file-tooltip';
-import { ExecutionNameTooltip } from '@/components/Tooltip/execution-name-tooltip';
 import { StaticValueTooltip } from '@/components/Tooltip/static-value-tooltip';
 import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
 import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
@@ -1343,10 +1341,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       }
                       editForm={
                         <div className="space-y-4">
-                          <ValidationField
-                            label="Name"
-                            error={validationErrors[`input_name_${index}`]}
-                          >
+                          <ValidationField label="Name" error={validationErrors[`input_name_${index}`]} required>
                             <input
                               type="text"
                               value={input.name || ''}
@@ -1455,11 +1450,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     />
                                                     <div className="flex items-center gap-1">
                                                       Inherit value from last execution
-                                                      <RequiredExecutionResultsTooltip>
-                                                        <div className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-help">
-                                                          <MaterialSymbol name="help" size="sm" />
-                                                        </div>
-                                                      </RequiredExecutionResultsTooltip>
+                                                      <RequiredExecutionResultsTooltip />
                                                     </div>
                                                   </label>
                                                 </div>
@@ -1547,9 +1538,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             <EditableAccordionSection
               id="outputs"
               title={
-                <div className="flex items-center gap-2">
-                  Outputs
-                  <OutputsHelpTooltip executorType={executor?.type} />
+                <div className="flex items-center">
+                  <span>Outputs</span>
+                  <OutputsTooltip className="ml-2" />
                 </div>
               }
               isOpen={openSections.includes('outputs')}
@@ -1583,7 +1574,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     editForm={
                       <div className="space-y-3">
                         <ValidationField
-                          label="Name"
+                          label={
+                            <div className="flex items-center">
+                              <span>Name</span>
+                              <OutputsHelpTooltip className="ml-2" executorType={executor.type} />
+                            </div>
+                          }
                           error={validationErrors[`output_${index}`]}
                         >
                           <input
@@ -2000,12 +1996,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     </ValidationField>
 
                     <ValidationField
-                      label={
-                        <div className="flex items-center gap-2">
-                          Project Name
-                          <ProjectNameTooltip />
-                        </div>
-                      }
+                      label="Project Name"
                       error={validationErrors.executorProject || fieldErrors.project}
                     >
                       <input
@@ -2037,12 +2028,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     </ValidationField>
 
                     <ValidationField
-                      label={
-                        <div className="flex items-center gap-2">
-                          Execution Type
-                          <ExecutionTypeTooltip />
-                        </div>
-                      }
+                      label="Execution Type"
                     >
                       <ControlledTabs
                         className="text-left m-0 w-full"
@@ -2415,12 +2401,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 {/* Unified Execution Name Field - appears for all executor types */}
                 {executor.type && (
                   <ValidationField
-                    label={
-                      <div className="flex items-center gap-2">
-                        Execution name (optional)
-                        <ExecutionNameTooltip />
-                      </div>
-                    }
+                    label="Execution name (optional)"
                   >
                     <TaggedInput
                       value={executor.name || ''}

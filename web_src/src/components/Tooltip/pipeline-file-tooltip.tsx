@@ -9,7 +9,7 @@ interface PipelineFileTooltipProps {
 export function PipelineFileTooltip({ className = '' }: PipelineFileTooltipProps) {
   return (
     <Tippy
-      content="Pipeline File - tooltip"
+      content="The path to the Semaphore pipeline file in your repository (e.g., .semaphore/semaphore.yml)."
       placement="top"
       arrow={true}
       theme="dark"

@@ -12,7 +12,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { useCanvasStore } from '../store/canvasStore';
 import { showErrorToast } from '@/utils/toast';
-import { FilterTooltip } from './FilterTooltip';
+import { EventSourceFilterTooltip } from '@/components/Tooltip/EventSourceFilterTooltip';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
 
 interface EventSourceEditModeContentProps {
@@ -747,11 +747,11 @@ curl -X POST \\
                 <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
                   <div className="flex justify-start items-center mb-2">
                     <label className="text-sm font-medium text-gray-900 dark:text-zinc-100">Filters</label>
-                    <FilterTooltip>
+                    <EventSourceFilterTooltip>
                       <div className="flex items-center ml-2">
                         <MaterialSymbol name="help" size="sm" className="text-zinc-400 hover:text-zinc-600 cursor-help" />
                       </div>
-                    </FilterTooltip>
+                    </EventSourceFilterTooltip>
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     Pro tip: Use <a href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Expr</a> to parse payload data

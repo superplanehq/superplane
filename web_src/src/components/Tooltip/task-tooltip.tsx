@@ -9,7 +9,7 @@ interface TaskTooltipProps {
 export function TaskTooltip({ className = '' }: TaskTooltipProps) {
   return (
     <Tippy
-      content="Task - tooltip"
+      content="The name of the Semaphore task to be executed."
       placement="top"
       arrow={true}
       theme="dark"

@@ -9,7 +9,7 @@ interface InputMappingsTooltipProps {
 export function InputMappingsTooltip({ className = '' }: InputMappingsTooltipProps) {
   return (
     <Tippy
-      content="Input Mappings - tooltip"
+      content="Define how an input's value is set when a new event arrives from a specified connection."
       placement="top"
       arrow={true}
       theme="dark"

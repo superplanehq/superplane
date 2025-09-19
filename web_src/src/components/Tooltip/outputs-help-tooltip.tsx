@@ -11,7 +11,7 @@ export function OutputsHelpTooltip({ className = '', executorType }: OutputsHelp
   const renderSemaphoreSection = () => (
     <div className="mb-6">
       <p className="text-xs mb-3 text-zinc-600 dark:text-zinc-400">
-        Add this to your Semaphore pipeline to push outputs using OIDC authentication:
+        From a Semaphore pipeline:
       </p>
       <CodeBlock>
         {`# Add to your .semaphore/semaphore.yml
@@ -42,7 +42,7 @@ export function OutputsHelpTooltip({ className = '', executorType }: OutputsHelp
   const renderGitHubSection = () => (
     <div className="mb-6">
       <p className="text-xs mb-3 text-zinc-600 dark:text-zinc-400">
-        Add these steps to your GitHub workflow to push outputs using OIDC. The GITHUB_ID_TOKEN must be generated in a previous step, like in the example below:
+        From a GitHub workflow:
       </p>
       <CodeBlock>
         {`# Add to your .github/workflows/*.yml
@@ -83,13 +83,16 @@ jobs:
           GITHUB_ID_TOKEN: \${{ steps.idToken.outputs.token }}
           SUPERPLANE_EXECUTION_ID: \${{ inputs.superplane_execution_id }}`}
       </CodeBlock>
+      <p className="text-xs text-zinc-500 dark:text-zinc-500">
+        <code>SUPERPLANE_EXECUTION_ID</code> is passed as an input to your GitHub workflow.
+      </p>
     </div>
   );
 
   const renderHttpSection = () => (
     <div className="mb-6">
-      <p className="text-xs mb-3 text-zinc-600 dark:text-zinc-400">
-        For HTTP executors, return outputs in your endpoint's JSON response:
+      <p className="text-xs mb-4 text-zinc-600 dark:text-zinc-400">
+        Outputs are key-value pairs that stages produce during execution. Downstream stages can then access these outputs as inputs. Here’s how to push outputs from your executions:
       </p>
       <CodeBlock>
         {`{
@@ -116,11 +119,11 @@ jobs:
       <ul className="text-xs space-y-1 text-zinc-600 dark:text-zinc-400">
         {executorType !== 'http' && (
           <>
-            <li><code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">execution_id</code> - Superplane execution identifier (passed as parameter)</li>
-            <li><code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">external_id</code> - External system's run/workflow identifier</li>
+            <li><code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">execution_id</code> - The ID of the Superplane stage execution.</li>
+            <li><code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">external_id</code> - The unique ID from the external system (e.g., <code>SEMAPHORE_WORKFLOW_ID</code>).</li>
           </>
         )}
-        <li><code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">outputs</code> - Key-value pairs of output data</li>
+        <li><code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded">outputs</code> - A JSON object of key-value pairs to be stored as outputs.</li>
       </ul>
     </div>
   );
@@ -128,10 +131,7 @@ jobs:
   const tooltipContent = (
     <div className="nodrag">
       <p className="text-xs mb-4 text-zinc-600 dark:text-zinc-400">
-        {executorType === 'http'
-          ? 'Return outputs in your HTTP endpoint\'s JSON response body.'
-          : 'Push outputs back to Superplane using the /outputs API endpoint.'
-        }
+        Outputs are key-value pairs that stages produce during execution. Downstream stages can then access these outputs as inputs. Here’s how to push outputs from your executions:
       </p>
 
       {/* Render specific section based on executor type */}
@@ -157,7 +157,7 @@ jobs:
       render={() => (
         <div onClick={(e) => e.stopPropagation()} className="max-w-[800px]">
           <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 text-sm z-50 font-normal">
-            <div className="font-semibold mb-3 text-zinc-900 dark:text-zinc-100">Pushing Outputs from Executions</div>
+            <div className="font-semibold mb-3 text-zinc-900 dark:text-zinc-100">How to Push Outputs</div>
             {tooltipContent}
           </div>
         </div>

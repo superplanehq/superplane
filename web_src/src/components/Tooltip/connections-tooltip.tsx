@@ -9,7 +9,7 @@ interface ConnectionsTooltipProps {
 export function ConnectionsTooltip({ className = '' }: ConnectionsTooltipProps) {
   return (
     <Tippy
-      content="Connections - tooltip"
+      content="Choose which event sources or stages trigger this component when they emit events."
       placement="top"
       arrow={true}
       theme="dark"

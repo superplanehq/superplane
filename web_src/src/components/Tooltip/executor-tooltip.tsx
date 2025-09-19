@@ -9,7 +9,7 @@ interface ExecutorTooltipProps {
 export function ExecutorTooltip({ className = '' }: ExecutorTooltipProps) {
   return (
     <Tippy
-      content="Executor Configuration - tooltip"
+      content="Configure what action this component will perform - specify pipelines, API endpoints, parameters, and execution settings."
       placement="top"
       arrow={true}
       theme="dark"

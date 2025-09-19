@@ -9,7 +9,7 @@ interface InputsTooltipProps {
 export function InputsTooltip({ className = '' }: InputsTooltipProps) {
   return (
     <Tippy
-      content="Inputs - tooltip"
+      content="Extract data from incoming events using JSONPath expressions to use during execution."
       placement="top"
       arrow={true}
       theme="dark"

@@ -9,7 +9,7 @@ interface SecretsTooltipProps {
 export function SecretsTooltip({ className = '' }: SecretsTooltipProps) {
   return (
     <Tippy
-      content="Secrets Management - tooltip"
+      content="Access encrypted credentials and sensitive data during execution (API keys, tokens, etc.)."
       placement="top"
       arrow={true}
       theme="dark"

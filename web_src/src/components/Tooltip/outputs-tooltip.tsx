@@ -2,14 +2,14 @@ import Tippy from '@tippyjs/react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import 'tippy.js/dist/tippy.css';
 
-interface ProjectNameTooltipProps {
+interface OutputsTooltipProps {
   className?: string;
 }
 
-export function ProjectNameTooltip({ className = '' }: ProjectNameTooltipProps) {
+export function OutputsTooltip({ className = '' }: OutputsTooltipProps) {
   return (
     <Tippy
-      content="Project Name - tooltip"
+      content="Produce data after execution that downstream components can access and use."
       placement="top"
       arrow={true}
       theme="dark"

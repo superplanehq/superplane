@@ -9,7 +9,7 @@ interface RefTooltipProps {
 export function RefTooltip({ className = '' }: RefTooltipProps) {
   return (
     <Tippy
-      content="Ref - tooltip"
+      content="The Git ref (branch, tag, or pull request) where the executor will find the workflow or pipeline YAML file to run."
       placement="top"
       arrow={true}
       theme="dark"
