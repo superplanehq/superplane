@@ -176,7 +176,7 @@ export function EventSourceEditModeContent({
       if (errorMessage.includes('project')) {
         errors.resourceName = 'Project not found. Please check the project name and ensure it exists in Semaphore.';
       } else if (errorMessage.includes('repository')) {
-        errors.resourceName = 'Repository not found. Please check the repository name and ensure it exists.';
+        errors.resourceName = 'Repository not found. Please check the repository name and ensure your Personal Access Token (PAT) has access to it.';
       }
     }
 
