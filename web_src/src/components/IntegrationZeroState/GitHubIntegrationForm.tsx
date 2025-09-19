@@ -52,6 +52,9 @@ export function GitHubIntegrationForm({
           className="w-full"
         />
         {errors.orgUrl && <ErrorMessage>{errors.orgUrl}</ErrorMessage>}
+        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+          <span className="font-semibold">Note:</span> The organization or user profile you enter here must match the owner of the Personal Access Token (PAT) you provide below.
+        </div>
       </Field>
 
       <Field>

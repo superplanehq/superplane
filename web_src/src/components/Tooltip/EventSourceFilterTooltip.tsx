@@ -1,18 +1,21 @@
 import Tippy from '@tippyjs/react/headless';
 import { ReactElement } from 'react';
 
-interface FilterTooltipProps {
+interface EventSourceFilterTooltipProps {
   children: React.ReactNode;
 }
 
-export function FilterTooltip({ children }: FilterTooltipProps) {
+export function EventSourceFilterTooltip({ children }: EventSourceFilterTooltipProps) {
   return (
     <div className="flex items-center gap-2">
       <Tippy
         render={() => (
           <div className="min-w-[300px] max-w-sm">
             <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 text-sm z-50">
-              <div className="font-semibold mb-3 text-zinc-900 dark:text-zinc-100">Filter Examples</div>
+              <div className="font-semibold mb-3 text-zinc-900 dark:text-zinc-100">Filtering Incoming Events</div>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+                Use filters to decide which incoming events are processed and forwarded by this event source. Events that do not match the filter conditions will be discarded.
+              </p>
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
                   <span className="text-zinc-500 text-base leading-none mt-1">•</span>
