@@ -166,7 +166,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     if (repositoryNotFoundMatch) {
       return {
         field: 'repository',
-        message: `Repository "${repositoryNotFoundMatch[1]}" not found`
+        message: `Repository "${repositoryNotFoundMatch[1]}" not found. Please check that the repository exists and that your Personal Access Token (PAT) has access to it.`
       };
     }
 
