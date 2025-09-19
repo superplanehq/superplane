@@ -53,7 +53,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
   const [integrationError, setIntegrationError] = useState(false);
-  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
@@ -247,6 +247,44 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
+  const generateUniqueEventSourceNameCopy = (baseName: string): string => {
+    const allEventSourceNames = allEventSources.map(es => es.metadata?.name?.toLowerCase() || '');
+    let copyName = `${baseName}-copy`;
+    let copyNumber = 1;
+
+    if (allEventSourceNames.includes(copyName.toLowerCase())) {
+      while (allEventSourceNames.includes(`${copyName}-${copyNumber}`.toLowerCase())) {
+        copyNumber++;
+      }
+      copyName = `${copyName}-${copyNumber}`;
+    }
+
+    return copyName;
+  };
+
+  const handleDuplicateEventSource = () => {
+    if (!currentEventSource) return;
+
+    const duplicateName = generateUniqueEventSourceNameCopy(currentEventSource.metadata?.name || 'Event Source');
+
+    const duplicatedEventSource = {
+      ...currentEventSource,
+      metadata: {
+        ...currentEventSource.metadata,
+        id: Date.now().toString(),
+        name: duplicateName,
+      },
+      events: []
+    };
+
+    addEventSource(duplicatedEventSource, true);
+
+    setTimeout(() => {
+      setFocusedNodeId(duplicatedEventSource.metadata?.id || '');
+      setEditingEventSource(duplicatedEventSource.metadata?.id || '');
+    }, 100);
+  };
+
   const handleYamlApply = (updatedData: unknown) => {
     // Handle YAML data application for event source
     const yamlData = updatedData as SuperplaneEventSource;
@@ -341,6 +379,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
+          onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {

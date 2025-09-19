@@ -21,7 +21,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup } = useCanvasStore();
+  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
@@ -200,6 +200,44 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     }
   };
 
+  const generateUniqueConnectionGroupNameCopy = (baseName: string): string => {
+    const allConnectionGroupNames = allConnectionGroups.map(cg => cg.metadata?.name?.toLowerCase() || '');
+    let copyName = `${baseName}-copy`;
+    let copyNumber = 1;
+
+    if (allConnectionGroupNames.includes(copyName.toLowerCase())) {
+      while (allConnectionGroupNames.includes(`${copyName}-${copyNumber}`.toLowerCase())) {
+        copyNumber++;
+      }
+      copyName = `${copyName}-${copyNumber}`;
+    }
+
+    return copyName;
+  };
+
+  const handleDuplicateConnectionGroup = () => {
+    if (!currentConnectionGroup) return;
+
+    const duplicateName = generateUniqueConnectionGroupNameCopy(currentConnectionGroup.metadata?.name || 'Connection Group');
+
+    const duplicatedConnectionGroup = {
+      ...currentConnectionGroup,
+      metadata: {
+        ...currentConnectionGroup.metadata,
+        id: Date.now().toString(),
+        name: duplicateName,
+      },
+      events: []
+    };
+
+    addConnectionGroup(duplicatedConnectionGroup, true);
+
+    setTimeout(() => {
+      setFocusedNodeId(duplicatedConnectionGroup.metadata?.id || '');
+      setEditingConnectionGroup(duplicatedConnectionGroup.metadata?.id || '');
+    }, 100);
+  };
+
   const handleYamlApply = useCallback((updatedData: unknown) => {
     // Handle YAML data application for connection group
     const yamlData = updatedData as SuperplaneConnectionGroup;
@@ -254,6 +292,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
+          onDuplicate={!isNewNode ? handleDuplicateConnectionGroup : undefined}
           isEditMode={isEditMode}
           entityType="connection group"
           entityData={currentFormData ? {

@@ -40,7 +40,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [stageNameDirtyByUser, setStageNameDirtyByUser] = useState(false);
   const [integrationError, setIntegrationError] = useState(false);
   const triggerSectionValidationRef = useRef<(() => void) | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
   const nodes = useCanvasStore(state => state.nodes);
   const currentStage = useCanvasStore(state =>
@@ -375,6 +375,46 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
+  const generateUniqueStageNameCopy = (baseName: string): string => {
+    const allStageNames = allStages.map(stage => stage.metadata?.name?.toLowerCase() || '');
+    let copyName = `${baseName}-copy`;
+    let copyNumber = 1;
+
+    if (allStageNames.includes(copyName.toLowerCase())) {
+      while (allStageNames.includes(`${copyName}-${copyNumber}`.toLowerCase())) {
+        copyNumber++;
+      }
+      copyName = `${copyName}-${copyNumber}`;
+    }
+
+    return copyName;
+  };
+
+  const handleDuplicateStage = () => {
+    if (!currentStage) return;
+
+    const duplicateName = generateUniqueStageNameCopy(currentStage.metadata?.name || 'Stage');
+
+    const duplicatedStage = {
+      ...currentStage,
+      metadata: {
+        ...currentStage.metadata,
+        id: Date.now().toString(),
+        name: duplicateName,
+      },
+      queue: [],
+      executions: [],
+      isDraft: true
+    };
+
+    addStage(duplicatedStage, true, true);
+
+    setTimeout(() => {
+      setFocusedNodeId(duplicatedStage.metadata?.id || '');
+      setEditingStage(duplicatedStage.metadata?.id || '');
+    }, 100);
+  };
+
   const handleYamlApply = (updatedData: unknown) => {
     const yamlData = updatedData as SuperplaneStage;
 
@@ -502,6 +542,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             onCancel={handleCancelEdit}
             onDiscard={() => setShowDiscardConfirm(true)}
             onEdit={() => handleEditClick({} as React.MouseEvent<HTMLButtonElement>)}
+            onDuplicate={!isNewNode ? handleDuplicateStage : undefined}
             isEditMode={isEditMode}
             entityType="stage"
             entityData={currentFormData ? {

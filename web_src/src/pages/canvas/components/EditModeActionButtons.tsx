@@ -8,6 +8,7 @@ interface EditModeActionButtonsProps {
   onCancel: () => void;
   onDiscard?: () => void;
   onEdit?: () => void; // For non-edit mode
+  onDuplicate?: () => void; // For duplicating the node
   entityType?: string; // e.g., "stage", "connection group", "event source"
   entityData?: unknown; // The current entity data for YAML editing
   onYamlApply?: (updatedData: unknown) => void; // Callback when YAML changes are applied
@@ -20,6 +21,7 @@ export function EditModeActionButtons({
   onCancel,
   onDiscard,
   onEdit,
+  onDuplicate,
   entityType = "item",
   entityData,
   onYamlApply,
@@ -78,6 +80,12 @@ export function EditModeActionButtons({
               <MaterialSymbol name="more_vert" size="md" />
             </DropdownButton>
             <DropdownMenu anchor="bottom start">
+              {onDuplicate && (
+                <DropdownItem className='flex items-center gap-2' onClick={onDuplicate}>
+                  <MaterialSymbol name="content_copy" size="md" />
+                  <DropdownLabel>Duplicate</DropdownLabel>
+                </DropdownItem>
+              )}
               <DropdownItem className='flex items-center gap-2' onClick={onDiscard}>
                 <MaterialSymbol name="delete" size="md" />
                 <DropdownLabel>Delete</DropdownLabel>
@@ -119,6 +127,12 @@ export function EditModeActionButtons({
           <MaterialSymbol name="more_vert" size="md" />
         </DropdownButton>
         <DropdownMenu anchor="bottom start">
+          {onDuplicate && (
+            <DropdownItem className='flex items-center gap-2' onClick={onDuplicate}>
+              <MaterialSymbol name="content_copy" size="md" />
+              <DropdownLabel>Duplicate</DropdownLabel>
+            </DropdownItem>
+          )}
           <DropdownItem className='flex items-center gap-2' onClick={onDiscard}>
             <MaterialSymbol name="delete" size="md" />
             <DropdownLabel>Delete</DropdownLabel>
