@@ -1,4 +1,4 @@
-import { PersistentTooltip } from './persistent-tooltip';
+import Tippy from '@tippyjs/react/headless';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { CodeBlock } from '@/components/CodeBlock/code-block';
 
@@ -153,22 +153,28 @@ jobs:
   );
 
   return (
-    <PersistentTooltip
-      content={tooltipContent}
-      title="Pushing Outputs from Executions"
-      maxWidth={800}
-      maxHeight=""
-      className={className}
+    <Tippy
+      render={() => (
+        <div onClick={(e) => e.stopPropagation()} className="max-w-[800px]">
+          <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 text-sm z-50 font-normal">
+            <div className="font-semibold mb-3 text-zinc-900 dark:text-zinc-100">Pushing Outputs from Executions</div>
+            {tooltipContent}
+          </div>
+        </div>
+      )}
+      placement="top"
+      interactive
+      delay={200}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer"
+        className={`text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer ${className}`}
         title="How to push outputs"
         role="button"
         tabIndex={0}
       >
         <MaterialSymbol name="help" size="sm" />
       </div>
-    </PersistentTooltip>
+    </Tippy>
   );
 }
