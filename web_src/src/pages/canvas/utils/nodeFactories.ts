@@ -57,6 +57,11 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
             url: '',
           },
         };
+      case 'noop':
+        return {
+          type: 'noop',
+          spec: {},
+        };
       default:
         return { type: '', spec: {} };
     }
