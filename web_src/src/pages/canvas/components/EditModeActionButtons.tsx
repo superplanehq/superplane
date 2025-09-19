@@ -8,6 +8,7 @@ interface EditModeActionButtonsProps {
   onCancel: () => void;
   onDiscard?: () => void;
   onEdit?: () => void; // For non-edit mode
+  onDuplicate?: () => void; // For duplicating the node
   entityType?: string; // e.g., "stage", "connection group", "event source"
   entityData?: unknown; // The current entity data for YAML editing
   onYamlApply?: (updatedData: unknown) => void; // Callback when YAML changes are applied
@@ -20,6 +21,7 @@ export function EditModeActionButtons({
   onCancel,
   onDiscard,
   onEdit,
+  onDuplicate,
   entityType = "item",
   entityData,
   onYamlApply,
@@ -73,6 +75,17 @@ export function EditModeActionButtons({
             Cancel
           </button>
 
+          {!isNewNode && onDuplicate && (
+            <button
+              onClick={onDuplicate}
+              className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              title="Duplicate"
+            >
+              <MaterialSymbol name="content_copy" size="md" />
+              Duplicate
+            </button>
+          )}
+
           {!isNewNode && <Dropdown>
             <DropdownButton plain className='flex items-center gap-2'>
               <MaterialSymbol name="more_vert" size="md" />
@@ -113,6 +126,17 @@ export function EditModeActionButtons({
         <MaterialSymbol name="edit" size="md" />
         Edit
       </button>
+
+      {onDuplicate && (
+        <button
+          onClick={onDuplicate}
+          className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+          title="Duplicate"
+        >
+          <MaterialSymbol name="content_copy" size="md" />
+          Duplicate
+        </button>
+      )}
 
       <Dropdown>
         <DropdownButton plain className='flex items-center gap-2'>
