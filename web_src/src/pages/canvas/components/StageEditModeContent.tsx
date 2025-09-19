@@ -982,16 +982,45 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   };
 
 
+  /**
+   * Problem: When users type input names, temporary name conflicts can occur (e.g., typing "input1"
+   * might temporarily show "input" which conflicts with another existing input). This causes input
+   * mappings to get mixed up between different inputs.
+   *
+   * Solution: Uses an invisible Unicode character (Zero-Width Non-Joiner U+200C) as a prefix to
+   * temporarily disambiguate conflicting names. This character is completely invisible to users
+   * but makes names technically unique for the system.
+   * This ensures input mappings never get mixed up during typing while keeping the UX seamless.
+   */
   const handleInputNameChange = (newName: string, index: number, input: SuperplaneInputDefinition) => {
     const oldName = input.name;
-    inputsEditor.updateItem(index, 'name', newName);
 
-    if (newName !== oldName) {
+    let hasNameConflict = inputs.some((otherInput, otherIndex) =>
+      otherIndex !== index && otherInput.name === newName && newName !== ''
+    );
+
+    if (newName.startsWith('\u200C')) {
+      const unprefixName = newName.slice(1);
+      const unprefixNameConflict = inputs.some((otherInput, otherIndex) =>
+        otherIndex !== index && otherInput.name === unprefixName && unprefixName !== ''
+      );
+
+      if (!unprefixNameConflict) {
+        hasNameConflict = false;
+        newName = unprefixName;
+      }
+    }
+
+    const finalName = hasNameConflict ? `\u200C${newName}` : newName;
+
+    inputsEditor.updateItem(index, 'name', finalName);
+
+    if (finalName !== oldName) {
       const updatedMappings = inputMappings.map(mapping => ({
         ...mapping,
         values: mapping.values?.map(value =>
           value.name === oldName
-            ? { ...value, name: newName }
+            ? { ...value, name: finalName }
             : value
         ) || []
       }));
