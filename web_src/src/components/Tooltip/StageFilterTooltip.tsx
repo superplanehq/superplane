@@ -1,17 +1,20 @@
 import Tippy from '@tippyjs/react/headless';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
-interface FiltersTooltipProps {
+interface StageFilterTooltipProps {
   className?: string;
 }
 
-export function FiltersTooltip({ className = '' }: FiltersTooltipProps) {
+export function StageFilterTooltip({ className = '' }: StageFilterTooltipProps) {
   const filterExamples = (
     <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[450px]">
-      <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">Filter Examples</div>
+      <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">Filtering Events</div>
+      <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-3">
+        Filters are used to parse event payloads. If the filter conditions are not met, the event will be ignored by the stage. Here are some examples of how to use JSONPath to filter event data.
+      </p>
       <div className="space-y-3">
         <div>
-          <div className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">Data Filters (JSONPath expressions):</div>
+          <div className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">Examples of Data Filters:</div>
           <div className="space-y-2 ml-2">
             <div>
               <div className="text-xs text-zinc-600 dark:text-zinc-400 mb-1">Equality:</div>
@@ -29,18 +32,6 @@ export function FiltersTooltip({ className = '' }: FiltersTooltipProps) {
               <div className="text-xs text-zinc-600 dark:text-zinc-400 mb-1">Nested properties:</div>
               <code className="text-xs bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
                 $.pull_request.merged == true
-              </code>
-            </div>
-            <div>
-              <div className="text-xs text-zinc-600 dark:text-zinc-400 mb-1">Array elements:</div>
-              <code className="text-xs bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
-                $.commits[0].author.name == "john.doe"
-              </code>
-            </div>
-            <div>
-              <div className="text-xs text-zinc-600 dark:text-zinc-400 mb-1">Previous stage inputs:</div>
-              <code className="text-xs bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded text-zinc-800 dark:text-zinc-200 font-mono">
-                $.inputs.DEPLOY_URL == "https://staging.example.com"
               </code>
             </div>
           </div>

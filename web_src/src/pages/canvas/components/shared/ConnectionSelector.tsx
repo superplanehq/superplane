@@ -2,7 +2,7 @@ import { SuperplaneConnection, SuperplaneConnectionType, SuperplaneFilter } from
 import { ValidationField } from './ValidationField';
 import { useConnectionOptions } from '../../hooks/useConnectionOptions';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { FiltersTooltip } from './FiltersTooltip';
+import { StageFilterTooltip } from '@/components/Tooltip/StageFilterTooltip';
 import { AutoCompleteSelect, type AutoCompleteOption } from '@/components/AutoCompleteSelect';
 
 interface ConnectionSelectorProps {
@@ -71,11 +71,11 @@ export function ConnectionSelector({
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-900 dark:text-zinc-100">Filters</label>
-              <FiltersTooltip />
+              <StageFilterTooltip />
             </div>
           </div>
           <div className="mb-3 text-xs text-zinc-600 dark:text-zinc-400">
-            Pro tip: You can use <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> expressions to build expressions
+            Pro tip: Expressions are parsed using the <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> language.
           </div>
           <div className="space-y-2">
             {(connection.filters || []).map((filter, filterIndex) => {

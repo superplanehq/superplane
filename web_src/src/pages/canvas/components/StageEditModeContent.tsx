@@ -18,8 +18,22 @@ import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
-import { OutputsHelpTooltip } from '@/components/PersistentTooltip';
+import { OutputsTooltip } from '@/components/Tooltip/outputs-tooltip';
+import { OutputsHelpTooltip } from '@/components/Tooltip/outputs-help-tooltip';
 import { ParametersTooltip } from '@/components/Tooltip';
+import { ConnectionsTooltip } from '@/components/Tooltip/connections-tooltip';
+import { InputsTooltip } from '@/components/Tooltip/inputs-tooltip';
+import { ConditionsTooltip } from '@/components/Tooltip/conditions-tooltip';
+import { SecretsTooltip } from '@/components/Tooltip/secrets-tooltip';
+import { ExecutorTooltip } from '@/components/Tooltip/executor-tooltip';
+import { InputMappingsTooltip } from '@/components/Tooltip/input-mappings-tooltip';
+import { RefTooltip } from '@/components/Tooltip/ref-tooltip';
+import { TaskTooltip } from '@/components/Tooltip/task-tooltip';
+import { WorkflowTooltip } from '@/components/Tooltip/workflow-tooltip';
+import { PipelineFileTooltip } from '@/components/Tooltip/pipeline-file-tooltip';
+import { StaticValueTooltip } from '@/components/Tooltip/static-value-tooltip';
+import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
+import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
 import { showErrorToast } from '@/utils/toast';
 import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
@@ -1176,7 +1190,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             {/* Connections Section */}
             <EditableAccordionSection
               id="connections"
-              title="Connections"
+              title={
+                <div className="flex items-center gap-2">
+                  Connections
+                  <ConnectionsTooltip />
+                </div>
+              }
               isOpen={openSections.includes('connections')}
               onToggle={handleAccordionToggle}
               isModified={isSectionModified(connections, 'connections')}
@@ -1256,7 +1275,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             {/* Inputs Section */}
             <EditableAccordionSection
               id="inputs"
-              title="Inputs"
+              title={
+                <div className="flex items-center gap-2">
+                  Inputs
+                  <InputsTooltip />
+                </div>
+              }
               isOpen={openSections.includes('inputs')}
               onToggle={handleAccordionToggle}
               isModified={isSectionModified(inputs, 'inputs')}
@@ -1317,10 +1341,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       }
                       editForm={
                         <div className="space-y-4">
-                          <ValidationField
-                            label="Name"
-                            error={validationErrors[`input_name_${index}`]}
-                          >
+                          <ValidationField label="Name" error={validationErrors[`input_name_${index}`]} required>
                             <input
                               type="text"
                               value={input.name || ''}
@@ -1347,7 +1368,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                           {/* Input Mappings for this specific input */}
                           <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
                             <ValidationField
-                              label="Input Mappings"
+                              label={
+                                <div className="flex items-center gap-2">
+                                  Input Mappings
+                                  <InputMappingsTooltip />
+                                </div>
+                              }
                               error={validationErrors[`input_mapping_${index}`]}
                             >
                               <div className="space-y-3">
@@ -1386,7 +1412,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                       onChange={() => handleValueModeChange('static', actualMappingIndex, input)}
                                                       className="w-4 h-4"
                                                     />
-                                                    Static Value
+                                                    <div className="flex items-center gap-1">
+                                                      Static Value
+                                                      <StaticValueTooltip>
+                                                        <div className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-help">
+                                                          <MaterialSymbol name="help" size="sm" />
+                                                        </div>
+                                                      </StaticValueTooltip>
+                                                    </div>
                                                   </label>
 
                                                   <label className="flex items-center gap-2 text-sm">
@@ -1397,7 +1430,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                       onChange={() => handleValueModeChange('eventData', actualMappingIndex, input)}
                                                       className="w-4 h-4"
                                                     />
-                                                    From Event Data
+                                                    <div className="flex items-center gap-1">
+                                                      From Event Data
+                                                      <ExpressionTooltip>
+                                                        <div className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-help">
+                                                          <MaterialSymbol name="help" size="sm" />
+                                                        </div>
+                                                      </ExpressionTooltip>
+                                                    </div>
                                                   </label>
 
                                                   <label className="flex items-center gap-2 text-sm">
@@ -1408,7 +1448,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                       onChange={() => handleValueModeChange('lastExecution', actualMappingIndex, input)}
                                                       className="w-4 h-4"
                                                     />
-                                                    Inherit value from last execution
+                                                    <div className="flex items-center gap-1">
+                                                      Inherit value from last execution
+                                                      <RequiredExecutionResultsTooltip />
+                                                    </div>
                                                   </label>
                                                 </div>
                                               </div>
@@ -1495,9 +1538,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             <EditableAccordionSection
               id="outputs"
               title={
-                <div className="flex items-center gap-2">
-                  Outputs
-                  <OutputsHelpTooltip executorType={executor?.type} />
+                <div className="flex items-center">
+                  <span>Outputs</span>
+                  <OutputsTooltip className="ml-2" />
                 </div>
               }
               isOpen={openSections.includes('outputs')}
@@ -1531,7 +1574,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     editForm={
                       <div className="space-y-3">
                         <ValidationField
-                          label="Name"
+                          label={
+                            <div className="flex items-center">
+                              <span>Name</span>
+                              <OutputsHelpTooltip className="ml-2" executorType={executor.type} />
+                            </div>
+                          }
                           error={validationErrors[`output_${index}`]}
                         >
                           <input
@@ -1583,7 +1631,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             {/* Conditions Section */}
             <EditableAccordionSection
               id="conditions"
-              title="Conditions"
+              title={
+                <div className="flex items-center gap-2">
+                  Conditions
+                  <ConditionsTooltip />
+                </div>
+              }
               isOpen={openSections.includes('conditions')}
               onToggle={handleAccordionToggle}
               isModified={isSectionModified(conditions, 'conditions')}
@@ -1722,7 +1775,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             {/* Secrets Section */}
             <EditableAccordionSection
               id="secrets"
-              title="Secrets Management"
+              title={
+                <div className="flex items-center gap-2">
+                  Secrets Management
+                  <SecretsTooltip />
+                </div>
+              }
               isOpen={openSections.includes('secrets')}
               onToggle={handleAccordionToggle}
               isModified={isSectionModified(secrets, 'secrets')}
@@ -1888,7 +1946,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
             {/* Executor Management Section */}
             <EditableAccordionSection
               id="executor"
-              title="Executor Configuration"
+              title={
+                <div className="flex items-center gap-2">
+                  Executor Configuration
+                  <ExecutorTooltip />
+                </div>
+              }
               isOpen={openSections.includes('executor')}
               onToggle={handleAccordionToggle}
               isModified={isSectionModified(executor, 'executor')}
@@ -1964,7 +2027,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       />
                     </ValidationField>
 
-                    <ValidationField label="Execution Type">
+                    <ValidationField
+                      label="Execution Type"
+                    >
                       <ControlledTabs
                         className="text-left m-0 w-full"
                         buttonClasses='w-full'
@@ -1983,7 +2048,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     </ValidationField>
 
                     {semaphoreExecutionType === 'task' && (
-                      <ValidationField label="Task">
+                      <ValidationField
+                        label={
+                          <div className="flex items-center gap-2">
+                            Task
+                            <TaskTooltip />
+                          </div>
+                        }
+                      >
                         <input
                           type="text"
                           value={(executor.spec?.task as string) || ''}
@@ -1995,7 +2067,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     )}
 
                     <ValidationField
-                      label="Ref"
+                      label={
+                        <div className="flex items-center gap-2">
+                          Ref
+                          <RefTooltip />
+                        </div>
+                      }
                       error={validationErrors.executorRef}
                     >
                       <input
@@ -2011,7 +2088,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     </ValidationField>
 
                     <ValidationField
-                      label="Pipeline File"
+                      label={
+                        <div className="flex items-center gap-2">
+                          Pipeline File
+                          <PipelineFileTooltip />
+                        </div>
+                      }
                       error={validationErrors.executorPipelineFile}
                     >
                       <input
@@ -2129,7 +2211,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     </ValidationField>
 
                     <ValidationField
-                      label="Workflow"
+                      label={
+                        <div className="flex items-center gap-2">
+                          Workflow
+                          <WorkflowTooltip />
+                        </div>
+                      }
                       error={validationErrors.executorWorkflow || fieldErrors.workflow}
                     >
                       <input
@@ -2148,7 +2235,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     </ValidationField>
 
                     <ValidationField
-                      label="Ref"
+                      label={
+                        <div className="flex items-center gap-2">
+                          Ref
+                          <RefTooltip />
+                        </div>
+                      }
                       error={validationErrors.executorRef}
                     >
                       <input
@@ -2308,7 +2400,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
                 {/* Unified Execution Name Field - appears for all executor types */}
                 {executor.type && (
-                  <ValidationField label="Execution name (optional)">
+                  <ValidationField
+                    label="Execution name (optional)"
+                  >
                     <TaggedInput
                       value={executor.name || ''}
                       onChange={(value) => setExecutor(prev => ({ ...prev, name: value }))}
