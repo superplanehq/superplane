@@ -18,6 +18,7 @@ import { useIntegrations } from '../../hooks/useIntegrations';
 import { EventStateItem, EventState } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
 import { EventSourceZeroState } from '../EventSourceZeroState';
+import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -53,7 +54,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
   const [integrationError, setIntegrationError] = useState(false);
-  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
@@ -247,6 +248,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
+  const handleDuplicateEventSource = () => {
+    if (!currentEventSource) return;
+
+    const duplicatedEventSource = createEventSourceDuplicate(currentEventSource, allEventSources);
+    addEventSource(duplicatedEventSource, true);
+
+    focusAndEditNode(
+      duplicatedEventSource.metadata?.id || '',
+      setFocusedNodeId,
+      setEditingEventSource
+    );
+  };
+
   const handleYamlApply = (updatedData: unknown) => {
     // Handle YAML data application for event source
     const yamlData = updatedData as SuperplaneEventSource;
@@ -341,6 +355,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
+          onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {

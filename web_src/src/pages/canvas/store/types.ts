@@ -25,7 +25,7 @@ export interface CanvasState {
   initialize: (data: CanvasData) => void;
   addStage: (stage: Stage, draft?: boolean, autoLayout?: boolean) => void;
   removeStage: (stageId: string) => void;
-  addConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => void;
+  addConnectionGroup: (connectionGroup: ConnectionGroupWithEvents, autoLayout?: boolean) => void;
   removeConnectionGroup: (connectionGroupId: string) => void;
   updateConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => void;
   updateStage: (stage: Stage) => void;
