@@ -9,8 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/executors"
 )
 
-const MaxHTTPResponseSize = 8 * 1024
-
 type NoOpExecutor struct{}
 
 func NewNoOpExecutor() executors.Executor {
