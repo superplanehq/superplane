@@ -132,6 +132,29 @@ func Test__UpdateIntegration(t *testing.T) {
 	})
 
 	t.Run("update integration by name", func(t *testing.T) {
+		createIntegrationSpec := &protos.Integration{
+			Metadata: &protos.Integration_Metadata{
+				Name: support.RandomName("integration-for-name-test"),
+			},
+			Spec: &protos.Integration_Spec{
+				Type: models.IntegrationTypeSemaphore,
+				Auth: &protos.Integration_Auth{
+					Use: protos.Integration_AUTH_TYPE_TOKEN,
+					Token: &protos.Integration_Auth_Token{
+						ValueFrom: &protos.ValueFrom{
+							Secret: &protos.ValueFromSecret{
+								Name: canvasSecret.Name,
+								Key:  "key",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		testIntegration, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createIntegrationSpec)
+		require.NoError(t, err)
+
 		newName := support.RandomName("updated-integration-name")
 		integration := &protos.Integration{
 			Metadata: &protos.Integration_Metadata{
@@ -153,11 +176,11 @@ func Test__UpdateIntegration(t *testing.T) {
 			},
 		}
 
-		response, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createdIntegration.Integration.Metadata.Name, integration)
+		response, err := UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), testIntegration.Integration.Metadata.Name, integration)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Equal(t, newName, response.Integration.Metadata.Name)
-		assert.Equal(t, createdIntegration.Integration.Metadata.Id, response.Integration.Metadata.Id)
+		assert.Equal(t, testIntegration.Integration.Metadata.Id, response.Integration.Metadata.Id)
 	})
 
 	t.Run("update canvas integration with organization secret", func(t *testing.T) {
