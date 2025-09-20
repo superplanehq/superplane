@@ -176,7 +176,42 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
           <div className="p-4 text-left">
             <div className="space-y-6">
               <div className="space-y-4">
-                {eventSourceType !== 'webhook' ? (
+                {/* Schedule Configuration */}
+                {selectedEventSource.spec?.schedule && (
+                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
+                    <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
+                      Schedule Configuration
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Schedule Type</div>
+                        <div className="text-sm text-gray-900 dark:text-zinc-200">
+                          {selectedEventSource.spec.schedule.type === 'TYPE_DAILY' ? 'Daily' : 'Weekly'}
+                        </div>
+                      </div>
+                      {selectedEventSource.spec.schedule.type === 'TYPE_WEEKLY' && selectedEventSource.spec.schedule.weekly && (
+                        <div>
+                          <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Day of Week</div>
+                          <div className="text-sm text-gray-900 dark:text-zinc-200">
+                            {selectedEventSource.spec.schedule.weekly.weekDay?.replace('WEEK_DAY_', '').replace('_', ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday'}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Time (UTC)</div>
+                        <div className="text-sm text-gray-900 dark:text-zinc-200">
+                          {selectedEventSource.spec.schedule.type === 'TYPE_DAILY'
+                            ? selectedEventSource.spec.schedule.daily?.time || '09:00'
+                            : selectedEventSource.spec.schedule.weekly?.time || '09:00'
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Integration Configuration */}
+                {eventSourceType !== 'webhook' && eventSourceType !== 'scheduled' ? (
                   <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
                     <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
                       {eventSourceType.charAt(0).toUpperCase() + eventSourceType.slice(1)} Configuration
@@ -192,7 +227,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
                       </div>
                     </div>
                   </div>
-                ) : (
+                ) : eventSourceType === 'webhook' ? (
                   <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
                     <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
                       Integration Configuration
@@ -204,7 +239,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>

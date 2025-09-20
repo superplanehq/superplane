@@ -1,13 +1,17 @@
 import { useCallback, useEffect } from 'react';
 import { EventSourceSchedule, EventSourceScheduleType, ScheduleWeekDay } from '@/api-client/types.gen';
 import { ValidationField } from './shared/ValidationField';
-import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 interface ScheduleConfigurationProps {
   schedule?: EventSourceSchedule | null;
   onScheduleChange: (schedule: EventSourceSchedule | null) => void;
   errors?: Record<string, string>;
 }
+
+const SCHEDULE_TYPE_OPTIONS: { value: EventSourceScheduleType; label: string }[] = [
+  { value: 'TYPE_DAILY', label: 'Daily' },
+  { value: 'TYPE_WEEKLY', label: 'Weekly' },
+];
 
 const WEEKDAY_OPTIONS: { value: ScheduleWeekDay; label: string }[] = [
   { value: 'WEEK_DAY_MONDAY', label: 'Monday' },
@@ -98,36 +102,21 @@ export function ScheduleConfiguration({
             error={errors.scheduleType}
             required={true}
           >
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleScheduleTypeChange('TYPE_DAILY')}
-                className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                  schedule?.type === 'TYPE_DAILY'
-                    ? 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300'
-                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-zinc-800 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-700'
-                }`}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <MaterialSymbol name="today" size="sm" />
-                  Daily
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleScheduleTypeChange('TYPE_WEEKLY')}
-                className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-                  schedule?.type === 'TYPE_WEEKLY'
-                    ? 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300'
-                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-zinc-800 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-700'
-                }`}
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <MaterialSymbol name="date_range" size="sm" />
-                  Weekly
-                </div>
-              </button>
-            </div>
+            <select
+              value={schedule?.type || 'TYPE_DAILY'}
+              onChange={(e) => handleScheduleTypeChange(e.target.value as EventSourceScheduleType)}
+              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${
+                errors.scheduleType
+                  ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
+                  : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+              }`}
+            >
+              {SCHEDULE_TYPE_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </ValidationField>
 
           {/* Weekly Day Selection */}

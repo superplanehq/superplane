@@ -519,7 +519,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             </div>
           ) : (
-            <EventSourceZeroState eventSourceType={eventSourceType} />
+            <EventSourceZeroState
+              eventSourceType={eventSourceType}
+              schedule={currentEventSource?.spec?.schedule || props.data.schedule || undefined}
+            />
           )}
 
         </>
