@@ -14,10 +14,32 @@ export type AuthorizationPermission = {
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
+export type EventSourceCronSchedule = {
+    expression?: string;
+};
+
+export type EventSourceDailySchedule = {
+    time?: string;
+};
+
 export type EventSourceEventType = {
     type?: string;
     filters?: Array<SuperplaneFilter>;
     filterOperator?: SuperplaneFilterOperator;
+};
+
+export type EventSourceSchedule = {
+    type?: EventSourceScheduleType;
+    daily?: EventSourceDailySchedule;
+    weekly?: EventSourceWeeklySchedule;
+    cron?: EventSourceCronSchedule;
+};
+
+export type EventSourceScheduleType = 'TYPE_UNKNOWN' | 'TYPE_DAILY' | 'TYPE_WEEKLY' | 'TYPE_CRON';
+
+export type EventSourceWeeklySchedule = {
+    weekDay?: ScheduleWeekDay;
+    time?: string;
 };
 
 export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
@@ -290,6 +312,8 @@ export type RolesUpdateRoleBody = {
 export type RolesUpdateRoleResponse = {
     role?: RolesRole;
 };
+
+export type ScheduleWeekDay = 'WEEK_DAY_UNKNOWN' | 'WEEK_DAY_MONDAY' | 'WEEK_DAY_TUESDAY' | 'WEEK_DAY_WEDNESDAY' | 'WEEK_DAY_THURSDAY' | 'WEEK_DAY_FRIDAY' | 'WEEK_DAY_SATURDAY' | 'WEEK_DAY_SUNDAY';
 
 /**
  * Local secrets are stored and managed by SuperPlane itself.
@@ -601,6 +625,7 @@ export type SuperplaneEventSourceSpec = {
     integration?: IntegrationsIntegrationRef;
     resource?: IntegrationsResourceRef;
     events?: Array<EventSourceEventType>;
+    schedule?: EventSourceSchedule;
 };
 
 export type SuperplaneEventSourceStatus = {

@@ -17,6 +17,8 @@
 - Targeted backend tests: `make test TEST_PACKAGES=./pkg/workers`
 - After updating UI code, always run `npm run build` to verify everything is correct
 - After updating GoLang code, always lint it with `make lint`
+- To generate DB migrations, use `make db.migration.create NAME=<name>`. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty.
+- When validating enum fields in protobuf requests, ensure that the enums are properly mapped to constants in the `pkg/models` package. Check the `Proto*` and `*ToProto` functions in pkg/grpc/actions/common.go.
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
   - `make pb.gen` to regenerate protobuf files
   - `make openapi.spec.gen` to generate OpenAPI spec for the API

@@ -18,6 +18,18 @@ const (
 	EventSourceStateReady    = "ready"
 	EventSourceScopeExternal = "external"
 	EventSourceScopeInternal = "internal"
+
+	ScheduleTypeDaily  = "daily"
+	ScheduleTypeWeekly = "weekly"
+	ScheduleTypeCron   = "cron"
+
+	WeekDayMonday    = "monday"
+	WeekDayTuesday   = "tuesday"
+	WeekDayWednesday = "wednesday"
+	WeekDayThursday  = "thursday"
+	WeekDayFriday    = "friday"
+	WeekDaySaturday  = "saturday"
+	WeekDaySunday    = "sunday"
 )
 
 type EventSource struct {
@@ -34,12 +46,33 @@ type EventSource struct {
 	DeletedAt   gorm.DeletedAt `gorm:"index"`
 
 	EventTypes datatypes.JSONSlice[EventType]
+	Schedule   *Schedule `gorm:"type:jsonb"`
 }
 
 type EventType struct {
 	Type           string   `json:"type"`
 	FilterOperator string   `json:"filter_operator"`
 	Filters        []Filter `json:"filters"`
+}
+
+type Schedule struct {
+	Type   string          `json:"type"`
+	Daily  *DailySchedule  `json:"daily,omitempty"`
+	Weekly *WeeklySchedule `json:"weekly,omitempty"`
+	Cron   *CronSchedule   `json:"cron,omitempty"`
+}
+
+type DailySchedule struct {
+	Time string `json:"time"` // Format: "HH:MM" in UTC (24-hour format)
+}
+
+type WeeklySchedule struct {
+	WeekDay string `json:"week_day"` // Monday, Tuesday, etc.
+	Time    string `json:"time"`     // Format: "HH:MM" in UTC (24-hour format)
+}
+
+type CronSchedule struct {
+	Expression string `json:"expression"` // Standard cron expression in UTC
 }
 
 // NOTE: caller must encrypt the key before calling this method.
@@ -404,4 +437,18 @@ func (s *EventSource) DeleteEventsInTransaction(tx *gorm.DB) error {
 		return fmt.Errorf("failed to delete events: %v", err)
 	}
 	return nil
+}
+
+func ListScheduledEventSources() ([]EventSource, error) {
+	var sources []EventSource
+	err := database.Conn().
+		Where("schedule IS NOT NULL").
+		Find(&sources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return sources, nil
 }

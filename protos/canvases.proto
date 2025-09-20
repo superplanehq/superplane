@@ -427,6 +427,45 @@ message EventSource {
     Integrations.IntegrationRef integration = 1;
     Integrations.ResourceRef resource = 2;
     repeated EventType events = 3;
+    Schedule schedule = 4;
+  }
+
+  message Schedule {
+    enum Type {
+      TYPE_UNKNOWN = 0;
+      TYPE_DAILY = 1;
+      TYPE_WEEKLY = 2;
+      TYPE_CRON = 3;
+    }
+
+    enum WeekDay {
+      WEEK_DAY_UNKNOWN = 0;
+      WEEK_DAY_MONDAY = 1;
+      WEEK_DAY_TUESDAY = 2;
+      WEEK_DAY_WEDNESDAY = 3;
+      WEEK_DAY_THURSDAY = 4;
+      WEEK_DAY_FRIDAY = 5;
+      WEEK_DAY_SATURDAY = 6;
+      WEEK_DAY_SUNDAY = 7;
+    }
+
+    Type type = 1;
+    DailySchedule daily = 2;
+    WeeklySchedule weekly = 3;
+    CronSchedule cron = 4;
+  }
+
+  message DailySchedule {
+    string time = 1; // Format: "HH:MM" in UTC (24-hour format)
+  }
+
+  message WeeklySchedule {
+    Schedule.WeekDay week_day = 1;
+    string time = 2; // Format: "HH:MM" in UTC (24-hour format)
+  }
+
+  message CronSchedule {
+    string expression = 1; // Standard cron expression in UTC (e.g., "0 8 * * *")
   }
 
   message EventType {

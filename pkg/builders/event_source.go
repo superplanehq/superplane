@@ -29,6 +29,7 @@ type EventSourceBuilder struct {
 	description        string
 	scope              string
 	eventTypes         []models.EventType
+	schedule           *models.Schedule
 	integration        *models.Integration
 	resource           integrations.Resource
 	existingEventSource *models.EventSource
@@ -87,6 +88,11 @@ func (b *EventSourceBuilder) WithEventTypes(eventTypes []models.EventType) *Even
 	return b
 }
 
+func (b *EventSourceBuilder) WithSchedule(schedule *models.Schedule) *EventSourceBuilder {
+	b.schedule = schedule
+	return b
+}
+
 func (b *EventSourceBuilder) WithExistingEventSource(existingEventSource *models.EventSource) *EventSourceBuilder {
 	b.existingEventSource = existingEventSource
 	return b
@@ -139,6 +145,7 @@ func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.Even
 		Key:         encryptedKey,
 		Scope:       b.scope,
 		EventTypes:  datatypes.NewJSONSlice(b.eventTypes),
+		Schedule:    b.schedule,
 	}
 
 	err = source.CreateInTransaction(tx)
@@ -258,6 +265,7 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 	eventSource.Scope = b.scope
 	eventSource.State = models.EventSourceStatePending
 	eventSource.EventTypes = datatypes.NewJSONSlice(b.eventTypes)
+	eventSource.Schedule = nil
 	eventSource.UpdatedAt = &now
 	err := tx.Save(eventSource).Error
 	if err != nil {
@@ -319,6 +327,7 @@ func (b *EventSourceBuilder) updateWithoutIntegration(tx *gorm.DB) (*models.Even
 		Update("description", b.description).
 		Update("updated_at", now).
 		Update("event_types", datatypes.NewJSONSlice(b.eventTypes)).
+		Update("schedule", b.schedule).
 		Update("resource_id", nil).
 		Error
 
@@ -370,6 +379,7 @@ func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSou
 		"updated_at":  now,
 		"event_types": datatypes.NewJSONSlice(b.eventTypes),
 		"resource_id": &resource.ID,
+		"schedule":    nil,
 	}
 
 	// If resource changed, set to pending so webhook gets recreated

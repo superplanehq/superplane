@@ -64,6 +64,11 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, err
 	}
 
+	schedule, err := validateSchedule(newSource.Spec, integration)
+	if err != nil {
+		return nil, err
+	}
+
 	//
 	// Create the event source
 	//
@@ -75,6 +80,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		ForIntegration(integration).
 		ForResource(resource).
 		WithEventTypes(eventTypes).
+		WithSchedule(schedule).
 		Create()
 
 	if err != nil {
@@ -130,6 +136,67 @@ func validateEventTypes(spec *pb.EventSource_Spec) ([]models.EventType, error) {
 	return out, nil
 }
 
+func validateSchedule(spec *pb.EventSource_Spec, integration *models.Integration) (*models.Schedule, error) {
+	if spec == nil || spec.Schedule == nil {
+		return nil, nil
+	}
+
+	if integration != nil {
+		return nil, status.Error(codes.InvalidArgument, "schedules are not supported for event sources with integrations")
+	}
+
+	scheduleType, err := actions.ProtoToScheduleType(spec.Schedule.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	schedule := &models.Schedule{
+		Type: scheduleType,
+	}
+
+	switch spec.Schedule.Type {
+	case pb.EventSource_Schedule_TYPE_DAILY:
+		if spec.Schedule.Daily == nil {
+			return nil, status.Error(codes.InvalidArgument, "daily schedule configuration is required")
+		}
+		if err := actions.ValidateTime(spec.Schedule.Daily.Time); err != nil {
+			return nil, err
+		}
+		schedule.Daily = &models.DailySchedule{
+			Time: spec.Schedule.Daily.Time,
+		}
+	case pb.EventSource_Schedule_TYPE_WEEKLY:
+		if spec.Schedule.Weekly == nil {
+			return nil, status.Error(codes.InvalidArgument, "weekly schedule configuration is required")
+		}
+		weekDay, err := actions.ProtoToWeekDay(spec.Schedule.Weekly.WeekDay)
+		if err != nil {
+			return nil, err
+		}
+		if err := actions.ValidateTime(spec.Schedule.Weekly.Time); err != nil {
+			return nil, err
+		}
+		schedule.Weekly = &models.WeeklySchedule{
+			WeekDay: weekDay,
+			Time:    spec.Schedule.Weekly.Time,
+		}
+	case pb.EventSource_Schedule_TYPE_CRON:
+		if spec.Schedule.Cron == nil {
+			return nil, status.Error(codes.InvalidArgument, "cron schedule configuration is required")
+		}
+		if err := actions.ValidateCronExpression(spec.Schedule.Cron.Expression); err != nil {
+			return nil, err
+		}
+		schedule.Cron = &models.CronSchedule{
+			Expression: spec.Schedule.Cron.Expression,
+		}
+	default:
+		return nil, status.Error(codes.InvalidArgument, "invalid schedule type")
+	}
+
+	return schedule, nil
+}
+
 func serializeEventSource(eventSource models.EventSource, statusInfo *models.EventSourceStatusInfo) (*pb.EventSource, error) {
 	spec := &pb.EventSource_Spec{
 		Events: []*pb.EventSource_EventType{},
@@ -174,6 +241,39 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 			Type: resource.Type(),
 			Name: resource.Name(),
 		}
+	}
+
+	//
+	// Serialize schedule
+	//
+	if eventSource.Schedule != nil {
+		schedule := &pb.EventSource_Schedule{
+			Type: actions.ScheduleTypeToProto(eventSource.Schedule.Type),
+		}
+
+		switch eventSource.Schedule.Type {
+		case models.ScheduleTypeDaily:
+			if eventSource.Schedule.Daily != nil {
+				schedule.Daily = &pb.EventSource_DailySchedule{
+					Time: eventSource.Schedule.Daily.Time,
+				}
+			}
+		case models.ScheduleTypeWeekly:
+			if eventSource.Schedule.Weekly != nil {
+				schedule.Weekly = &pb.EventSource_WeeklySchedule{
+					WeekDay: actions.WeekDayToProto(eventSource.Schedule.Weekly.WeekDay),
+					Time:    eventSource.Schedule.Weekly.Time,
+				}
+			}
+		case models.ScheduleTypeCron:
+			if eventSource.Schedule.Cron != nil {
+				schedule.Cron = &pb.EventSource_CronSchedule{
+					Expression: eventSource.Schedule.Cron.Expression,
+				}
+			}
+		}
+
+		spec.Schedule = schedule
 	}
 
 	pbEventSource := &pb.EventSource{

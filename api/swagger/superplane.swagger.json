@@ -2726,6 +2726,24 @@
       ],
       "default": "REJECTION_REASON_UNKNOWN"
     },
+    "EventSourceCronSchedule": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "title": "Standard cron expression in UTC (e.g., \"0 8 * * *\")"
+        }
+      }
+    },
+    "EventSourceDailySchedule": {
+      "type": "object",
+      "properties": {
+        "time": {
+          "type": "string",
+          "title": "Format: \"HH:MM\" in UTC (24-hour format)"
+        }
+      }
+    },
     "EventSourceEventType": {
       "type": "object",
       "properties": {
@@ -2741,6 +2759,45 @@
         },
         "filterOperator": {
           "$ref": "#/definitions/SuperplaneFilterOperator"
+        }
+      }
+    },
+    "EventSourceSchedule": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/EventSourceScheduleType"
+        },
+        "daily": {
+          "$ref": "#/definitions/EventSourceDailySchedule"
+        },
+        "weekly": {
+          "$ref": "#/definitions/EventSourceWeeklySchedule"
+        },
+        "cron": {
+          "$ref": "#/definitions/EventSourceCronSchedule"
+        }
+      }
+    },
+    "EventSourceScheduleType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNKNOWN",
+        "TYPE_DAILY",
+        "TYPE_WEEKLY",
+        "TYPE_CRON"
+      ],
+      "default": "TYPE_UNKNOWN"
+    },
+    "EventSourceWeeklySchedule": {
+      "type": "object",
+      "properties": {
+        "weekDay": {
+          "$ref": "#/definitions/ScheduleWeekDay"
+        },
+        "time": {
+          "type": "string",
+          "title": "Format: \"HH:MM\" in UTC (24-hour format)"
         }
       }
     },
@@ -3363,6 +3420,20 @@
           "$ref": "#/definitions/RolesRole"
         }
       }
+    },
+    "ScheduleWeekDay": {
+      "type": "string",
+      "enum": [
+        "WEEK_DAY_UNKNOWN",
+        "WEEK_DAY_MONDAY",
+        "WEEK_DAY_TUESDAY",
+        "WEEK_DAY_WEDNESDAY",
+        "WEEK_DAY_THURSDAY",
+        "WEEK_DAY_FRIDAY",
+        "WEEK_DAY_SATURDAY",
+        "WEEK_DAY_SUNDAY"
+      ],
+      "default": "WEEK_DAY_UNKNOWN"
     },
     "SecretLocal": {
       "type": "object",
@@ -4082,6 +4153,9 @@
             "type": "object",
             "$ref": "#/definitions/EventSourceEventType"
           }
+        },
+        "schedule": {
+          "$ref": "#/definitions/EventSourceSchedule"
         }
       }
     },
