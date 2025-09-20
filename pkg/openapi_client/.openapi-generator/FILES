@@ -26,7 +26,6 @@ docs/ConnectionGroupAPI.md
 docs/EventAPI.md
 docs/EventRejectionRejectionReason.md
 docs/EventSourceAPI.md
-docs/EventSourceCronSchedule.md
 docs/EventSourceDailySchedule.md
 docs/EventSourceEventType.md
 docs/EventSourceSchedule.md
@@ -209,7 +208,6 @@ model_auth_token.go
 model_authorization_domain_type.go
 model_authorization_permission.go
 model_event_rejection_rejection_reason.go
-model_event_source_cron_schedule.go
 model_event_source_daily_schedule.go
 model_event_source_event_type.go
 model_event_source_schedule.go

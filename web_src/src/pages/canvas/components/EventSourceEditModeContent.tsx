@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { EventSourceNodeType } from '@/canvas/types/flow';
-import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef, EventSourceEventType, SuperplaneFilter, SuperplaneFilterOperator } from '@/api-client/types.gen';
+import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef, EventSourceEventType, SuperplaneFilter, SuperplaneFilterOperator, EventSourceSchedule } from '@/api-client/types.gen';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
 import { useResetEventSourceKey } from '@/hooks/useCanvasData';
@@ -14,6 +14,7 @@ import { useCanvasStore } from '../store/canvasStore';
 import { showErrorToast } from '@/utils/toast';
 import { EventSourceFilterTooltip } from '@/components/Tooltip/EventSourceFilterTooltip';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
+import { ScheduleConfiguration } from './ScheduleConfiguration';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -50,6 +51,7 @@ export function EventSourceEditModeContent({
   const [resourceType, setResourceType] = useState(data.resource?.type);
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
   const [eventTypes, setEventTypes] = useState<EventSourceEventType[]>(data.events || []);
+  const [schedule, setSchedule] = useState<EventSourceSchedule | null>(data.schedule || null);
   const [apiValidationErrors, setApiValidationErrors] = useState<Record<string, string>>({});
   const [isKeyRevealed, setIsKeyRevealed] = useState(false);
   const [showWebhookInstructions, setShowWebhookInstructions] = useState(false);
@@ -190,46 +192,71 @@ export function EventSourceEditModeContent({
   const validateAllFields = (setErrors?: (errors: Record<string, string>) => void) => {
     const errors: Record<string, string> = {};
 
-    if (eventSourceType === 'semaphore' || eventSourceType === 'github') {
-      if (!selectedIntegration) {
-        errors.integration = 'Integration is required';
-      }
+    if (eventSourceType === 'scheduled') {
+      // For scheduled event sources, only validate the schedule
+      if (!schedule) {
+        errors.schedule = 'Schedule is required for scheduled event sources';
+      } else {
+        if (!schedule.type || schedule.type === 'TYPE_UNKNOWN') {
+          errors.scheduleType = 'Schedule type is required';
+        }
 
-      if (!resourceName || resourceName.trim() === '') {
-        errors.resourceName = eventSourceType === 'semaphore' ? 'Project name is required' : 'Resource name is required';
-      }
-    }
-
-    // Validate event types and filters
-    eventTypes.forEach((eventType, index) => {
-      if (!eventType.type || eventType.type.trim() === '') {
-        errors[`eventType_${index}`] = 'Event type is required';
-      }
-
-      if (eventType.filters && eventType.filters.length > 0) {
-        const emptyFilters: number[] = [];
-
-        eventType.filters.forEach((filter, filterIndex) => {
-          if (filter.type === 'FILTER_TYPE_DATA') {
-            if (!filter.data?.expression || filter.data.expression.trim() === '') {
-              emptyFilters.push(filterIndex + 1);
-            }
-          } else if (filter.type === 'FILTER_TYPE_HEADER') {
-            if (!filter.header?.expression || filter.header.expression.trim() === '') {
-              emptyFilters.push(filterIndex + 1);
-            }
+        if (schedule.type === 'TYPE_DAILY') {
+          if (!schedule.daily?.time) {
+            errors.time = 'Time is required for daily schedule';
           }
-        });
-
-        if (emptyFilters.length > 0) {
-          if (emptyFilters.length === 1) {
-            errors[`eventType_${index}_filters`] = `Filter ${emptyFilters[0]} is incomplete - please fill all fields`;
-          } else {
-            errors[`eventType_${index}_filters`] = `Filters ${emptyFilters.join(', ')} are incomplete - please fill all fields`;
+        } else if (schedule.type === 'TYPE_WEEKLY') {
+          if (!schedule.weekly?.weekDay || schedule.weekly.weekDay === 'WEEK_DAY_UNKNOWN') {
+            errors.weekDay = 'Day of week is required for weekly schedule';
+          }
+          if (!schedule.weekly?.time) {
+            errors.time = 'Time is required for weekly schedule';
           }
         }
       }
-    });
+    } else {
+      // For other event source types, validate normally
+      if (eventSourceType === 'semaphore' || eventSourceType === 'github') {
+        if (!selectedIntegration) {
+          errors.integration = 'Integration is required';
+        }
+
+        if (!resourceName || resourceName.trim() === '') {
+          errors.resourceName = eventSourceType === 'semaphore' ? 'Project name is required' : 'Resource name is required';
+        }
+      }
+
+      // Validate event types and filters for non-scheduled event sources
+      eventTypes.forEach((eventType, index) => {
+        if (!eventType.type || eventType.type.trim() === '') {
+          errors[`eventType_${index}`] = 'Event type is required';
+        }
+
+        if (eventType.filters && eventType.filters.length > 0) {
+          const emptyFilters: number[] = [];
+
+          eventType.filters.forEach((filter, filterIndex) => {
+            if (filter.type === 'FILTER_TYPE_DATA') {
+              if (!filter.data?.expression || filter.data.expression.trim() === '') {
+                emptyFilters.push(filterIndex + 1);
+              }
+            } else if (filter.type === 'FILTER_TYPE_HEADER') {
+              if (!filter.header?.expression || filter.header.expression.trim() === '') {
+                emptyFilters.push(filterIndex + 1);
+              }
+            }
+          });
+
+          if (emptyFilters.length > 0) {
+            if (emptyFilters.length === 1) {
+              errors[`eventType_${index}_filters`] = `Filter ${emptyFilters[0]} is incomplete - please fill all fields`;
+            } else {
+              errors[`eventType_${index}_filters`] = `Filters ${emptyFilters.join(', ')} are incomplete - please fill all fields`;
+            }
+          }
+        }
+      });
+    }
 
     if (setErrors) {
       setErrors(errors);
@@ -276,7 +303,8 @@ export function EventSourceEditModeContent({
       spec: {
         integration: data.integration,
         resource: data.resource,
-        events: data.events
+        events: data.events,
+        schedule: data.schedule
       } as SuperplaneEventSourceSpec
     },
     onDataChange,
@@ -292,11 +320,23 @@ export function EventSourceEditModeContent({
         onValidationResult(isValid);
       }
     }
-  }, [shouldValidate, selectedIntegration, resourceName, eventSourceType, eventTypes, onValidationResult]);
+  }, [shouldValidate, selectedIntegration, resourceName, eventSourceType, eventTypes, schedule, onValidationResult]);
 
   useEffect(() => {
-    setOpenSections(['general', 'integration', 'webhook', 'filters']);
-  }, [setOpenSections]);
+    const sections = ['general'];
+    if (eventSourceType === 'scheduled') {
+      sections.push('schedule');
+    } else {
+      if (eventSourceType !== 'webhook') {
+        sections.push('integration');
+      }
+      if (eventSourceType === 'webhook') {
+        sections.push('webhook');
+      }
+      sections.push('filters');
+    }
+    setOpenSections(sections);
+  }, [setOpenSections, eventSourceType]);
 
   useEffect(() => {
     syncWithIncomingData(
@@ -304,7 +344,8 @@ export function EventSourceEditModeContent({
         spec: {
           integration: data.integration,
           resource: data.resource,
-          events: data.events
+          events: data.events,
+          schedule: data.schedule
         } as SuperplaneEventSourceSpec
       },
       (incomingData) => {
@@ -312,6 +353,7 @@ export function EventSourceEditModeContent({
         setResourceType(incomingData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
         setResourceName(incomingData.spec.resource?.name || '');
         setEventTypes(incomingData.spec.events || []);
+        setSchedule(incomingData.spec.schedule || null);
       }
     );
   }, [data, eventSourceType, syncWithIncomingData]);
@@ -374,7 +416,12 @@ curl -X POST \\
     if (onDataChange) {
       const spec: SuperplaneEventSourceSpec = {};
 
-      if ((eventSourceType === 'semaphore' || eventSourceType === 'github') && selectedIntegration) {
+      if (eventSourceType === 'scheduled') {
+        // For scheduled event sources, only include the schedule
+        if (schedule) {
+          spec.schedule = schedule;
+        }
+      } else if ((eventSourceType === 'semaphore' || eventSourceType === 'github') && selectedIntegration) {
         spec.integration = selectedIntegration;
 
         if (resourceType && resourceName) {
@@ -385,7 +432,7 @@ curl -X POST \\
         }
       }
 
-      // Include event types with filters
+      // Include event types with filters for non-scheduled event sources
       if (eventTypes.length > 0) {
         spec.events = eventTypes;
       }
@@ -394,7 +441,7 @@ curl -X POST \\
         spec
       });
     }
-  }, [selectedIntegration, resourceType, resourceName, eventTypes, eventSourceType, onDataChange, handleDataChange]);
+  }, [selectedIntegration, resourceType, resourceName, eventTypes, schedule, eventSourceType, onDataChange, handleDataChange]);
 
   // Auto-select first integration when integrations become available
   useEffect(() => {
@@ -424,6 +471,9 @@ curl -X POST \\
         setSelectedIntegration(originalData.spec.integration || null);
         setResourceType(originalData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
         setResourceName(originalData.spec.resource?.name || '');
+        break;
+      case 'schedule':
+        setSchedule(originalData.spec.schedule || null);
         break;
       case 'filters':
         setEventTypes(originalData.spec.events || []);
@@ -702,8 +752,27 @@ curl -X POST \\
           </EditableAccordionSection>
         )}
 
-        {/* Event Types and Filters Section */}
-        {(!requireIntegration || availableIntegrations.length > 0) && <EditableAccordionSection
+        {/* Schedule Section - Only for scheduled event sources */}
+        {eventSourceType === 'scheduled' && (
+          <EditableAccordionSection
+            id="schedule"
+            title="Schedule"
+            isOpen={openSections.includes('schedule')}
+            onToggle={handleAccordionToggle}
+            isModified={JSON.stringify(schedule) !== JSON.stringify(originalData.spec.schedule || null)}
+            onRevert={revertSection}
+            requiredBadge={true}
+          >
+            <ScheduleConfiguration
+              schedule={schedule}
+              onScheduleChange={setSchedule}
+              errors={combinedErrors}
+            />
+          </EditableAccordionSection>
+        )}
+
+        {/* Event Types and Filters Section - Not for scheduled event sources */}
+        {eventSourceType !== 'scheduled' && (!requireIntegration || availableIntegrations.length > 0) && <EditableAccordionSection
           id="filters"
           title="Filters"
           isOpen={openSections.includes('filters')}

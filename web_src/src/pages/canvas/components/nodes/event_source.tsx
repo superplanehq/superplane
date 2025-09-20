@@ -147,20 +147,35 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       setApiError(null);
 
       if (isNewEventSource) {
-
-        const result = await createEventSourceMutation.mutateAsync({
+        // Keep the temporary node visible during the request
+        // Create the backend call promise
+        createEventSourceMutation.mutateAsync({
           name: eventSourceName,
           description: eventSourceDescription,
           spec: currentFormData.spec
+        }).then((result) => {
+          const newEventSource = result.data?.eventSource;
+
+          if (newEventSource) {
+            const generatedKey = result.data?.key;
+            updateEventSourceKey(newEventSource.metadata?.id || '', generatedKey || '');
+
+            // Add the new event source to the canvas
+            const newEventSourceWithEvents = {
+              ...newEventSource,
+              events: [],
+              eventSourceType: currentFormData.spec.schedule ? 'scheduled' : undefined,
+            };
+            addEventSource(newEventSourceWithEvents);
+
+            // Remove the temporary node after the new one is added
+            removeEventSource(props.id);
+          }
+        }).catch((error) => {
+          // If the request fails, keep the temporary node for retry
+          console.error('Failed to create event source:', error);
+          // The apiError will be set by the mutation's onError callback
         });
-
-        const newEventSource = result.data?.eventSource;
-
-        if (newEventSource) {
-          const generatedKey = result.data?.key;
-          updateEventSourceKey(newEventSource.metadata?.id || '', generatedKey || '');
-          removeEventSource(props.id);
-        }
       } else {
         await updateEventSourceMutation.mutateAsync({
           eventSourceId: currentEventSource.metadata?.id || '',
@@ -294,11 +309,16 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     if (props.data.eventSourceType)
       return props.data.eventSourceType;
 
+    // Check if this is a scheduled event source
+    if (props.data.schedule) {
+      return 'scheduled';
+    }
+
     if (integration?.spec?.type) {
       return integration.spec.type;
     }
     return "webhook";
-  }, [integration, props.data.eventSourceType]);
+  }, [integration, props.data.eventSourceType, props.data.schedule]);
 
   // Auto-enter edit mode for webhook with key
   useEffect(() => {
@@ -439,6 +459,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               integration: currentFormData.spec.integration,
               resource: currentFormData.spec.resource,
               events: currentFormData.spec.events,
+              schedule: currentFormData.spec.schedule,
             })
           }}
           canvasId={canvasId}

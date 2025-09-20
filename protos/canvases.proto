@@ -435,7 +435,6 @@ message EventSource {
       TYPE_UNKNOWN = 0;
       TYPE_DAILY = 1;
       TYPE_WEEKLY = 2;
-      TYPE_CRON = 3;
     }
 
     enum WeekDay {
@@ -452,7 +451,6 @@ message EventSource {
     Type type = 1;
     DailySchedule daily = 2;
     WeeklySchedule weekly = 3;
-    CronSchedule cron = 4;
   }
 
   message DailySchedule {
@@ -464,9 +462,6 @@ message EventSource {
     string time = 2; // Format: "HH:MM" in UTC (24-hour format)
   }
 
-  message CronSchedule {
-    string expression = 1; // Standard cron expression in UTC (e.g., "0 8 * * *")
-  }
 
   message EventType {
     string type = 1;

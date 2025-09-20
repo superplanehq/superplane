@@ -24,7 +24,6 @@ const (
 	EVENTSOURCESCHEDULETYPE_TYPE_UNKNOWN EventSourceScheduleType = "TYPE_UNKNOWN"
 	EVENTSOURCESCHEDULETYPE_TYPE_DAILY EventSourceScheduleType = "TYPE_DAILY"
 	EVENTSOURCESCHEDULETYPE_TYPE_WEEKLY EventSourceScheduleType = "TYPE_WEEKLY"
-	EVENTSOURCESCHEDULETYPE_TYPE_CRON EventSourceScheduleType = "TYPE_CRON"
 )
 
 // All allowed values of EventSourceScheduleType enum
@@ -32,7 +31,6 @@ var AllowedEventSourceScheduleTypeEnumValues = []EventSourceScheduleType{
 	"TYPE_UNKNOWN",
 	"TYPE_DAILY",
 	"TYPE_WEEKLY",
-	"TYPE_CRON",
 }
 
 func (v *EventSourceScheduleType) UnmarshalJSON(src []byte) error {

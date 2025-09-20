@@ -14,10 +14,6 @@ export type AuthorizationPermission = {
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
-export type EventSourceCronSchedule = {
-    expression?: string;
-};
-
 export type EventSourceDailySchedule = {
     time?: string;
 };
@@ -32,10 +28,9 @@ export type EventSourceSchedule = {
     type?: EventSourceScheduleType;
     daily?: EventSourceDailySchedule;
     weekly?: EventSourceWeeklySchedule;
-    cron?: EventSourceCronSchedule;
 };
 
-export type EventSourceScheduleType = 'TYPE_UNKNOWN' | 'TYPE_DAILY' | 'TYPE_WEEKLY' | 'TYPE_CRON';
+export type EventSourceScheduleType = 'TYPE_UNKNOWN' | 'TYPE_DAILY' | 'TYPE_WEEKLY';
 
 export type EventSourceWeeklySchedule = {
     weekDay?: ScheduleWeekDay;

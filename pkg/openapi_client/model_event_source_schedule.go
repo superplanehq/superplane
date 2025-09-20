@@ -23,7 +23,6 @@ type EventSourceSchedule struct {
 	Type *EventSourceScheduleType `json:"type,omitempty"`
 	Daily *EventSourceDailySchedule `json:"daily,omitempty"`
 	Weekly *EventSourceWeeklySchedule `json:"weekly,omitempty"`
-	Cron *EventSourceCronSchedule `json:"cron,omitempty"`
 }
 
 // NewEventSourceSchedule instantiates a new EventSourceSchedule object
@@ -143,38 +142,6 @@ func (o *EventSourceSchedule) SetWeekly(v EventSourceWeeklySchedule) {
 	o.Weekly = &v
 }
 
-// GetCron returns the Cron field value if set, zero value otherwise.
-func (o *EventSourceSchedule) GetCron() EventSourceCronSchedule {
-	if o == nil || IsNil(o.Cron) {
-		var ret EventSourceCronSchedule
-		return ret
-	}
-	return *o.Cron
-}
-
-// GetCronOk returns a tuple with the Cron field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *EventSourceSchedule) GetCronOk() (*EventSourceCronSchedule, bool) {
-	if o == nil || IsNil(o.Cron) {
-		return nil, false
-	}
-	return o.Cron, true
-}
-
-// HasCron returns a boolean if a field has been set.
-func (o *EventSourceSchedule) HasCron() bool {
-	if o != nil && !IsNil(o.Cron) {
-		return true
-	}
-
-	return false
-}
-
-// SetCron gets a reference to the given EventSourceCronSchedule and assigns it to the Cron field.
-func (o *EventSourceSchedule) SetCron(v EventSourceCronSchedule) {
-	o.Cron = &v
-}
-
 func (o EventSourceSchedule) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -193,9 +160,6 @@ func (o EventSourceSchedule) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Weekly) {
 		toSerialize["weekly"] = o.Weekly
-	}
-	if !IsNil(o.Cron) {
-		toSerialize["cron"] = o.Cron
 	}
 	return toSerialize, nil
 }

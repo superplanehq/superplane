@@ -1,5 +1,5 @@
 import { Node, Edge } from "@xyflow/react";
-import { 
+import {
   SuperplaneStageEvent,
   SuperplaneEvent,
   SuperplaneStageEventState,
@@ -15,7 +15,8 @@ import {
   SpecGroupBy,
   IntegrationsIntegrationRef,
   IntegrationsResourceRef,
-  EventSourceEventType
+  EventSourceEventType,
+  EventSourceSchedule
 } from "@/api-client/types.gen";
 
 export type AllNodeType = EventSourceNodeType | StageNodeType | ConnectionGroupNodeType;
@@ -42,6 +43,7 @@ export type EventSourceNodeData = {
   integration: IntegrationsIntegrationRef | null;
   resource: IntegrationsResourceRef | null;
   eventSourceType?: string;
+  schedule?: EventSourceSchedule | null;
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;

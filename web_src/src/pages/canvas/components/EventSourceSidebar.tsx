@@ -16,7 +16,8 @@ import { SidebarTabs } from './SidebarTabs';
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
-  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
+  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
+  'scheduled': <MaterialSymbol className='-mt-1 -mb-1' name="schedule" size="xl" />
 }
 
 type TabType = 'history' | 'settings';
@@ -78,13 +79,18 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
     if (selectedEventSource.eventSourceType)
       return selectedEventSource.eventSourceType;
 
+    // Check if this is a scheduled event source
+    if (selectedEventSource.spec?.schedule) {
+      return 'scheduled';
+    }
+
     const integrationName = selectedEventSource.spec?.integration?.name;
     const integration = canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
     if (integration && integration.spec?.type) {
       return integration.spec?.type;
     }
     return "webhook";
-  }, [canvasIntegrations, selectedEventSource.eventSourceType, selectedEventSource.spec?.integration?.name]);
+  }, [canvasIntegrations, selectedEventSource.eventSourceType, selectedEventSource.spec?.integration?.name, selectedEventSource.spec?.schedule]);
 
 
   return (

@@ -2726,15 +2726,6 @@
       ],
       "default": "REJECTION_REASON_UNKNOWN"
     },
-    "EventSourceCronSchedule": {
-      "type": "object",
-      "properties": {
-        "expression": {
-          "type": "string",
-          "title": "Standard cron expression in UTC (e.g., \"0 8 * * *\")"
-        }
-      }
-    },
     "EventSourceDailySchedule": {
       "type": "object",
       "properties": {
@@ -2773,9 +2764,6 @@
         },
         "weekly": {
           "$ref": "#/definitions/EventSourceWeeklySchedule"
-        },
-        "cron": {
-          "$ref": "#/definitions/EventSourceCronSchedule"
         }
       }
     },
@@ -2784,8 +2772,7 @@
       "enum": [
         "TYPE_UNKNOWN",
         "TYPE_DAILY",
-        "TYPE_WEEKLY",
-        "TYPE_CRON"
+        "TYPE_WEEKLY"
       ],
       "default": "TYPE_UNKNOWN"
     },

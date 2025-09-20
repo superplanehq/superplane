@@ -561,8 +561,6 @@ func ProtoToScheduleType(scheduleType pb.EventSource_Schedule_Type) (string, err
 		return models.ScheduleTypeDaily, nil
 	case pb.EventSource_Schedule_TYPE_WEEKLY:
 		return models.ScheduleTypeWeekly, nil
-	case pb.EventSource_Schedule_TYPE_CRON:
-		return models.ScheduleTypeCron, nil
 	default:
 		return "", status.Error(codes.InvalidArgument, "invalid schedule type")
 	}
@@ -574,8 +572,6 @@ func ScheduleTypeToProto(scheduleType string) pb.EventSource_Schedule_Type {
 		return pb.EventSource_Schedule_TYPE_DAILY
 	case models.ScheduleTypeWeekly:
 		return pb.EventSource_Schedule_TYPE_WEEKLY
-	case models.ScheduleTypeCron:
-		return pb.EventSource_Schedule_TYPE_CRON
 	default:
 		return pb.EventSource_Schedule_TYPE_UNKNOWN
 	}

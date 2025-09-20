@@ -228,6 +228,15 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     },
     {
       id: 'event_source',
+      name: 'Scheduled Event Source',
+      description: 'Trigger workflows on a schedule',
+      icon: 'schedule',
+      category: 'Event Sources',
+      category_description: 'Emit events that can be used to trigger executions',
+      eventSourceType: 'scheduled'
+    },
+    {
+      id: 'event_source',
       name: 'Semaphore Event Source',
       description: 'Trigger workflows from Semaphore events',
       image: SemaphoreLogo,

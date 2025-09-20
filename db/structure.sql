@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AhJtjeMQDsU8dMO1jRbOySm3EkUjyPi3k12wmTB7r7W6bVQbUlQ2SAFf4GRT9jx
+\restrict 0BPgWZUVgSC6wpMy2jDetnt093BDkmV9gT7NCTZLIXbvH05vixVnrsggLQ2XxKp
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -221,7 +221,10 @@ CREATE TABLE public.event_sources (
     scope character varying(64) NOT NULL,
     description text,
     event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    schedule jsonb,
+    last_triggered_at timestamp without time zone,
+    next_trigger_at timestamp without time zone
 );
 
 
@@ -893,6 +896,13 @@ CREATE INDEX idx_event_sources_deleted_at ON public.event_sources USING btree (d
 
 
 --
+-- Name: idx_event_sources_next_trigger_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_sources_next_trigger_at ON public.event_sources USING btree (next_trigger_at);
+
+
+--
 -- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1155,13 +1165,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AhJtjeMQDsU8dMO1jRbOySm3EkUjyPi3k12wmTB7r7W6bVQbUlQ2SAFf4GRT9jx
+\unrestrict 0BPgWZUVgSC6wpMy2jDetnt093BDkmV9gT7NCTZLIXbvH05vixVnrsggLQ2XxKp
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict BZNa4MMueVYeFCg022Y55fssPL4Br96RpZeMWJJeHtwrExfWuwyniI76qsaIPZV
+\restrict MbbD4lXoTeGZeU044FvsCM4NAdFaM6HR1nbBv8iE9IzCpzj6hXyIvQOoa6vs97Q
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1183,7 +1193,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250918143015	f
+20250919234748	f
 \.
 
 
@@ -1191,5 +1201,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BZNa4MMueVYeFCg022Y55fssPL4Br96RpZeMWJJeHtwrExfWuwyniI76qsaIPZV
+\unrestrict MbbD4lXoTeGZeU044FvsCM4NAdFaM6HR1nbBv8iE9IzCpzj6hXyIvQOoa6vs97Q
 

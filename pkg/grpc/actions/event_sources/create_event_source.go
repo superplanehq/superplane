@@ -180,16 +180,6 @@ func validateSchedule(spec *pb.EventSource_Spec, integration *models.Integration
 			WeekDay: weekDay,
 			Time:    spec.Schedule.Weekly.Time,
 		}
-	case pb.EventSource_Schedule_TYPE_CRON:
-		if spec.Schedule.Cron == nil {
-			return nil, status.Error(codes.InvalidArgument, "cron schedule configuration is required")
-		}
-		if err := actions.ValidateCronExpression(spec.Schedule.Cron.Expression); err != nil {
-			return nil, err
-		}
-		schedule.Cron = &models.CronSchedule{
-			Expression: spec.Schedule.Cron.Expression,
-		}
 	default:
 		return nil, status.Error(codes.InvalidArgument, "invalid schedule type")
 	}
@@ -247,28 +237,23 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 	// Serialize schedule
 	//
 	if eventSource.Schedule != nil {
+		scheduleData := eventSource.Schedule.Data()
 		schedule := &pb.EventSource_Schedule{
-			Type: actions.ScheduleTypeToProto(eventSource.Schedule.Type),
+			Type: actions.ScheduleTypeToProto(scheduleData.Type),
 		}
 
-		switch eventSource.Schedule.Type {
+		switch scheduleData.Type {
 		case models.ScheduleTypeDaily:
-			if eventSource.Schedule.Daily != nil {
+			if scheduleData.Daily != nil {
 				schedule.Daily = &pb.EventSource_DailySchedule{
-					Time: eventSource.Schedule.Daily.Time,
+					Time: scheduleData.Daily.Time,
 				}
 			}
 		case models.ScheduleTypeWeekly:
-			if eventSource.Schedule.Weekly != nil {
+			if scheduleData.Weekly != nil {
 				schedule.Weekly = &pb.EventSource_WeeklySchedule{
-					WeekDay: actions.WeekDayToProto(eventSource.Schedule.Weekly.WeekDay),
-					Time:    eventSource.Schedule.Weekly.Time,
-				}
-			}
-		case models.ScheduleTypeCron:
-			if eventSource.Schedule.Cron != nil {
-				schedule.Cron = &pb.EventSource_CronSchedule{
-					Expression: eventSource.Schedule.Cron.Expression,
+					WeekDay: actions.WeekDayToProto(scheduleData.Weekly.WeekDay),
+					Time:    scheduleData.Weekly.Time,
 				}
 			}
 		}

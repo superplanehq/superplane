@@ -16,8 +16,8 @@
 - One-shot backend tests: `make test` (Golang).
 - Targeted backend tests: `make test TEST_PACKAGES=./pkg/workers`
 - After updating UI code, always run `npm run build` to verify everything is correct
-- After updating GoLang code, always lint it with `make lint`
-- To generate DB migrations, use `make db.migration.create NAME=<name>`. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty.
+- After updating GoLang code, always check it with `make lint && go build cmd/server/main.go && rm main`
+- To generate DB migrations, use `make db.migration.create NAME=<name>`. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>`, where DB_NAME can be `superplane_dev` or `superplane_test`
 - When validating enum fields in protobuf requests, ensure that the enums are properly mapped to constants in the `pkg/models` package. Check the `Proto*` and `*ToProto` functions in pkg/grpc/actions/common.go.
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
   - `make pb.gen` to regenerate protobuf files
@@ -29,3 +29,5 @@
 
 - Tests end with _test.go
 - Always prefer early returns over else blocks when possible
+- When naming variables, avoid names like `*Str` or `*UUID`; Go is a typed language, we don't need types in the variables names
+- When writing tests that require specific timestamps to be used, always use timestamps based off of `time.Now()`, instead of absolute times created with `time.Date`
