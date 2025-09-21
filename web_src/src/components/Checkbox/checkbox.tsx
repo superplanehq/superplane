@@ -43,25 +43,30 @@ export function Checkbox({
   className,
   checked,
   onChange,
+  disabled,
   ...props
 }: {
   className?: string
   checked?: boolean
+  disabled?: boolean
   onChange?: (checked: boolean) => void
-} & Omit<React.ComponentPropsWithoutRef<'input'>, 'type' | 'checked' | 'onChange'>) {
+} & Omit<React.ComponentPropsWithoutRef<'input'>, 'type' | 'checked' | 'onChange' | 'disabled'>) {
   return (
     <span
       data-slot="control"
       className={clsx(className, 'group inline-flex focus:outline-hidden')}
     >
-      <span 
+      <span
         className={clsx([
-          'relative isolate flex size-4.5 items-center justify-center rounded-[0.3125rem] sm:size-4 cursor-pointer',
+          'relative isolate flex size-4.5 items-center justify-center rounded-[0.3125rem] sm:size-4',
+          disabled ? '!cursor-not-allowed opacity-50' : '!cursor-pointer',
           'before:absolute before:inset-0 before:-z-10 before:rounded-[calc(0.3125rem-1px)] before:bg-white before:shadow-sm',
           'dark:before:hidden',
           'dark:bg-white/5',
-          'border border-zinc-950/15 hover:border-zinc-950/30',
-          'dark:border-white/15 dark:hover:border-white/30',
+          'border border-zinc-950/15',
+          !disabled && 'hover:border-zinc-950/30',
+          'dark:border-white/15',
+          !disabled && 'dark:hover:border-white/30',
           'after:absolute after:inset-0 after:rounded-[calc(0.3125rem-1px)] after:shadow-[inset_0_1px_theme(colors.white/15%)]',
           'dark:after:-inset-px dark:after:hidden dark:after:rounded-[0.3125rem]',
           'focus:outline-2 focus:outline-offset-2 focus:outline-blue-500',
@@ -72,17 +77,25 @@ export function Checkbox({
           ]
         ])}
         onClick={() => {
-          onChange?.(!checked)
+          if (!disabled) {
+            onChange?.(!checked)
+          }
         }}
       >
         <input
           {...props}
           type="checkbox"
           checked={checked}
+          disabled={disabled}
           onChange={(e) => {
-            onChange?.(e.target.checked)
+            if (!disabled) {
+              onChange?.(e.target.checked)
+            }
           }}
-          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+          className={clsx(
+            "absolute inset-0 opacity-0 z-10",
+            disabled ? "!cursor-not-allowed" : "!cursor-pointer"
+          )}
         />
         <svg
           className={clsx(
