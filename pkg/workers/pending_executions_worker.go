@@ -121,6 +121,7 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte,
 	response, err := executor.Execute(spec, executors.ExecutionParameters{
 		ExecutionID: execution.ID.String(),
 		StageID:     stage.ID.String(),
+		OutputNames: stage.OutputNames(),
 	})
 
 	if err != nil {

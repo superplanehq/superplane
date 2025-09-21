@@ -11,6 +11,7 @@ import { InlineEditable } from '../InlineEditable';
 import { EditModeActionButtons } from '../EditModeActionButtons';
 import { twMerge } from 'tailwind-merge';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { createConnectionGroupDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
@@ -21,7 +22,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup } = useCanvasStore();
+  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
@@ -200,6 +201,19 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     }
   };
 
+  const handleDuplicateConnectionGroup = () => {
+    if (!currentConnectionGroup) return;
+
+    const duplicatedConnectionGroup = createConnectionGroupDuplicate(currentConnectionGroup, allConnectionGroups);
+    addConnectionGroup(duplicatedConnectionGroup, true);
+
+    focusAndEditNode(
+      duplicatedConnectionGroup.metadata?.id || '',
+      setFocusedNodeId,
+      setEditingConnectionGroup
+    );
+  };
+
   const handleYamlApply = useCallback((updatedData: unknown) => {
     // Handle YAML data application for connection group
     const yamlData = updatedData as SuperplaneConnectionGroup;
@@ -254,6 +268,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
+          onDuplicate={!isNewNode ? handleDuplicateConnectionGroup : undefined}
           isEditMode={isEditMode}
           entityType="connection group"
           entityData={currentFormData ? {
