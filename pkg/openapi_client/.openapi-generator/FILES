@@ -28,8 +28,9 @@ docs/EventRejectionRejectionReason.md
 docs/EventSourceAPI.md
 docs/EventSourceDailySchedule.md
 docs/EventSourceEventType.md
-docs/EventSourceSchedule.md
+docs/EventSourceHourlySchedule.md
 docs/EventSourceScheduleType.md
+docs/EventSourceStatusSchedule.md
 docs/EventSourceWeeklySchedule.md
 docs/ExecutionAPI.md
 docs/ExecutionResult.md
@@ -143,6 +144,7 @@ docs/SuperplaneEvent.md
 docs/SuperplaneEventRejection.md
 docs/SuperplaneEventSource.md
 docs/SuperplaneEventSourceMetadata.md
+docs/SuperplaneEventSourceSchedule.md
 docs/SuperplaneEventSourceSpec.md
 docs/SuperplaneEventSourceStatus.md
 docs/SuperplaneEventSourceType.md
@@ -210,8 +212,9 @@ model_authorization_permission.go
 model_event_rejection_rejection_reason.go
 model_event_source_daily_schedule.go
 model_event_source_event_type.go
-model_event_source_schedule.go
+model_event_source_hourly_schedule.go
 model_event_source_schedule_type.go
+model_event_source_status_schedule.go
 model_event_source_weekly_schedule.go
 model_execution_result.go
 model_execution_result_reason.go
@@ -317,6 +320,7 @@ model_superplane_event.go
 model_superplane_event_rejection.go
 model_superplane_event_source.go
 model_superplane_event_source_metadata.go
+model_superplane_event_source_schedule.go
 model_superplane_event_source_spec.go
 model_superplane_event_source_status.go
 model_superplane_event_source_type.go

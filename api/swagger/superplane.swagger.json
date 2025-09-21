@@ -2753,17 +2753,13 @@
         }
       }
     },
-    "EventSourceSchedule": {
+    "EventSourceHourlySchedule": {
       "type": "object",
       "properties": {
-        "type": {
-          "$ref": "#/definitions/EventSourceScheduleType"
-        },
-        "daily": {
-          "$ref": "#/definitions/EventSourceDailySchedule"
-        },
-        "weekly": {
-          "$ref": "#/definitions/EventSourceWeeklySchedule"
+        "minute": {
+          "type": "integer",
+          "format": "int32",
+          "title": "0-59, minute of the hour to trigger"
         }
       }
     },
@@ -2771,10 +2767,24 @@
       "type": "string",
       "enum": [
         "TYPE_UNKNOWN",
+        "TYPE_HOURLY",
         "TYPE_DAILY",
         "TYPE_WEEKLY"
       ],
       "default": "TYPE_UNKNOWN"
+    },
+    "EventSourceStatusSchedule": {
+      "type": "object",
+      "properties": {
+        "lastTrigger": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nextTrigger": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     },
     "EventSourceWeeklySchedule": {
       "type": "object",
@@ -4125,6 +4135,23 @@
         }
       }
     },
+    "SuperplaneEventSourceSchedule": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/EventSourceScheduleType"
+        },
+        "hourly": {
+          "$ref": "#/definitions/EventSourceHourlySchedule"
+        },
+        "daily": {
+          "$ref": "#/definitions/EventSourceDailySchedule"
+        },
+        "weekly": {
+          "$ref": "#/definitions/EventSourceWeeklySchedule"
+        }
+      }
+    },
     "SuperplaneEventSourceSpec": {
       "type": "object",
       "properties": {
@@ -4142,7 +4169,7 @@
           }
         },
         "schedule": {
-          "$ref": "#/definitions/EventSourceSchedule"
+          "$ref": "#/definitions/SuperplaneEventSourceSchedule"
         }
       }
     },
@@ -4151,6 +4178,9 @@
       "properties": {
         "history": {
           "$ref": "#/definitions/StatusHistory"
+        },
+        "schedule": {
+          "$ref": "#/definitions/EventSourceStatusSchedule"
         }
       }
     },

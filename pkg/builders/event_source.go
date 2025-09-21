@@ -155,7 +155,7 @@ func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.Even
 		}
 		schedule := datatypes.NewJSONType(*b.schedule)
 		source.Schedule = &schedule
-		source.NextTriggerAt = &nextTrigger
+		source.NextTriggerAt = nextTrigger
 	}
 
 	err = source.CreateInTransaction(tx)
@@ -347,7 +347,7 @@ func (b *EventSourceBuilder) updateWithoutIntegration(tx *gorm.DB) (*models.Even
 		}
 		schedule := datatypes.NewJSONType(*b.schedule)
 		updates["schedule"] = &schedule
-		updates["next_trigger_at"] = &nextTrigger
+		updates["next_trigger_at"] = nextTrigger
 	} else {
 		updates["schedule"] = nil
 		updates["next_trigger_at"] = nil

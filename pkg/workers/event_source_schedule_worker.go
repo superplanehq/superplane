@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -75,9 +76,17 @@ func (w *EventSourceScheduleWorker) ProcessScheduledEventSource(eventSource mode
 			return fmt.Errorf("failed to calculate next trigger: %v", err)
 		}
 
-		err = eventSource.UpdateNextTriggerInTransaction(tx, next)
+		err = eventSource.UpdateNextTriggerInTransaction(tx, *next)
 		if err != nil {
 			return fmt.Errorf("failed to update next trigger: %v", err)
+		}
+
+		// Publish event creation message for real-time UI updates
+		eventCreatedMessage := messages.NewEventCreatedMessage(eventSource.CanvasID.String(), event)
+		err = eventCreatedMessage.Publish()
+		if err != nil {
+			log.Errorf("Failed to publish event created message for scheduled event %s: %v", event.ID, err)
+			// Don't fail the transaction for publishing errors
 		}
 
 		log.Infof("Processed scheduled event source %s, created event %s, next trigger: %v", eventSource.ID, event.ID, next)

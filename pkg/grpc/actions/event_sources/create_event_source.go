@@ -155,6 +155,17 @@ func validateSchedule(spec *pb.EventSource_Spec, integration *models.Integration
 	}
 
 	switch spec.Schedule.Type {
+	case pb.EventSource_Schedule_TYPE_HOURLY:
+		if spec.Schedule.Hourly == nil {
+			return nil, status.Error(codes.InvalidArgument, "hourly schedule configuration is required")
+		}
+		minute := int(spec.Schedule.Hourly.Minute)
+		if minute < 0 || minute > 59 {
+			return nil, status.Error(codes.InvalidArgument, "minute must be between 0 and 59")
+		}
+		schedule.Hourly = &models.HourlySchedule{
+			Minute: minute,
+		}
 	case pb.EventSource_Schedule_TYPE_DAILY:
 		if spec.Schedule.Daily == nil {
 			return nil, status.Error(codes.InvalidArgument, "daily schedule configuration is required")
@@ -243,6 +254,12 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 		}
 
 		switch scheduleData.Type {
+		case models.ScheduleTypeHourly:
+			if scheduleData.Hourly != nil {
+				schedule.Hourly = &pb.EventSource_HourlySchedule{
+					Minute: int32(scheduleData.Hourly.Minute),
+				}
+			}
 		case models.ScheduleTypeDaily:
 			if scheduleData.Daily != nil {
 				schedule.Daily = &pb.EventSource_DailySchedule{
@@ -287,6 +304,21 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 				return nil, err
 			}
 			status.History.RecentItems = append(status.History.RecentItems, pbEvent)
+		}
+
+		// Add schedule information if the event source has a schedule
+		if eventSource.Schedule != nil {
+			scheduleStatus := &pb.EventSource_Status_Schedule{}
+
+			if eventSource.LastTriggeredAt != nil {
+				scheduleStatus.LastTrigger = timestamppb.New(*eventSource.LastTriggeredAt)
+			}
+
+			if eventSource.NextTriggerAt != nil {
+				scheduleStatus.NextTrigger = timestamppb.New(*eventSource.NextTriggerAt)
+			}
+
+			status.Schedule = scheduleStatus
 		}
 
 		pbEventSource.Status = status

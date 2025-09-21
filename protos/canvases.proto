@@ -433,8 +433,9 @@ message EventSource {
   message Schedule {
     enum Type {
       TYPE_UNKNOWN = 0;
-      TYPE_DAILY = 1;
-      TYPE_WEEKLY = 2;
+      TYPE_HOURLY = 1;
+      TYPE_DAILY = 2;
+      TYPE_WEEKLY = 3;
     }
 
     enum WeekDay {
@@ -449,8 +450,13 @@ message EventSource {
     }
 
     Type type = 1;
-    DailySchedule daily = 2;
-    WeeklySchedule weekly = 3;
+    HourlySchedule hourly = 2;
+    DailySchedule daily = 3;
+    WeeklySchedule weekly = 4;
+  }
+
+  message HourlySchedule {
+    int32 minute = 1; // 0-59, minute of the hour to trigger
   }
 
   message DailySchedule {
@@ -475,7 +481,13 @@ message EventSource {
       repeated Event recent_items = 2;
     }
 
+    message Schedule {
+      google.protobuf.Timestamp last_trigger = 1;
+      google.protobuf.Timestamp next_trigger = 2;
+    }
+
     History history = 1;
+    Schedule schedule = 2;
   }
 
   Metadata metadata = 1;

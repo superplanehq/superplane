@@ -23,7 +23,8 @@ import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDu
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
-  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
+  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
+  'scheduled': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="schedule" size="xl" />
 }
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
@@ -433,7 +434,52 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           </div>
         </div>
         {!isEditMode && (
-          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
+          <>
+            <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
+            {/* Schedule Status */}
+            {currentEventSource?.spec?.schedule && currentEventSource?.status?.schedule && (
+              <div className="w-full mt-3 space-y-2">
+                {/* Schedule Type and Configuration */}
+                <div className="flex items-center gap-2 text-xs">
+                  <MaterialSymbol name="event_repeat" size="sm" className="text-purple-600 dark:text-purple-400" />
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                    {currentEventSource.spec.schedule.type === 'TYPE_HOURLY' &&
+                      `Hourly, ${currentEventSource.spec.schedule.hourly?.minute || 0} minutes past the hour`
+                    }
+                    {currentEventSource.spec.schedule.type === 'TYPE_DAILY' &&
+                      `Daily at ${currentEventSource.spec.schedule.daily?.time || '00:00'} UTC`
+                    }
+                    {currentEventSource.spec.schedule.type === 'TYPE_WEEKLY' &&
+                      `Weekly on ${currentEventSource.spec.schedule.weekly?.weekDay?.replace('WEEK_DAY_', '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday'} at ${currentEventSource.spec.schedule.weekly?.time || '00:00'} UTC`
+                    }
+                  </span>
+                </div>
+
+                {currentEventSource.status.schedule.lastTrigger && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <MaterialSymbol name="history" size="sm" className="text-green-600 dark:text-green-400" />
+                    <span className="text-gray-500 dark:text-gray-400">Last:</span>
+                    <span className="text-gray-700 dark:text-gray-300">
+                      {new Date(currentEventSource.status.schedule.lastTrigger).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
+                      })} UTC
+                    </span>
+                  </div>
+                )}
+                {currentEventSource.status.schedule.nextTrigger && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <MaterialSymbol name="schedule" size="sm" className="text-blue-600 dark:text-blue-400" />
+                    <span className="text-gray-500 dark:text-gray-400">Next:</span>
+                    <span className="text-gray-700 dark:text-gray-300">
+                      {new Date(currentEventSource.status.schedule.nextTrigger).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
+                      })} UTC
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
       </div>

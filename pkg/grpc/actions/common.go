@@ -557,6 +557,8 @@ func SerializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 
 func ProtoToScheduleType(scheduleType pb.EventSource_Schedule_Type) (string, error) {
 	switch scheduleType {
+	case pb.EventSource_Schedule_TYPE_HOURLY:
+		return models.ScheduleTypeHourly, nil
 	case pb.EventSource_Schedule_TYPE_DAILY:
 		return models.ScheduleTypeDaily, nil
 	case pb.EventSource_Schedule_TYPE_WEEKLY:
@@ -568,6 +570,8 @@ func ProtoToScheduleType(scheduleType pb.EventSource_Schedule_Type) (string, err
 
 func ScheduleTypeToProto(scheduleType string) pb.EventSource_Schedule_Type {
 	switch scheduleType {
+	case models.ScheduleTypeHourly:
+		return pb.EventSource_Schedule_TYPE_HOURLY
 	case models.ScheduleTypeDaily:
 		return pb.EventSource_Schedule_TYPE_DAILY
 	case models.ScheduleTypeWeekly:

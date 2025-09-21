@@ -9,6 +9,7 @@ interface ScheduleConfigurationProps {
 }
 
 const SCHEDULE_TYPE_OPTIONS: { value: EventSourceScheduleType; label: string }[] = [
+  { value: 'TYPE_HOURLY', label: 'Hourly' },
   { value: 'TYPE_DAILY', label: 'Daily' },
   { value: 'TYPE_WEEKLY', label: 'Weekly' },
 ];
@@ -46,7 +47,11 @@ export function ScheduleConfiguration({
       type
     };
 
-    if (type === 'TYPE_DAILY') {
+    if (type === 'TYPE_HOURLY') {
+      newSchedule.hourly = {
+        minute: schedule?.hourly?.minute ?? 0
+      };
+    } else if (type === 'TYPE_DAILY') {
       newSchedule.daily = {
         time: schedule?.daily?.time || '09:00'
       };
@@ -56,6 +61,17 @@ export function ScheduleConfiguration({
         time: schedule?.weekly?.time || '09:00'
       };
     }
+
+    onScheduleChange(newSchedule);
+  }, [schedule, onScheduleChange]);
+
+  const handleMinuteChange = useCallback((minute: number) => {
+    if (!schedule || schedule.type !== 'TYPE_HOURLY') return;
+
+    const newSchedule: EventSourceSchedule = {
+      ...schedule,
+      hourly: { minute }
+    };
 
     onScheduleChange(newSchedule);
   }, [schedule, onScheduleChange]);
@@ -119,6 +135,31 @@ export function ScheduleConfiguration({
             </select>
           </ValidationField>
 
+          {/* Hourly Minute Selection */}
+          {schedule?.type === 'TYPE_HOURLY' && (
+            <ValidationField
+              label="Minute"
+              error={errors.minute}
+              required={true}
+            >
+              <select
+                value={schedule.hourly?.minute ?? 0}
+                onChange={(e) => handleMinuteChange(parseInt(e.target.value))}
+                className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${
+                  errors.minute
+                    ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
+                    : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                }`}
+              >
+                {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
+                  <option key={minute} value={minute}>
+                    :{minute.toString().padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+            </ValidationField>
+          )}
+
           {/* Weekly Day Selection */}
           {schedule?.type === 'TYPE_WEEKLY' && (
             <ValidationField
@@ -145,11 +186,12 @@ export function ScheduleConfiguration({
           )}
 
           {/* Time Selection */}
-          <ValidationField
-            label="Time (UTC)"
-            error={errors.time}
-            required={true}
-          >
+          {(schedule?.type === 'TYPE_DAILY' || schedule?.type === 'TYPE_WEEKLY') && (
+            <ValidationField
+              label="Time (UTC)"
+              error={errors.time}
+              required={true}
+            >
             <input
               type="time"
               value={getCurrentTime()}
@@ -160,7 +202,8 @@ export function ScheduleConfiguration({
                   : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
               }`}
             />
-          </ValidationField>
+            </ValidationField>
+          )}
     </div>
   );
 }

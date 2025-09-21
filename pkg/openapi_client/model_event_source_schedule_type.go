@@ -22,6 +22,7 @@ type EventSourceScheduleType string
 // List of EventSourceScheduleType
 const (
 	EVENTSOURCESCHEDULETYPE_TYPE_UNKNOWN EventSourceScheduleType = "TYPE_UNKNOWN"
+	EVENTSOURCESCHEDULETYPE_TYPE_HOURLY EventSourceScheduleType = "TYPE_HOURLY"
 	EVENTSOURCESCHEDULETYPE_TYPE_DAILY EventSourceScheduleType = "TYPE_DAILY"
 	EVENTSOURCESCHEDULETYPE_TYPE_WEEKLY EventSourceScheduleType = "TYPE_WEEKLY"
 )
@@ -29,6 +30,7 @@ const (
 // All allowed values of EventSourceScheduleType enum
 var AllowedEventSourceScheduleTypeEnumValues = []EventSourceScheduleType{
 	"TYPE_UNKNOWN",
+	"TYPE_HOURLY",
 	"TYPE_DAILY",
 	"TYPE_WEEKLY",
 }

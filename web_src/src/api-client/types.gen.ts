@@ -24,13 +24,16 @@ export type EventSourceEventType = {
     filterOperator?: SuperplaneFilterOperator;
 };
 
-export type EventSourceSchedule = {
-    type?: EventSourceScheduleType;
-    daily?: EventSourceDailySchedule;
-    weekly?: EventSourceWeeklySchedule;
+export type EventSourceHourlySchedule = {
+    minute?: number;
 };
 
-export type EventSourceScheduleType = 'TYPE_UNKNOWN' | 'TYPE_DAILY' | 'TYPE_WEEKLY';
+export type EventSourceScheduleType = 'TYPE_UNKNOWN' | 'TYPE_HOURLY' | 'TYPE_DAILY' | 'TYPE_WEEKLY';
+
+export type EventSourceStatusSchedule = {
+    lastTrigger?: string;
+    nextTrigger?: string;
+};
 
 export type EventSourceWeeklySchedule = {
     weekDay?: ScheduleWeekDay;
@@ -616,15 +619,23 @@ export type SuperplaneEventSourceMetadata = {
     updatedAt?: string;
 };
 
+export type SuperplaneEventSourceSchedule = {
+    type?: EventSourceScheduleType;
+    hourly?: EventSourceHourlySchedule;
+    daily?: EventSourceDailySchedule;
+    weekly?: EventSourceWeeklySchedule;
+};
+
 export type SuperplaneEventSourceSpec = {
     integration?: IntegrationsIntegrationRef;
     resource?: IntegrationsResourceRef;
     events?: Array<EventSourceEventType>;
-    schedule?: EventSourceSchedule;
+    schedule?: SuperplaneEventSourceSchedule;
 };
 
 export type SuperplaneEventSourceStatus = {
     history?: StatusHistory;
+    schedule?: EventSourceStatusSchedule;
 };
 
 export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';

@@ -23,7 +23,7 @@ type SuperplaneEventSourceSpec struct {
 	Integration *IntegrationsIntegrationRef `json:"integration,omitempty"`
 	Resource *IntegrationsResourceRef `json:"resource,omitempty"`
 	Events []EventSourceEventType `json:"events,omitempty"`
-	Schedule *EventSourceSchedule `json:"schedule,omitempty"`
+	Schedule *SuperplaneEventSourceSchedule `json:"schedule,omitempty"`
 }
 
 // NewSuperplaneEventSourceSpec instantiates a new SuperplaneEventSourceSpec object
@@ -140,9 +140,9 @@ func (o *SuperplaneEventSourceSpec) SetEvents(v []EventSourceEventType) {
 }
 
 // GetSchedule returns the Schedule field value if set, zero value otherwise.
-func (o *SuperplaneEventSourceSpec) GetSchedule() EventSourceSchedule {
+func (o *SuperplaneEventSourceSpec) GetSchedule() SuperplaneEventSourceSchedule {
 	if o == nil || IsNil(o.Schedule) {
-		var ret EventSourceSchedule
+		var ret SuperplaneEventSourceSchedule
 		return ret
 	}
 	return *o.Schedule
@@ -150,7 +150,7 @@ func (o *SuperplaneEventSourceSpec) GetSchedule() EventSourceSchedule {
 
 // GetScheduleOk returns a tuple with the Schedule field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSourceSpec) GetScheduleOk() (*EventSourceSchedule, bool) {
+func (o *SuperplaneEventSourceSpec) GetScheduleOk() (*SuperplaneEventSourceSchedule, bool) {
 	if o == nil || IsNil(o.Schedule) {
 		return nil, false
 	}
@@ -166,8 +166,8 @@ func (o *SuperplaneEventSourceSpec) HasSchedule() bool {
 	return false
 }
 
-// SetSchedule gets a reference to the given EventSourceSchedule and assigns it to the Schedule field.
-func (o *SuperplaneEventSourceSpec) SetSchedule(v EventSourceSchedule) {
+// SetSchedule gets a reference to the given SuperplaneEventSourceSchedule and assigns it to the Schedule field.
+func (o *SuperplaneEventSourceSpec) SetSchedule(v SuperplaneEventSourceSchedule) {
 	o.Schedule = &v
 }
 
