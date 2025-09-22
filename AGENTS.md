@@ -17,8 +17,8 @@
 - Targeted backend tests: `make test TEST_PACKAGES=./pkg/workers`
 - After updating UI code, always run `npm run build` to verify everything is correct
 - After updating GoLang code, always lint it with `make lint`
-- After updating GoLang code, always run `go build cmd/server/main.go` to ensure it compiles
 - After adding new API endpoints, ensure the new endpoints have their authorization covered in `pkg/authorization/interceptor.go`
+- For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
   - `make pb.gen` to regenerate protobuf files
   - `make openapi.spec.gen` to generate OpenAPI spec for the API
