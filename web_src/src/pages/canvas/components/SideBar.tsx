@@ -7,9 +7,9 @@ import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { useStageExecutions, useStageEvents, canvasKeys } from "@/hooks/useCanvasData";
 import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
 
-import { SidebarHeader } from "./SidebarHeader";
-import { SidebarTabs } from "./SidebarTabs";
-import { ResizeHandle } from "./ResizeHandle";
+import { SidebarHeader } from "../../../components/SidebarHeader";
+import { SidebarTabs } from "../../../components/SidebarTabs";
+import { ResizeHandle } from "../../../components/ResizeHandle";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { ExecutionsTab } from "./tabs/ExecutionsTab";
 import { QueueTab } from "./tabs/QueueTab";

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { SuperplaneEventState, SuperplaneEventStateReason } from '@/api-client';
-import { formatRelativeTime } from '../utils/stageEventUtils';
-import { PayloadDisplay } from './PayloadDisplay';
+import { formatRelativeTime } from '../../pages/canvas/utils/stageEventUtils';
+import { PayloadDisplay } from '../PayloadDisplay';
 
 interface EventItemProps {
   eventId: string;

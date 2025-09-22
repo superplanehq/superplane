@@ -1,5 +1,5 @@
 import { Stage } from "../../store/types";
-import { EventItem } from '../EventItem';
+import { EventItem } from '../../../../components/EventItem';
 import { RejectionItem } from '../RejectionItem';
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useEventRejections, useStageEvents, useEvents } from '@/hooks/useCanvasData';

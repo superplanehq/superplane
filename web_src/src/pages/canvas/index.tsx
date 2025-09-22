@@ -6,7 +6,7 @@ import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
 import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListConnectionGroups, SuperplaneStage, SuperplaneEventSource, SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneConnection, SuperplaneConnectionType } from "@/api-client";
 import { ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from "./store/types";
 import { Sidebar } from "./components/SideBar";
-import { EventSourceSidebar } from "./components/EventSourceSidebar";
+import { EventSourceSidebar } from "../../components/EventSourceSidebar";
 import { ComponentSidebar, ConnectionInfo } from "./components/ComponentSidebar";
 import { CanvasNavigation, CanvasNavigationContent, type CanvasView } from "../../components/CanvasNavigation";
 import { useNodeHandlers } from "./utils/nodeHandlers";

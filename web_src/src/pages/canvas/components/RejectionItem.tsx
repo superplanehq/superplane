@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EventRejectionRejectionReason } from '@/api-client';
 import { formatRelativeTime } from '../utils/stageEventUtils';
-import { PayloadDisplay } from './PayloadDisplay';
+import { PayloadDisplay } from '../../../components/PayloadDisplay';
 
 interface RejectionItemProps {
   rejection: {

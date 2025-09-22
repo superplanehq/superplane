@@ -1,17 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
 import { SuperplaneEventSource, SuperplaneEvent } from "@/api-client";
-import { useResizableSidebar } from "../hooks/useResizableSidebar";
-import { SidebarHeader } from "./SidebarHeader";
-import { ResizeHandle } from "./ResizeHandle";
+import { useResizableSidebar } from "../../pages/canvas/hooks/useResizableSidebar";
+import { SidebarHeader } from "../SidebarHeader";
+import { ResizeHandle } from "../ResizeHandle";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
-import { EventItem } from "./EventItem";
-import { useIntegrations } from "../hooks/useIntegrations";
-import { useCanvasStore } from "../store/canvasStore";
+import { EventItem } from "../EventItem";
+import { useIntegrations } from "../../pages/canvas/hooks/useIntegrations";
+import { useCanvasStore } from "../../pages/canvas/store/canvasStore";
 import { useEvents } from "@/hooks/useCanvasData";
-import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
+import { DEFAULT_SIDEBAR_WIDTH } from "../../pages/canvas/utils/constants";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
-import { SidebarTabs } from './SidebarTabs';
+import { SidebarTabs } from '../SidebarTabs';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,

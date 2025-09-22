@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { twMerge } from 'tailwind-merge';
-import { PayloadModal } from './PayloadModal';
+import { PayloadModal } from '../PayloadModal';
 import JsonView from '@uiw/react-json-view';
 import { lightTheme } from '@uiw/react-json-view/light';
 import { darkTheme } from '@uiw/react-json-view/dark';
