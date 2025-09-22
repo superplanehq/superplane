@@ -290,12 +290,14 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 		Spec: spec,
 	}
 
+	// Always create status field
+	status := &pb.EventSource_Status{}
+
+	// Add history information only if statusInfo is provided
 	if statusInfo != nil {
-		status := &pb.EventSource_Status{
-			History: &pb.EventSource_Status_History{
-				Received:    uint32(statusInfo.ReceivedCount),
-				RecentItems: []*pb.Event{},
-			},
+		status.History = &pb.EventSource_Status_History{
+			Received:    uint32(statusInfo.ReceivedCount),
+			RecentItems: []*pb.Event{},
 		}
 
 		for _, event := range statusInfo.RecentEvents {
@@ -305,24 +307,24 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 			}
 			status.History.RecentItems = append(status.History.RecentItems, pbEvent)
 		}
+	}
 
-		// Add schedule information if the event source has a schedule
-		if eventSource.Schedule != nil {
-			scheduleStatus := &pb.EventSource_Status_Schedule{}
+	// Add schedule information if the event source has a schedule
+	if eventSource.Schedule != nil {
+		scheduleStatus := &pb.EventSource_Status_Schedule{}
 
-			if eventSource.LastTriggeredAt != nil {
-				scheduleStatus.LastTrigger = timestamppb.New(*eventSource.LastTriggeredAt)
-			}
-
-			if eventSource.NextTriggerAt != nil {
-				scheduleStatus.NextTrigger = timestamppb.New(*eventSource.NextTriggerAt)
-			}
-
-			status.Schedule = scheduleStatus
+		if eventSource.LastTriggeredAt != nil {
+			scheduleStatus.LastTrigger = timestamppb.New(*eventSource.LastTriggeredAt)
 		}
 
-		pbEventSource.Status = status
+		if eventSource.NextTriggerAt != nil {
+			scheduleStatus.NextTrigger = timestamppb.New(*eventSource.NextTriggerAt)
+		}
+
+		status.Schedule = scheduleStatus
 	}
+
+	pbEventSource.Status = status
 
 	return pbEventSource, nil
 }

@@ -178,21 +178,18 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           // The apiError will be set by the mutation's onError callback
         });
       } else {
-        await updateEventSourceMutation.mutateAsync({
+        const updateResult = await updateEventSourceMutation.mutateAsync({
           eventSourceId: currentEventSource.metadata?.id || '',
           name: eventSourceName,
           description: eventSourceDescription,
           spec: currentFormData.spec
         });
 
+        const updatedEventSource = updateResult.data?.eventSource;
         updateEventSource({
-          ...currentEventSource,
-          metadata: {
-            ...currentEventSource.metadata,
-            name: eventSourceName,
-            description: eventSourceDescription
-          },
-          spec: currentFormData.spec
+          ...updatedEventSource,
+          events: currentEventSource.events || [],
+          eventSourceType: currentFormData.spec.schedule ? 'scheduled' : undefined,
         });
 
         props.data.name = eventSourceName;
@@ -437,7 +434,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           <>
             <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
             {/* Schedule Status */}
-            {currentEventSource?.spec?.schedule && currentEventSource?.status?.schedule && (
+            {currentEventSource?.spec?.schedule && (
               <div className="w-full mt-3 space-y-2">
                 {/* Schedule Type and Configuration */}
                 <div className="flex items-center gap-2 text-xs">
@@ -455,27 +452,33 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                   </span>
                 </div>
 
-                {currentEventSource.status.schedule.lastTrigger && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <MaterialSymbol name="history" size="sm" className="text-green-600 dark:text-green-400" />
-                    <span className="text-gray-500 dark:text-gray-400">Last:</span>
-                    <span className="text-gray-700 dark:text-gray-300">
-                      {new Date(currentEventSource.status.schedule.lastTrigger).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
-                      })} UTC
-                    </span>
-                  </div>
-                )}
-                {currentEventSource.status.schedule.nextTrigger && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <MaterialSymbol name="schedule" size="sm" className="text-blue-600 dark:text-blue-400" />
-                    <span className="text-gray-500 dark:text-gray-400">Next:</span>
-                    <span className="text-gray-700 dark:text-gray-300">
-                      {new Date(currentEventSource.status.schedule.nextTrigger).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
-                      })} UTC
-                    </span>
-                  </div>
+                {/* Timestamps - only show if status is available */}
+                {currentEventSource?.status?.schedule && (
+                  <>
+                    <div className="flex items-center gap-2 text-xs">
+                      <MaterialSymbol name="history" size="sm" className="text-green-600 dark:text-green-400" />
+                      <span className="text-gray-500 dark:text-gray-400">Last:</span>
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {currentEventSource.status.schedule.lastTrigger
+                          ? new Date(currentEventSource.status.schedule.lastTrigger).toLocaleDateString('en-US', {
+                              month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
+                            }) + ' UTC'
+                          : '-'
+                        }
+                      </span>
+                    </div>
+                    {currentEventSource.status.schedule.nextTrigger && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <MaterialSymbol name="schedule" size="sm" className="text-blue-600 dark:text-blue-400" />
+                        <span className="text-gray-500 dark:text-gray-400">Next:</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {new Date(currentEventSource.status.schedule.nextTrigger).toLocaleDateString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
+                          })} UTC
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -565,10 +568,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             </div>
           ) : (
-            <EventSourceZeroState
-              eventSourceType={eventSourceType}
-              schedule={currentEventSource?.spec?.schedule || props.data.schedule || undefined}
-            />
+            // Only show EventSourceZeroState for non-scheduled event sources
+            eventSourceType !== 'scheduled' && (
+              <EventSourceZeroState
+                eventSourceType={eventSourceType}
+              />
+            )
           )}
 
         </>
