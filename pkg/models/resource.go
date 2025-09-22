@@ -152,6 +152,17 @@ func CountOtherStagesUsingResource(resourceID uuid.UUID, currentStageID uuid.UUI
 	return count, nil
 }
 
+func CountResourcesByIntegration(integrationID uuid.UUID) (int64, error) {
+	var count int64
+	err := database.Conn().
+		Model(&Resource{}).
+		Where("integration_id = ?", integrationID).
+		Count(&count).
+		Error
+
+	return count, err
+}
+
 // DeleteResourceWithChildren deletes a resource and all its child resources in a transaction
 func DeleteResourceWithChildren(resourceID uuid.UUID) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {

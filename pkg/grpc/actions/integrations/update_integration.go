@@ -38,6 +38,16 @@ func UpdateIntegration(
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
+	resourceCount, err := models.CountResourcesByIntegration(integration.ID)
+	if err != nil {
+		log.Errorf("Error checking resources for integration. Error: %v", err)
+		return nil, status.Error(codes.Internal, "failed to check integration resources")
+	}
+
+	if resourceCount > 0 {
+		return nil, status.Error(codes.FailedPrecondition, "integration cannot be updated as it is being used by existing resources")
+	}
+
 	updatedIntegration, err := buildIntegration(ctx, encryptor, registry, domainType, uuid.MustParse(domainID), spec)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

@@ -16,6 +16,7 @@ import {
   useIntegrationForm,
   NEW_SECRET_NAME
 } from '../../IntegrationForm'
+import { showErrorToast, showSuccessToast } from '../../../utils/toast'
 
 interface CanvasIntegrationsProps {
   canvasId: string
@@ -139,10 +140,12 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
       }
 
       await createIntegrationMutation.mutateAsync(integrationPayload)
+      showSuccessToast('Integration created successfully')
       resetForm()
       setSection('list')
     } catch (error) {
       console.error('Failed to create integration:', error)
+      showErrorToast('Failed to create integration. Please try again.')
     } finally {
       setIsCreating(false)
     }
@@ -207,12 +210,17 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
       }
 
       await updateIntegrationMutation.mutateAsync(updateData)
+      showSuccessToast('Integration updated successfully')
       resetForm()
       setEditingIntegration(null)
       setNewSecretValue('')
       setSection('list')
     } catch (error) {
       console.error('Failed to update integration:', error)
+      const errorMessage = (error as Error).message
+        ? (error as Error).message
+        : 'Failed to update integration. Please try again.'
+      showErrorToast(errorMessage)
     } finally {
       setIsCreating(false)
     }
