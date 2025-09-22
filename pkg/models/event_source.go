@@ -131,22 +131,30 @@ func (s *Schedule) calculateNextWeeklyTrigger(weekDay string, timeValue string, 
 
 	nowUTC := now.UTC()
 	currentWeekday := nowUTC.Weekday()
+	nextTrigger := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), hour, minute, 0, 0, time.UTC)
 
+	//
+	// If target and current week days are the same,
+	// we need to check if the next trigger is in the past
+	//
+	if targetWeekday == currentWeekday {
+		if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
+			nextTrigger = nextTrigger.AddDate(0, 0, 7)
+		}
+		return &nextTrigger, nil
+	}
+
+	//
+	// Otherwise, we need to calculate the number of days until the target week day
+	//
 	daysUntilTarget := int(targetWeekday - currentWeekday)
 	if daysUntilTarget < 0 {
 		daysUntilTarget += 7
 	}
 
-	nextTrigger := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), hour, minute, 0, 0, time.UTC)
 	nextTrigger = nextTrigger.AddDate(0, 0, daysUntilTarget)
-
-	if daysUntilTarget == 0 && (nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC)) {
-		nextTrigger = nextTrigger.AddDate(0, 0, 7)
-	}
-
 	return &nextTrigger, nil
 }
-
 
 func parseTime(timeValue string) (hour int, minute int, err error) {
 	parts := strings.Split(timeValue, ":")
