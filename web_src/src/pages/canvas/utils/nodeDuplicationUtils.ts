@@ -56,7 +56,7 @@ export const createEventSourceDuplicate = (
       id: Date.now().toString(), // Temporary ID
       name: duplicateName,
     },
-    events: []
+    isDuplicate: true
   };
 };
 

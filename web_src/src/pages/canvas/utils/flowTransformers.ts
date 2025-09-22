@@ -23,7 +23,7 @@ export const transformEventSourcesToNodes = (
           return timeB - timeA;
         }).slice(0, 3)
       : [];
-    
+      
     return ({
       id: es.metadata?.id || '',
       type: 'event_source',
@@ -31,7 +31,7 @@ export const transformEventSourcesToNodes = (
         id: es.metadata?.id || '',
         name: es.metadata?.name,
         description: es.metadata?.description,
-        eventFilters: es.eventFilters,
+        eventFilters: es.spec?.events,
         events: lastEvents,
         integration: es.spec?.integration,
         resource: es.spec?.resource,
