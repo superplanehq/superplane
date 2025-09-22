@@ -10,7 +10,7 @@ import { useConnectionManager } from '../hooks/useConnectionManager';
 import { useValidation } from '../hooks/useValidation';
 import { EditableAccordionSection } from './shared/EditableAccordionSection';
 import { InlineEditor } from './shared/InlineEditor';
-import { ValidationField } from './shared/ValidationField';
+import { ValidationField } from '../../../components/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
 import { ProTip } from './shared/ProTip';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';

@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { EventSourceNodeType } from '@/canvas/types/flow';
-import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef, EventSourceEventType, SuperplaneFilter, SuperplaneFilterOperator, EventSourceSchedule } from '@/api-client/types.gen';
+import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef, EventSourceEventType, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneEventSourceSchedule } from '@/api-client/types.gen';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
 import { useResetEventSourceKey } from '@/hooks/useCanvasData';
 import { EditableAccordionSection } from './shared/EditableAccordionSection';
-import { ValidationField } from './shared/ValidationField';
+import { ValidationField } from '../../../components/ValidationField';
 import { Button } from '@/components/Button/button';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -14,7 +14,7 @@ import { useCanvasStore } from '../store/canvasStore';
 import { showErrorToast } from '@/utils/toast';
 import { EventSourceFilterTooltip } from '@/components/Tooltip/EventSourceFilterTooltip';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
-import { ScheduleConfiguration } from './ScheduleConfiguration';
+import { ScheduleConfiguration } from '../../../components/ScheduleConfiguration';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -51,7 +51,7 @@ export function EventSourceEditModeContent({
   const [resourceType, setResourceType] = useState(data.resource?.type);
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
   const [eventTypes, setEventTypes] = useState<EventSourceEventType[]>(data.events || []);
-  const [schedule, setSchedule] = useState<EventSourceSchedule | null>(data.schedule || null);
+  const [schedule, setSchedule] = useState<SuperplaneEventSourceSchedule | null>(data.schedule || null);
   const [apiValidationErrors, setApiValidationErrors] = useState<Record<string, string>>({});
   const [isKeyRevealed, setIsKeyRevealed] = useState(false);
   const [showWebhookInstructions, setShowWebhookInstructions] = useState(false);

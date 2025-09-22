@@ -16,7 +16,7 @@ import {
   IntegrationsIntegrationRef,
   IntegrationsResourceRef,
   EventSourceEventType,
-  EventSourceSchedule
+  SuperplaneEventSourceSchedule
 } from "@/api-client/types.gen";
 
 export type AllNodeType = EventSourceNodeType | StageNodeType | ConnectionGroupNodeType;
@@ -43,7 +43,7 @@ export type EventSourceNodeData = {
   integration: IntegrationsIntegrationRef | null;
   resource: IntegrationsResourceRef | null;
   eventSourceType?: string;
-  schedule?: EventSourceSchedule | null;
+  schedule?: SuperplaneEventSourceSchedule | null;
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;

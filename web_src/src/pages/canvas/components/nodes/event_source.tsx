@@ -17,7 +17,7 @@ import { twMerge } from 'tailwind-merge';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { EventStateItem, EventState } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
-import { EventSourceZeroState } from '../EventSourceZeroState';
+import { EventSourceZeroState } from '../../../../components/EventSourceZeroState';
 import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 const EventSourceImageMap = {

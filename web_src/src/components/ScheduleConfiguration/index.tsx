@@ -1,20 +1,21 @@
 import { useCallback, useEffect } from 'react';
-import { EventSourceSchedule, EventSourceScheduleType, ScheduleWeekDay } from '@/api-client/types.gen';
-import { ValidationField } from './shared/ValidationField';
+import { SuperplaneEventSourceSchedule, EventSourceScheduleType, ScheduleWeekDay } from '@/api-client/types.gen';
+import { ValidationField } from '../ValidationField';
+import { Select } from '../Select';
 
 interface ScheduleConfigurationProps {
-  schedule?: EventSourceSchedule | null;
-  onScheduleChange: (schedule: EventSourceSchedule | null) => void;
+  schedule?: SuperplaneEventSourceSchedule | null;
+  onScheduleChange: (schedule: SuperplaneEventSourceSchedule | null) => void;
   errors?: Record<string, string>;
 }
 
-const SCHEDULE_TYPE_OPTIONS: { value: EventSourceScheduleType; label: string }[] = [
+const SCHEDULE_TYPE_OPTIONS = [
   { value: 'TYPE_HOURLY', label: 'Hourly' },
   { value: 'TYPE_DAILY', label: 'Daily' },
   { value: 'TYPE_WEEKLY', label: 'Weekly' },
 ];
 
-const WEEKDAY_OPTIONS: { value: ScheduleWeekDay; label: string }[] = [
+const WEEKDAY_OPTIONS = [
   { value: 'WEEK_DAY_MONDAY', label: 'Monday' },
   { value: 'WEEK_DAY_TUESDAY', label: 'Tuesday' },
   { value: 'WEEK_DAY_WEDNESDAY', label: 'Wednesday' },
@@ -23,6 +24,11 @@ const WEEKDAY_OPTIONS: { value: ScheduleWeekDay; label: string }[] = [
   { value: 'WEEK_DAY_SATURDAY', label: 'Saturday' },
   { value: 'WEEK_DAY_SUNDAY', label: 'Sunday' },
 ];
+
+const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+  value: (i * 5).toString(),
+  label: `:${(i * 5).toString().padStart(2, '0')}`
+}));
 
 export function ScheduleConfiguration({
   schedule,
@@ -42,9 +48,9 @@ export function ScheduleConfiguration({
     }
   }, [schedule, onScheduleChange]);
 
-  const handleScheduleTypeChange = useCallback((type: EventSourceScheduleType) => {
-    const newSchedule: EventSourceSchedule = {
-      type
+  const handleScheduleTypeChange = useCallback((type: string) => {
+    const newSchedule: SuperplaneEventSourceSchedule = {
+      type: type as EventSourceScheduleType
     };
 
     if (type === 'TYPE_HOURLY') {
@@ -65,12 +71,12 @@ export function ScheduleConfiguration({
     onScheduleChange(newSchedule);
   }, [schedule, onScheduleChange]);
 
-  const handleMinuteChange = useCallback((minute: number) => {
+  const handleMinuteChange = useCallback((minute: string) => {
     if (!schedule || schedule.type !== 'TYPE_HOURLY') return;
 
-    const newSchedule: EventSourceSchedule = {
+    const newSchedule: SuperplaneEventSourceSchedule = {
       ...schedule,
-      hourly: { minute }
+      hourly: { minute: parseInt(minute) }
     };
 
     onScheduleChange(newSchedule);
@@ -79,7 +85,7 @@ export function ScheduleConfiguration({
   const handleTimeChange = useCallback((time: string) => {
     if (!schedule) return;
 
-    const newSchedule: EventSourceSchedule = { ...schedule };
+    const newSchedule: SuperplaneEventSourceSchedule = { ...schedule };
 
     if (schedule.type === 'TYPE_DAILY') {
       newSchedule.daily = { ...schedule.daily, time };
@@ -90,12 +96,12 @@ export function ScheduleConfiguration({
     onScheduleChange(newSchedule);
   }, [schedule, onScheduleChange]);
 
-  const handleWeekDayChange = useCallback((weekDay: ScheduleWeekDay) => {
+  const handleWeekDayChange = useCallback((weekDay: string) => {
     if (!schedule || schedule.type !== 'TYPE_WEEKLY') return;
 
-    const newSchedule: EventSourceSchedule = {
+    const newSchedule: SuperplaneEventSourceSchedule = {
       ...schedule,
-      weekly: { ...schedule.weekly, weekDay }
+      weekly: { ...schedule.weekly, weekDay: weekDay as ScheduleWeekDay }
     };
 
     onScheduleChange(newSchedule);
@@ -118,21 +124,12 @@ export function ScheduleConfiguration({
             error={errors.scheduleType}
             required={true}
           >
-            <select
+            <Select
+              options={SCHEDULE_TYPE_OPTIONS}
               value={schedule?.type || 'TYPE_DAILY'}
-              onChange={(e) => handleScheduleTypeChange(e.target.value as EventSourceScheduleType)}
-              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${
-                errors.scheduleType
-                  ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
-                  : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-              }`}
-            >
-              {SCHEDULE_TYPE_OPTIONS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              onChange={handleScheduleTypeChange}
+              error={!!errors.scheduleType}
+            />
           </ValidationField>
 
           {/* Hourly Minute Selection */}
@@ -142,21 +139,12 @@ export function ScheduleConfiguration({
               error={errors.minute}
               required={true}
             >
-              <select
-                value={schedule.hourly?.minute ?? 0}
-                onChange={(e) => handleMinuteChange(parseInt(e.target.value))}
-                className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${
-                  errors.minute
-                    ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
-                    : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                }`}
-              >
-                {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
-                  <option key={minute} value={minute}>
-                    :{minute.toString().padStart(2, '0')}
-                  </option>
-                ))}
-              </select>
+              <Select
+                options={MINUTE_OPTIONS}
+                value={(schedule.hourly?.minute ?? 0).toString()}
+                onChange={handleMinuteChange}
+                error={!!errors.minute}
+              />
             </ValidationField>
           )}
 
@@ -167,21 +155,12 @@ export function ScheduleConfiguration({
               error={errors.weekDay}
               required={true}
             >
-              <select
+              <Select
+                options={WEEKDAY_OPTIONS}
                 value={schedule.weekly?.weekDay || 'WEEK_DAY_MONDAY'}
-                onChange={(e) => handleWeekDayChange(e.target.value as ScheduleWeekDay)}
-                className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${
-                  errors.weekDay
-                    ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
-                    : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                }`}
-              >
-                {WEEKDAY_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+                onChange={handleWeekDayChange}
+                error={!!errors.weekDay}
+              />
             </ValidationField>
           )}
 

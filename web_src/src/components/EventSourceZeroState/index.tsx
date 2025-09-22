@@ -1,9 +1,9 @@
 import React from 'react';
-import { EventSourceSchedule } from '@/api-client/types.gen';
+import { SuperplaneEventSourceSchedule } from '@/api-client/types.gen';
 
 interface EventSourceZeroStateProps {
   eventSourceType: string;
-  schedule?: EventSourceSchedule;
+  schedule?: SuperplaneEventSourceSchedule;
 }
 
 const getZeroStateMessage = (eventSourceType: string): string => {
@@ -19,21 +19,33 @@ const getZeroStateMessage = (eventSourceType: string): string => {
   }
 };
 
-const formatScheduleInfo = (schedule: EventSourceSchedule): { title: string; description: string } => {
+const formatScheduleInfo = (schedule: SuperplaneEventSourceSchedule): { title: string; description: string } => {
+  if (schedule.type === 'TYPE_HOURLY') {
+    const minute = schedule.hourly?.minute ?? 0;
+    const minuteText = minute.toString().padStart(2, '0');
+    return {
+      title: 'Scheduled Hourly',
+      description: `Events will be generated every hour at :${minuteText} minutes`
+    };
+  }
+
   if (schedule.type === 'TYPE_DAILY') {
     const time = schedule.daily?.time || '09:00';
     return {
       title: 'Scheduled Daily',
       description: `Events will be generated daily at ${time} UTC`
     };
-  } else if (schedule.type === 'TYPE_WEEKLY') {
+  }
+
+  if (schedule.type === 'TYPE_WEEKLY') {
     const time = schedule.weekly?.time || '09:00';
-    const weekDay = schedule.weekly?.weekDay?.replace('WEEK_DAY_', '').replace('_', ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday';
+    const weekDay = schedule.weekly?.weekDay?.replace('WEEK_DAY_', '').replace('_', ' ').toLowerCase().replace(/^\w/, (c: string) => c.toUpperCase()) || 'Monday';
     return {
       title: 'Scheduled Weekly',
       description: `Events will be generated every ${weekDay} at ${time} UTC`
     };
   }
+
   return {
     title: 'Scheduled',
     description: 'Events will be generated according to the configured schedule'
