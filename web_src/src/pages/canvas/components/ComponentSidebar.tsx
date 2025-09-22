@@ -116,6 +116,15 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       category_description: 'Execute remote operations',
       executorType: 'github'
     },
+    {
+      id: 'stage',
+      name: 'No-Op Stage',
+      description: 'A stage that does nothing but returns random outputs',
+      icon: 'check_circle',
+      category: 'Stages',
+      category_description: 'Execute remote operations',
+      executorType: 'noop'
+    },
     // Stages - Coming Soon
     {
       id: 'stage',

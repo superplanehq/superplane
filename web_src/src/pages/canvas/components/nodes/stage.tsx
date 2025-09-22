@@ -21,6 +21,7 @@ import { IOTooltip } from './IOTooltip';
 import { twMerge } from 'tailwind-merge';
 import { StageQueueSection } from '../StageQueueSection';
 import { EventTriggerBadge } from '../EventTriggerBadge';
+import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
@@ -40,7 +41,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [stageNameDirtyByUser, setStageNameDirtyByUser] = useState(false);
   const [integrationError, setIntegrationError] = useState(false);
   const triggerSectionValidationRef = useRef<(() => void) | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent } = useCanvasStore();
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId } = useCanvasStore();
   const allStages = useCanvasStore(state => state.stages);
   const nodes = useCanvasStore(state => state.nodes);
   const currentStage = useCanvasStore(state =>
@@ -375,6 +376,19 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
+  const handleDuplicateStage = () => {
+    if (!currentStage) return;
+
+    const duplicatedStage = createStageDuplicate(currentStage, allStages);
+    addStage(duplicatedStage, true, true);
+
+    focusAndEditNode(
+      duplicatedStage.metadata?.id || '',
+      setFocusedNodeId,
+      setEditingStage
+    );
+  };
+
   const handleYamlApply = (updatedData: unknown) => {
     const yamlData = updatedData as SuperplaneStage;
 
@@ -502,6 +516,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             onCancel={handleCancelEdit}
             onDiscard={() => setShowDiscardConfirm(true)}
             onEdit={() => handleEditClick({} as React.MouseEvent<HTMLButtonElement>)}
+            onDuplicate={!isNewNode ? handleDuplicateStage : undefined}
             isEditMode={isEditMode}
             entityType="stage"
             entityData={currentFormData ? {

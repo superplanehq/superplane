@@ -14,6 +14,7 @@ import (
 const (
 	ExecutorTypeSemaphore = "semaphore"
 	ExecutorTypeHTTP      = "http"
+	ExecutorTypeNoOp      = "noop"
 
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"
@@ -278,6 +279,14 @@ func FindStageByName(canvasID string, name string) (*Stage, error) {
 	}
 
 	return &stage, nil
+}
+
+func (s *Stage) OutputNames() []string {
+	var names []string
+	for _, output := range s.Outputs {
+		names = append(names, output.Name)
+	}
+	return names
 }
 
 func (s *Stage) GetResource() (*Resource, error) {

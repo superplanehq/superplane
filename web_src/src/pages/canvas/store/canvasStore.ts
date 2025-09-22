@@ -89,11 +89,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
-  addConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => {
+  addConnectionGroup: (connectionGroup: ConnectionGroupWithEvents, autoLayout = false) => {
     set((state) => ({
       connectionGroups: [...state.connectionGroups, { ...connectionGroup, events: [] }],
     }));
-    get().syncToReactFlow();
+    get().syncToReactFlow({ autoLayout });
   },
 
   removeConnectionGroup: (connectionGroupId: string) => {
