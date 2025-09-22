@@ -64,6 +64,11 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, err
 	}
 
+	schedule, err := validateSchedule(newSource.Spec, integration)
+	if err != nil {
+		return nil, err
+	}
+
 	//
 	// Create the event source
 	//
@@ -75,6 +80,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		ForIntegration(integration).
 		ForResource(resource).
 		WithEventTypes(eventTypes).
+		WithSchedule(schedule).
 		Create()
 
 	if err != nil {
@@ -130,6 +136,68 @@ func validateEventTypes(spec *pb.EventSource_Spec) ([]models.EventType, error) {
 	return out, nil
 }
 
+func validateSchedule(spec *pb.EventSource_Spec, integration *models.Integration) (*models.Schedule, error) {
+	if spec == nil || spec.Schedule == nil {
+		return nil, nil
+	}
+
+	if integration != nil {
+		return nil, status.Error(codes.InvalidArgument, "schedules are not supported for event sources with integrations")
+	}
+
+	scheduleType, err := actions.ProtoToScheduleType(spec.Schedule.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	schedule := &models.Schedule{
+		Type: scheduleType,
+	}
+
+	switch spec.Schedule.Type {
+	case pb.EventSource_Schedule_TYPE_HOURLY:
+		if spec.Schedule.Hourly == nil {
+			return nil, status.Error(codes.InvalidArgument, "hourly schedule configuration is required")
+		}
+		minute := int(spec.Schedule.Hourly.Minute)
+		if minute < 0 || minute > 59 {
+			return nil, status.Error(codes.InvalidArgument, "minute must be between 0 and 59")
+		}
+		schedule.Hourly = &models.HourlySchedule{
+			Minute: minute,
+		}
+	case pb.EventSource_Schedule_TYPE_DAILY:
+		if spec.Schedule.Daily == nil {
+			return nil, status.Error(codes.InvalidArgument, "daily schedule configuration is required")
+		}
+		if err := actions.ValidateTime(spec.Schedule.Daily.Time); err != nil {
+			return nil, err
+		}
+		schedule.Daily = &models.DailySchedule{
+			Time: spec.Schedule.Daily.Time,
+		}
+	case pb.EventSource_Schedule_TYPE_WEEKLY:
+		if spec.Schedule.Weekly == nil {
+			return nil, status.Error(codes.InvalidArgument, "weekly schedule configuration is required")
+		}
+		weekDay, err := actions.ProtoToWeekDay(spec.Schedule.Weekly.WeekDay)
+		if err != nil {
+			return nil, err
+		}
+		if err := actions.ValidateTime(spec.Schedule.Weekly.Time); err != nil {
+			return nil, err
+		}
+		schedule.Weekly = &models.WeeklySchedule{
+			WeekDay: weekDay,
+			Time:    spec.Schedule.Weekly.Time,
+		}
+	default:
+		return nil, status.Error(codes.InvalidArgument, "invalid schedule type")
+	}
+
+	return schedule, nil
+}
+
 func serializeEventSource(eventSource models.EventSource, statusInfo *models.EventSourceStatusInfo) (*pb.EventSource, error) {
 	spec := &pb.EventSource_Spec{
 		Events: []*pb.EventSource_EventType{},
@@ -176,6 +244,40 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 		}
 	}
 
+	//
+	// Serialize schedule
+	//
+	if eventSource.Schedule != nil {
+		scheduleData := eventSource.Schedule.Data()
+		schedule := &pb.EventSource_Schedule{
+			Type: actions.ScheduleTypeToProto(scheduleData.Type),
+		}
+
+		switch scheduleData.Type {
+		case models.ScheduleTypeHourly:
+			if scheduleData.Hourly != nil {
+				schedule.Hourly = &pb.EventSource_HourlySchedule{
+					Minute: int32(scheduleData.Hourly.Minute),
+				}
+			}
+		case models.ScheduleTypeDaily:
+			if scheduleData.Daily != nil {
+				schedule.Daily = &pb.EventSource_DailySchedule{
+					Time: scheduleData.Daily.Time,
+				}
+			}
+		case models.ScheduleTypeWeekly:
+			if scheduleData.Weekly != nil {
+				schedule.Weekly = &pb.EventSource_WeeklySchedule{
+					WeekDay: actions.WeekDayToProto(scheduleData.Weekly.WeekDay),
+					Time:    scheduleData.Weekly.Time,
+				}
+			}
+		}
+
+		spec.Schedule = schedule
+	}
+
 	pbEventSource := &pb.EventSource{
 		Metadata: &pb.EventSource_Metadata{
 			Id:          eventSource.ID.String(),
@@ -185,15 +287,15 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 			CreatedAt:   timestamppb.New(*eventSource.CreatedAt),
 			UpdatedAt:   timestamppb.New(*eventSource.UpdatedAt),
 		},
-		Spec: spec,
+		Spec:   spec,
+		Status: &pb.EventSource_Status{},
 	}
 
+	// Add history information only if statusInfo is provided
 	if statusInfo != nil {
-		status := &pb.EventSource_Status{
-			History: &pb.EventSource_Status_History{
-				Received:    uint32(statusInfo.ReceivedCount),
-				RecentItems: []*pb.Event{},
-			},
+		pbEventSource.Status.History = &pb.EventSource_Status_History{
+			Received:    uint32(statusInfo.ReceivedCount),
+			RecentItems: []*pb.Event{},
 		}
 
 		for _, event := range statusInfo.RecentEvents {
@@ -201,10 +303,20 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 			if err != nil {
 				return nil, err
 			}
-			status.History.RecentItems = append(status.History.RecentItems, pbEvent)
+			pbEventSource.Status.History.RecentItems = append(pbEventSource.Status.History.RecentItems, pbEvent)
+		}
+	}
+
+	// Add schedule information if the event source has a schedule
+	if eventSource.Schedule != nil {
+		pbEventSource.Status.Schedule = &pb.EventSource_Status_Schedule{}
+		if eventSource.LastTriggeredAt != nil {
+			pbEventSource.Status.Schedule.LastTrigger = timestamppb.New(*eventSource.LastTriggeredAt)
 		}
 
-		pbEventSource.Status = status
+		if eventSource.NextTriggerAt != nil {
+			pbEventSource.Status.Schedule.NextTrigger = timestamppb.New(*eventSource.NextTriggerAt)
+		}
 	}
 
 	return pbEventSource, nil

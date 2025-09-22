@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from './types';
 import { SuperplaneCanvas, SuperplaneStageEventState, SuperplaneStageEventStateReason } from "@/api-client/types.gen";
-import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneDiscardStageEvent, superplaneCancelStageExecution, superplaneListStageExecutions } from '@/api-client';
+import { superplaneApproveStageEvent, superplaneListStageEvents, superplaneListEvents, superplaneDiscardStageEvent, superplaneCancelStageExecution, superplaneListStageExecutions, superplaneDescribeEventSource } from '@/api-client';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
@@ -289,18 +289,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return;
     }
 
-    const eventsResponse = await superplaneListEvents(withOrganizationHeader({
-      path: { canvasIdOrName: canvasId },
-      query: { 
-        sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
-        sourceId: eventSourceId,
-        limit: SYNC_EVENTS_LIMIT
-      }
-    }));
+    // Fetch both events and updated event source status
+    const [eventsResponse, eventSourceResponse] = await Promise.all([
+      superplaneListEvents(withOrganizationHeader({
+        path: { canvasIdOrName: canvasId },
+        query: {
+          sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE' as const,
+          sourceId: eventSourceId,
+          limit: SYNC_EVENTS_LIMIT
+        }
+      })),
+      superplaneDescribeEventSource(withOrganizationHeader({
+        path: { canvasIdOrName: canvasId, idOrName: eventSourceId }
+      }))
+    ]);
 
     set((state) => ({
       eventSources: state.eventSources.map((es) => es.metadata!.id === eventSourceId ? {
         ...updatingEventSource,
+        ...eventSourceResponse.data?.eventSource,
         events: eventsResponse.data?.events || []
       } : es)
     }));

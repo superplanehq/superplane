@@ -26,7 +26,12 @@ docs/ConnectionGroupAPI.md
 docs/EventAPI.md
 docs/EventRejectionRejectionReason.md
 docs/EventSourceAPI.md
+docs/EventSourceDailySchedule.md
 docs/EventSourceEventType.md
+docs/EventSourceHourlySchedule.md
+docs/EventSourceScheduleType.md
+docs/EventSourceStatusSchedule.md
+docs/EventSourceWeeklySchedule.md
 docs/ExecutionAPI.md
 docs/ExecutionResult.md
 docs/ExecutionResultReason.md
@@ -87,6 +92,7 @@ docs/RolesRoleMetadata.md
 docs/RolesRoleSpec.md
 docs/RolesUpdateRoleBody.md
 docs/RolesUpdateRoleResponse.md
+docs/ScheduleWeekDay.md
 docs/SecretAPI.md
 docs/SecretLocal.md
 docs/SecretProvider.md
@@ -140,6 +146,7 @@ docs/SuperplaneEvent.md
 docs/SuperplaneEventRejection.md
 docs/SuperplaneEventSource.md
 docs/SuperplaneEventSourceMetadata.md
+docs/SuperplaneEventSourceSchedule.md
 docs/SuperplaneEventSourceSpec.md
 docs/SuperplaneEventSourceStatus.md
 docs/SuperplaneEventSourceType.md
@@ -205,7 +212,12 @@ model_auth_token.go
 model_authorization_domain_type.go
 model_authorization_permission.go
 model_event_rejection_rejection_reason.go
+model_event_source_daily_schedule.go
 model_event_source_event_type.go
+model_event_source_hourly_schedule.go
+model_event_source_schedule_type.go
+model_event_source_status_schedule.go
+model_event_source_weekly_schedule.go
 model_execution_result.go
 model_execution_result_reason.go
 model_googlerpc_status.go
@@ -260,6 +272,7 @@ model_roles_role_metadata.go
 model_roles_role_spec.go
 model_roles_update_role_body.go
 model_roles_update_role_response.go
+model_schedule_week_day.go
 model_secret_local.go
 model_secret_provider.go
 model_secrets_create_secret_request.go
@@ -311,6 +324,7 @@ model_superplane_event.go
 model_superplane_event_rejection.go
 model_superplane_event_source.go
 model_superplane_event_source_metadata.go
+model_superplane_event_source_schedule.go
 model_superplane_event_source_spec.go
 model_superplane_event_source_status.go
 model_superplane_event_source_type.go

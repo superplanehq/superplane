@@ -23,9 +23,9 @@ export const EventSourceZeroState: React.FC<EventSourceZeroStateProps> = ({
   return (
     <div className="bg-zinc-50 dark:bg-zinc-800 px-4 rounded-b-lg border-t border-gray-200 dark:border-gray-700">
       <div className="text-center py-4 pt-6 pb-4">
-        <span 
-          className="material-symbols-outlined select-none inline-flex items-center justify-center !w-12 !h-12 !text-[48px] !leading-12 mx-auto text-zinc-400 dark:text-zinc-500 mb-2 animate-pulse" 
-          aria-hidden="true" 
+        <span
+          className="material-symbols-outlined select-none inline-flex items-center justify-center !w-12 !h-12 !text-[48px] !leading-12 mx-auto text-zinc-400 dark:text-zinc-500 mb-2 animate-pulse"
+          aria-hidden="true"
           style={{ fontVariationSettings: '"FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24' }}
         >
           sensors

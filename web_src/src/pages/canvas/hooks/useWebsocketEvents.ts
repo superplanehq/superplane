@@ -31,6 +31,7 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
   const syncStageExecutions = useCanvasStore((s) => s.syncStageExecutions);
   const syncEventSourceEvents = useCanvasStore((s) => s.syncEventSourceEvents);
   const addEventSource = useCanvasStore((s) => s.addEventSource);
+  const updateEventSource = useCanvasStore((s) => s.updateEventSource);
   const updateCanvas = useCanvasStore((s) => s.updateCanvas);
   const syncToReactFlow = useCanvasStore((s) => s.syncToReactFlow);
   const lockedNodes = useCanvasStore((s) => s.lockedNodes);
@@ -96,6 +97,11 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
       case 'event_source_added':
         eventSource = payload;
         addEventSource(eventSource as EventSourceWithEvents);
+        syncReactFlowWithTimeout(lockedNodes);
+        break;
+      case 'event_source_updated':
+        eventSource = payload;
+        updateEventSource(eventSource as EventSourceWithEvents);
         syncReactFlowWithTimeout(lockedNodes);
         break;
       case 'canvas_updated':
@@ -209,5 +215,5 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
     }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastJsonMessage, addEventSource, addStage, updateCanvas, updateStage, syncStageEvents, syncStageExecutions]);
+  }, [lastJsonMessage, addEventSource, updateEventSource, addStage, updateCanvas, updateStage, syncStageEvents, syncStageExecutions]);
 }
