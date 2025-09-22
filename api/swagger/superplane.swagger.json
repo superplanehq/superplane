@@ -1816,6 +1816,44 @@
         "tags": [
           "Integration"
         ]
+      },
+      "patch": {
+        "summary": "Update an integration",
+        "description": "Updates an existing integration",
+        "operationId": "Integrations_UpdateIntegration",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/IntegrationsUpdateIntegrationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IntegrationsUpdateIntegrationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
       }
     },
     "/api/v1/me": {
@@ -3157,6 +3195,28 @@
         },
         "name": {
           "type": "string"
+        }
+      }
+    },
+    "IntegrationsUpdateIntegrationBody": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "integration": {
+          "$ref": "#/definitions/IntegrationsIntegration"
+        }
+      }
+    },
+    "IntegrationsUpdateIntegrationResponse": {
+      "type": "object",
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/IntegrationsIntegration"
         }
       }
     },

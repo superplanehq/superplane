@@ -195,6 +195,16 @@ export type IntegrationsResourceRef = {
     name?: string;
 };
 
+export type IntegrationsUpdateIntegrationBody = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    integration?: IntegrationsIntegration;
+};
+
+export type IntegrationsUpdateIntegrationResponse = {
+    integration?: IntegrationsIntegration;
+};
+
 export type MeRegenerateTokenResponse = {
     token?: string;
 };
@@ -2138,6 +2148,33 @@ export type IntegrationsDescribeIntegrationResponses = {
 };
 
 export type IntegrationsDescribeIntegrationResponse2 = IntegrationsDescribeIntegrationResponses[keyof IntegrationsDescribeIntegrationResponses];
+
+export type IntegrationsUpdateIntegrationData = {
+    body: IntegrationsUpdateIntegrationBody;
+    path: {
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/integrations/{idOrName}';
+};
+
+export type IntegrationsUpdateIntegrationErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type IntegrationsUpdateIntegrationError = IntegrationsUpdateIntegrationErrors[keyof IntegrationsUpdateIntegrationErrors];
+
+export type IntegrationsUpdateIntegrationResponses = {
+    /**
+     * A successful response.
+     */
+    200: IntegrationsUpdateIntegrationResponse;
+};
+
+export type IntegrationsUpdateIntegrationResponse2 = IntegrationsUpdateIntegrationResponses[keyof IntegrationsUpdateIntegrationResponses];
 
 export type MeMeData = {
     body?: never;
