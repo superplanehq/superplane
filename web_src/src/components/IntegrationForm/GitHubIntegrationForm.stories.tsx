@@ -1,0 +1,178 @@
+import React, { useState } from 'react'
+import type { Meta, StoryObj } from '@storybook/react'
+import { GitHubIntegrationForm } from './GitHubIntegrationForm'
+import type { IntegrationData, FormErrors } from './types'
+
+const meta: Meta<typeof GitHubIntegrationForm> = {
+  title: 'Components/IntegrationForm/GitHubIntegrationForm',
+  component: GitHubIntegrationForm,
+  parameters: {
+    layout: 'centered',
+  },
+  tags: ['autodocs'],
+  decorators: [
+    (Story) => (
+      <div className="w-[600px] p-6 bg-white dark:bg-zinc-900 rounded-lg">
+        <Story />
+      </div>
+    ),
+  ],
+}
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+const mockSecrets = [
+  {
+    metadata: { id: '1', name: 'github-pat-1' },
+    spec: {
+      local: {
+        data: {
+          'api-token': 'ghp_xxxxxxxxxxxxxxxxxxxx',
+          'backup-token': 'ghp_yyyyyyyyyyyyyyyyyyyy'
+        }
+      }
+    }
+  },
+  {
+    metadata: { id: '2', name: 'my-github-secret' },
+    spec: {
+      local: {
+        data: {
+          'token': 'ghp_zzzzzzzzzzzzzzzzzzzz'
+        }
+      }
+    }
+  }
+]
+
+export const Default: Story = {
+  render: (args) => {
+    const [integrationData, setIntegrationData] = useState<IntegrationData>({
+      orgUrl: '',
+      name: '',
+      apiToken: {
+        secretName: '',
+        secretKey: ''
+      }
+    })
+
+    const [errors, setErrors] = useState<FormErrors>({})
+    const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
+    const [newSecretToken, setNewSecretToken] = useState('')
+
+    return (
+      <GitHubIntegrationForm
+        integrationData={integrationData}
+        setIntegrationData={setIntegrationData}
+        errors={errors}
+        setErrors={setErrors}
+        apiTokenTab={apiTokenTab}
+        setApiTokenTab={setApiTokenTab}
+        newSecretToken={newSecretToken}
+        setNewSecretToken={setNewSecretToken}
+        secrets={mockSecrets}
+        {...args}
+      />
+    )
+  }
+}
+
+export const WithExistingData: Story = {
+  render: (args) => {
+    const [integrationData, setIntegrationData] = useState<IntegrationData>({
+      orgUrl: 'https://github.com/myorg',
+      name: 'myorg-account',
+      apiToken: {
+        secretName: '',
+        secretKey: ''
+      }
+    })
+
+    const [errors, setErrors] = useState<FormErrors>({})
+    const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
+    const [newSecretToken, setNewSecretToken] = useState('')
+
+    return (
+      <GitHubIntegrationForm
+        integrationData={integrationData}
+        setIntegrationData={setIntegrationData}
+        errors={errors}
+        setErrors={setErrors}
+        apiTokenTab={apiTokenTab}
+        setApiTokenTab={setApiTokenTab}
+        newSecretToken={newSecretToken}
+        setNewSecretToken={setNewSecretToken}
+        secrets={mockSecrets}
+        {...args}
+      />
+    )
+  }
+}
+
+export const WithErrors: Story = {
+  render: (args) => {
+    const [integrationData, setIntegrationData] = useState<IntegrationData>({
+      orgUrl: 'invalid-org-name!@#',
+      name: '',
+      apiToken: {
+        secretName: '',
+        secretKey: ''
+      }
+    })
+
+    const [errors, setErrors] = useState<FormErrors>({
+      orgUrl: 'Invalid organization name. Only letters, numbers, and hyphens are allowed',
+      name: 'Field cannot be empty'
+    })
+    const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
+    const [newSecretToken, setNewSecretToken] = useState('')
+
+    return (
+      <GitHubIntegrationForm
+        integrationData={integrationData}
+        setIntegrationData={setIntegrationData}
+        errors={errors}
+        setErrors={setErrors}
+        apiTokenTab={apiTokenTab}
+        setApiTokenTab={setApiTokenTab}
+        newSecretToken={newSecretToken}
+        setNewSecretToken={setNewSecretToken}
+        secrets={mockSecrets}
+        {...args}
+      />
+    )
+  }
+}
+
+export const EmptyState: Story = {
+  render: (args) => {
+    const [integrationData, setIntegrationData] = useState<IntegrationData>({
+      orgUrl: '',
+      name: '',
+      apiToken: {
+        secretName: '',
+        secretKey: ''
+      }
+    })
+
+    const [errors, setErrors] = useState<FormErrors>({})
+    const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
+    const [newSecretToken, setNewSecretToken] = useState('')
+
+    return (
+      <GitHubIntegrationForm
+        integrationData={integrationData}
+        setIntegrationData={setIntegrationData}
+        errors={errors}
+        setErrors={setErrors}
+        apiTokenTab={apiTokenTab}
+        setApiTokenTab={setApiTokenTab}
+        newSecretToken={newSecretToken}
+        setNewSecretToken={setNewSecretToken}
+        secrets={[]}
+        {...args}
+      />
+    )
+  }
+}

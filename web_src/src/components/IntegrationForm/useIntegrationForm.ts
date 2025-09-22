@@ -5,11 +5,12 @@ import { getIntegrationConfig } from './integrationConfigs';
 interface UseIntegrationFormProps {
   integrationType: string;
   integrations: any[];
+  editingIntegration?: any;
 }
 
 export const NEW_SECRET_NAME = 'my-api-token';
 
-export function useIntegrationForm({ integrationType, integrations }: UseIntegrationFormProps) {
+export function useIntegrationForm({ integrationType, integrations, editingIntegration }: UseIntegrationFormProps) {
   const [integrationData, setIntegrationData] = useState<IntegrationData>({
     orgUrl: '',
     name: '',
@@ -35,8 +36,15 @@ export function useIntegrationForm({ integrationType, integrations }: UseIntegra
     
     if (!integrationData.name.trim()) {
       newErrors.name = 'Field cannot be empty';
-    } else if (integrations.some(int => int.metadata?.name === integrationData.name.trim())) {
-      newErrors.name = 'Integration with this name already exists';
+    } else {
+      // Check for duplicate names, but exclude the currently editing integration
+      const isDuplicate = integrations.some(int =>
+        int.metadata?.name === integrationData.name.trim() &&
+        int.metadata?.id !== editingIntegration?.metadata?.id
+      );
+      if (isDuplicate) {
+        newErrors.name = 'Integration with this name already exists';
+      }
     }
     
     if (apiTokenTab === 'new') {
