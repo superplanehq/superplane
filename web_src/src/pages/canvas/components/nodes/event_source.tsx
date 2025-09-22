@@ -149,7 +149,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
       if (isNewEventSource) {
         // Keep the temporary node visible during the request
-        // Create the backend call promise
         createEventSourceMutation.mutateAsync({
           name: eventSourceName,
           description: eventSourceDescription,
@@ -178,18 +177,21 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           // The apiError will be set by the mutation's onError callback
         });
       } else {
-        const updateResult = await updateEventSourceMutation.mutateAsync({
+        await updateEventSourceMutation.mutateAsync({
           eventSourceId: currentEventSource.metadata?.id || '',
           name: eventSourceName,
           description: eventSourceDescription,
           spec: currentFormData.spec
         });
 
-        const updatedEventSource = updateResult.data?.eventSource;
         updateEventSource({
-          ...updatedEventSource,
-          events: currentEventSource.events || [],
-          eventSourceType: currentFormData.spec.schedule ? 'scheduled' : undefined,
+          ...currentEventSource,
+          metadata: {
+            ...currentEventSource.metadata,
+            name: eventSourceName,
+            description: eventSourceDescription
+          },
+          spec: currentFormData.spec
         });
 
         props.data.name = eventSourceName;

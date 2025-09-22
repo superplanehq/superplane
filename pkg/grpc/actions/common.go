@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"sort"
 	"time"
 
@@ -631,20 +630,6 @@ func ValidateTime(timeStr string) error {
 	_, err := time.Parse("15:04", timeStr)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, "time must be in HH:MM format (24-hour)")
-	}
-
-	return nil
-}
-
-func ValidateCronExpression(expression string) error {
-	if expression == "" {
-		return status.Error(codes.InvalidArgument, "cron expression is required")
-	}
-
-	// Basic cron expression validation (5 or 6 fields)
-	cronRegex := regexp.MustCompile(`^(\S+\s+){4}\S+(\s+\S+)?$`)
-	if !cronRegex.MatchString(expression) {
-		return status.Error(codes.InvalidArgument, "invalid cron expression format")
 	}
 
 	return nil
