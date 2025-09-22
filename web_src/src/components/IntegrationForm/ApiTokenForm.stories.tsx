@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
+import { MemoryRouter } from 'react-router-dom'
 import { ApiTokenForm } from './ApiTokenForm'
 import type { IntegrationData, FormErrors } from './types'
 
@@ -12,9 +13,11 @@ const meta: Meta<typeof ApiTokenForm> = {
   tags: ['autodocs'],
   decorators: [
     (Story) => (
-      <div className="w-[600px] p-6 bg-white dark:bg-zinc-900 rounded-lg">
-        <Story />
-      </div>
+      <MemoryRouter>
+        <div className="w-[600px] p-6 bg-white dark:bg-zinc-900 rounded-lg">
+          <Story />
+        </div>
+      </MemoryRouter>
     ),
   ],
 }

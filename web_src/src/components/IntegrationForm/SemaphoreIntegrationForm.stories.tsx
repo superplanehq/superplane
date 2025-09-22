@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { SemaphoreIntegrationForm } from './SemaphoreIntegrationForm'
 import type { IntegrationData, FormErrors } from './types'
@@ -60,6 +60,7 @@ export const Default: Story = {
     const [errors, setErrors] = useState<FormErrors>({})
     const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
     const [newSecretToken, setNewSecretToken] = useState('')
+    const orgUrlRef = useRef<HTMLInputElement>(null)
 
     return (
       <SemaphoreIntegrationForm
@@ -72,6 +73,7 @@ export const Default: Story = {
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
         secrets={mockSecrets}
+        orgUrlRef={orgUrlRef}
         {...args}
       />
     )
@@ -92,6 +94,7 @@ export const WithExistingData: Story = {
     const [errors, setErrors] = useState<FormErrors>({})
     const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
     const [newSecretToken, setNewSecretToken] = useState('')
+    const orgUrlRef = useRef<HTMLInputElement>(null)
 
     return (
       <SemaphoreIntegrationForm
@@ -104,6 +107,7 @@ export const WithExistingData: Story = {
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
         secrets={mockSecrets}
+        orgUrlRef={orgUrlRef}
         {...args}
       />
     )
@@ -127,6 +131,7 @@ export const WithErrors: Story = {
     })
     const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
     const [newSecretToken, setNewSecretToken] = useState('')
+    const orgUrlRef = useRef<HTMLInputElement>(null)
 
     return (
       <SemaphoreIntegrationForm
@@ -139,6 +144,7 @@ export const WithErrors: Story = {
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
         secrets={mockSecrets}
+        orgUrlRef={orgUrlRef}
         {...args}
       />
     )
@@ -159,6 +165,7 @@ export const WithApiEndpoint: Story = {
     const [errors, setErrors] = useState<FormErrors>({})
     const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
     const [newSecretToken, setNewSecretToken] = useState('')
+    const orgUrlRef = useRef<HTMLInputElement>(null)
 
     return (
       <SemaphoreIntegrationForm
@@ -171,6 +178,7 @@ export const WithApiEndpoint: Story = {
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
         secrets={mockSecrets}
+        orgUrlRef={orgUrlRef}
         {...args}
       />
     )
@@ -191,6 +199,7 @@ export const EmptyState: Story = {
     const [errors, setErrors] = useState<FormErrors>({})
     const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new')
     const [newSecretToken, setNewSecretToken] = useState('')
+    const orgUrlRef = useRef<HTMLInputElement>(null)
 
     return (
       <SemaphoreIntegrationForm
@@ -203,6 +212,7 @@ export const EmptyState: Story = {
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
         secrets={[]}
+        orgUrlRef={orgUrlRef}
         {...args}
       />
     )

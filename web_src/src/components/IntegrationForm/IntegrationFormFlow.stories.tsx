@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
+import { MemoryRouter } from 'react-router-dom'
 import { GitHubIntegrationForm } from './GitHubIntegrationForm'
 import { SemaphoreIntegrationForm } from './SemaphoreIntegrationForm'
 import { ApiTokenForm } from './ApiTokenForm'
@@ -16,9 +17,11 @@ const meta: Meta = {
   tags: ['autodocs'],
   decorators: [
     (Story) => (
-      <div className="w-[700px] p-8 bg-white dark:bg-zinc-900 rounded-lg">
-        <Story />
-      </div>
+      <MemoryRouter>
+        <div className="w-[700px] p-8 bg-white dark:bg-zinc-900 rounded-lg">
+          <Story />
+        </div>
+      </MemoryRouter>
     ),
   ],
 }
@@ -59,6 +62,7 @@ const mockIntegrations = [
 export const GitHubIntegrationFlow: Story = {
   render: () => {
     const [integrationType] = useState('github')
+    const orgUrlRef = useRef<HTMLInputElement>(null)
 
     const {
       integrationData,
@@ -122,6 +126,7 @@ export const GitHubIntegrationFlow: Story = {
           newSecretToken={newSecretToken}
           setNewSecretToken={setNewSecretToken}
           secrets={mockSecrets}
+          orgUrlRef={orgUrlRef}
         />
 
         <ApiTokenForm
@@ -136,6 +141,7 @@ export const GitHubIntegrationFlow: Story = {
           secrets={mockSecrets}
           organizationId="org-123"
           canvasId="canvas-456"
+          orgUrlRef={orgUrlRef}
         />
 
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
@@ -196,6 +202,7 @@ export const GitHubIntegrationFlow: Story = {
 export const SemaphoreIntegrationFlow: Story = {
   render: () => {
     const [integrationType] = useState('semaphore')
+    const orgUrlRef = useRef<HTMLInputElement>(null)
 
     const {
       integrationData,
@@ -259,6 +266,7 @@ export const SemaphoreIntegrationFlow: Story = {
           newSecretToken={newSecretToken}
           setNewSecretToken={setNewSecretToken}
           secrets={mockSecrets}
+          orgUrlRef={orgUrlRef}
         />
 
         <ApiTokenForm
@@ -273,6 +281,7 @@ export const SemaphoreIntegrationFlow: Story = {
           secrets={mockSecrets}
           organizationId="org-123"
           canvasId="canvas-456"
+          orgUrlRef={orgUrlRef}
         />
 
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
@@ -319,6 +328,7 @@ export const SemaphoreIntegrationFlow: Story = {
 export const EditIntegrationFlow: Story = {
   render: () => {
     const [integrationType] = useState('github')
+    const orgUrlRef = useRef<HTMLInputElement>(null)
 
     // Simulate editing an existing integration
     const [integrationData, setIntegrationData] = useState<IntegrationData>({
@@ -374,6 +384,7 @@ export const EditIntegrationFlow: Story = {
           newSecretToken={newSecretToken}
           setNewSecretToken={setNewSecretToken}
           secrets={mockSecrets}
+          orgUrlRef={orgUrlRef}
         />
 
         <ApiTokenForm
@@ -388,6 +399,7 @@ export const EditIntegrationFlow: Story = {
           secrets={mockSecrets}
           organizationId="org-123"
           canvasId="canvas-456"
+          orgUrlRef={orgUrlRef}
         />
 
         <div className="flex gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
