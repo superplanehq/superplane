@@ -148,10 +148,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
     const isTemporaryId = currentEventSource.metadata?.id && /^\d+$/.test(currentEventSource.metadata.id);
     const isNewEventSource = !currentEventSource.metadata?.id || isTemporaryId;
+    let success = false;
 
     try {
       setApiError(null);
-
       if (isNewEventSource) {
         // Keep the temporary node visible during the request
         createEventSourceMutation.mutateAsync({
@@ -175,11 +175,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
             // Remove the temporary node after the new one is added
             removeEventSource(props.id);
+            success = true;
           }
         }).catch((error) => {
-          // If the request fails, keep the temporary node for retry
-          console.error('Failed to create event source:', error);
-          // The apiError will be set by the mutation's onError callback
+          setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
         });
       } else {
         await updateEventSourceMutation.mutateAsync({
@@ -201,11 +200,14 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
         props.data.name = eventSourceName;
         props.data.description = eventSourceDescription;
+        success = true;
       }
-      setIsEditMode(false);
-      setEditingEventSource(null);
-      setCurrentFormData(null);
-      setIntegrationError(false);
+      if (success) {
+        setIsEditMode(false);
+        setEditingEventSource(null);
+        setCurrentFormData(null);
+        setIntegrationError(false);
+      }
     } catch (error) {
       setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
     }
