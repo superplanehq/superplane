@@ -178,7 +178,22 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
     setIsCreating(true)
 
     try {
-      if (newSecretValue.trim() && integrationData.apiToken.secretName && integrationData.apiToken.secretKey) {
+      // Check if only the secret value has changed
+      const currentUrl = editingIntegration.spec?.url || ''
+      const currentName = editingIntegration.metadata?.name || ''
+      let trimmedUrl = integrationData.orgUrl.trim()
+      if (trimmedUrl.endsWith('/')) {
+        trimmedUrl = trimmedUrl.slice(0, -1)
+      }
+
+      const isOnlySecretUpdate = newSecretValue.trim() &&
+        integrationData.apiToken.secretName &&
+        integrationData.apiToken.secretKey &&
+        currentUrl === trimmedUrl &&
+        currentName === integrationData.name.trim()
+
+      if (isOnlySecretUpdate) {
+        // Only update the secret
         try {
           await updateSecretMutation.mutateAsync({
             name: integrationData.apiToken.secretName,
@@ -187,30 +202,43 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
               value: newSecretValue.trim()
             }]
           });
+          showSuccessToast('Secret updated successfully')
         } catch (error) {
           console.error('Failed to update secret:', error);
           setErrors({ secretValue: 'Failed to update secret value' });
           return;
         }
+      } else {
+        // Update secret if provided
+        if (newSecretValue.trim() && integrationData.apiToken.secretName && integrationData.apiToken.secretKey) {
+          try {
+            await updateSecretMutation.mutateAsync({
+              name: integrationData.apiToken.secretName,
+              environmentVariables: [{
+                name: integrationData.apiToken.secretKey,
+                value: newSecretValue.trim()
+              }]
+            });
+          } catch (error) {
+            console.error('Failed to update secret:', error);
+            setErrors({ secretValue: 'Failed to update secret value' });
+            return;
+          }
+        }
+        const updateData: UpdateIntegrationParams = {
+          id: editingIntegration.metadata?.id as string,
+          name: integrationData.name.trim(),
+          type: selectedType,
+          url: trimmedUrl,
+          authType: 'AUTH_TYPE_TOKEN' as const,
+          tokenSecretName: integrationData.apiToken.secretName,
+          tokenSecretKey: integrationData.apiToken.secretKey,
+        }
+
+        await updateIntegrationMutation.mutateAsync(updateData)
+        showSuccessToast('Integration updated successfully')
       }
 
-      let trimmedUrl = integrationData.orgUrl.trim()
-      if (trimmedUrl.endsWith('/')) {
-        trimmedUrl = trimmedUrl.slice(0, -1)
-      }
-
-      const updateData: UpdateIntegrationParams = {
-        id: editingIntegration.metadata?.id as string,
-        name: integrationData.name.trim(),
-        type: selectedType,
-        url: trimmedUrl,
-        authType: 'AUTH_TYPE_TOKEN' as const,
-        tokenSecretName: integrationData.apiToken.secretName,
-        tokenSecretKey: integrationData.apiToken.secretKey,
-      }
-
-      await updateIntegrationMutation.mutateAsync(updateData)
-      showSuccessToast('Integration updated successfully')
       resetForm()
       setEditingIntegration(null)
       setNewSecretValue('')

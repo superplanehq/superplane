@@ -41,10 +41,6 @@ export function SettingsApiTokenForm({
   if (isEditMode && integrationData.apiToken.secretName) {
     return (
       <div className="space-y-4">
-        <div className="text-sm font-medium text-gray-900 dark:text-white">
-          API Token
-        </div>
-
         <Field>
           <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
             Update Token Value
