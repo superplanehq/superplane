@@ -2,9 +2,9 @@
 -- PostgreSQL database dump
 --
 
-\restrict AhJtjeMQDsU8dMO1jRbOySm3EkUjyPi3k12wmTB7r7W6bVQbUlQ2SAFf4GRT9jx
+\restrict f0YEz9Ig9OHacqJancyhwqPHzrmI1TcfX7nKbJ7UWpeShbSUSTBLjhPhIgwvJas
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
@@ -221,7 +221,10 @@ CREATE TABLE public.event_sources (
     scope character varying(64) NOT NULL,
     description text,
     event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    schedule jsonb,
+    last_triggered_at timestamp without time zone,
+    next_trigger_at timestamp without time zone
 );
 
 
@@ -837,6 +840,13 @@ CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at)
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -890,6 +900,13 @@ CREATE INDEX idx_event_rejections_target ON public.event_rejections USING btree 
 --
 
 CREATE INDEX idx_event_sources_deleted_at ON public.event_sources USING btree (deleted_at);
+
+
+--
+-- Name: idx_event_sources_next_trigger_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_sources_next_trigger_at ON public.event_sources USING btree (next_trigger_at);
 
 
 --
@@ -1155,15 +1172,15 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AhJtjeMQDsU8dMO1jRbOySm3EkUjyPi3k12wmTB7r7W6bVQbUlQ2SAFf4GRT9jx
+\unrestrict f0YEz9Ig9OHacqJancyhwqPHzrmI1TcfX7nKbJ7UWpeShbSUSTBLjhPhIgwvJas
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict BZNa4MMueVYeFCg022Y55fssPL4Br96RpZeMWJJeHtwrExfWuwyniI76qsaIPZV
+\restrict Nf2xL5jNWgOcYjJTikpXVucN4R28aJwO4LtAXC62Yyef42LY55TvXHyRv49g1Dg
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
@@ -1183,7 +1200,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250918143015	f
+20250919234748	f
 \.
 
 
@@ -1191,5 +1208,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BZNa4MMueVYeFCg022Y55fssPL4Br96RpZeMWJJeHtwrExfWuwyniI76qsaIPZV
+\unrestrict Nf2xL5jNWgOcYjJTikpXVucN4R28aJwO4LtAXC62Yyef42LY55TvXHyRv49g1Dg
 

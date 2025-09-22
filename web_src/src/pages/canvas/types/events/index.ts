@@ -11,6 +11,7 @@ export type EventMap = {
     connection_group_added: ConnectionGroupWithEvents;
     stage_updated: Stage;
     event_source_added: EventSourceWithEvents;
+    event_source_updated: EventSourceWithEvents;
     canvas_updated: SuperplaneCanvas;
     new_stage_event: StageEventPayload;
     stage_event_approved: StageEventPayload;

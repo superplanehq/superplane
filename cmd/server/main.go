@@ -112,6 +112,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		w := workers.NewHardDeletionWorker(registry, cleanupService)
 		go w.Start()
 	}
+
+	if os.Getenv("START_EVENT_SOURCE_SCHEDULE_WORKER") == "yes" {
+		log.Println("Starting Event Source Schedule Worker")
+
+		w, err := workers.NewEventSourceScheduleWorker(time.Now)
+		if err != nil {
+			panic(err)
+		}
+
+		go w.Start()
+	}
 }
 
 func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {

@@ -23,6 +23,7 @@ type SuperplaneEventSourceSpec struct {
 	Integration *IntegrationsIntegrationRef `json:"integration,omitempty"`
 	Resource *IntegrationsResourceRef `json:"resource,omitempty"`
 	Events []EventSourceEventType `json:"events,omitempty"`
+	Schedule *SuperplaneEventSourceSchedule `json:"schedule,omitempty"`
 }
 
 // NewSuperplaneEventSourceSpec instantiates a new SuperplaneEventSourceSpec object
@@ -138,6 +139,38 @@ func (o *SuperplaneEventSourceSpec) SetEvents(v []EventSourceEventType) {
 	o.Events = v
 }
 
+// GetSchedule returns the Schedule field value if set, zero value otherwise.
+func (o *SuperplaneEventSourceSpec) GetSchedule() SuperplaneEventSourceSchedule {
+	if o == nil || IsNil(o.Schedule) {
+		var ret SuperplaneEventSourceSchedule
+		return ret
+	}
+	return *o.Schedule
+}
+
+// GetScheduleOk returns a tuple with the Schedule field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneEventSourceSpec) GetScheduleOk() (*SuperplaneEventSourceSchedule, bool) {
+	if o == nil || IsNil(o.Schedule) {
+		return nil, false
+	}
+	return o.Schedule, true
+}
+
+// HasSchedule returns a boolean if a field has been set.
+func (o *SuperplaneEventSourceSpec) HasSchedule() bool {
+	if o != nil && !IsNil(o.Schedule) {
+		return true
+	}
+
+	return false
+}
+
+// SetSchedule gets a reference to the given SuperplaneEventSourceSchedule and assigns it to the Schedule field.
+func (o *SuperplaneEventSourceSpec) SetSchedule(v SuperplaneEventSourceSchedule) {
+	o.Schedule = &v
+}
+
 func (o SuperplaneEventSourceSpec) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -156,6 +189,9 @@ func (o SuperplaneEventSourceSpec) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Events) {
 		toSerialize["events"] = o.Events
+	}
+	if !IsNil(o.Schedule) {
+		toSerialize["schedule"] = o.Schedule
 	}
 	return toSerialize, nil
 }
