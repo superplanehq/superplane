@@ -472,6 +472,24 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     return inputMappingErrors;
   }, [inputMappings, inputs]);
 
+  const validateConnections = useCallback((connections: SuperplaneConnection[], errors: Record<string, string>) => {
+    connections.forEach((connection, index) => {
+      const connectionErrors = connectionManager.validateConnection(connection);
+      if (connectionErrors.length > 0) {
+        errors[`connection_${index}`] = connectionErrors.join(', ');
+      }
+    });
+
+
+    if (connections.length === 0) {
+      errors.connections = 'At least one connection is required';
+    } else {
+      delete errors.connections;
+    }
+
+    return errors;
+  }, []);
+
   const validateAllFields = useCallback((showUiErrors: boolean = true) => {
     let errors: Record<string, string> = {};
 
@@ -490,17 +508,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       }
     });
 
-    connections.forEach((connection, index) => {
-      const connectionErrors = connectionManager.validateConnection(connection);
-      if (connectionErrors.length > 0) {
-        errors[`connection_${index}`] = connectionErrors.join(', ');
-      }
-    });
-
-
-    if (connections.length === 0) {
-      errors.connections = 'At least one connection is required';
-    }
+    errors = validateConnections(connections, errors);
 
 
     secrets.forEach((secret, index) => {
@@ -536,7 +544,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
 
     return errors;
-  }, [inputs, outputs, connections, secrets, conditions, validateInput, validateOutput, validateSecret, validateCondition, validateInputMappings, validateExecutor, executor]);
+  }, [inputs, outputs, connections, secrets, conditions, validateInput, validateOutput, validateSecret, validateCondition, validateInputMappings, validateExecutor, executor, validateConnections]);
 
 
 
@@ -653,10 +661,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   // Initialize open sections
   useEffect(() => {
     const sectionsToOpen = ['general'];
+    let newValidationErrors: Record<string, string> = {};
 
-    const connectionsNeedConfiguration = connections.length === 0;
-    if (connectionsNeedConfiguration) {
+    const connectionErrors = validateConnections(connections, {});
+    if (Object.keys(connectionErrors).length > 0) {
       sectionsToOpen.push('connections');
+      newValidationErrors = {
+        ...connectionErrors
+      };
     }
 
     const inputErrors = hasErrorsWithPrefix(validationErrors, ['input_name_', 'input_mapping_']);
@@ -668,8 +680,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     if (Object.keys(executorErrors).length > 0 || (isNewStage && executor.resource?.type && executor.type !== 'noop')) {
       sectionsToOpen.push('executor');
-      setValidationErrors(executorErrors);
+      newValidationErrors = {
+        ...newValidationErrors,
+        ...executorErrors
+      };
     }
+    setValidationErrors(newValidationErrors);
 
     setOpenSections(sectionsToOpen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1126,6 +1142,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
 
     connectionsEditor.saveEdit();
+
+    // Clear the general "connections" error if we now have at least one connection
+    if (connections.length > 0) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.connections;
+        return newErrors;
+      });
+    }
 
     if (savedConnection?.name && inputs.length > 0) {
       const existingMapping = inputMappings.find(mapping =>
