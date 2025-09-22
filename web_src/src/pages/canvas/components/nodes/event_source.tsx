@@ -4,7 +4,7 @@ import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource } from '@/hooks/useCanvasData';
-import { SuperplaneEventSource, SuperplaneEventSourceSpec } from '@/api-client';
+import { SuperplaneEventSource, SuperplaneEventSourceSpec, superplaneCreateEvent } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -19,7 +19,8 @@ import { EventStateItem, EventState } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
 import { EventSourceZeroState } from '../EventSourceZeroState';
 import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
-import { EmitEventModal } from '../EmitEventModal';
+import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
+import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -422,7 +423,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               setShowEmitEventModal(true);
             }}
             className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-            title="Emit a test event"
+            title="Manually emit an event"
           >
             <MaterialSymbol name="send" size="sm" />
           </button>
@@ -537,10 +538,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         <EmitEventModal
           isOpen={showEmitEventModal}
           onClose={() => setShowEmitEventModal(false)}
-          sourceId={currentEventSource.metadata.id}
           sourceName={currentEventSource.metadata.name || ''}
-          sourceType="event_source"
           lastEvent={currentEventSource.events?.[0]}
+          onSubmit={async (eventType: string, eventData: any) => {
+            await superplaneCreateEvent(withOrganizationHeader({
+              path: { canvasIdOrName: canvasId! },
+              body: {
+                sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE',
+                sourceId: currentEventSource.metadata!.id,
+                type: eventType,
+                raw: eventData
+              }
+            }));
+          }}
         />
       )}
     </div>
