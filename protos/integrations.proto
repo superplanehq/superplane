@@ -60,6 +60,18 @@ service Integrations {
       tags: "Integration";
     };
   }
+
+  rpc UpdateIntegration(UpdateIntegrationRequest) returns (UpdateIntegrationResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/integrations/{id_or_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update an integration";
+      description: "Updates an existing integration";
+      tags: "Integration";
+    };
+  }
 }
 
 message CreateIntegrationRequest {
@@ -69,6 +81,17 @@ message CreateIntegrationRequest {
 }
 
 message CreateIntegrationResponse {
+  Integration integration = 1;
+}
+
+message UpdateIntegrationRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string id_or_name = 3;
+  Integration integration = 4;
+}
+
+message UpdateIntegrationResponse {
   Integration integration = 1;
 }
 
