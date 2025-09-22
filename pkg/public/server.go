@@ -353,8 +353,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 }
 
 type OrganizationCreationRequest struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
+	Name string `json:"name"`
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -377,8 +376,8 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" || req.DisplayName == "" {
-		http.Error(w, "Name and DisplayName are required", http.StatusBadRequest)
+	if req.Name == "" {
+		http.Error(w, "Name is required", http.StatusBadRequest)
 		return
 	}
 
@@ -386,7 +385,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	// TODO: the organization creation should be in a transaction
 	// Create the organization and set up roles for it.
 	//
-	organization, err := models.CreateOrganization(req.Name, req.DisplayName, "")
+	organization, err := models.CreateOrganization(req.Name, "")
 	if err != nil {
 		log.Errorf("Error creating organization: %v", err)
 		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
@@ -468,7 +467,6 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	type Organization struct {
 		ID          string `json:"id"`
 		Name        string `json:"name"`
-		DisplayName string `json:"display_name"`
 		Description string `json:"description"`
 	}
 
@@ -483,7 +481,6 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		response = append(response, Organization{
 			ID:          organization.ID.String(),
 			Name:        organization.Name,
-			DisplayName: organization.DisplayName,
 			Description: organization.Description,
 		})
 	}

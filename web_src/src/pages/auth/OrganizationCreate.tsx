@@ -5,7 +5,6 @@ import { Text } from '../../components/Text/text';
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -24,7 +23,6 @@ const OrganizationCreate: React.FC = () => {
         credentials: 'include',
         body: JSON.stringify({
           name: name.trim(),
-          display_name: displayName.trim(),
         }),
       });
 
@@ -66,7 +64,7 @@ const OrganizationCreate: React.FC = () => {
           )}
 
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-left text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
               Name
             </label>
             <input
@@ -74,24 +72,6 @@ const OrganizationCreate: React.FC = () => {
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white"
-              placeholder="acme-corp"
-            />
-            <Text className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Used in URLs and API calls. Use lowercase letters, numbers, and hyphens.
-            </Text>
-          </div>
-
-          <div>
-            <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 text-left dark:text-gray-300 mb-2">
-              Display Name
-            </label>
-            <input
-              type="text"
-              id="displayName"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
               required
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white"
               placeholder="Acme Corporation"
@@ -112,7 +92,7 @@ const OrganizationCreate: React.FC = () => {
               type="submit"
               color="blue"
               className="flex-1"
-              disabled={loading || !name.trim() || !displayName.trim()}
+              disabled={loading || !name.trim()}
             >
               {loading ? 'Creating...' : 'Create Organization'}
             </Button>
