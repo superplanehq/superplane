@@ -244,8 +244,6 @@ export type OrganizationsOrganization = {
 export type OrganizationsOrganizationMetadata = {
     id?: string;
     name?: string;
-    displayName?: string;
-    description?: string;
     createdAt?: string;
     updatedAt?: string;
 };

@@ -3305,12 +3305,6 @@
         "name": {
           "type": "string"
         },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
