@@ -33,7 +33,6 @@ function ModalWrapper({
         loadLastEvent={loadLastEvent || defaultLoadLastEvent}
         onCancel={() => {}}
         onSubmit={async (eventType, eventData) => {
-          console.log('Emitting event:', { eventType, eventData })
           await new Promise(resolve => setTimeout(resolve, 1000))
         }}
       />
