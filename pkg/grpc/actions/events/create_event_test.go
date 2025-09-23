@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -16,8 +17,10 @@ import (
 func Test__CreateEvent(t *testing.T) {
 	r := support.Setup(t)
 
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
 	t.Run("no source type -> error", func(t *testing.T) {
-		_, err := CreateEvent(context.Background(), r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, r.Source.ID.String(), "webhook", map[string]any{"test": "data"})
+		_, err := CreateEvent(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN, r.Source.ID.String(), "webhook", map[string]any{"test": "data"})
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -26,7 +29,7 @@ func Test__CreateEvent(t *testing.T) {
 	})
 
 	t.Run("invalid canvas ID -> error", func(t *testing.T) {
-		_, err := CreateEvent(context.Background(), "invalid-uuid", protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, r.Source.ID.String(), "webhook", map[string]any{"test": "data"})
+		_, err := CreateEvent(ctx, "invalid-uuid", protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, r.Source.ID.String(), "webhook", map[string]any{"test": "data"})
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -35,7 +38,7 @@ func Test__CreateEvent(t *testing.T) {
 	})
 
 	t.Run("invalid source ID -> error", func(t *testing.T) {
-		_, err := CreateEvent(context.Background(), r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, "invalid-uuid", "webhook", map[string]any{"test": "data"})
+		_, err := CreateEvent(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, "invalid-uuid", "webhook", map[string]any{"test": "data"})
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -44,7 +47,7 @@ func Test__CreateEvent(t *testing.T) {
 	})
 
 	t.Run("empty event type -> error", func(t *testing.T) {
-		_, err := CreateEvent(context.Background(), r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, r.Source.ID.String(), "", map[string]any{"test": "data"})
+		_, err := CreateEvent(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, r.Source.ID.String(), "", map[string]any{"test": "data"})
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -54,7 +57,7 @@ func Test__CreateEvent(t *testing.T) {
 
 	t.Run("source not found -> error", func(t *testing.T) {
 		nonExistentID := uuid.NewString()
-		_, err := CreateEvent(context.Background(), r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, nonExistentID, "webhook", map[string]any{"test": "data"})
+		_, err := CreateEvent(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, nonExistentID, "webhook", map[string]any{"test": "data"})
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -71,7 +74,7 @@ func Test__CreateEvent(t *testing.T) {
 			},
 		}
 
-		res, err := CreateEvent(context.Background(), r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, r.Source.ID.String(), "webhook", rawData)
+		res, err := CreateEvent(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, r.Source.ID.String(), "webhook", rawData)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Event)
@@ -96,7 +99,7 @@ func Test__CreateEvent(t *testing.T) {
 			"stage_data": "test",
 		}
 
-		res, err := CreateEvent(context.Background(), r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_STAGE, r.Stage.ID.String(), "execution_complete", rawData)
+		res, err := CreateEvent(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_STAGE, r.Stage.ID.String(), "execution_complete", rawData)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Event)
@@ -118,7 +121,7 @@ func Test__CreateEvent(t *testing.T) {
 			"invalid": make(chan int),
 		}
 
-		_, err := CreateEvent(context.Background(), r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, r.Source.ID.String(), "webhook", invalidData)
+		_, err := CreateEvent(ctx, r.Canvas.ID.String(), protos.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE, r.Source.ID.String(), "webhook", invalidData)
 		require.Error(t, err)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -14,6 +15,11 @@ import (
 )
 
 func CreateEvent(ctx context.Context, canvasID string, protoSourceType pb.EventSourceType, sourceID string, eventType string, raw map[string]any) (*pb.CreateEventResponse, error) {
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
 	sourceType := actions.ProtoToEventSourceType(protoSourceType)
 	if sourceType == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid source type")
@@ -43,7 +49,8 @@ func CreateEvent(ctx context.Context, canvasID string, protoSourceType pb.EventS
 		return nil, status.Errorf(codes.InvalidArgument, "invalid raw data: %v", err)
 	}
 
-	event, err := models.CreateEvent(parsedSourceID, parsedCanvasID, sourceName, sourceType, eventType, rawBytes, []byte(`{}`))
+	user := uuid.MustParse(userID)
+	event, err := models.CreateManualEvent(parsedSourceID, parsedCanvasID, sourceName, sourceType, eventType, rawBytes, &user)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create event: %v", err)
 	}
