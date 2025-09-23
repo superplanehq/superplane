@@ -34,7 +34,6 @@ import { PipelineFileTooltip } from '@/components/Tooltip/pipeline-file-tooltip'
 import { StaticValueTooltip } from '@/components/Tooltip/static-value-tooltip';
 import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
 import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
-import { showErrorToast } from '@/utils/toast';
 import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
 
@@ -60,6 +59,7 @@ interface StageEditModeContentProps {
   onTriggerSectionValidation?: { current: ((hasFieldErrors?: boolean) => void) | null };
   onStageNameChange?: (name: string) => void;
   integrationError?: boolean;
+  onFieldErrorsChange?: (setFieldErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>) => void;
 }
 
 interface ParameterWithId {
@@ -69,7 +69,7 @@ interface ParameterWithId {
 }
 
 
-export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange, integrationError = false }: StageEditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange, integrationError = false, onFieldErrorsChange }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -132,6 +132,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     return id;
   }, [nextIdCounter]);
 
+  // Pass setFieldErrors to parent component
+  useEffect(() => {
+    if (onFieldErrorsChange) {
+      onFieldErrorsChange(setFieldErrors);
+    }
+  }, [onFieldErrorsChange]);
+
 
   const parametersWithIdToRecord = useCallback((params: ParameterWithId[]): Record<string, string> => {
     return params.reduce((acc, param) => {
@@ -157,60 +164,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const { data: organizationSecrets = [], isLoading: loadingOrganizationSecrets } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
   const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
-
-  // API Error parsing function
-  const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
-    if (!errorMessage) return null;
-
-    const repositoryNotFoundMatch = errorMessage.match(/repository\s+([^\s]+)\s+not\s+found/i);
-    if (repositoryNotFoundMatch) {
-      return {
-        field: 'repository',
-        message: `Repository "${repositoryNotFoundMatch[1]}" not found. Please check that the repository exists and that your Personal Access Token (PAT) has access to it.`
-      };
-    }
-
-    const workflowNotFoundMatch = errorMessage.match(/workflow\s+([^\s]+)\s+not\s+found/i);
-    if (workflowNotFoundMatch) {
-      return {
-        field: 'workflow',
-        message: `Workflow "${workflowNotFoundMatch[1]}" not found`
-      };
-    }
-
-    // Check for project not found error
-    const projectNotFoundMatch = errorMessage.match(/project\s+([^\s]+)\s+not\s+found/i);
-    if (projectNotFoundMatch) {
-      return {
-        field: 'project',
-        message: `Project "${projectNotFoundMatch[1]}" not found`
-      };
-    }
-
-    return null;
-  }, []);
-
-  // Handle API errors by highlighting fields
-  const handleApiError = useCallback((errorMessage: string) => {
-    const parsedError = parseApiErrorMessage(errorMessage);
-    if (parsedError) {
-      setFieldErrors(prev => ({
-        ...prev,
-        [parsedError.field]: parsedError.message
-      }));
-      onTriggerSectionValidation?.current?.(true);
-    }
-    showErrorToast(errorMessage);
-  }, [parseApiErrorMessage, onTriggerSectionValidation]);
-
-  // Expose handleApiError to global scope for stage.tsx to call
-  useEffect(() => {
-    (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError = handleApiError;
-
-    return () => {
-      delete (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError;
-    };
-  }, [handleApiError]);
 
   // Helper functions
   const hasErrorsWithPrefix = useCallback((errors: Record<string, string>, prefixes: string | string[]) => {
@@ -2017,7 +1970,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               hasError={
                 isExecutorMisconfigured() ||
                 hasErrorsWithPrefix(validationErrors, 'executor') ||
-                Object.values(fieldErrors).some(Boolean)
+                Object.values(fieldErrors || {}).some(Boolean)
               }
             >
               <div className="space-y-4">
@@ -2437,7 +2390,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       </div>
                     </ValidationField>
 
-                    <ValidationField label="Response Policy - Success Status Codes">
+                    <ValidationField label="Response Policy - Success Status Codes" error={fieldErrors.statusCodes}>
                       <input
                         type="text"
                         value={responsePolicyStatusCodesDisplay}
@@ -2448,8 +2401,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                           setResponsePolicyStatusCodesDisplay(endsWithComma ? codes.join(',') + ',' : codes.join(','));
                         }}
                         placeholder="200, 201, 202"
-                        className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                      />
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${fieldErrors.statusCodes
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`} />
                     </ValidationField>
                   </div>
                 )}
