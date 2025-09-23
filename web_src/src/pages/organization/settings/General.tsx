@@ -14,9 +14,9 @@ interface GeneralProps {
 
 export function General({ organization }: GeneralProps) {
   const { organizationId } = useParams<{ organizationId: string }>()
-  const [displayName, setDisplayName] = useState(organization.metadata?.displayName || '')
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [organizationDescription, setOrganizationDescription] = useState(organization.metadata?.description || '')
+  const [name, setName] = useState(organization.metadata?.name || '')
 
   // Use React Query mutation hook
   const updateOrganizationMutation = useUpdateOrganization(organizationId || '')
@@ -31,7 +31,7 @@ export function General({ organization }: GeneralProps) {
       setSaveMessage(null)
 
       await updateOrganizationMutation.mutateAsync({
-        displayName: displayName,
+        name: name,
         description: organizationDescription,
       })
 
@@ -55,8 +55,8 @@ export function General({ organization }: GeneralProps) {
           </Label>
           <Input
             type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className="max-w-lg"
           />
         </Field>
