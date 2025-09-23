@@ -366,17 +366,11 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return 'border-gray-200 dark:border-gray-700';
   };
 
-  const handleNodeClick = () => {
-    if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {
-      selectEventSourceId(currentEventSource.metadata.id);
-    }
-  };
 
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
       style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
-      onClick={handleNodeClick}
     >
       {(focusedNodeId === props.id || isEditMode) && (
         <EditModeActionButtons
@@ -386,6 +380,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
           onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
+          onSend={currentEventSource?.metadata?.id ? () => setShowEmitEventModal(true) : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
@@ -403,6 +398,22 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           } : null)}
           onYamlApply={handleYamlApply}
         />
+      )}
+
+      {/* Sidebar Control Button */}
+      {!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/) && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (currentEventSource.metadata?.id) {
+              selectEventSourceId(currentEventSource.metadata.id);
+            }
+          }}
+          className="absolute top-4 right-4 z-10 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none"
+          title="Open sidebar"
+        >
+          <MaterialSymbol name="info" size="md" />
+        </button>
       )}
 
       {/* Header Section */}
@@ -443,18 +454,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             </div>
           </div>
         </div>
-        {!isEditMode && currentEventSource?.metadata?.id && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowEmitEventModal(true);
-            }}
-            className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-            title="Manually emit an event"
-          >
-            <MaterialSymbol name="send" size="sm" />
-          </button>
-        )}
         </div>
         {!isEditMode && (
           <>
