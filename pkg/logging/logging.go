@@ -73,3 +73,16 @@ func ForEvent(event *models.Event) *log.Entry {
 		},
 	)
 }
+
+func ForEventSource(source *models.EventSource) *log.Entry {
+	if source == nil {
+		return log.WithFields(log.Fields{})
+	}
+
+	return log.WithFields(
+		log.Fields{
+			"id":   source.ID,
+			"name": source.Name,
+		},
+	)
+}

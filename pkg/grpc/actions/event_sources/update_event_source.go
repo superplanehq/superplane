@@ -82,6 +82,11 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, err
 	}
 
+	schedule, err := validateSchedule(newSource.Spec, integration)
+	if err != nil {
+		return nil, err
+	}
+
 	oldResourceID := eventSource.ResourceID
 
 	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor, registry).
@@ -93,6 +98,7 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		ForIntegration(integration).
 		ForResource(resource).
 		WithEventTypes(eventTypes).
+		WithSchedule(schedule).
 		Update()
 
 	if err != nil {

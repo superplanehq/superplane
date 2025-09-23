@@ -1,5 +1,5 @@
 import { SuperplaneConnection, SuperplaneConnectionType, SuperplaneFilter } from '@/api-client/types.gen';
-import { ValidationField } from './ValidationField';
+import { ValidationField } from '../../../../components/ValidationField';
 import { useConnectionOptions } from '../../hooks/useConnectionOptions';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { StageFilterTooltip } from '@/components/Tooltip/StageFilterTooltip';

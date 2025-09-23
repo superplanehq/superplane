@@ -17,13 +17,14 @@ import { twMerge } from 'tailwind-merge';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { EventStateItem, EventState } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
-import { EventSourceZeroState } from '../EventSourceZeroState';
+import { EventSourceZeroState } from '../../../../components/EventSourceZeroState';
 import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
-  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
+  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
+  'scheduled': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="schedule" size="xl" />
 }
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
@@ -147,20 +148,34 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       setApiError(null);
 
       if (isNewEventSource) {
-
-        const result = await createEventSourceMutation.mutateAsync({
+        // Keep the temporary node visible during the request
+        createEventSourceMutation.mutateAsync({
           name: eventSourceName,
           description: eventSourceDescription,
           spec: currentFormData.spec
+        }).then((result) => {
+          const newEventSource = result.data?.eventSource;
+
+          if (newEventSource) {
+            const generatedKey = result.data?.key;
+            updateEventSourceKey(newEventSource.metadata?.id || '', generatedKey || '');
+
+            // Add the new event source to the canvas
+            const newEventSourceWithEvents = {
+              ...newEventSource,
+              events: [],
+              eventSourceType: currentFormData.spec.schedule ? 'scheduled' : undefined,
+            };
+            addEventSource(newEventSourceWithEvents);
+
+            // Remove the temporary node after the new one is added
+            removeEventSource(props.id);
+          }
+        }).catch((error) => {
+          // If the request fails, keep the temporary node for retry
+          console.error('Failed to create event source:', error);
+          // The apiError will be set by the mutation's onError callback
         });
-
-        const newEventSource = result.data?.eventSource;
-
-        if (newEventSource) {
-          const generatedKey = result.data?.key;
-          updateEventSourceKey(newEventSource.metadata?.id || '', generatedKey || '');
-          removeEventSource(props.id);
-        }
       } else {
         await updateEventSourceMutation.mutateAsync({
           eventSourceId: currentEventSource.metadata?.id || '',
@@ -294,11 +309,16 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     if (props.data.eventSourceType)
       return props.data.eventSourceType;
 
+    // Check if this is a scheduled event source
+    if (props.data.schedule) {
+      return 'scheduled';
+    }
+
     if (integration?.spec?.type) {
       return integration.spec.type;
     }
     return "webhook";
-  }, [integration, props.data.eventSourceType]);
+  }, [integration, props.data.eventSourceType, props.data.schedule]);
 
   // Auto-enter edit mode for webhook with key
   useEffect(() => {
@@ -413,7 +433,58 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           </div>
         </div>
         {!isEditMode && (
-          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
+          <>
+            <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
+            {/* Schedule Status */}
+            {currentEventSource?.spec?.schedule && (
+              <div className="w-full mt-3 space-y-2">
+                {/* Schedule Type and Configuration */}
+                <div className="flex items-center gap-2 text-xs">
+                  <MaterialSymbol name="event_repeat" size="sm" className="text-purple-600 dark:text-purple-400" />
+                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                    {currentEventSource.spec.schedule.type === 'TYPE_HOURLY' &&
+                      `Hourly, ${currentEventSource.spec.schedule.hourly?.minute || 0} minutes past the hour`
+                    }
+                    {currentEventSource.spec.schedule.type === 'TYPE_DAILY' &&
+                      `Daily at ${currentEventSource.spec.schedule.daily?.time || '00:00'} UTC`
+                    }
+                    {currentEventSource.spec.schedule.type === 'TYPE_WEEKLY' &&
+                      `Weekly on ${currentEventSource.spec.schedule.weekly?.weekDay?.replace('WEEK_DAY_', '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday'} at ${currentEventSource.spec.schedule.weekly?.time || '00:00'} UTC`
+                    }
+                  </span>
+                </div>
+
+                {/* Timestamps - only show if status is available */}
+                {currentEventSource?.status?.schedule && (
+                  <>
+                    <div className="flex items-center gap-2 text-xs">
+                      <MaterialSymbol name="history" size="sm" className="text-green-600 dark:text-green-400" />
+                      <span className="text-gray-500 dark:text-gray-400">Last:</span>
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {currentEventSource.status.schedule.lastTrigger
+                          ? new Date(currentEventSource.status.schedule.lastTrigger).toLocaleDateString('en-US', {
+                              month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
+                            }) + ' UTC'
+                          : '-'
+                        }
+                      </span>
+                    </div>
+                    {currentEventSource.status.schedule.nextTrigger && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <MaterialSymbol name="schedule" size="sm" className="text-blue-600 dark:text-blue-400" />
+                        <span className="text-gray-500 dark:text-gray-400">Next:</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {new Date(currentEventSource.status.schedule.nextTrigger).toLocaleDateString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
+                          })} UTC
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </>
         )}
 
       </div>
@@ -439,6 +510,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               integration: currentFormData.spec.integration,
               resource: currentFormData.spec.resource,
               events: currentFormData.spec.events,
+              schedule: currentFormData.spec.schedule,
             })
           }}
           canvasId={canvasId}
@@ -498,7 +570,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             </div>
           ) : (
-            <EventSourceZeroState eventSourceType={eventSourceType} />
+            // Only show EventSourceZeroState for non-scheduled event sources
+            eventSourceType !== 'scheduled' && (
+              <EventSourceZeroState
+                eventSourceType={eventSourceType}
+              />
+            )
           )}
 
         </>

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations"
@@ -551,6 +552,87 @@ func SerializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 	}
 
 	return &e, nil
+}
+
+func ProtoToScheduleType(scheduleType pb.EventSource_Schedule_Type) (string, error) {
+	switch scheduleType {
+	case pb.EventSource_Schedule_TYPE_HOURLY:
+		return models.ScheduleTypeHourly, nil
+	case pb.EventSource_Schedule_TYPE_DAILY:
+		return models.ScheduleTypeDaily, nil
+	case pb.EventSource_Schedule_TYPE_WEEKLY:
+		return models.ScheduleTypeWeekly, nil
+	default:
+		return "", status.Error(codes.InvalidArgument, "invalid schedule type")
+	}
+}
+
+func ScheduleTypeToProto(scheduleType string) pb.EventSource_Schedule_Type {
+	switch scheduleType {
+	case models.ScheduleTypeHourly:
+		return pb.EventSource_Schedule_TYPE_HOURLY
+	case models.ScheduleTypeDaily:
+		return pb.EventSource_Schedule_TYPE_DAILY
+	case models.ScheduleTypeWeekly:
+		return pb.EventSource_Schedule_TYPE_WEEKLY
+	default:
+		return pb.EventSource_Schedule_TYPE_UNKNOWN
+	}
+}
+
+func ProtoToWeekDay(weekDay pb.EventSource_Schedule_WeekDay) (string, error) {
+	switch weekDay {
+	case pb.EventSource_Schedule_WEEK_DAY_MONDAY:
+		return models.WeekDayMonday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_TUESDAY:
+		return models.WeekDayTuesday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_WEDNESDAY:
+		return models.WeekDayWednesday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_THURSDAY:
+		return models.WeekDayThursday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_FRIDAY:
+		return models.WeekDayFriday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_SATURDAY:
+		return models.WeekDaySaturday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_SUNDAY:
+		return models.WeekDaySunday, nil
+	default:
+		return "", status.Error(codes.InvalidArgument, "invalid week day")
+	}
+}
+
+func WeekDayToProto(weekDay string) pb.EventSource_Schedule_WeekDay {
+	switch weekDay {
+	case models.WeekDayMonday:
+		return pb.EventSource_Schedule_WEEK_DAY_MONDAY
+	case models.WeekDayTuesday:
+		return pb.EventSource_Schedule_WEEK_DAY_TUESDAY
+	case models.WeekDayWednesday:
+		return pb.EventSource_Schedule_WEEK_DAY_WEDNESDAY
+	case models.WeekDayThursday:
+		return pb.EventSource_Schedule_WEEK_DAY_THURSDAY
+	case models.WeekDayFriday:
+		return pb.EventSource_Schedule_WEEK_DAY_FRIDAY
+	case models.WeekDaySaturday:
+		return pb.EventSource_Schedule_WEEK_DAY_SATURDAY
+	case models.WeekDaySunday:
+		return pb.EventSource_Schedule_WEEK_DAY_SUNDAY
+	default:
+		return pb.EventSource_Schedule_WEEK_DAY_UNKNOWN
+	}
+}
+
+func ValidateTime(timeStr string) error {
+	if timeStr == "" {
+		return status.Error(codes.InvalidArgument, "time is required")
+	}
+
+	_, err := time.Parse("15:04", timeStr)
+	if err != nil {
+		return status.Error(codes.InvalidArgument, "time must be in HH:MM format (24-hour)")
+	}
+
+	return nil
 }
 
 func StageEventStateToProto(state string) pb.StageEvent_State {

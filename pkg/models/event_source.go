@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,20 +19,35 @@ const (
 	EventSourceStateReady    = "ready"
 	EventSourceScopeExternal = "external"
 	EventSourceScopeInternal = "internal"
+
+	ScheduleTypeHourly = "hourly"
+	ScheduleTypeDaily  = "daily"
+	ScheduleTypeWeekly = "weekly"
+
+	WeekDayMonday    = "monday"
+	WeekDayTuesday   = "tuesday"
+	WeekDayWednesday = "wednesday"
+	WeekDayThursday  = "thursday"
+	WeekDayFriday    = "friday"
+	WeekDaySaturday  = "saturday"
+	WeekDaySunday    = "sunday"
 )
 
 type EventSource struct {
-	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID    uuid.UUID
-	ResourceID  *uuid.UUID
-	Name        string
-	Description string
-	Key         []byte
-	State       string
-	Scope       string
-	CreatedAt   *time.Time
-	UpdatedAt   *time.Time
-	DeletedAt   gorm.DeletedAt `gorm:"index"`
+	ID              uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID        uuid.UUID
+	ResourceID      *uuid.UUID
+	Name            string
+	Description     string
+	Key             []byte
+	State           string
+	Scope           string
+	Schedule        *datatypes.JSONType[Schedule] `gorm:"column:schedule"`
+	LastTriggeredAt *time.Time                    `gorm:"column:last_triggered_at"`
+	NextTriggerAt   *time.Time                    `gorm:"column:next_trigger_at"`
+	CreatedAt       *time.Time
+	UpdatedAt       *time.Time
+	DeletedAt       gorm.DeletedAt `gorm:"index"`
 
 	EventTypes datatypes.JSONSlice[EventType]
 }
@@ -40,6 +56,215 @@ type EventType struct {
 	Type           string   `json:"type"`
 	FilterOperator string   `json:"filter_operator"`
 	Filters        []Filter `json:"filters"`
+}
+
+type Schedule struct {
+	Type   string          `json:"type"`
+	Hourly *HourlySchedule `json:"hourly,omitempty"`
+	Daily  *DailySchedule  `json:"daily,omitempty"`
+	Weekly *WeeklySchedule `json:"weekly,omitempty"`
+}
+
+func (s *Schedule) CalculateNextTrigger(now time.Time) (*time.Time, error) {
+	switch s.Type {
+	case ScheduleTypeHourly:
+		if s.Hourly == nil {
+			return nil, fmt.Errorf("hourly schedule configuration is missing")
+		}
+		return s.calculateNextHourlyTrigger(s.Hourly.Minute, now)
+	case ScheduleTypeDaily:
+		if s.Daily == nil {
+			return nil, fmt.Errorf("daily schedule configuration is missing")
+		}
+		return s.calculateNextDailyTrigger(s.Daily.Time, now)
+	case ScheduleTypeWeekly:
+		if s.Weekly == nil {
+			return nil, fmt.Errorf("weekly schedule configuration is missing")
+		}
+		return s.calculateNextWeeklyTrigger(s.Weekly.WeekDay, s.Weekly.Time, now)
+	default:
+		return nil, fmt.Errorf("unsupported schedule type: %s", s.Type)
+	}
+}
+
+func (s *Schedule) calculateNextHourlyTrigger(minute int, now time.Time) (*time.Time, error) {
+	if minute < 0 || minute > 59 {
+		return nil, fmt.Errorf("minute must be between 0 and 59, got: %d", minute)
+	}
+
+	nowUTC := now.UTC()
+	nextTrigger := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), nowUTC.Hour(), minute, 0, 0, time.UTC)
+
+	if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
+		nextTrigger = nextTrigger.Add(time.Hour)
+	}
+
+	return &nextTrigger, nil
+}
+
+func (s *Schedule) calculateNextDailyTrigger(timeValue string, now time.Time) (*time.Time, error) {
+	hour, minute, err := parseTime(timeValue)
+	if err != nil {
+		return nil, fmt.Errorf("invalid time format: %v", err)
+	}
+
+	nowUTC := now.UTC()
+	nextTrigger := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), hour, minute, 0, 0, time.UTC)
+
+	if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
+		nextTrigger = nextTrigger.AddDate(0, 0, 1)
+	}
+
+	return &nextTrigger, nil
+}
+
+func (s *Schedule) calculateNextWeeklyTrigger(weekDay string, timeValue string, now time.Time) (*time.Time, error) {
+	hour, minute, err := parseTime(timeValue)
+	if err != nil {
+		return nil, fmt.Errorf("invalid time format: %v", err)
+	}
+
+	targetWeekday, err := parseWeekday(weekDay)
+	if err != nil {
+		return nil, fmt.Errorf("invalid weekday: %v", err)
+	}
+
+	nowUTC := now.UTC()
+	currentWeekday := nowUTC.Weekday()
+	nextTrigger := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), hour, minute, 0, 0, time.UTC)
+
+	//
+	// If target and current week days are the same,
+	// we need to check if the next trigger is in the past
+	//
+	if targetWeekday == currentWeekday {
+		if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
+			nextTrigger = nextTrigger.AddDate(0, 0, 7)
+		}
+		return &nextTrigger, nil
+	}
+
+	//
+	// Otherwise, we need to calculate the number of days until the target week day
+	//
+	daysUntilTarget := int(targetWeekday - currentWeekday)
+	if daysUntilTarget < 0 {
+		daysUntilTarget += 7
+	}
+
+	nextTrigger = nextTrigger.AddDate(0, 0, daysUntilTarget)
+	return &nextTrigger, nil
+}
+
+func parseTime(timeValue string) (hour int, minute int, err error) {
+	parts := strings.Split(timeValue, ":")
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("time must be in HH:MM format, got: %s", timeValue)
+	}
+
+	hour, err = strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid hour: %s", parts[0])
+	}
+
+	minute, err = strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid minute: %s", parts[1])
+	}
+
+	if hour < 0 || hour > 23 {
+		return 0, 0, fmt.Errorf("hour must be between 0 and 23, got: %d", hour)
+	}
+
+	if minute < 0 || minute > 59 {
+		return 0, 0, fmt.Errorf("minute must be between 0 and 59, got: %d", minute)
+	}
+
+	return hour, minute, nil
+}
+
+func parseWeekday(weekDay string) (time.Weekday, error) {
+	switch strings.ToLower(weekDay) {
+	case WeekDayMonday:
+		return time.Monday, nil
+	case WeekDayTuesday:
+		return time.Tuesday, nil
+	case WeekDayWednesday:
+		return time.Wednesday, nil
+	case WeekDayThursday:
+		return time.Thursday, nil
+	case WeekDayFriday:
+		return time.Friday, nil
+	case WeekDaySaturday:
+		return time.Saturday, nil
+	case WeekDaySunday:
+		return time.Sunday, nil
+	default:
+		return time.Sunday, fmt.Errorf("invalid weekday: %s", weekDay)
+	}
+}
+
+func WeekdayToString(weekday time.Weekday) string {
+	switch weekday {
+	case time.Monday:
+		return WeekDayMonday
+	case time.Tuesday:
+		return WeekDayTuesday
+	case time.Wednesday:
+		return WeekDayWednesday
+	case time.Thursday:
+		return WeekDayThursday
+	case time.Friday:
+		return WeekDayFriday
+	case time.Saturday:
+		return WeekDaySaturday
+	case time.Sunday:
+		return WeekDaySunday
+	default:
+		return WeekDayMonday
+	}
+}
+
+type HourlySchedule struct {
+	Minute int `json:"minute"` // 0-59, minute of the hour to trigger
+}
+
+type DailySchedule struct {
+	Time string `json:"time"` // Format: "HH:MM" in UTC (24-hour format)
+}
+
+type WeeklySchedule struct {
+	WeekDay string `json:"week_day"` // Monday, Tuesday, etc.
+	Time    string `json:"time"`     // Format: "HH:MM" in UTC (24-hour format)
+}
+
+func (s *EventSource) UpdateNextTrigger(nextTrigger time.Time) error {
+	return s.UpdateNextTriggerInTransaction(database.Conn(), nextTrigger)
+}
+
+func (s *EventSource) UpdateNextTriggerInTransaction(tx *gorm.DB, nextTrigger time.Time) error {
+	now := time.Now()
+	s.NextTriggerAt = &nextTrigger
+	s.LastTriggeredAt = &now
+	s.UpdatedAt = &now
+
+	return tx.Save(s).Error
+}
+
+func ListDueScheduledEventSources() ([]EventSource, error) {
+	var eventSources []EventSource
+	now := time.Now()
+
+	err := database.Conn().
+		Where("next_trigger_at <= ?", now).
+		Find(&eventSources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return eventSources, nil
 }
 
 // NOTE: caller must encrypt the key before calling this method.
