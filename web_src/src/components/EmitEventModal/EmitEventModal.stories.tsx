@@ -2,16 +2,26 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
 import { EmitEventModal } from './EmitEventModal'
 import { Button } from '../Button/button'
+import { SuperplaneEvent } from '@/api-client'
 
 // Wrapper component to handle modal state
 function ModalWrapper({
   isOpen: initialIsOpen = false,
   sourceName = 'Test Event Source',
-  lastEvent
+  loadLastEvent,
+  simulateLoading = false
 }: Partial<React.ComponentProps<typeof EmitEventModal>> & {
   isOpen?: boolean
+  simulateLoading?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(initialIsOpen)
+
+  const defaultLoadLastEvent = async (): Promise<SuperplaneEvent | null> => {
+    if (simulateLoading) {
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+    return null
+  }
 
   return (
     <div>
@@ -20,9 +30,11 @@ function ModalWrapper({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         sourceName={sourceName}
-        lastEvent={lastEvent}
+        loadLastEvent={loadLastEvent || defaultLoadLastEvent}
         onCancel={() => {}}
-        onSubmit={async () => {}}
+        onSubmit={async (eventType, eventData) => {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }}
       />
     </div>
   )
@@ -42,6 +54,9 @@ const meta: Meta<typeof ModalWrapper> = {
     isOpen: {
       control: 'boolean',
     },
+    simulateLoading: {
+      control: 'boolean',
+    },
   },
 }
 
@@ -59,7 +74,7 @@ export const WithLastEvent: Story = {
   args: {
     sourceName: 'Slack Webhook',
     isOpen: false,
-    lastEvent: {
+    loadLastEvent: async () => ({
       id: 'event-123',
       type: 'message.created',
       raw: {
@@ -73,6 +88,21 @@ export const WithLastEvent: Story = {
         }
       },
       created: '2024-01-15T10:30:00Z',
-    },
+    }),
+  },
+}
+
+export const LoadingState: Story = {
+  args: {
+    sourceName: 'API Webhook',
+    isOpen: false,
+    simulateLoading: true,
+  },
+}
+
+export const OpenedModal: Story = {
+  args: {
+    sourceName: 'GitHub Push',
+    isOpen: true,
   },
 }

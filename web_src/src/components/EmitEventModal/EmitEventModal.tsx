@@ -10,19 +10,20 @@ interface EmitEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   sourceName: string;
-  lastEvent?: SuperplaneEvent;
+  loadLastEvent: () => Promise<SuperplaneEvent | null>;
   onCancel?: () => void;
   onSubmit: (eventType: string, eventData: any) => Promise<void>;
 }
 
 
-export function EmitEventModal({ isOpen, onClose, sourceName, lastEvent, onCancel, onSubmit }: EmitEventModalProps) {
+export function EmitEventModal({ isOpen, onClose, sourceName, loadLastEvent, onCancel, onSubmit }: EmitEventModalProps) {
   const [eventType, setEventType] = useState('');
   const [rawEventData, setRawEventData] = useState('{}');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isLoadingLastEvent, setIsLoadingLastEvent] = useState(false);
 
   // Detect dark mode
   useEffect(() => {
@@ -41,15 +42,27 @@ export function EmitEventModal({ isOpen, onClose, sourceName, lastEvent, onCance
     return () => observer.disconnect();
   }, []);
 
-  // Set default values from lastEvent when modal opens
+  // Load last event when modal opens
   useEffect(() => {
-    if (isOpen && lastEvent) {
-      setEventType(lastEvent.type || '');
-      if (lastEvent.raw) {
-        setRawEventData(JSON.stringify(lastEvent.raw, null, 2));
-      }
+    if (isOpen) {
+      setIsLoadingLastEvent(true);
+      loadLastEvent()
+        .then((event) => {
+          if (event) {
+            setEventType(event.type || '');
+            if (event.raw) {
+              setRawEventData(JSON.stringify(event.raw, null, 2));
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to load last event:', error);
+        })
+        .finally(() => {
+          setIsLoadingLastEvent(false);
+        });
     }
-  }, [isOpen, lastEvent]);
+  }, [isOpen]);
 
   const validateAndParseJson = (jsonString: string): { isValid: boolean; parsed?: any } => {
     try {
@@ -146,73 +159,82 @@ export function EmitEventModal({ isOpen, onClose, sourceName, lastEvent, onCance
 
         {/* Body */}
         <div className="flex-1 p-6 overflow-hidden flex flex-col">
-        <div className="flex-1 flex flex-col space-y-4">
-          <div>
-            <label htmlFor="eventType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Event Type
-            </label>
-            <Input
-              id="eventType"
-              value={eventType}
-              onChange={(e) => setEventType(e.target.value)}
-              placeholder="e.g., webhook, push, deployment_complete"
-              disabled={isSubmitting}
-              className="w-full"
-            />
-          </div>
-
-          <div className="flex-1 flex flex-col">
-            <label htmlFor="rawData" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Event Data (JSON)
-            </label>
-            <div className="flex-1 border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
-              <Editor
-                height="100%"
-                defaultLanguage="json"
-                value={rawEventData}
-                onChange={handleRawDataChange}
-                theme={isDarkMode ? 'vs-dark' : 'vs'}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 14,
-                  lineNumbers: 'on',
-                  rulers: [],
-                  wordWrap: 'on',
-                  folding: true,
-                  bracketPairColorization: {
-                    enabled: true
-                  },
-                  autoIndent: 'advanced',
-                  formatOnPaste: true,
-                  formatOnType: true,
-                  tabSize: 2,
-                  insertSpaces: true,
-                  scrollBeyondLastLine: false,
-                  renderWhitespace: 'boundary',
-                  smoothScrolling: true,
-                  cursorBlinking: 'smooth',
-                  readOnly: isSubmitting,
-                  contextmenu: true,
-                  selectOnLineNumbers: true
-                }}
-              />
-            </div>
-            {jsonError && (
-              <p className="text-red-600 dark:text-red-400 text-sm mt-1">
-                {jsonError}
-              </p>
-            )}
-          </div>
-
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-              <div className="flex items-center">
-                <MaterialSymbol name="error" className="text-red-400 mr-2" />
-                <span className="text-red-800 dark:text-red-200 text-sm">{error}</span>
+          {isLoadingLastEvent ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                <MaterialSymbol name="hourglass_empty" className="animate-spin" size="lg" />
+                <span className="text-lg">Loading last event...</span>
               </div>
             </div>
+          ) : (
+            <div className="flex-1 flex flex-col space-y-4">
+              <div>
+                <label htmlFor="eventType" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Event Type
+                </label>
+                <Input
+                  id="eventType"
+                  value={eventType}
+                  onChange={(e) => setEventType(e.target.value)}
+                  placeholder="e.g., webhook, push, deployment_complete"
+                  disabled={isSubmitting}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex-1 flex flex-col">
+                <label htmlFor="rawData" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Event Data (JSON)
+                </label>
+                <div className="flex-1 border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
+                  <Editor
+                    height="100%"
+                    defaultLanguage="json"
+                    value={rawEventData}
+                    onChange={handleRawDataChange}
+                    theme={isDarkMode ? 'vs-dark' : 'vs'}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      lineNumbers: 'on',
+                      rulers: [],
+                      wordWrap: 'on',
+                      folding: true,
+                      bracketPairColorization: {
+                        enabled: true
+                      },
+                      autoIndent: 'advanced',
+                      formatOnPaste: true,
+                      formatOnType: true,
+                      tabSize: 2,
+                      insertSpaces: true,
+                      scrollBeyondLastLine: false,
+                      renderWhitespace: 'boundary',
+                      smoothScrolling: true,
+                      cursorBlinking: 'smooth',
+                      readOnly: isSubmitting,
+                      contextmenu: true,
+                      selectOnLineNumbers: true
+                    }}
+                  />
+                </div>
+                {jsonError && (
+                  <p className="text-red-600 dark:text-red-400 text-sm mt-1">
+                    {jsonError}
+                  </p>
+                )}
+              </div>
+
+              {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
+                  <div className="flex items-center">
+                    <MaterialSymbol name="error" className="text-red-400 mr-2" />
+                    <span className="text-red-800 dark:text-red-200 text-sm">{error}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
-        </div>
         </div>
 
         {/* Footer */}
@@ -223,7 +245,7 @@ export function EmitEventModal({ isOpen, onClose, sourceName, lastEvent, onCance
           <Button
             color="blue"
             onClick={handleSubmit}
-            disabled={isSubmitting || !eventType.trim() || jsonError !== null}
+            disabled={isSubmitting || isLoadingLastEvent || !eventType.trim() || jsonError !== null}
           >
             {isSubmitting ? (
               <>
