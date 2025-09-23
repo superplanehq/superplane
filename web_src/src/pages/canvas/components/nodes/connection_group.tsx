@@ -304,6 +304,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
       {/* Header Section */}
       <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-start justify-between w-full">
         <div className="flex items-start flex-1 min-w-0">
           <div className='max-w-8 mt-1 flex items-center justify-center'>
             <MaterialSymbol name="account_tree" size="lg" />
@@ -337,6 +338,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
               />}
             </div>
           </div>
+        </div>
         </div>
         {!isEditMode && (
           <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || ''}</div>
@@ -439,6 +441,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
         onConfirm={handleDiscardConnectionGroup}
         onCancel={() => setShowDiscardConfirm(false)}
       />
+
     </div>
   );
 }

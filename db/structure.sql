@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VndnVCGba6Op8EAqnH3leEOtVqexwmIioK2Z6wC3mNft2UEBZwM1flDRKekekm4
+\restrict a4EbNbrPffA8JDyzoNXy67Ywf2SufZDMusVidJXYLCiqPRIBFEfv1gWJQP49eeX
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -244,7 +244,8 @@ CREATE TABLE public.events (
     headers jsonb DEFAULT '{}'::jsonb NOT NULL,
     type character varying(128) NOT NULL,
     state_reason character varying(64),
-    state_message text
+    state_message text,
+    created_by uuid
 );
 
 
@@ -1164,13 +1165,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VndnVCGba6Op8EAqnH3leEOtVqexwmIioK2Z6wC3mNft2UEBZwM1flDRKekekm4
+\unrestrict a4EbNbrPffA8JDyzoNXy67Ywf2SufZDMusVidJXYLCiqPRIBFEfv1gWJQP49eeX
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict nMRrNHJYoEZ4KEjrZbcQoYWFf2loPXFRXnNfvqG5QbU6MjfcPteTGvrrXYlISIy
+\restrict QpZp3dPWqd1sMkzs7IeK5EFMsxIrFyCMQ3oTDQdZdnXb56YezyHpFGbVFwxT9IT
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1192,7 +1193,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250922200128	f
+20250923143841	f
 \.
 
 
@@ -1200,5 +1201,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nMRrNHJYoEZ4KEjrZbcQoYWFf2loPXFRXnNfvqG5QbU6MjfcPteTGvrrXYlISIy
+\unrestrict QpZp3dPWqd1sMkzs7IeK5EFMsxIrFyCMQ3oTDQdZdnXb56YezyHpFGbVFwxT9IT
 

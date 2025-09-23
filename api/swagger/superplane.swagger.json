@@ -625,6 +625,44 @@
         "tags": [
           "Event"
         ]
+      },
+      "post": {
+        "summary": "Create an event",
+        "description": "Creates a new event for the specified canvas (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_CreateEvent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateEventResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateEventBody"
+            }
+          }
+        ],
+        "tags": [
+          "Event"
+        ]
       }
     },
     "/api/v1/canvases/{canvasIdOrName}/rejections": {
@@ -3983,6 +4021,31 @@
       "properties": {
         "connectionGroup": {
           "$ref": "#/definitions/SuperplaneConnectionGroup"
+        }
+      }
+    },
+    "SuperplaneCreateEventBody": {
+      "type": "object",
+      "properties": {
+        "sourceType": {
+          "$ref": "#/definitions/SuperplaneEventSourceType"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "raw": {
+          "type": "object"
+        }
+      }
+    },
+    "SuperplaneCreateEventResponse": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "$ref": "#/definitions/SuperplaneEvent"
         }
       }
     },
