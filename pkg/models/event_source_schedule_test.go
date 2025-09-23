@@ -9,9 +9,9 @@ import (
 )
 
 func Test__CalculateNextTrigger(t *testing.T) {
-	now := time.Now()
 
 	t.Run("daily schedule - same day, time not passed", func(t *testing.T) {
+		now := time.Now()
 		futureTime := now.Add(2 * time.Hour).Format("15:04")
 		schedule := Schedule{
 			Type: ScheduleTypeDaily,
@@ -29,6 +29,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 	})
 
 	t.Run("daily schedule - time already passed, next day", func(t *testing.T) {
+		now := time.Now()
 		pastTime := now.Add(-2 * time.Hour).Format("15:04")
 		schedule := Schedule{
 			Type: ScheduleTypeDaily,
@@ -46,6 +47,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 	})
 
 	t.Run("daily schedule - exact time match, next day", func(t *testing.T) {
+		now := time.Now()
 		currentTime := now.Format("15:04")
 		schedule := Schedule{
 			Type: ScheduleTypeDaily,
@@ -63,6 +65,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 	})
 
 	t.Run("weekly schedule - same day, time not passed", func(t *testing.T) {
+		now := time.Now()
 		weekdayStr := WeekdayToString(now.Weekday())
 		futureTime := now.Add(2 * time.Hour).Format("15:04")
 		schedule := Schedule{
@@ -82,6 +85,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 	})
 
 	t.Run("weekly schedule - same day, time passed, next week", func(t *testing.T) {
+		now := time.Now()
 		weekdayStr := WeekdayToString(now.Weekday())
 		pastTime := now.Add(-2 * time.Hour).Format("15:04")
 		schedule := Schedule{
@@ -101,6 +105,8 @@ func Test__CalculateNextTrigger(t *testing.T) {
 	})
 
 	t.Run("weekly schedule - different day in future", func(t *testing.T) {
+		now := time.Now()
+
 		// Get a future weekday (if today is Sunday, use Monday, otherwise use next day)
 		currentWeekday := now.Weekday()
 		var targetWeekday time.Weekday
@@ -134,7 +140,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 			},
 		}
 
-		_, err := schedule.CalculateNextTrigger(now)
+		_, err := schedule.CalculateNextTrigger(time.Now())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "hour must be between 0 and 23")
 	})
@@ -148,7 +154,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 			},
 		}
 
-		_, err := schedule.CalculateNextTrigger(now)
+		_, err := schedule.CalculateNextTrigger(time.Now())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid weekday")
 	})
@@ -158,7 +164,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 			Type: "monthly",
 		}
 
-		_, err := schedule.CalculateNextTrigger(now)
+		_, err := schedule.CalculateNextTrigger(time.Now())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported schedule type")
 	})
@@ -168,7 +174,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 			Type: ScheduleTypeDaily,
 		}
 
-		_, err := schedule.CalculateNextTrigger(now)
+		_, err := schedule.CalculateNextTrigger(time.Now())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "daily schedule configuration is missing")
 	})
@@ -178,7 +184,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 			Type: ScheduleTypeWeekly,
 		}
 
-		_, err := schedule.CalculateNextTrigger(now)
+		_, err := schedule.CalculateNextTrigger(time.Now())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "weekly schedule configuration is missing")
 	})
