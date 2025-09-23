@@ -325,7 +325,6 @@ CREATE TABLE public.organization_invitations (
 CREATE TABLE public.organizations (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(255) NOT NULL,
-    display_name character varying(255) NOT NULL,
     allowed_providers jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
@@ -838,13 +837,6 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 --
 
 CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
-
-
---
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --

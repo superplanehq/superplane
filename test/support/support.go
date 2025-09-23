@@ -79,7 +79,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	// Create organization and user
 	//
 	var err error
-	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"), "")
+	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"))
 	require.NoError(t, err)
 	r.AuthService.SetupOrganizationRoles(organization.ID.String())
 	require.NoError(t, err)
@@ -341,7 +341,7 @@ func AuthService(t *testing.T) *authorization.AuthService {
 
 // TODO: this needs to be refactored
 func CreateOrganization(t *testing.T, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
-	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"), "")
+	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"))
 	require.NoError(t, err)
 	r.AuthService.SetupOrganizationRoles(organization.ID.String())
 	require.NoError(t, err)

@@ -448,7 +448,7 @@ export const useUpdateOrganization = (organizationId: string) => {
   
   return useMutation({
     mutationFn: async (params: {
-      displayName?: string,
+      name?: string,
       description?: string
     }) => {
       return await organizationsUpdateOrganization(
@@ -457,7 +457,7 @@ export const useUpdateOrganization = (organizationId: string) => {
           body: {
             organization: {
               metadata: {
-                displayName: params.displayName,
+                name: params.name,
                 description: params.description
               }
             }
