@@ -173,7 +173,11 @@ func (s *ResourceCleanupService) CleanupStageWebhooks(stage *models.Stage) error
 }
 
 func (s *ResourceCleanupService) CleanupEventSourceWebhooks(eventSource *models.EventSource, resource *models.Resource) (bool, error) {
-	if eventSource.ResourceID == nil || resource == nil {
+	if eventSource.ResourceID == nil {
+		return false, nil
+	}
+
+	if resource == nil {
 		return false, nil
 	}
 
