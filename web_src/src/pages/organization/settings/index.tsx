@@ -95,10 +95,10 @@ export function OrganizationSettings() {
                 <Avatar
                   className='w-6 h-6 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-white'
                   slot="icon"
-                  initials={(organization?.metadata?.displayName || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
-                  alt={organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}
+                  initials={(organization?.metadata?.name || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
+                  alt={organization?.metadata?.name || organization?.metadata?.name || 'Organization'}
                 />
-                <SidebarLabel className='text-zinc-900 dark:text-white'>{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</SidebarLabel>
+                <SidebarLabel className='text-zinc-900 dark:text-white'>{organization?.metadata?.name || organization?.metadata?.name || 'Organization'}</SidebarLabel>
               </div>
               {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
                 <SidebarItem

@@ -31,9 +31,7 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 	if pbOrganization.Metadata.Name != "" {
 		organization.Name = pbOrganization.Metadata.Name
 	}
-	if pbOrganization.Metadata.DisplayName != "" {
-		organization.DisplayName = pbOrganization.Metadata.DisplayName
-	}
+
 	if pbOrganization.Metadata.Description != "" {
 		organization.Description = pbOrganization.Metadata.Description
 	}
@@ -55,7 +53,6 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 			Metadata: &pb.Organization_Metadata{
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
-				DisplayName: organization.DisplayName,
 				Description: organization.Description,
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),

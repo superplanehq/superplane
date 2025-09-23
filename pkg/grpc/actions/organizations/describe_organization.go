@@ -29,7 +29,6 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 			Metadata: &pb.Organization_Metadata{
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
-				DisplayName: organization.DisplayName,
 				Description: organization.Description,
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
