@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneEventSourceStatus{}
 
 // SuperplaneEventSourceStatus struct for SuperplaneEventSourceStatus
 type SuperplaneEventSourceStatus struct {
-	History *StatusHistory `json:"history,omitempty"`
+	LastEvent *SuperplaneEvent `json:"lastEvent,omitempty"`
 	Schedule *EventSourceStatusSchedule `json:"schedule,omitempty"`
 }
 
@@ -41,36 +41,36 @@ func NewSuperplaneEventSourceStatusWithDefaults() *SuperplaneEventSourceStatus {
 	return &this
 }
 
-// GetHistory returns the History field value if set, zero value otherwise.
-func (o *SuperplaneEventSourceStatus) GetHistory() StatusHistory {
-	if o == nil || IsNil(o.History) {
-		var ret StatusHistory
+// GetLastEvent returns the LastEvent field value if set, zero value otherwise.
+func (o *SuperplaneEventSourceStatus) GetLastEvent() SuperplaneEvent {
+	if o == nil || IsNil(o.LastEvent) {
+		var ret SuperplaneEvent
 		return ret
 	}
-	return *o.History
+	return *o.LastEvent
 }
 
-// GetHistoryOk returns a tuple with the History field value if set, nil otherwise
+// GetLastEventOk returns a tuple with the LastEvent field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSourceStatus) GetHistoryOk() (*StatusHistory, bool) {
-	if o == nil || IsNil(o.History) {
+func (o *SuperplaneEventSourceStatus) GetLastEventOk() (*SuperplaneEvent, bool) {
+	if o == nil || IsNil(o.LastEvent) {
 		return nil, false
 	}
-	return o.History, true
+	return o.LastEvent, true
 }
 
-// HasHistory returns a boolean if a field has been set.
-func (o *SuperplaneEventSourceStatus) HasHistory() bool {
-	if o != nil && !IsNil(o.History) {
+// HasLastEvent returns a boolean if a field has been set.
+func (o *SuperplaneEventSourceStatus) HasLastEvent() bool {
+	if o != nil && !IsNil(o.LastEvent) {
 		return true
 	}
 
 	return false
 }
 
-// SetHistory gets a reference to the given StatusHistory and assigns it to the History field.
-func (o *SuperplaneEventSourceStatus) SetHistory(v StatusHistory) {
-	o.History = &v
+// SetLastEvent gets a reference to the given SuperplaneEvent and assigns it to the LastEvent field.
+func (o *SuperplaneEventSourceStatus) SetLastEvent(v SuperplaneEvent) {
+	o.LastEvent = &v
 }
 
 // GetSchedule returns the Schedule field value if set, zero value otherwise.
@@ -115,8 +115,8 @@ func (o SuperplaneEventSourceStatus) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneEventSourceStatus) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.History) {
-		toSerialize["history"] = o.History
+	if !IsNil(o.LastEvent) {
+		toSerialize["lastEvent"] = o.LastEvent
 	}
 	if !IsNil(o.Schedule) {
 		toSerialize["schedule"] = o.Schedule

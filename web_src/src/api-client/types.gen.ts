@@ -389,11 +389,6 @@ export type SpecGroupBy = {
 
 export type SpecTimeoutBehavior = 'TIMEOUT_BEHAVIOR_NONE' | 'TIMEOUT_BEHAVIOR_DROP' | 'TIMEOUT_BEHAVIOR_EMIT';
 
-export type StatusHistory = {
-    received?: number;
-    recentItems?: Array<SuperplaneEvent>;
-};
-
 export type StatusQueue = {
     total?: number;
     items?: Array<SuperplaneStageEvent>;
@@ -656,7 +651,7 @@ export type SuperplaneEventSourceSpec = {
 };
 
 export type SuperplaneEventSourceStatus = {
-    history?: StatusHistory;
+    lastEvent?: SuperplaneEvent;
     schedule?: EventSourceStatusSchedule;
 };
 

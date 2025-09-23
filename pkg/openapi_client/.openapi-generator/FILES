@@ -108,7 +108,6 @@ docs/SecretsUpdateSecretResponse.md
 docs/SpecGroupBy.md
 docs/SpecTimeoutBehavior.md
 docs/StageAPI.md
-docs/StatusHistory.md
 docs/StatusQueue.md
 docs/SuperplaneAddUserBody.md
 docs/SuperplaneApproveStageEventResponse.md
@@ -288,7 +287,6 @@ model_secrets_update_secret_body.go
 model_secrets_update_secret_response.go
 model_spec_group_by.go
 model_spec_timeout_behavior.go
-model_status_history.go
 model_status_queue.go
 model_superplane_add_user_body.go
 model_superplane_approve_stage_event_response.go

@@ -488,17 +488,12 @@ message EventSource {
   }
 
   message Status {
-    message History {
-      uint32 received = 1;
-      repeated Event recent_items = 2;
-    }
-
     message Schedule {
       google.protobuf.Timestamp last_trigger = 1;
       google.protobuf.Timestamp next_trigger = 2;
     }
 
-    History history = 1;
+    Event last_event = 1;
     Schedule schedule = 2;
   }
 

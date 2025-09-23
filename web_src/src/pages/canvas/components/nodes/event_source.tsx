@@ -15,7 +15,7 @@ import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { twMerge } from 'tailwind-merge';
 import { useIntegrations } from '../../hooks/useIntegrations';
-import { EventStateItem, EventState } from '../EventStateItem';
+import { EventStateItem } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
 import { EventSourceZeroState } from '../../../../components/EventSourceZeroState';
 import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
@@ -23,7 +23,7 @@ import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 
 const EventSourceImageMap = {
-  'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
+  'webhook': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="webhook" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
   'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
   'scheduled': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="schedule" size="xl" />
@@ -566,31 +566,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       ) : (
         <>
 
-          {currentEventSource?.events?.length ? (
+          {currentEventSource?.status?.lastEvent ? (
             <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center w-full justify-between mb-2 py-2">
-                <div className="text-sm  font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.status?.history?.received || 0})</div>
+                <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last Event</div>
               </div>
 
               <div className="space-y-1">
-                {currentEventSource.events.slice(0, 3).map((event) => {
-                  // Map event states to our EventState type
-                  let eventState: EventState = 'pending';
-                  if (event.state === 'STATE_REJECTED') {
-                    eventState = 'rejected';
-                  } else if (event.state === 'STATE_PROCESSED') {
-                    eventState = 'processed';
-                  }
-
-                  return (
-                    <EventStateItem
-                      key={event.id}
-                      state={eventState}
-                      receivedAt={event.receivedAt}
-                      eventType={event.type}
-                    />
-                  );
-                })}
+                <EventStateItem
+                  key={currentEventSource.status.lastEvent.id}
+                  state={currentEventSource.status.lastEvent.state}
+                  receivedAt={currentEventSource.status.lastEvent.receivedAt}
+                  eventType={currentEventSource.status.lastEvent.type}
+                />
               </div>
             </div>
           ) : (
