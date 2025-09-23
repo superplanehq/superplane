@@ -20,6 +20,7 @@
 - To generate DB migrations, use `make db.migration.create NAME=<name>`. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>`, where DB_NAME can be `superplane_dev` or `superplane_test`
 - When validating enum fields in protobuf requests, ensure that the enums are properly mapped to constants in the `pkg/models` package. Check the `Proto*` and `*ToProto` functions in pkg/grpc/actions/common.go.
 - When adding a new worker in pkg/workers, always add its startup to `cmd/server/main.go`, and update the docker compose files with the new environment variables that are needed.
+- After adding new API endpoints, ensure the new endpoints have their authorization covered in `pkg/authorization/interceptor.go`
 - For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
   - `make pb.gen` to regenerate protobuf files
@@ -31,5 +32,6 @@
 
 - Tests end with _test.go
 - Always prefer early returns over else blocks when possible
+- GoLang: prefer `any` over `interface{}` types
 - When naming variables, avoid names like `*Str` or `*UUID`; Go is a typed language, we don't need types in the variables names
 - When writing tests that require specific timestamps to be used, always use timestamps based off of `time.Now()`, instead of absolute times created with `time.Date`

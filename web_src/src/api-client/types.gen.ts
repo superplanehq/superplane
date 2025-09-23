@@ -244,7 +244,6 @@ export type OrganizationsOrganization = {
 export type OrganizationsOrganizationMetadata = {
     id?: string;
     name?: string;
-    displayName?: string;
     description?: string;
     createdAt?: string;
     updatedAt?: string;
@@ -522,6 +521,19 @@ export type SuperplaneCreateConnectionGroupBody = {
 
 export type SuperplaneCreateConnectionGroupResponse = {
     connectionGroup?: SuperplaneConnectionGroup;
+};
+
+export type SuperplaneCreateEventBody = {
+    sourceType?: SuperplaneEventSourceType;
+    sourceId?: string;
+    type?: string;
+    raw?: {
+        [key: string]: unknown;
+    };
+};
+
+export type SuperplaneCreateEventResponse = {
+    event?: SuperplaneEvent;
 };
 
 export type SuperplaneCreateEventSourceBody = {
@@ -1407,6 +1419,33 @@ export type SuperplaneListEventsResponses = {
 };
 
 export type SuperplaneListEventsResponse2 = SuperplaneListEventsResponses[keyof SuperplaneListEventsResponses];
+
+export type SuperplaneCreateEventData = {
+    body: SuperplaneCreateEventBody;
+    path: {
+        canvasIdOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/events';
+};
+
+export type SuperplaneCreateEventErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneCreateEventError = SuperplaneCreateEventErrors[keyof SuperplaneCreateEventErrors];
+
+export type SuperplaneCreateEventResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneCreateEventResponse;
+};
+
+export type SuperplaneCreateEventResponse2 = SuperplaneCreateEventResponses[keyof SuperplaneCreateEventResponses];
 
 export type SuperplaneListEventRejectionsData = {
     body?: never;

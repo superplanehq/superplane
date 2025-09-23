@@ -23,7 +23,6 @@ var _ MappedNullable = &OrganizationsOrganizationMetadata{}
 type OrganizationsOrganizationMetadata struct {
 	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
-	DisplayName *string `json:"displayName,omitempty"`
 	Description *string `json:"description,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
@@ -108,38 +107,6 @@ func (o *OrganizationsOrganizationMetadata) HasName() bool {
 // SetName gets a reference to the given string and assigns it to the Name field.
 func (o *OrganizationsOrganizationMetadata) SetName(v string) {
 	o.Name = &v
-}
-
-// GetDisplayName returns the DisplayName field value if set, zero value otherwise.
-func (o *OrganizationsOrganizationMetadata) GetDisplayName() string {
-	if o == nil || IsNil(o.DisplayName) {
-		var ret string
-		return ret
-	}
-	return *o.DisplayName
-}
-
-// GetDisplayNameOk returns a tuple with the DisplayName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *OrganizationsOrganizationMetadata) GetDisplayNameOk() (*string, bool) {
-	if o == nil || IsNil(o.DisplayName) {
-		return nil, false
-	}
-	return o.DisplayName, true
-}
-
-// HasDisplayName returns a boolean if a field has been set.
-func (o *OrganizationsOrganizationMetadata) HasDisplayName() bool {
-	if o != nil && !IsNil(o.DisplayName) {
-		return true
-	}
-
-	return false
-}
-
-// SetDisplayName gets a reference to the given string and assigns it to the DisplayName field.
-func (o *OrganizationsOrganizationMetadata) SetDisplayName(v string) {
-	o.DisplayName = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
@@ -253,9 +220,6 @@ func (o OrganizationsOrganizationMetadata) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
-	}
-	if !IsNil(o.DisplayName) {
-		toSerialize["displayName"] = o.DisplayName
 	}
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description

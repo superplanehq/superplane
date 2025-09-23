@@ -19,8 +19,7 @@ func Test__UpdateOrganization(t *testing.T) {
 	t.Run("organization does not exist -> error", func(t *testing.T) {
 		organization := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
-				Name:        "updated-name",
-				DisplayName: "Updated Display Name",
+				Name: "updated-name",
 			},
 		}
 
@@ -36,7 +35,6 @@ func Test__UpdateOrganization(t *testing.T) {
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
 				Name:        "updated-org",
-				DisplayName: "Updated Organization",
 				Description: "Updated description",
 			},
 		}
@@ -48,7 +46,6 @@ func Test__UpdateOrganization(t *testing.T) {
 		require.NotNil(t, response.Organization.Metadata)
 		assert.Equal(t, r.Organization.ID.String(), response.Organization.Metadata.Id)
 		assert.Equal(t, "updated-org", response.Organization.Metadata.Name)
-		assert.Equal(t, "Updated Organization", response.Organization.Metadata.DisplayName)
 		assert.Equal(t, "Updated description", response.Organization.Metadata.Description)
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.True(t, response.Organization.Metadata.UpdatedAt.AsTime().After(*r.Organization.UpdatedAt))

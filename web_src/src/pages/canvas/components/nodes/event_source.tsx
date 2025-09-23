@@ -4,7 +4,7 @@ import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource } from '@/hooks/useCanvasData';
-import { SuperplaneEventSource, SuperplaneEventSourceSpec } from '@/api-client';
+import { SuperplaneEventSource, SuperplaneEventSourceSpec, superplaneCreateEvent } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -19,6 +19,8 @@ import { EventStateItem, EventState } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
 import { EventSourceZeroState } from '../../../../components/EventSourceZeroState';
 import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
+import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
+import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -45,8 +47,13 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; spec: SuperplaneEventSourceSpec } | null>({
     name: props.data.name || '',
     description: props.data.description || '',
-    spec: {}
+    spec: {
+      integration: props.data.integration ? { ...props.data.integration } : undefined,
+      resource: props.data.resource ? { ...props.data.resource } : undefined,
+      events: props.data.eventFilters ? [...props.data.eventFilters] : [],
+    }
   });
+
   const [eventSourceName, setEventSourceName] = useState(props.data.name || '');
   const [eventSourceDescription, setEventSourceDescription] = useState(props.data.description || '');
   const [dirtyByUser, setDirtyByUser] = useState(false);
@@ -55,6 +62,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
   const [integrationError, setIntegrationError] = useState(false);
+  const [showEmitEventModal, setShowEmitEventModal] = useState(false);
   const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
@@ -143,10 +151,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
     const isTemporaryId = currentEventSource.metadata?.id && /^\d+$/.test(currentEventSource.metadata.id);
     const isNewEventSource = !currentEventSource.metadata?.id || isTemporaryId;
+    let success = false;
 
     try {
       setApiError(null);
-
       if (isNewEventSource) {
         // Keep the temporary node visible during the request
         createEventSourceMutation.mutateAsync({
@@ -170,11 +178,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
             // Remove the temporary node after the new one is added
             removeEventSource(props.id);
+            success = true;
           }
         }).catch((error) => {
-          // If the request fails, keep the temporary node for retry
-          console.error('Failed to create event source:', error);
-          // The apiError will be set by the mutation's onError callback
+          setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
         });
       } else {
         await updateEventSourceMutation.mutateAsync({
@@ -196,11 +203,14 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
         props.data.name = eventSourceName;
         props.data.description = eventSourceDescription;
+        success = true;
       }
-      setIsEditMode(false);
-      setEditingEventSource(null);
-      setCurrentFormData(null);
-      setIntegrationError(false);
+      if (success) {
+        setIsEditMode(false);
+        setEditingEventSource(null);
+        setCurrentFormData(null);
+        setIntegrationError(false);
+      }
     } catch (error) {
       setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
     }
@@ -397,6 +407,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
       {/* Header Section */}
       <div className="px-4 py-4 justify-between items-start">
+        <div className="flex items-start justify-between w-full">
         <div className="flex items-start flex-1 min-w-0">
           <div className='max-w-8 mt-1 flex items-center justify-center'>
             {EventSourceImageMap[eventSourceType as keyof typeof EventSourceImageMap]}
@@ -432,6 +443,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             </div>
           </div>
         </div>
+        {!isEditMode && currentEventSource?.metadata?.id && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowEmitEventModal(true);
+            }}
+            className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+            title="Manually emit an event"
+          >
+            <MaterialSymbol name="send" size="sm" />
+          </button>
+        )}
+        </div>
         {!isEditMode && (
           <>
             <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
@@ -463,8 +487,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                       <span className="text-gray-700 dark:text-gray-300">
                         {currentEventSource.status.schedule.lastTrigger
                           ? new Date(currentEventSource.status.schedule.lastTrigger).toLocaleDateString('en-US', {
-                              month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
-                            }) + ' UTC'
+                            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
+                          }) + ' UTC'
                           : '-'
                         }
                       </span>
@@ -523,7 +547,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               // Clear API errors when user makes changes
               setApiError(null);
 
-              if (isNewNode && !dirtyByUser) {
+              if (isNewNode && !dirtyByUser && !currentEventSource?.isDuplicate) {
                 const autoGeneratedName = generateEventSourceName(spec.resource?.name || '');
                 setEventSourceName(autoGeneratedName);
                 if (currentFormData) {
@@ -593,6 +617,26 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         onConfirm={handleDiscardEventSource}
         onCancel={() => setShowDiscardConfirm(false)}
       />
+
+      {currentEventSource?.metadata?.id && (
+        <EmitEventModal
+          isOpen={showEmitEventModal}
+          onClose={() => setShowEmitEventModal(false)}
+          sourceName={currentEventSource.metadata.name || ''}
+          lastEvent={currentEventSource.events?.[0]}
+          onSubmit={async (eventType: string, eventData: any) => {
+            await superplaneCreateEvent(withOrganizationHeader({
+              path: { canvasIdOrName: canvasId! },
+              body: {
+                sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE',
+                sourceId: currentEventSource.metadata!.id,
+                type: eventType,
+                raw: eventData
+              }
+            }));
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -92,5 +92,5 @@ export interface CanvasState {
 }
 
 export type Stage = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; executions: Array<SuperplaneExecution>; isDraft?: boolean}
-export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneEvent>; eventSourceType?: string; eventFilters?: Array<EventSourceEventType>}
+export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneEvent>; eventSourceType?: string; eventFilters?: Array<EventSourceEventType>; isDuplicate?: boolean}
 export type ConnectionGroupWithEvents = SuperplaneConnectionGroup & {events: Array<SuperplaneEvent>}

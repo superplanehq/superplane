@@ -841,10 +841,9 @@ type Organization_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -893,13 +892,6 @@ func (x *Organization_Metadata) GetName() string {
 	return ""
 }
 
-func (x *Organization_Metadata) GetDisplayName() string {
-	if x != nil {
-		return x.DisplayName
-	}
-	return ""
-}
-
 func (x *Organization_Metadata) GetDescription() string {
 	if x != nil {
 		return x.Description
@@ -925,18 +917,17 @@ var File_organizations_proto protoreflect.FileDescriptor
 
 const file_organizations_proto_rawDesc = "" +
 	"\n" +
-	"\x13organizations.proto\x12\x18Superplane.Organizations\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xc7\x02\n" +
+	"\x13organizations.proto\x12\x18Superplane.Organizations\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xa4\x02\n" +
 	"\fOrganization\x12K\n" +
-	"\bmetadata\x18\x01 \x01(\v2/.Superplane.Organizations.Organization.MetadataR\bmetadata\x1a\xe9\x01\n" +
+	"\bmetadata\x18\x01 \x01(\v2/.Superplane.Organizations.Organization.MetadataR\bmetadata\x1a\xc6\x01\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
-	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x129\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"-\n" +
+	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"-\n" +
 	"\x1bDescribeOrganizationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"j\n" +
 	"\x1cDescribeOrganizationResponse\x12J\n" +
