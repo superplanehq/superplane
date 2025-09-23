@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { MemoryRouter } from 'react-router-dom'
 import { ApiTokenForm } from './ApiTokenForm'
 import type { IntegrationData, FormErrors } from './types'
+import { createMockSecrets, defaultProps } from './__mocks__/storyFactory'
 
 const meta: Meta<typeof ApiTokenForm> = {
   title: 'Components/IntegrationForm/ApiTokenForm',
@@ -25,43 +26,7 @@ const meta: Meta<typeof ApiTokenForm> = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const mockSecrets = [
-  {
-    metadata: { id: '1', name: 'github-pat' },
-    spec: {
-      local: {
-        data: {
-          'api-token': 'ghp_xxxxxxxxxxxxxxxxxxxx',
-          'backup-token': 'ghp_yyyyyyyyyyyyyyyyyyyy',
-          'webhook-secret': 'whs_zzzzzzzzzzzzzzzzzzzz'
-        }
-      }
-    }
-  },
-  {
-    metadata: { id: '2', name: 'semaphore-key' },
-    spec: {
-      local: {
-        data: {
-          'token': 'smp_aaaaaaaaaaaaaaaaaaa',
-          'api-key': 'smp_bbbbbbbbbbbbbbbbbb'
-        }
-      }
-    }
-  },
-  {
-    metadata: { id: '3', name: 'service-keys' },
-    spec: {
-      local: {
-        data: {
-          'primary': 'key_111111111111111',
-          'secondary': 'key_222222222222222',
-          'fallback': 'key_333333333333333'
-        }
-      }
-    }
-  }
-]
+const mockSecrets = createMockSecrets()
 
 export const NewSecretTab: Story = {
   render: (args) => {
@@ -88,10 +53,10 @@ export const NewSecretTab: Story = {
         setApiTokenTab={setApiTokenTab}
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
         {...args}
+        secrets={mockSecrets}
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
       />
     )
   }
@@ -122,10 +87,10 @@ export const ExistingSecretTab: Story = {
         setApiTokenTab={setApiTokenTab}
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
         {...args}
+        secrets={mockSecrets}
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
       />
     )
   }
@@ -156,10 +121,10 @@ export const ExistingSecretSelected: Story = {
         setApiTokenTab={setApiTokenTab}
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
         {...args}
+        secrets={mockSecrets}
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
       />
     )
   }
@@ -190,10 +155,10 @@ export const WithNewSecretValue: Story = {
         setApiTokenTab={setApiTokenTab}
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
         {...args}
+        secrets={mockSecrets}
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
       />
     )
   }
@@ -227,10 +192,10 @@ export const WithErrors: Story = {
         setApiTokenTab={setApiTokenTab}
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
         {...args}
+        secrets={mockSecrets}
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
       />
     )
   }
@@ -295,10 +260,10 @@ export const MultipleKeyOptions: Story = {
         setApiTokenTab={setApiTokenTab}
         newSecretToken={newSecretToken}
         setNewSecretToken={setNewSecretToken}
-        secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
         {...args}
+        secrets={mockSecrets}
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
       />
     )
   }

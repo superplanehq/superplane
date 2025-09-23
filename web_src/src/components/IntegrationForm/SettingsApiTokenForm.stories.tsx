@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SettingsApiTokenForm } from './SettingsApiTokenForm'
 import type { IntegrationData, FormErrors } from './types'
+import { createMockSecrets, defaultProps } from './__mocks__/storyFactory'
 
 // Create a query client for stories
 const queryClient = new QueryClient({
@@ -35,31 +36,7 @@ const meta: Meta<typeof SettingsApiTokenForm> = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const mockSecrets = [
-  {
-    metadata: { id: '1', name: 'github-pat' },
-    spec: {
-      local: {
-        data: {
-          'api-token': 'ghp_xxxxxxxxxxxxxxxxxxxx',
-          'backup-token': 'ghp_yyyyyyyyyyyyyyyyyyyy',
-          'webhook-secret': 'whs_zzzzzzzzzzzzzzzzzzzz'
-        }
-      }
-    }
-  },
-  {
-    metadata: { id: '2', name: 'semaphore-key' },
-    spec: {
-      local: {
-        data: {
-          'token': 'smp_aaaaaaaaaaaaaaaaaaa',
-          'api-key': 'smp_bbbbbbbbbbbbbbbbbb'
-        }
-      }
-    }
-  }
-]
+const mockSecrets = createMockSecrets()
 
 export const CreateMode: Story = {
   render: (args) => {
@@ -81,8 +58,8 @@ export const CreateMode: Story = {
         errors={errors}
         setErrors={setErrors}
         secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
         isEditMode={false}
       />
     )
@@ -110,8 +87,8 @@ export const EditMode: Story = {
         errors={errors}
         setErrors={setErrors}
         secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
         isEditMode={true}
         newSecretValue={newSecretValue}
         setNewSecretValue={setNewSecretValue}
@@ -141,8 +118,8 @@ export const EditModeWithValue: Story = {
         errors={errors}
         setErrors={setErrors}
         secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
         isEditMode={true}
         newSecretValue={newSecretValue}
         setNewSecretValue={setNewSecretValue}
@@ -171,8 +148,8 @@ export const WithSelectedSecret: Story = {
         errors={errors}
         setErrors={setErrors}
         secrets={mockSecrets}
-        organizationId="org-123"
-        canvasId="canvas-456"
+        organizationId={defaultProps.organizationId}
+        canvasId={defaultProps.canvasId}
         isEditMode={false}
       />
     )

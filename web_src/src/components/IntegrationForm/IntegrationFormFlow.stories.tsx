@@ -8,6 +8,7 @@ import { useIntegrationForm } from './useIntegrationForm'
 import { Button } from '../Button/button'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import type { IntegrationData, FormErrors } from './types'
+import { createFlowMockSecrets, createMockIntegrations, defaultProps } from './__mocks__/storyFactory'
 
 const meta: Meta = {
   title: 'Components/IntegrationForm/Complete Flow',
@@ -29,35 +30,8 @@ const meta: Meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const mockSecrets = [
-  {
-    metadata: { id: '1', name: 'github-pat-production' },
-    spec: {
-      local: {
-        data: {
-          'api-token': 'ghp_xxxxxxxxxxxxxxxxxxxx',
-          'webhook-secret': 'whs_yyyyyyyyyyyyyyyyyyyy'
-        }
-      }
-    }
-  },
-  {
-    metadata: { id: '2', name: 'semaphore-api-key' },
-    spec: {
-      local: {
-        data: {
-          'token': 'smp_zzzzzzzzzzzzzzzzzzzz',
-          'backup-key': 'smp_aaaaaaaaaaaaaaaaaaa'
-        }
-      }
-    }
-  }
-]
-
-const mockIntegrations = [
-  { metadata: { name: 'existing-github-integration' } },
-  { metadata: { name: 'production-semaphore' } }
-]
+const mockSecrets = createFlowMockSecrets()
+const mockIntegrations = createMockIntegrations()
 
 export const GitHubIntegrationFlow: Story = {
   render: () => {
@@ -139,8 +113,8 @@ export const GitHubIntegrationFlow: Story = {
           newSecretToken={newSecretToken}
           setNewSecretToken={setNewSecretToken}
           secrets={mockSecrets}
-          organizationId="org-123"
-          canvasId="canvas-456"
+          organizationId={defaultProps.organizationId}
+          canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
         />
 
@@ -279,8 +253,8 @@ export const SemaphoreIntegrationFlow: Story = {
           newSecretToken={newSecretToken}
           setNewSecretToken={setNewSecretToken}
           secrets={mockSecrets}
-          organizationId="org-123"
-          canvasId="canvas-456"
+          organizationId={defaultProps.organizationId}
+          canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
         />
 
@@ -397,8 +371,8 @@ export const EditIntegrationFlow: Story = {
           newSecretToken={newSecretToken}
           setNewSecretToken={setNewSecretToken}
           secrets={mockSecrets}
-          organizationId="org-123"
-          canvasId="canvas-456"
+          organizationId={defaultProps.organizationId}
+          canvasId={defaultProps.canvasId}
           orgUrlRef={orgUrlRef}
         />
 

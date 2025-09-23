@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { SemaphoreIntegrationForm } from './SemaphoreIntegrationForm'
 import type { IntegrationData, FormErrors } from './types'
+import { createSemaphoreMockSecrets } from './__mocks__/storyFactory'
 
 const meta: Meta<typeof SemaphoreIntegrationForm> = {
   title: 'Components/IntegrationForm/SemaphoreIntegrationForm',
@@ -22,29 +23,7 @@ const meta: Meta<typeof SemaphoreIntegrationForm> = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const mockSecrets = [
-  {
-    metadata: { id: '1', name: 'semaphore-api-key' },
-    spec: {
-      local: {
-        data: {
-          'api-token': 'smp_xxxxxxxxxxxxxxxxxxxx',
-          'backup-token': 'smp_yyyyyyyyyyyyyyyyyyyy'
-        }
-      }
-    }
-  },
-  {
-    metadata: { id: '2', name: 'my-semaphore-secret' },
-    spec: {
-      local: {
-        data: {
-          'token': 'smp_zzzzzzzzzzzzzzzzzzzz'
-        }
-      }
-    }
-  }
-]
+const mockSecrets = createSemaphoreMockSecrets()
 
 export const Default: Story = {
   render: (args) => {
