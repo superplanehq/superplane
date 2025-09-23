@@ -625,7 +625,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           isOpen={showEmitEventModal}
           onClose={() => setShowEmitEventModal(false)}
           sourceName={currentEventSource.metadata.name || ''}
-          lastEvent={currentEventSource.events?.[0]}
+          loadLastEvent={async () => {
+            // For event sources, return the latest event immediately
+            return currentEventSource.events?.[0] || null;
+          }}
           onSubmit={async (eventType: string, eventData: any) => {
             await superplaneCreateEvent(withOrganizationHeader({
               path: { canvasIdOrName: canvasId! },
