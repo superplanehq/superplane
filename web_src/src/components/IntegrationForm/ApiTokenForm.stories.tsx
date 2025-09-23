@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { MemoryRouter } from 'react-router-dom'
 import { ApiTokenForm } from './ApiTokenForm'
 import type { IntegrationData, FormErrors } from './types'
-import { createMockSecrets, defaultProps } from './__mocks__/storyFactory'
+import { createMockSecrets, defaultProps } from '../../../test/__mocks__/secrets'
 
 const meta: Meta<typeof ApiTokenForm> = {
   title: 'Components/IntegrationForm/ApiTokenForm',
@@ -102,7 +102,7 @@ export const ExistingSecretSelected: Story = {
       orgUrl: 'https://github.com/myorg',
       name: 'myorg-account',
       apiToken: {
-        secretName: 'github-pat',
+        secretName: 'secret-1',
         secretKey: 'api-token'
       }
     })

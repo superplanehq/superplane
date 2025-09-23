@@ -8,7 +8,7 @@ import { useIntegrationForm } from './useIntegrationForm'
 import { Button } from '../Button/button'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import type { IntegrationData, FormErrors } from './types'
-import { createFlowMockSecrets, createMockIntegrations, defaultProps } from './__mocks__/storyFactory'
+import { createMockSecrets, createMockIntegrations, defaultProps } from '../../../test/__mocks__/secrets'
 
 const meta: Meta = {
   title: 'Components/IntegrationForm/Complete Flow',
@@ -30,7 +30,7 @@ const meta: Meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const mockSecrets = createFlowMockSecrets()
+const mockSecrets = createMockSecrets()
 const mockIntegrations = createMockIntegrations()
 
 export const GitHubIntegrationFlow: Story = {
@@ -309,7 +309,7 @@ export const EditIntegrationFlow: Story = {
       orgUrl: 'https://github.com/mycompany',
       name: 'mycompany-production',
       apiToken: {
-        secretName: 'github-pat-production',
+        secretName: 'secret-1',
         secretKey: 'api-token'
       }
     })

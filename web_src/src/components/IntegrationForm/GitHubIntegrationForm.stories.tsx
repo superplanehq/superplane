@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { GitHubIntegrationForm } from './GitHubIntegrationForm'
 import type { IntegrationData, FormErrors } from './types'
-import { createGitHubMockSecrets } from './__mocks__/storyFactory'
+import { createMockSecrets } from '../../../test/__mocks__/secrets'
 
 const meta: Meta<typeof GitHubIntegrationForm> = {
   title: 'Components/IntegrationForm/GitHubIntegrationForm',
@@ -23,7 +23,7 @@ const meta: Meta<typeof GitHubIntegrationForm> = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const mockSecrets = createGitHubMockSecrets()
+const mockSecrets = createMockSecrets()
 
 export const Default: Story = {
   render: (args) => {

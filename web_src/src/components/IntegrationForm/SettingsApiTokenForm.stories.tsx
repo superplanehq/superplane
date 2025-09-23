@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SettingsApiTokenForm } from './SettingsApiTokenForm'
 import type { IntegrationData, FormErrors } from './types'
-import { createMockSecrets, defaultProps } from './__mocks__/storyFactory'
+import { createMockSecrets, defaultProps } from '../../../test/__mocks__/secrets'
 
 // Create a query client for stories
 const queryClient = new QueryClient({
@@ -72,7 +72,7 @@ export const EditMode: Story = {
       orgUrl: 'https://github.com/myorg',
       name: 'myorg-account',
       apiToken: {
-        secretName: 'github-pat',
+        secretName: 'secret-1',
         secretKey: 'api-token'
       }
     })
@@ -103,7 +103,7 @@ export const EditModeWithValue: Story = {
       orgUrl: 'https://github.com/myorg',
       name: 'myorg-account',
       apiToken: {
-        secretName: 'github-pat',
+        secretName: 'secret-1',
         secretKey: 'api-token'
       }
     })
@@ -134,7 +134,7 @@ export const WithSelectedSecret: Story = {
       orgUrl: 'https://github.com/myorg',
       name: 'myorg-account',
       apiToken: {
-        secretName: 'github-pat',
+        secretName: 'secret-1',
         secretKey: 'api-token'
       }
     })
