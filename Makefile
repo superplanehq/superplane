@@ -63,6 +63,8 @@ dev.console:
 #
 
 db.create:
+	-docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
+	-docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
 	-docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 

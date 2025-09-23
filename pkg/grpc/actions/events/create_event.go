@@ -6,8 +6,10 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -58,6 +60,11 @@ func CreateEvent(ctx context.Context, canvasID string, protoSourceType pb.EventS
 	serialized, err := actions.SerializeEvent(*event)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to serialize event: %v", err)
+	}
+
+	err = messages.NewEventCreatedMessage(canvasID, event).Publish()
+	if err != nil {
+		log.Errorf("failed to publish event created message: %v", err)
 	}
 
 	return &pb.CreateEventResponse{

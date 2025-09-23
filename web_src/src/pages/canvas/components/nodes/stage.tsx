@@ -4,8 +4,8 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useUpdateStage, useCreateStage, useDeleteStage } from '@/hooks/useCanvasData';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
+import { useUpdateStage, useCreateStage, useDeleteStage, useEvents } from '@/hooks/useCanvasData';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent } from '@/api-client';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -23,6 +23,8 @@ import { StageQueueSection } from '../StageQueueSection';
 import { EventTriggerBadge } from '../EventTriggerBadge';
 import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 import { showErrorToast } from '@/utils/toast';
+import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
+import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
@@ -41,6 +43,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const [stageNameDirtyByUser, setStageNameDirtyByUser] = useState(false);
   const [integrationError, setIntegrationError] = useState(false);
+  const [showEmitEventModal, setShowEmitEventModal] = useState(false);
   const triggerSectionValidationRef = useRef<(() => void) | null>(null);
   const setFieldErrorsRef = useRef<React.Dispatch<React.SetStateAction<Record<string, string>>> | null>(null);
   const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId } = useCanvasStore();
@@ -604,39 +607,53 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
         {/* Header Section */}
         <div className={twMerge('px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>
-          <div className="flex items-start flex-1 min-w-0">
-            <div className='max-w-8 mt-1 flex items-center justify-center'>
-              {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
-            </div>
-            <div className="flex-1 min-w-0 ml-2">
-              <div className="mb-1">
-                <InlineEditable
-                  value={stageName}
-                  onSave={handleStageNameChange}
-                  placeholder="Stage name"
-                  className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
-                    nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
-                    isEditMode ? 'text-sm' : '')}
-                  isEditMode={isEditMode}
-                  autoFocus={!!isNewNode && !props.data.executor?.resource?.type}
-                  dataTestId="event-source-name-input"
-                />
-                {nameError && isEditMode && (
-                  <div className="text-xs text-red-600 text-left mt-1 px-2">
-                    {nameError}
-                  </div>
-                )}
+          <div className="flex items-start justify-between w-full">
+            <div className="flex items-start flex-1 min-w-0">
+              <div className='max-w-8 mt-1 flex items-center justify-center'>
+                {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
               </div>
-              <div>
-                {isEditMode && <InlineEditable
-                  value={stageDescription}
-                  onSave={handleStageDescriptionChange}
-                  placeholder={isEditMode ? "Add description..." : ""}
-                  className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
-                  isEditMode={isEditMode}
-                />}
+              <div className="flex-1 min-w-0 ml-2">
+                <div className="mb-1">
+                  <InlineEditable
+                    value={stageName}
+                    onSave={handleStageNameChange}
+                    placeholder="Stage name"
+                    className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                      nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                      isEditMode ? 'text-sm' : '')}
+                    isEditMode={isEditMode}
+                    autoFocus={!!isNewNode && !props.data.executor?.resource?.type}
+                    dataTestId="event-source-name-input"
+                  />
+                  {nameError && isEditMode && (
+                    <div className="text-xs text-red-600 text-left mt-1 px-2">
+                      {nameError}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  {isEditMode && <InlineEditable
+                    value={stageDescription}
+                    onSave={handleStageDescriptionChange}
+                    placeholder={isEditMode ? "Add description..." : ""}
+                    className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
+                    isEditMode={isEditMode}
+                  />}
+                </div>
               </div>
             </div>
+            {!isEditMode && currentStage?.metadata?.id && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEmitEventModal(true);
+                }}
+                className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                title="Manually emit an event"
+              >
+                <MaterialSymbol name="send" size="sm" />
+              </button>
+            )}
           </div>
           {!isEditMode && (
             <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{stageDescription || ''}</div>
@@ -774,6 +791,41 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           onConfirm={handleDiscardStage}
           onCancel={() => setShowDiscardConfirm(false)}
         />
+
+        {currentStage?.metadata?.id && (
+          <EmitEventModal
+            isOpen={showEmitEventModal}
+            onClose={() => setShowEmitEventModal(false)}
+            sourceName={currentStage.metadata.name || ''}
+            loadLastEvent={async () => {
+              try {
+                const response = await superplaneListEvents(withOrganizationHeader({
+                  path: { canvasIdOrName: canvasId! },
+                  query: {
+                    sourceType: 'EVENT_SOURCE_TYPE_STAGE' as const,
+                    sourceId: currentStage.metadata!.id,
+                    limit: 1
+                  }
+                }));
+                return response.data?.events?.[0] || null;
+              } catch (error) {
+                console.error('Failed to load last event for stage:', error);
+                return null;
+              }
+            }}
+            onSubmit={async (eventType: string, eventData: any) => {
+              await superplaneCreateEvent(withOrganizationHeader({
+                path: { canvasIdOrName: canvasId! },
+                body: {
+                  sourceType: 'EVENT_SOURCE_TYPE_STAGE',
+                  sourceId: currentStage.metadata!.id,
+                  type: eventType,
+                  raw: eventData
+                }
+              }));
+            }}
+          />
+        )}
       </div>
 
     </div>
