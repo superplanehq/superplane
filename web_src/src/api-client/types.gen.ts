@@ -14,10 +14,30 @@ export type AuthorizationPermission = {
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
+export type EventSourceDailySchedule = {
+    time?: string;
+};
+
 export type EventSourceEventType = {
     type?: string;
     filters?: Array<SuperplaneFilter>;
     filterOperator?: SuperplaneFilterOperator;
+};
+
+export type EventSourceHourlySchedule = {
+    minute?: number;
+};
+
+export type EventSourceScheduleType = 'TYPE_UNKNOWN' | 'TYPE_HOURLY' | 'TYPE_DAILY' | 'TYPE_WEEKLY';
+
+export type EventSourceStatusSchedule = {
+    lastTrigger?: string;
+    nextTrigger?: string;
+};
+
+export type EventSourceWeeklySchedule = {
+    weekDay?: ScheduleWeekDay;
+    time?: string;
 };
 
 export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
@@ -175,6 +195,16 @@ export type IntegrationsResourceRef = {
     name?: string;
 };
 
+export type IntegrationsUpdateIntegrationBody = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    integration?: IntegrationsIntegration;
+};
+
+export type IntegrationsUpdateIntegrationResponse = {
+    integration?: IntegrationsIntegration;
+};
+
 export type MeRegenerateTokenResponse = {
     token?: string;
 };
@@ -290,6 +320,8 @@ export type RolesUpdateRoleBody = {
 export type RolesUpdateRoleResponse = {
     role?: RolesRole;
 };
+
+export type ScheduleWeekDay = 'WEEK_DAY_UNKNOWN' | 'WEEK_DAY_MONDAY' | 'WEEK_DAY_TUESDAY' | 'WEEK_DAY_WEDNESDAY' | 'WEEK_DAY_THURSDAY' | 'WEEK_DAY_FRIDAY' | 'WEEK_DAY_SATURDAY' | 'WEEK_DAY_SUNDAY';
 
 /**
  * Local secrets are stored and managed by SuperPlane itself.
@@ -610,14 +642,23 @@ export type SuperplaneEventSourceMetadata = {
     updatedAt?: string;
 };
 
+export type SuperplaneEventSourceSchedule = {
+    type?: EventSourceScheduleType;
+    hourly?: EventSourceHourlySchedule;
+    daily?: EventSourceDailySchedule;
+    weekly?: EventSourceWeeklySchedule;
+};
+
 export type SuperplaneEventSourceSpec = {
     integration?: IntegrationsIntegrationRef;
     resource?: IntegrationsResourceRef;
     events?: Array<EventSourceEventType>;
+    schedule?: SuperplaneEventSourceSchedule;
 };
 
 export type SuperplaneEventSourceStatus = {
     history?: StatusHistory;
+    schedule?: EventSourceStatusSchedule;
 };
 
 export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
@@ -2147,6 +2188,33 @@ export type IntegrationsDescribeIntegrationResponses = {
 };
 
 export type IntegrationsDescribeIntegrationResponse2 = IntegrationsDescribeIntegrationResponses[keyof IntegrationsDescribeIntegrationResponses];
+
+export type IntegrationsUpdateIntegrationData = {
+    body: IntegrationsUpdateIntegrationBody;
+    path: {
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/integrations/{idOrName}';
+};
+
+export type IntegrationsUpdateIntegrationErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type IntegrationsUpdateIntegrationError = IntegrationsUpdateIntegrationErrors[keyof IntegrationsUpdateIntegrationErrors];
+
+export type IntegrationsUpdateIntegrationResponses = {
+    /**
+     * A successful response.
+     */
+    200: IntegrationsUpdateIntegrationResponse;
+};
+
+export type IntegrationsUpdateIntegrationResponse2 = IntegrationsUpdateIntegrationResponses[keyof IntegrationsUpdateIntegrationResponses];
 
 export type MeMeData = {
     body?: never;

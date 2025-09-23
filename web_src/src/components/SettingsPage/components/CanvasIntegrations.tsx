@@ -10,6 +10,7 @@ import { IntegrationsIntegration } from '@/api-client'
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
 import GithubLogo from '@/assets/github-mark.svg'
 import { useNavigate } from 'react-router-dom'
+import { showErrorToast, showSuccessToast } from '../../../utils/toast'
 
 interface CanvasIntegrationsProps {
   canvasId: string
@@ -112,10 +113,12 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
 
     try {
       await createIntegrationMutation.mutateAsync(integrationData)
+      showSuccessToast('Integration created successfully')
       resetForm()
       setSection('list')
     } catch (error) {
       console.error('Failed to create integration:', error)
+      showErrorToast('Failed to create integration. Please try again.')
     }
   }
 
@@ -152,10 +155,15 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
 
     try {
       await updateIntegrationMutation.mutateAsync(updateData)
+      showSuccessToast('Integration updated successfully')
       resetForm()
       setSection('list')
     } catch (error) {
       console.error('Failed to update integration:', error)
+      const errorMessage = (error as Error).message
+        ? (error as Error).message
+        : 'Failed to update integration. Please try again.'
+      showErrorToast(errorMessage)
     }
   }
 

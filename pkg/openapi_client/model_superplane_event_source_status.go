@@ -21,6 +21,7 @@ var _ MappedNullable = &SuperplaneEventSourceStatus{}
 // SuperplaneEventSourceStatus struct for SuperplaneEventSourceStatus
 type SuperplaneEventSourceStatus struct {
 	History *StatusHistory `json:"history,omitempty"`
+	Schedule *EventSourceStatusSchedule `json:"schedule,omitempty"`
 }
 
 // NewSuperplaneEventSourceStatus instantiates a new SuperplaneEventSourceStatus object
@@ -72,6 +73,38 @@ func (o *SuperplaneEventSourceStatus) SetHistory(v StatusHistory) {
 	o.History = &v
 }
 
+// GetSchedule returns the Schedule field value if set, zero value otherwise.
+func (o *SuperplaneEventSourceStatus) GetSchedule() EventSourceStatusSchedule {
+	if o == nil || IsNil(o.Schedule) {
+		var ret EventSourceStatusSchedule
+		return ret
+	}
+	return *o.Schedule
+}
+
+// GetScheduleOk returns a tuple with the Schedule field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneEventSourceStatus) GetScheduleOk() (*EventSourceStatusSchedule, bool) {
+	if o == nil || IsNil(o.Schedule) {
+		return nil, false
+	}
+	return o.Schedule, true
+}
+
+// HasSchedule returns a boolean if a field has been set.
+func (o *SuperplaneEventSourceStatus) HasSchedule() bool {
+	if o != nil && !IsNil(o.Schedule) {
+		return true
+	}
+
+	return false
+}
+
+// SetSchedule gets a reference to the given EventSourceStatusSchedule and assigns it to the Schedule field.
+func (o *SuperplaneEventSourceStatus) SetSchedule(v EventSourceStatusSchedule) {
+	o.Schedule = &v
+}
+
 func (o SuperplaneEventSourceStatus) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o SuperplaneEventSourceStatus) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.History) {
 		toSerialize["history"] = o.History
+	}
+	if !IsNil(o.Schedule) {
+		toSerialize["schedule"] = o.Schedule
 	}
 	return toSerialize, nil
 }

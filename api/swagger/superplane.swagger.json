@@ -1854,6 +1854,44 @@
         "tags": [
           "Integration"
         ]
+      },
+      "patch": {
+        "summary": "Update an integration",
+        "description": "Updates an existing integration",
+        "operationId": "Integrations_UpdateIntegration",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/IntegrationsUpdateIntegrationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IntegrationsUpdateIntegrationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
       }
     },
     "/api/v1/me": {
@@ -2764,6 +2802,15 @@
       ],
       "default": "REJECTION_REASON_UNKNOWN"
     },
+    "EventSourceDailySchedule": {
+      "type": "object",
+      "properties": {
+        "time": {
+          "type": "string",
+          "title": "Format: \"HH:MM\" in UTC (24-hour format)"
+        }
+      }
+    },
     "EventSourceEventType": {
       "type": "object",
       "properties": {
@@ -2779,6 +2826,51 @@
         },
         "filterOperator": {
           "$ref": "#/definitions/SuperplaneFilterOperator"
+        }
+      }
+    },
+    "EventSourceHourlySchedule": {
+      "type": "object",
+      "properties": {
+        "minute": {
+          "type": "integer",
+          "format": "int32",
+          "title": "0-59, minute of the hour to trigger"
+        }
+      }
+    },
+    "EventSourceScheduleType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNKNOWN",
+        "TYPE_HOURLY",
+        "TYPE_DAILY",
+        "TYPE_WEEKLY"
+      ],
+      "default": "TYPE_UNKNOWN"
+    },
+    "EventSourceStatusSchedule": {
+      "type": "object",
+      "properties": {
+        "lastTrigger": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nextTrigger": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "EventSourceWeeklySchedule": {
+      "type": "object",
+      "properties": {
+        "weekDay": {
+          "$ref": "#/definitions/ScheduleWeekDay"
+        },
+        "time": {
+          "type": "string",
+          "title": "Format: \"HH:MM\" in UTC (24-hour format)"
         }
       }
     },
@@ -3144,6 +3236,28 @@
         }
       }
     },
+    "IntegrationsUpdateIntegrationBody": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "integration": {
+          "$ref": "#/definitions/IntegrationsIntegration"
+        }
+      }
+    },
+    "IntegrationsUpdateIntegrationResponse": {
+      "type": "object",
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/IntegrationsIntegration"
+        }
+      }
+    },
     "MeRegenerateTokenResponse": {
       "type": "object",
       "properties": {
@@ -3401,6 +3515,20 @@
           "$ref": "#/definitions/RolesRole"
         }
       }
+    },
+    "ScheduleWeekDay": {
+      "type": "string",
+      "enum": [
+        "WEEK_DAY_UNKNOWN",
+        "WEEK_DAY_MONDAY",
+        "WEEK_DAY_TUESDAY",
+        "WEEK_DAY_WEDNESDAY",
+        "WEEK_DAY_THURSDAY",
+        "WEEK_DAY_FRIDAY",
+        "WEEK_DAY_SATURDAY",
+        "WEEK_DAY_SUNDAY"
+      ],
+      "default": "WEEK_DAY_UNKNOWN"
     },
     "SecretLocal": {
       "type": "object",
@@ -4130,6 +4258,23 @@
         }
       }
     },
+    "SuperplaneEventSourceSchedule": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/EventSourceScheduleType"
+        },
+        "hourly": {
+          "$ref": "#/definitions/EventSourceHourlySchedule"
+        },
+        "daily": {
+          "$ref": "#/definitions/EventSourceDailySchedule"
+        },
+        "weekly": {
+          "$ref": "#/definitions/EventSourceWeeklySchedule"
+        }
+      }
+    },
     "SuperplaneEventSourceSpec": {
       "type": "object",
       "properties": {
@@ -4145,6 +4290,9 @@
             "type": "object",
             "$ref": "#/definitions/EventSourceEventType"
           }
+        },
+        "schedule": {
+          "$ref": "#/definitions/SuperplaneEventSourceSchedule"
         }
       }
     },
@@ -4153,6 +4301,9 @@
       "properties": {
         "history": {
           "$ref": "#/definitions/StatusHistory"
+        },
+        "schedule": {
+          "$ref": "#/definitions/EventSourceStatusSchedule"
         }
       }
     },

@@ -296,4 +296,173 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, models.EventSourceScopeExternal, source.Scope)
 		assert.Equal(t, externalName, source.Name)
 	})
+
+	t.Run("event source with daily schedule is created", func(t *testing.T) {
+		name := support.RandomName("scheduled-source")
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Schedule: &protos.EventSource_Schedule{
+					Type: protos.EventSource_Schedule_TYPE_DAILY,
+					Daily: &protos.EventSource_DailySchedule{
+						Time: "10:30",
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.EventSource)
+		assert.Equal(t, name, response.EventSource.Metadata.Name)
+		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
+
+		require.NotNil(t, response.EventSource.Spec.Schedule)
+		assert.Equal(t, protos.EventSource_Schedule_TYPE_DAILY, response.EventSource.Spec.Schedule.Type)
+		require.NotNil(t, response.EventSource.Spec.Schedule.Daily)
+		assert.Equal(t, "10:30", response.EventSource.Spec.Schedule.Daily.Time)
+	})
+
+	t.Run("event source with weekly schedule is created", func(t *testing.T) {
+		name := support.RandomName("weekly-scheduled-source")
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Schedule: &protos.EventSource_Schedule{
+					Type: protos.EventSource_Schedule_TYPE_WEEKLY,
+					Weekly: &protos.EventSource_WeeklySchedule{
+						WeekDay: protos.EventSource_Schedule_WEEK_DAY_FRIDAY,
+						Time:    "15:45",
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.EventSource)
+		assert.Equal(t, name, response.EventSource.Metadata.Name)
+
+		require.NotNil(t, response.EventSource.Spec.Schedule)
+		assert.Equal(t, protos.EventSource_Schedule_TYPE_WEEKLY, response.EventSource.Spec.Schedule.Type)
+		require.NotNil(t, response.EventSource.Spec.Schedule.Weekly)
+		assert.Equal(t, protos.EventSource_Schedule_WEEK_DAY_FRIDAY, response.EventSource.Spec.Schedule.Weekly.WeekDay)
+		assert.Equal(t, "15:45", response.EventSource.Spec.Schedule.Weekly.Time)
+	})
+
+	t.Run("event source with schedule and integration -> error", func(t *testing.T) {
+		name := support.RandomName("invalid-scheduled-source")
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: r.Integration.Name,
+				},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
+				},
+				Schedule: &protos.EventSource_Schedule{
+					Type: protos.EventSource_Schedule_TYPE_DAILY,
+					Daily: &protos.EventSource_DailySchedule{
+						Time: "10:30",
+					},
+				},
+			},
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "schedules are not supported for event sources with integrations", s.Message())
+	})
+
+	t.Run("daily schedule without daily config -> error", func(t *testing.T) {
+		name := support.RandomName("invalid-daily-source")
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Schedule: &protos.EventSource_Schedule{
+					Type: protos.EventSource_Schedule_TYPE_DAILY,
+				},
+			},
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "daily schedule configuration is required", s.Message())
+	})
+
+	t.Run("weekly schedule without weekly config -> error", func(t *testing.T) {
+		name := support.RandomName("invalid-weekly-source")
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Schedule: &protos.EventSource_Schedule{
+					Type: protos.EventSource_Schedule_TYPE_WEEKLY,
+				},
+			},
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "weekly schedule configuration is required", s.Message())
+	})
+
+	t.Run("daily schedule with invalid time format -> error", func(t *testing.T) {
+		name := support.RandomName("invalid-time-source")
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Schedule: &protos.EventSource_Schedule{
+					Type: protos.EventSource_Schedule_TYPE_DAILY,
+					Daily: &protos.EventSource_DailySchedule{
+						Time: "25:70",
+					},
+				},
+			},
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), "time must be in HH:MM format")
+	})
+
+	t.Run("weekly schedule with invalid time format -> error", func(t *testing.T) {
+		name := support.RandomName("invalid-weekly-time-source")
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Schedule: &protos.EventSource_Schedule{
+					Type: protos.EventSource_Schedule_TYPE_WEEKLY,
+					Weekly: &protos.EventSource_WeeklySchedule{
+						WeekDay: protos.EventSource_Schedule_WEEK_DAY_MONDAY,
+						Time:    "invalid-time",
+					},
+				},
+			},
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Contains(t, s.Message(), "time must be in HH:MM format")
+	})
 }

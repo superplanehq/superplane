@@ -58,6 +58,18 @@ func CreateIntegration(integration *Integration) (*Integration, error) {
 	return nil, err
 }
 
+func (i *Integration) Update() error {
+	now := time.Now()
+	i.UpdatedAt = &now
+
+	err := database.Conn().Save(i).Error
+	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrNameAlreadyUsed
+	}
+
+	return err
+}
+
 func (i *Integration) ListResources(resourceType string) ([]*Resource, error) {
 	resources := []*Resource{}
 
