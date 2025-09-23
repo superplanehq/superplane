@@ -47,6 +47,7 @@ type Event struct {
 	StateReason  string
 	StateMessage string
 	ReceivedAt   *time.Time
+	CreatedBy    *uuid.UUID
 	Raw          datatypes.JSON
 	Headers      datatypes.JSON
 }
@@ -200,6 +201,34 @@ func (e *Event) EvaluateStringExpression(expression string) (string, error) {
 	}
 
 	return v, nil
+}
+
+func CreateManualEvent(sourceID uuid.UUID, canvasID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, createdBy *uuid.UUID) (*Event, error) {
+	now := time.Now()
+
+	event := Event{
+		SourceID:   sourceID,
+		CanvasID:   canvasID,
+		SourceName: sourceName,
+		SourceType: sourceType,
+		Type:       eventType,
+		State:      EventStatePending,
+		ReceivedAt: &now,
+		Raw:        datatypes.JSON(raw),
+		Headers:    datatypes.JSON([]byte(`{}`)),
+		CreatedBy:  createdBy,
+	}
+
+	err := database.Conn().
+		Clauses(clause.Returning{}).
+		Create(&event).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
 }
 
 func CreateEvent(sourceID uuid.UUID, canvasID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, headers []byte) (*Event, error) {

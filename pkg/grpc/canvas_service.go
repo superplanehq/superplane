@@ -13,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type CanvasService struct {
@@ -194,6 +196,15 @@ func (s *CanvasService) DeleteConnectionGroup(ctx context.Context, req *pb.Delet
 func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsRequest) (*pb.ListEventsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return events.ListEvents(ctx, canvasID, req.SourceType, req.SourceId, req.Limit, req.Before)
+}
+
+func (s *CanvasService) CreateEvent(ctx context.Context, req *pb.CreateEventRequest) (*pb.CreateEventResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	if req.Raw == nil {
+		return nil, status.Error(codes.InvalidArgument, "raw data is required")
+	}
+
+	return events.CreateEvent(ctx, canvasID, req.SourceType, req.SourceId, req.Type, req.Raw.AsMap())
 }
 
 func (s *CanvasService) ListEventRejections(ctx context.Context, req *pb.ListEventRejectionsRequest) (*pb.ListEventRejectionsResponse, error) {
