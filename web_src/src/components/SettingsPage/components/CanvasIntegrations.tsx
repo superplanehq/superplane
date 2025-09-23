@@ -1,15 +1,21 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Heading } from '../../Heading/heading'
 import { Text } from '../../Text/text'
 import { Button } from '../../Button/button'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
-import { Input } from '../../Input/input'
-import { useIntegrations, useCreateIntegration, useUpdateIntegration, type CreateIntegrationParams, type UpdateIntegrationParams } from '../../../pages/canvas/hooks/useIntegrations'
-import { useSecrets, useSecret } from '../../../pages/canvas/hooks/useSecrets'
+import { useIntegrations, useCreateIntegration, useUpdateIntegration, type UpdateIntegrationParams } from '../../../pages/canvas/hooks/useIntegrations'
+import { useSecrets, useCreateSecret, useUpdateSecret } from '../../../pages/canvas/hooks/useSecrets'
 import { IntegrationsIntegration } from '@/api-client'
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
 import GithubLogo from '@/assets/github-mark.svg'
-import { useNavigate } from 'react-router-dom'
+
+import {
+  GitHubIntegrationForm,
+  SemaphoreIntegrationForm,
+  SettingsApiTokenForm,
+  useIntegrationForm,
+  NEW_SECRET_NAME
+} from '../../IntegrationForm'
 import { showErrorToast, showSuccessToast } from '../../../utils/toast'
 
 interface CanvasIntegrationsProps {
@@ -50,20 +56,34 @@ const INTEGRATION_TYPES: Record<string, IntegrationType> = {
 export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrationsProps) {
   const [section, setSection] = useState<IntegrationSection>('list')
   const [selectedType, setSelectedType] = useState<string>('semaphore')
-  const [integrationName, setIntegrationName] = useState('')
-  const [integrationUrl, setIntegrationUrl] = useState('')
-  const [authType, setAuthType] = useState<'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'>('AUTH_TYPE_NONE')
-  const [selectedSecretId, setSelectedSecretId] = useState('')
-  const [selectedSecretKey, setSelectedSecretKey] = useState('')
   const [editingIntegration, setEditingIntegration] = useState<IntegrationsIntegration | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [newSecretValue, setNewSecretValue] = useState('')
+  const orgUrlRef = useRef<HTMLInputElement>(null)
 
   const { data: integrations, isLoading, error } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS")
   const createIntegrationMutation = useCreateIntegration(canvasId, "DOMAIN_TYPE_CANVAS")
   const updateIntegrationMutation = useUpdateIntegration(canvasId, "DOMAIN_TYPE_CANVAS", editingIntegration?.metadata?.id || '')
   const { data: secrets = [] } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS")
-  const { data: selectedSecret } = useSecret(canvasId, "DOMAIN_TYPE_CANVAS", selectedSecretId)
+  const createSecretMutation = useCreateSecret(canvasId, "DOMAIN_TYPE_CANVAS")
+  const updateSecretMutation = useUpdateSecret(canvasId, "DOMAIN_TYPE_CANVAS", editingIntegration?.spec?.auth?.token?.valueFrom?.secret?.name || '')
 
-  const navigate = useNavigate()
+  const {
+    integrationData,
+    setIntegrationData,
+    apiTokenTab,
+    setApiTokenTab,
+    newSecretToken,
+    setNewSecretToken,
+    errors,
+    setErrors,
+    validateForm,
+    resetForm
+  } = useIntegrationForm({
+    integrationType: selectedType,
+    integrations: integrations || [],
+    editingIntegration
+  })
 
   const handleAddIntegration = () => {
     setSection('choose-type')
@@ -71,92 +91,157 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
 
   const handleTypeSelection = (type: string) => {
     setSelectedType(type)
+    resetForm()
     setSection('new')
-    setIntegrationUrl('')
-  }
-
-  const resetForm = () => {
-    setIntegrationName('')
-    setIntegrationUrl('')
-    setAuthType('AUTH_TYPE_NONE')
-    setSelectedSecretId('')
-    setSelectedSecretKey('')
-    setEditingIntegration(null)
   }
 
   const handleCreateIntegration = async () => {
-    const trimmedIntegrationName = integrationName.trim()
-    let trimmedIntegrationUrl = integrationUrl.trim()
-
-    if (!trimmedIntegrationName || !trimmedIntegrationUrl) {
+    if (!validateForm()) {
       return
     }
 
-    if (trimmedIntegrationUrl.endsWith('/')) {
-      trimmedIntegrationUrl = trimmedIntegrationUrl.slice(0, -1)
-    }
-
-
-    // Validate token authentication requirements
-    if (authType === 'AUTH_TYPE_TOKEN' && (!selectedSecretId || !selectedSecretKey)) {
-      return
-    }
-
-    const integrationData: CreateIntegrationParams = {
-      name: trimmedIntegrationName,
-      type: selectedType as 'semaphore',
-      url: trimmedIntegrationUrl,
-      authType,
-      tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
-      tokenSecretKey: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretKey : undefined,
-    }
+    setIsCreating(true)
 
     try {
-      await createIntegrationMutation.mutateAsync(integrationData)
+      let secretName = integrationData.apiToken.secretName
+      let secretKey = integrationData.apiToken.secretKey
+
+      if (apiTokenTab === 'new') {
+        try {
+          const secretData = {
+            name: `${integrationData.name.trim()}-api-key`,
+            environmentVariables: [{
+              name: NEW_SECRET_NAME,
+              value: newSecretToken
+            }]
+          }
+
+          await createSecretMutation.mutateAsync(secretData)
+          secretName = secretData.name
+          secretKey = NEW_SECRET_NAME
+        } catch {
+          setErrors({ apiToken: 'Failed to create a secret, please try to create secret manually and import' })
+          return
+        }
+      }
+
+      let trimmedUrl = integrationData.orgUrl.trim()
+      if (trimmedUrl.endsWith('/')) {
+        trimmedUrl = trimmedUrl.slice(0, -1)
+      }
+
+      const integrationPayload = {
+        name: integrationData.name.trim(),
+        type: selectedType,
+        url: trimmedUrl,
+        authType: 'AUTH_TYPE_TOKEN' as const,
+        tokenSecretName: secretName,
+        tokenSecretKey: secretKey
+      }
+
+      await createIntegrationMutation.mutateAsync(integrationPayload)
       showSuccessToast('Integration created successfully')
       resetForm()
       setSection('list')
     } catch (error) {
       console.error('Failed to create integration:', error)
       showErrorToast('Failed to create integration. Please try again.')
+    } finally {
+      setIsCreating(false)
     }
   }
 
   const handleConfigureIntegration = (integration: IntegrationsIntegration) => {
     setEditingIntegration(integration)
     setSelectedType(integration.spec?.type || 'semaphore')
-    setIntegrationName(integration.metadata?.name || '')
-    setIntegrationUrl(integration.spec?.url || '')
-    setAuthType(integration.spec?.auth?.use || 'AUTH_TYPE_NONE' as 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE')
-    setSelectedSecretId(integration.spec?.auth?.token?.valueFrom?.secret?.name || '')
-    setSelectedSecretKey(integration.spec?.auth?.token?.valueFrom?.secret?.key || '')
+
+    setIntegrationData({
+      orgUrl: integration.spec?.url || '',
+      name: integration.metadata?.name || '',
+      apiToken: {
+        secretName: integration.spec?.auth?.token?.valueFrom?.secret?.name || '',
+        secretKey: integration.spec?.auth?.token?.valueFrom?.secret?.key || ''
+      }
+    })
+
+    setApiTokenTab('existing')
+    setNewSecretValue('')
+
     setSection('edit')
   }
 
   const handleUpdateIntegration = async () => {
-    if (!integrationName.trim() || !integrationUrl.trim() || !editingIntegration) {
+    if (!validateForm() || !editingIntegration) {
       return
     }
 
-    // Validate token authentication requirements
-    if (authType === 'AUTH_TYPE_TOKEN' && (!selectedSecretId || !selectedSecretKey)) {
-      return
-    }
-
-    const updateData: UpdateIntegrationParams = {
-      id: editingIntegration.metadata?.id as string,
-      name: integrationName.trim(),
-      type: selectedType,
-      url: integrationUrl.trim(),
-      authType,
-      tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
-      tokenSecretKey: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretKey : undefined,
-    }
+    setIsCreating(true)
 
     try {
-      await updateIntegrationMutation.mutateAsync(updateData)
-      showSuccessToast('Integration updated successfully')
+      // Check if only the secret value has changed
+      const currentUrl = editingIntegration.spec?.url || ''
+      const currentName = editingIntegration.metadata?.name || ''
+      let trimmedUrl = integrationData.orgUrl.trim()
+      if (trimmedUrl.endsWith('/')) {
+        trimmedUrl = trimmedUrl.slice(0, -1)
+      }
+
+      const isOnlySecretUpdate = newSecretValue.trim() &&
+        integrationData.apiToken.secretName &&
+        integrationData.apiToken.secretKey &&
+        currentUrl === trimmedUrl &&
+        currentName === integrationData.name.trim()
+
+      if (isOnlySecretUpdate) {
+        // Only update the secret
+        try {
+          await updateSecretMutation.mutateAsync({
+            name: integrationData.apiToken.secretName,
+            environmentVariables: [{
+              name: integrationData.apiToken.secretKey,
+              value: newSecretValue.trim()
+            }]
+          });
+          showSuccessToast('Secret updated successfully')
+        } catch (error) {
+          console.error('Failed to update secret:', error);
+          setErrors({ secretValue: 'Failed to update secret value' });
+          return;
+        }
+      } else {
+        // Update secret if provided
+        if (newSecretValue.trim() && integrationData.apiToken.secretName && integrationData.apiToken.secretKey) {
+          try {
+            await updateSecretMutation.mutateAsync({
+              name: integrationData.apiToken.secretName,
+              environmentVariables: [{
+                name: integrationData.apiToken.secretKey,
+                value: newSecretValue.trim()
+              }]
+            });
+          } catch (error) {
+            console.error('Failed to update secret:', error);
+            setErrors({ secretValue: 'Failed to update secret value' });
+            return;
+          }
+        }
+        const updateData: UpdateIntegrationParams = {
+          id: editingIntegration.metadata?.id as string,
+          name: integrationData.name.trim(),
+          type: selectedType,
+          url: trimmedUrl,
+          authType: 'AUTH_TYPE_TOKEN' as const,
+          tokenSecretName: integrationData.apiToken.secretName,
+          tokenSecretKey: integrationData.apiToken.secretKey,
+        }
+
+        await updateIntegrationMutation.mutateAsync(updateData)
+        showSuccessToast('Integration updated successfully')
+      }
+
       resetForm()
+      setEditingIntegration(null)
+      setNewSecretValue('')
       setSection('list')
     } catch (error) {
       console.error('Failed to update integration:', error)
@@ -164,13 +249,15 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
         ? (error as Error).message
         : 'Failed to update integration. Please try again.'
       showErrorToast(errorMessage)
+    } finally {
+      setIsCreating(false)
     }
   }
 
   const hasIntegrations = integrations && integrations.length > 0
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 h-full overflow-y-auto px-4 pb-8">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         {section === 'choose-type' && (
@@ -332,7 +419,10 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
             </div>
 
             <div className="flex gap-3 mt-6">
-              <Button onClick={() => setSection('list')}>
+              <Button onClick={() => {
+                resetForm()
+                setSection('list')
+              }}>
                 <MaterialSymbol name="arrow_back" size="sm" />
                 Back
               </Button>
@@ -355,118 +445,61 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
 
           <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 text-left">
             <div className="space-y-6">
-              {/* Integration Name */}
-              <div>
-                <label htmlFor="integration-name" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                  Integration Name
-                </label>
-                <Input
-                  id="integration-name"
-                  type="text"
-                  placeholder={`Enter a name for this ${INTEGRATION_TYPES[selectedType]?.label} integration`}
-                  value={integrationName}
-                  onChange={(e) => setIntegrationName(e.target.value)}
-                  className="w-full"
+              {/* Integration Type Specific Form */}
+              {selectedType === 'github' ? (
+                <GitHubIntegrationForm
+                  integrationData={integrationData}
+                  setIntegrationData={setIntegrationData}
+                  errors={errors}
+                  setErrors={setErrors}
+                  apiTokenTab={apiTokenTab}
+                  setApiTokenTab={setApiTokenTab}
+                  newSecretToken={newSecretToken}
+                  setNewSecretToken={setNewSecretToken}
+                  secrets={secrets}
+                  orgUrlRef={orgUrlRef}
                 />
-              </div>
-
-              {/* URL */}
-              <div>
-                <label htmlFor="integration-url" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                  URL
-                </label>
-                <Input
-                  id="integration-url"
-                  type="url"
-                  placeholder={
-                    selectedType === 'semaphore'
-                      ? 'https://api.semaphoreci.com'
-                      : ''
-                  }
-                  value={integrationUrl}
-                  onChange={(e) => setIntegrationUrl(e.target.value)}
-                  className="w-full"
+              ) : (
+                <SemaphoreIntegrationForm
+                  integrationData={integrationData}
+                  setIntegrationData={setIntegrationData}
+                  errors={errors}
+                  setErrors={setErrors}
+                  apiTokenTab={apiTokenTab}
+                  setApiTokenTab={setApiTokenTab}
+                  newSecretToken={newSecretToken}
+                  setNewSecretToken={setNewSecretToken}
+                  secrets={secrets}
+                  orgUrlRef={orgUrlRef}
                 />
-              </div>
-
-              {/* Authentication */}
-              <div>
-                <label htmlFor="auth-type" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                  Authentication
-                </label>
-                <select
-                  id="auth-type"
-                  value={authType}
-                  onChange={(e) => setAuthType(e.target.value as typeof authType)}
-                  className="mt-2 block w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="AUTH_TYPE_NONE">No Authentication</option>
-                  <option value="AUTH_TYPE_TOKEN">Token Authentication</option>
-                  <option value="AUTH_TYPE_OIDC">OIDC Authentication</option>
-                </select>
-              </div>
-
-              {/* Secret Selection (if token auth) */}
-              {authType === 'AUTH_TYPE_TOKEN' && (
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="secret-select" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                      Select Secret
-                    </label>
-                    <select
-                      id="secret-select"
-                      value={selectedSecretId}
-                      onChange={(e) => {
-                        setSelectedSecretId(e.target.value)
-                        setSelectedSecretKey('') // Reset key selection when secret changes
-                      }}
-                      className="mt-2 block w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Choose a secret...</option>
-                      {secrets.map((secret) => (
-                        <option key={secret.metadata?.id} value={secret.metadata?.name}>
-                          {secret.metadata?.name}
-                        </option>
-                      ))}
-                    </select>
-                    {secrets.length === 0 && (
-                      <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
-                        No secrets available. Create a secret first in the &nbsp;
-                        <span className="text-blue-600 hover:underline cursor-pointer" onClick={() => navigate(`/${organizationId}/canvas/${canvasId}#secrets`)}>secrets section</span>.
-                      </Text>
-                    )}
-                  </div>
-
-                  {/* Key Selection (if secret is selected) */}
-                  {selectedSecretId && selectedSecret && (
-                    <div>
-                      <label htmlFor="key-select" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                        Select Key
-                      </label>
-                      <select
-                        id="key-select"
-                        value={selectedSecretKey}
-                        onChange={(e) => setSelectedSecretKey(e.target.value)}
-                        className="mt-2 block w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">Choose a key...</option>
-                        {selectedSecret.spec?.local?.data && Object.keys(selectedSecret.spec.local.data).map((key) => (
-                          <option key={key} value={key}>
-                            {key}
-                          </option>
-                        ))}
-                      </select>
-                      <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
-                        Select which key from the secret to use as the authentication token.
-                      </Text>
-                    </div>
-                  )}
-                </div>
               )}
+
+              {/* API Token Form */}
+              <SettingsApiTokenForm
+                integrationData={integrationData}
+                setIntegrationData={setIntegrationData}
+                errors={errors}
+                setErrors={setErrors}
+                secrets={secrets}
+                organizationId={organizationId}
+                canvasId={canvasId}
+                isEditMode={section === 'edit'}
+                newSecretValue={newSecretValue}
+                setNewSecretValue={setNewSecretValue}
+              />
 
               {/* Action buttons */}
               <div className="flex gap-3">
-                <Button onClick={() => section === 'edit' ? setSection('list') : setSection('choose-type')}>
+                <Button onClick={() => {
+                  if (section === 'edit') {
+                    resetForm()
+                    setEditingIntegration(null)
+                    setSection('list')
+                  } else {
+                    resetForm()
+                    setSection('choose-type')
+                  }
+                }}>
                   <MaterialSymbol name="arrow_back" size="sm" />
                   Back
                 </Button>
@@ -474,13 +507,15 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
                   color="blue"
                   onClick={section === 'edit' ? handleUpdateIntegration : handleCreateIntegration}
                   disabled={
+                    isCreating ||
                     (section === 'edit' ? updateIntegrationMutation.isPending : createIntegrationMutation.isPending) ||
-                    !integrationName.trim() ||
-                    !integrationUrl.trim() ||
-                    (authType === 'AUTH_TYPE_TOKEN' && (!selectedSecretId || !selectedSecretKey))
+                    !integrationData.name.trim() ||
+                    !integrationData.orgUrl.trim() ||
+                    (apiTokenTab === 'existing' && (!integrationData.apiToken.secretName || !integrationData.apiToken.secretKey)) ||
+                    (apiTokenTab === 'new' && !newSecretToken.trim())
                   }
                 >
-                  {(section === 'edit' ? updateIntegrationMutation.isPending : createIntegrationMutation.isPending) ? (
+                  {(section === 'edit' ? updateIntegrationMutation.isPending : createIntegrationMutation.isPending) || isCreating ? (
                     <>
                       <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
                       {section === 'edit' ? 'Updating...' : 'Creating...'}

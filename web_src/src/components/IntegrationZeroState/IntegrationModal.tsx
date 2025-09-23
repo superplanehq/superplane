@@ -12,10 +12,7 @@ import { MaterialSymbol } from '../MaterialSymbol/material-symbol';
 import { Link } from '../Link/link';
 import { useIntegrations, useCreateIntegration } from '../../pages/canvas/hooks/useIntegrations';
 import { useSecrets, useCreateSecret } from '../../pages/canvas/hooks/useSecrets';
-import { GitHubIntegrationForm } from './GitHubIntegrationForm';
-import { SemaphoreIntegrationForm } from './SemaphoreIntegrationForm';
-import { ApiTokenForm } from './ApiTokenForm';
-import { NEW_SECRET_NAME, useIntegrationForm } from './useIntegrationForm';
+import { GitHubIntegrationForm, SemaphoreIntegrationForm, ApiTokenForm, NEW_SECRET_NAME, useIntegrationForm } from '../IntegrationForm';
 
 interface IntegrationModalProps {
   open: boolean;

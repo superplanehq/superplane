@@ -15,7 +15,7 @@ const Navigation: React.FC = () => {
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 border-b">
       <div className="flex items-center justify-between px-2 py-[8px]">
-        <Link href="/" className="flex items-center flex-shrink-0 text-decoration-none">
+        <Link href={`/${organizationId}`} className="flex items-center flex-shrink-0 text-decoration-none">
           <strong className="ml-2 text-xl text-gray-900 dark:text-white">SuperPlane</strong>
         </Link>
         <div className="flex items-center flex-shrink-0">
@@ -112,7 +112,7 @@ const Navigation: React.FC = () => {
                     </span>
                   </DropdownItem>
 
-                  <DropdownItem href="/select">
+                  <DropdownItem href="/">
                     <span className="flex items-center gap-x-2">
                       <MaterialSymbol name="swap_horiz" data-slot="icon" size='sm' />
                       <DropdownLabel>Change organization</DropdownLabel>
