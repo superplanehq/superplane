@@ -17,8 +17,6 @@ import (
 	"gorm.io/gorm"
 )
 
-var ErrResourceAlreadyUsed = fmt.Errorf("resource already used")
-
 type EventSourceBuilder struct {
 	tx                  *gorm.DB
 	ctx                 context.Context
@@ -259,10 +257,45 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 
 	//
 	// If the creation is for an external event source,
-	// and there's already an existing external one, fail the creation, to avoid a duplicate.
+	// and there's already an existing external one, create a new one instead of failing.
+	// This allows multiple event sources to listen to the same resource.
 	//
 	if eventSource.Scope == models.EventSourceScopeExternal {
-		return nil, "", ErrResourceAlreadyUsed
+		// Create a new event source for the same resource
+		id := uuid.New()
+		plainKey, encryptedKey, err := crypto.NewRandomKey(b.ctx, b.encryptor, id.String())
+		if err != nil {
+			return nil, "", err
+		}
+
+		source := &models.EventSource{
+			ID:          id,
+			CanvasID:    b.canvasID,
+			Name:        b.name,
+			Description: b.description,
+			Key:         encryptedKey,
+			Scope:       b.scope,
+			EventTypes:  datatypes.NewJSONSlice(b.eventTypes),
+			ResourceID:  eventSource.ResourceID,
+		}
+
+		// Set schedule if provided
+		if b.schedule != nil {
+			nextTrigger, err := b.schedule.CalculateNextTrigger(time.Now())
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to calculate next trigger: %v", err)
+			}
+			schedule := datatypes.NewJSONType(*b.schedule)
+			source.Schedule = &schedule
+			source.NextTriggerAt = nextTrigger
+		}
+
+		err = source.CreateInTransaction(tx)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return source, plainKey, nil
 	}
 
 	//
@@ -387,9 +420,8 @@ func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSou
 
 	existingSource, err := resource.FindEventSourceInTransaction(tx)
 	if err == nil && existingSource.ID != b.existingEventSource.ID {
-		if existingSource.Scope == models.EventSourceScopeExternal {
-			return nil, "", ErrResourceAlreadyUsed
-		}
+		// Allow multiple event sources for the same resource - no need to fail
+		// This enables multiple external event sources listening to the same resource
 	}
 
 	plainKey, err := b.encryptor.Decrypt(b.ctx, b.existingEventSource.Key, []byte(b.existingEventSource.ID.String()))

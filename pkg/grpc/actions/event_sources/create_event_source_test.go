@@ -215,11 +215,14 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
-	t.Run("event source for the same integration resource -> error", func(t *testing.T) {
-		name := support.RandomName("source")
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+	t.Run("event source for the same integration resource -> creates new event source", func(t *testing.T) {
+		name1 := support.RandomName("source1")
+		name2 := support.RandomName("source2")
+		
+		// Create first event source for the resource
+		response1, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
-				Name: name,
+				Name: name1,
 			},
 			Spec: &protos.EventSource_Spec{
 				Integration: &integrationPb.IntegrationRef{
@@ -227,14 +230,37 @@ func Test__CreateEventSource(t *testing.T) {
 				},
 				Resource: &integrationPb.ResourceRef{
 					Type: "project",
-					Name: "demo-project",
+					Name: "demo-project-multi",
 				},
 			},
 		})
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "event source for project demo-project already exists", s.Message())
+		require.NoError(t, err)
+		require.NotNil(t, response1)
+		
+		// Create second event source for the same resource - should succeed
+		response2, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name2,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: r.Integration.Name,
+				},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project-multi",
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response2)
+		require.NotNil(t, response2.EventSource)
+		
+		// Both event sources should have different IDs but same resource
+		assert.NotEqual(t, response1.EventSource.Metadata.Id, response2.EventSource.Metadata.Id)
+		assert.Equal(t, response1.EventSource.Spec.Resource.Name, response2.EventSource.Spec.Resource.Name)
+		assert.Equal(t, name1, response1.EventSource.Metadata.Name)
+		assert.Equal(t, name2, response2.EventSource.Metadata.Name)
 	})
 
 	t.Run("event source when internal one exists for the same integration resource -> becomes external", func(t *testing.T) {

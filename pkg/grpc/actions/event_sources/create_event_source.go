@@ -88,10 +88,6 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
-		if errors.Is(err, builders.ErrResourceAlreadyUsed) {
-			return nil, status.Errorf(codes.InvalidArgument, "event source for %s %s already exists", resource.Type(), resource.Name())
-		}
-
 		log.Errorf("Error creating event source in canvas %s. Event source: %v. Error: %v", canvasID, newSource, err)
 		return nil, err
 	}
