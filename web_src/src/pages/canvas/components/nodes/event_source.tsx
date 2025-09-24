@@ -9,7 +9,7 @@ import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { EditModeActionButtons } from '../EditModeActionButtons';
+import { NodeActionButtons } from '@/components/NodeActionButtons';
 import { useParams } from 'react-router-dom';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
@@ -21,6 +21,7 @@ import { EventSourceZeroState } from '../../../../components/EventSourceZeroStat
 import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
+import { convertUTCToLocalTime, formatTimestampInUserTimezone, getUserTimezoneDisplay } from '@/utils/timezone';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="webhook" size="xl" />,
@@ -41,6 +42,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const currentEventSource = useCanvasStore(state =>
     state.eventSources.find(es => es.metadata?.id === props.id)
   );
+  const eventSourceId = currentEventSource?.metadata?.id;
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -184,15 +186,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
         });
       } else {
-        await updateEventSourceMutation.mutateAsync({
+        const updateResult = await updateEventSourceMutation.mutateAsync({
           eventSourceId: currentEventSource.metadata?.id || '',
           name: eventSourceName,
           description: eventSourceDescription,
           spec: currentFormData.spec
         });
 
+        // Update with the complete response including status
         updateEventSource({
           ...currentEventSource,
+          ...updateResult.data?.eventSource,
           metadata: {
             ...currentEventSource.metadata,
             name: eventSourceName,
@@ -366,26 +370,22 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return 'border-gray-200 dark:border-gray-700';
   };
 
-  const handleNodeClick = () => {
-    if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {
-      selectEventSourceId(currentEventSource.metadata.id);
-    }
-  };
 
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
       style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
-      onClick={handleNodeClick}
     >
       {(focusedNodeId === props.id || isEditMode) && (
-        <EditModeActionButtons
+        <NodeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveEventSource}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
           onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
+          onSend={eventSourceId ? () => setShowEmitEventModal(true) : undefined}
+          onSelect={eventSourceId && !props.id.match(/^\d+$/) ? () => selectEventSourceId(eventSourceId) : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
@@ -404,6 +404,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onYamlApply={handleYamlApply}
         />
       )}
+
 
       {/* Header Section */}
       <div className="px-4 py-4 justify-between items-start">
@@ -443,18 +444,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             </div>
           </div>
         </div>
-        {!isEditMode && currentEventSource?.metadata?.id && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowEmitEventModal(true);
-            }}
-            className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-            title="Manually emit an event"
-          >
-            <MaterialSymbol name="send" size="sm" />
-          </button>
-        )}
         </div>
         {!isEditMode && (
           <>
@@ -465,16 +454,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 {/* Schedule Type and Configuration */}
                 <div className="flex items-center gap-2 text-xs">
                   <MaterialSymbol name="event_repeat" size="sm" className="text-purple-600 dark:text-purple-400" />
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                  <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
                     {currentEventSource.spec.schedule.type === 'TYPE_HOURLY' &&
                       `Hourly, ${currentEventSource.spec.schedule.hourly?.minute || 0} minutes past the hour`
                     }
                     {currentEventSource.spec.schedule.type === 'TYPE_DAILY' &&
-                      `Daily at ${currentEventSource.spec.schedule.daily?.time || '00:00'} UTC`
+                      `Daily at ${convertUTCToLocalTime(currentEventSource.spec.schedule.daily?.time || '00:00')}, ${getUserTimezoneDisplay()}`
                     }
-                    {currentEventSource.spec.schedule.type === 'TYPE_WEEKLY' &&
-                      `Weekly on ${currentEventSource.spec.schedule.weekly?.weekDay?.replace('WEEK_DAY_', '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday'} at ${currentEventSource.spec.schedule.weekly?.time || '00:00'} UTC`
-                    }
+                    {currentEventSource.spec.schedule.type === 'TYPE_WEEKLY' && (
+                      <div className="leading-tight">
+                        <div>Weekly on {currentEventSource.spec.schedule.weekly?.weekDay?.replace('WEEK_DAY_', '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday'}</div>
+                        <div>{convertUTCToLocalTime(currentEventSource.spec.schedule.weekly?.time || '00:00')}, {getUserTimezoneDisplay()}</div>
+                      </div>
+                    )}
                   </span>
                 </div>
 
@@ -486,9 +478,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                       <span className="text-gray-500 dark:text-gray-400">Last:</span>
                       <span className="text-gray-700 dark:text-gray-300">
                         {currentEventSource.status.schedule.lastTrigger
-                          ? new Date(currentEventSource.status.schedule.lastTrigger).toLocaleDateString('en-US', {
-                            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
-                          }) + ' UTC'
+                          ? formatTimestampInUserTimezone(currentEventSource.status.schedule.lastTrigger)
                           : '-'
                         }
                       </span>
@@ -498,9 +488,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                         <MaterialSymbol name="schedule" size="sm" className="text-blue-600 dark:text-blue-400" />
                         <span className="text-gray-500 dark:text-gray-400">Next:</span>
                         <span className="text-gray-700 dark:text-gray-300">
-                          {new Date(currentEventSource.status.schedule.nextTrigger).toLocaleDateString('en-US', {
-                            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC'
-                          })} UTC
+                          {formatTimestampInUserTimezone(currentEventSource.status.schedule.nextTrigger)}
                         </span>
                       </div>
                     )}
