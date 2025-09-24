@@ -9,7 +9,7 @@ import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { EditModeActionButtons } from '../EditModeActionButtons';
+import { NodeActionButtons } from '@/components/NodeActionButtons';
 import { useParams } from 'react-router-dom';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
@@ -42,6 +42,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const currentEventSource = useCanvasStore(state =>
     state.eventSources.find(es => es.metadata?.id === props.id)
   );
+  const eventSourceId = currentEventSource?.metadata?.id;
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -369,26 +370,22 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return 'border-gray-200 dark:border-gray-700';
   };
 
-  const handleNodeClick = () => {
-    if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {
-      selectEventSourceId(currentEventSource.metadata.id);
-    }
-  };
 
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
       style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
-      onClick={handleNodeClick}
     >
       {(focusedNodeId === props.id || isEditMode) && (
-        <EditModeActionButtons
+        <NodeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveEventSource}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
           onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
+          onSend={eventSourceId ? () => setShowEmitEventModal(true) : undefined}
+          onSelect={eventSourceId && !props.id.match(/^\d+$/) ? () => selectEventSourceId(eventSourceId) : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
@@ -407,6 +404,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onYamlApply={handleYamlApply}
         />
       )}
+
 
       {/* Header Section */}
       <div className="px-4 py-4 justify-between items-start">
@@ -446,18 +444,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             </div>
           </div>
         </div>
-        {!isEditMode && currentEventSource?.metadata?.id && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowEmitEventModal(true);
-            }}
-            className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-            title="Manually emit an event"
-          >
-            <MaterialSymbol name="send" size="sm" />
-          </button>
-        )}
         </div>
         {!isEditMode && (
           <>
