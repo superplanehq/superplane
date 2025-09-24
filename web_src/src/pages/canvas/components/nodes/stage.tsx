@@ -12,7 +12,7 @@ import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { Badge } from '@/components/Badge/badge';
-import { EditModeActionButtons } from '../EditModeActionButtons';
+import { NodeActionButtons } from '@/components/NodeActionButtons';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 
@@ -562,7 +562,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       >
 
         {(focusedNodeId === props.id || isEditMode) && (
-          <EditModeActionButtons
+          <NodeActionButtons
             isNewNode={!!isNewNode}
             onSave={handleSaveStage}
             onCancel={handleCancelEdit}
@@ -570,6 +570,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             onEdit={() => handleEditClick({} as React.MouseEvent<HTMLButtonElement>)}
             onDuplicate={!isNewNode ? handleDuplicateStage : undefined}
             onSend={currentStage?.metadata?.id ? () => setShowEmitEventModal(true) : undefined}
+            onSelect={currentStage?.metadata?.id ? () => selectStageId(props.id) : undefined}
             isEditMode={isEditMode}
             entityType="stage"
             entityData={currentFormData ? {
@@ -605,19 +606,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           />
         )}
 
-        {/* Sidebar Control Button */}
-        {!isEditMode && currentStage?.metadata?.id && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              selectStageId(props.id);
-            }}
-            className="absolute top-4 right-4 z-10 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none"
-            title="Open sidebar"
-          >
-            <MaterialSymbol name="info" size="md" />
-          </button>
-        )}
 
         {/* Header Section */}
         <div className={twMerge('px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>

@@ -9,7 +9,7 @@ import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { EditModeActionButtons } from '../EditModeActionButtons';
+import { NodeActionButtons } from '@/components/NodeActionButtons';
 import { useParams } from 'react-router-dom';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
@@ -373,7 +373,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {(focusedNodeId === props.id || isEditMode) && (
-        <EditModeActionButtons
+        <NodeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveEventSource}
           onCancel={handleCancelEdit}
@@ -381,6 +381,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onEdit={handleEditClick}
           onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
           onSend={currentEventSource?.metadata?.id ? () => setShowEmitEventModal(true) : undefined}
+          onSelect={currentEventSource?.metadata?.id && !props.id.match(/^\d+$/) ? () => selectEventSourceId(currentEventSource.metadata.id) : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
@@ -400,21 +401,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         />
       )}
 
-      {/* Sidebar Control Button */}
-      {!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/) && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (currentEventSource.metadata?.id) {
-              selectEventSourceId(currentEventSource.metadata.id);
-            }
-          }}
-          className="absolute top-4 right-4 z-10 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none"
-          title="Open sidebar"
-        >
-          <MaterialSymbol name="info" size="md" />
-        </button>
-      )}
 
       {/* Header Section */}
       <div className="px-4 py-4 justify-between items-start">
