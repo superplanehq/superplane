@@ -620,6 +620,22 @@
             "required": false,
             "type": "string",
             "format": "date-time"
+          },
+          {
+            "name": "states",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STATE_UNKNOWN",
+                "STATE_PENDING",
+                "STATE_REJECTED",
+                "STATE_PROCESSED"
+              ]
+            },
+            "collectionFormat": "multi"
           }
         ],
         "tags": [

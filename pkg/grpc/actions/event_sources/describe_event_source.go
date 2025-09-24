@@ -25,7 +25,7 @@ func DescribeEventSource(ctx context.Context, canvasID string, idOrName string) 
 		return nil, err
 	}
 
-	lastEvents, err := models.GetEventSourcesLastEvents([]models.EventSource{*source})
+	lastEvents, err := models.LastProcessedEventForSources([]models.EventSource{*source})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get event source last events: %w", err)
 	}

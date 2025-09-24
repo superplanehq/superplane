@@ -35,9 +35,9 @@ func serializeEventSources(eventSources []models.EventSource) ([]*pb.EventSource
 		return []*pb.EventSource{}, nil
 	}
 
-	lastEvents, err := models.GetEventSourcesLastEvents(eventSources)
+	lastEvents, err := models.LastProcessedEventForSources(eventSources)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get event source last events: %w", err)
+		return nil, fmt.Errorf("failed to get last processed event for sources: %w", err)
 	}
 
 	sources := []*pb.EventSource{}

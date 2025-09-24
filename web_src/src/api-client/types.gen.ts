@@ -1393,6 +1393,7 @@ export type SuperplaneListEventsData = {
         sourceId?: string;
         limit?: number;
         before?: string;
+        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_REJECTED' | 'STATE_PROCESSED'>;
     };
     url: '/api/v1/canvases/{canvasIdOrName}/events';
 };

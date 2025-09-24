@@ -1055,6 +1055,7 @@ message ListEventsRequest {
   string source_id = 3;
   uint32 limit = 4;
   google.protobuf.Timestamp before = 5;
+  repeated Event.State states = 6;
 }
 
 message ListEventsResponse {

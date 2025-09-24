@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { SuperplaneEventSource, SuperplaneEvent } from "@/api-client";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { SuperplaneEventSource, SuperplaneEvent, SuperplaneEventState } from "@/api-client";
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { SidebarHeader } from "./SidebarHeader";
 import { ResizeHandle } from "./ResizeHandle";
@@ -12,15 +12,16 @@ import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { SidebarTabs } from './SidebarTabs';
+import { ControlledTabs } from '@/components/Tabs/tabs';
 
 const EventSourceImageMap = {
-  'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
+  'webhook': <MaterialSymbol className='-mt-1 -mb-1 text-gray-600 dark:text-gray-300' name="webhook" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
   'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
-  'scheduled': <MaterialSymbol className='-mt-1 -mb-1' name="schedule" size="xl" />
+  'scheduled': <MaterialSymbol className='-mt-1 -mb-1 text-gray-600 dark:text-gray-300' name="schedule" size="xl" />
 }
 
-type TabType = 'history' | 'settings';
+type TabType = 'history';
 
 interface EventSourceSidebarProps {
   selectedEventSource: SuperplaneEventSource & {
@@ -34,6 +35,7 @@ interface EventSourceSidebarProps {
 export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth = DEFAULT_SIDEBAR_WIDTH }: EventSourceSidebarProps) => {
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(initialWidth);
   const [activeTab, setActiveTab] = useState<TabType>('history');
+  const [activeEventFilter, setActiveEventFilter] = useState<SuperplaneEventState>('STATE_PROCESSED');
   const canvasId = useCanvasStore(state => state.canvasId) || '';
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
@@ -45,7 +47,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
     isFetchingNextPage,
     isLoading: eventsLoading,
     refetch: refetchEvents
-  } = useEvents(canvasId, 'EVENT_SOURCE_TYPE_EVENT_SOURCE', selectedEventSource.metadata?.id || '');
+  } = useEvents(canvasId, 'EVENT_SOURCE_TYPE_EVENT_SOURCE', selectedEventSource.metadata?.id || '', [activeEventFilter]);
 
   // Flatten all pages into a single array
   const allEvents = useMemo(() => {
@@ -56,6 +58,18 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
   const totalCount = useMemo(() => {
     return eventsData?.pages[0]?.totalCount || 0;
   }, [eventsData]);
+
+  // Handle load more functionality
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Refetch when filter changes
+  useEffect(() => {
+    refetchEvents();
+  }, [activeEventFilter, refetchEvents]);
 
   useEffect(() => {
     if ((selectedEventSource?.events?.length || 0) > 0 && allEvents.length > 0) {
@@ -114,7 +128,6 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
       <SidebarTabs
         tabs={[
           { key: 'history', label: 'History' },
-          { key: 'settings', label: 'Settings' }
         ]}
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab as TabType)}
@@ -122,18 +135,32 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'history' && (
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100 uppercase tracking-wide">
-                Event History ({totalCount})
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bold text-left text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Events ({totalCount})
               </h3>
+              <div className="flex-shrink-0">
+                <ControlledTabs
+                  tabs={[
+                    { id: 'STATE_PROCESSED', label: 'Processed' },
+                    { id: 'STATE_REJECTED', label: 'Rejected' }
+                  ]}
+                  activeTab={activeEventFilter}
+                  onTabChange={(filter) => setActiveEventFilter(filter as SuperplaneEventState)}
+                  variant="pills"
+                  buttonClasses="text-xs"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
               {eventsLoading && allEvents.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="text-sm text-gray-500 mt-2">Loading events...</p>
+                  <div className="inline-flex items-center justify-center w-16 h-16 mb-3">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+                  </div>
+                  <p className="text-zinc-600 dark:text-zinc-400 text-sm">Loading events...</p>
                 </div>
               ) : allEvents.length > 0 ? (
                 allEvents.map((event: SuperplaneEvent) => (
@@ -153,95 +180,30 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
               ) : (
                 <div className="text-center py-8 bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
                   <span className="material-symbols-outlined select-none inline-flex items-center justify-center !w-16 !h-16 !text-[64px] !leading-16 mx-auto text-zinc-400 dark:text-zinc-500 mb-3 " aria-hidden="true" style={{ fontVariationSettings: "FILL 0, wght 400, GRAD 0, opsz 24" }}>inbox</span>
-                  <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">No events received</p>
+                  <p data-slot="text" className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-sm text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
+                    {activeEventFilter === 'STATE_PROCESSED' ? 'No processed events' : 'No rejected events'}
+                  </p>
                 </div>
               )}
             </div>
 
             {hasNextPage && (
-              <div className="mt-4 text-center">
-                <button
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed"
-                >
-                  {isFetchingNextPage ? 'Loading...' : 'Load more events'}
-                </button>
+              <div className="flex justify-center pt-4">
+                {isFetchingNextPage ? (
+                  <div className="inline-flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent mr-2"></div>
+                    <span className="text-zinc-600 dark:text-zinc-400 text-sm">Loading more...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleLoadMore}
+                    className="text-blue-600 text-sm hover:text-blue-700 underline transition-colors duration-200"
+                  >
+                    Load More
+                  </button>
+                )}
               </div>
             )}
-          </div>
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="p-4 text-left">
-            <div className="space-y-6">
-              <div className="space-y-4">
-                {/* Schedule Configuration */}
-                {selectedEventSource.spec?.schedule && (
-                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
-                    <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
-                      Schedule Configuration
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Schedule Type</div>
-                        <div className="text-sm text-gray-900 dark:text-zinc-200">
-                          {selectedEventSource.spec.schedule.type === 'TYPE_DAILY' ? 'Daily' : 'Weekly'}
-                        </div>
-                      </div>
-                      {selectedEventSource.spec.schedule.type === 'TYPE_WEEKLY' && selectedEventSource.spec.schedule.weekly && (
-                        <div>
-                          <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Day of Week</div>
-                          <div className="text-sm text-gray-900 dark:text-zinc-200">
-                            {selectedEventSource.spec.schedule.weekly.weekDay?.replace('WEEK_DAY_', '').replace('_', ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday'}
-                          </div>
-                        </div>
-                      )}
-                      <div>
-                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Time (UTC)</div>
-                        <div className="text-sm text-gray-900 dark:text-zinc-200">
-                          {selectedEventSource.spec.schedule.type === 'TYPE_DAILY'
-                            ? selectedEventSource.spec.schedule.daily?.time || '09:00'
-                            : selectedEventSource.spec.schedule.weekly?.time || '09:00'
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Integration Configuration */}
-                {eventSourceType !== 'webhook' && eventSourceType !== 'scheduled' ? (
-                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
-                    <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
-                      {eventSourceType.charAt(0).toUpperCase() + eventSourceType.slice(1)} Configuration
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Integration</div>
-                        <div className="text-sm text-gray-900 dark:text-zinc-200">{selectedEventSource.spec?.integration?.name || `${eventSourceType.charAt(0).toUpperCase() + eventSourceType.slice(1)} Integration`}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Project</div>
-                        <div className="text-sm text-gray-900 dark:text-zinc-200">{selectedEventSource.metadata?.name || 'Unknown Project'}</div>
-                      </div>
-                    </div>
-                  </div>
-                ) : eventSourceType === 'webhook' ? (
-                  <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
-                    <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide mb-3">
-                      Integration Configuration
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1">Integration</div>
-                        <div className="text-sm text-gray-900 dark:text-zinc-200">Direct Webhook</div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
           </div>
         )}
       </div>

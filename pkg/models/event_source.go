@@ -479,8 +479,7 @@ func ListPendingEventSources() ([]EventSource, error) {
 	return eventSources, nil
 }
 
-
-func GetEventSourcesLastEvents(eventSources []EventSource) (map[uuid.UUID]*Event, error) {
+func LastProcessedEventForSources(eventSources []EventSource) (map[uuid.UUID]*Event, error) {
 	if len(eventSources) == 0 {
 		return make(map[uuid.UUID]*Event), nil
 	}
@@ -490,10 +489,10 @@ func GetEventSourcesLastEvents(eventSources []EventSource) (map[uuid.UUID]*Event
 		eventSourceIDs[i] = source.ID
 	}
 
-	return getLastEventsForEventSources(eventSourceIDs)
+	return getLastProcessedEventForSources(eventSourceIDs)
 }
 
-func getLastEventsForEventSources(eventSourceIDs []uuid.UUID) (map[uuid.UUID]*Event, error) {
+func getLastProcessedEventForSources(eventSourceIDs []uuid.UUID) (map[uuid.UUID]*Event, error) {
 	events := make(map[uuid.UUID]*Event)
 
 	var results []Event
@@ -504,10 +503,10 @@ func getLastEventsForEventSources(eventSourceIDs []uuid.UUID) (map[uuid.UUID]*Ev
 			WHERE id IN (
 				SELECT DISTINCT ON (source_id) id
 				FROM events
-				WHERE source_id IN ? AND source_type = ?
+				WHERE source_id IN ? AND source_type = ? AND state = ?
 				ORDER BY source_id, received_at DESC
 			)
-		`, eventSourceIDs, SourceTypeEventSource).
+		`, eventSourceIDs, SourceTypeEventSource, EventStateProcessed).
 		Find(&results).Error
 
 	if err != nil {
