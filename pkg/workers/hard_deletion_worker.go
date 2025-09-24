@@ -93,7 +93,7 @@ func (w *HardDeletionWorker) processStages() error {
 // hardDeleteStage handles hard deletion of soft-deleted stages following hierarchical dependency chain:
 // 1. Delete stage executions and their execution resources FIRST
 // (executions have foreign key to stage_events, so must be deleted first)
-// 2. Now delete stage events and their associated events
+// 2. Now delete stage events
 // 3. Delete connections where this stage is the target
 // 4. Clean up integration webhooks if stage has a resource
 // 5. Finally, hard delete the stage itself
@@ -156,27 +156,12 @@ func (w *HardDeletionWorker) processEventSources() error {
 }
 
 // hardDeleteEventSource handles hard deletion of soft-deleted event sources:
-// 1. Delete stage executions that reference stage events from this event source FIRST
-// 2. Delete stage events and their associated events that originated from this event source
-// 3. Delete connections where this event source is the source
-// 4. Delete events directly created by this event source
-// 5. Clean up integration webhooks if event source has a resource
-// 6. Finally, hard delete the event source itself
+// 1. Delete connections where this event source is the source
+// 2. Clean up integration webhooks if event source has a resource
+// 3. Finally, hard delete the event source itself
 func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSource *models.EventSource) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := models.DeleteStageExecutionsBySourceInTransaction(tx, eventSource.ID, models.SourceTypeEventSource); err != nil {
-			return err
-		}
-
-		if err := eventSource.DeleteStageEventsInTransaction(tx); err != nil {
-			return err
-		}
-
 		if err := eventSource.DeleteConnectionsInTransaction(tx); err != nil {
-			return err
-		}
-
-		if err := eventSource.DeleteEventsInTransaction(tx); err != nil {
 			return err
 		}
 
@@ -252,10 +237,9 @@ func (w *HardDeletionWorker) processConnectionGroups() error {
 }
 
 // hardDeleteConnectionGroup handles hard deletion of soft-deleted connection groups:
-// 1. Delete connection group field sets and their events
+// 1. Delete connection group field sets (but preserve their events)
 // 2. Delete connections where this connection group is the source or target
-// 3. Delete events created by this connection group
-// 4. Finally, hard delete the connection group itself
+// 3. Finally, hard delete the connection group itself
 func (w *HardDeletionWorker) hardDeleteConnectionGroup(logger *log.Entry, connectionGroup *models.ConnectionGroup) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := connectionGroup.DeleteFieldSetsInTransaction(tx); err != nil {
@@ -263,10 +247,6 @@ func (w *HardDeletionWorker) hardDeleteConnectionGroup(logger *log.Entry, connec
 		}
 
 		if err := connectionGroup.DeleteConnectionsInTransaction(tx); err != nil {
-			return err
-		}
-
-		if err := connectionGroup.DeleteEventsInTransaction(tx); err != nil {
 			return err
 		}
 
