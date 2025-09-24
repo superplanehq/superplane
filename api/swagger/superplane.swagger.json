@@ -620,6 +620,22 @@
             "required": false,
             "type": "string",
             "format": "date-time"
+          },
+          {
+            "name": "states",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STATE_UNKNOWN",
+                "STATE_PENDING",
+                "STATE_REJECTED",
+                "STATE_PROCESSED"
+              ]
+            },
+            "collectionFormat": "multi"
           }
         ],
         "tags": [
@@ -3678,22 +3694,6 @@
       ],
       "default": "TIMEOUT_BEHAVIOR_NONE"
     },
-    "StatusHistory": {
-      "type": "object",
-      "properties": {
-        "received": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "recentItems": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneEvent"
-          }
-        }
-      }
-    },
     "StatusQueue": {
       "type": "object",
       "properties": {
@@ -4296,8 +4296,8 @@
     "SuperplaneEventSourceStatus": {
       "type": "object",
       "properties": {
-        "history": {
-          "$ref": "#/definitions/StatusHistory"
+        "lastEvent": {
+          "$ref": "#/definitions/SuperplaneEvent"
         },
         "schedule": {
           "$ref": "#/definitions/EventSourceStatusSchedule"

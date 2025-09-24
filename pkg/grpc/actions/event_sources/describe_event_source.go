@@ -25,17 +25,17 @@ func DescribeEventSource(ctx context.Context, canvasID string, idOrName string) 
 		return nil, err
 	}
 
-	statusInfo, err := models.GetEventSourcesStatusInfo([]models.EventSource{*source})
+	lastEvents, err := models.LastProcessedEventForSources([]models.EventSource{*source})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get event source status info: %w", err)
+		return nil, fmt.Errorf("failed to get event source last events: %w", err)
 	}
 
-	var sourceStatus *models.EventSourceStatusInfo
-	if info, exists := statusInfo[source.ID]; exists {
-		sourceStatus = info
+	var lastEvent *models.Event
+	if event, exists := lastEvents[source.ID]; exists {
+		lastEvent = event
 	}
 
-	protoSource, err := serializeEventSource(*source, sourceStatus)
+	protoSource, err := serializeEventSource(*source, lastEvent)
 	if err != nil {
 		return nil, err
 	}

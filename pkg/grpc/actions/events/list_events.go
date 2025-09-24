@@ -21,7 +21,7 @@ const (
 	DefaultLimit = 50
 )
 
-func ListEvents(ctx context.Context, canvasID string, protoSourceType pb.EventSourceType, sourceID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
+func ListEvents(ctx context.Context, canvasID string, protoSourceType pb.EventSourceType, sourceID string, limit uint32, before *timestamppb.Timestamp, protoStates []pb.Event_State) (*pb.ListEventsResponse, error) {
 	sourceType := actions.ProtoToEventSourceType(protoSourceType)
 	if sourceType == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid source type")
@@ -32,6 +32,7 @@ func ListEvents(ctx context.Context, canvasID string, protoSourceType pb.EventSo
 		return nil, status.Error(codes.InvalidArgument, "invalid source ID")
 	}
 
+	states := getStates(protoStates)
 	limit = getLimit(limit)
 	result := listAndCountEventsInParallel(
 		uuid.MustParse(canvasID),
@@ -39,6 +40,7 @@ func ListEvents(ctx context.Context, canvasID string, protoSourceType pb.EventSo
 		id,
 		int(limit),
 		getBefore(before),
+		states,
 	)
 
 	if result.listErr != nil {
@@ -84,7 +86,7 @@ func (r *listAndCountEventsResult) lastTimestamp() *timestamppb.Timestamp {
 	return nil
 }
 
-func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType string, sourceID uuid.UUID, limit int, beforeTime *time.Time) *listAndCountEventsResult {
+func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType string, sourceID uuid.UUID, limit int, beforeTime *time.Time, states []string) *listAndCountEventsResult {
 	result := &listAndCountEventsResult{}
 	var wg sync.WaitGroup
 
@@ -92,16 +94,50 @@ func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType string, sourceI
 
 	go func() {
 		defer wg.Done()
-		result.events, result.listErr = models.FilterEvents(canvasID, sourceType, sourceID.String(), limit, beforeTime)
+		result.events, result.listErr = models.FilterEvents(canvasID, sourceType, sourceID.String(), limit, beforeTime, states)
 	}()
 
 	go func() {
 		defer wg.Done()
-		result.totalCount, result.countErr = models.CountEvents(canvasID, sourceType, sourceID.String())
+		result.totalCount, result.countErr = models.CountEvents(canvasID, sourceType, sourceID.String(), states)
 	}()
 
 	wg.Wait()
 	return result
+}
+
+func protoToEventState(state pb.Event_State) string {
+	switch state {
+	case pb.Event_STATE_PENDING:
+		return models.EventStatePending
+	case pb.Event_STATE_REJECTED:
+		return models.EventStateRejected
+	case pb.Event_STATE_PROCESSED:
+		return models.EventStateProcessed
+	default:
+		return ""
+	}
+}
+
+func getStates(protoStates []pb.Event_State) []string {
+	var states []string
+	for _, protoState := range protoStates {
+		state := protoToEventState(protoState)
+		if state != "" {
+			states = append(states, state)
+		}
+	}
+
+	// If no states specified, default to processed and rejected
+	if len(states) == 0 {
+		states = []string{
+			protoToEventState(pb.Event_STATE_PENDING),
+			protoToEventState(pb.Event_STATE_PROCESSED),
+			protoToEventState(pb.Event_STATE_REJECTED),
+		}
+	}
+
+	return states
 }
 
 func getLimit(limit uint32) uint32 {
