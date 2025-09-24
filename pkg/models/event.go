@@ -327,7 +327,7 @@ func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr str
 	return events, nil
 }
 
-func FilterEvents(canvasID uuid.UUID, sourceType string, sourceID string, limit int, before *time.Time) ([]Event, error) {
+func FilterEvents(canvasID uuid.UUID, sourceType string, sourceID string, limit int, before *time.Time, states []string) ([]Event, error) {
 	var events []Event
 
 	query := database.Conn().
@@ -345,6 +345,10 @@ func FilterEvents(canvasID uuid.UUID, sourceType string, sourceID string, limit 
 		query = query.Where("received_at < ?", before)
 	}
 
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
 	query = query.Order("received_at DESC").Limit(limit)
 	err := query.Find(&events).Error
 	if err != nil {
@@ -354,12 +358,16 @@ func FilterEvents(canvasID uuid.UUID, sourceType string, sourceID string, limit 
 	return events, nil
 }
 
-func CountEvents(canvasID uuid.UUID, sourceType string, sourceID string) (int64, error) {
+func CountEvents(canvasID uuid.UUID, sourceType string, sourceID string, states []string) (int64, error) {
 	query := database.Conn().
 		Model(&Event{}).
 		Where("canvas_id = ?", canvasID).
 		Where("source_type = ?", sourceType).
 		Where("source_id = ?", sourceID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
 
 	var count int64
 	err := query.Count(&count).Error

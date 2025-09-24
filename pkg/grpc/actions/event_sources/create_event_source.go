@@ -198,7 +198,7 @@ func validateSchedule(spec *pb.EventSource_Spec, integration *models.Integration
 	return schedule, nil
 }
 
-func serializeEventSource(eventSource models.EventSource, statusInfo *models.EventSourceStatusInfo) (*pb.EventSource, error) {
+func serializeEventSource(eventSource models.EventSource, lastEvent *models.Event) (*pb.EventSource, error) {
 	spec := &pb.EventSource_Spec{
 		Events: []*pb.EventSource_EventType{},
 	}
@@ -291,20 +291,13 @@ func serializeEventSource(eventSource models.EventSource, statusInfo *models.Eve
 		Status: &pb.EventSource_Status{},
 	}
 
-	// Add history information only if statusInfo is provided
-	if statusInfo != nil {
-		pbEventSource.Status.History = &pb.EventSource_Status_History{
-			Received:    uint32(statusInfo.ReceivedCount),
-			RecentItems: []*pb.Event{},
+	// Add last event information if provided
+	if lastEvent != nil {
+		pbEvent, err := actions.SerializeEvent(*lastEvent)
+		if err != nil {
+			return nil, err
 		}
-
-		for _, event := range statusInfo.RecentEvents {
-			pbEvent, err := actions.SerializeEvent(event)
-			if err != nil {
-				return nil, err
-			}
-			pbEventSource.Status.History.RecentItems = append(pbEventSource.Status.History.RecentItems, pbEvent)
-		}
+		pbEventSource.Status.LastEvent = pbEvent
 	}
 
 	// Add schedule information if the event source has a schedule
