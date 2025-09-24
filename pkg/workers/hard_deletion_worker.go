@@ -1,9 +1,11 @@
 package workers
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -163,20 +165,47 @@ func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSourc
 			return err
 		}
 
-		if eventSource.ResourceID != nil {
-			if err := w.CleanupService.CleanupEventSourceWebhooks(eventSource); err != nil {
-				logger.Warnf("Failed to cleanup event source webhooks: %v", err)
-				// Don't fail the transaction, just log the warning
-			}
-		}
+		shouldDeleteResource, resource := w.prepareResourceCleanup(logger, eventSource)
 
 		if err := eventSource.HardDeleteInTransaction(tx); err != nil {
 			return fmt.Errorf("failed to hard delete event source: %v", err)
 		}
 
+		//
+		// Now that the event source is deleted, we can safely delete the resource if it's safe to do so
+		//
+		if resource != nil && shouldDeleteResource {
+			if err := w.CleanupService.CleanupUnusedResourceWithModelInTransaction(tx, resource, uuid.Nil); err != nil {
+				logger.Errorf("Failed to cleanup unused resource: %v", err)
+				// Don't fail the transaction, just log the warning
+			}
+		}
+
 		logger.Info("Hard deleted event source with all dependencies")
 		return nil
 	})
+}
+
+func (w *HardDeletionWorker) prepareResourceCleanup(logger *log.Entry, eventSource *models.EventSource) (bool, *models.Resource) {
+	if eventSource.ResourceID == nil {
+		return false, nil
+	}
+
+	resource, err := models.FindResourceByID(*eventSource.ResourceID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Warnf("Failed to find resource for cleanup: %v", err)
+		}
+		return false, nil
+	}
+
+	canDelete, err := w.CleanupService.CleanupEventSourceWebhooks(eventSource, resource)
+	if err != nil {
+		logger.Warnf("Failed to cleanup event source webhooks: %v", err)
+		return false, resource
+	}
+
+	return canDelete, resource
 }
 
 // processConnectionGroups handles hard deletion of soft-deleted connection groups:

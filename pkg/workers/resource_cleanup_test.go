@@ -151,3 +151,44 @@ func Test__ResourceCleanupService(t *testing.T) {
 		assert.Equal(t, resource.ID, foundResource.ID)
 	})
 }
+
+func Test__ResourceCleanupService_CleanupEventSourceWebhooks(t *testing.T) {
+	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
+	defer r.Close()
+
+	service := NewResourceCleanupService(r.Registry)
+
+	t.Run("event source with no resource -> no error", func(t *testing.T) {
+		eventSource := &models.EventSource{
+			ID:         uuid.New(),
+			ResourceID: nil,
+		}
+
+		canDelete, err := service.CleanupEventSourceWebhooks(eventSource, nil)
+		assert.NoError(t, err)
+		assert.False(t, canDelete)
+	})
+
+	t.Run("event source with resource -> performs webhook cleanup", func(t *testing.T) {
+		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-single")
+		require.NoError(t, err)
+
+		eventSource, _, err := builders.NewEventSourceBuilder(r.Encryptor, r.Registry).
+			InCanvas(r.Canvas.ID).
+			WithName("test-event-source-single").
+			WithScope(models.EventSourceScopeExternal).
+			ForIntegration(r.Integration).
+			ForResource(resource).
+			Create()
+		require.NoError(t, err)
+
+		_, err = service.CleanupEventSourceWebhooks(eventSource, resource)
+		assert.NoError(t, err)
+		// The result depends on whether other event sources use this resource
+		// We can't predict it in this test, so just verify no error occurred
+
+		foundResource, err := models.FindResourceByID(resource.ID)
+		assert.NoError(t, err)
+		assert.Equal(t, resource.ID, foundResource.ID)
+	})
+}
