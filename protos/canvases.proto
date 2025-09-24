@@ -680,6 +680,7 @@ message Stage {
     repeated InputMapping input_mappings = 5;
     repeated OutputDefinition outputs = 6;
     repeated ValueDefinition secrets = 7;
+    bool dry_run = 8;
   }
 
   message Status {

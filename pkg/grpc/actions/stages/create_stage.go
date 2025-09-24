@@ -119,6 +119,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		WithExecutorType(stage.Spec.Executor.Type).
 		WithExecutorSpec(executorSpec).
 		WithExecutorName(stage.Spec.Executor.Name).
+		WithDryRun(stage.Spec.DryRun).
 		ForIntegration(integration).
 		ForResource(resource).
 		Create()
@@ -302,6 +303,7 @@ func serializeStage(
 			Outputs:       outputs,
 			InputMappings: inputMappings,
 			Secrets:       secrets,
+			DryRun:        stage.DryRun,
 		},
 	}
 

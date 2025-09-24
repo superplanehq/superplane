@@ -36,6 +36,7 @@ import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
 import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
 import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
+import { Switch } from '@/components/Switch/switch';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -54,6 +55,7 @@ interface StageEditModeContentProps {
     secrets: SuperplaneValueDefinition[];
     conditions: SuperplaneCondition[];
     inputMappings: SuperplaneInputMapping[];
+    dryRun: boolean;
     isValid: boolean
   }) => void;
   onTriggerSectionValidation?: { current: ((hasFieldErrors?: boolean) => void) | null };
@@ -85,6 +87,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     integration: data.executor?.integration || {},
   });
   const [inputMappings, setInputMappings] = useState<SuperplaneInputMapping[]>(data.inputMappings || []);
+  const [dryRun, setDryRun] = useState<boolean>(data.dryRun || false);
   const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
     ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
   );
@@ -138,7 +141,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       onFieldErrorsChange(setFieldErrors);
     }
   }, [onFieldErrorsChange]);
-
 
   const parametersWithIdToRecord = useCallback((params: ParameterWithId[]): Record<string, string> => {
     return params.reduce((acc, param) => {
@@ -327,6 +329,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       return errors;
     }
 
+    // Skip executor spec validation if in dry run mode
+    if (dryRun) {
+      return errors;
+    }
+
     if (executor.type === 'semaphore') {
       if (!executor.integration?.name) {
         errors.executorIntegration = 'Semaphore integration is required';
@@ -363,7 +370,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
 
     return errors;
-  }, []);
+  }, [dryRun]);
 
   const validateInputMappings = useCallback((currentErrors: Record<string, string>) => {
     const inputMappingErrors = new Map<string, string[]>();
@@ -528,6 +535,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       conditions: data.conditions || [],
       executor: data.executor || { type: '', spec: {} },
       inputMappings: data.inputMappings || [],
+      dryRun: data.dryRun || false,
       isValid: true
     },
     onDataChange,
@@ -563,6 +571,21 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
   }, [isNewStage, executor.type, executor.integration?.name, canvasIntegrations, orgIntegrations, validationErrors.executorIntegration, setValidationErrors]);
 
+  // Clear executor validation errors when dry run mode is enabled
+  useEffect(() => {
+    if (dryRun) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        // Remove all executor-related validation errors
+        Object.keys(newErrors).forEach(key => {
+          if (key.startsWith('executor')) {
+            delete newErrors[key];
+          }
+        });
+        return newErrors;
+      });
+    }
+  }, [dryRun, setValidationErrors]);
 
   const triggerSectionValidation = useCallback((hasFieldErrors: boolean = false) => {
     const errors = validateAllFields();
@@ -745,6 +768,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         conditions: data.conditions || [],
         executor: data.executor || { type: '', spec: {} },
         inputMappings: data.inputMappings || [],
+        dryRun: data.dryRun || false,
         isValid: true
       },
       (incomingData) => {
@@ -755,6 +779,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         setConditions(incomingData.conditions);
         setExecutor(incomingData.executor);
         setInputMappings(incomingData.inputMappings);
+        setDryRun(incomingData.dryRun || false);
         setResponsePolicyStatusCodesDisplay(
           ((incomingData.executor?.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
         );
@@ -778,10 +803,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         executor,
         secrets,
         conditions,
-        inputMappings
+        inputMappings,
+        dryRun
       });
     }// eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.name, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, onDataChange]);
+  }, [data.name, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, dryRun, onDataChange]);
 
   // Revert function for each section
   const revertSection = (section: string) => {
@@ -1196,6 +1222,26 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         {/* Form sections - only show if integrations are available or not required */}
         {hasRequiredIntegrations && (
           <>
+            {/* DryRun Toggle */}
+            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={dryRun}
+                  onChange={setDryRun}
+                  color="indigo"
+                  aria-label="Toggle dry run mode"
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Dry Run Mode
+                  </span>
+                  <span className="text-xs text-amber-700 dark:text-amber-300">
+                    When enabled, this stage will use the no-op executor regardless of the configured executor type
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Connections Section */}
             <EditableAccordionSection
               id="connections"

@@ -137,6 +137,11 @@ func (b *StageBuilder) WithExecutorName(name string) *StageBuilder {
 	return b
 }
 
+func (b *StageBuilder) WithDryRun(dryRun bool) *StageBuilder {
+	b.newStage.DryRun = dryRun
+	return b
+}
+
 func (b *StageBuilder) Create() (*models.Stage, error) {
 	err := b.validateExecutorSpec()
 	if err != nil {
@@ -158,6 +163,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		ExecutorType:  b.executorType,
 		ExecutorSpec:  datatypes.JSON(b.executorSpec),
 		ExecutorName:  b.newStage.ExecutorName,
+		DryRun:        b.newStage.DryRun,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -299,6 +305,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 			Update("executor_type", b.executorType).
 			Update("executor_spec", datatypes.JSON(b.executorSpec)).
 			Update("executor_name", b.newStage.ExecutorName).
+			Update("dry_run", b.newStage.DryRun).
 			Update("resource_id", resourceID).
 			Error
 

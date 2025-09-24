@@ -64,6 +64,7 @@ export type StageData = {
   secrets: SuperplaneValueDefinition[];
   inputMappings?: SuperplaneInputMapping[];
   executor?: SuperplaneExecutor;
+  dryRun?: boolean;
   spec: object;
   approveStageEvent: (event: SuperplaneStageEvent) => void;
   isDraft?: boolean;

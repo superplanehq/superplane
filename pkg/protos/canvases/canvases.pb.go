@@ -8053,6 +8053,7 @@ type Stage_Spec struct {
 	InputMappings []*InputMapping        `protobuf:"bytes,5,rep,name=input_mappings,json=inputMappings,proto3" json:"input_mappings,omitempty"`
 	Outputs       []*OutputDefinition    `protobuf:"bytes,6,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	Secrets       []*ValueDefinition     `protobuf:"bytes,7,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	DryRun        bool                   `protobuf:"varint,8,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8134,6 +8135,13 @@ func (x *Stage_Spec) GetSecrets() []*ValueDefinition {
 		return x.Secrets
 	}
 	return nil
+}
+
+func (x *Stage_Spec) GetDryRun() bool {
+	if x != nil {
+		return x.DryRun
+	}
+	return false
 }
 
 type Stage_Status struct {
@@ -8521,7 +8529,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x11TYPE_EVENT_SOURCE\x10\x01\x12\x0e\n" +
 	"\n" +
 	"TYPE_STAGE\x10\x02\x12\x19\n" +
-	"\x15TYPE_CONNECTION_GROUP\x10\x03\"\xa5\a\n" +
+	"\x15TYPE_CONNECTION_GROUP\x10\x03\"\xbe\a\n" +
 	"\x05Stage\x126\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1a.Superplane.Stage.MetadataR\bmetadata\x12*\n" +
 	"\x04spec\x18\x02 \x01(\v2\x16.Superplane.Stage.SpecR\x04spec\x120\n" +
@@ -8532,7 +8540,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1b\n" +
 	"\tcanvas_id\x18\x04 \x01(\tR\bcanvasId\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x1a\x8e\x03\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x1a\xa7\x03\n" +
 	"\x04Spec\x128\n" +
 	"\vconnections\x18\x01 \x03(\v2\x16.Superplane.ConnectionR\vconnections\x125\n" +
 	"\n" +
@@ -8542,7 +8550,8 @@ const file_canvases_proto_rawDesc = "" +
 	"\x06inputs\x18\x04 \x03(\v2\x1b.Superplane.InputDefinitionR\x06inputs\x12?\n" +
 	"\x0einput_mappings\x18\x05 \x03(\v2\x18.Superplane.InputMappingR\rinputMappings\x126\n" +
 	"\aoutputs\x18\x06 \x03(\v2\x1c.Superplane.OutputDefinitionR\aoutputs\x125\n" +
-	"\asecrets\x18\a \x03(\v2\x1b.Superplane.ValueDefinitionR\asecrets\x1a\xc9\x01\n" +
+	"\asecrets\x18\a \x03(\v2\x1b.Superplane.ValueDefinitionR\asecrets\x12\x17\n" +
+	"\adry_run\x18\b \x01(\bR\x06dryRun\x1a\xc9\x01\n" +
 	"\x06Status\x12<\n" +
 	"\x0elast_execution\x18\x01 \x01(\v2\x15.Superplane.ExecutionR\rlastExecution\x124\n" +
 	"\x05queue\x18\x02 \x01(\v2\x1e.Superplane.Stage.Status.QueueR\x05queue\x1aK\n" +

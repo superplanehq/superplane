@@ -37,7 +37,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const isNewNode = Boolean(props.data.isDraft) || !!(props.id && /^\d+$/.test(props.id));
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; dryRun: boolean; isValid: boolean } | null>(null);
   const [stageName, setStageName] = useState(props.data.name || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -306,7 +306,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
           conditions: currentFormData.conditions,
-          inputMappings: currentFormData.inputMappings
+          inputMappings: currentFormData.inputMappings,
+          dryRun: currentFormData.dryRun
         };
         await createStageMutation.mutateAsync(createParams);
         removeStage(props.id);
@@ -326,7 +327,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
           conditions: currentFormData.conditions,
-          inputMappings: currentFormData.inputMappings
+          inputMappings: currentFormData.inputMappings,
+          dryRun: currentFormData.dryRun
         };
         await updateStageMutation.mutateAsync(updateParams);
 
@@ -345,12 +347,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             conditions: currentFormData.conditions,
             executor: currentFormData.executor,
             secrets: currentFormData.secrets,
-            inputMappings: currentFormData.inputMappings
+            inputMappings: currentFormData.inputMappings,
+            dryRun: currentFormData.dryRun
           }
         });
 
         props.data.name = stageName;
         props.data.description = stageDescription;
+        props.data.dryRun = currentFormData.dryRun;
       }
     } catch (error) {
       const apiError = error as Error;
@@ -673,7 +677,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 executor: currentFormData.executor,
                 secrets: currentFormData.secrets,
                 conditions: currentFormData.conditions,
-                inputMappings: currentFormData.inputMappings
+                inputMappings: currentFormData.inputMappings,
+                dryRun: currentFormData.dryRun
               })
             }}
             currentStageId={props.id}
@@ -690,8 +695,18 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         ) : (
           <>
 
-            {executorBadges.length > 0 && (
+            {(executorBadges.length > 0 || props.data.dryRun) && (
               <div className="flex items-center w-full gap-2 px-4 font-semibold min-w-0 overflow-hidden">
+                {props.data.dryRun && (
+                  <Badge
+                    color="yellow"
+                    icon="bug_report"
+                    className="flex-shrink-0"
+                    title="This stage is in dry run mode and will use the no-op executor"
+                  >
+                    Dry Run
+                  </Badge>
+                )}
                 {executorBadges.map((badge, index) => (
                   <Badge
                     key={`${badge.icon}-${index}`}
