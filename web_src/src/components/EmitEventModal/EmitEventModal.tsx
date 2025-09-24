@@ -16,7 +16,7 @@ interface EventTemplate {
   image?: string;
   eventType: string;
   nodeType: 'event_source' | 'stage';
-  eventData: any;
+  getEventData: () => any;
 }
 
 const EVENT_TEMPLATES: EventTemplate[] = [
@@ -26,7 +26,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
     image: GithubLogo,
     eventType: 'push',
     nodeType: 'event_source' as const,
-    eventData: {
+    getEventData: () => ({
       ref: "refs/heads/main",
       before: "2364960799e343f8cb594a81b1f34e7219f8254a",
       after: "7fcca06c1b2b2c482df382248610d46cfd789837",
@@ -176,7 +176,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
           "web_src/src/pages/canvas/index.tsx"
         ]
       }
-    }
+    })
   },
   {
     name: 'Semaphore - Pipeline Done Event',
@@ -184,7 +184,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
     image: SemaphoreLogo,
     eventType: 'pipeline_done',
     nodeType: 'event_source' as const,
-    eventData: {
+    getEventData: () => ({
       version: "1.0.0",
       organization: {
         name: "test",
@@ -266,7 +266,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
           ]
         }
       ]
-    }
+    })
   },
   {
     name: 'Custom WebHook',
@@ -274,7 +274,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
     icon: 'webhook',
     eventType: 'custom',
     nodeType: 'event_source' as const,
-    eventData: {}
+    getEventData: () => ({})
   },
   {
     name: 'SuperPlane - Execution Finished Event',
@@ -282,7 +282,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
     icon: 'task_alt',
     eventType: 'execution_finished',
     nodeType: 'stage' as const,
-    eventData: {
+    getEventData: () => ({
       type: "execution_finished",
       stage: {
         id: crypto.randomUUID()
@@ -295,7 +295,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
         result_message: "",
         result_reason: ""
       },
-    }
+    })
   }
 ];
 
@@ -390,7 +390,7 @@ export function EmitEventModal({ isOpen, onClose, sourceName, nodeType, loadLast
 
   const handleTemplateSelect = (template: EventTemplate) => {
     setEventType(template.eventType);
-    setRawEventData(JSON.stringify(template.eventData, null, 2));
+    setRawEventData(JSON.stringify(template.getEventData(), null, 2));
     setSelectedTemplate(template.name);
     setJsonError(null);
     setError(null);

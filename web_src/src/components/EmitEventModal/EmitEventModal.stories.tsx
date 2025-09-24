@@ -8,6 +8,7 @@ import { SuperplaneEvent } from '@/api-client'
 function ModalWrapper({
   isOpen: initialIsOpen = false,
   sourceName = 'Test Event Source',
+  nodeType = 'event_source',
   loadLastEvent,
   simulateLoading = false
 }: Partial<React.ComponentProps<typeof EmitEventModal>> & {
@@ -30,6 +31,7 @@ function ModalWrapper({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         sourceName={sourceName}
+        nodeType={nodeType}
         loadLastEvent={loadLastEvent || defaultLoadLastEvent}
         onCancel={() => {}}
         onSubmit={async (eventType, eventData) => {
@@ -51,6 +53,10 @@ const meta: Meta<typeof ModalWrapper> = {
     sourceName: {
       control: 'text',
     },
+    nodeType: {
+      control: 'select',
+      options: ['event_source', 'stage'],
+    },
     isOpen: {
       control: 'boolean',
     },
@@ -66,6 +72,7 @@ type Story = StoryObj<typeof meta>
 export const Default: Story = {
   args: {
     sourceName: 'GitHub Webhook',
+    nodeType: 'event_source',
     isOpen: false,
   },
 }
@@ -73,6 +80,7 @@ export const Default: Story = {
 export const WithLastEvent: Story = {
   args: {
     sourceName: 'Slack Webhook',
+    nodeType: 'event_source',
     isOpen: false,
     loadLastEvent: async () => ({
       id: 'event-123',
@@ -95,6 +103,7 @@ export const WithLastEvent: Story = {
 export const LoadingState: Story = {
   args: {
     sourceName: 'API Webhook',
+    nodeType: 'event_source',
     isOpen: false,
     simulateLoading: true,
   },
@@ -103,6 +112,15 @@ export const LoadingState: Story = {
 export const OpenedModal: Story = {
   args: {
     sourceName: 'GitHub Push',
+    nodeType: 'event_source',
+    isOpen: true,
+  },
+}
+
+export const StageTemplates: Story = {
+  args: {
+    sourceName: 'SuperPlane Stage',
+    nodeType: 'stage',
     isOpen: true,
   },
 }
