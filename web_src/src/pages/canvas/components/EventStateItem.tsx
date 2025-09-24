@@ -2,11 +2,10 @@ import React from 'react';
 import { formatFullTimestamp, formatRelativeTime } from '../utils/stageEventUtils';
 import Tippy from '@tippyjs/react/headless';
 import 'tippy.js/dist/tippy.css';
-
-export type EventState = 'pending' | 'rejected' | 'processed';
+import { SuperplaneEventState } from '@/api-client';
 
 interface EventStateItemProps {
-  state: EventState;
+  state?: SuperplaneEventState;
   receivedAt?: string;
   eventType?: string;
   onClick?: () => void;
@@ -18,17 +17,17 @@ export const EventStateItem: React.FC<EventStateItemProps> = ({
   eventType,
   onClick
 }) => {
-  const getStateConfig = (state: EventState) => {
+  const getStateConfig = (state: SuperplaneEventState) => {
     switch (state) {
-      case 'pending':
+      case 'STATE_PENDING':
         return {
-          bgColor: 'bg-yellow-100/50',
+          bgColor: 'bg-yellow-100/50 dark:bg-yellow-900/20',
           textColor: 'text-yellow-700 dark:text-yellow-400',
           icon: 'schedule',
           label: 'Pending',
           animate: true,
         };
-      case 'rejected':
+      case 'STATE_REJECTED':
         return {
           bgColor: 'bg-zinc-100/50 dark:bg-zinc-900/20',
           textColor: 'text-zinc-600 dark:text-zinc-400',
@@ -36,7 +35,7 @@ export const EventStateItem: React.FC<EventStateItemProps> = ({
           label: 'Rejected',
           animate: false,
         };
-      case 'processed':
+      case 'STATE_PROCESSED':
         return {
           bgColor: 'bg-green-100/50 dark:bg-green-900/20',
           textColor: 'text-green-600 dark:text-green-400',
@@ -44,10 +43,19 @@ export const EventStateItem: React.FC<EventStateItemProps> = ({
           label: 'Processed',
           animate: false,
         };
+      case 'STATE_UNKNOWN':
+      default:
+        return {
+          bgColor: 'bg-gray-100/50 dark:bg-gray-900/20',
+          textColor: 'text-gray-600 dark:text-gray-400',
+          icon: 'help',
+          label: 'Unknown',
+          animate: false,
+        };
     }
   };
 
-  const config = getStateConfig(state);
+  const config = getStateConfig(state || 'STATE_UNKNOWN');
   const timeAgo = receivedAt ? formatRelativeTime(receivedAt, true) : '';
 
   return (

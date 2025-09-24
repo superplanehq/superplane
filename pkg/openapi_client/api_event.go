@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"reflect"
 )
 
 
@@ -155,6 +156,7 @@ type ApiSuperplaneListEventsRequest struct {
 	sourceId *string
 	limit *int64
 	before *time.Time
+	states *[]string
 }
 
 func (r ApiSuperplaneListEventsRequest) SourceType(sourceType string) ApiSuperplaneListEventsRequest {
@@ -174,6 +176,11 @@ func (r ApiSuperplaneListEventsRequest) Limit(limit int64) ApiSuperplaneListEven
 
 func (r ApiSuperplaneListEventsRequest) Before(before time.Time) ApiSuperplaneListEventsRequest {
 	r.before = &before
+	return r
+}
+
+func (r ApiSuperplaneListEventsRequest) States(states []string) ApiSuperplaneListEventsRequest {
+	r.states = &states
 	return r
 }
 
@@ -234,6 +241,17 @@ func (a *EventAPIService) SuperplaneListEventsExecute(r ApiSuperplaneListEventsR
 	}
 	if r.before != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
+	}
+	if r.states != nil {
+		t := *r.states
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "states", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "states", t, "form", "multi")
+		}
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

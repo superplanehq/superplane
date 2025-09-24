@@ -479,99 +479,34 @@ func ListPendingEventSources() ([]EventSource, error) {
 	return eventSources, nil
 }
 
-type EventSourceStatusInfo struct {
-	EventSourceID uuid.UUID
-	ReceivedCount int
-	RecentEvents  []Event
-}
-
-func GetEventSourcesStatusInfo(eventSources []EventSource) (map[uuid.UUID]*EventSourceStatusInfo, error) {
-	statusMap := make(map[uuid.UUID]*EventSourceStatusInfo)
-
+func LastProcessedEventForSources(eventSources []EventSource) (map[uuid.UUID]*Event, error) {
 	if len(eventSources) == 0 {
-		return statusMap, nil
+		return make(map[uuid.UUID]*Event), nil
 	}
 
 	eventSourceIDs := make([]uuid.UUID, len(eventSources))
 	for i, source := range eventSources {
 		eventSourceIDs[i] = source.ID
-		statusMap[source.ID] = &EventSourceStatusInfo{
-			EventSourceID: source.ID,
-			RecentEvents:  []Event{},
-		}
 	}
 
-	// Get event counts for each event source
-	counts, err := getEventCountsForEventSources(eventSourceIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get recent events for each event source (last 3)
-	recentEvents, err := getRecentEventsForEventSources(eventSourceIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Populate status map
-	for sourceID, count := range counts {
-		if status, exists := statusMap[sourceID]; exists {
-			status.ReceivedCount = count
-		}
-	}
-
-	for sourceID, events := range recentEvents {
-		if status, exists := statusMap[sourceID]; exists {
-			status.RecentEvents = events
-		}
-	}
-
-	return statusMap, nil
+	return getLastProcessedEventForSources(eventSourceIDs)
 }
 
-func getEventCountsForEventSources(eventSourceIDs []uuid.UUID) (map[uuid.UUID]int, error) {
-	counts := make(map[uuid.UUID]int)
-
-	var results []struct {
-		SourceID uuid.UUID
-		Count    int
-	}
-
-	err := database.Conn().
-		Raw(`
-			SELECT source_id, COUNT(*) as count
-			FROM events 
-			WHERE source_id IN ? AND source_type = ?
-			GROUP BY source_id
-		`, eventSourceIDs, SourceTypeEventSource).
-		Find(&results).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, result := range results {
-		counts[result.SourceID] = result.Count
-	}
-
-	return counts, nil
-}
-
-func getRecentEventsForEventSources(eventSourceIDs []uuid.UUID) (map[uuid.UUID][]Event, error) {
-	events := make(map[uuid.UUID][]Event)
+func getLastProcessedEventForSources(eventSourceIDs []uuid.UUID) (map[uuid.UUID]*Event, error) {
+	events := make(map[uuid.UUID]*Event)
 
 	var results []Event
 
 	err := database.Conn().
 		Raw(`
-			SELECT * FROM (
-				SELECT *, ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY received_at DESC) as rn
-				FROM events 
-				WHERE source_id IN ? AND source_type = ?
-			) ranked
-			WHERE rn <= 3
-			ORDER BY source_id, received_at DESC
-		`, eventSourceIDs, SourceTypeEventSource).
+			SELECT * FROM events
+			WHERE id IN (
+				SELECT DISTINCT ON (source_id) id
+				FROM events
+				WHERE source_id IN ? AND source_type = ? AND state = ?
+				ORDER BY source_id, received_at DESC
+			)
+		`, eventSourceIDs, SourceTypeEventSource, EventStateProcessed).
 		Find(&results).Error
 
 	if err != nil {
@@ -579,10 +514,8 @@ func getRecentEventsForEventSources(eventSourceIDs []uuid.UUID) (map[uuid.UUID][
 	}
 
 	for _, event := range results {
-		if _, exists := events[event.SourceID]; !exists {
-			events[event.SourceID] = []Event{}
-		}
-		events[event.SourceID] = append(events[event.SourceID], event)
+		eventCopy := event // Create a copy to avoid pointer issues
+		events[event.SourceID] = &eventCopy
 	}
 
 	return events, nil

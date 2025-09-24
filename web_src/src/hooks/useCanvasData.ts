@@ -38,7 +38,7 @@ export const canvasKeys = {
   stage: (canvasId: string, stageId: string) => [...canvasKeys.all, 'stage', canvasId, stageId] as const,
   eventSources: (canvasId: string) => [...canvasKeys.all, 'eventSources', canvasId] as const,
   eventSource: (canvasId: string, eventSourceId: string) => [...canvasKeys.all, 'eventSource', canvasId, eventSourceId] as const,
-  events: (canvasId: string, sourceType: string, sourceId: string) => [...canvasKeys.all, 'events', canvasId, sourceType, sourceId] as const,
+  events: (canvasId: string, sourceType: string, sourceId: string, states?: string[]) => [...canvasKeys.all, 'events', canvasId, sourceType, sourceId, states] as const,
   stageEvents: (canvasId: string, stageId: string, states: SuperplaneStageEventState[]) => [...canvasKeys.all, 'stageEvents', canvasId, stageId, states] as const,
   stageExecutions: (canvasId: string, stageId: string, results?: string[]) => [...canvasKeys.all, 'stageExecutions', canvasId, stageId, results] as const,
   connectionGroups: (canvasId: string) => [...canvasKeys.all, 'connectionGroups', canvasId] as const,
@@ -627,9 +627,9 @@ export const useIntegrations = () => {
 }
 
 // Event-related hooks
-export const useEvents = (canvasId: string, sourceType: string, sourceId: string) => {
+export const useEvents = (canvasId: string, sourceType: string, sourceId: string, states?: string[]) => {
   return useInfiniteQuery({
-    queryKey: canvasKeys.events(canvasId, sourceType, sourceId),
+    queryKey: canvasKeys.events(canvasId, sourceType, sourceId, states),
     queryFn: async ({ pageParam }) => {
       const response = await superplaneListEvents(
         withOrganizationHeader({
@@ -638,7 +638,8 @@ export const useEvents = (canvasId: string, sourceType: string, sourceId: string
             sourceType,
             sourceId,
             limit: 20,
-            ...(pageParam && { before: pageParam })
+            ...(pageParam && { before: pageParam }),
+            ...(states && states.length > 0 && { states })
           }
         })
       )
