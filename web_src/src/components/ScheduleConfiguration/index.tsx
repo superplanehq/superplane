@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { SuperplaneEventSourceSchedule, EventSourceScheduleType, ScheduleWeekDay } from '@/api-client/types.gen';
 import { ValidationField } from '../ValidationField';
 import { Select } from '../Select';
+import { convertLocalTimeToUTC, convertUTCToLocalTime, getUserTimezoneDisplay } from '@/utils/timezone';
 
 interface ScheduleConfigurationProps {
   schedule?: SuperplaneEventSourceSchedule | null;
@@ -42,7 +43,7 @@ export function ScheduleConfiguration({
       onScheduleChange({
         type: 'TYPE_DAILY',
         daily: {
-          time: '09:00'
+          time: convertLocalTimeToUTC('09:00')
         }
       });
     }
@@ -59,12 +60,12 @@ export function ScheduleConfiguration({
       };
     } else if (type === 'TYPE_DAILY') {
       newSchedule.daily = {
-        time: schedule?.daily?.time || '09:00'
+        time: schedule?.daily?.time || convertLocalTimeToUTC('09:00')
       };
     } else if (type === 'TYPE_WEEKLY') {
       newSchedule.weekly = {
         weekDay: schedule?.weekly?.weekDay || 'WEEK_DAY_MONDAY',
-        time: schedule?.weekly?.time || '09:00'
+        time: schedule?.weekly?.time || convertLocalTimeToUTC('09:00')
       };
     }
 
@@ -85,12 +86,13 @@ export function ScheduleConfiguration({
   const handleTimeChange = useCallback((time: string) => {
     if (!schedule) return;
 
+    const utcTime = convertLocalTimeToUTC(time);
     const newSchedule: SuperplaneEventSourceSchedule = { ...schedule };
 
     if (schedule.type === 'TYPE_DAILY') {
-      newSchedule.daily = { ...schedule.daily, time };
+      newSchedule.daily = { ...schedule.daily, time: utcTime };
     } else if (schedule.type === 'TYPE_WEEKLY') {
-      newSchedule.weekly = { ...schedule.weekly, time };
+      newSchedule.weekly = { ...schedule.weekly, time: utcTime };
     }
 
     onScheduleChange(newSchedule);
@@ -109,9 +111,11 @@ export function ScheduleConfiguration({
 
   const getCurrentTime = (): string => {
     if (schedule?.type === 'TYPE_DAILY') {
-      return schedule.daily?.time || '09:00';
+      const utcTime = schedule.daily?.time || convertLocalTimeToUTC('09:00');
+      return convertUTCToLocalTime(utcTime);
     } else if (schedule?.type === 'TYPE_WEEKLY') {
-      return schedule.weekly?.time || '09:00';
+      const utcTime = schedule.weekly?.time || convertLocalTimeToUTC('09:00');
+      return convertUTCToLocalTime(utcTime);
     }
     return '09:00';
   };
@@ -167,7 +171,7 @@ export function ScheduleConfiguration({
           {/* Time Selection */}
           {(schedule?.type === 'TYPE_DAILY' || schedule?.type === 'TYPE_WEEKLY') && (
             <ValidationField
-              label="Time (UTC)"
+              label={`Time (${getUserTimezoneDisplay()})`}
               error={errors.time}
               required={true}
             >
