@@ -41,6 +41,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const currentEventSource = useCanvasStore(state =>
     state.eventSources.find(es => es.metadata?.id === props.id)
   );
+  const eventSourceId = currentEventSource?.metadata?.id;
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -380,8 +381,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
           onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
-          onSend={currentEventSource?.metadata?.id ? () => setShowEmitEventModal(true) : undefined}
-          onSelect={currentEventSource?.metadata?.id && !props.id.match(/^\d+$/) ? () => selectEventSourceId(currentEventSource.metadata.id) : undefined}
+          onSend={eventSourceId ? () => setShowEmitEventModal(true) : undefined}
+          onSelect={eventSourceId && !props.id.match(/^\d+$/) ? () => selectEventSourceId(eventSourceId) : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
