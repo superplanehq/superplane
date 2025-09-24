@@ -96,6 +96,72 @@ func (s *ResourceCleanupService) CleanupUnusedResource(oldResourceID, excludeSta
 	return nil
 }
 
+func (s *ResourceCleanupService) CleanupUnusedResourceWithModel(oldResource *models.Resource, excludeStageID uuid.UUID) error {
+	logger := log.WithField("old_resource_id", oldResource.ID)
+
+	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResource(oldResource.ID)
+	if err != nil {
+		logger.Errorf("Error counting external event sources using resource: %v", err)
+		return err
+	}
+
+	stagesCount, err := models.CountOtherStagesUsingResource(oldResource.ID, excludeStageID)
+	if err != nil {
+		logger.Errorf("Error counting stages using resource: %v", err)
+		return err
+	}
+
+	totalUsages := externalEventSourceCount + stagesCount
+	if totalUsages > 0 {
+		logger.Infof("Resource is used by %d external event sources and %d stages, skipping cleanup",
+			externalEventSourceCount, stagesCount)
+		return nil
+	}
+
+	err = models.DeleteResourceWithChildren(oldResource.ID)
+	if err != nil {
+		logger.Errorf("Error deleting old resource and children from database: %v", err)
+		return err
+	}
+
+	logger.Infof("Successfully deleted old resource %s from database", oldResource.ID)
+
+	return nil
+}
+
+func (s *ResourceCleanupService) CleanupUnusedResourceWithModelInTransaction(tx *gorm.DB, oldResource *models.Resource, excludeStageID uuid.UUID) error {
+	logger := log.WithField("old_resource_id", oldResource.ID)
+
+	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResource(oldResource.ID)
+	if err != nil {
+		logger.Errorf("Error counting external event sources using resource: %v", err)
+		return err
+	}
+
+	stagesCount, err := models.CountOtherStagesUsingResource(oldResource.ID, excludeStageID)
+	if err != nil {
+		logger.Errorf("Error counting stages using resource: %v", err)
+		return err
+	}
+
+	totalUsages := externalEventSourceCount + stagesCount
+	if totalUsages > 0 {
+		logger.Infof("Resource is used by %d external event sources and %d stages, skipping cleanup",
+			externalEventSourceCount, stagesCount)
+		return nil
+	}
+
+	err = models.DeleteResourceWithChildrenInTransaction(tx, oldResource.ID)
+	if err != nil {
+		logger.Errorf("Error deleting old resource and children from database: %v", err)
+		return err
+	}
+
+	logger.Infof("Successfully deleted old resource %s from database", oldResource.ID)
+
+	return nil
+}
+
 func (s *ResourceCleanupService) CleanupStageWebhooks(stage *models.Stage) error {
 	if stage.ResourceID == nil {
 		return nil
@@ -106,45 +172,40 @@ func (s *ResourceCleanupService) CleanupStageWebhooks(stage *models.Stage) error
 	return s.CleanupUnusedResource(*stage.ResourceID, uuid.Nil)
 }
 
-func (s *ResourceCleanupService) CleanupEventSourceWebhooks(eventSource *models.EventSource) error {
+func (s *ResourceCleanupService) CleanupEventSourceWebhooks(eventSource *models.EventSource, resource *models.Resource) (bool, error) {
 	if eventSource.ResourceID == nil {
-		return nil
+		return false, nil
+	}
+
+	if resource == nil {
+		return false, nil
 	}
 
 	logger := log.WithField("event_source_id", eventSource.ID)
 
-	resource, err := models.FindResourceByID(*eventSource.ResourceID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Info("Resource not found, skipping webhook cleanup")
-			return nil
-		}
-		return err
-	}
-
 	count, err := models.CountExternalEventSourcesUsingResource(*eventSource.ResourceID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Do not clean up if there are other event sources using this resource
 	if count > 1 {
-		return nil
+		return false, nil
 	}
 
 	integration, err := models.FindIntegrationByID(resource.IntegrationID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	resourceManager, err := s.Registry.NewResourceManager(context.Background(), integration)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	childResources, err := resource.FindChildren()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	for _, childResource := range childResources {
@@ -152,8 +213,10 @@ func (s *ResourceCleanupService) CleanupEventSourceWebhooks(eventSource *models.
 		err = resourceManager.CleanupWebhook(resource, &childResource)
 		if err != nil {
 			logger.Errorf("Error cleaning up webhook: %v", err)
+		} else {
+			logger.Infof("Successfully cleaned up webhook %s", childResource.Id())
 		}
 	}
 
-	return nil
+	return true, nil
 }
