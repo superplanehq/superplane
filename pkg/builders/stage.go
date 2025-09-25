@@ -137,6 +137,11 @@ func (b *StageBuilder) WithExecutorName(name string) *StageBuilder {
 	return b
 }
 
+func (b *StageBuilder) WithDryRun(dryRun bool) *StageBuilder {
+	b.newStage.DryRun = dryRun
+	return b
+}
+
 func (b *StageBuilder) Create() (*models.Stage, error) {
 	err := b.validateExecutorSpec()
 	if err != nil {
@@ -158,6 +163,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		ExecutorType:  b.executorType,
 		ExecutorSpec:  datatypes.JSON(b.executorSpec),
 		ExecutorName:  b.newStage.ExecutorName,
+		DryRun:        b.newStage.DryRun,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -205,6 +211,19 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 }
 
 func (b *StageBuilder) validateExecutorSpec() error {
+	//
+	// If the stage is being created in dry run mode,
+	// we use the no-op executor.
+	//
+	if b.newStage.DryRun {
+		executor, err := b.registry.NewExecutor(models.ExecutorTypeNoOp)
+		if err != nil {
+			return err
+		}
+
+		return executor.Validate(b.ctx, b.executorSpec)
+	}
+
 	if b.executorSpec == nil {
 		return fmt.Errorf("missing executor spec")
 	}
@@ -309,6 +328,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 			Update("executor_type", b.executorType).
 			Update("executor_spec", datatypes.JSON(b.executorSpec)).
 			Update("executor_name", b.newStage.ExecutorName).
+			Update("dry_run", b.newStage.DryRun).
 			Update("resource_id", resourceID).
 			Error
 

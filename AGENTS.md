@@ -15,8 +15,8 @@
 - Run server: `make dev.start` - UI at http://localhost:8000
 - One-shot backend tests: `make test` (Golang).
 - Targeted backend tests: `make test TEST_PACKAGES=./pkg/workers`
-- After updating UI code, always run `npm run build` to verify everything is correct
-- After updating GoLang code, always check it with `make lint && go build cmd/server/main.go && rm main`
+- After updating UI code, always run `make check.build.ui` to verify everything is correct
+- After updating GoLang code, always check it with `make lint && make check.build.app`
 - To generate DB migrations, use `make db.migration.create NAME=<name>`. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>`, where DB_NAME can be `superplane_dev` or `superplane_test`
 - When validating enum fields in protobuf requests, ensure that the enums are properly mapped to constants in the `pkg/models` package. Check the `Proto*` and `*ToProto` functions in pkg/grpc/actions/common.go.
 - When adding a new worker in pkg/workers, always add its startup to `cmd/server/main.go`, and update the docker compose files with the new environment variables that are needed.

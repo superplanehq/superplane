@@ -65,6 +65,7 @@ export const transformStagesToNodes = (
       inputMappings: st.spec?.inputMappings || [],
       secrets: st.spec?.secrets || [],
       executor: st.spec?.executor,
+      dryRun: st.spec?.dryRun || false,
       approveStageEvent: (event: SuperplaneStageEvent) => {
         approveStageEvent(event.id!, st.metadata?.id || '');
       },

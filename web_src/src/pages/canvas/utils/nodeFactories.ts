@@ -80,7 +80,8 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
       executor: getExecutorTemplate(executorType),
       connections: connections,
       inputMappings: [],
-      secrets: []
+      secrets: [],
+      dryRun: true
     },
   };
 };
