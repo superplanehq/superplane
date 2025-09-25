@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCanvasStore } from './canvasStore';
-import { StageWithEventQueue, ConnectionGroupWithEvents } from './types';
+import { Stage, ConnectionGroupWithEvents } from './types';
 
 describe('canvasStore', () => {
   beforeEach(() => {
@@ -28,7 +28,7 @@ describe('canvasStore', () => {
 
   describe('updateConnectionSourceNames', () => {
     it('should update stage connections that reference the renamed entity', () => {
-      const mockStage: StageWithEventQueue = {
+      const mockStage: Stage = {
         metadata: { id: 'stage1', name: 'Stage 1' },
         spec: {
           connections: [
@@ -37,7 +37,11 @@ describe('canvasStore', () => {
           ]
         },
         queue: [],
-        events: []
+        executions: [],
+        status: {
+          lastExecution: undefined,
+          queue: undefined,
+        }
       };
 
       useCanvasStore.setState({ stages: [mockStage] });
@@ -71,7 +75,7 @@ describe('canvasStore', () => {
     });
 
     it('should update multiple entities with connections referencing the renamed entity', () => {
-      const mockStage: StageWithEventQueue = {
+      const mockStage: Stage = {
         metadata: { id: 'stage1', name: 'Stage 1' },
         spec: {
           connections: [
@@ -79,7 +83,11 @@ describe('canvasStore', () => {
           ]
         },
         queue: [],
-        events: []
+        executions: [],
+        status: {
+          lastExecution: undefined,
+          queue: undefined,
+        }
       };
 
       const mockConnectionGroup: ConnectionGroupWithEvents = {
@@ -107,7 +115,7 @@ describe('canvasStore', () => {
     });
 
     it('should not modify connections that do not match the old name', () => {
-      const mockStage: StageWithEventQueue = {
+      const mockStage: Stage = {
         metadata: { id: 'stage1', name: 'Stage 1' },
         spec: {
           connections: [
@@ -116,7 +124,11 @@ describe('canvasStore', () => {
           ]
         },
         queue: [],
-        events: []
+        executions: [],
+        status: {
+          lastExecution: undefined,
+          queue: undefined,
+        }
       };
 
       useCanvasStore.setState({ stages: [mockStage] });
@@ -129,11 +141,15 @@ describe('canvasStore', () => {
     });
 
     it('should handle entities with no connections', () => {
-      const mockStage: StageWithEventQueue = {
+      const mockStage: Stage = {
         metadata: { id: 'stage1', name: 'Stage 1' },
         spec: {},
         queue: [],
-        events: []
+        executions: [],
+        status: {
+          lastExecution: undefined,
+          queue: undefined,
+        }
       };
 
       const mockConnectionGroup: ConnectionGroupWithEvents = {
@@ -161,7 +177,7 @@ describe('canvasStore', () => {
     });
 
     it('should preserve other connection properties when updating name', () => {
-      const mockStage: StageWithEventQueue = {
+      const mockStage: Stage = {
         metadata: { id: 'stage1', name: 'Stage 1' },
         spec: {
           connections: [
@@ -173,7 +189,11 @@ describe('canvasStore', () => {
           ]
         },
         queue: [],
-        events: []
+        executions: [],
+        status: {
+          lastExecution: undefined,
+          queue: undefined,
+        }
       };
 
       useCanvasStore.setState({ stages: [mockStage] });
