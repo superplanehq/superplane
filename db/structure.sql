@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict EV5goSciBdjgTQ0NVIK8eFuD3fJHcjQoVtAmbcQOYWHg250GEJbG4mWiDRhrddV
+\restrict fNOMEDXyv0vreKGCpdmhaOQNiyEgETKJhkH2ud5zo1pUXEo68YSEzmHSkEdcPpc
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -932,6 +932,27 @@ CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_
 
 
 --
+-- Name: idx_stage_events_stage_id_state_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_stage_events_stage_id_state_created_at ON public.stage_events USING btree (stage_id, state, created_at);
+
+
+--
+-- Name: idx_stage_executions_id_stage_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_stage_executions_id_stage_id ON public.stage_executions USING btree (id, stage_id);
+
+
+--
+-- Name: idx_stage_executions_stage_id_state_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_stage_executions_stage_id_state_created_at ON public.stage_executions USING btree (stage_id, state, created_at DESC);
+
+
+--
 -- Name: idx_stages_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1173,16 +1194,16 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EV5goSciBdjgTQ0NVIK8eFuD3fJHcjQoVtAmbcQOYWHg250GEJbG4mWiDRhrddV
+\unrestrict fNOMEDXyv0vreKGCpdmhaOQNiyEgETKJhkH2ud5zo1pUXEo68YSEzmHSkEdcPpc
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict Zsp65to2xzq89ruTlQ9OYgicZnbAdb8UxXGXMLhZnMg5o8MWLNhdVxRi6vMKsvX
+\restrict aLQboVDx6NFWbknRE3UzK71Ut8xHrIKoI7GVihTCSm93hSObZGLTEUlxe4iKaym
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1201,7 +1222,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250924084313	f
+20250925010754	f
 \.
 
 
@@ -1209,5 +1230,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Zsp65to2xzq89ruTlQ9OYgicZnbAdb8UxXGXMLhZnMg5o8MWLNhdVxRi6vMKsvX
+\unrestrict aLQboVDx6NFWbknRE3UzK71Ut8xHrIKoI7GVihTCSm93hSObZGLTEUlxe4iKaym
 
