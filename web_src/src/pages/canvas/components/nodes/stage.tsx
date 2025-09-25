@@ -764,7 +764,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   </div>
                 </div>
               </div>
-
               {/* Queue Section */}
               <StageQueueSection
                 lastWaitingEvent={lastWaitingEvent}

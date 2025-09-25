@@ -609,6 +609,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           isOpen={showEmitEventModal}
           onClose={() => setShowEmitEventModal(false)}
           sourceName={currentEventSource.metadata.name || ''}
+          nodeType="event_source"
           loadLastEvent={async () => {
             // For event sources, return the latest event immediately
             return currentEventSource.events?.[0] || null;
