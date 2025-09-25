@@ -279,17 +279,6 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 			ResourceID:  eventSource.ResourceID,
 		}
 
-		// Set schedule if provided
-		if b.schedule != nil {
-			nextTrigger, err := b.schedule.CalculateNextTrigger(time.Now())
-			if err != nil {
-				return nil, "", fmt.Errorf("failed to calculate next trigger: %v", err)
-			}
-			schedule := datatypes.NewJSONType(*b.schedule)
-			source.Schedule = &schedule
-			source.NextTriggerAt = nextTrigger
-		}
-
 		err = source.CreateInTransaction(tx)
 		if err != nil {
 			return nil, "", err
