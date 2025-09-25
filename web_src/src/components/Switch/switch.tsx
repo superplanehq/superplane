@@ -25,7 +25,7 @@ export function Switch({
     <button
       type="button"
       disabled={disabled}
-      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ${disabled ? '!cursor-not-allowed opacity-50' : '!cursor-pointer'} ${colorClasses[color]} ${className}`}
+      className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${disabled ? '!cursor-not-allowed opacity-50' : '!cursor-pointer'} ${colorClasses[color]} ${className}`}
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}

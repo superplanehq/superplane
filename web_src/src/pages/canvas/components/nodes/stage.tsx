@@ -38,7 +38,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [isHovered, setIsHovered] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; dryRun: boolean; isValid: boolean } | null>(null);
   const [stageName, setStageName] = useState(props.data.name || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -145,6 +145,11 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const validateIntegrationRequirement = () => {
     if (!currentFormData?.executor) {
+      return true;
+    }
+
+    // Skip integration validation when DryRun mode is enabled
+    if (currentFormData.dryRun) {
       return true;
     }
 
@@ -307,7 +312,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
           conditions: currentFormData.conditions,
-          inputMappings: currentFormData.inputMappings
+          inputMappings: currentFormData.inputMappings,
+          dryRun: currentFormData.dryRun
         };
         await createStageMutation.mutateAsync(createParams);
         removeStage(props.id);
@@ -327,7 +333,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
           conditions: currentFormData.conditions,
-          inputMappings: currentFormData.inputMappings
+          inputMappings: currentFormData.inputMappings,
+          dryRun: currentFormData.dryRun
         };
         await updateStageMutation.mutateAsync(updateParams);
 
@@ -346,12 +353,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             conditions: currentFormData.conditions,
             executor: currentFormData.executor,
             secrets: currentFormData.secrets,
-            inputMappings: currentFormData.inputMappings
+            inputMappings: currentFormData.inputMappings,
+            dryRun: currentFormData.dryRun
           }
         });
 
         props.data.name = stageName;
         props.data.description = stageDescription;
+        props.data.dryRun = currentFormData.dryRun;
       }
     } catch (error) {
       const apiError = error as Error;

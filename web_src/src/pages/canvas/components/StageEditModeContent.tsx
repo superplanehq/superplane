@@ -33,9 +33,11 @@ import { WorkflowTooltip } from '@/components/Tooltip/workflow-tooltip';
 import { PipelineFileTooltip } from '@/components/Tooltip/pipeline-file-tooltip';
 import { StaticValueTooltip } from '@/components/Tooltip/static-value-tooltip';
 import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
+import { DryRunTooltip } from '@/components/Tooltip/dry-run-tooltip';
 import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
 import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
+import { Switch } from '@/components/Switch/switch';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -54,6 +56,7 @@ interface StageEditModeContentProps {
     secrets: SuperplaneValueDefinition[];
     conditions: SuperplaneCondition[];
     inputMappings: SuperplaneInputMapping[];
+    dryRun: boolean;
     isValid: boolean
   }) => void;
   onTriggerSectionValidation?: { current: ((hasFieldErrors?: boolean) => void) | null };
@@ -85,6 +88,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     integration: data.executor?.integration || {},
   });
   const [inputMappings, setInputMappings] = useState<SuperplaneInputMapping[]>(data.inputMappings || []);
+  const [dryRun, setDryRun] = useState<boolean>(data.dryRun || false);
   const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
     ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
   );
@@ -138,7 +142,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       onFieldErrorsChange(setFieldErrors);
     }
   }, [onFieldErrorsChange]);
-
 
   const parametersWithIdToRecord = useCallback((params: ParameterWithId[]): Record<string, string> => {
     return params.reduce((acc, param) => {
@@ -327,6 +330,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       return errors;
     }
 
+    // Skip executor spec validation if in dry run mode
+    if (dryRun) {
+      return errors;
+    }
+
     if (executor.type === 'semaphore') {
       if (!executor.integration?.name) {
         errors.executorIntegration = 'Semaphore integration is required';
@@ -363,7 +371,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
 
     return errors;
-  }, []);
+  }, [dryRun]);
 
   const validateInputMappings = useCallback((currentErrors: Record<string, string>) => {
     const inputMappingErrors = new Map<string, string[]>();
@@ -528,6 +536,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       conditions: data.conditions || [],
       executor: data.executor || { type: '', spec: {} },
       inputMappings: data.inputMappings || [],
+      dryRun: data.dryRun || false,
       isValid: true
     },
     onDataChange,
@@ -563,6 +572,21 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }
   }, [isNewStage, executor.type, executor.integration?.name, canvasIntegrations, orgIntegrations, validationErrors.executorIntegration, setValidationErrors]);
 
+  // Clear executor validation errors when dry run mode is enabled
+  useEffect(() => {
+    if (dryRun) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        // Remove all executor-related validation errors
+        Object.keys(newErrors).forEach(key => {
+          if (key.startsWith('executor')) {
+            delete newErrors[key];
+          }
+        });
+        return newErrors;
+      });
+    }
+  }, [dryRun, setValidationErrors]);
 
   const triggerSectionValidation = useCallback((hasFieldErrors: boolean = false) => {
     const errors = validateAllFields();
@@ -642,7 +666,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     setOpenSections(sectionsToOpen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setOpenSections, isNewStage, executor.resource?.type, executor.type]);
+  }, [setOpenSections, isNewStage, executor.type]);
 
   // Connection management
   const connectionManager = useConnectionManager({
@@ -745,6 +769,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         conditions: data.conditions || [],
         executor: data.executor || { type: '', spec: {} },
         inputMappings: data.inputMappings || [],
+        dryRun: data.dryRun || false,
         isValid: true
       },
       (incomingData) => {
@@ -755,6 +780,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         setConditions(incomingData.conditions);
         setExecutor(incomingData.executor);
         setInputMappings(incomingData.inputMappings);
+        setDryRun(incomingData.dryRun || false);
         setResponsePolicyStatusCodesDisplay(
           ((incomingData.executor?.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
         );
@@ -778,10 +804,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         executor,
         secrets,
         conditions,
-        inputMappings
+        inputMappings,
+        dryRun
       });
     }// eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.name, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, onDataChange]);
+  }, [data.name, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, dryRun, onDataChange]);
 
   // Revert function for each section
   const revertSection = (section: string) => {
@@ -1181,9 +1208,28 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   return (
     <NodeContentWrapper nodeId={currentStageId}>
-      <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-1')}>
-        {/* Show zero state if executor type requires integrations but none are available */}
-        {requireIntegration && !hasRequiredIntegrations && (
+      <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && !dryRun && 'pb-1')}>
+        {/* DryRun Toggle - always visible */}
+        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MaterialSymbol name="science" size="sm" className="text-amber-600 dark:text-amber-400" />
+              <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Dry Run Mode
+              </span>
+              <DryRunTooltip className="flex items-center" />
+            </div>
+            <Switch
+              checked={dryRun}
+              onChange={setDryRun}
+              color="indigo"
+              aria-label="Toggle dry run mode"
+            />
+          </div>
+        </div>
+
+        {/* Show zero state if executor type requires integrations but none are available, except in dry-run mode */}
+        {requireIntegration && !hasRequiredIntegrations && !dryRun && (
           <IntegrationZeroState
             integrationType={executor?.type || ''}
             label={getZeroStateLabel()}
@@ -1193,9 +1239,10 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           />
         )}
 
-        {/* Form sections - only show if integrations are available or not required */}
-        {hasRequiredIntegrations && (
+        {/* Form sections - only show if integrations are available or not required, or in dry-run mode */}
+        {(hasRequiredIntegrations || dryRun) && (
           <>
+
             {/* Connections Section */}
             <EditableAccordionSection
               id="connections"
@@ -1974,7 +2021,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               }
             >
               <div className="space-y-4">
-                {executor.type === 'semaphore' && (
+                {!dryRun && executor.type === 'semaphore' && (
                   <div className="space-y-4">
                     <ValidationField
                       label="Integration"
@@ -2163,7 +2210,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   </div>
                 )}
 
-                {executor.type === 'github' && (
+                {!dryRun && executor.type === 'github' && (
                   <div className="space-y-4">
                     <ValidationField
                       label="Integration"
@@ -2310,7 +2357,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   </div>
                 )}
 
-                {executor.type === 'http' && (
+                {!dryRun && executor.type === 'http' && (
                   <div className="space-y-4">
                     <ValidationField
                       label="URL"

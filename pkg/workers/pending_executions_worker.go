@@ -80,10 +80,35 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return err
 	}
 
-	if stage.ResourceID == nil {
-		return w.handleExecutor(logger, spec, execution, stage)
+	//
+	// If the stage is in dry run mode, we use the no-op executor.
+	//
+	if stage.DryRun {
+		executor, err := w.Registry.NewExecutor(models.ExecutorTypeNoOp)
+		if err != nil {
+			return err
+		}
+
+		return w.handleExecutor(logger, executor, spec, execution, stage)
 	}
 
+	//
+	// If the stage is not connected to integration,
+	// we use an executor unrelated to integrations.
+	//
+	if stage.ResourceID == nil {
+		executor, err := w.Registry.NewExecutor(stage.ExecutorType)
+		if err != nil {
+			return err
+		}
+
+		return w.handleExecutor(logger, executor, spec, execution, stage)
+	}
+
+	//
+	// If the stage is connected to integration,
+	// we use an executor related to integrations.
+	//
 	return w.handleIntegrationExecutor(logger, spec, stage, execution)
 }
 
@@ -112,12 +137,7 @@ func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor cry
 	return secretMap, nil
 }
 
-func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte, execution models.StageExecution, stage *models.Stage) error {
-	executor, err := w.Registry.NewExecutor(stage.ExecutorType)
-	if err != nil {
-		return err
-	}
-
+func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, executor executors.Executor, spec []byte, execution models.StageExecution, stage *models.Stage) error {
 	response, err := executor.Execute(spec, executors.ExecutionParameters{
 		ExecutionID: execution.ID.String(),
 		StageID:     stage.ID.String(),

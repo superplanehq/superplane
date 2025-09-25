@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fFh7Dhcs3V5gmnFT6e9YounVnfEiAzZKY21jkf9iSsdQQ6qYPum7KspirCDb7ja
+\restrict EV5goSciBdjgTQ0NVIK8eFuD3fJHcjQoVtAmbcQOYWHg250GEJbG4mWiDRhrddV
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -470,7 +470,8 @@ CREATE TABLE public.stages (
     resource_id uuid,
     description text,
     executor_name text,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    dry_run boolean DEFAULT false
 );
 
 
@@ -1172,13 +1173,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fFh7Dhcs3V5gmnFT6e9YounVnfEiAzZKY21jkf9iSsdQQ6qYPum7KspirCDb7ja
+\unrestrict EV5goSciBdjgTQ0NVIK8eFuD3fJHcjQoVtAmbcQOYWHg250GEJbG4mWiDRhrddV
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict tn3e2sa1HfhP3Sri6UkzSgH4bp9AQ4sazFTQ6QXxadAUDyeN3rLdLk9QYV67pEe
+\restrict Zsp65to2xzq89ruTlQ9OYgicZnbAdb8UxXGXMLhZnMg5o8MWLNhdVxRi6vMKsvX
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1200,7 +1201,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250923143841	f
+20250924084313	f
 \.
 
 
@@ -1208,5 +1209,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tn3e2sa1HfhP3Sri6UkzSgH4bp9AQ4sazFTQ6QXxadAUDyeN3rLdLk9QYV67pEe
+\unrestrict Zsp65to2xzq89ruTlQ9OYgicZnbAdb8UxXGXMLhZnMg5o8MWLNhdVxRi6vMKsvX
 
