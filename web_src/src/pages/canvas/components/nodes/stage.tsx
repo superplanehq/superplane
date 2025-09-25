@@ -46,7 +46,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showEmitEventModal, setShowEmitEventModal] = useState(false);
   const triggerSectionValidationRef = useRef<(() => void) | null>(null);
   const setFieldErrorsRef = useRef<React.Dispatch<React.SetStateAction<Record<string, string>>> | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId } = useCanvasStore();
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId, updateConnectionSourceNames } = useCanvasStore();
 
   const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
     if (!errorMessage) return null;
@@ -336,6 +336,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           dryRun: currentFormData.dryRun
         };
         await updateStageMutation.mutateAsync(updateParams);
+
+        // Update connection source names if stage name changed
+        const oldStageName = currentStage.metadata?.name;
+        if (oldStageName && oldStageName !== stageName) {
+          updateConnectionSourceNames(oldStageName, stageName);
+        }
 
         updateStage({
           ...currentStage,
@@ -829,6 +835,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 return null;
               }
             }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onSubmit={async (eventType: string, eventData: any) => {
               await superplaneCreateEvent(withOrganizationHeader({
                 path: { canvasIdOrName: canvasId! },

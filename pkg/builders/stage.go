@@ -287,6 +287,16 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 
 		//
+		// Update connection source names if stage name changed (do this BEFORE deleting connections)
+		//
+		if b.existingStage.Name != b.newStage.Name {
+			err := models.UpdateReferencesAfterNameUpdateInTransaction(tx, b.existingStage.CanvasID, b.existingStage.ID, models.SourceTypeStage, b.existingStage.Name, b.newStage.Name)
+			if err != nil {
+				return fmt.Errorf("failed to update connection source names: %v", err)
+			}
+		}
+
+		//
 		// Delete existing connections
 		//
 		if err := tx.Where("target_id = ?", b.existingStage.ID).Delete(&models.Connection{}).Error; err != nil {

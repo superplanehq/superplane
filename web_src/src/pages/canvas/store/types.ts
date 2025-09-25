@@ -89,6 +89,7 @@ export interface CanvasState {
   updateEventSourceKey: (eventSourceId: string, key: string) => void;
   resetEventSourceKey: (eventSourceId: string) => void;
   setLockedNodes: (locked: boolean) => void;
+  updateConnectionSourceNames: (oldName: string, newName: string) => void;
 }
 
 export type Stage = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; executions: Array<SuperplaneExecution>; isDraft?: boolean}

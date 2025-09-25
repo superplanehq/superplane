@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/builders"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/test/support"
@@ -132,6 +134,56 @@ func Test__UpdateEventSource(t *testing.T) {
 		assert.NotEmpty(t, res.Key)
 	})
 
+	t.Run("connection source names are updated when event source name changes", func(t *testing.T) {
+		executorType, executorSpec, resource := support.Executor(t, r)
+
+		connectedStage, err := builders.NewStageBuilder(r.Registry).
+			WithContext(ctx).
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas.ID).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			WithConnections([]models.Connection{
+				{
+					SourceName: "standalone-event-source",
+					SourceType: models.SourceTypeEventSource,
+					SourceID:   uuid.MustParse(eventSource.EventSource.Metadata.Id),
+				},
+			}).
+			Create()
+
+		require.NoError(t, err)
+		connectedStageUUID, err := uuid.Parse(connectedStage.ID.String())
+		require.NoError(t, err)
+		dbConnections, err := models.ListConnections(connectedStageUUID, models.ConnectionTargetTypeStage)
+		require.NoError(t, err)
+		require.Len(t, dbConnections, 1)
+		assert.Equal(t, "standalone-event-source", dbConnections[0].SourceName)
+
+		_, err = UpdateEventSource(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), eventSourceID, &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: "updated-event-source-name",
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: r.Integration.Name,
+				},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		dbConnections, err = models.ListConnections(connectedStageUUID, models.ConnectionTargetTypeStage)
+		require.NoError(t, err)
+		require.Len(t, dbConnections, 1)
+		assert.Equal(t, "updated-event-source-name", dbConnections[0].SourceName)
+	})
+
 	t.Run("event source updated to add schedule", func(t *testing.T) {
 		res, err := UpdateEventSource(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), eventSourceID, &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
@@ -147,7 +199,6 @@ func Test__UpdateEventSource(t *testing.T) {
 				},
 			},
 		})
-
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Equal(t, eventSourceID, res.EventSource.Metadata.Id)

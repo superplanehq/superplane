@@ -22,7 +22,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId } = useCanvasStore();
+  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId, updateConnectionSourceNames } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
@@ -123,6 +123,12 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           timeout: currentFormData.timeout,
           timeoutBehavior: currentFormData.timeoutBehavior
         });
+
+        // Update connection source names if connection group name changed
+        const oldConnectionGroupName = currentConnectionGroup.metadata?.name;
+        if (oldConnectionGroupName && oldConnectionGroupName !== connectionGroupName) {
+          updateConnectionSourceNames(oldConnectionGroupName, connectionGroupName);
+        }
 
         updateConnectionGroup({
           ...currentConnectionGroup,
@@ -305,40 +311,40 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       {/* Header Section */}
       <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-start justify-between w-full">
-        <div className="flex items-start flex-1 min-w-0">
-          <div className='max-w-8 mt-1 flex items-center justify-center'>
-            <MaterialSymbol name="account_tree" size="lg" />
-          </div>
-          <div className="flex-1 min-w-0 ml-2">
-            <div className="mb-1">
-              <InlineEditable
-                value={connectionGroupName}
-                onSave={handleConnectionGroupNameChange}
-                placeholder="Connection group name"
-                className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
-                  nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
-                  isEditMode ? 'text-sm' : '')}
-                isEditMode={isEditMode}
-                autoFocus={!!isNewNode}
-                dataTestId="event-source-name-input"
-              />
-              {nameError && isEditMode && (
-                <div className="text-xs text-red-600 text-left mt-1 px-2">
-                  {nameError}
-                </div>
-              )}
+          <div className="flex items-start flex-1 min-w-0">
+            <div className='max-w-8 mt-1 flex items-center justify-center'>
+              <MaterialSymbol name="account_tree" size="lg" />
             </div>
-            <div>
-              {isEditMode && <InlineEditable
-                value={connectionGroupDescription}
-                onSave={handleConnectionGroupDescriptionChange}
-                placeholder={isEditMode ? "Add description..." : ""}
-                className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
-                isEditMode={isEditMode}
-              />}
+            <div className="flex-1 min-w-0 ml-2">
+              <div className="mb-1">
+                <InlineEditable
+                  value={connectionGroupName}
+                  onSave={handleConnectionGroupNameChange}
+                  placeholder="Connection group name"
+                  className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                    nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                    isEditMode ? 'text-sm' : '')}
+                  isEditMode={isEditMode}
+                  autoFocus={!!isNewNode}
+                  dataTestId="event-source-name-input"
+                />
+                {nameError && isEditMode && (
+                  <div className="text-xs text-red-600 text-left mt-1 px-2">
+                    {nameError}
+                  </div>
+                )}
+              </div>
+              <div>
+                {isEditMode && <InlineEditable
+                  value={connectionGroupDescription}
+                  onSave={handleConnectionGroupDescriptionChange}
+                  placeholder={isEditMode ? "Add description..." : ""}
+                  className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
+                  isEditMode={isEditMode}
+                />}
+              </div>
             </div>
           </div>
-        </div>
         </div>
         {!isEditMode && (
           <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || ''}</div>
