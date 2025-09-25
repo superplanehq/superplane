@@ -1,45 +1,52 @@
-import React, { JSX, useMemo } from 'react';
-import { ExecutionResult, SuperplaneExecutionState, SuperplaneEvent } from '@/api-client';
+import React, { JSX } from 'react';
+import { ExecutionResult, ExecutionResultReason, SuperplaneExecutionState, SuperplaneEvent, SuperplaneExecutionResource } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { PayloadDisplay } from '../PayloadDisplay';
 
 interface RunItemProps {
   state: SuperplaneExecutionState;
   result: ExecutionResult;
+  resultReason?: ExecutionResultReason;
+  resultMessage?: string;
   title: string;
   runId?: string;
   inputs: Record<string, string>;
   outputs: Record<string, string>;
+  resources?: SuperplaneExecutionResource[];
   timestamp: string;
   executionDuration?: string;
   eventId?: string;
   queuedOn?: string;
   approvedOn?: string;
   approvedBy?: string;
-  cancelledOn?: string;
-  cancelledBy?: string;
+  discardedOn?: string;
+  discardedBy?: string;
   sourceEvent?: SuperplaneEvent;
-  emmitedEvent?: SuperplaneEvent;
+  cancelledAt?: string;
+  finishedAt?: string;
   onCancel: () => void;
 }
 
 export const RunItem: React.FC<RunItemProps> = React.memo(({
   state,
   result,
+  resultReason,
+  resultMessage,
   title,
   runId,
   timestamp,
   executionDuration,
   inputs,
   outputs,
+  resources,
   eventId,
   queuedOn,
   approvedOn,
   approvedBy,
-  cancelledOn,
-  cancelledBy,
+  discardedOn,
+  discardedBy,
   sourceEvent,
-  emmitedEvent,
+  cancelledAt,
+  finishedAt,
   onCancel,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
@@ -47,11 +54,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   const toggleExpand = (): void => {
     setIsExpanded(!isExpanded);
   };
-
-  const sourceEventPayload = useMemo(() => sourceEvent?.raw, [sourceEvent]);
-  const sourceEventHeaders = useMemo(() => sourceEvent?.headers, [sourceEvent]);
-  const emmitedEventPayload = useMemo(() => emmitedEvent?.raw, [emmitedEvent]);
-  const emmitedEventHeaders = useMemo(() => emmitedEvent?.headers, [emmitedEvent]);
 
   const renderStatusBadge = (): JSX.Element => {
     switch (state) {
@@ -74,6 +76,17 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-red-500/15 text-red-700 group-hover:bg-red-500/25 dark:text-red-400 dark:group-hover:bg-red-500/25">
                 <MaterialSymbol name="cancel" size="sm" />
                 <span className="uppercase">failed</span>
+              </span>
+            </button>
+          );
+        }
+        if (result === 'RESULT_CANCELLED') {
+          return (
+            <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
+              <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
+              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-gray-500/15 text-gray-700 group-hover:bg-gray-500/25 dark:text-gray-400 dark:group-hover:bg-gray-500/25">
+                <MaterialSymbol name="block" size="sm" />
+                <span className="uppercase">cancelled</span>
               </span>
             </button>
           );
@@ -107,16 +120,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             </span>
           </button>
         );
-      case 'STATE_CANCELLED':
-        return (
-          <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
-            <span className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 pointer-fine:hidden" aria-hidden="true"></span>
-            <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-gray-500/15 text-gray-700 group-hover:bg-gray-500/25 dark:text-gray-400 dark:group-hover:bg-gray-500/25">
-              <MaterialSymbol name="block" size="sm" />
-              <span className="uppercase">cancelled</span>
-            </span>
-          </button>
-        );
       default:
         return (
           <button className="!flex !items-center group relative inline-flex rounded-md focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-gray-500 hover:bg-gray-500/10" type="button">
@@ -139,13 +142,14 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         if (result === 'RESULT_FAILED') {
           return 'border-t-red-400 dark:border-t-red-700';
         }
+        if (result === 'RESULT_CANCELLED') {
+          return 'border-t-gray-400 dark:border-t-gray-700';
+        }
         return 'border-t-gray-400 dark:border-t-gray-700';
       case 'STATE_PENDING':
         return 'border-t-orange-400 dark:border-t-orange-700';
       case 'STATE_STARTED':
         return 'border-t-blue-400 dark:border-t-blue-700';
-      case 'STATE_CANCELLED':
-        return 'border-t-gray-400 dark:border-t-gray-700';
       default:
         return 'border-t-gray-400 dark:border-t-gray-700';
     }
@@ -166,7 +170,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                   </div>
                 )}
               </div>
-              {['STATE_PENDING', 'STATE_STARTED'].includes(state) && (
+              {['STATE_PENDING', 'STATE_STARTED'].includes(state) && !cancelledAt && (
                 <span onClick={(e) => {
                   e.stopPropagation();
                   onCancel?.()
@@ -222,38 +226,37 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         {isExpanded && (
           <div className="mt-3 space-y-4 text-left">
             {/* Run Section */}
-            {(state === 'STATE_CANCELLED' && (cancelledOn || cancelledBy)) && (
-              <div className="space-y-3">
-                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  Run
-                </div>
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                Run
+              </div>
 
-                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1">
-                      <MaterialSymbol name="calendar_today" size="md" className="text-gray-600 dark:text-zinc-400" />
-                      <span className="text-xs text-gray-500 dark:text-zinc-400">
-                        Started on {new Date(timestamp).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })} {new Date(timestamp).toLocaleTimeString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                          hour12: false
-                        })}
-                      </span>
-                    </div>
-                    {cancelledOn && (
+              <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <MaterialSymbol name="calendar_today" size="md" className="text-gray-600 dark:text-zinc-400" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                      Started on {new Date(timestamp).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })} {new Date(timestamp).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                      })}
+                    </span>
+                  </div>
+                    {finishedAt && state === 'STATE_FINISHED' && (
                       <div className="flex items-center gap-1">
-                        <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <MaterialSymbol name="event_available" size="md" className="text-gray-600 dark:text-zinc-400" />
                         <span className="text-xs text-gray-500 dark:text-zinc-400">
-                          Cancelled on {new Date(cancelledOn).toLocaleDateString('en-US', {
+                          Finished on {new Date(finishedAt).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric'
-                          })} {new Date(cancelledOn).toLocaleTimeString('en-US', {
+                          })} {new Date(finishedAt).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',
@@ -262,39 +265,181 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                         </span>
                       </div>
                     )}
-                    {cancelledBy && (
+                    {executionDuration && (
                       <div className="flex items-center gap-1">
-                        <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
-                        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{cancelledBy}</span>
+                        <MaterialSymbol name="timer" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Duration: <span className="text-gray-800 dark:text-gray-200 font-medium">{executionDuration}</span>
                         </span>
                       </div>
                     )}
+                  <div className="flex items-center gap-1">
+                    <MaterialSymbol name="info" size="md" className="text-gray-600 dark:text-zinc-400" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                      State: <span className="text-gray-800 dark:text-gray-200 font-medium">{state.replace('STATE_', '').toLowerCase()}</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MaterialSymbol name="info" size="md" className="text-gray-600 dark:text-zinc-400" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                      Result: <span className="text-gray-800 dark:text-gray-200 font-medium">{result.replace('RESULT_', '').toLowerCase()}</span>
+                    </span>
+                  </div>
+                    {discardedOn && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Discarded on {new Date(discardedOn).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(discardedOn).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {cancelledAt && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Cancelled on {new Date(cancelledAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })} {new Date(cancelledAt).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {discardedBy && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{discardedBy}</span>
+                        </span>
+                      </div>
+                    )}
+                    {result === 'RESULT_FAILED' && resultReason && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="info" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Reason: <span className="text-gray-800 dark:text-gray-200 font-medium">{resultReason.replace('RESULT_REASON_', '').toLowerCase().replace('_', ' ')}</span>
+                        </span>
+                      </div>
+                    )}
+                    {result === 'RESULT_FAILED' && resultMessage && (
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <MaterialSymbol name="message" size="md" className="text-gray-600 dark:text-zinc-400" />
+                          <span className="text-xs text-gray-500 dark:text-zinc-400">Message</span>
+                        </div>
+                        <div className="text-xs text-gray-800 dark:text-gray-200 pl-6 break-words">
+                          {resultMessage}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Resources Sub-Section */}
+                  {resources && resources.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-600">
+                      <div className="text-xs font-semibold text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                        External Resources
+                      </div>
+                      <div className="space-y-2">
+                        {resources.map((resource) => (
+                          <div key={resource.id} className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MaterialSymbol name="inventory_2" size="sm" className="text-gray-500 dark:text-zinc-400 flex-shrink-0" />
+                              <div className="text-xs text-gray-800 dark:text-gray-200 font-medium break-all">
+                                {resource.id}
+                              </div>
+                            </div>
+                            <div className="pl-6 space-y-1">
+                              {resource.type && (
+                                <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                  Type: {resource.type}
+                                </div>
+                              )}
+                              <div className="space-y-1">
+                                {resource.state && (
+                                  <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                    State: <span className="font-medium">{resource.state.toLowerCase()}</span>
+                                  </div>
+                                )}
+                                {resource.result && (
+                                  <div className="text-xs text-gray-500 dark:text-zinc-400">
+                                    Result: <span className="font-medium">{resource.result.toLowerCase()}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            {/* Inputs Section */}
+            {Object.keys(inputs).length > 0 && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                  Inputs
+                </div>
+
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    {Object.entries(inputs).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <MaterialSymbol name="input" size="md" className="text-gray-600 dark:text-zinc-400 flex-shrink-0" />
+                          <span className="text-xs text-gray-800 dark:text-gray-200 font-medium truncate">
+                            {key}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-700 dark:text-gray-300 text-right">
+                          {value}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Run Details Section */}
-            {(Object.keys(inputs).length > 0 || Object.keys(outputs).length > 0 || (emmitedEvent && (emmitedEventPayload || emmitedEventHeaders))) && (
+            {/* Outputs Section */}
+            {Object.keys(outputs).length > 0 && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                  {state === 'STATE_CANCELLED' ? 'Event' : 'Run'}
+                  Outputs
                 </div>
-                <div>
-                  <PayloadDisplay
-                    showDetailsTab={false}
-                    eventId={emmitedEvent?.id}
-                    timestamp={emmitedEvent?.receivedAt}
-                    state={emmitedEvent?.state}
-                    eventType={emmitedEvent?.type}
-                    sourceName={emmitedEvent?.sourceName}
-                    headers={emmitedEventHeaders}
-                    payload={emmitedEventPayload}
-                    inputs={inputs}
-                    outputs={outputs}
-                    rounded={false}
-                  />
+
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    {Object.entries(outputs).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <MaterialSymbol name="output" size="md" className="text-gray-600 dark:text-zinc-400 flex-shrink-0" />
+                          <span className="text-xs text-gray-800 dark:text-gray-200 font-medium truncate">
+                            {key}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-700 dark:text-gray-300 text-right">
+                          {value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -356,23 +501,40 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
             )}
 
             {/* Trigger Event Details Section */}
-            {sourceEvent && (sourceEventPayload || sourceEventHeaders) && (
+            {sourceEvent && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Trigger Event
                 </div>
 
-                <PayloadDisplay
-                  showDetailsTab={true}
-                  eventId={sourceEvent.id}
-                  timestamp={sourceEvent.receivedAt}
-                  state={sourceEvent.state}
-                  eventType={sourceEvent.type}
-                  sourceName={sourceEvent.sourceName}
-                  headers={sourceEventHeaders}
-                  payload={sourceEventPayload}
-                  rounded={false}
-                />
+                <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                  <div className="space-y-1">
+                    {sourceEvent.id && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="tag" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          ID: <span className="text-blue-600 dark:text-blue-400 font-mono">{sourceEvent.id}</span>
+                        </span>
+                      </div>
+                    )}
+                    {sourceEvent.type && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="category" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Type: <span className="text-gray-800 dark:text-gray-200 font-mono">{sourceEvent.type}</span>
+                        </span>
+                      </div>
+                    )}
+                    {sourceEvent.sourceName && (
+                      <div className="flex items-center gap-1">
+                        <MaterialSymbol name="source" size="md" className="text-gray-600 dark:text-zinc-400" />
+                        <span className="text-xs text-gray-500 dark:text-zinc-400">
+                          Source: <span className="text-gray-800 dark:text-gray-200">{sourceEvent.sourceName}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>

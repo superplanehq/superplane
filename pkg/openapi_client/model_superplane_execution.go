@@ -24,11 +24,15 @@ type SuperplaneExecution struct {
 	Id *string `json:"id,omitempty"`
 	State *SuperplaneExecutionState `json:"state,omitempty"`
 	Result *ExecutionResult `json:"result,omitempty"`
+	ResultReason *ExecutionResultReason `json:"resultReason,omitempty"`
+	ResultMessage *string `json:"resultMessage,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
+	CancelledAt *time.Time `json:"cancelledAt,omitempty"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	Outputs []SuperplaneOutputValue `json:"outputs,omitempty"`
 	Resources []SuperplaneExecutionResource `json:"resources,omitempty"`
+	StageEvent *SuperplaneStageEvent `json:"stageEvent,omitempty"`
 }
 
 // NewSuperplaneExecution instantiates a new SuperplaneExecution object
@@ -41,6 +45,8 @@ func NewSuperplaneExecution() *SuperplaneExecution {
 	this.State = &state
 	var result ExecutionResult = EXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
+	var resultReason ExecutionResultReason = EXECUTIONRESULTREASON_RESULT_REASON_OK
+	this.ResultReason = &resultReason
 	return &this
 }
 
@@ -53,6 +59,8 @@ func NewSuperplaneExecutionWithDefaults() *SuperplaneExecution {
 	this.State = &state
 	var result ExecutionResult = EXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
+	var resultReason ExecutionResultReason = EXECUTIONRESULTREASON_RESULT_REASON_OK
+	this.ResultReason = &resultReason
 	return &this
 }
 
@@ -152,6 +160,70 @@ func (o *SuperplaneExecution) SetResult(v ExecutionResult) {
 	o.Result = &v
 }
 
+// GetResultReason returns the ResultReason field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetResultReason() ExecutionResultReason {
+	if o == nil || IsNil(o.ResultReason) {
+		var ret ExecutionResultReason
+		return ret
+	}
+	return *o.ResultReason
+}
+
+// GetResultReasonOk returns a tuple with the ResultReason field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetResultReasonOk() (*ExecutionResultReason, bool) {
+	if o == nil || IsNil(o.ResultReason) {
+		return nil, false
+	}
+	return o.ResultReason, true
+}
+
+// HasResultReason returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasResultReason() bool {
+	if o != nil && !IsNil(o.ResultReason) {
+		return true
+	}
+
+	return false
+}
+
+// SetResultReason gets a reference to the given ExecutionResultReason and assigns it to the ResultReason field.
+func (o *SuperplaneExecution) SetResultReason(v ExecutionResultReason) {
+	o.ResultReason = &v
+}
+
+// GetResultMessage returns the ResultMessage field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetResultMessage() string {
+	if o == nil || IsNil(o.ResultMessage) {
+		var ret string
+		return ret
+	}
+	return *o.ResultMessage
+}
+
+// GetResultMessageOk returns a tuple with the ResultMessage field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetResultMessageOk() (*string, bool) {
+	if o == nil || IsNil(o.ResultMessage) {
+		return nil, false
+	}
+	return o.ResultMessage, true
+}
+
+// HasResultMessage returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasResultMessage() bool {
+	if o != nil && !IsNil(o.ResultMessage) {
+		return true
+	}
+
+	return false
+}
+
+// SetResultMessage gets a reference to the given string and assigns it to the ResultMessage field.
+func (o *SuperplaneExecution) SetResultMessage(v string) {
+	o.ResultMessage = &v
+}
+
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
 func (o *SuperplaneExecution) GetCreatedAt() time.Time {
 	if o == nil || IsNil(o.CreatedAt) {
@@ -214,6 +286,38 @@ func (o *SuperplaneExecution) HasStartedAt() bool {
 // SetStartedAt gets a reference to the given time.Time and assigns it to the StartedAt field.
 func (o *SuperplaneExecution) SetStartedAt(v time.Time) {
 	o.StartedAt = &v
+}
+
+// GetCancelledAt returns the CancelledAt field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetCancelledAt() time.Time {
+	if o == nil || IsNil(o.CancelledAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.CancelledAt
+}
+
+// GetCancelledAtOk returns a tuple with the CancelledAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetCancelledAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.CancelledAt) {
+		return nil, false
+	}
+	return o.CancelledAt, true
+}
+
+// HasCancelledAt returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasCancelledAt() bool {
+	if o != nil && !IsNil(o.CancelledAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetCancelledAt gets a reference to the given time.Time and assigns it to the CancelledAt field.
+func (o *SuperplaneExecution) SetCancelledAt(v time.Time) {
+	o.CancelledAt = &v
 }
 
 // GetFinishedAt returns the FinishedAt field value if set, zero value otherwise.
@@ -312,6 +416,38 @@ func (o *SuperplaneExecution) SetResources(v []SuperplaneExecutionResource) {
 	o.Resources = v
 }
 
+// GetStageEvent returns the StageEvent field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetStageEvent() SuperplaneStageEvent {
+	if o == nil || IsNil(o.StageEvent) {
+		var ret SuperplaneStageEvent
+		return ret
+	}
+	return *o.StageEvent
+}
+
+// GetStageEventOk returns a tuple with the StageEvent field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetStageEventOk() (*SuperplaneStageEvent, bool) {
+	if o == nil || IsNil(o.StageEvent) {
+		return nil, false
+	}
+	return o.StageEvent, true
+}
+
+// HasStageEvent returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasStageEvent() bool {
+	if o != nil && !IsNil(o.StageEvent) {
+		return true
+	}
+
+	return false
+}
+
+// SetStageEvent gets a reference to the given SuperplaneStageEvent and assigns it to the StageEvent field.
+func (o *SuperplaneExecution) SetStageEvent(v SuperplaneStageEvent) {
+	o.StageEvent = &v
+}
+
 func (o SuperplaneExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -331,11 +467,20 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Result) {
 		toSerialize["result"] = o.Result
 	}
+	if !IsNil(o.ResultReason) {
+		toSerialize["resultReason"] = o.ResultReason
+	}
+	if !IsNil(o.ResultMessage) {
+		toSerialize["resultMessage"] = o.ResultMessage
+	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt
 	}
 	if !IsNil(o.StartedAt) {
 		toSerialize["startedAt"] = o.StartedAt
+	}
+	if !IsNil(o.CancelledAt) {
+		toSerialize["cancelledAt"] = o.CancelledAt
 	}
 	if !IsNil(o.FinishedAt) {
 		toSerialize["finishedAt"] = o.FinishedAt
@@ -345,6 +490,9 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Resources) {
 		toSerialize["resources"] = o.Resources
+	}
+	if !IsNil(o.StageEvent) {
+		toSerialize["stageEvent"] = o.StageEvent
 	}
 	return toSerialize, nil
 }

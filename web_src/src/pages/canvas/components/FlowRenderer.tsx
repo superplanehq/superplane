@@ -26,28 +26,18 @@ export const FlowRenderer: React.FC = () => {
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
   const setFocusedNodeId = useCanvasStore((state) => state.setFocusedNodeId);
-  const fitViewNode = useCanvasStore((state) => state.fitViewNode);
-  const setFitViewNodeRef = useCanvasStore((state) => state.setFitViewNodeRef);
   const lockedNodes = useCanvasStore((state) => state.lockedNodes);
   const setLockedNodes = useCanvasStore((state) => state.setLockedNodes);
 
   const { applyElkAutoLayout } = useAutoLayout();
-  const { onNodeDragStop, onInit, fitViewToNode } = useFlowHandlers();
-
-  React.useEffect(() => {
-    setFitViewNodeRef(fitViewToNode);
-  }, [fitViewToNode, setFitViewNodeRef]);
+  const { onNodeDragStop, onInit } = useFlowHandlers();
 
   const animatedEdges = useMemo(() => {
     const runningEdges = new Set<string>();
 
     stages.forEach(stage => {
-      const allExecutions = stage.queue?.flatMap(event => ({ ...event.execution, sourceId: event.sourceId }))
-        .filter(execution => execution)
-        .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [];
-
-      const executionsRunning = allExecutions.filter(execution => execution?.state === 'STATE_STARTED');
-      const sourceIdStageIdPairs = executionsRunning.map(execution => `${execution.sourceId}-${stage.metadata?.id}`);
+      const executionsRunning = stage.executions?.filter(execution => execution?.state === 'STATE_STARTED') || [];
+      const sourceIdStageIdPairs = executionsRunning.map(execution => `${execution.stageEvent?.triggerEvent?.sourceId}-${stage.metadata?.id}`);
       const isRunning = sourceIdStageIdPairs.length > 0;
 
       if (isRunning) {
@@ -73,7 +63,6 @@ export const FlowRenderer: React.FC = () => {
         onNodeDragStop={onNodeDragStop}
         onNodeClick={(_, node) => {
           setFocusedNodeId(node.id);
-          fitViewNode(node.id);
         }}
         onNodeDrag={(_, node) => {
           setFocusedNodeId(node.id)
@@ -87,6 +76,7 @@ export const FlowRenderer: React.FC = () => {
         minZoom={0.4}
         maxZoom={1.5}
         colorMode={"system"}
+        onBeforeDelete={async () => false}
       >
         <FlowControls
           onAutoLayout={applyElkAutoLayout}

@@ -1,6 +1,6 @@
 import { SuperplaneConnectionGroup, SuperplaneEventSource, SuperplaneStageEvent } from "@/api-client/types.gen";
 import { AllNodeType, EdgeType } from "../types/flow";
-import { EventSourceWithEvents, StageWithEventQueue } from "../store/types";
+import { EventSourceWithEvents, Stage } from "../store/types";
 import { ConnectionLineType, Edge, MarkerType } from "@xyflow/react";
 import { DEFAULT_HEIGHT, DEFAULT_WIDTH } from "./constants";
 import { ElkExtendedEdge, ElkNode } from "elkjs";
@@ -23,7 +23,7 @@ export const transformEventSourcesToNodes = (
           return timeB - timeA;
         }).slice(0, 3)
       : [];
-    
+      
     return ({
       id: es.metadata?.id || '',
       type: 'event_source',
@@ -31,11 +31,12 @@ export const transformEventSourcesToNodes = (
         id: es.metadata?.id || '',
         name: es.metadata?.name,
         description: es.metadata?.description,
-        eventFilters: es.eventFilters,
+        eventFilters: es.spec?.events,
         events: lastEvents,
         integration: es.spec?.integration,
         resource: es.spec?.resource,
         eventSourceType: es.eventSourceType,
+        schedule: es.spec?.schedule,
       },
       position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
     }) as unknown as AllNodeType;
@@ -43,7 +44,7 @@ export const transformEventSourcesToNodes = (
 };
 
 export const transformStagesToNodes = (
-  stages: StageWithEventQueue[],
+  stages: Stage[],
   nodePositions: NodePositions,
   approveStageEvent: (eventId: string, stageId: string) => void
 ): AllNodeType[] => {
@@ -100,7 +101,7 @@ export const transformConnectionGroupsToNodes = (
 };
 
 export const transformToEdges = (
-  stages: StageWithEventQueue[],
+  stages: Stage[],
   connectionGroups: SuperplaneConnectionGroup[],
   eventSources: SuperplaneEventSource[]
 ): EdgeType[] => {

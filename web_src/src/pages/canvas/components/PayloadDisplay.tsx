@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { twMerge } from 'tailwind-merge';
 import { PayloadModal } from './PayloadModal';
+import JsonView from '@uiw/react-json-view';
+import { lightTheme } from '@uiw/react-json-view/light';
+import { darkTheme } from '@uiw/react-json-view/dark';
 
 interface PayloadDisplayProps {
   headers?: { [key: string]: unknown };
@@ -9,44 +12,31 @@ interface PayloadDisplayProps {
   // Details tab props
   eventId?: string;
   timestamp?: string;
-  state?: string;
   eventType?: string;
   sourceName?: string;
   showDetailsTab?: boolean;
-  // Inputs/Outputs props
-  inputs?: Record<string, string>;
-  outputs?: Record<string, string>;
   rounded?: boolean;
 }
 
-type TabType = 'details' | 'headers' | 'payload' | 'inputs' | 'outputs';
+type TabType = 'details' | 'headers' | 'payload';
 
 export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   headers,
   payload,
   eventId,
   timestamp,
-  state,
   eventType,
   sourceName,
   showDetailsTab = false,
-  inputs,
-  outputs,
   rounded = true,
 }) => {
   const displayHeaders = headers || {};
   const displayPayload = payload || {};
-  const displayInputs = inputs || {};
-  const displayOutputs = outputs || {};
 
   const hasHeaders = Object.keys(displayHeaders).length > 0;
   const hasPayload = Object.keys(displayPayload).length > 0;
-  const hasInputs = Object.keys(displayInputs).length > 0;
-  const hasOutputs = Object.keys(displayOutputs).length > 0;
 
   const getDefaultTab = (): TabType => {
-    if (hasInputs) return 'inputs';
-    if (hasOutputs) return 'outputs';
     if (showDetailsTab) return 'details';
     if (hasHeaders) return 'headers';
     if (hasPayload) return 'payload';
@@ -55,42 +45,25 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
 
   const [activeTab, setActiveTab] = useState<TabType>(getDefaultTab());
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // State configuration for details tab
-  const getStateConfig = () => {
-    switch (state) {
-      case 'STATE_PENDING':
-        return {
-          dotColor: 'bg-yellow-500',
-          textColor: 'text-yellow-700 dark:text-yellow-400',
-          label: 'Pending',
-          animate: true,
-        };
-      case 'STATE_DISCARDED':
-        return {
-          dotColor: 'bg-zinc-500',
-          textColor: 'text-zinc-600 dark:text-zinc-400',
-          label: 'Discarded',
-          animate: false,
-        };
-      case 'STATE_PROCESSED':
-        return {
-          dotColor: 'bg-green-500',
-          textColor: 'text-green-600 dark:text-green-400',
-          label: 'Forwarded',
-          animate: false,
-        };
-      default:
-        return {
-          dotColor: 'bg-gray-500',
-          textColor: 'text-gray-600 dark:text-gray-400',
-          label: 'Unknown',
-          animate: false,
-        };
-    }
-  };
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    };
 
-  const stateConfig = getStateConfig();
+    checkDarkMode();
+
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
 
   const formatTimestamp = () => {
     if (!timestamp) return 'N/A';
@@ -138,15 +111,6 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-6 text-sm">
               <div>
-                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">STATE</div>
-                <div className="text-blue-600 dark:text-blue-400 text-xs font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 ${stateConfig.dotColor} ${stateConfig.animate ? 'animate-pulse' : ''} ${rounded ? 'rounded-full' : 'rounded'} flex-shrink-0`}></div>
-                    <span className={`text-xs font-medium ${stateConfig.textColor}`}>{stateConfig.label}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
                 <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">RECEIVED ON</div>
                 <div className="text-xs text-gray-900 dark:text-zinc-200">{formatTimestamp()}</div>
               </div>
@@ -156,13 +120,11 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
               </div>
               <div>
                 <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">TYPE</div>
-                <div className="text-xs font-medium">{eventType || 'webhook'}</div>
+                <div className="text-xs text-gray-900 dark:text-zinc-200 font-medium">{eventType || 'webhook'}</div>
               </div>
-              <div className="col-span-2">
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">EVENT ID</div>
-                  <div className="font-mono text-xs text-gray-900 dark:text-zinc-200 break-all">{eventId}</div>
-                </div>
+              <div>
+                <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">EVENT ID</div>
+                <div className="font-mono text-xs text-gray-900 dark:text-zinc-200 break-all">{eventId}</div>
               </div>
             </div>
           </div>
@@ -216,68 +178,24 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
             </div>
             <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
               {Object.keys(displayPayload).length > 0 ? (
-                <pre className="text-xs font-mono text-gray-900 dark:text-zinc-200 whitespace-pre-wrap">
-                  {JSON.stringify(displayPayload, null, 2)}
-                </pre>
+                <JsonView
+                  value={displayPayload}
+                  style={{
+                    fontSize: '12px',
+                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                    backgroundColor: 'transparent',
+                    ...(isDarkMode ? darkTheme : lightTheme)
+                  }}
+                  displayDataTypes={false}
+                  displayObjectSize={false}
+                  enableClipboard={false}
+                  collapsed={false}
+                />
               ) : (
                 <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
                   No payload available
                 </div>
               )}
-            </div>
-          </div>
-        );
-      case 'inputs':
-        return (
-          <div>
-            <div className="space-y-2">
-              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
-                {Object.keys(displayInputs).length > 0 ? (
-                  <div className="space-y-2">
-                    {Object.entries(displayInputs).map(([key, value]) => (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium pr-2 flex-shrink-0">
-                          {key}
-                        </span>
-                        <span className="text-xs font-mono text-gray-900 dark:text-zinc-200 break-all">
-                          {value || '-'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
-                    No inputs available
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      case 'outputs':
-        return (
-          <div>
-            <div className="space-y-2">
-              <div className="bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700 p-3 max-h-60 overflow-y-auto">
-                {Object.keys(displayOutputs).length > 0 ? (
-                  <div className="space-y-2">
-                    {Object.entries(displayOutputs).map(([key, value]) => (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium pr-2 flex-shrink-0">
-                          {key}
-                        </span>
-                        <span className="text-xs font-mono text-gray-900 dark:text-zinc-200 break-all">
-                          {value || '-'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-500 dark:text-zinc-400 italic">
-                    No outputs available
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         );
@@ -287,7 +205,7 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
   };
 
   // Don't render if no data to display
-  if (!hasHeaders && !hasPayload && !hasInputs && !hasOutputs && !showDetailsTab) {
+  if (!hasHeaders && !hasPayload && !showDetailsTab) {
     return null;
   }
 
@@ -298,8 +216,6 @@ export const PayloadDisplay: React.FC<PayloadDisplayProps> = ({
           <div className="border-b border-gray-200 dark:border-zinc-700">
             <div className="w-full border-b border-zinc-200 dark:border-zinc-700">
               <nav className="flex gap-0">
-                {hasInputs && renderTabButton('inputs', 'Inputs')}
-                {hasOutputs && renderTabButton('outputs', 'Outputs')}
                 {showDetailsTab && renderTabButton('details', 'Details')}
                 {hasHeaders && renderTabButton('headers', 'Headers')}
                 {hasPayload && renderTabButton('payload', 'Payload')}

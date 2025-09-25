@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Editor from '@monaco-editor/react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { Button } from '@/components/Button/button';
 
@@ -16,6 +17,24 @@ export function PayloadModal({
   title,
   content
 }: PayloadModalProps) {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    };
+
+    checkDarkMode();
+
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -71,13 +90,30 @@ export function PayloadModal({
 
         {/* Content */}
         <div className="flex-1 border-b border-gray-200 dark:border-zinc-700 overflow-hidden">
-          <div className="h-full p-4">
-            <div className="bg-gray-50 dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-700 h-full overflow-hidden">
-              <pre className="p-4 text-sm font-mono text-gray-900 dark:text-zinc-100 overflow-auto h-full whitespace-pre-wrap break-words">
-                {formattedContent}
-              </pre>
-            </div>
-          </div>
+          <Editor
+            height="100%"
+            defaultLanguage="json"
+            value={formattedContent}
+            theme={isDarkMode ? 'vs-dark' : 'vs'}
+            options={{
+              readOnly: true,
+              minimap: { enabled: false },
+              fontSize: 14,
+              lineNumbers: 'on',
+              rulers: [],
+              wordWrap: 'on',
+              folding: true,
+              bracketPairColorization: {
+                enabled: true
+              },
+              scrollBeyondLastLine: false,
+              renderWhitespace: 'boundary',
+              smoothScrolling: true,
+              cursorBlinking: 'smooth',
+              contextmenu: false,
+              selectOnLineNumbers: false
+            }}
+          />
         </div>
 
         {/* Footer */}

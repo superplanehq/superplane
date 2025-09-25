@@ -52,6 +52,13 @@ type ResourceManager interface {
 	Status(resourceType, id string, parentResource Resource) (StatefulResource, error)
 
 	//
+	// Cancel a resource.
+	// Used by the execution poller to cancel execution resources,
+	// when an execution is cancelled.
+	//
+	Cancel(resourceType, id string, parentResource Resource) error
+
+	//
 	// Configure the webhook for a integration resource.
 	// This method might be called multiple times for the same parent resource,
 	// so it should also update webhook-related resources, if needed.

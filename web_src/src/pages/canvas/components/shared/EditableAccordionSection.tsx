@@ -4,7 +4,7 @@ import { RevertButton } from '../RevertButton';
 
 interface EditableAccordionSectionProps {
   id: string;
-  title: string;
+  title: string | React.ReactNode;
   isOpen: boolean;
   onToggle: (sectionId: string) => void;
   isModified: boolean;
@@ -14,6 +14,8 @@ interface EditableAccordionSectionProps {
   requiredBadge?: boolean;
   children: React.ReactNode;
   validationError?: string;
+  className?: string;
+  hasError?: boolean;
 }
 
 export function EditableAccordionSection({
@@ -27,12 +29,18 @@ export function EditableAccordionSection({
   countLabel,
   requiredBadge = false,
   children,
-  validationError
+  validationError,
+  className,
+  hasError = false
 }: EditableAccordionSectionProps) {
   const titleContent = (
     <div className="flex items-center justify-between w-full">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-zinc-600 dark:text-zinc-100">{title}</span>
+        {typeof title === 'string' ? (
+          <span className={`text-sm ${hasError ? 'text-red-600 dark:text-red-400' : 'text-zinc-600 dark:text-zinc-100'}`}>{title}</span>
+        ) : (
+          <div className={`text-sm ${hasError ? 'text-red-600 dark:text-red-400' : 'text-zinc-600 dark:text-zinc-100'}`}>{title}</div>
+        )}
         <RevertButton
           sectionId={id}
           isModified={isModified}
@@ -58,6 +66,7 @@ export function EditableAccordionSection({
       title={titleContent}
       isOpen={isOpen}
       onToggle={onToggle}
+      className={className}
     >
       <div className="space-y-2">
         {validationError && (

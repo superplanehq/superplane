@@ -15,7 +15,6 @@ import (
 type Organization struct {
 	ID               uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Name             string    `gorm:"uniqueIndex"`
-	DisplayName      string
 	Description      string
 	AllowedProviders datatypes.JSONSlice[string]
 	CreatedAt        *time.Time
@@ -32,7 +31,7 @@ func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
 
 	err := database.Conn().
 		Where("id IN (?)", ids).
-		Order("display_name ASC").
+		Order("name ASC").
 		Find(&organizations).
 		Error
 
@@ -73,11 +72,10 @@ func FindOrganizationByName(name string) (*Organization, error) {
 	return &organization, nil
 }
 
-func CreateOrganization(name, displayName, description string) (*Organization, error) {
+func CreateOrganization(name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
 		Name:             name,
-		DisplayName:      displayName,
 		Description:      description,
 		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub},
 		CreatedAt:        &now,

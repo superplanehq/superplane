@@ -19,39 +19,40 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"reflect"
 )
 
 
 // EventAPIService EventAPI service
 type EventAPIService service
 
-type ApiSuperplaneBulkListEventsRequest struct {
+type ApiSuperplaneCreateEventRequest struct {
 	ctx context.Context
 	ApiService *EventAPIService
 	canvasIdOrName string
-	body *SuperplaneBulkListEventsBody
+	body *SuperplaneCreateEventBody
 }
 
-func (r ApiSuperplaneBulkListEventsRequest) Body(body SuperplaneBulkListEventsBody) ApiSuperplaneBulkListEventsRequest {
+func (r ApiSuperplaneCreateEventRequest) Body(body SuperplaneCreateEventBody) ApiSuperplaneCreateEventRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiSuperplaneBulkListEventsRequest) Execute() (*SuperplaneBulkListEventsResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneBulkListEventsExecute(r)
+func (r ApiSuperplaneCreateEventRequest) Execute() (*SuperplaneCreateEventResponse, *http.Response, error) {
+	return r.ApiService.SuperplaneCreateEventExecute(r)
 }
 
 /*
-SuperplaneBulkListEvents Bulk list events
+SuperplaneCreateEvent Create an event
 
-Returns events for multiple sources in a single request to optimize loading performance
+Creates a new event for the specified canvas (canvas can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
- @return ApiSuperplaneBulkListEventsRequest
+ @return ApiSuperplaneCreateEventRequest
 */
-func (a *EventAPIService) SuperplaneBulkListEvents(ctx context.Context, canvasIdOrName string) ApiSuperplaneBulkListEventsRequest {
-	return ApiSuperplaneBulkListEventsRequest{
+func (a *EventAPIService) SuperplaneCreateEvent(ctx context.Context, canvasIdOrName string) ApiSuperplaneCreateEventRequest {
+	return ApiSuperplaneCreateEventRequest{
 		ApiService: a,
 		ctx: ctx,
 		canvasIdOrName: canvasIdOrName,
@@ -59,21 +60,21 @@ func (a *EventAPIService) SuperplaneBulkListEvents(ctx context.Context, canvasId
 }
 
 // Execute executes the request
-//  @return SuperplaneBulkListEventsResponse
-func (a *EventAPIService) SuperplaneBulkListEventsExecute(r ApiSuperplaneBulkListEventsRequest) (*SuperplaneBulkListEventsResponse, *http.Response, error) {
+//  @return SuperplaneCreateEventResponse
+func (a *EventAPIService) SuperplaneCreateEventExecute(r ApiSuperplaneCreateEventRequest) (*SuperplaneCreateEventResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneBulkListEventsResponse
+		localVarReturnValue  *SuperplaneCreateEventResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EventAPIService.SuperplaneBulkListEvents")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "EventAPIService.SuperplaneCreateEvent")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/events/bulk"
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/events"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -153,8 +154,9 @@ type ApiSuperplaneListEventsRequest struct {
 	canvasIdOrName string
 	sourceType *string
 	sourceId *string
-	limit *int32
+	limit *int64
 	before *time.Time
+	states *[]string
 }
 
 func (r ApiSuperplaneListEventsRequest) SourceType(sourceType string) ApiSuperplaneListEventsRequest {
@@ -167,13 +169,18 @@ func (r ApiSuperplaneListEventsRequest) SourceId(sourceId string) ApiSuperplaneL
 	return r
 }
 
-func (r ApiSuperplaneListEventsRequest) Limit(limit int32) ApiSuperplaneListEventsRequest {
+func (r ApiSuperplaneListEventsRequest) Limit(limit int64) ApiSuperplaneListEventsRequest {
 	r.limit = &limit
 	return r
 }
 
 func (r ApiSuperplaneListEventsRequest) Before(before time.Time) ApiSuperplaneListEventsRequest {
 	r.before = &before
+	return r
+}
+
+func (r ApiSuperplaneListEventsRequest) States(states []string) ApiSuperplaneListEventsRequest {
+	r.states = &states
 	return r
 }
 
@@ -234,6 +241,17 @@ func (a *EventAPIService) SuperplaneListEventsExecute(r ApiSuperplaneListEventsR
 	}
 	if r.before != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
+	}
+	if r.states != nil {
+		t := *r.states
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "states", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "states", t, "form", "multi")
+		}
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

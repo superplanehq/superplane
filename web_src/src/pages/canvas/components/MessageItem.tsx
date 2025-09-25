@@ -2,20 +2,16 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { SuperplaneStageEvent, SuperplaneStage, SuperplaneEvent } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { formatRelativeTime } from '../utils/stageEventUtils';
-import { PayloadDisplay } from './PayloadDisplay';
 
 interface MessageItemProps {
-  event: SuperplaneStageEvent | SuperplaneEvent;
+  event: SuperplaneStageEvent;
   sourceEvent?: SuperplaneEvent;
   selectedStage?: SuperplaneStage;
   onApprove?: (eventId: string) => void;
   onCancel?: (eventId: string) => void;
   onRemove?: (eventId: string) => void;
-  executionRunning?: boolean;
-  plainEventPayload?: { [key: string]: unknown };
-  plainEventHeaders?: { [key: string]: unknown };
-  cancelledOn?: string;
-  cancelledBy?: string;
+  discardedOn?: string;
+  discardedBy?: string;
   approvedOn?: string;
   approvedBy?: string;
 }
@@ -26,11 +22,9 @@ const MessageItem = React.memo(({
   onApprove,
   onCancel,
   onRemove,
-  plainEventPayload,
-  plainEventHeaders,
   sourceEvent,
-  cancelledOn,
-  cancelledBy,
+  discardedOn,
+  discardedBy,
   approvedOn,
   approvedBy
 }: MessageItemProps) => {
@@ -38,15 +32,7 @@ const MessageItem = React.memo(({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Type guard to determine if this is a SuperplaneStageEvent
-  const isStageEvent = (evt: SuperplaneStageEvent | SuperplaneEvent): evt is SuperplaneStageEvent => {
-    return 'inputs' in evt || 'stateReason' in evt;
-  };
 
-  // Type guard to determine if this is a SuperplaneEvent (discarded event)
-  const isPlainEvent = (evt: SuperplaneStageEvent | SuperplaneEvent): evt is SuperplaneEvent => {
-    return !isStageEvent(evt);
-  };
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -84,31 +70,6 @@ const MessageItem = React.memo(({
   }, []);
 
 
-  const mapEventInputs = useCallback(() => {
-    // Only show inputs for stage events, not plain events
-    if (isPlainEvent(event) || !selectedStage) {
-      return {};
-    }
-
-    const map: Record<string, string> = {};
-    const stageEvent = event as SuperplaneStageEvent;
-    const eventInputs = stageEvent.inputs?.map(input => [input.name, input.value]).reduce((acc, [key, value]) => {
-      acc[key!] = value!;
-      return acc;
-    }, {} as Record<string, string>);
-
-    selectedStage?.spec?.inputs?.forEach((input) => {
-      if (!input.name) {
-        return;
-      }
-
-      map[input.name!] = eventInputs?.[input.name!] || "-";
-    });
-
-    return map;
-  }, [event, selectedStage]);
-
-  const inputsRecord = useMemo(() => mapEventInputs(), [mapEventInputs]);
   const requiredApprovals = useMemo(() =>
     selectedStage?.spec?.conditions
       ?.find(condition => condition.type === "CONDITION_TYPE_APPROVAL")
@@ -130,12 +91,7 @@ const MessageItem = React.memo(({
   }, [timeWindowCondition]);
 
   const getRelativeTime = useCallback(() => {
-    let timestamp: string | undefined;
-    if (isStageEvent(event)) {
-      timestamp = event.createdAt;
-    } else {
-      timestamp = event.receivedAt;
-    }
+    const timestamp = event.createdAt;
     if (!timestamp) return 'now';
     return formatRelativeTime(timestamp, true);
   }, [event]);
@@ -145,22 +101,17 @@ const MessageItem = React.memo(({
       <div className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer" onClick={toggleExpand}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 truncate">
-            {isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' ? (
+            {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' ? (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-amber-400/20 text-amber-700 group-data-hover:bg-amber-400/30 dark:bg-amber-400/10 dark:text-amber-400 dark:group-data-hover:bg-amber-400/15">
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">how_to_reg</span>
                 <span className="uppercase">Approval</span>
               </span>
-            ) : isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' ? (
+            ) : event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' ? (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base animate-pulse" aria-hidden="true">schedule</span>
                 <span className="uppercase">Scheduled</span>
               </span>
-            ) : isStageEvent(event) && event.state === 'STATE_PROCESSED' && event.stateReason === 'STATE_REASON_CANCELLED' ? (
-              <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
-                <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base" aria-hidden="true">block</span>
-                <span className="uppercase">Cancelled</span>
-              </span>
-            ) : isPlainEvent(event) && event.state === 'STATE_DISCARDED' ? (
+            ) : event.state === 'STATE_DISCARDED' ? (
               <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
                 <span className="material-symbols-outlined select-none inline-flex items-center justify-center !text-base" aria-hidden="true">block</span>
                 <span className="uppercase">Discarded</span>
@@ -172,13 +123,25 @@ const MessageItem = React.memo(({
               </span>
             )}
             <span className="font-medium truncate text-sm dark:text-white">
-              {isStageEvent(event) ? (event.name || event.id || 'Unknown') : (event.id || 'Discarded Event')}
+              {event.name || event.id || 'Unknown'}
             </span>
           </div>
           <div className="flex items-center gap-3">
             {!isExpanded && (
               <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
                 {getRelativeTime()}
+              </span>
+            )}
+            {event.state === 'STATE_PENDING' && onCancel && (
+              <span
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleCancel();
+                }}
+                className="text-xs text-black dark:text-zinc-400 cursor-pointer underline"
+              >
+                Discard
               </span>
             )}
             <MaterialSymbol
@@ -191,8 +154,8 @@ const MessageItem = React.memo(({
 
         {isExpanded && (
           <div className="text-left mt-3 space-y-3">
-            {/* Queue Section - show for cancelled stage events */}
-            {isStageEvent(event) && event.state === 'STATE_PROCESSED' && event.stateReason === 'STATE_REASON_CANCELLED' && (event.createdAt || approvedOn || approvedBy || cancelledOn || cancelledBy) && (
+            {/* Queue Section - show for discarded stage events */}
+            {event.state === 'STATE_DISCARDED' && (event.createdAt || approvedOn || approvedBy || discardedOn || discardedBy) && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                   Queue
@@ -242,15 +205,15 @@ const MessageItem = React.memo(({
                         </span>
                       </div>
                     )}
-                    {cancelledOn && (
+                    {discardedOn && (
                       <div className="flex items-center gap-1">
                         <MaterialSymbol name="cancel" size="md" className="text-gray-600 dark:text-zinc-400" />
                         <span className="text-xs text-gray-500 dark:text-zinc-400">
-                          Cancelled on {new Date(cancelledOn).toLocaleDateString('en-US', {
+                          Discarded on {new Date(discardedOn).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric'
-                          })} {new Date(cancelledOn).toLocaleTimeString('en-US', {
+                          })} {new Date(discardedOn).toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit',
@@ -259,11 +222,11 @@ const MessageItem = React.memo(({
                         </span>
                       </div>
                     )}
-                    {cancelledBy && (
+                    {discardedBy && (
                       <div className="flex items-center gap-1">
                         <MaterialSymbol name="person" size="md" className="text-gray-600 dark:text-zinc-400" />
                         <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{cancelledBy}</span>
+                          Cancelled by <span className="text-blue-600 dark:text-blue-400 truncate">{discardedBy}</span>
                         </span>
                       </div>
                     )}
@@ -273,42 +236,68 @@ const MessageItem = React.memo(({
             )}
 
             <div className="mt-3 space-y-3">
-              {/* Show payload/headers for plain events */}
-              {isPlainEvent(event) && (plainEventPayload || plainEventHeaders) && (
+              {/* Show inputs */}
+              {event.inputs && event.inputs.length > 0 && (
                 <div className="space-y-3">
-                  <PayloadDisplay
-                    showDetailsTab={true}
-                    eventId={event.id}
-                    timestamp={event.receivedAt}
-                    state={event.state}
-                    eventType={event.type}
-                    sourceName={event.sourceName}
-                    headers={plainEventHeaders}
-                    payload={plainEventPayload}
-                    inputs={inputsRecord}
-                    rounded={false}
-                  />
+                  <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                    Inputs
+                  </div>
+
+                  <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                    <div className="space-y-1">
+                      {event.inputs.map((input) => (
+                        <div key={input.name} className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <MaterialSymbol name="input" size="md" className="text-gray-600 dark:text-zinc-400 flex-shrink-0" />
+                            <span className="text-xs text-gray-800 dark:text-gray-200 font-medium truncate">
+                              {input.name}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-700 dark:text-gray-300 text-right">
+                            {input.value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Show payload/headers for stage events */}
-              {isStageEvent(event) && sourceEvent && (plainEventPayload || plainEventHeaders) && (
+              {/* Show trigger event details */}
+              {sourceEvent && (
                 <div className="space-y-3">
-                  {(cancelledBy || cancelledOn) && <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-                    Event
-                  </div>}
-                  <PayloadDisplay
-                    showDetailsTab={true}
-                    eventId={sourceEvent.id}
-                    timestamp={sourceEvent.receivedAt}
-                    state={sourceEvent.state}
-                    eventType={sourceEvent.type}
-                    sourceName={sourceEvent.sourceName}
-                    headers={plainEventHeaders}
-                    payload={plainEventPayload}
-                    inputs={inputsRecord}
-                    rounded={false}
-                  />
+                  <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+                    Trigger Event
+                  </div>
+
+                  <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-4 text-xs">
+                    <div className="space-y-1">
+                      {sourceEvent.id && (
+                        <div className="flex items-center gap-1">
+                          <MaterialSymbol name="tag" size="md" className="text-gray-600 dark:text-zinc-400" />
+                          <span className="text-xs text-gray-500 dark:text-zinc-400">
+                            ID: <span className="text-blue-600 dark:text-blue-400 font-mono">{sourceEvent.id}</span>
+                          </span>
+                        </div>
+                      )}
+                      {sourceEvent.type && (
+                        <div className="flex items-center gap-1">
+                          <MaterialSymbol name="category" size="md" className="text-gray-600 dark:text-zinc-400" />
+                          <span className="text-xs text-gray-500 dark:text-zinc-400">
+                            Type: <span className="text-gray-800 dark:text-gray-200 font-mono">{sourceEvent.type}</span>
+                          </span>
+                        </div>
+                      )}
+                      {sourceEvent.sourceName && (
+                        <div className="flex items-center gap-1">
+                          <MaterialSymbol name="source" size="md" className="text-gray-600 dark:text-zinc-400" />
+                          <span className="text-xs text-gray-500 dark:text-zinc-400">
+                            Source: <span className="text-gray-800 dark:text-gray-200">{sourceEvent.sourceName}</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -316,8 +305,8 @@ const MessageItem = React.memo(({
         )}
       </div>
 
-      {/* Approval Footer - only for stage events */}
-      {isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' && (
+      {/* Approval Footer */}
+      {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_APPROVAL' && (
         <div className="px-3 py-2 border bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-700">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
@@ -373,25 +362,15 @@ const MessageItem = React.memo(({
         </div>
       )}
 
-      {/* Time Window Footer - only for stage events */}
-      {isStageEvent(event) && event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' && (
+      {/* Time Window Footer */}
+      {event.state === 'STATE_WAITING' && event.stateReason === 'STATE_REASON_TIME_WINDOW' && (
         <div className="px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center text-left">
               <MaterialSymbol name="schedule" size="md" className="text-orange-700 dark:text-orange-200 mr-2" />
               <span className="text-xs text-gray-700 dark:text-zinc-400">{formatTimeWindow()}</span>
             </div>
-            <span onClick={() => onCancel?.(event.id || '')} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Cancel</span>
-          </div>
-        </div>
-      )}
-
-      {/* Time Window Footer - only for stage events */}
-      {isStageEvent(event) && event.state === 'STATE_PENDING' && (
-        <div className="px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-700 dark:text-zinc-400">Waiting for execution</span>
-            <span onClick={() => onCancel?.(event.id || '')} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Cancel</span>
+            <span onClick={() => onCancel?.(event.id || '')} className="text-xs text-black dark:text-zinc-400 cursor-pointer underline">Discard</span>
           </div>
         </div>
       )}

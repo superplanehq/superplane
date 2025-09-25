@@ -6,7 +6,6 @@ import { useAccount } from '../../contexts/AccountContext';
 interface Organization {
   id: string;
   name: string;
-  display_name: string;
   description?: string;
 }
 
@@ -102,7 +101,7 @@ const OrganizationSelect: React.FC = () => {
                 <div className="flex items-center mb-2">
                   <span className="text-md mr-2">🏢</span>
                   <h4 className="text-md font-semibold text-gray-900 dark:text-white truncate">
-                    {org.display_name}
+                    {org.name}
                   </h4>
                 </div>
                 <Text className="text-sm text-left text-gray-600 dark:text-gray-400 truncate">

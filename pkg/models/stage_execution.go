@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,30 +14,73 @@ import (
 )
 
 const (
-	ExecutionPending   = "pending"
-	ExecutionStarted   = "started"
-	ExecutionFinished  = "finished"
-	ExecutionCancelled = "cancelled"
+	ExecutionPending  = "pending"
+	ExecutionStarted  = "started"
+	ExecutionFinished = "finished"
 
 	ExecutionResourcePending  = "pending"
 	ExecutionResourceFinished = "finished"
 
-	ResultPassed = "passed"
-	ResultFailed = "failed"
+	ResultPassed    = "passed"
+	ResultFailed    = "failed"
+	ResultCancelled = "cancelled"
+
+	ResultReasonError          = "error"
+	ResultReasonTimeout        = "timeout"
+	ResultReasonUser           = "user"
+	ResultReasonMissingOutputs = "missing-outputs"
+)
+
+var (
+	ErrExecutionAlreadyCancelled  = errors.New("execution already cancelled")
+	ErrExecutionCannotBeCancelled = errors.New("execution cannot be cancelled")
 )
 
 type StageExecution struct {
-	ID           uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID     uuid.UUID
-	StageID      uuid.UUID
-	StageEventID uuid.UUID
-	State        string
-	Result       string
-	CreatedAt    *time.Time
-	UpdatedAt    *time.Time
-	StartedAt    *time.Time
-	FinishedAt   *time.Time
-	Outputs      datatypes.JSONType[map[string]any]
+	ID            uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID      uuid.UUID
+	StageID       uuid.UUID
+	StageEventID  uuid.UUID
+	State         string
+	Result        string
+	ResultReason  string
+	ResultMessage string
+	CreatedAt     *time.Time
+	UpdatedAt     *time.Time
+	StartedAt     *time.Time
+	FinishedAt    *time.Time
+	Outputs       datatypes.JSONType[map[string]any]
+	CancelledAt   *time.Time
+	CancelledBy   *uuid.UUID
+
+	StageEvent *StageEvent `gorm:"foreignKey:StageEventID;references:ID"`
+}
+
+func (e *StageExecution) IsTimedOut(now time.Time, timeout time.Duration) bool {
+	if e.StartedAt == nil {
+		return false
+	}
+
+	runningDuration := now.Sub(*e.StartedAt)
+	return runningDuration > timeout
+}
+
+func (e *StageExecution) Cancel(userID uuid.UUID) error {
+	if e.State == ExecutionFinished {
+		return ErrExecutionCannotBeCancelled
+	}
+
+	if e.CancelledAt != nil {
+		return ErrExecutionAlreadyCancelled
+	}
+
+	now := time.Now()
+	return database.Conn().Model(e).
+		Clauses(clause.Returning{}).
+		Update("updated_at", &now).
+		Update("cancelled_at", &now).
+		Update("cancelled_by", &userID).
+		Error
 }
 
 func (e *StageExecution) GetInputs() (map[string]any, error) {
@@ -84,18 +128,18 @@ func (e *StageExecution) Start() error {
 		Error
 }
 
-func (e *StageExecution) Finish(stage *Stage, result string) (*Event, error) {
+func (e *StageExecution) Finish(stage *Stage, result, reason, message string) (*Event, error) {
 	var event *Event
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		event, err = e.FinishInTransaction(tx, stage, result)
+		event, err = e.FinishInTransaction(tx, stage, result, reason, message)
 		return err
 	})
 
 	return event, err
 }
 
-func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result string) (*Event, error) {
+func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result, reason, message string) (*Event, error) {
 	now := time.Now()
 
 	//
@@ -104,6 +148,8 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 	err := tx.Model(e).
 		Clauses(clause.Returning{}).
 		Update("result", result).
+		Update("result_reason", reason).
+		Update("result_message", message).
 		Update("state", ExecutionFinished).
 		Update("updated_at", &now).
 		Update("finished_at", &now).
@@ -165,6 +211,31 @@ type ExecutionIntegrationResource struct {
 	ExecutionExternalID string
 }
 
+func (e *StageExecution) Finished(resources []*ExecutionResource) bool {
+	for _, r := range resources {
+		if !r.Finished() {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (e *StageExecution) GetResult(stage *Stage, resources []*ExecutionResource) (string, string, string) {
+	for _, r := range resources {
+		if !r.Successful() {
+			return ResultFailed, ResultReasonError, fmt.Sprintf("%s failed: %s", r.Type(), r.Id())
+		}
+	}
+
+	missingOutputs := stage.MissingRequiredOutputs(e.Outputs.Data())
+	if len(missingOutputs) > 0 {
+		return ResultFailed, ResultReasonMissingOutputs, fmt.Sprintf("missing outputs: %v", missingOutputs)
+	}
+
+	return ResultPassed, "", ""
+}
+
 func (e *StageExecution) IntegrationResource(externalID string) (*ExecutionIntegrationResource, error) {
 	var r ExecutionIntegrationResource
 	err := database.Conn().
@@ -189,7 +260,23 @@ func (e *StageExecution) IntegrationResource(externalID string) (*ExecutionInteg
 	return &r, nil
 }
 
-func FindExecutionByID(id uuid.UUID) (*StageExecution, error) {
+func FindExecutionByID(id, stageID uuid.UUID) (*StageExecution, error) {
+	var execution StageExecution
+
+	err := database.Conn().
+		Where("id = ?", id).
+		Where("stage_id = ?", stageID).
+		First(&execution).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
+func FindUnscopedExecutionByID(id uuid.UUID) (*StageExecution, error) {
 	var execution StageExecution
 
 	err := database.Conn().
@@ -283,13 +370,28 @@ type ExecutionResource struct {
 	StageID          uuid.UUID
 	ParentResourceID uuid.UUID
 	ExternalID       string
-	Type             string
+	ResourceType     string `gorm:"column:type"`
 	State            string
 	Result           string
-	RetryCount       int `gorm:"default:0"`
-	LastRetryAt      *time.Time
+	LastPolledAt     *time.Time
 	CreatedAt        *time.Time
 	UpdatedAt        *time.Time
+}
+
+func (r *ExecutionResource) Finished() bool {
+	return r.State == ExecutionResourceFinished
+}
+
+func (r *ExecutionResource) Successful() bool {
+	return r.Result == ResultPassed
+}
+
+func (r *ExecutionResource) Id() string {
+	return r.ExternalID
+}
+
+func (r *ExecutionResource) Type() string {
+	return r.ResourceType
 }
 
 func PendingExecutionResources() ([]ExecutionResource, error) {
@@ -307,9 +409,9 @@ func PendingExecutionResources() ([]ExecutionResource, error) {
 	return resources, nil
 }
 
-func (e *ExecutionResource) Finish(result string) error {
+func (r *ExecutionResource) Finish(result string) error {
 	return database.Conn().
-		Model(e).
+		Model(r).
 		Clauses(clause.Returning{}).
 		Update("state", ExecutionResourceFinished).
 		Update("result", result).
@@ -317,31 +419,25 @@ func (e *ExecutionResource) Finish(result string) error {
 		Error
 }
 
-func (e *ExecutionResource) IncrementRetryCount() error {
-	now := time.Now()
+func (r *ExecutionResource) UpdatePollingMetadata() error {
 	return database.Conn().
-		Model(e).
+		Model(r).
 		Clauses(clause.Returning{}).
-		Update("retry_count", e.RetryCount+1).
-		Update("last_retry_at", &now).
-		Update("updated_at", &now).
+		Update("last_polled_at", time.Now()).
+		Update("updated_at", time.Now()).
 		Error
 }
 
-func (e *ExecutionResource) ShouldRetry(maxRetries int, retryDelay time.Duration) bool {
-	if e.RetryCount >= maxRetries {
-		return false
-	}
-
-	if e.LastRetryAt == nil {
+func (r *ExecutionResource) ShouldPoll(pollDelay time.Duration) bool {
+	if r.LastPolledAt == nil {
 		return true
 	}
 
-	return time.Since(*e.LastRetryAt) >= retryDelay
+	return time.Since(*r.LastPolledAt) >= pollDelay
 }
 
-func (e *StageExecution) Resources() ([]ExecutionResource, error) {
-	var resources []ExecutionResource
+func (e *StageExecution) Resources() ([]*ExecutionResource, error) {
+	var resources []*ExecutionResource
 
 	err := database.Conn().
 		Where("execution_id = ?", e.ID).
@@ -355,13 +451,13 @@ func (e *StageExecution) Resources() ([]ExecutionResource, error) {
 	return resources, nil
 }
 
-func (e *ExecutionResource) FindIntegration() (*Integration, error) {
+func (r *ExecutionResource) FindIntegration() (*Integration, error) {
 	var integration Integration
 
 	err := database.Conn().
 		Table("resources").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
-		Where("resources.id = ?", e.ParentResourceID).
+		Where("resources.id = ?", r.ParentResourceID).
 		Select("integrations.*").
 		First(&integration).
 		Error
@@ -373,11 +469,11 @@ func (e *ExecutionResource) FindIntegration() (*Integration, error) {
 	return &integration, nil
 }
 
-func (e *ExecutionResource) FindParentResource() (*Resource, error) {
+func (r *ExecutionResource) FindParentResource() (*Resource, error) {
 	var resource Resource
 
 	err := database.Conn().
-		Where("id = ?", e.ParentResourceID).
+		Where("id = ?", r.ParentResourceID).
 		First(&resource).
 		Error
 
@@ -410,7 +506,7 @@ func (e *StageExecution) AddResource(externalID string, externalType string, par
 		StageID:          e.StageID,
 		ParentResourceID: parentResourceID,
 		ExternalID:       externalID,
-		Type:             externalType,
+		ResourceType:     externalType,
 		State:            ExecutionResourcePending,
 	}
 

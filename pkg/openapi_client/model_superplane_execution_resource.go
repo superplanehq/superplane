@@ -21,6 +21,9 @@ var _ MappedNullable = &SuperplaneExecutionResource{}
 // SuperplaneExecutionResource struct for SuperplaneExecutionResource
 type SuperplaneExecutionResource struct {
 	Id *string `json:"id,omitempty"`
+	Type *string `json:"type,omitempty"`
+	State *string `json:"state,omitempty"`
+	Result *string `json:"result,omitempty"`
 }
 
 // NewSuperplaneExecutionResource instantiates a new SuperplaneExecutionResource object
@@ -72,6 +75,102 @@ func (o *SuperplaneExecutionResource) SetId(v string) {
 	o.Id = &v
 }
 
+// GetType returns the Type field value if set, zero value otherwise.
+func (o *SuperplaneExecutionResource) GetType() string {
+	if o == nil || IsNil(o.Type) {
+		var ret string
+		return ret
+	}
+	return *o.Type
+}
+
+// GetTypeOk returns a tuple with the Type field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecutionResource) GetTypeOk() (*string, bool) {
+	if o == nil || IsNil(o.Type) {
+		return nil, false
+	}
+	return o.Type, true
+}
+
+// HasType returns a boolean if a field has been set.
+func (o *SuperplaneExecutionResource) HasType() bool {
+	if o != nil && !IsNil(o.Type) {
+		return true
+	}
+
+	return false
+}
+
+// SetType gets a reference to the given string and assigns it to the Type field.
+func (o *SuperplaneExecutionResource) SetType(v string) {
+	o.Type = &v
+}
+
+// GetState returns the State field value if set, zero value otherwise.
+func (o *SuperplaneExecutionResource) GetState() string {
+	if o == nil || IsNil(o.State) {
+		var ret string
+		return ret
+	}
+	return *o.State
+}
+
+// GetStateOk returns a tuple with the State field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecutionResource) GetStateOk() (*string, bool) {
+	if o == nil || IsNil(o.State) {
+		return nil, false
+	}
+	return o.State, true
+}
+
+// HasState returns a boolean if a field has been set.
+func (o *SuperplaneExecutionResource) HasState() bool {
+	if o != nil && !IsNil(o.State) {
+		return true
+	}
+
+	return false
+}
+
+// SetState gets a reference to the given string and assigns it to the State field.
+func (o *SuperplaneExecutionResource) SetState(v string) {
+	o.State = &v
+}
+
+// GetResult returns the Result field value if set, zero value otherwise.
+func (o *SuperplaneExecutionResource) GetResult() string {
+	if o == nil || IsNil(o.Result) {
+		var ret string
+		return ret
+	}
+	return *o.Result
+}
+
+// GetResultOk returns a tuple with the Result field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecutionResource) GetResultOk() (*string, bool) {
+	if o == nil || IsNil(o.Result) {
+		return nil, false
+	}
+	return o.Result, true
+}
+
+// HasResult returns a boolean if a field has been set.
+func (o *SuperplaneExecutionResource) HasResult() bool {
+	if o != nil && !IsNil(o.Result) {
+		return true
+	}
+
+	return false
+}
+
+// SetResult gets a reference to the given string and assigns it to the Result field.
+func (o *SuperplaneExecutionResource) SetResult(v string) {
+	o.Result = &v
+}
+
 func (o SuperplaneExecutionResource) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -84,6 +183,15 @@ func (o SuperplaneExecutionResource) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
+	}
+	if !IsNil(o.Type) {
+		toSerialize["type"] = o.Type
+	}
+	if !IsNil(o.State) {
+		toSerialize["state"] = o.State
+	}
+	if !IsNil(o.Result) {
+		toSerialize["result"] = o.Result
 	}
 	return toSerialize, nil
 }

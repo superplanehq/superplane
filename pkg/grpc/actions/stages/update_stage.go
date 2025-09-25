@@ -156,6 +156,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		newStage.Spec.Inputs,
 		newStage.Spec.Outputs,
 		newStage.Spec.InputMappings,
+		nil,
 	)
 
 	if err != nil {

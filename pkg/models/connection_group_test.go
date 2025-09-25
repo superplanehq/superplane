@@ -16,7 +16,7 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
-	org, err := CreateOrganization(uuid.New().String(), "test", "")
+	org, err := CreateOrganization(uuid.New().String(), "test")
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
-	org, err := CreateOrganization(uuid.New().String(), "test", "")
+	org, err := CreateOrganization(uuid.New().String(), "test")
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
@@ -332,7 +332,7 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
-	org, err := CreateOrganization(uuid.New().String(), "test", "")
+	org, err := CreateOrganization(uuid.New().String(), "test")
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)

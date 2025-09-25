@@ -121,11 +121,12 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte,
 	response, err := executor.Execute(spec, executors.ExecutionParameters{
 		ExecutionID: execution.ID.String(),
 		StageID:     stage.ID.String(),
+		OutputNames: stage.OutputNames(),
 	})
 
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
-		newEvent, err := execution.Finish(stage, models.ResultFailed)
+		newEvent, err := execution.Finish(stage, models.ResultFailed, models.ResultReasonError, fmt.Sprintf("Error calling executor: %v", err))
 		if err != nil {
 			return fmt.Errorf("error moving execution to failed state: %v", err)
 		}
@@ -146,6 +147,9 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte,
 	}
 
 	result := models.ResultFailed
+	resultReason := ""
+	resultMessage := ""
+
 	if response.Successful() {
 		result = models.ResultPassed
 	}
@@ -155,16 +159,15 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte,
 	//
 	missingOutputs := stage.MissingRequiredOutputs(outputs)
 	if len(missingOutputs) > 0 {
-		logger.Infof("Execution has missing outputs %v - marking the execution as failed", missingOutputs)
 		result = models.ResultFailed
+		resultReason = models.ResultReasonMissingOutputs
+		resultMessage = fmt.Sprintf("missing outputs: %v", missingOutputs)
 	}
 
-	newEvent, err := execution.Finish(stage, result)
+	newEvent, err := execution.Finish(stage, result, resultReason, resultMessage)
 	if err != nil {
 		return err
 	}
-
-	logger.Infof("Finished execution: %s", result)
 
 	err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 	if err != nil {
@@ -203,7 +206,7 @@ func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, s
 	statefulResource, err := integrationExecutor.Execute(spec, *parameters)
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
-		newEvent, err := execution.Finish(stage, models.ResultFailed)
+		newEvent, err := execution.Finish(stage, models.ResultFailed, models.ResultReasonError, fmt.Sprintf("Error calling executor: %v", err))
 		if err != nil {
 			return fmt.Errorf("error moving execution to failed state: %v", err)
 		}

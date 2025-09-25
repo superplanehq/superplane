@@ -1007,7 +1007,7 @@ func Test__AuthService_DetectMissingPermissions(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("detect missing permissions", func(t *testing.T) {
-		newOrg, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
+		newOrg, err := models.CreateOrganization("test-org", "Test Organization")
 		require.NoError(t, err)
 
 		newCanvas, err := models.CreateCanvas(uuid.New(), newOrg.ID, "Test Canvas", "Test Canvas")
@@ -1036,7 +1036,7 @@ func Test__AuthService_SyncDefaultRoles(t *testing.T) {
 
 	t.Run("sync default roles for existing entities", func(t *testing.T) {
 		// First check that we have missing permissions
-		newOrg, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
+		newOrg, err := models.CreateOrganization("test-org", "Test Organization")
 		require.NoError(t, err)
 		_, err = models.CreateCanvas(uuid.New(), newOrg.ID, "Test Canvas", "Test Canvas")
 		require.NoError(t, err)
@@ -1095,7 +1095,7 @@ func Test__AuthService_CheckAndSyncMissingPermissions(t *testing.T) {
 	require.NoError(t, err)
 	authService.EnableCache(false)
 
-	org, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
+	org, err := models.CreateOrganization("test-org", "Test Organization")
 	require.NoError(t, err)
 	canvas, err := models.CreateCanvas(uuid.New(), org.ID, "Test Canvas", "Test Canvas")
 	require.NoError(t, err)
@@ -1143,7 +1143,7 @@ func Test__AuthService_SyncOrganizationRoles(t *testing.T) {
 	authService.EnableCache(false)
 
 	userID := uuid.New()
-	org, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
+	org, err := models.CreateOrganization("test-org", "Test Organization")
 	require.NoError(t, err)
 	orgID := org.ID.String()
 
@@ -1205,7 +1205,7 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 	authService.EnableCache(false)
 
 	userID := uuid.New()
-	org, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
+	org, err := models.CreateOrganization("test-org", "Test Organization")
 	require.NoError(t, err)
 	canvas, err := models.CreateCanvas(userID, org.ID, "Test Canvas", "Test Canvas")
 	require.NoError(t, err)

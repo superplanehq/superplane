@@ -71,12 +71,6 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start()
 	}
 
-	if os.Getenv("START_EXECUTION_RESOURCE_POLLER") == "yes" {
-		log.Println("Starting Execution Resource Poller")
-		resourcePoller := workers.NewExecutionResourcePoller(encryptor, registry)
-		go resourcePoller.Start()
-	}
-
 	if os.Getenv("START_PENDING_EXECUTIONS_WORKER") == "yes" {
 		log.Println("Starting Pending Stage Events Worker")
 
@@ -116,6 +110,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		log.Println("Starting Hard Deletion Worker")
 
 		w := workers.NewHardDeletionWorker(registry, cleanupService)
+		go w.Start()
+	}
+
+	if os.Getenv("START_EVENT_SOURCE_SCHEDULE_WORKER") == "yes" {
+		log.Println("Starting Event Source Schedule Worker")
+
+		w, err := workers.NewEventSourceScheduleWorker(time.Now)
+		if err != nil {
+			panic(err)
+		}
+
 		go w.Start()
 	}
 }

@@ -22,18 +22,15 @@ var _ MappedNullable = &SuperplaneStageEvent{}
 // SuperplaneStageEvent struct for SuperplaneStageEvent
 type SuperplaneStageEvent struct {
 	Id *string `json:"id,omitempty"`
-	SourceId *string `json:"sourceId,omitempty"`
-	SourceType *SuperplaneConnectionType `json:"sourceType,omitempty"`
 	State *SuperplaneStageEventState `json:"state,omitempty"`
 	StateReason *SuperplaneStageEventStateReason `json:"stateReason,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	Approvals []SuperplaneStageEventApproval `json:"approvals,omitempty"`
-	Execution *SuperplaneExecution `json:"execution,omitempty"`
 	Inputs []SuperplaneKeyValuePair `json:"inputs,omitempty"`
 	Name *string `json:"name,omitempty"`
-	EventId *string `json:"eventId,omitempty"`
-	CancelledBy *string `json:"cancelledBy,omitempty"`
-	CancelledAt *time.Time `json:"cancelledAt,omitempty"`
+	TriggerEvent *SuperplaneEvent `json:"triggerEvent,omitempty"`
+	DiscardedBy *string `json:"discardedBy,omitempty"`
+	DiscardedAt *time.Time `json:"discardedAt,omitempty"`
 }
 
 // NewSuperplaneStageEvent instantiates a new SuperplaneStageEvent object
@@ -42,8 +39,6 @@ type SuperplaneStageEvent struct {
 // will change when the set of required properties is changed
 func NewSuperplaneStageEvent() *SuperplaneStageEvent {
 	this := SuperplaneStageEvent{}
-	var sourceType SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
-	this.SourceType = &sourceType
 	var state SuperplaneStageEventState = SUPERPLANESTAGEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
 	var stateReason SuperplaneStageEventStateReason = SUPERPLANESTAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
@@ -56,8 +51,6 @@ func NewSuperplaneStageEvent() *SuperplaneStageEvent {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneStageEventWithDefaults() *SuperplaneStageEvent {
 	this := SuperplaneStageEvent{}
-	var sourceType SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
-	this.SourceType = &sourceType
 	var state SuperplaneStageEventState = SUPERPLANESTAGEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
 	var stateReason SuperplaneStageEventStateReason = SUPERPLANESTAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
@@ -95,70 +88,6 @@ func (o *SuperplaneStageEvent) HasId() bool {
 // SetId gets a reference to the given string and assigns it to the Id field.
 func (o *SuperplaneStageEvent) SetId(v string) {
 	o.Id = &v
-}
-
-// GetSourceId returns the SourceId field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetSourceId() string {
-	if o == nil || IsNil(o.SourceId) {
-		var ret string
-		return ret
-	}
-	return *o.SourceId
-}
-
-// GetSourceIdOk returns a tuple with the SourceId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetSourceIdOk() (*string, bool) {
-	if o == nil || IsNil(o.SourceId) {
-		return nil, false
-	}
-	return o.SourceId, true
-}
-
-// HasSourceId returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasSourceId() bool {
-	if o != nil && !IsNil(o.SourceId) {
-		return true
-	}
-
-	return false
-}
-
-// SetSourceId gets a reference to the given string and assigns it to the SourceId field.
-func (o *SuperplaneStageEvent) SetSourceId(v string) {
-	o.SourceId = &v
-}
-
-// GetSourceType returns the SourceType field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetSourceType() SuperplaneConnectionType {
-	if o == nil || IsNil(o.SourceType) {
-		var ret SuperplaneConnectionType
-		return ret
-	}
-	return *o.SourceType
-}
-
-// GetSourceTypeOk returns a tuple with the SourceType field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetSourceTypeOk() (*SuperplaneConnectionType, bool) {
-	if o == nil || IsNil(o.SourceType) {
-		return nil, false
-	}
-	return o.SourceType, true
-}
-
-// HasSourceType returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasSourceType() bool {
-	if o != nil && !IsNil(o.SourceType) {
-		return true
-	}
-
-	return false
-}
-
-// SetSourceType gets a reference to the given SuperplaneConnectionType and assigns it to the SourceType field.
-func (o *SuperplaneStageEvent) SetSourceType(v SuperplaneConnectionType) {
-	o.SourceType = &v
 }
 
 // GetState returns the State field value if set, zero value otherwise.
@@ -289,38 +218,6 @@ func (o *SuperplaneStageEvent) SetApprovals(v []SuperplaneStageEventApproval) {
 	o.Approvals = v
 }
 
-// GetExecution returns the Execution field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetExecution() SuperplaneExecution {
-	if o == nil || IsNil(o.Execution) {
-		var ret SuperplaneExecution
-		return ret
-	}
-	return *o.Execution
-}
-
-// GetExecutionOk returns a tuple with the Execution field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetExecutionOk() (*SuperplaneExecution, bool) {
-	if o == nil || IsNil(o.Execution) {
-		return nil, false
-	}
-	return o.Execution, true
-}
-
-// HasExecution returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasExecution() bool {
-	if o != nil && !IsNil(o.Execution) {
-		return true
-	}
-
-	return false
-}
-
-// SetExecution gets a reference to the given SuperplaneExecution and assigns it to the Execution field.
-func (o *SuperplaneStageEvent) SetExecution(v SuperplaneExecution) {
-	o.Execution = &v
-}
-
 // GetInputs returns the Inputs field value if set, zero value otherwise.
 func (o *SuperplaneStageEvent) GetInputs() []SuperplaneKeyValuePair {
 	if o == nil || IsNil(o.Inputs) {
@@ -385,100 +282,100 @@ func (o *SuperplaneStageEvent) SetName(v string) {
 	o.Name = &v
 }
 
-// GetEventId returns the EventId field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetEventId() string {
-	if o == nil || IsNil(o.EventId) {
-		var ret string
+// GetTriggerEvent returns the TriggerEvent field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetTriggerEvent() SuperplaneEvent {
+	if o == nil || IsNil(o.TriggerEvent) {
+		var ret SuperplaneEvent
 		return ret
 	}
-	return *o.EventId
+	return *o.TriggerEvent
 }
 
-// GetEventIdOk returns a tuple with the EventId field value if set, nil otherwise
+// GetTriggerEventOk returns a tuple with the TriggerEvent field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetEventIdOk() (*string, bool) {
-	if o == nil || IsNil(o.EventId) {
+func (o *SuperplaneStageEvent) GetTriggerEventOk() (*SuperplaneEvent, bool) {
+	if o == nil || IsNil(o.TriggerEvent) {
 		return nil, false
 	}
-	return o.EventId, true
+	return o.TriggerEvent, true
 }
 
-// HasEventId returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasEventId() bool {
-	if o != nil && !IsNil(o.EventId) {
+// HasTriggerEvent returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasTriggerEvent() bool {
+	if o != nil && !IsNil(o.TriggerEvent) {
 		return true
 	}
 
 	return false
 }
 
-// SetEventId gets a reference to the given string and assigns it to the EventId field.
-func (o *SuperplaneStageEvent) SetEventId(v string) {
-	o.EventId = &v
+// SetTriggerEvent gets a reference to the given SuperplaneEvent and assigns it to the TriggerEvent field.
+func (o *SuperplaneStageEvent) SetTriggerEvent(v SuperplaneEvent) {
+	o.TriggerEvent = &v
 }
 
-// GetCancelledBy returns the CancelledBy field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetCancelledBy() string {
-	if o == nil || IsNil(o.CancelledBy) {
+// GetDiscardedBy returns the DiscardedBy field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetDiscardedBy() string {
+	if o == nil || IsNil(o.DiscardedBy) {
 		var ret string
 		return ret
 	}
-	return *o.CancelledBy
+	return *o.DiscardedBy
 }
 
-// GetCancelledByOk returns a tuple with the CancelledBy field value if set, nil otherwise
+// GetDiscardedByOk returns a tuple with the DiscardedBy field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetCancelledByOk() (*string, bool) {
-	if o == nil || IsNil(o.CancelledBy) {
+func (o *SuperplaneStageEvent) GetDiscardedByOk() (*string, bool) {
+	if o == nil || IsNil(o.DiscardedBy) {
 		return nil, false
 	}
-	return o.CancelledBy, true
+	return o.DiscardedBy, true
 }
 
-// HasCancelledBy returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasCancelledBy() bool {
-	if o != nil && !IsNil(o.CancelledBy) {
+// HasDiscardedBy returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasDiscardedBy() bool {
+	if o != nil && !IsNil(o.DiscardedBy) {
 		return true
 	}
 
 	return false
 }
 
-// SetCancelledBy gets a reference to the given string and assigns it to the CancelledBy field.
-func (o *SuperplaneStageEvent) SetCancelledBy(v string) {
-	o.CancelledBy = &v
+// SetDiscardedBy gets a reference to the given string and assigns it to the DiscardedBy field.
+func (o *SuperplaneStageEvent) SetDiscardedBy(v string) {
+	o.DiscardedBy = &v
 }
 
-// GetCancelledAt returns the CancelledAt field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetCancelledAt() time.Time {
-	if o == nil || IsNil(o.CancelledAt) {
+// GetDiscardedAt returns the DiscardedAt field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetDiscardedAt() time.Time {
+	if o == nil || IsNil(o.DiscardedAt) {
 		var ret time.Time
 		return ret
 	}
-	return *o.CancelledAt
+	return *o.DiscardedAt
 }
 
-// GetCancelledAtOk returns a tuple with the CancelledAt field value if set, nil otherwise
+// GetDiscardedAtOk returns a tuple with the DiscardedAt field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetCancelledAtOk() (*time.Time, bool) {
-	if o == nil || IsNil(o.CancelledAt) {
+func (o *SuperplaneStageEvent) GetDiscardedAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.DiscardedAt) {
 		return nil, false
 	}
-	return o.CancelledAt, true
+	return o.DiscardedAt, true
 }
 
-// HasCancelledAt returns a boolean if a field has been set.
-func (o *SuperplaneStageEvent) HasCancelledAt() bool {
-	if o != nil && !IsNil(o.CancelledAt) {
+// HasDiscardedAt returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasDiscardedAt() bool {
+	if o != nil && !IsNil(o.DiscardedAt) {
 		return true
 	}
 
 	return false
 }
 
-// SetCancelledAt gets a reference to the given time.Time and assigns it to the CancelledAt field.
-func (o *SuperplaneStageEvent) SetCancelledAt(v time.Time) {
-	o.CancelledAt = &v
+// SetDiscardedAt gets a reference to the given time.Time and assigns it to the DiscardedAt field.
+func (o *SuperplaneStageEvent) SetDiscardedAt(v time.Time) {
+	o.DiscardedAt = &v
 }
 
 func (o SuperplaneStageEvent) MarshalJSON() ([]byte, error) {
@@ -494,12 +391,6 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
 	}
-	if !IsNil(o.SourceId) {
-		toSerialize["sourceId"] = o.SourceId
-	}
-	if !IsNil(o.SourceType) {
-		toSerialize["sourceType"] = o.SourceType
-	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
 	}
@@ -512,23 +403,20 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Approvals) {
 		toSerialize["approvals"] = o.Approvals
 	}
-	if !IsNil(o.Execution) {
-		toSerialize["execution"] = o.Execution
-	}
 	if !IsNil(o.Inputs) {
 		toSerialize["inputs"] = o.Inputs
 	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
 	}
-	if !IsNil(o.EventId) {
-		toSerialize["eventId"] = o.EventId
+	if !IsNil(o.TriggerEvent) {
+		toSerialize["triggerEvent"] = o.TriggerEvent
 	}
-	if !IsNil(o.CancelledBy) {
-		toSerialize["cancelledBy"] = o.CancelledBy
+	if !IsNil(o.DiscardedBy) {
+		toSerialize["discardedBy"] = o.DiscardedBy
 	}
-	if !IsNil(o.CancelledAt) {
-		toSerialize["cancelledAt"] = o.CancelledAt
+	if !IsNil(o.DiscardedAt) {
+		toSerialize["discardedAt"] = o.DiscardedAt
 	}
 	return toSerialize, nil
 }

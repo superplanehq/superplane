@@ -19,21 +19,14 @@ import (
 )
 
 const (
-	EventStatePending = "pending"
-
-	//
-	// Event ends up in this state when:
-	// - Event does not pass event source filters
-	// - Source is not connected to anything
-	// - Source is connected, but filters on all the connections reject it.
-	//
-	EventStateDiscarded = "discarded"
-
-	//
-	// Event ends up in this state when:
-	// - Source is connected and not rejected by some connection filters.
-	//
+	EventStatePending   = "pending"
+	EventStateRejected  = "rejected"
 	EventStateProcessed = "processed"
+
+	EventStateReasonFiltered = "filtered"
+	EventStateReasonError    = "error"
+	EventStateReasonOk       = "ok"
+	EventStateReasonUnknown  = "unknown"
 
 	SourceTypeEventSource     = "event-source"
 	SourceTypeStage           = "stage"
@@ -44,16 +37,19 @@ const (
 )
 
 type Event struct {
-	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	SourceID   uuid.UUID
-	CanvasID   uuid.UUID
-	SourceName string
-	SourceType string
-	Type       string
-	State      string
-	ReceivedAt *time.Time
-	Raw        datatypes.JSON
-	Headers    datatypes.JSON
+	ID           uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	SourceID     uuid.UUID
+	CanvasID     uuid.UUID
+	SourceName   string
+	SourceType   string
+	Type         string
+	State        string
+	StateReason  string
+	StateMessage string
+	ReceivedAt   *time.Time
+	CreatedBy    *uuid.UUID
+	Raw          datatypes.JSON
+	Headers      datatypes.JSON
 }
 
 type headerVisitor struct{}
@@ -83,14 +79,16 @@ func (v *headerVisitor) Visit(node *ast.Node) {
 	}
 }
 
-func (e *Event) UpdateState(state string) error {
-	return e.UpdateStateInTransaction(database.Conn(), state)
+func (e *Event) UpdateState(state, reason, message string) error {
+	return e.UpdateStateInTransaction(database.Conn(), state, reason, message)
 }
 
-func (e *Event) UpdateStateInTransaction(tx *gorm.DB, state string) error {
+func (e *Event) UpdateStateInTransaction(tx *gorm.DB, state, reason, message string) error {
 	return tx.Model(e).
 		Clauses(clause.Returning{}).
 		Update("state", state).
+		Update("state_reason", reason).
+		Update("state_message", message).
 		Error
 }
 
@@ -205,6 +203,34 @@ func (e *Event) EvaluateStringExpression(expression string) (string, error) {
 	return v, nil
 }
 
+func CreateManualEvent(sourceID uuid.UUID, canvasID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, createdBy *uuid.UUID) (*Event, error) {
+	now := time.Now()
+
+	event := Event{
+		SourceID:   sourceID,
+		CanvasID:   canvasID,
+		SourceName: sourceName,
+		SourceType: sourceType,
+		Type:       eventType,
+		State:      EventStatePending,
+		ReceivedAt: &now,
+		Raw:        datatypes.JSON(raw),
+		Headers:    datatypes.JSON([]byte(`{}`)),
+		CreatedBy:  createdBy,
+	}
+
+	err := database.Conn().
+		Clauses(clause.Returning{}).
+		Create(&event).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
 func CreateEvent(sourceID uuid.UUID, canvasID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, headers []byte) (*Event, error) {
 	return CreateEventInTransaction(database.Conn(), sourceID, canvasID, sourceName, sourceType, eventType, raw, headers)
 }
@@ -301,29 +327,29 @@ func ListEventsByCanvasID(canvasID uuid.UUID, sourceType string, sourceIDStr str
 	return events, nil
 }
 
-func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int, before *time.Time) ([]Event, error) {
+func FilterEvents(canvasID uuid.UUID, sourceType string, sourceID string, limit int, before *time.Time, states []string) ([]Event, error) {
 	var events []Event
 
-	query := database.Conn().Where("canvas_id = ?", canvasID)
+	query := database.Conn().
+		Where("canvas_id = ?", canvasID)
 
 	if sourceType != "" {
 		query = query.Where("source_type = ?", sourceType)
 	}
 
-	if sourceIDStr != "" {
-		sourceID, err := uuid.Parse(sourceIDStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid source ID: %v", err)
-		}
+	if sourceID != "" {
 		query = query.Where("source_id = ?", sourceID)
 	}
 
 	if before != nil {
 		query = query.Where("received_at < ?", before)
+	}
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
 	}
 
 	query = query.Order("received_at DESC").Limit(limit)
-
 	err := query.Find(&events).Error
 	if err != nil {
 		return nil, err
@@ -332,97 +358,24 @@ func ListEventsByCanvasIDWithLimitAndBefore(canvasID uuid.UUID, sourceType strin
 	return events, nil
 }
 
-func BulkListEventsByCanvasIDAndSource(canvasID uuid.UUID, sourceType string, sourceIDStr string, limit int) ([]Event, error) {
-	var events []Event
+func CountEvents(canvasID uuid.UUID, sourceType string, sourceID string, states []string) (int64, error) {
+	query := database.Conn().
+		Model(&Event{}).
+		Where("canvas_id = ?", canvasID).
+		Where("source_type = ?", sourceType).
+		Where("source_id = ?", sourceID)
 
-	query := database.Conn().Where("canvas_id = ?", canvasID)
-
-	if sourceType != "" {
-		query = query.Where("source_type = ?", sourceType)
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
 	}
 
-	if sourceIDStr != "" {
-		sourceID, err := uuid.Parse(sourceIDStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid source ID: %v", err)
-		}
-		query = query.Where("source_id = ?", sourceID)
-	}
-
-	query = query.Order("received_at DESC")
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	err := query.Find(&events).Error
+	var count int64
+	err := query.Count(&count).Error
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	return events, nil
-}
-
-func BulkListEventsByCanvasIDAndMultipleSources(canvasID uuid.UUID, sourceFilters []SourceFilter, limitPerSource int, before *time.Time) (map[string][]Event, error) {
-	if len(sourceFilters) == 0 {
-		return map[string][]Event{}, nil
-	}
-
-	var events []Event
-	query := database.Conn().Where("canvas_id = ?", canvasID)
-
-	var conditions []string
-	var args []interface{}
-
-	for _, filter := range sourceFilters {
-		if filter.SourceID != "" {
-			sourceID, err := uuid.Parse(filter.SourceID)
-			if err != nil {
-				return nil, fmt.Errorf("invalid source ID %s: %v", filter.SourceID, err)
-			}
-			condition := "(source_type = ? AND source_id = ?)"
-			conditions = append(conditions, condition)
-			args = append(args, filter.SourceType, sourceID)
-		} else {
-			condition := "(source_type = ?)"
-			conditions = append(conditions, condition)
-			args = append(args, filter.SourceType)
-		}
-	}
-
-	if len(conditions) > 0 {
-		whereClause := strings.Join(conditions, " OR ")
-		query = query.Where(whereClause, args...)
-	}
-
-	if before != nil {
-		query = query.Where("received_at < ?", before)
-	}
-
-	query = query.Order("source_id, source_type, received_at DESC")
-
-	err := query.Find(&events).Error
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[string][]Event)
-	sourceCounters := make(map[string]int)
-
-	for _, event := range events {
-		sourceKey := fmt.Sprintf("%s|%s", event.SourceType, event.SourceID.String())
-
-		if limitPerSource > 0 {
-			if sourceCounters[sourceKey] >= limitPerSource {
-				continue
-			}
-			sourceCounters[sourceKey]++
-		}
-
-		result[sourceKey] = append(result[sourceKey], event)
-	}
-
-	return result, nil
+	return count, nil
 }
 
 // CompileBooleanExpression compiles a boolean expression.

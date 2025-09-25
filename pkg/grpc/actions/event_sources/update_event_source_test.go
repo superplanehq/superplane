@@ -149,6 +149,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				},
 			},
 		})
+
 		require.NoError(t, err)
 		connectedStageUUID, err := uuid.Parse(connectedStage.Stage.Metadata.GetId())
 		require.NoError(t, err)
@@ -177,5 +178,54 @@ func Test__UpdateEventSource(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, dbConnections, 1)
 		assert.Equal(t, "updated-event-source-name", dbConnections[0].SourceName)
+	})
+
+	t.Run("event source updated to add schedule", func(t *testing.T) {
+		res, err := UpdateEventSource(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), eventSourceID, &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name:        "scheduled-event-source",
+				Description: "with schedule",
+			},
+			Spec: &protos.EventSource_Spec{
+				Schedule: &protos.EventSource_Schedule{
+					Type: protos.EventSource_Schedule_TYPE_DAILY,
+					Daily: &protos.EventSource_DailySchedule{
+						Time: "14:30",
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		assert.Equal(t, eventSourceID, res.EventSource.Metadata.Id)
+		assert.Equal(t, "scheduled-event-source", res.EventSource.Metadata.Name)
+		assert.Equal(t, "with schedule", res.EventSource.Metadata.Description)
+		assert.Nil(t, res.EventSource.Spec.Integration)
+		assert.Nil(t, res.EventSource.Spec.Resource)
+
+		require.NotNil(t, res.EventSource.Spec.Schedule)
+		assert.Equal(t, protos.EventSource_Schedule_TYPE_DAILY, res.EventSource.Spec.Schedule.Type)
+		require.NotNil(t, res.EventSource.Spec.Schedule.Daily)
+		assert.Equal(t, "14:30", res.EventSource.Spec.Schedule.Daily.Time)
+		assert.NotEmpty(t, res.Key)
+	})
+
+	t.Run("event source updated to remove schedule", func(t *testing.T) {
+		res, err := UpdateEventSource(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), eventSourceID, &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name:        "no-schedule-event-source",
+				Description: "no schedule",
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		assert.Equal(t, eventSourceID, res.EventSource.Metadata.Id)
+		assert.Equal(t, "no-schedule-event-source", res.EventSource.Metadata.Name)
+		assert.Equal(t, "no schedule", res.EventSource.Metadata.Description)
+		assert.Nil(t, res.EventSource.Spec.Integration)
+		assert.Nil(t, res.EventSource.Spec.Resource)
+		assert.Nil(t, res.EventSource.Spec.Schedule)
+		assert.NotEmpty(t, res.Key)
 	})
 }

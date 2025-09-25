@@ -29,6 +29,7 @@ type EventSourceBuilder struct {
 	description         string
 	scope               string
 	eventTypes          []models.EventType
+	schedule            *models.Schedule
 	integration         *models.Integration
 	resource            integrations.Resource
 	existingEventSource *models.EventSource
@@ -87,6 +88,11 @@ func (b *EventSourceBuilder) WithEventTypes(eventTypes []models.EventType) *Even
 	return b
 }
 
+func (b *EventSourceBuilder) WithSchedule(schedule *models.Schedule) *EventSourceBuilder {
+	b.schedule = schedule
+	return b
+}
+
 func (b *EventSourceBuilder) WithExistingEventSource(existingEventSource *models.EventSource) *EventSourceBuilder {
 	b.existingEventSource = existingEventSource
 	return b
@@ -139,6 +145,17 @@ func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.Even
 		Key:         encryptedKey,
 		Scope:       b.scope,
 		EventTypes:  datatypes.NewJSONSlice(b.eventTypes),
+	}
+
+	// Set schedule if provided
+	if b.schedule != nil {
+		nextTrigger, err := b.schedule.CalculateNextTrigger(time.Now())
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to calculate next trigger: %v", err)
+		}
+		schedule := datatypes.NewJSONType(*b.schedule)
+		source.Schedule = &schedule
+		source.NextTriggerAt = nextTrigger
 	}
 
 	err = source.CreateInTransaction(tx)
@@ -324,13 +341,30 @@ func (b *EventSourceBuilder) updateWithoutIntegration(tx *gorm.DB) (*models.Even
 	}
 
 	now := time.Now()
-	err = tx.Model(b.existingEventSource).
-		Update("name", b.name).
-		Update("description", b.description).
-		Update("updated_at", now).
-		Update("event_types", datatypes.NewJSONSlice(b.eventTypes)).
-		Update("resource_id", nil).
-		Error
+	updates := map[string]interface{}{
+		"name":        b.name,
+		"description": b.description,
+		"updated_at":  now,
+		"event_types": datatypes.NewJSONSlice(b.eventTypes),
+		"resource_id": nil,
+	}
+
+	// Handle schedule updates
+	if b.schedule != nil {
+		nextTrigger, err := b.schedule.CalculateNextTrigger(time.Now())
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to calculate next trigger: %v", err)
+		}
+		schedule := datatypes.NewJSONType(*b.schedule)
+		updates["schedule"] = &schedule
+		updates["next_trigger_at"] = nextTrigger
+	} else {
+		updates["schedule"] = nil
+		updates["next_trigger_at"] = nil
+		updates["last_triggered_at"] = nil
+	}
+
+	err = tx.Model(b.existingEventSource).Updates(updates).Error
 
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to update event source: %v", err)

@@ -152,65 +152,77 @@ func CountOtherStagesUsingResource(resourceID uuid.UUID, currentStageID uuid.UUI
 	return count, nil
 }
 
+func CountResourcesByIntegration(integrationID uuid.UUID) (int64, error) {
+	var count int64
+	err := database.Conn().
+		Model(&Resource{}).
+		Where("integration_id = ?", integrationID).
+		Count(&count).
+		Error
+
+	return count, err
+}
+
 // DeleteResourceWithChildren deletes a resource and all its child resources in a transaction
 func DeleteResourceWithChildren(resourceID uuid.UUID) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		// Find the resource to delete
-		var resource Resource
-		err := tx.Where("id = ?", resourceID).First(&resource).Error
+	return DeleteResourceWithChildrenInTransaction(database.Conn(), resourceID)
+}
+
+func DeleteResourceWithChildrenInTransaction(tx *gorm.DB, resourceID uuid.UUID) error {
+	var resource Resource
+	err := tx.Where("id = ?", resourceID).First(&resource).Error
+	if err != nil {
+		return err
+	}
+
+	// Find all child resources
+	var childResources []Resource
+	err = tx.Where("parent_id = ?", resourceID).Find(&childResources).Error
+	if err != nil {
+		return err
+	}
+
+	for _, childResource := range childResources {
+		err = DeleteExecutionResourcesByParentResourceInTransaction(tx, childResource.ID)
 		if err != nil {
 			return err
 		}
+	}
 
-		// Find all child resources
-		var childResources []Resource
-		err = tx.Where("parent_id = ?", resourceID).Find(&childResources).Error
-		if err != nil {
-			return err
-		}
+	err = DeleteExecutionResourcesByParentResourceInTransaction(tx, resourceID)
+	if err != nil {
+		return err
+	}
 
-		for _, childResource := range childResources {
-			err = DeleteExecutionResourcesByParentResourceInTransaction(tx, childResource.ID)
-			if err != nil {
-				return err
-			}
-		}
-
-		err = DeleteExecutionResourcesByParentResourceInTransaction(tx, resourceID)
-		if err != nil {
-			return err
-		}
-
-		// Delete internal event sources associated with child resources
-		for _, childResource := range childResources {
-			err = tx.Unscoped().Where("resource_id = ? AND scope = ?", childResource.ID, EventSourceScopeInternal).
-				Delete(&EventSource{}).Error
-			if err != nil {
-				return err
-			}
-		}
-
-		// Delete internal event sources associated with the parent resource
-		err = tx.Unscoped().Where("resource_id = ? AND scope = ?", resourceID, EventSourceScopeInternal).
+	// Delete internal event sources associated with child resources
+	for _, childResource := range childResources {
+		err = tx.Unscoped().Where("resource_id = ? AND scope = ?", childResource.ID, EventSourceScopeInternal).
 			Delete(&EventSource{}).Error
 		if err != nil {
 			return err
 		}
+	}
 
-		// Delete child resources (after deleting their event sources)
-		if len(childResources) > 0 {
-			err = tx.Delete(&childResources).Error
-			if err != nil {
-				return err
-			}
-		}
+	// Delete internal event sources associated with the parent resource
+	err = tx.Unscoped().Where("resource_id = ? AND scope = ?", resourceID, EventSourceScopeInternal).
+		Delete(&EventSource{}).Error
+	if err != nil {
+		return err
+	}
 
-		// Delete the parent resource
-		err = tx.Delete(&resource).Error
+	// Delete child resources (after deleting their event sources)
+	if len(childResources) > 0 {
+		err = tx.Delete(&childResources).Error
 		if err != nil {
 			return err
 		}
+	}
 
-		return nil
-	})
+	// Delete the parent resource
+	err = tx.Delete(&resource).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

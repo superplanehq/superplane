@@ -2,6 +2,7 @@ package eventsources
 
 import (
 	"context"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -30,9 +31,23 @@ func ListEventSources(ctx context.Context, canvasID string) (*pb.ListEventSource
 }
 
 func serializeEventSources(eventSources []models.EventSource) ([]*pb.EventSource, error) {
+	if len(eventSources) == 0 {
+		return []*pb.EventSource{}, nil
+	}
+
+	lastEvents, err := models.LastProcessedEventForSources(eventSources)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last processed event for sources: %w", err)
+	}
+
 	sources := []*pb.EventSource{}
 	for _, source := range eventSources {
-		protoSource, err := serializeEventSource(source)
+		var lastEvent *models.Event
+		if event, exists := lastEvents[source.ID]; exists {
+			lastEvent = event
+		}
+
+		protoSource, err := serializeEventSource(source, lastEvent)
 		if err != nil {
 			return nil, err
 		}

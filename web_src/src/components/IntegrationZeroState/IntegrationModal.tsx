@@ -12,10 +12,7 @@ import { MaterialSymbol } from '../MaterialSymbol/material-symbol';
 import { Link } from '../Link/link';
 import { useIntegrations, useCreateIntegration } from '../../pages/canvas/hooks/useIntegrations';
 import { useSecrets, useCreateSecret } from '../../pages/canvas/hooks/useSecrets';
-import { GitHubIntegrationForm } from './GitHubIntegrationForm';
-import { SemaphoreIntegrationForm } from './SemaphoreIntegrationForm';
-import { ApiTokenForm } from './ApiTokenForm';
-import { useIntegrationForm } from './useIntegrationForm';
+import { GitHubIntegrationForm, SemaphoreIntegrationForm, ApiTokenForm, NEW_SECRET_NAME, useIntegrationForm } from '../IntegrationForm';
 
 interface IntegrationModalProps {
   open: boolean;
@@ -48,8 +45,6 @@ export function IntegrationModal({
     setIntegrationData,
     apiTokenTab,
     setApiTokenTab,
-    newSecretName,
-    setNewSecretName,
     newSecretToken,
     setNewSecretToken,
     errors,
@@ -84,14 +79,14 @@ export function IntegrationModal({
           const secretData = {
             name: `${integrationData.name.trim()}-api-key`,
             environmentVariables: [{
-              name: newSecretName,
+              name: NEW_SECRET_NAME,
               value: newSecretToken
             }]
           };
 
           await createSecretMutation.mutateAsync(secretData);
           secretName = secretData.name;
-          secretKey = newSecretName;
+          secretKey = NEW_SECRET_NAME;
         } catch {
           setErrors({ apiToken: 'Failed to create a secret, please try to create secret manually and import' });
           return;
@@ -138,7 +133,7 @@ export function IntegrationModal({
       <DialogTitle>Create {config.displayName} Integration</DialogTitle>
       <DialogDescription className='text-sm'>
         New integration will be saved to integrations page. Manage integrations{' '}
-        <Link href={`/organization/${organizationId}/canvas/${canvasId}#integrations`} className='text-blue-600 dark:text-blue-400'> here</Link>.
+        <Link href={`/${organizationId}/canvas/${canvasId}#integrations`} className='text-blue-600 dark:text-blue-400'> here</Link>.
       </DialogDescription>
 
       <DialogBody className="space-y-6">
@@ -150,8 +145,6 @@ export function IntegrationModal({
             setErrors={setErrors}
             apiTokenTab={apiTokenTab}
             setApiTokenTab={setApiTokenTab}
-            newSecretName={newSecretName}
-            setNewSecretName={setNewSecretName}
             newSecretToken={newSecretToken}
             setNewSecretToken={setNewSecretToken}
             secrets={secrets}
@@ -165,8 +158,6 @@ export function IntegrationModal({
             setErrors={setErrors}
             apiTokenTab={apiTokenTab}
             setApiTokenTab={setApiTokenTab}
-            newSecretName={newSecretName}
-            setNewSecretName={setNewSecretName}
             newSecretToken={newSecretToken}
             setNewSecretToken={setNewSecretToken}
             secrets={secrets}
@@ -181,8 +172,6 @@ export function IntegrationModal({
           setErrors={setErrors}
           apiTokenTab={apiTokenTab}
           setApiTokenTab={setApiTokenTab}
-          newSecretName={newSecretName}
-          setNewSecretName={setNewSecretName}
           newSecretToken={newSecretToken}
           setNewSecretToken={setNewSecretToken}
           secrets={secrets}

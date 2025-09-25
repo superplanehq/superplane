@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MWmKJTh3v9oh8htLVrbW0CSSLGvnbNUHoQxE2hg7NaF6dHHPrQmfSTaLFMlMNV8
+\restrict a4EbNbrPffA8JDyzoNXy67Ywf2SufZDMusVidJXYLCiqPRIBFEfv1gWJQP49eeX
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -191,6 +191,21 @@ CREATE TABLE public.connections (
 
 
 --
+-- Name: event_rejections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.event_rejections (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    event_id uuid NOT NULL,
+    target_type character varying(64) NOT NULL,
+    target_id uuid NOT NULL,
+    reason character varying(64) NOT NULL,
+    message text,
+    rejected_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: event_sources; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -206,7 +221,10 @@ CREATE TABLE public.event_sources (
     scope character varying(64) NOT NULL,
     description text,
     event_types jsonb DEFAULT '[]'::jsonb NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    schedule jsonb,
+    last_triggered_at timestamp without time zone,
+    next_trigger_at timestamp without time zone
 );
 
 
@@ -224,7 +242,10 @@ CREATE TABLE public.events (
     raw jsonb NOT NULL,
     state character varying(64) NOT NULL,
     headers jsonb DEFAULT '{}'::jsonb NOT NULL,
-    type character varying(128) NOT NULL
+    type character varying(128) NOT NULL,
+    state_reason character varying(64),
+    state_message text,
+    created_by uuid
 );
 
 
@@ -243,8 +264,7 @@ CREATE TABLE public.execution_resources (
     result character varying(64) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    retry_count integer DEFAULT 0 NOT NULL,
-    last_retry_at timestamp without time zone
+    last_polled_at timestamp without time zone
 );
 
 
@@ -305,7 +325,6 @@ CREATE TABLE public.organization_invitations (
 CREATE TABLE public.organizations (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(255) NOT NULL,
-    display_name character varying(255) NOT NULL,
     allowed_providers jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
@@ -401,8 +420,8 @@ CREATE TABLE public.stage_events (
     created_at timestamp without time zone NOT NULL,
     inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
     name text,
-    cancelled_by uuid,
-    cancelled_at timestamp without time zone
+    discarded_by uuid,
+    discarded_at timestamp without time zone
 );
 
 
@@ -421,7 +440,11 @@ CREATE TABLE public.stage_executions (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     started_at timestamp without time zone,
-    finished_at timestamp without time zone
+    finished_at timestamp without time zone,
+    cancelled_at timestamp without time zone,
+    cancelled_by uuid,
+    result_reason character varying(64),
+    result_message text
 );
 
 
@@ -577,6 +600,14 @@ ALTER TABLE ONLY public.connections
 
 ALTER TABLE ONLY public.connections
     ADD CONSTRAINT connections_target_id_source_id_key UNIQUE (target_id, source_id);
+
+
+--
+-- Name: event_rejections event_rejections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_rejections
+    ADD CONSTRAINT event_rejections_pkey PRIMARY KEY (id);
 
 
 --
@@ -844,10 +875,31 @@ CREATE INDEX idx_connection_groups_deleted_at ON public.connection_groups USING 
 
 
 --
+-- Name: idx_event_rejections_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_rejections_event_id ON public.event_rejections USING btree (event_id);
+
+
+--
+-- Name: idx_event_rejections_target; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_rejections_target ON public.event_rejections USING btree (target_type, target_id);
+
+
+--
 -- Name: idx_event_sources_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_event_sources_deleted_at ON public.event_sources USING btree (deleted_at);
+
+
+--
+-- Name: idx_event_sources_next_trigger_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_event_sources_next_trigger_at ON public.event_sources USING btree (next_trigger_at);
 
 
 --
@@ -982,6 +1034,14 @@ ALTER TABLE ONLY public.connection_groups
 
 
 --
+-- Name: event_rejections event_rejections_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_rejections
+    ADD CONSTRAINT event_rejections_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.events(id);
+
+
+--
 -- Name: event_sources event_sources_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1042,7 +1102,7 @@ ALTER TABLE ONLY public.connections
 --
 
 ALTER TABLE ONLY public.stage_event_approvals
-    ADD CONSTRAINT stage_event_approvals_stage_event_id_fkey FOREIGN KEY (stage_event_id) REFERENCES public.stage_events(id);
+    ADD CONSTRAINT stage_event_approvals_stage_event_id_fkey FOREIGN KEY (stage_event_id) REFERENCES public.stage_events(id) ON DELETE CASCADE;
 
 
 --
@@ -1105,13 +1165,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MWmKJTh3v9oh8htLVrbW0CSSLGvnbNUHoQxE2hg7NaF6dHHPrQmfSTaLFMlMNV8
+\unrestrict a4EbNbrPffA8JDyzoNXy67Ywf2SufZDMusVidJXYLCiqPRIBFEfv1gWJQP49eeX
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 064poHNocEhBHOXbAuejZ5Zc1ClYr8yXW8G49hZwS7p7T0RUkJ4Mf0m9JbvN5cw
+\restrict QpZp3dPWqd1sMkzs7IeK5EFMsxIrFyCMQ3oTDQdZdnXb56YezyHpFGbVFwxT9IT
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1133,7 +1193,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250904120548	f
+20250923143841	f
 \.
 
 
@@ -1141,5 +1201,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 064poHNocEhBHOXbAuejZ5Zc1ClYr8yXW8G49hZwS7p7T0RUkJ4Mf0m9JbvN5cw
+\unrestrict QpZp3dPWqd1sMkzs7IeK5EFMsxIrFyCMQ3oTDQdZdnXb56YezyHpFGbVFwxT9IT
 

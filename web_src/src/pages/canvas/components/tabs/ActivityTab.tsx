@@ -1,20 +1,20 @@
-import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
+import { Stage } from "../../store/types";
 import { ExecutionTimeline } from '../ExecutionTimeline';
-import { SuperplaneStageEvent, SuperplaneEvent } from "@/api-client";
+import { SuperplaneStageEvent, SuperplaneExecution } from "@/api-client";
 import MessageItem from '../MessageItem';
 
 interface ActivityTabProps {
-  selectedStage: StageWithEventQueue;
+  selectedStage: Stage;
   pendingEvents: SuperplaneStageEvent[];
   waitingEvents: SuperplaneStageEvent[];
-  partialExecutions: ExecutionWithEvent[];
-  approveStageEvent: (stageEventId: string, stageId: string) => void;
-  cancelStageEvent: (stageEventId: string, stageId: string) => void;
+  partialExecutions: SuperplaneExecution[];
+  approveStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
+  discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
+  cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
   executionRunning: boolean;
   onChangeTab: (tab: string) => void;
   organizationId: string;
-  connectionEventsById: Record<string, SuperplaneEvent>;
-  eventsByExecutionId: Record<string, SuperplaneEvent>;
+  isLoading: boolean;
 }
 
 export const ActivityTab = ({
@@ -23,14 +23,26 @@ export const ActivityTab = ({
   waitingEvents,
   partialExecutions,
   approveStageEvent,
-  cancelStageEvent,
-  executionRunning,
+  discardStageEvent,
+  cancelStageExecution,
   onChangeTab,
   organizationId,
-  connectionEventsById,
-  eventsByExecutionId
+  isLoading
 }: ActivityTabProps) => {
   const queueCount = pendingEvents.length + waitingEvents.length;
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 mb-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+          </div>
+          <p className="text-zinc-600 dark:text-zinc-400 text-sm">Loading activity...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -39,7 +51,7 @@ export const ActivityTab = ({
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Recent Runs</h3>
           <button className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-            onClick={() => onChangeTab('history')}
+            onClick={() => onChangeTab('executions')}
           >
             View all
           </button>
@@ -47,9 +59,7 @@ export const ActivityTab = ({
         <ExecutionTimeline
           executions={partialExecutions.slice(0, 3)}
           organizationId={organizationId}
-          connectionEventsById={connectionEventsById}
-          eventsByExecutionId={eventsByExecutionId}
-          onCancel={(eventId) => cancelStageEvent(eventId, selectedStage.metadata!.id!)}
+          onCancel={(executionId) => cancelStageExecution(executionId, selectedStage.metadata!.id!)}
         />
       </div>
 
@@ -72,9 +82,7 @@ export const ActivityTab = ({
             [...pendingEvents, ...waitingEvents]
               .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
               .map((event) => {
-                const sourceEvent = connectionEventsById[event.eventId || ''];
-                const plainEventPayload = sourceEvent?.raw;
-                const plainEventHeaders = sourceEvent?.headers;
+                const sourceEvent = event.triggerEvent;
 
                 return (
                   <MessageItem
@@ -82,11 +90,8 @@ export const ActivityTab = ({
                     event={event}
                     selectedStage={selectedStage}
                     onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
-                    onCancel={(eventId) => cancelStageEvent(eventId, selectedStage.metadata!.id!)}
-                    executionRunning={executionRunning}
+                    onCancel={(eventId) => discardStageEvent(eventId, selectedStage.metadata!.id!)}
                     sourceEvent={sourceEvent}
-                    plainEventPayload={plainEventPayload}
-                    plainEventHeaders={plainEventHeaders}
                   />
                 );
               })

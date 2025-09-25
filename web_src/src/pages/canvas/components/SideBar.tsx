@@ -1,21 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from 'react-router-dom';
-import { ExecutionWithEvent, StageWithEventQueue } from "../store/types";
+import { useQueryClient } from '@tanstack/react-query';
+import { Stage } from "../store/types";
 
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
+import { useStageExecutions, useStageEvents, canvasKeys } from "@/hooks/useCanvasData";
+import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
 
 import { SidebarHeader } from "./SidebarHeader";
 import { SidebarTabs } from "./SidebarTabs";
 import { ResizeHandle } from "./ResizeHandle";
 import { ActivityTab } from "./tabs/ActivityTab";
-import { HistoryTab } from "./tabs/HistoryTab";
+import { ExecutionsTab } from "./tabs/ExecutionsTab";
+import { QueueTab } from "./tabs/QueueTab";
+import { EventsTab } from "./tabs/EventsTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
-import { SuperplaneConnectionType, SuperplaneEvent, SuperplaneExecution } from "@/api-client";
-import { useCanvasStore } from "../store/canvasStore";
-import { useConnectedSourcesEvents } from "@/hooks/useCanvasData";
 
 const StageImageMap = {
   'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
@@ -24,141 +26,96 @@ const StageImageMap = {
 }
 
 interface SidebarProps {
-  selectedStage: StageWithEventQueue;
+  selectedStage: Stage;
   onClose: () => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
-  cancelStageEvent: (stageEventId: string, stageId: string) => void;
+  discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
+  cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
+  initialWidth?: number;
 }
 
-export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStageEvent }: SidebarProps) => {
+export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStageEvent, cancelStageExecution, initialWidth = DEFAULT_SIDEBAR_WIDTH }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState('activity');
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
-  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(450);
-  const { connectionGroups, stages, eventSources } = useCanvasStore();
+  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(initialWidth);
+  const queryClient = useQueryClient();
+
+  // Wrapper function to handle approval with query invalidation
+  const handleApproveStageEvent = async (stageEventId: string, stageId: string) => {
+    try {
+      await approveStageEvent(stageEventId, stageId);
+      
+      // Invalidate queries to refresh both stage events and executions data
+      await queryClient.invalidateQueries({
+        queryKey: canvasKeys.stageEvents(canvasId || '', stageId, ['STATE_PENDING', 'STATE_WAITING'])
+      });
+      await queryClient.invalidateQueries({
+        queryKey: canvasKeys.stageExecutions(canvasId || '', stageId)
+      });
+    } catch (error) {
+      console.error('Failed to approve stage event:', error);
+    }
+  };
+
+  // Wrapper function to handle discard with query invalidation
+  const handleDiscardStageEvent = async (stageEventId: string, stageId: string) => {
+    try {
+      await discardStageEvent(stageEventId, stageId);
+      
+      // Invalidate queries to refresh the data
+      await queryClient.invalidateQueries({
+        queryKey: canvasKeys.stageEvents(canvasId || '', stageId, ['STATE_PENDING', 'STATE_WAITING'])
+      });
+    } catch (error) {
+      console.error('Failed to discard stage event:', error);
+    }
+  };
+
+  // Wrapper function to handle execution cancellation with query invalidation
+  const handleCancelStageExecution = async (executionId: string, stageId: string) => {
+    try {
+      await cancelStageExecution(executionId, stageId);
+      
+      // Invalidate queries to refresh the data
+      await queryClient.invalidateQueries({
+        queryKey: canvasKeys.stageExecutions(canvasId || '', stageId)
+      });
+    } catch (error) {
+      console.error('Failed to cancel stage execution:', error);
+    }
+  };
 
   const tabs = useMemo(() => [
     { key: 'activity', label: 'Activity' },
-    { key: 'history', label: 'History' },
+    { key: 'executions', label: 'Executions' },
+    { key: 'queue', label: 'Queue' },
+    { key: 'events', label: 'Events' },
     { key: 'settings', label: 'Settings' },
   ], []);
 
-  const allConnections: { type: SuperplaneConnectionType; name: string }[] = useMemo(() =>
-    selectedStage.spec?.connections
-      ?.map(connection => ({ type: connection.type as SuperplaneConnectionType, name: connection.name as string })) || [],
-    [selectedStage.spec?.connections]
-  );
-
-  const partialConnectionEvents = useMemo(() => {
-    const plainEventsById: SuperplaneEvent[] = [];
-
-    const connectedEventSourceNames = new Set<string>();
-    const connectedStageNames = new Set<string>();
-    const connectedConnectionGroupNames = new Set<string>();
-
-    allConnections.forEach(connection => {
-      if (connection.type === 'TYPE_EVENT_SOURCE') {
-        connectedEventSourceNames.add(connection.name);
-      } else if (connection.type === 'TYPE_STAGE') {
-        connectedStageNames.add(connection.name);
-      } else if (connection.type === 'TYPE_CONNECTION_GROUP') {
-        connectedConnectionGroupNames.add(connection.name);
-      }
-    });
-
-    eventSources.forEach(eventSource => {
-      if (connectedEventSourceNames.has(eventSource.metadata?.name || '')) {
-        eventSource?.events?.forEach(event => {
-          plainEventsById.push(event);
-        });
-      }
-    });
-
-    stages.forEach(stage => {
-      if (connectedStageNames.has(stage.metadata?.name || '')) {
-        stage?.events?.forEach(event => {
-          plainEventsById.push(event);
-        });
-      }
-    });
-
-    connectionGroups.forEach(connectionGroup => {
-      if (connectedConnectionGroupNames.has(connectionGroup.metadata?.name || '')) {
-        connectionGroup?.events?.forEach(event => {
-          plainEventsById.push(event);
-        });
-      }
-    });
-
-    return plainEventsById;
-  }, [allConnections, eventSources, stages, connectionGroups]);
 
 
-  const connectedSources = useMemo(() => {
-    const eventSourceIds: string[] = [];
-    const stageIds: string[] = [];
-    const connectionGroupIds: string[] = [];
-
-    allConnections.forEach(connection => {
-      if (connection.type === 'TYPE_EVENT_SOURCE') {
-        const eventSource = eventSources.find(es => es.metadata?.name === connection.name);
-        if (eventSource?.metadata?.id) {
-          eventSourceIds.push(eventSource.metadata.id);
-        }
-      } else if (connection.type === 'TYPE_STAGE') {
-        const stage = stages.find(s => s.metadata?.name === connection.name);
-        if (stage?.metadata?.id) {
-          stageIds.push(stage.metadata.id);
-        }
-      } else if (connection.type === 'TYPE_CONNECTION_GROUP') {
-        const connectionGroup = connectionGroups.find(cg => cg.metadata?.name === connection.name);
-        if (connectionGroup?.metadata?.id) {
-          connectionGroupIds.push(connectionGroup.metadata.id);
-        }
-      }
-    });
-
-    return { eventSourceIds, stageIds, connectionGroupIds };
-  }, [allConnections, eventSources, stages, connectionGroups]);
 
 
+
+
+
+
+  // Fetch executions directly from the API
   const {
-    data: connectedEventsData,
-    isFetchingNextPage: isFetchingNextConnectedEvents,
-    refetch: refetchConnectedEvents,
-    fetchNextPage: fetchNextConnectedEvents,
-  } = useConnectedSourcesEvents(canvasId || '', connectedSources, 20);
+    data: executionsData,
+    isLoading: executionsLoading
+  } = useStageExecutions(canvasId || '', selectedStage.metadata?.id || '');
 
-  const connectionEventsById = useMemo(() => {
-    const eventsById: Record<string, SuperplaneEvent> = {};
-
-    connectedEventsData?.pages.forEach(page => {
-      page.events.forEach(event => {
-        eventsById[event.id || ''] = event;
-      });
-    });
-
-    return eventsById;
-  }, [connectedEventsData]);
-
-  const eventsByExecutionId = useMemo(() => {
-    const emittedEventsById: Record<string, SuperplaneEvent> = {};
-
-    selectedStage.events?.forEach(event => {
-      const execution = event.raw?.execution as SuperplaneExecution;
-      if (execution?.id) {
-        emittedEventsById[execution.id || ''] = event;
-      }
-    })
-
-    return emittedEventsById;
-  }, [selectedStage.events]);
+  // Fetch pending and waiting stage events
+  const {
+    data: queueEventsData,
+    isLoading: queueEventsLoading
+  } = useStageEvents(canvasId || '', selectedStage.metadata?.id || '', ['STATE_PENDING', 'STATE_WAITING']);
 
   const partialExecutions = useMemo(() =>
-    selectedStage.queue
-      ?.filter(event => event.execution)
-      .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
-      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
-    [selectedStage.queue]
+    executionsData?.pages.flatMap(page => page.executions) || [],
+    [executionsData?.pages]
   );
 
   const executionRunning = useMemo(() =>
@@ -166,21 +123,23 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
     [partialExecutions]
   );
 
+  // Get all queue events from the API
+  const allQueueEvents = useMemo(() =>
+    queueEventsData?.pages.flatMap(page => page.events) || [],
+    [queueEventsData?.pages]
+  );
+
   // Filter events by their state
   const pendingEvents = useMemo(() =>
-    selectedStage.queue?.filter(event => event.state === 'STATE_PENDING' && !event.execution) || [],
-    [selectedStage.queue]
+    allQueueEvents.filter(event => event.state === 'STATE_PENDING'),
+    [allQueueEvents]
   );
 
   const waitingEvents = useMemo(() =>
-    selectedStage.queue?.filter(event => event.state === 'STATE_WAITING' && !event.execution) || [],
-    [selectedStage.queue]
+    allQueueEvents.filter(event => event.state === 'STATE_WAITING'),
+    [allQueueEvents]
   );
 
-  // Every time partialConnectionEvents changes, refetch connected events
-  useEffect(() => {
-    refetchConnectedEvents();
-  }, [refetchConnectedEvents, partialConnectionEvents]);
 
   // Render the appropriate content based on the active tab
   const renderTabContent = () => {
@@ -193,25 +152,37 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, cancelStage
             pendingEvents={pendingEvents}
             waitingEvents={waitingEvents}
             partialExecutions={partialExecutions}
-            approveStageEvent={approveStageEvent}
+            approveStageEvent={handleApproveStageEvent}
             executionRunning={executionRunning}
             organizationId={organizationId!}
-            connectionEventsById={connectionEventsById}
-            eventsByExecutionId={eventsByExecutionId}
-            cancelStageEvent={cancelStageEvent}
+            discardStageEvent={handleDiscardStageEvent}
+            cancelStageExecution={handleCancelStageExecution}
+            isLoading={executionsLoading || queueEventsLoading}
           />
         );
 
-      case 'history':
-        return <HistoryTab
+      case 'executions':
+        return <ExecutionsTab
           canvasId={canvasId!}
-          approveStageEvent={approveStageEvent}
-          organizationId={organizationId!}
           selectedStage={selectedStage}
-          connectionEventsById={connectionEventsById}
-          isFetchingNextConnectedEvents={isFetchingNextConnectedEvents}
-          fetchNextConnectedEvents={fetchNextConnectedEvents}
-          cancelStageEvent={cancelStageEvent}
+          organizationId={organizationId!}
+          cancelStageExecution={handleCancelStageExecution}
+        />;
+
+      case 'queue':
+        return <QueueTab
+          canvasId={canvasId!}
+          selectedStage={selectedStage}
+          organizationId={organizationId!}
+          approveStageEvent={handleApproveStageEvent}
+          discardStageEvent={handleDiscardStageEvent}
+        />;
+
+      case 'events':
+        return <EventsTab
+          canvasId={canvasId!}
+          selectedStage={selectedStage}
+          organizationId={organizationId!}
         />;
 
       case 'settings':

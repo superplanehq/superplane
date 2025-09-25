@@ -24,27 +24,43 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
         return {
           type: 'semaphore',
           integration: {
-            name: 'semaphore',
+            name: '',
           },
           resource: {
             type: 'project',
             name: '',
           },
+          spec: {
+            ref: 'refs/heads/main',
+            pipelineFile: '.semaphore/semaphore.yml',
+          }
         };
       case 'github':
         return {
           type: 'github',
           integration: {
-            name: 'github',
+            name: '',
           },
           resource: {
             type: 'repository',
-            name: 'my-repository',
+            name: '',
           },
+          spec: {
+            ref: 'main',
+            workflow: '.github/workflows/main.yml',
+          }
         };
       case 'http':
         return {
           type: 'http',
+          spec: {
+            url: '',
+          },
+        };
+      case 'noop':
+        return {
+          type: 'noop',
+          spec: {},
         };
       default:
         return { type: '', spec: {} };

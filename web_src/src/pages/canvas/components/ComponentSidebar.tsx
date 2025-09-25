@@ -116,6 +116,15 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       category_description: 'Execute remote operations',
       executorType: 'github'
     },
+    {
+      id: 'stage',
+      name: 'No-Op Stage',
+      description: 'A stage that does nothing but returns random outputs',
+      icon: 'check_circle',
+      category: 'Stages',
+      category_description: 'Execute remote operations',
+      executorType: 'noop'
+    },
     // Stages - Coming Soon
     {
       id: 'stage',
@@ -219,6 +228,15 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     },
     {
       id: 'event_source',
+      name: 'Scheduled Event Source',
+      description: 'Trigger workflows on a schedule',
+      icon: 'schedule',
+      category: 'Event Sources',
+      category_description: 'Emit events that can be used to trigger executions',
+      eventSourceType: 'scheduled'
+    },
+    {
+      id: 'event_source',
       name: 'Semaphore Event Source',
       description: 'Trigger workflows from Semaphore events',
       image: SemaphoreLogo,
@@ -287,14 +305,13 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between px-4 pt-4 pb-0 sticky top-0">
             <div className="flex items-center gap-3">
-              <Button
-                color='white'
+              <button
                 onClick={onClose}
                 aria-label="Close sidebar"
-                className='!px-1 !py-0'
+                className="px-2 py-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 rounded-md shadow-md hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all duration-300 flex items-center gap-2"
               >
-                <MaterialSymbol name="menu_open" size="lg" />
-              </Button>
+                <MaterialSymbol name="menu_open" size="lg" className="text-gray-600 dark:text-zinc-300" />
+              </button>
 
               <h2 id="sidebar-title" className="text-md font-semibold text-gray-900 dark:text-zinc-100">
                 Components

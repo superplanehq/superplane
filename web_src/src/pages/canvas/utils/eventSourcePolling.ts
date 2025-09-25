@@ -1,5 +1,5 @@
 import { useCanvasStore } from '../store/canvasStore';
-import { ConnectionGroupWithEvents, EventSourceWithEvents, StageWithEventQueue } from '../store/types';
+import { ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from '../store/types';
 
 const buildPollFunction = (sourceType: 'event-source' | 'connection-group' | 'stage', canvasId: string, sourceId: string, syncFunction: (canvasId: string, sourceId: string) => Promise<void>) => {
   const maxAttempts = 20;
@@ -10,7 +10,7 @@ const buildPollFunction = (sourceType: 'event-source' | 'connection-group' | 'st
     attempts++;
     await syncFunction(canvasId, sourceId);
     
-    let currentSources: EventSourceWithEvents[] | ConnectionGroupWithEvents[] | StageWithEventQueue[] = []
+    let currentSources: EventSourceWithEvents[] | ConnectionGroupWithEvents[] | Stage[] = []
     
     if (sourceType === 'event-source') {
       currentSources = useCanvasStore.getState().eventSources;
@@ -26,7 +26,15 @@ const buildPollFunction = (sourceType: 'event-source' | 'connection-group' | 'st
       return;
     }
 
-    const hasPendingEvents = source.events?.some(event => event.state === 'STATE_PENDING') ?? false;
+    let hasPendingEvents = false;
+    
+    if (sourceType === 'stage') {
+      const stage = source as Stage;
+      hasPendingEvents = stage.queue?.some(event => event.state === 'STATE_PENDING') ?? false;
+    } else {
+      const sourceWithEvents = source as EventSourceWithEvents | ConnectionGroupWithEvents;
+      hasPendingEvents = sourceWithEvents.events?.some(event => event.state === 'STATE_PENDING') ?? false;
+    }
     
     if (hasPendingEvents && attempts < maxAttempts) {
       setTimeout(poll, pollInterval);

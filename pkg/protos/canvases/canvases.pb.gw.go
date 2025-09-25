@@ -620,6 +620,73 @@ func local_request_Superplane_ListConnectionGroups_0(ctx context.Context, marsha
 	return msg, metadata, err
 }
 
+var filter_Superplane_ListStageExecutions_0 = &utilities.DoubleArray{Encoding: map[string]int{"canvas_id_or_name": 0, "stage_id_or_name": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
+
+func request_Superplane_ListStageExecutions_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListStageExecutionsRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	io.Copy(io.Discard, req.Body)
+	val, ok := pathParams["canvas_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
+	}
+	protoReq.CanvasIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
+	}
+	val, ok = pathParams["stage_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "stage_id_or_name")
+	}
+	protoReq.StageIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "stage_id_or_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Superplane_ListStageExecutions_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.ListStageExecutions(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Superplane_ListStageExecutions_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListStageExecutionsRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["canvas_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
+	}
+	protoReq.CanvasIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
+	}
+	val, ok = pathParams["stage_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "stage_id_or_name")
+	}
+	protoReq.StageIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "stage_id_or_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Superplane_ListStageExecutions_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.ListStageExecutions(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 var filter_Superplane_ListStageEvents_0 = &utilities.DoubleArray{Encoding: map[string]int{"canvas_id_or_name": 0, "stage_id_or_name": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
 
 func request_Superplane_ListStageEvents_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -738,9 +805,9 @@ func local_request_Superplane_ListEvents_0(ctx context.Context, marshaler runtim
 	return msg, metadata, err
 }
 
-func request_Superplane_BulkListEvents_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_Superplane_CreateEvent_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq BulkListEventsRequest
+		protoReq CreateEventRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -755,13 +822,13 @@ func request_Superplane_BulkListEvents_0(ctx context.Context, marshaler runtime.
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
 	}
-	msg, err := client.BulkListEvents(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.CreateEvent(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_Superplane_BulkListEvents_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_Superplane_CreateEvent_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq BulkListEventsRequest
+		protoReq CreateEventRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -776,49 +843,7 @@ func local_request_Superplane_BulkListEvents_0(ctx context.Context, marshaler ru
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
 	}
-	msg, err := server.BulkListEvents(ctx, &protoReq)
-	return msg, metadata, err
-}
-
-func request_Superplane_BulkListStageEvents_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq BulkListStageEventsRequest
-		metadata runtime.ServerMetadata
-		err      error
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	val, ok := pathParams["canvas_id_or_name"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
-	}
-	protoReq.CanvasIdOrName, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
-	}
-	msg, err := client.BulkListStageEvents(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
-	return msg, metadata, err
-}
-
-func local_request_Superplane_BulkListStageEvents_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
-	var (
-		protoReq BulkListStageEventsRequest
-		metadata runtime.ServerMetadata
-		err      error
-	)
-	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	val, ok := pathParams["canvas_id_or_name"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
-	}
-	protoReq.CanvasIdOrName, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
-	}
-	msg, err := server.BulkListStageEvents(ctx, &protoReq)
+	msg, err := server.CreateEvent(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -1282,9 +1307,9 @@ func local_request_Superplane_ApproveStageEvent_0(ctx context.Context, marshaler
 	return msg, metadata, err
 }
 
-func request_Superplane_CancelStageEvent_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_Superplane_DiscardStageEvent_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq CancelStageEventRequest
+		protoReq DiscardStageEventRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -1315,13 +1340,13 @@ func request_Superplane_CancelStageEvent_0(ctx context.Context, marshaler runtim
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "event_id", err)
 	}
-	msg, err := client.CancelStageEvent(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.DiscardStageEvent(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_Superplane_CancelStageEvent_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_Superplane_DiscardStageEvent_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq CancelStageEventRequest
+		protoReq DiscardStageEventRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -1352,7 +1377,132 @@ func local_request_Superplane_CancelStageEvent_0(ctx context.Context, marshaler 
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "event_id", err)
 	}
-	msg, err := server.CancelStageEvent(ctx, &protoReq)
+	msg, err := server.DiscardStageEvent(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_Superplane_CancelStageExecution_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq CancelStageExecutionRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["canvas_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
+	}
+	protoReq.CanvasIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
+	}
+	val, ok = pathParams["stage_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "stage_id_or_name")
+	}
+	protoReq.StageIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "stage_id_or_name", err)
+	}
+	val, ok = pathParams["execution_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "execution_id")
+	}
+	protoReq.ExecutionId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "execution_id", err)
+	}
+	msg, err := client.CancelStageExecution(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Superplane_CancelStageExecution_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq CancelStageExecutionRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["canvas_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
+	}
+	protoReq.CanvasIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
+	}
+	val, ok = pathParams["stage_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "stage_id_or_name")
+	}
+	protoReq.StageIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "stage_id_or_name", err)
+	}
+	val, ok = pathParams["execution_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "execution_id")
+	}
+	protoReq.ExecutionId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "execution_id", err)
+	}
+	msg, err := server.CancelStageExecution(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+var filter_Superplane_ListEventRejections_0 = &utilities.DoubleArray{Encoding: map[string]int{"canvas_id_or_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+
+func request_Superplane_ListEventRejections_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListEventRejectionsRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	io.Copy(io.Discard, req.Body)
+	val, ok := pathParams["canvas_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
+	}
+	protoReq.CanvasIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Superplane_ListEventRejections_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.ListEventRejections(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Superplane_ListEventRejections_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListEventRejectionsRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["canvas_id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
+	}
+	protoReq.CanvasIdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Superplane_ListEventRejections_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.ListEventRejections(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -1737,6 +1887,26 @@ func RegisterSuperplaneHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_ListConnectionGroups_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_Superplane_ListStageExecutions_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/ListStageExecutions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/executions"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Superplane_ListStageExecutions_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Superplane_ListStageExecutions_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_Superplane_ListStageEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1777,45 +1947,25 @@ func RegisterSuperplaneHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_ListEvents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_Superplane_BulkListEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Superplane_CreateEvent_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/BulkListEvents", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/events/bulk"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/CreateEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/events"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_Superplane_BulkListEvents_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_Superplane_CreateEvent_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Superplane_BulkListEvents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
-	mux.Handle(http.MethodPost, pattern_Superplane_BulkListStageEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		var stream runtime.ServerTransportStream
-		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/BulkListStageEvents", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stage-events/bulk"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := local_request_Superplane_BulkListStageEvents_0(annotatedContext, inboundMarshaler, server, req, pathParams)
-		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_Superplane_BulkListStageEvents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Superplane_CreateEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodGet, pattern_Superplane_ListConnectionGroupFieldSets_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -1977,25 +2127,65 @@ func RegisterSuperplaneHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_ApproveStageEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_Superplane_CancelStageEvent_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Superplane_DiscardStageEvent_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/CancelStageEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/cancel"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/DiscardStageEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/discard"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_Superplane_CancelStageEvent_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_Superplane_DiscardStageEvent_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Superplane_CancelStageEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Superplane_DiscardStageEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPost, pattern_Superplane_CancelStageExecution_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/CancelStageExecution", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/executions/{execution_id}/cancel"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Superplane_CancelStageExecution_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Superplane_CancelStageExecution_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_Superplane_ListEventRejections_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/ListEventRejections", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/rejections"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Superplane_ListEventRejections_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Superplane_ListEventRejections_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_Superplane_AddUser_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -2315,6 +2505,23 @@ func RegisterSuperplaneHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_ListConnectionGroups_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_Superplane_ListStageExecutions_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/ListStageExecutions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/executions"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Superplane_ListStageExecutions_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Superplane_ListStageExecutions_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_Superplane_ListStageEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -2349,39 +2556,22 @@ func RegisterSuperplaneHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_ListEvents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_Superplane_BulkListEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Superplane_CreateEvent_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/BulkListEvents", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/events/bulk"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/CreateEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/events"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_Superplane_BulkListEvents_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_Superplane_CreateEvent_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Superplane_BulkListEvents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
-	})
-	mux.Handle(http.MethodPost, pattern_Superplane_BulkListStageEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
-		ctx, cancel := context.WithCancel(req.Context())
-		defer cancel()
-		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/BulkListStageEvents", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stage-events/bulk"))
-		if err != nil {
-			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		resp, md, err := request_Superplane_BulkListStageEvents_0(annotatedContext, inboundMarshaler, client, req, pathParams)
-		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
-		if err != nil {
-			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
-			return
-		}
-		forward_Superplane_BulkListStageEvents_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Superplane_CreateEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodGet, pattern_Superplane_ListConnectionGroupFieldSets_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -2519,22 +2709,56 @@ func RegisterSuperplaneHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_ApproveStageEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodPost, pattern_Superplane_CancelStageEvent_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPost, pattern_Superplane_DiscardStageEvent_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/CancelStageEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/cancel"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/DiscardStageEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/discard"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_Superplane_CancelStageEvent_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_Superplane_DiscardStageEvent_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Superplane_CancelStageEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Superplane_DiscardStageEvent_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPost, pattern_Superplane_CancelStageExecution_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/CancelStageExecution", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/executions/{execution_id}/cancel"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Superplane_CancelStageExecution_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Superplane_CancelStageExecution_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodGet, pattern_Superplane_ListEventRejections_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/ListEventRejections", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/rejections"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Superplane_ListEventRejections_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Superplane_ListEventRejections_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_Superplane_AddUser_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -2588,10 +2812,10 @@ var (
 	pattern_Superplane_ListStages_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages"}, ""))
 	pattern_Superplane_ListEventSources_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "event-sources"}, ""))
 	pattern_Superplane_ListConnectionGroups_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "connection-groups"}, ""))
+	pattern_Superplane_ListStageExecutions_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "stage_id_or_name", "executions"}, ""))
 	pattern_Superplane_ListStageEvents_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "stage_id_or_name", "events"}, ""))
 	pattern_Superplane_ListEvents_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "events"}, ""))
-	pattern_Superplane_BulkListEvents_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "events", "bulk"}, ""))
-	pattern_Superplane_BulkListStageEvents_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stage-events", "bulk"}, ""))
+	pattern_Superplane_CreateEvent_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "events"}, ""))
 	pattern_Superplane_ListConnectionGroupFieldSets_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id_or_name", "connection-groups", "id_or_name", "field-sets"}, ""))
 	pattern_Superplane_UpdateStage_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "id_or_name"}, ""))
 	pattern_Superplane_DeleteStage_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "id_or_name"}, ""))
@@ -2600,7 +2824,9 @@ var (
 	pattern_Superplane_UpdateConnectionGroup_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "connection-groups", "id_or_name"}, ""))
 	pattern_Superplane_DeleteConnectionGroup_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "connection-groups", "id_or_name"}, ""))
 	pattern_Superplane_ApproveStageEvent_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7, 2, 8}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "stage_id_or_name", "events", "event_id", "approve"}, ""))
-	pattern_Superplane_CancelStageEvent_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7, 2, 8}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "stage_id_or_name", "events", "event_id", "cancel"}, ""))
+	pattern_Superplane_DiscardStageEvent_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7, 2, 8}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "stage_id_or_name", "events", "event_id", "discard"}, ""))
+	pattern_Superplane_CancelStageExecution_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7, 2, 8}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "stage_id_or_name", "executions", "execution_id", "cancel"}, ""))
+	pattern_Superplane_ListEventRejections_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "rejections"}, ""))
 	pattern_Superplane_AddUser_0                      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "users"}, ""))
 	pattern_Superplane_RemoveUser_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "users", "user_id"}, ""))
 )
@@ -2620,10 +2846,10 @@ var (
 	forward_Superplane_ListStages_0                   = runtime.ForwardResponseMessage
 	forward_Superplane_ListEventSources_0             = runtime.ForwardResponseMessage
 	forward_Superplane_ListConnectionGroups_0         = runtime.ForwardResponseMessage
+	forward_Superplane_ListStageExecutions_0          = runtime.ForwardResponseMessage
 	forward_Superplane_ListStageEvents_0              = runtime.ForwardResponseMessage
 	forward_Superplane_ListEvents_0                   = runtime.ForwardResponseMessage
-	forward_Superplane_BulkListEvents_0               = runtime.ForwardResponseMessage
-	forward_Superplane_BulkListStageEvents_0          = runtime.ForwardResponseMessage
+	forward_Superplane_CreateEvent_0                  = runtime.ForwardResponseMessage
 	forward_Superplane_ListConnectionGroupFieldSets_0 = runtime.ForwardResponseMessage
 	forward_Superplane_UpdateStage_0                  = runtime.ForwardResponseMessage
 	forward_Superplane_DeleteStage_0                  = runtime.ForwardResponseMessage
@@ -2632,7 +2858,9 @@ var (
 	forward_Superplane_UpdateConnectionGroup_0        = runtime.ForwardResponseMessage
 	forward_Superplane_DeleteConnectionGroup_0        = runtime.ForwardResponseMessage
 	forward_Superplane_ApproveStageEvent_0            = runtime.ForwardResponseMessage
-	forward_Superplane_CancelStageEvent_0             = runtime.ForwardResponseMessage
+	forward_Superplane_DiscardStageEvent_0            = runtime.ForwardResponseMessage
+	forward_Superplane_CancelStageExecution_0         = runtime.ForwardResponseMessage
+	forward_Superplane_ListEventRejections_0          = runtime.ForwardResponseMessage
 	forward_Superplane_AddUser_0                      = runtime.ForwardResponseMessage
 	forward_Superplane_RemoveUser_0                   = runtime.ForwardResponseMessage
 )

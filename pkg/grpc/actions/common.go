@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations"
@@ -15,6 +16,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func ValidateUUIDs(ids ...string) error {
@@ -34,8 +37,25 @@ func ExecutionResultToProto(result string) pb.Execution_Result {
 		return pb.Execution_RESULT_FAILED
 	case models.ResultPassed:
 		return pb.Execution_RESULT_PASSED
+	case models.ResultCancelled:
+		return pb.Execution_RESULT_CANCELLED
 	default:
 		return pb.Execution_RESULT_UNKNOWN
+	}
+}
+
+func ExecutionResultReasonToProto(reason string) pb.Execution_ResultReason {
+	switch reason {
+	case models.ResultReasonError:
+		return pb.Execution_RESULT_REASON_ERROR
+	case models.ResultReasonMissingOutputs:
+		return pb.Execution_RESULT_REASON_MISSING_OUTPUTS
+	case models.ResultReasonTimeout:
+		return pb.Execution_RESULT_REASON_TIMEOUT
+	case models.ResultReasonUser:
+		return pb.Execution_RESULT_REASON_USER
+	default:
+		return pb.Execution_RESULT_REASON_OK
 	}
 }
 
@@ -91,7 +111,7 @@ func ValidateConnections(canvasID string, connections []*pb.Connection) ([]model
 		cs = append(cs, models.Connection{
 			SourceID:       *sourceID,
 			SourceName:     connection.Name,
-			SourceType:     protoToConnectionType(connection.Type),
+			SourceType:     ProtoToConnectionType(connection.Type),
 			FilterOperator: ProtoToFilterOperator(connection.FilterOperator),
 			Filters:        filters,
 		})
@@ -159,7 +179,7 @@ func validateHeaderFilter(filter *pb.HeaderFilter) (*models.Filter, error) {
 	}, nil
 }
 
-func protoToConnectionType(t pb.Connection_Type) string {
+func ProtoToConnectionType(t pb.Connection_Type) string {
 	switch t {
 	case pb.Connection_TYPE_STAGE:
 		return models.SourceTypeStage
@@ -263,6 +283,17 @@ func ConnectionTypeToProto(t string) pb.Connection_Type {
 		return pb.Connection_TYPE_CONNECTION_GROUP
 	default:
 		return pb.Connection_TYPE_UNKNOWN
+	}
+}
+
+func RejectionReasonToProto(reason string) pb.EventRejection_RejectionReason {
+	switch reason {
+	case models.EventRejectionReasonFiltered:
+		return pb.EventRejection_REJECTION_REASON_FILTERED
+	case models.EventRejectionReasonError:
+		return pb.EventRejection_REJECTION_REASON_ERROR
+	default:
+		return pb.EventRejection_REJECTION_REASON_UNKNOWN
 	}
 }
 
@@ -377,4 +408,255 @@ func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.
 	}
 
 	return models.DomainTypeOrganization, &canvas.OrganizationID, nil
+}
+
+func SerializeEvent(in models.Event) (*pb.Event, error) {
+	event := &pb.Event{
+		Id:          in.ID.String(),
+		SourceId:    in.SourceID.String(),
+		SourceName:  in.SourceName,
+		SourceType:  EventSourceTypeToProto(in.SourceType),
+		Type:        in.Type,
+		State:       EventStateToProto(in.State),
+		StateReason: EventStateReasonToProto(in.StateReason),
+		ReceivedAt:  timestamppb.New(*in.ReceivedAt),
+	}
+
+	if len(in.Raw) > 0 {
+		data, err := in.GetData()
+		if err != nil {
+			return nil, err
+		}
+
+		event.Raw, err = structpb.NewStruct(data)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(in.Headers) > 0 {
+		headers, err := in.GetHeaders()
+		if err != nil {
+			return nil, err
+		}
+
+		event.Headers, err = structpb.NewStruct(headers)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return event, nil
+}
+
+func EventSourceTypeToProto(sourceType string) pb.EventSourceType {
+	switch sourceType {
+	case models.SourceTypeEventSource:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
+	case models.SourceTypeStage:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE
+	case models.SourceTypeConnectionGroup:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP
+	default:
+		return pb.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN
+	}
+}
+
+func ProtoToEventSourceType(sourceType pb.EventSourceType) string {
+	switch sourceType {
+	case pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE:
+		return models.SourceTypeEventSource
+	case pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE:
+		return models.SourceTypeStage
+	case pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP:
+		return models.SourceTypeConnectionGroup
+	default:
+		return ""
+	}
+}
+
+func EventStateToProto(state string) pb.Event_State {
+	switch state {
+	case models.EventStatePending:
+		return pb.Event_STATE_PENDING
+	case models.EventStateProcessed:
+		return pb.Event_STATE_PROCESSED
+	case models.EventStateRejected:
+		return pb.Event_STATE_REJECTED
+	default:
+		return pb.Event_STATE_UNKNOWN
+	}
+}
+
+func EventStateReasonToProto(stateReason string) pb.Event_StateReason {
+	switch stateReason {
+	case models.EventStateReasonError:
+		return pb.Event_STATE_REASON_ERROR
+	case models.EventStateReasonFiltered:
+		return pb.Event_STATE_REASON_FILTERED
+	case models.EventStateReasonOk:
+		return pb.Event_STATE_REASON_OK
+	default:
+		return pb.Event_STATE_REASON_UNKNOWN
+	}
+}
+
+func SerializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
+	e := pb.StageEvent{
+		Id:          in.ID.String(),
+		State:       StageEventStateToProto(in.State),
+		StateReason: StageEventStateReasonToProto(in.StateReason),
+		CreatedAt:   timestamppb.New(*in.CreatedAt),
+		Approvals:   []*pb.StageEventApproval{},
+		Inputs:      []*pb.KeyValuePair{},
+		Name:        in.Name,
+	}
+
+	if in.DiscardedBy != nil {
+		e.DiscardedBy = in.DiscardedBy.String()
+	}
+	if in.DiscardedAt != nil {
+		e.DiscardedAt = timestamppb.New(*in.DiscardedAt)
+	}
+
+	//
+	// Add inputs
+	//
+	for k, v := range in.Inputs.Data() {
+		e.Inputs = append(e.Inputs, &pb.KeyValuePair{Name: k, Value: v.(string)})
+	}
+
+	//
+	// Add approvals
+	//
+	approvals, err := in.FindApprovals()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, approval := range approvals {
+		e.Approvals = append(e.Approvals, &pb.StageEventApproval{
+			ApprovedBy: approval.ApprovedBy.String(),
+			ApprovedAt: timestamppb.New(*approval.ApprovedAt),
+		})
+	}
+
+	if in.Event != nil {
+		serializedTriggerEvent, err := SerializeEvent(*in.Event)
+		if err != nil {
+			return nil, err
+		}
+		e.TriggerEvent = serializedTriggerEvent
+	}
+
+	return &e, nil
+}
+
+func ProtoToScheduleType(scheduleType pb.EventSource_Schedule_Type) (string, error) {
+	switch scheduleType {
+	case pb.EventSource_Schedule_TYPE_HOURLY:
+		return models.ScheduleTypeHourly, nil
+	case pb.EventSource_Schedule_TYPE_DAILY:
+		return models.ScheduleTypeDaily, nil
+	case pb.EventSource_Schedule_TYPE_WEEKLY:
+		return models.ScheduleTypeWeekly, nil
+	default:
+		return "", status.Error(codes.InvalidArgument, "invalid schedule type")
+	}
+}
+
+func ScheduleTypeToProto(scheduleType string) pb.EventSource_Schedule_Type {
+	switch scheduleType {
+	case models.ScheduleTypeHourly:
+		return pb.EventSource_Schedule_TYPE_HOURLY
+	case models.ScheduleTypeDaily:
+		return pb.EventSource_Schedule_TYPE_DAILY
+	case models.ScheduleTypeWeekly:
+		return pb.EventSource_Schedule_TYPE_WEEKLY
+	default:
+		return pb.EventSource_Schedule_TYPE_UNKNOWN
+	}
+}
+
+func ProtoToWeekDay(weekDay pb.EventSource_Schedule_WeekDay) (string, error) {
+	switch weekDay {
+	case pb.EventSource_Schedule_WEEK_DAY_MONDAY:
+		return models.WeekDayMonday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_TUESDAY:
+		return models.WeekDayTuesday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_WEDNESDAY:
+		return models.WeekDayWednesday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_THURSDAY:
+		return models.WeekDayThursday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_FRIDAY:
+		return models.WeekDayFriday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_SATURDAY:
+		return models.WeekDaySaturday, nil
+	case pb.EventSource_Schedule_WEEK_DAY_SUNDAY:
+		return models.WeekDaySunday, nil
+	default:
+		return "", status.Error(codes.InvalidArgument, "invalid week day")
+	}
+}
+
+func WeekDayToProto(weekDay string) pb.EventSource_Schedule_WeekDay {
+	switch weekDay {
+	case models.WeekDayMonday:
+		return pb.EventSource_Schedule_WEEK_DAY_MONDAY
+	case models.WeekDayTuesday:
+		return pb.EventSource_Schedule_WEEK_DAY_TUESDAY
+	case models.WeekDayWednesday:
+		return pb.EventSource_Schedule_WEEK_DAY_WEDNESDAY
+	case models.WeekDayThursday:
+		return pb.EventSource_Schedule_WEEK_DAY_THURSDAY
+	case models.WeekDayFriday:
+		return pb.EventSource_Schedule_WEEK_DAY_FRIDAY
+	case models.WeekDaySaturday:
+		return pb.EventSource_Schedule_WEEK_DAY_SATURDAY
+	case models.WeekDaySunday:
+		return pb.EventSource_Schedule_WEEK_DAY_SUNDAY
+	default:
+		return pb.EventSource_Schedule_WEEK_DAY_UNKNOWN
+	}
+}
+
+func ValidateTime(timeStr string) error {
+	if timeStr == "" {
+		return status.Error(codes.InvalidArgument, "time is required")
+	}
+
+	_, err := time.Parse("15:04", timeStr)
+	if err != nil {
+		return status.Error(codes.InvalidArgument, "time must be in HH:MM format (24-hour)")
+	}
+
+	return nil
+}
+
+func StageEventStateToProto(state string) pb.StageEvent_State {
+	switch state {
+	case models.StageEventStatePending:
+		return pb.StageEvent_STATE_PENDING
+	case models.StageEventStateWaiting:
+		return pb.StageEvent_STATE_WAITING
+	case models.StageEventStateProcessed:
+		return pb.StageEvent_STATE_PROCESSED
+	case models.StageEventStateDiscarded:
+		return pb.StageEvent_STATE_DISCARDED
+	default:
+		return pb.StageEvent_STATE_UNKNOWN
+	}
+}
+
+func StageEventStateReasonToProto(stateReason string) pb.StageEvent_StateReason {
+	switch stateReason {
+	case models.StageEventStateReasonApproval:
+		return pb.StageEvent_STATE_REASON_APPROVAL
+	case models.StageEventStateReasonTimeWindow:
+		return pb.StageEvent_STATE_REASON_TIME_WINDOW
+	default:
+		return pb.StageEvent_STATE_REASON_UNKNOWN
+	}
 }

@@ -2,10 +2,11 @@ package events
 
 import (
 	"context"
-	"log"
+	"sync"
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -15,98 +16,149 @@ import (
 )
 
 const (
-	DefaultLimit = 20
-	MaxLimit     = 50
+	MinLimit     = 50
+	MaxLimit     = 100
+	DefaultLimit = 50
 )
 
-func ListEvents(ctx context.Context, canvasID string, sourceType pb.EventSourceType, sourceID string, limit int32, before *timestamppb.Timestamp) (*pb.ListEventsResponse, error) {
-	canvasUUID, err := uuid.Parse(canvasID)
+func ListEvents(ctx context.Context, canvasID string, protoSourceType pb.EventSourceType, sourceID string, limit uint32, before *timestamppb.Timestamp, protoStates []pb.Event_State) (*pb.ListEventsResponse, error) {
+	sourceType := actions.ProtoToEventSourceType(protoSourceType)
+	if sourceType == "" {
+		return nil, status.Error(codes.InvalidArgument, "invalid source type")
+	}
+
+	id, err := uuid.Parse(sourceID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
+		return nil, status.Error(codes.InvalidArgument, "invalid source ID")
 	}
 
-	validatedLimit := validateLimit(int(limit))
+	states := getStates(protoStates)
+	limit = getLimit(limit)
+	result := listAndCountEventsInParallel(
+		uuid.MustParse(canvasID),
+		sourceType,
+		id,
+		int(limit),
+		getBefore(before),
+		states,
+	)
 
-	var beforeTime *time.Time
-	if before != nil && before.IsValid() {
-		t := before.AsTime()
-		beforeTime = &t
-	}
-	log.Println("beforeTime", beforeTime)
-	events, err := models.ListEventsByCanvasIDWithLimitAndBefore(canvasUUID, EventSourceTypeToString(sourceType), sourceID, validatedLimit, beforeTime)
-	if err != nil {
-		return nil, err
+	if result.listErr != nil {
+		return nil, result.listErr
 	}
 
-	serialized, err := serializeEvents(events)
+	if result.countErr != nil {
+		return nil, result.countErr
+	}
+
+	serialized, err := serializeEvents(result.events)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &pb.ListEventsResponse{
-		Events: serialized,
+		Events:        serialized,
+		TotalCount:    uint32(result.totalCount),
+		HasNextPage:   result.hasNextPage(limit),
+		LastTimestamp: result.lastTimestamp(),
 	}
 
 	return response, nil
 }
 
-func validateLimit(limit int) int {
-	if limit < 1 || limit > MaxLimit {
+type listAndCountEventsResult struct {
+	events     []models.Event
+	totalCount int64
+	listErr    error
+	countErr   error
+}
+
+func (r *listAndCountEventsResult) hasNextPage(limit uint32) bool {
+	return len(r.events) == int(limit) && r.totalCount > int64(limit)
+}
+
+func (r *listAndCountEventsResult) lastTimestamp() *timestamppb.Timestamp {
+	if len(r.events) > 0 {
+		lastEvent := r.events[len(r.events)-1]
+		return timestamppb.New(*lastEvent.ReceivedAt)
+	}
+
+	return nil
+}
+
+func listAndCountEventsInParallel(canvasID uuid.UUID, sourceType string, sourceID uuid.UUID, limit int, beforeTime *time.Time, states []string) *listAndCountEventsResult {
+	result := &listAndCountEventsResult{}
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		result.events, result.listErr = models.FilterEvents(canvasID, sourceType, sourceID.String(), limit, beforeTime, states)
+	}()
+
+	go func() {
+		defer wg.Done()
+		result.totalCount, result.countErr = models.CountEvents(canvasID, sourceType, sourceID.String(), states)
+	}()
+
+	wg.Wait()
+	return result
+}
+
+func protoToEventState(state pb.Event_State) string {
+	switch state {
+	case pb.Event_STATE_PENDING:
+		return models.EventStatePending
+	case pb.Event_STATE_REJECTED:
+		return models.EventStateRejected
+	case pb.Event_STATE_PROCESSED:
+		return models.EventStateProcessed
+	default:
+		return ""
+	}
+}
+
+func getStates(protoStates []pb.Event_State) []string {
+	var states []string
+	for _, protoState := range protoStates {
+		state := protoToEventState(protoState)
+		if state != "" {
+			states = append(states, state)
+		}
+	}
+
+	// If no states specified, default to processed and rejected
+	if len(states) == 0 {
+		states = []string{
+			protoToEventState(pb.Event_STATE_PENDING),
+			protoToEventState(pb.Event_STATE_PROCESSED),
+			protoToEventState(pb.Event_STATE_REJECTED),
+		}
+	}
+
+	return states
+}
+
+func getLimit(limit uint32) uint32 {
+	if limit == 0 {
 		return DefaultLimit
 	}
+
+	if limit > MaxLimit {
+		return MaxLimit
+	}
+
 	return limit
 }
 
-func EventSourceTypeToString(sourceType pb.EventSourceType) string {
-	switch sourceType {
-	case pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE:
-		return models.SourceTypeEventSource
-	case pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE:
-		return models.SourceTypeStage
-	case pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP:
-		return models.SourceTypeConnectionGroup
-	default:
-		return ""
+func getBefore(before *timestamppb.Timestamp) *time.Time {
+	if before != nil && before.IsValid() {
+		t := before.AsTime()
+		return &t
 	}
-}
 
-func StringToEventSourceType(sourceType string) pb.EventSourceType {
-	switch sourceType {
-	case models.SourceTypeEventSource:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_EVENT_SOURCE
-	case models.SourceTypeStage:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_STAGE
-	case models.SourceTypeConnectionGroup:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_CONNECTION_GROUP
-	default:
-		return pb.EventSourceType_EVENT_SOURCE_TYPE_UNKNOWN
-	}
-}
-
-func EventStateProtoToString(state pb.Event_State) string {
-	switch state {
-	case pb.Event_STATE_PROCESSED:
-		return models.EventStateProcessed
-	case pb.Event_STATE_PENDING:
-		return models.EventStatePending
-	case pb.Event_STATE_DISCARDED:
-		return models.EventStateDiscarded
-	default:
-		return ""
-	}
-}
-
-func StringToEventStateProto(state string) pb.Event_State {
-	switch state {
-	case models.EventStateProcessed:
-		return pb.Event_STATE_PROCESSED
-	case models.EventStatePending:
-		return pb.Event_STATE_PENDING
-	case models.EventStateDiscarded:
-		return pb.Event_STATE_DISCARDED
-	default:
-		return pb.Event_STATE_UNKNOWN
-	}
+	return nil
 }
 
 func serializeEvents(in []models.Event) ([]*pb.Event, error) {
@@ -123,13 +175,15 @@ func serializeEvents(in []models.Event) ([]*pb.Event, error) {
 
 func serializeEvent(in models.Event) (*pb.Event, error) {
 	event := &pb.Event{
-		Id:         in.ID.String(),
-		SourceId:   in.SourceID.String(),
-		SourceName: in.SourceName,
-		SourceType: StringToEventSourceType(in.SourceType),
-		Type:       in.Type,
-		State:      StringToEventStateProto(in.State),
-		ReceivedAt: timestamppb.New(*in.ReceivedAt),
+		Id:           in.ID.String(),
+		SourceId:     in.SourceID.String(),
+		SourceName:   in.SourceName,
+		SourceType:   actions.EventSourceTypeToProto(in.SourceType),
+		Type:         in.Type,
+		State:        actions.EventStateToProto(in.State),
+		StateReason:  actions.EventStateReasonToProto(in.StateReason),
+		StateMessage: in.StateMessage,
+		ReceivedAt:   timestamppb.New(*in.ReceivedAt),
 	}
 
 	if len(in.Raw) > 0 {

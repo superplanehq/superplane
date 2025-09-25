@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { ConnectionGroupNodeType } from '@/canvas/types/flow';
@@ -8,9 +8,10 @@ import { SuperplaneConnection, GroupByField, SpecTimeoutBehavior, SuperplaneConn
 import { ConnectionGroupEditModeContent } from '../ConnectionGroupEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
-import { EditModeActionButtons } from '../EditModeActionButtons';
+import { NodeActionButtons } from '@/components/NodeActionButtons';
 import { twMerge } from 'tailwind-merge';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { createConnectionGroupDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
@@ -20,7 +21,8 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [connectionGroupName, setConnectionGroupName] = useState(props.data.name || '');
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
-  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, updateConnectionSourceNames } = useCanvasStore();
+  const [apiError, setApiError] = useState<string | null>(null);
+  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId, updateConnectionSourceNames } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
@@ -89,6 +91,8 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     const isNewConnectionGroup = !currentConnectionGroup.metadata?.id || isTemporaryId;
 
     try {
+      setApiError(null);
+
       if (isNewConnectionGroup) {
 
         const result = await createConnectionGroupMutation.mutateAsync({
@@ -151,7 +155,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       setEditingConnectionGroup(null);
       setCurrentFormData(null);
     } catch (error) {
-      console.error(`Failed to ${isNewConnectionGroup ? 'create' : 'update'} connection group:`, error);
+      setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
     }
   };
 
@@ -166,7 +170,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
   const handleDiscardConnectionGroup = async () => {
     if (currentConnectionGroup?.metadata?.id) {
-      const isTemporaryId = /^\\d+$/.test(currentConnectionGroup.metadata.id);
+      const isTemporaryId = /^\d+$/.test(currentConnectionGroup.metadata.id);
       const isRealConnectionGroup = !isTemporaryId;
 
       if (isRealConnectionGroup) {
@@ -203,7 +207,20 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     }
   };
 
-  const handleYamlApply = (updatedData: unknown) => {
+  const handleDuplicateConnectionGroup = () => {
+    if (!currentConnectionGroup) return;
+
+    const duplicatedConnectionGroup = createConnectionGroupDuplicate(currentConnectionGroup, allConnectionGroups);
+    addConnectionGroup(duplicatedConnectionGroup, true);
+
+    focusAndEditNode(
+      duplicatedConnectionGroup.metadata?.id || '',
+      setFocusedNodeId,
+      setEditingConnectionGroup
+    );
+  };
+
+  const handleYamlApply = useCallback((updatedData: unknown) => {
     // Handle YAML data application for connection group
     const yamlData = updatedData as SuperplaneConnectionGroup;
 
@@ -227,7 +244,12 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
         isValid: currentFormData.isValid // Keep current validation state
       });
     }
-  };
+  }, [currentFormData, connectionGroupName, connectionGroupDescription]);
+
+  const handleDataChange = useCallback((data: { name: string; description?: string; connections: SuperplaneConnection[]; groupByFields: GroupByField[]; timeout?: number; timeoutBehavior?: SpecTimeoutBehavior; isValid: boolean }) => {
+    setCurrentFormData(data);
+    setApiError(null);
+  }, []);
 
   const borderColor = useMemo(() => {
     if (isPartiallyBroken) {
@@ -246,12 +268,13 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {(focusedNodeId === props.id || isEditMode) && (
-        <EditModeActionButtons
+        <NodeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveConnectionGroup}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
+          onDuplicate={!isNewNode ? handleDuplicateConnectionGroup : undefined}
           isEditMode={isEditMode}
           entityType="connection group"
           entityData={currentFormData ? {
@@ -287,37 +310,39 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
       {/* Header Section */}
       <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-start flex-1 min-w-0">
-          <div className='max-w-8 mt-1 flex items-center justify-center'>
-            <MaterialSymbol name="account_tree" size="lg" />
-          </div>
-          <div className="flex-1 min-w-0 ml-2">
-            <div className="mb-1">
-              <InlineEditable
-                value={connectionGroupName}
-                onSave={handleConnectionGroupNameChange}
-                placeholder="Connection group name"
-                className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
-                  nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
-                  isEditMode ? 'text-sm' : '')}
-                isEditMode={isEditMode}
-                autoFocus={!!isNewNode}
-                dataTestId="event-source-name-input"
-              />
-              {nameError && isEditMode && (
-                <div className="text-xs text-red-600 text-left mt-1 px-2">
-                  {nameError}
-                </div>
-              )}
+        <div className="flex items-start justify-between w-full">
+          <div className="flex items-start flex-1 min-w-0">
+            <div className='max-w-8 mt-1 flex items-center justify-center'>
+              <MaterialSymbol name="account_tree" size="lg" />
             </div>
-            <div>
-              {isEditMode && <InlineEditable
-                value={connectionGroupDescription}
-                onSave={handleConnectionGroupDescriptionChange}
-                placeholder={isEditMode ? "Add description..." : ""}
-                className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
-                isEditMode={isEditMode}
-              />}
+            <div className="flex-1 min-w-0 ml-2">
+              <div className="mb-1">
+                <InlineEditable
+                  value={connectionGroupName}
+                  onSave={handleConnectionGroupNameChange}
+                  placeholder="Connection group name"
+                  className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                    nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                    isEditMode ? 'text-sm' : '')}
+                  isEditMode={isEditMode}
+                  autoFocus={!!isNewNode}
+                  dataTestId="event-source-name-input"
+                />
+                {nameError && isEditMode && (
+                  <div className="text-xs text-red-600 text-left mt-1 px-2">
+                    {nameError}
+                  </div>
+                )}
+              </div>
+              <div>
+                {isEditMode && <InlineEditable
+                  value={connectionGroupDescription}
+                  onSave={handleConnectionGroupDescriptionChange}
+                  placeholder={isEditMode ? "Add description..." : ""}
+                  className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
+                  isEditMode={isEditMode}
+                />}
+              </div>
             </div>
           </div>
         </div>
@@ -340,7 +365,8 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
             })
           }}
           currentConnectionGroupId={props.id}
-          onDataChange={setCurrentFormData}
+          apiError={apiError}
+          onDataChange={handleDataChange}
         />
       ) : (
         <>
@@ -421,6 +447,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
         onConfirm={handleDiscardConnectionGroup}
         onCancel={() => setShowDiscardConfirm(false)}
       />
+
     </div>
   );
 }

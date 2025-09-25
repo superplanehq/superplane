@@ -51,6 +51,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbIntegrations.Integrations_DescribeIntegration_FullMethodName: {Resource: "integration", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
 		pbIntegrations.Integrations_ListIntegrations_FullMethodName:    {Resource: "integration", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
 		pbIntegrations.Integrations_CreateIntegration_FullMethodName:   {Resource: "integration", Action: "create", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbIntegrations.Integrations_UpdateIntegration_FullMethodName:   {Resource: "integration", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
 
 		// Canvases rules
 		pbSuperplane.Superplane_CreateCanvas_FullMethodName:                 {Resource: "canvas", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
@@ -70,17 +71,19 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSuperplane.Superplane_UpdateStage_FullMethodName:                  {Resource: "stage", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_DeleteStage_FullMethodName:                  {Resource: "stage", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListStages_FullMethodName:                   {Resource: "stage", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_ListStageExecutions_FullMethodName:          {Resource: "stageexecution", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_CancelStageExecution_FullMethodName:         {Resource: "stageexecution", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_CreateConnectionGroup_FullMethodName:        {Resource: "connectiongroup", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_UpdateConnectionGroup_FullMethodName:        {Resource: "connectiongroup", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_DeleteConnectionGroup_FullMethodName:        {Resource: "connectiongroup", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_DescribeConnectionGroup_FullMethodName:      {Resource: "connectiongroup", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListConnectionGroups_FullMethodName:         {Resource: "connectiongroup", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ApproveStageEvent_FullMethodName:            {Resource: "stageevent", Action: "approve", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbSuperplane.Superplane_CancelStageEvent_FullMethodName:             {Resource: "stageevent", Action: "cancel", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_DiscardStageEvent_FullMethodName:            {Resource: "stageevent", Action: "discard", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListStageEvents_FullMethodName:              {Resource: "stageevent", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbSuperplane.Superplane_BulkListStageEvents_FullMethodName:          {Resource: "stageevent", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListEvents_FullMethodName:                   {Resource: "event", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbSuperplane.Superplane_BulkListEvents_FullMethodName:               {Resource: "event", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_CreateEvent_FullMethodName:                  {Resource: "event", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_ListEventRejections_FullMethodName:          {Resource: "event", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListConnectionGroupFieldSets_FullMethodName: {Resource: "connectiongroupfieldset", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 
 		// Groups rules

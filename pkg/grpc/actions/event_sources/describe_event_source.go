@@ -3,6 +3,7 @@ package eventsources
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -24,7 +25,17 @@ func DescribeEventSource(ctx context.Context, canvasID string, idOrName string) 
 		return nil, err
 	}
 
-	protoSource, err := serializeEventSource(*source)
+	lastEvents, err := models.LastProcessedEventForSources([]models.EventSource{*source})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get event source last events: %w", err)
+	}
+
+	var lastEvent *models.Event
+	if event, exists := lastEvents[source.ID]; exists {
+		lastEvent = event
+	}
+
+	protoSource, err := serializeEventSource(*source, lastEvent)
 	if err != nil {
 		return nil, err
 	}

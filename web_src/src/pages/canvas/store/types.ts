@@ -1,5 +1,5 @@
 import { CanvasData } from "../types";
-import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEventSource, SuperplaneExecution, SuperplaneStage, SuperplaneStageEvent, SuperplaneEvent, EventSourceEventType } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEventSource, SuperplaneStage, SuperplaneStageEvent, SuperplaneEvent, SuperplaneExecution, EventSourceEventType } from "@/api-client/types.gen";
 import { ReadyState } from "react-use-websocket";
 import { AllNodeType, EdgeType } from "../types/flow";
 import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
@@ -8,7 +8,7 @@ import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
 export interface CanvasState {
   canvas: SuperplaneCanvas;
   canvasId: string;
-  stages: StageWithEventQueue[];
+  stages: Stage[];
   eventSources: EventSourceWithEvents[];
   connectionGroups: ConnectionGroupWithEvents[];
   nodePositions: Record<string, { x: number, y: number }>;
@@ -23,19 +23,20 @@ export interface CanvasState {
   
   // Actions
   initialize: (data: CanvasData) => void;
-  addStage: (stage: StageWithEventQueue, draft?: boolean, autoLayout?: boolean) => void;
+  addStage: (stage: Stage, draft?: boolean, autoLayout?: boolean) => void;
   removeStage: (stageId: string) => void;
-  addConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => void;
+  addConnectionGroup: (connectionGroup: ConnectionGroupWithEvents, autoLayout?: boolean) => void;
   removeConnectionGroup: (connectionGroupId: string) => void;
   updateConnectionGroup: (connectionGroup: ConnectionGroupWithEvents) => void;
-  updateStage: (stage: StageWithEventQueue) => void;
+  updateStage: (stage: Stage) => void;
   addEventSource: (eventSource: EventSourceWithEvents, autoLayout?: boolean) => void;
   removeEventSource: (eventSourceId: string) => void;
   updateEventSource: (eventSource: EventSourceWithEvents) => void;
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
-  approveStageEvent: (stageEventId: string, stageId: string) => void;
-  cancelStageEvent: (stageEventId: string, stageId: string) => void;
+  approveStageEvent: (stageEventId: string, stageId: string) => Promise<any>;
+  discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
+  cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
   selectStageId: (stageId: string) => void;
   cleanSelectedStageId: () => void;
   selectEventSourceId: (eventSourceId: string) => void;
@@ -47,6 +48,7 @@ export interface CanvasState {
   setEditingConnectionGroup: (connectionGroupId: string | null) => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
   syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
+  syncStageExecutions: (canvasId: string, stageId: string) => Promise<void>;
   syncEventSourceEvents: (canvasId: string, eventSourceId: string) => Promise<void>;
   syncStagePlainEvents: (canvasId: string, stageId: string) => Promise<void>;
   syncConnectionGroupPlainEvents: (canvasId: string, connectionGroupId: string) => Promise<void>;
@@ -67,9 +69,6 @@ export interface CanvasState {
   lockedNodes: boolean;
   // flow actions
   syncToReactFlow: (options?: { autoLayout?: boolean }) => void;
-  fitViewNode: (nodeId: string) => void;
-  fitViewNodeRef: ((nodeId: string) => void) | null;
-  setFitViewNodeRef: (fitViewNodeFn: (nodeId: string) => void) => void;
   onNodesChange: OnNodesChange<AllNodeType>;
   onEdgesChange: OnEdgesChange<EdgeType>;
   onConnect: (connection: Connection) => void;
@@ -93,7 +92,6 @@ export interface CanvasState {
   updateConnectionSourceNames: (oldName: string, newName: string) => void;
 }
 
-export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; events: Array<SuperplaneEvent>; isDraft?: boolean}
-export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneEvent>; eventSourceType?: string; eventFilters?: Array<EventSourceEventType>}
+export type Stage = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; executions: Array<SuperplaneExecution>; isDraft?: boolean}
+export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneEvent>; eventSourceType?: string; eventFilters?: Array<EventSourceEventType>; isDuplicate?: boolean}
 export type ConnectionGroupWithEvents = SuperplaneConnectionGroup & {events: Array<SuperplaneEvent>}
-export type ExecutionWithEvent = SuperplaneExecution & {event: SuperplaneStageEvent}

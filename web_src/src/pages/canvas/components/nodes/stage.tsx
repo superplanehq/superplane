@@ -1,17 +1,18 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useUpdateStage, useCreateStage, useDeleteStage } from '@/hooks/useCanvasData';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent } from '@/api-client';
+import { useIntegrations } from '../../hooks/useIntegrations';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { Badge } from '@/components/Badge/badge';
-import { EditModeActionButtons } from '../EditModeActionButtons';
+import { NodeActionButtons } from '@/components/NodeActionButtons';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 
@@ -20,6 +21,10 @@ import { IOTooltip } from './IOTooltip';
 import { twMerge } from 'tailwind-merge';
 import { StageQueueSection } from '../StageQueueSection';
 import { EventTriggerBadge } from '../EventTriggerBadge';
+import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
+import { showErrorToast } from '@/utils/toast';
+import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
+import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
@@ -29,14 +34,71 @@ const StageImageMap = {
 
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const { organizationId } = useParams<{ organizationId: string }>();
-  const isNewNode = Boolean(props.data.isDraft) || (props.id && /^\d+$/.test(props.id));
+  const isNewNode = Boolean(props.data.isDraft) || !!(props.id && /^\d+$/.test(props.id));
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
   const [stageName, setStageName] = useState(props.data.name || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, updateConnectionSourceNames } = useCanvasStore();
+  const [stageNameDirtyByUser, setStageNameDirtyByUser] = useState(false);
+  const [integrationError, setIntegrationError] = useState(false);
+  const [showEmitEventModal, setShowEmitEventModal] = useState(false);
+  const triggerSectionValidationRef = useRef<(() => void) | null>(null);
+  const setFieldErrorsRef = useRef<React.Dispatch<React.SetStateAction<Record<string, string>>> | null>(null);
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId, updateConnectionSourceNames } = useCanvasStore();
+
+  const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
+    if (!errorMessage) return null;
+
+    const repositoryNotFoundMatch = errorMessage.match(/repository\s+([^\s]+)\s+not\s+found/i);
+    if (repositoryNotFoundMatch) {
+      return {
+        field: 'repository',
+        message: `Repository "${repositoryNotFoundMatch[1]}" not found. Please check that the repository exists and that your Personal Access Token (PAT) has access to it.`
+      };
+    }
+
+    const workflowNotFoundMatch = errorMessage.match(/workflow\s+([^\s]+)\s+not\s+found/i);
+    if (workflowNotFoundMatch) {
+      return {
+        field: 'workflow',
+        message: `Workflow "${workflowNotFoundMatch[1]}" not found`
+      };
+    }
+
+    // Check for project not found error
+    const projectNotFoundMatch = errorMessage.match(/project\s+([^\s]+)\s+not\s+found/i);
+    if (projectNotFoundMatch) {
+      return {
+        field: 'project',
+        message: `Project "${projectNotFoundMatch[1]}" not found`
+      };
+    }
+
+    const invalidStatusCodeMatch = errorMessage.match(/invalid\s+status\s+code/i);
+    if (invalidStatusCodeMatch) {
+      return {
+        field: 'statusCodes',
+        message: 'Invalid status code'
+      };
+    }
+
+    return null;
+  }, []);
+
+  const handleApiError = useCallback((errorMessage: string) => {
+    const parsedError = parseApiErrorMessage(errorMessage);
+    if (parsedError && setFieldErrorsRef.current) {
+      setFieldErrorsRef.current(prev => ({
+        ...prev,
+        [parsedError.field]: parsedError.message
+      }));
+      triggerSectionValidationRef?.current?.();
+    }
+    showErrorToast(errorMessage);
+  }, [parseApiErrorMessage]);
+
   const allStages = useCanvasStore(state => state.stages);
   const nodes = useCanvasStore(state => state.nodes);
   const currentStage = useCanvasStore(state =>
@@ -79,15 +141,38 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setNameError(null);
     return true;
   };
+
+  const validateIntegrationRequirement = () => {
+    if (!currentFormData?.executor) {
+      return true;
+    }
+
+    const executorType = currentFormData.executor.type || '';
+    const requireIntegration = ['semaphore', 'github'].includes(executorType);
+
+    if (!requireIntegration) {
+      return true;
+    }
+
+    const semaphoreIntegrations = availableIntegrations.filter(int => int.spec?.type === 'semaphore');
+    const githubIntegrations = availableIntegrations.filter(int => int.spec?.type === 'github');
+
+    const hasRequiredIntegrations = (executorType === 'semaphore' && semaphoreIntegrations.length > 0) ||
+      (executorType === 'github' && githubIntegrations.length > 0);
+
+    return hasRequiredIntegrations;
+  };
+
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
   const deleteStageMutation = useDeleteStage(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
+  const { data: availableIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
 
   const pendingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_PENDING' && !event.execution)
+      ?.filter(event => event.state === 'STATE_PENDING')
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
@@ -98,7 +183,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const waitingEvents = useMemo(() =>
     currentStage?.queue
-      ?.filter(event => event.state === 'STATE_WAITING' && !event.execution)
+      ?.filter(event => event.state === 'STATE_WAITING')
       ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
@@ -114,15 +199,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   );
 
   const allExecutions = useMemo(() =>
-    currentStage?.queue?.flatMap(event => event.execution as SuperplaneExecution)
-      .filter(execution => execution)
-      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
-    [currentStage?.queue]
+    currentStage?.executions
+      ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
+    [currentStage?.executions]
   );
 
   const allFinishedExecutions = useMemo(() =>
     allExecutions
-      .filter(execution => execution?.state === 'STATE_FINISHED' || execution?.state === 'STATE_CANCELLED')
+      .filter(execution => execution?.state === 'STATE_FINISHED')
     , [allExecutions]
   );
 
@@ -133,7 +217,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   // If there is a running execution, use it as the last execution
   const lastExecution = runningExecution || allFinishedExecutions.at(0);
-  const lastExecutionEvent = currentStage?.queue?.find(event => event.execution?.id === lastExecution?.id);
+  const lastExecutionEvent = lastExecution?.stageEvent;
   const lastInputsCount = lastExecutionEvent?.inputs?.length || 0;
   const lastOutputsCount = lastExecution?.outputs?.length || 0;
 
@@ -154,13 +238,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         if (result === 'RESULT_FAILED') {
           return <MaterialSymbol name="cancel" size="lg" className="text-red-600 mr-2" />;
         }
-        return <MaterialSymbol name="check_circle" size="lg" className="text-green-600 mr-2" />; case 'STATE_PENDING':
+        if (result === 'RESULT_CANCELLED') {
+          return <MaterialSymbol name="block" size="lg" className="text-gray-600 dark:text-gray-400 mr-2" />;
+        }
+        return <MaterialSymbol name="check_circle" size="lg" className="text-green-600 mr-2" />;
+      case 'STATE_PENDING':
         return (
           <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 mr-2 animate-spin" />
-        );
-      case 'STATE_CANCELLED':
-        return (
-          <MaterialSymbol name="block" size="lg" className="text-gray-600 dark:text-gray-400 mr-2" />
         );
       default:
         return (
@@ -184,11 +268,27 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       return;
     }
 
+    let basicValidationPassed = true;
+
     if (!validateStageName(stageName)) {
+      basicValidationPassed = false;
+    }
+
+    if (!validateIntegrationRequirement()) {
+      // Integration is required but not available, show error message
+      setIntegrationError(true);
+      const executorType = currentFormData.executor?.type;
+
+      handleApiError(`${executorType} integration is required but not configured. Please add a ${executorType} integration to continue.`);
       return;
     }
 
     if (!currentFormData.isValid) {
+      triggerSectionValidationRef?.current?.();
+      basicValidationPassed = false;
+    }
+
+    if (!basicValidationPassed) {
       return;
     }
 
@@ -261,14 +361,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     } catch (error) {
       const apiError = error as Error;
       console.error(`Failed to ${isNewStage ? 'create' : 'update'} stage:`, apiError);
-
       console.error('API Error:', apiError);
 
-      // Call the API error handler if available
-      const handleStageApiError = (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError;
-      if (handleStageApiError) {
-        handleStageApiError(apiError.message);
-      }
+      handleApiError(apiError.message);
 
       return;
     }
@@ -276,19 +371,21 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setIsEditMode(false);
     setEditingStage(null);
     setCurrentFormData(null);
+    setIntegrationError(false);
   };
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setEditingStage(null);
     setCurrentFormData(null);
+    setIntegrationError(false);
     setStageName(props.data.name);
     setStageDescription(props.data.description || '');
   };
 
   const handleDiscardStage = async () => {
     if (currentStage?.metadata?.id) {
-      const isTemporaryId = /^\\d+$/.test(currentStage.metadata.id);
+      const isTemporaryId = /^\d+$/.test(currentStage.metadata.id);
       const isRealStage = !isTemporaryId && !currentStage.isDraft;
 
       if (isRealStage) {
@@ -307,12 +404,21 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const handleStageNameChange = (newName: string) => {
     setStageName(newName);
     validateStageName(newName);
+    handleStageNameUserModified();
     if (currentFormData) {
       setCurrentFormData({
         ...currentFormData,
         name: newName
       });
     }
+  };
+
+  const handleStageNameUserModified = () => {
+    setStageNameDirtyByUser(true);
+  };
+
+  const handleAutoGeneratedStageNameChange = (name: string) => {
+    setStageName(name);
   };
 
   const handleStageDescriptionChange = (newDescription: string) => {
@@ -323,6 +429,19 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         description: newDescription
       });
     }
+  };
+
+  const handleDuplicateStage = () => {
+    if (!currentStage) return;
+
+    const duplicatedStage = createStageDuplicate(currentStage, allStages);
+    addStage(duplicatedStage, true, true);
+
+    focusAndEditNode(
+      duplicatedStage.metadata?.id || '',
+      setFocusedNodeId,
+      setEditingStage
+    );
   };
 
   const handleYamlApply = (updatedData: unknown) => {
@@ -357,6 +476,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setCurrentFormData(data);
   }, []);
 
+  const handleFieldErrorsChange = useCallback((setFieldErrorsFunction: React.Dispatch<React.SetStateAction<Record<string, string>>>) => {
+    setFieldErrorsRef.current = setFieldErrorsFunction;
+  }, []);
+
   const getBackgroundColorClass = () => {
     const latestExecution = allExecutions.at(0);
     const status = latestExecution?.state;
@@ -372,11 +495,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         if (result === 'RESULT_FAILED') {
           return 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-700';
         }
+        if (result === 'RESULT_CANCELLED') {
+          return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
+        }
         return 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-700';
       case 'STATE_PENDING':
         return 'bg-yellow-50 dark:bg-yellow-900/50 border-yellow-200 dark:border-yellow-700';
-      case 'STATE_CANCELLED':
-        return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
       default:
         return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
     }
@@ -437,7 +561,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   return (
     <div
-      onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
       className={twMerge(`bg-transparent rounded-xl border-2 relative `, borderColor)}
     >
       <div className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-gray-700 rounded-xl"
@@ -445,12 +568,15 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       >
 
         {(focusedNodeId === props.id || isEditMode) && (
-          <EditModeActionButtons
+          <NodeActionButtons
             isNewNode={!!isNewNode}
             onSave={handleSaveStage}
             onCancel={handleCancelEdit}
             onDiscard={() => setShowDiscardConfirm(true)}
             onEdit={() => handleEditClick({} as React.MouseEvent<HTMLButtonElement>)}
+            onDuplicate={!isNewNode ? handleDuplicateStage : undefined}
+            onSend={currentStage?.metadata?.id ? () => setShowEmitEventModal(true) : undefined}
+            onSelect={currentStage?.metadata?.id ? () => selectStageId(props.id) : undefined}
             isEditMode={isEditMode}
             entityType="stage"
             entityData={currentFormData ? {
@@ -486,39 +612,42 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           />
         )}
 
+
         {/* Header Section */}
         <div className={twMerge('px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>
-          <div className="flex items-start flex-1 min-w-0">
-            <div className='max-w-8 mt-1 flex items-center justify-center'>
-              {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
-            </div>
-            <div className="flex-1 min-w-0 ml-2">
-              <div className="mb-1">
-                <InlineEditable
-                  value={stageName}
-                  onSave={handleStageNameChange}
-                  placeholder="Stage name"
-                  className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
-                    nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
-                    isEditMode ? 'text-sm' : '')}
-                  isEditMode={isEditMode}
-                  autoFocus={!!isNewNode}
-                  dataTestId="event-source-name-input"
-                />
-                {nameError && isEditMode && (
-                  <div className="text-xs text-red-600 text-left mt-1 px-2">
-                    {nameError}
-                  </div>
-                )}
+          <div className="flex items-start justify-between w-full">
+            <div className="flex items-start flex-1 min-w-0">
+              <div className='max-w-8 mt-1 flex items-center justify-center'>
+                {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
               </div>
-              <div>
-                {isEditMode && <InlineEditable
-                  value={stageDescription}
-                  onSave={handleStageDescriptionChange}
-                  placeholder={isEditMode ? "Add description..." : ""}
-                  className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
-                  isEditMode={isEditMode}
-                />}
+              <div className="flex-1 min-w-0 ml-2">
+                <div className="mb-1">
+                  <InlineEditable
+                    value={stageName}
+                    onSave={handleStageNameChange}
+                    placeholder="Stage name"
+                    className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                      nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                      isEditMode ? 'text-sm' : '')}
+                    isEditMode={isEditMode}
+                    autoFocus={!!isNewNode && !props.data.executor?.resource?.type}
+                    dataTestId="event-source-name-input"
+                  />
+                  {nameError && isEditMode && (
+                    <div className="text-xs text-red-600 text-left mt-1 px-2">
+                      {nameError}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  {isEditMode && <InlineEditable
+                    value={stageDescription}
+                    onSave={handleStageDescriptionChange}
+                    placeholder={isEditMode ? "Add description..." : ""}
+                    className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
+                    isEditMode={isEditMode}
+                  />}
+                </div>
               </div>
             </div>
           </div>
@@ -546,7 +675,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             currentStageId={props.id}
             canvasId={canvasId}
             organizationId={organizationId!}
+            isNewStage={isNewNode}
+            dirtyByUser={stageNameDirtyByUser}
             onDataChange={handleDataChange}
+            onTriggerSectionValidation={triggerSectionValidationRef}
+            onStageNameChange={handleAutoGeneratedStageNameChange}
+            integrationError={integrationError}
+            onFieldErrorsChange={handleFieldErrorsChange}
           />
         ) : (
           <>
@@ -588,8 +723,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 <div className="flex items-center mb-1 py-2">
                   {getStatusIcon()}
                   <span
-                    className="text-left w-full font-semibold text-sm hover:underline truncate text-gray-900 dark:text-gray-100"
-                    onClick={() => selectStageId(props.id)}
+                    className="text-left w-full font-semibold text-sm truncate text-gray-900 dark:text-gray-100"
                   >
                     {lastExecutionEvent?.name || lastExecution?.id || 'No recent runs'}
                   </span>
@@ -652,6 +786,43 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           onConfirm={handleDiscardStage}
           onCancel={() => setShowDiscardConfirm(false)}
         />
+
+        {currentStage?.metadata?.id && (
+          <EmitEventModal
+            isOpen={showEmitEventModal}
+            onClose={() => setShowEmitEventModal(false)}
+            sourceName={currentStage.metadata.name || ''}
+            nodeType="stage"
+            loadLastEvent={async () => {
+              try {
+                const response = await superplaneListEvents(withOrganizationHeader({
+                  path: { canvasIdOrName: canvasId! },
+                  query: {
+                    sourceType: 'EVENT_SOURCE_TYPE_STAGE' as const,
+                    sourceId: currentStage.metadata!.id,
+                    limit: 1
+                  }
+                }));
+                return response.data?.events?.[0] || null;
+              } catch (error) {
+                console.error('Failed to load last event for stage:', error);
+                return null;
+              }
+            }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onSubmit={async (eventType: string, eventData: any) => {
+              await superplaneCreateEvent(withOrganizationHeader({
+                path: { canvasIdOrName: canvasId! },
+                body: {
+                  sourceType: 'EVENT_SOURCE_TYPE_STAGE',
+                  sourceId: currentStage.metadata!.id,
+                  type: eventType,
+                  raw: eventData
+                }
+              }));
+            }}
+          />
+        )}
       </div>
 
     </div>

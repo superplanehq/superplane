@@ -6,7 +6,7 @@ import { Link } from '../Link/link'
 const styles = {
   base: [
     // Base
-    'relative isolate inline-flex items-baseline justify-center gap-x-2 rounded-lg border text-base/6 font-semibold',
+    'relative isolate inline-flex items-baseline justify-center items-center gap-x-2 rounded-lg border text-base/6 font-semibold',
     // Sizing
     'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6',
     // Focus
@@ -174,7 +174,9 @@ export const Button = forwardRef(function Button(
   const classes = clsx(
     className,
     styles.base,
-    outline ? styles.outline : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
+    outline ? styles.outline : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc']),
+    // Handle cursor styling with data attributes for better specificity
+    'data-disabled:!cursor-not-allowed !cursor-pointer'
   )
 
   return 'href' in props ? (
@@ -182,7 +184,7 @@ export const Button = forwardRef(function Button(
       <TouchTarget>{children}</TouchTarget>
     </Link>
   ) : (
-    <Headless.Button {...props} className={clsx(classes, 'cursor-default')} ref={ref}>
+    <Headless.Button {...props} className={classes} ref={ref}>
       <TouchTarget>{children}</TouchTarget>
     </Headless.Button>
   )

@@ -39,6 +39,7 @@ services:
       START_PENDING_FIELD_SETS_WORKER: "yes"
       START_PENDING_EVENT_SOURCES_WORKER: "yes"
       START_HARD_DELETION_WORKER: "yes"
+      START_EVENT_SOURCE_SCHEDULE_WORKER: "yes"
       WEB_BASE_PATH: ""
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
@@ -51,6 +52,7 @@ services:
     ports:
       - 5173:5173
       - 4173:4173
+      - 6006:6006
       - 8000:8000
       - 50051:50051
 

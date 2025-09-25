@@ -187,6 +187,17 @@ service Superplane {
     };
   }
 
+  rpc ListStageExecutions(ListStageExecutionsRequest) returns (ListStageExecutionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/executions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List executions";
+      description: "Returns a list of all executions for the specified stage (canvas can be referenced by ID or name)";
+      tags: "Execution";
+    };
+  }
+
   rpc ListStageEvents(ListStageEventsRequest) returns (ListStageEventsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events"
@@ -209,27 +220,15 @@ service Superplane {
     };
   }
 
-  rpc BulkListEvents(BulkListEventsRequest) returns (BulkListEventsResponse) {
+  rpc CreateEvent(CreateEventRequest) returns (CreateEventResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/events/bulk"
+      post: "/api/v1/canvases/{canvas_id_or_name}/events"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Bulk list events";
-      description: "Returns events for multiple sources in a single request to optimize loading performance";
+      summary: "Create an event";
+      description: "Creates a new event for the specified canvas (canvas can be referenced by ID or name)";
       tags: "Event";
-    };
-  }
-
-  rpc BulkListStageEvents(BulkListStageEventsRequest) returns (BulkListStageEventsResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/stage-events/bulk"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Bulk list stage events";
-      description: "Returns stage events for multiple stages in a single request to optimize loading performance";
-      tags: "Stage";
     };
   }
 
@@ -325,15 +324,38 @@ service Superplane {
     };
   }
 
-  rpc CancelStageEvent(CancelStageEventRequest) returns (CancelStageEventResponse) {
+  rpc DiscardStageEvent(DiscardStageEventRequest) returns (DiscardStageEventResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/cancel"
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/discard"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Cancel a stage event";
-      description: "Cancels the specified stage event (canvas can be referenced by ID or name)";
+      summary: "Discards a stage event";
+      description: "Discards the specified stage event (canvas can be referenced by ID or name)";
       tags: "Stage";
+    };
+  }
+
+  rpc CancelStageExecution(CancelStageExecutionRequest) returns (CancelStageExecutionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/executions/{execution_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel a stage execution";
+      description: "Cancel the specified stage execution (canvas can be referenced by ID or name)";
+      tags: "Stage";
+    };
+  }
+
+  rpc ListEventRejections(ListEventRejectionsRequest) returns (ListEventRejectionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/rejections"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List event rejections";
+      description: "Returns a list of events that were rejected by a particular component";
+      tags: "Canvas";
     };
   }
 
@@ -417,7 +439,47 @@ message EventSource {
     Integrations.IntegrationRef integration = 1;
     Integrations.ResourceRef resource = 2;
     repeated EventType events = 3;
+    Schedule schedule = 4;
   }
+
+  message Schedule {
+    enum Type {
+      TYPE_UNKNOWN = 0;
+      TYPE_HOURLY = 1;
+      TYPE_DAILY = 2;
+      TYPE_WEEKLY = 3;
+    }
+
+    enum WeekDay {
+      WEEK_DAY_UNKNOWN = 0;
+      WEEK_DAY_MONDAY = 1;
+      WEEK_DAY_TUESDAY = 2;
+      WEEK_DAY_WEDNESDAY = 3;
+      WEEK_DAY_THURSDAY = 4;
+      WEEK_DAY_FRIDAY = 5;
+      WEEK_DAY_SATURDAY = 6;
+      WEEK_DAY_SUNDAY = 7;
+    }
+
+    Type type = 1;
+    HourlySchedule hourly = 2;
+    DailySchedule daily = 3;
+    WeeklySchedule weekly = 4;
+  }
+
+  message HourlySchedule {
+    int32 minute = 1; // 0-59, minute of the hour to trigger
+  }
+
+  message DailySchedule {
+    string time = 1; // Format: "HH:MM" in UTC (24-hour format)
+  }
+
+  message WeeklySchedule {
+    Schedule.WeekDay week_day = 1;
+    string time = 2; // Format: "HH:MM" in UTC (24-hour format)
+  }
+
 
   message EventType {
     string type = 1;
@@ -425,8 +487,19 @@ message EventSource {
     FilterOperator filter_operator = 3;
   }
 
+  message Status {
+    message Schedule {
+      google.protobuf.Timestamp last_trigger = 1;
+      google.protobuf.Timestamp next_trigger = 2;
+    }
+
+    Event last_event = 1;
+    Schedule schedule = 2;
+  }
+
   Metadata metadata = 1;
   Spec spec = 2;
+  Status status = 3;
 }
 
 message DescribeStageRequest {
@@ -604,8 +677,19 @@ message Stage {
     repeated ValueDefinition secrets = 7;
   }
 
+  message Status {
+    message Queue {
+      uint32 total = 1;
+      repeated StageEvent items = 2;
+    }
+
+    Execution last_execution = 1;
+    Queue queue = 2;
+  }
+
   Metadata metadata = 1;
   Spec spec = 2;
+  Status status = 3;
 }
 
 message OutputDefinition {
@@ -780,12 +864,15 @@ message ListStageEventsRequest {
   string canvas_id_or_name = 2;
   repeated StageEvent.State states = 3;
   repeated StageEvent.StateReason state_reasons = 4;
-  int32 limit = 5;
+  uint32 limit = 5;
   google.protobuf.Timestamp before = 6;
 }
 
 message ListStageEventsResponse {
   repeated StageEvent events = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
 }
 
 message StageEvent {
@@ -793,34 +880,26 @@ message StageEvent {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_WAITING = 2;
-    STATE_PROCESSED = 4;
+    STATE_PROCESSED = 3;
+    STATE_DISCARDED = 4;
   }
 
   enum StateReason {
     STATE_REASON_UNKNOWN = 0;
     STATE_REASON_APPROVAL = 1;
     STATE_REASON_TIME_WINDOW = 2;
-    STATE_REASON_EXECUTION = 3;
-    STATE_REASON_CONNECTION = 4;
-    STATE_REASON_CANCELLED = 5;
-    STATE_REASON_UNHEALTHY = 6;
-    STATE_REASON_STUCK = 7;
-    STATE_REASON_TIMEOUT = 8;
   }
 
   string id = 1;
-  string source_id = 2;
-  Connection.Type source_type = 3;
-  State state = 4;
-  StateReason state_reason = 5;
-  google.protobuf.Timestamp created_at = 6;
-  repeated StageEventApproval approvals = 7;
-  Execution execution = 8;
-  repeated KeyValuePair inputs = 9;
-  string name = 10;
-  string event_id = 11;
-  string cancelled_by = 12;
-  google.protobuf.Timestamp cancelled_at = 13;
+  State state = 2;
+  StateReason state_reason = 3;
+  google.protobuf.Timestamp created_at = 4;
+  repeated StageEventApproval approvals = 5;
+  repeated KeyValuePair inputs = 6;
+  string name = 7;
+  Event trigger_event = 8;
+  string discarded_by = 9;
+  google.protobuf.Timestamp discarded_at = 10;
 }
 
 message KeyValuePair {
@@ -833,33 +912,64 @@ message OutputValue {
   string value = 2;
 }
 
+message ListStageExecutionsRequest {
+  string stage_id_or_name = 1;
+  string canvas_id_or_name = 2;
+  repeated Execution.State states = 3;
+  repeated Execution.Result results = 4;
+  uint32 limit = 5;
+  google.protobuf.Timestamp before = 6;
+}
+
+message ListStageExecutionsResponse {
+  repeated Execution executions = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
 message Execution {
   enum State {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_STARTED = 2;
     STATE_FINISHED = 3;
-    STATE_CANCELLED = 4;
   }
 
   enum Result {
     RESULT_UNKNOWN = 0;
     RESULT_PASSED = 1;
     RESULT_FAILED = 2;
+    RESULT_CANCELLED = 3;
+  }
+
+  enum ResultReason {
+    RESULT_REASON_OK = 0;
+    RESULT_REASON_ERROR = 1;
+    RESULT_REASON_MISSING_OUTPUTS = 2;
+    RESULT_REASON_TIMEOUT = 3;
+    RESULT_REASON_USER = 4;
   }
 
   string id = 1;
   State state = 2;
   Result result = 3;
-  google.protobuf.Timestamp created_at = 4;
-  google.protobuf.Timestamp started_at = 5;
-  google.protobuf.Timestamp finished_at = 6;
-  repeated OutputValue outputs = 7;
-  repeated ExecutionResource resources = 8;
+  ResultReason result_reason = 4;
+  string result_message = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp started_at = 7;
+  google.protobuf.Timestamp cancelled_at = 8;
+  google.protobuf.Timestamp finished_at = 9;
+  repeated OutputValue outputs = 10;
+  repeated ExecutionResource resources = 11;
+  StageEvent stage_event = 12;
 }
 
 message ExecutionResource {
   string id = 1;
+  string type = 2;
+  string state = 3;
+  string result = 4;
 }
 
 message StageEventApproval {
@@ -877,14 +987,24 @@ message ApproveStageEventResponse {
   StageEvent event = 1;
 }
 
-message CancelStageEventRequest {
+message DiscardStageEventRequest {
   string stage_id_or_name = 1;
   string canvas_id_or_name = 2;
   string event_id = 3;
 }
 
-message CancelStageEventResponse {
+message DiscardStageEventResponse {
   StageEvent event = 1;
+}
+
+message CancelStageExecutionRequest {
+  string stage_id_or_name = 1;
+  string canvas_id_or_name = 2;
+  string execution_id = 3;
+}
+
+message CancelStageExecutionResponse {
+  Execution execution = 1;
 }
 
 message AddUserRequest {
@@ -933,20 +1053,43 @@ message ListEventsRequest {
   string canvas_id_or_name = 1;
   EventSourceType source_type = 2;
   string source_id = 3;
-  int32 limit = 4;
+  uint32 limit = 4;
   google.protobuf.Timestamp before = 5;
+  repeated Event.State states = 6;
 }
 
 message ListEventsResponse {
   repeated Event events = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message CreateEventRequest {
+  string canvas_id_or_name = 1;
+  EventSourceType source_type = 2;
+  string source_id = 3;
+  string type = 4;
+  google.protobuf.Struct raw = 5;
+}
+
+message CreateEventResponse {
+  Event event = 1;
 }
 
 message Event {
   enum State {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
-    STATE_DISCARDED = 2;
+    STATE_REJECTED = 2;
     STATE_PROCESSED = 3;
+  }
+
+  enum StateReason {
+    STATE_REASON_UNKNOWN = 0;
+    STATE_REASON_FILTERED = 1;
+    STATE_REASON_ERROR = 2;
+    STATE_REASON_OK = 3;
   }
 
   string id = 1;
@@ -955,53 +1098,43 @@ message Event {
   EventSourceType source_type = 4;
   string type = 5;
   State state = 6;
-  google.protobuf.Timestamp received_at = 7;
-  google.protobuf.Struct raw = 8;
-  google.protobuf.Struct headers = 9;
+  StateReason state_reason = 7;
+  string state_message = 8;
+  google.protobuf.Timestamp received_at = 9;
+  google.protobuf.Struct raw = 10;
+  google.protobuf.Struct headers = 11;
 }
 
-message EventSourceItemRequest {
-  string source_id = 1;
-  EventSourceType source_type = 2;
+message EventRejection {
+  enum RejectionReason {
+    REJECTION_REASON_UNKNOWN = 0;
+    REJECTION_REASON_FILTERED = 1;
+    REJECTION_REASON_ERROR = 2;
+  }
+
+  string id = 1;
+  Event event = 2;
+  Connection.Type target_type = 3;
+  string target_id = 4;
+  string target_name = 5;
+  RejectionReason reason = 6;
+  string message = 7;
+  google.protobuf.Timestamp rejected_at = 8;
 }
 
-message StageEventItemRequest {
-  string stage_id_or_name = 1;
-}
-
-message BulkListEventsRequest {
+message ListEventRejectionsRequest {
   string canvas_id_or_name = 1;
-  repeated EventSourceItemRequest sources = 2;
-  int32 limit_per_source = 3;
-  google.protobuf.Timestamp before = 4;
+  Connection.Type target_type = 2;
+  string target_id = 3;
+  uint32 limit = 4;
+  google.protobuf.Timestamp before = 5;
 }
 
-message BulkListEventsResponse {
-  repeated EventSourceItemResult results = 1;
-}
-
-message BulkListStageEventsRequest {
-  string canvas_id_or_name = 1;
-  repeated StageEventItemRequest stages = 2;
-  repeated StageEvent.State states = 3;
-  repeated StageEvent.StateReason state_reasons = 4;
-  int32 limit_per_stage = 5;
-  google.protobuf.Timestamp before = 6;
-}
-
-message BulkListStageEventsResponse {
-  repeated StageEventItemResult results = 1;
-}
-
-message EventSourceItemResult {
-  string source_id = 1;
-  EventSourceType source_type = 2;
-  repeated Event events = 3;
-}
-
-message StageEventItemResult {
-  string stage_id = 1;
-  repeated StageEvent events = 2;
+message ListEventRejectionsResponse {
+  repeated EventRejection rejections = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
 }
 
 message StageCreated {
@@ -1062,7 +1195,7 @@ message StageEventApproved {
   google.protobuf.Timestamp timestamp = 5;
 }
 
-message StageEventCancelled {
+message StageEventDiscarded {
   string canvas_id = 1;
   string stage_id = 2;
   string event_id = 3;
@@ -1087,6 +1220,14 @@ message StageExecutionStarted {
 }
 
 message StageExecutionFinished {
+  string canvas_id = 1;
+  string execution_id = 2;
+  string stage_id = 3;
+  string event_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message StageExecutionCancelled {
   string canvas_id = 1;
   string execution_id = 2;
   string stage_id = 3;

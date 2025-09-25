@@ -98,6 +98,10 @@ func (e *HTTPExecutor) Execute(specData []byte, parameters executors.ExecutionPa
 		allowedCodes = spec.ResponsePolicy.StatusCodes
 	}
 
+	if !slices.Contains(allowedCodes, uint32(res.StatusCode)) {
+		return nil, fmt.Errorf("invalid HTTP response: status code %d not in allowed codes %v", res.StatusCode, allowedCodes)
+	}
+
 	return &HTTPResponse{
 		statusCode:   res.StatusCode,
 		allowedCodes: allowedCodes,

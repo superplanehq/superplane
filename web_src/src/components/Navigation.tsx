@@ -15,7 +15,7 @@ const Navigation: React.FC = () => {
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 border-b">
       <div className="flex items-center justify-between px-2 py-[8px]">
-        <Link href="/" className="flex items-center flex-shrink-0 text-decoration-none">
+        <Link href={`/${organizationId}`} className="flex items-center flex-shrink-0 text-decoration-none">
           <strong className="ml-2 text-xl text-gray-900 dark:text-white">SuperPlane</strong>
         </Link>
         <div className="flex items-center flex-shrink-0">
@@ -28,7 +28,7 @@ const Navigation: React.FC = () => {
               className="flex items-center justify-between gap-x-4 rounded-md border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
             >
               {/* Organization Avatar with User Avatar Overlay */}
-              <Text className="text-sm font-medium flex-1 text-left max-w-[150px] truncate">{organization?.metadata?.displayName || organization?.metadata?.name || account?.name}</Text>
+              <Text className="text-sm font-medium flex-1 text-left max-w-[150px] truncate">{organization?.metadata?.name || account?.name}</Text>
 
               {/* User Avatar (smaller, overlapping in bottom-right) */}
               <Avatar
@@ -73,12 +73,12 @@ const Navigation: React.FC = () => {
                 <DropdownHeader>
                   <div className="flex items-center space-x-3">
                     <Avatar
-                      initials={(organization?.metadata?.displayName || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
-                      alt={organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}
+                      initials={(organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
+                      alt={organization?.metadata?.name || 'Organization'}
                       className="size-8"
                     />
                     <div className="flex-1 min-w-0">
-                      <Text className="font-medium truncate max-w-[150px] truncate-ellipsis">{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</Text>
+                      <Text className="font-medium truncate max-w-[150px] truncate-ellipsis">{organization?.metadata?.name || 'Organization'}</Text>
                     </div>
                   </div>
                 </DropdownHeader>
@@ -112,10 +112,10 @@ const Navigation: React.FC = () => {
                     </span>
                   </DropdownItem>
 
-                  <DropdownItem href={`/${organizationId}/settings/billing`}>
+                  <DropdownItem href="/">
                     <span className="flex items-center gap-x-2">
-                      <MaterialSymbol name="credit_card" data-slot="icon" size='sm' />
-                      <DropdownLabel>Billing & Plans</DropdownLabel>
+                      <MaterialSymbol name="swap_horiz" data-slot="icon" size='sm' />
+                      <DropdownLabel>Change organization</DropdownLabel>
                     </span>
                   </DropdownItem>
                 </DropdownSection>

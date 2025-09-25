@@ -3,7 +3,6 @@ package models
 import (
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	uuid "github.com/google/uuid"
@@ -15,6 +14,7 @@ import (
 const (
 	ExecutorTypeSemaphore = "semaphore"
 	ExecutorTypeHTTP      = "http"
+	ExecutorTypeNoOp      = "noop"
 
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"
@@ -281,6 +281,14 @@ func FindStageByName(canvasID string, name string) (*Stage, error) {
 	return &stage, nil
 }
 
+func (s *Stage) OutputNames() []string {
+	var names []string
+	for _, output := range s.Outputs {
+		names = append(names, output.Name)
+	}
+	return names
+}
+
 func (s *Stage) GetResource() (*Resource, error) {
 	var resource Resource
 
@@ -410,9 +418,10 @@ func (s *Stage) ListEventsInTransaction(tx *gorm.DB, states, stateReasons []stri
 	return events, nil
 }
 
-func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons []string, limit int, before *time.Time) ([]StageEvent, error) {
+func (s *Stage) FilterEvents(states, stateReasons []string, limit int, before *time.Time) ([]StageEvent, error) {
 	var events []StageEvent
 	query := database.Conn().
+		Preload("Event").
 		Where("stage_id = ?", s.ID).
 		Where("state IN ?", states)
 
@@ -430,65 +439,6 @@ func (s *Stage) ListEventsWithLimitAndBefore(states, stateReasons []string, limi
 	}
 
 	return events, nil
-}
-
-func BulkFindStagesByCanvasIDAndIdentifiers(canvasID uuid.UUID, identifiers []string) (map[string]*Stage, error) {
-	if len(identifiers) == 0 {
-		return map[string]*Stage{}, nil
-	}
-
-	var stages []Stage
-
-	var stageIDs []uuid.UUID
-	var stageNames []string
-
-	for _, identifier := range identifiers {
-		if id, err := uuid.Parse(identifier); err == nil {
-			stageIDs = append(stageIDs, id)
-		} else {
-			stageNames = append(stageNames, identifier)
-		}
-	}
-
-	query := database.Conn().Where("canvas_id = ?", canvasID)
-
-	var conditions []string
-	var args []interface{}
-
-	if len(stageIDs) > 0 {
-		conditions = append(conditions, "id IN ?")
-		args = append(args, stageIDs)
-	}
-
-	if len(stageNames) > 0 {
-		conditions = append(conditions, "name IN ?")
-		args = append(args, stageNames)
-	}
-
-	if len(conditions) > 0 {
-		whereClause := fmt.Sprintf("(%s)", strings.Join(conditions, " OR "))
-		query = query.Where(whereClause, args...)
-	}
-
-	err := query.Find(&stages).Error
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[string]*Stage)
-
-	for _, stage := range stages {
-		stageIDStr := stage.ID.String()
-		if slices.Contains(identifiers, stageIDStr) {
-			result[stageIDStr] = &stage
-		}
-
-		if slices.Contains(identifiers, stage.Name) {
-			result[stage.Name] = &stage
-		}
-	}
-
-	return result, nil
 }
 
 func (s *Stage) FindExecutionByID(id uuid.UUID) (*StageExecution, error) {
@@ -575,13 +525,6 @@ func (s *Stage) DeleteStageExecutionsInTransaction(tx *gorm.DB) error {
 }
 
 func (s *Stage) DeleteStageEventsInTransaction(tx *gorm.DB) error {
-	// Delete events associated with stage events
-	if err := tx.Unscoped().
-		Where("id IN (SELECT event_id FROM stage_events WHERE stage_id = ?)", s.ID).
-		Delete(&Event{}).Error; err != nil {
-		return fmt.Errorf("failed to delete events: %v", err)
-	}
-
 	if err := tx.Unscoped().Where("stage_id = ?", s.ID).Delete(&StageEvent{}).Error; err != nil {
 		return fmt.Errorf("failed to delete stage events: %v", err)
 	}
@@ -589,9 +532,232 @@ func (s *Stage) DeleteStageEventsInTransaction(tx *gorm.DB) error {
 	return nil
 }
 
+func (s *Stage) FilterExecutions(states []string, results []string, limit int, before *time.Time) ([]StageExecution, error) {
+	var executions []StageExecution
+	query := database.Conn().
+		Preload("StageEvent", func(db *gorm.DB) *gorm.DB {
+			return db.Preload("Event")
+		}).
+		Where("stage_id = ?", s.ID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
+	if len(results) > 0 {
+		query = query.Where("result IN ?", results)
+	}
+
+	if before != nil {
+		query = query.Where("created_at < ?", before)
+	}
+
+	err := query.Order("created_at DESC").Limit(limit).Find(&executions).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
 func (s *Stage) DeleteConnectionsInTransaction(tx *gorm.DB) error {
 	if err := tx.Unscoped().Where("target_id = ? AND target_type = ?", s.ID, ConnectionTargetTypeStage).Delete(&Connection{}).Error; err != nil {
 		return fmt.Errorf("failed to delete connections: %v", err)
 	}
 	return nil
+}
+
+func (s *Stage) CountExecutions(states []string, results []string) (int64, error) {
+	query := database.Conn().
+		Model(&StageExecution{}).
+		Where("stage_id = ?", s.ID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
+	if len(results) > 0 {
+		query = query.Where("result IN ?", results)
+	}
+
+	var count int64
+	err := query.Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func (s *Stage) CountEvents(states, stateReasons []string) (int64, error) {
+	query := database.Conn().
+		Model(&StageEvent{}).
+		Where("stage_id = ?", s.ID)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
+	if len(stateReasons) > 0 {
+		query = query.Where("state_reason IN ?", stateReasons)
+	}
+
+	var count int64
+	err := query.Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+type StageStatusInfo struct {
+	StageID       uuid.UUID
+	LastExecution *StageExecution
+	QueueTotal    int
+	QueueItems    []StageEvent
+}
+
+func GetStagesStatusInfo(stages []Stage) (map[uuid.UUID]*StageStatusInfo, error) {
+	statusMap := make(map[uuid.UUID]*StageStatusInfo)
+
+	if len(stages) == 0 {
+		return statusMap, nil
+	}
+
+	stageIDs := make([]uuid.UUID, len(stages))
+	for i, stage := range stages {
+		stageIDs[i] = stage.ID
+		statusMap[stage.ID] = &StageStatusInfo{
+			StageID:    stage.ID,
+			QueueItems: []StageEvent{},
+		}
+	}
+
+	lastExecutions, err := getLastExecutionsForStages(stageIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	queueCounts, queueItems, err := getQueueInfoForStages(stageIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for stageID, execution := range lastExecutions {
+		if status, exists := statusMap[stageID]; exists {
+			status.LastExecution = execution
+		}
+	}
+
+	for stageID, count := range queueCounts {
+		if status, exists := statusMap[stageID]; exists {
+			status.QueueTotal = count
+		}
+	}
+
+	for stageID, items := range queueItems {
+		if status, exists := statusMap[stageID]; exists {
+			status.QueueItems = items
+		}
+	}
+
+	return statusMap, nil
+}
+
+func getLastExecutionsForStages(stageIDs []uuid.UUID) (map[uuid.UUID]*StageExecution, error) {
+	executions := make(map[uuid.UUID]*StageExecution)
+
+	var results []StageExecution
+
+	err := database.Conn().
+		Preload("StageEvent", func(db *gorm.DB) *gorm.DB {
+			return db.Preload("Event")
+		}).
+		Raw(`
+			SELECT * FROM stage_executions 
+			WHERE id IN (
+				SELECT DISTINCT ON (stage_id) id
+				FROM stage_executions 
+				WHERE stage_id IN ?
+				ORDER BY stage_id, created_at DESC
+			)
+		`, stageIDs).
+		Find(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range results {
+		executions[result.StageID] = &result
+	}
+
+	return executions, nil
+}
+
+func getQueueInfoForStages(stageIDs []uuid.UUID) (map[uuid.UUID]int, map[uuid.UUID][]StageEvent, error) {
+	counts := make(map[uuid.UUID]int)
+	items := make(map[uuid.UUID][]StageEvent)
+
+	var queueEvents []struct {
+		StageID     uuid.UUID
+		ID          uuid.UUID
+		Name        string
+		EventID     uuid.UUID
+		SourceID    uuid.UUID
+		SourceName  string
+		SourceType  string
+		State       string
+		StateReason string
+		CreatedAt   *time.Time
+	}
+
+	err := database.Conn().
+		Raw(`
+			SELECT 
+				stage_id,
+				id,
+				name,
+				event_id,
+				source_id,
+				source_name,
+				source_type,
+				state,
+				state_reason,
+				created_at
+			FROM stage_events
+			WHERE stage_id IN ? 
+				AND state IN (?, ?)
+			ORDER BY stage_id, created_at ASC
+		`, stageIDs, StageEventStatePending, StageEventStateWaiting).
+		Find(&queueEvents).Error
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, event := range queueEvents {
+		counts[event.StageID]++
+
+		stageEvent := StageEvent{
+			ID:          event.ID,
+			Name:        event.Name,
+			StageID:     event.StageID,
+			EventID:     event.EventID,
+			SourceID:    event.SourceID,
+			SourceName:  event.SourceName,
+			SourceType:  event.SourceType,
+			State:       event.State,
+			StateReason: event.StateReason,
+			CreatedAt:   event.CreatedAt,
+		}
+
+		if _, exists := items[event.StageID]; !exists {
+			items[event.StageID] = []StageEvent{}
+		}
+		items[event.StageID] = append(items[event.StageID], stageEvent)
+	}
+
+	return counts, items, nil
 }

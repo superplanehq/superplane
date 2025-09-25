@@ -13,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type CanvasService struct {
@@ -127,9 +129,9 @@ func (s *CanvasService) ApproveStageEvent(ctx context.Context, req *pb.ApproveSt
 	return stageevents.ApproveStageEvent(ctx, canvasID, req.StageIdOrName, req.EventId)
 }
 
-func (s *CanvasService) CancelStageEvent(ctx context.Context, req *pb.CancelStageEventRequest) (*pb.CancelStageEventResponse, error) {
+func (s *CanvasService) DiscardStageEvent(ctx context.Context, req *pb.DiscardStageEventRequest) (*pb.DiscardStageEventResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return stageevents.CancelStageEvent(ctx, canvasID, req.StageIdOrName, req.EventId)
+	return stageevents.DiscardStageEvent(ctx, canvasID, req.StageIdOrName, req.EventId)
 }
 
 func (s *CanvasService) ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
@@ -140,6 +142,16 @@ func (s *CanvasService) ListStages(ctx context.Context, req *pb.ListStagesReques
 func (s *CanvasService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return stageevents.ListStageEvents(ctx, canvasID, req.StageIdOrName, req.States, req.StateReasons, req.Limit, req.Before)
+}
+
+func (s *CanvasService) ListStageExecutions(ctx context.Context, req *pb.ListStageExecutionsRequest) (*pb.ListStageExecutionsResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stages.ListStageExecutions(ctx, canvasID, req.StageIdOrName, req.States, req.Results, req.Limit, req.Before)
+}
+
+func (s *CanvasService) CancelStageExecution(ctx context.Context, req *pb.CancelStageExecutionRequest) (*pb.CancelStageExecutionResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stages.CancelStageExecution(ctx, canvasID, req.StageIdOrName, req.ExecutionId)
 }
 
 func (s *CanvasService) DeleteStage(ctx context.Context, req *pb.DeleteStageRequest) (*pb.DeleteStageResponse, error) {
@@ -183,15 +195,19 @@ func (s *CanvasService) DeleteConnectionGroup(ctx context.Context, req *pb.Delet
 
 func (s *CanvasService) ListEvents(ctx context.Context, req *pb.ListEventsRequest) (*pb.ListEventsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return events.ListEvents(ctx, canvasID, req.SourceType, req.SourceId, req.Limit, req.Before)
+	return events.ListEvents(ctx, canvasID, req.SourceType, req.SourceId, req.Limit, req.Before, req.States)
 }
 
-func (s *CanvasService) BulkListEvents(ctx context.Context, req *pb.BulkListEventsRequest) (*pb.BulkListEventsResponse, error) {
+func (s *CanvasService) CreateEvent(ctx context.Context, req *pb.CreateEventRequest) (*pb.CreateEventResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return events.BulkListEvents(ctx, canvasID, req.Sources, req.LimitPerSource, req.Before)
+	if req.Raw == nil {
+		return nil, status.Error(codes.InvalidArgument, "raw data is required")
+	}
+
+	return events.CreateEvent(ctx, canvasID, req.SourceType, req.SourceId, req.Type, req.Raw.AsMap())
 }
 
-func (s *CanvasService) BulkListStageEvents(ctx context.Context, req *pb.BulkListStageEventsRequest) (*pb.BulkListStageEventsResponse, error) {
+func (s *CanvasService) ListEventRejections(ctx context.Context, req *pb.ListEventRejectionsRequest) (*pb.ListEventRejectionsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return stageevents.BulkListStageEvents(ctx, canvasID, req.Stages, req.LimitPerStage, req.Before, req.States, req.StateReasons)
+	return canvases.ListEventRejections(ctx, canvasID, req.TargetType, req.TargetId, req.Limit, req.Before)
 }

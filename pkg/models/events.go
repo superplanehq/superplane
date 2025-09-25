@@ -27,11 +27,13 @@ type StageInEvent struct {
 }
 
 type ExecutionInEvent struct {
-	ID         string     `json:"id"`
-	Result     string     `json:"result"`
-	CreatedAt  *time.Time `json:"created_at,omitempty"`
-	StartedAt  *time.Time `json:"started_at,omitempty"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	ID            string     `json:"id"`
+	Result        string     `json:"result"`
+	ResultReason  string     `json:"result_reason"`
+	ResultMessage string     `json:"result_message"`
+	CreatedAt     *time.Time `json:"created_at,omitempty"`
+	StartedAt     *time.Time `json:"started_at,omitempty"`
+	FinishedAt    *time.Time `json:"finished_at,omitempty"`
 }
 
 //
@@ -52,11 +54,13 @@ func NewExecutionCompletionEvent(execution *StageExecution, inputs map[string]an
 			ID: execution.StageID.String(),
 		},
 		Execution: &ExecutionInEvent{
-			ID:         execution.ID.String(),
-			Result:     execution.Result,
-			CreatedAt:  execution.CreatedAt,
-			StartedAt:  execution.StartedAt,
-			FinishedAt: execution.FinishedAt,
+			ID:            execution.ID.String(),
+			Result:        execution.Result,
+			ResultReason:  execution.ResultReason,
+			ResultMessage: execution.ResultMessage,
+			CreatedAt:     execution.CreatedAt,
+			StartedAt:     execution.StartedAt,
+			FinishedAt:    execution.FinishedAt,
 		},
 		Inputs:  inputs,
 		Outputs: outputs,
