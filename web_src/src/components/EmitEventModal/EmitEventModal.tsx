@@ -63,7 +63,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
       },
       pusher: {
         name: "lucaspin",
-        email: "pinheiro.lucasaugusto@gmail.com"
+        email: "lucas@superplane.com"
       },
       organization: {
         login: "superplanehq",
