@@ -1,9 +1,11 @@
 package workers
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -91,7 +93,7 @@ func (w *HardDeletionWorker) processStages() error {
 // hardDeleteStage handles hard deletion of soft-deleted stages following hierarchical dependency chain:
 // 1. Delete stage executions and their execution resources FIRST
 // (executions have foreign key to stage_events, so must be deleted first)
-// 2. Now delete stage events and their associated events
+// 2. Now delete stage events
 // 3. Delete connections where this stage is the target
 // 4. Clean up integration webhooks if stage has a resource
 // 5. Finally, hard delete the stage itself
@@ -154,44 +156,56 @@ func (w *HardDeletionWorker) processEventSources() error {
 }
 
 // hardDeleteEventSource handles hard deletion of soft-deleted event sources:
-// 1. Delete stage executions that reference stage events from this event source FIRST
-// 2. Delete stage events and their associated events that originated from this event source
-// 3. Delete connections where this event source is the source
-// 4. Delete events directly created by this event source
-// 5. Clean up integration webhooks if event source has a resource
-// 6. Finally, hard delete the event source itself
+// 1. Delete connections where this event source is the source
+// 2. Clean up integration webhooks if event source has a resource
+// 3. Finally, hard delete the event source itself
 func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSource *models.EventSource) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := models.DeleteStageExecutionsBySourceInTransaction(tx, eventSource.ID, models.SourceTypeEventSource); err != nil {
-			return err
-		}
-
-		if err := eventSource.DeleteStageEventsInTransaction(tx); err != nil {
-			return err
-		}
-
 		if err := eventSource.DeleteConnectionsInTransaction(tx); err != nil {
 			return err
 		}
 
-		if err := eventSource.DeleteEventsInTransaction(tx); err != nil {
-			return err
-		}
-
-		if eventSource.ResourceID != nil {
-			if err := w.CleanupService.CleanupEventSourceWebhooks(eventSource); err != nil {
-				logger.Warnf("Failed to cleanup event source webhooks: %v", err)
-				// Don't fail the transaction, just log the warning
-			}
-		}
+		shouldDeleteResource, resource := w.prepareResourceCleanup(logger, eventSource)
 
 		if err := eventSource.HardDeleteInTransaction(tx); err != nil {
 			return fmt.Errorf("failed to hard delete event source: %v", err)
 		}
 
+		//
+		// Now that the event source is deleted, we can safely delete the resource if it's safe to do so
+		//
+		if resource != nil && shouldDeleteResource {
+			if err := w.CleanupService.CleanupUnusedResourceWithModelInTransaction(tx, resource, uuid.Nil); err != nil {
+				logger.Errorf("Failed to cleanup unused resource: %v", err)
+				// Don't fail the transaction, just log the warning
+			}
+		}
+
 		logger.Info("Hard deleted event source with all dependencies")
 		return nil
 	})
+}
+
+func (w *HardDeletionWorker) prepareResourceCleanup(logger *log.Entry, eventSource *models.EventSource) (bool, *models.Resource) {
+	if eventSource.ResourceID == nil {
+		return false, nil
+	}
+
+	resource, err := models.FindResourceByID(*eventSource.ResourceID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Warnf("Failed to find resource for cleanup: %v", err)
+		}
+		return false, nil
+	}
+
+	canDelete, err := w.CleanupService.CleanupEventSourceWebhooks(eventSource, resource)
+	if err != nil {
+		logger.Warnf("Failed to cleanup event source webhooks: %v", err)
+		return false, resource
+	}
+
+	return canDelete, resource
 }
 
 // processConnectionGroups handles hard deletion of soft-deleted connection groups:
@@ -223,10 +237,9 @@ func (w *HardDeletionWorker) processConnectionGroups() error {
 }
 
 // hardDeleteConnectionGroup handles hard deletion of soft-deleted connection groups:
-// 1. Delete connection group field sets and their events
+// 1. Delete connection group field sets (but preserve their events)
 // 2. Delete connections where this connection group is the source or target
-// 3. Delete events created by this connection group
-// 4. Finally, hard delete the connection group itself
+// 3. Finally, hard delete the connection group itself
 func (w *HardDeletionWorker) hardDeleteConnectionGroup(logger *log.Entry, connectionGroup *models.ConnectionGroup) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := connectionGroup.DeleteFieldSetsInTransaction(tx); err != nil {
@@ -234,10 +247,6 @@ func (w *HardDeletionWorker) hardDeleteConnectionGroup(logger *log.Entry, connec
 		}
 
 		if err := connectionGroup.DeleteConnectionsInTransaction(tx); err != nil {
-			return err
-		}
-
-		if err := connectionGroup.DeleteEventsInTransaction(tx); err != nil {
 			return err
 		}
 

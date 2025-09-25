@@ -145,7 +145,7 @@ func Test__HardDeletionWorker(t *testing.T) {
 
 		var foundEvent models.Event
 		err = database.Conn().Unscoped().Where("id = ?", event.ID).First(&foundEvent).Error
-		assert.Error(t, err)
+		assert.NoError(t, err)
 
 		var foundConnection models.Connection
 		err = database.Conn().Unscoped().Where("id = ?", connection.ID).First(&foundConnection).Error
@@ -222,15 +222,15 @@ func Test__HardDeletionWorker(t *testing.T) {
 
 		var foundStageEvent models.StageEvent
 		err = database.Conn().Unscoped().Where("id = ?", stageEvent.ID).First(&foundStageEvent).Error
-		assert.Error(t, err)
+		assert.NoError(t, err)
 
 		var foundExecution models.StageExecution
 		err = database.Conn().Unscoped().Where("id = ?", stageExecution.ID).First(&foundExecution).Error
-		assert.Error(t, err)
+		assert.NoError(t, err)
 
 		var foundEvent models.Event
 		err = database.Conn().Unscoped().Where("id = ?", event.ID).First(&foundEvent).Error
-		assert.Error(t, err)
+		assert.NoError(t, err)
 
 		var foundConnection models.Connection
 		err = database.Conn().Unscoped().Where("id = ?", connection.ID).First(&foundConnection).Error
@@ -299,7 +299,7 @@ func Test__HardDeletionWorker(t *testing.T) {
 
 		var foundEvent models.Event
 		err = database.Conn().Unscoped().Where("id = ?", event.ID).First(&foundEvent).Error
-		assert.Error(t, err)
+		assert.NoError(t, err)
 
 		var foundConnection models.Connection
 		err = database.Conn().Unscoped().Where("id = ?", connection.ID).First(&foundConnection).Error

@@ -35,19 +35,19 @@ func serializeEventSources(eventSources []models.EventSource) ([]*pb.EventSource
 		return []*pb.EventSource{}, nil
 	}
 
-	statusInfo, err := models.GetEventSourcesStatusInfo(eventSources)
+	lastEvents, err := models.LastProcessedEventForSources(eventSources)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get event source status info: %w", err)
+		return nil, fmt.Errorf("failed to get last processed event for sources: %w", err)
 	}
 
 	sources := []*pb.EventSource{}
 	for _, source := range eventSources {
-		var sourceStatus *models.EventSourceStatusInfo
-		if info, exists := statusInfo[source.ID]; exists {
-			sourceStatus = info
+		var lastEvent *models.Event
+		if event, exists := lastEvents[source.ID]; exists {
+			lastEvent = event
 		}
 
-		protoSource, err := serializeEventSource(source, sourceStatus)
+		protoSource, err := serializeEventSource(source, lastEvent)
 		if err != nil {
 			return nil, err
 		}

@@ -147,7 +147,7 @@ export function Canvas() {
 
     const eventSourcesWithEvents: EventSourceWithEvents[] = rawEventSources.map(eventSource => ({
       ...eventSource,
-      events: eventSource.status?.history?.recentItems || [],
+      events: eventSource.status?.lastEvent ? [eventSource.status.lastEvent] : [],
       eventFilters: []
     }));
 

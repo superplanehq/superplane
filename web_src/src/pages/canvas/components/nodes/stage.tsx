@@ -12,7 +12,7 @@ import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { Badge } from '@/components/Badge/badge';
-import { EditModeActionButtons } from '../EditModeActionButtons';
+import { NodeActionButtons } from '@/components/NodeActionButtons';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 
@@ -559,7 +559,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   return (
     <div
-      onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
       className={twMerge(`bg-transparent rounded-xl border-2 relative `, borderColor)}
     >
       <div className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-gray-700 rounded-xl"
@@ -567,13 +566,15 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       >
 
         {(focusedNodeId === props.id || isEditMode) && (
-          <EditModeActionButtons
+          <NodeActionButtons
             isNewNode={!!isNewNode}
             onSave={handleSaveStage}
             onCancel={handleCancelEdit}
             onDiscard={() => setShowDiscardConfirm(true)}
             onEdit={() => handleEditClick({} as React.MouseEvent<HTMLButtonElement>)}
             onDuplicate={!isNewNode ? handleDuplicateStage : undefined}
+            onSend={currentStage?.metadata?.id ? () => setShowEmitEventModal(true) : undefined}
+            onSelect={currentStage?.metadata?.id ? () => selectStageId(props.id) : undefined}
             isEditMode={isEditMode}
             entityType="stage"
             entityData={currentFormData ? {
@@ -608,6 +609,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             onYamlApply={handleYamlApply}
           />
         )}
+
 
         {/* Header Section */}
         <div className={twMerge('px-4 py-4 justify-between items-start border-gray-200 dark:border-gray-700', isEditMode ? 'border-b' : '')}>
@@ -646,18 +648,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 </div>
               </div>
             </div>
-            {!isEditMode && currentStage?.metadata?.id && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowEmitEventModal(true);
-                }}
-                className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-                title="Manually emit an event"
-              >
-                <MaterialSymbol name="send" size="sm" />
-              </button>
-            )}
           </div>
           {!isEditMode && (
             <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{stageDescription || ''}</div>
@@ -742,8 +732,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 <div className="flex items-center mb-1 py-2">
                   {getStatusIcon()}
                   <span
-                    className="text-left w-full font-semibold text-sm hover:underline truncate text-gray-900 dark:text-gray-100"
-                    onClick={() => selectStageId(props.id)}
+                    className="text-left w-full font-semibold text-sm truncate text-gray-900 dark:text-gray-100"
                   >
                     {lastExecutionEvent?.name || lastExecution?.id || 'No recent runs'}
                   </span>

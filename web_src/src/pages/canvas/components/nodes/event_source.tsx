@@ -9,13 +9,13 @@ import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { EditModeActionButtons } from '../EditModeActionButtons';
+import { NodeActionButtons } from '@/components/NodeActionButtons';
 import { useParams } from 'react-router-dom';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { twMerge } from 'tailwind-merge';
 import { useIntegrations } from '../../hooks/useIntegrations';
-import { EventStateItem, EventState } from '../EventStateItem';
+import { EventStateItem } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
 import { EventSourceZeroState } from '../../../../components/EventSourceZeroState';
 import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
@@ -24,7 +24,7 @@ import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { convertUTCToLocalTime, formatTimestampInUserTimezone, getUserTimezoneDisplay } from '@/utils/timezone';
 
 const EventSourceImageMap = {
-  'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
+  'webhook': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="webhook" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
   'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
   'scheduled': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="schedule" size="xl" />
@@ -42,6 +42,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const currentEventSource = useCanvasStore(state =>
     state.eventSources.find(es => es.metadata?.id === props.id)
   );
+  const eventSourceId = currentEventSource?.metadata?.id;
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -369,26 +370,22 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return 'border-gray-200 dark:border-gray-700';
   };
 
-  const handleNodeClick = () => {
-    if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {
-      selectEventSourceId(currentEventSource.metadata.id);
-    }
-  };
 
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
       style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
-      onClick={handleNodeClick}
     >
       {(focusedNodeId === props.id || isEditMode) && (
-        <EditModeActionButtons
+        <NodeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveEventSource}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           onEdit={handleEditClick}
           onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
+          onSend={eventSourceId ? () => setShowEmitEventModal(true) : undefined}
+          onSelect={eventSourceId && !props.id.match(/^\d+$/) ? () => selectEventSourceId(eventSourceId) : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
@@ -407,6 +404,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onYamlApply={handleYamlApply}
         />
       )}
+
 
       {/* Header Section */}
       <div className="px-4 py-4 justify-between items-start">
@@ -446,18 +444,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             </div>
           </div>
         </div>
-        {!isEditMode && currentEventSource?.metadata?.id && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowEmitEventModal(true);
-            }}
-            className="ml-2 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-            title="Manually emit an event"
-          >
-            <MaterialSymbol name="send" size="sm" />
-          </button>
-        )}
         </div>
         {!isEditMode && (
           <>
@@ -568,31 +554,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       ) : (
         <>
 
-          {currentEventSource?.events?.length ? (
+          {currentEventSource?.status?.lastEvent ? (
             <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center w-full justify-between mb-2 py-2">
-                <div className="text-sm  font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Latest Events ({currentEventSource?.status?.history?.received || 0})</div>
+                <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last Event</div>
               </div>
 
               <div className="space-y-1">
-                {currentEventSource.events.slice(0, 3).map((event) => {
-                  // Map event states to our EventState type
-                  let eventState: EventState = 'pending';
-                  if (event.state === 'STATE_REJECTED') {
-                    eventState = 'rejected';
-                  } else if (event.state === 'STATE_PROCESSED') {
-                    eventState = 'processed';
-                  }
-
-                  return (
-                    <EventStateItem
-                      key={event.id}
-                      state={eventState}
-                      receivedAt={event.receivedAt}
-                      eventType={event.type}
-                    />
-                  );
-                })}
+                <EventStateItem
+                  key={currentEventSource.status.lastEvent.id}
+                  state={currentEventSource.status.lastEvent.state}
+                  receivedAt={currentEventSource.status.lastEvent.receivedAt}
+                  eventType={currentEventSource.status.lastEvent.type}
+                />
               </div>
             </div>
           ) : (
