@@ -89,7 +89,11 @@ func ListConnectionsInTransaction(tx *gorm.DB, targetID uuid.UUID, targetType st
 	return connections, nil
 }
 
-func UpdateConnectionSourceNameInTransaction(tx *gorm.DB, canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, oldName string, newName string) error {
+type StageNotifier interface {
+	NotifyStageUpdated(stage *Stage)
+}
+
+func UpdateConnectionSourceNameInTransaction(tx *gorm.DB, canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, oldName string, newName string, notifier StageNotifier) error {
 	// Update connection source names
 	if err := tx.
 		Model(&Connection{}).
@@ -117,6 +121,11 @@ func UpdateConnectionSourceNameInTransaction(tx *gorm.DB, canvasID uuid.UUID, so
 		if err := tx.Save(&stage).Error; err != nil {
 			log.Errorf("Failed to update stage input mappings: %v", err)
 			return err
+		}
+
+		if notifier != nil {
+			log.Infof("Stage updated due to stage name change: %s", stage.ID)
+			notifier.NotifyStageUpdated(&stage)
 		}
 	}
 

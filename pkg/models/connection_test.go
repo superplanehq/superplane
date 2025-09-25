@@ -112,7 +112,7 @@ func Test__UpdateConnectionSourceNameInTransaction_WithInputMappings(t *testing.
 	assert.Equal(t, "source-1", retrievedStage.InputMappings[0].Values[1].ValueFrom.EventData.Connection)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return UpdateConnectionSourceNameInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name")
+		return UpdateConnectionSourceNameInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name", nil)
 	})
 	require.NoError(t, err)
 
@@ -176,7 +176,7 @@ func Test__UpdateConnectionSourceNameInTransaction(t *testing.T) {
 	assert.Equal(t, "source-1", connections[0].SourceName)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return UpdateConnectionSourceNameInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name")
+		return UpdateConnectionSourceNameInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name", nil)
 	})
 	require.NoError(t, err)
 

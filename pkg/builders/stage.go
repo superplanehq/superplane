@@ -271,7 +271,8 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		// Update connection source names if stage name changed (do this BEFORE deleting connections)
 		//
 		if b.existingStage.Name != b.newStage.Name {
-			err := models.UpdateConnectionSourceNameInTransaction(tx, b.existingStage.CanvasID, b.existingStage.ID, models.SourceTypeStage, b.existingStage.Name, b.newStage.Name)
+			notifier := NewMessageStageNotifier()
+			err := models.UpdateConnectionSourceNameInTransaction(tx, b.existingStage.CanvasID, b.existingStage.ID, models.SourceTypeStage, b.existingStage.Name, b.newStage.Name, notifier)
 			if err != nil {
 				return fmt.Errorf("failed to update connection source names: %v", err)
 			}

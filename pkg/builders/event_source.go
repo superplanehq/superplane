@@ -334,7 +334,8 @@ func (b *EventSourceBuilder) updateWithoutIntegration(tx *gorm.DB) (*models.Even
 	// Update connection source names if event source name changed
 	//
 	if b.existingEventSource.Name != b.name {
-		err = models.UpdateConnectionSourceNameInTransaction(tx, b.existingEventSource.CanvasID, b.existingEventSource.ID, models.SourceTypeEventSource, b.existingEventSource.Name, b.name)
+		notifier := NewMessageStageNotifier()
+		err = models.UpdateConnectionSourceNameInTransaction(tx, b.existingEventSource.CanvasID, b.existingEventSource.ID, models.SourceTypeEventSource, b.existingEventSource.Name, b.name, notifier)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to update connection source names: %v", err)
 		}
@@ -411,7 +412,8 @@ func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSou
 	// Update connection source names if event source name changed
 	//
 	if b.existingEventSource.Name != b.name {
-		err = models.UpdateConnectionSourceNameInTransaction(tx, b.existingEventSource.CanvasID, b.existingEventSource.ID, models.SourceTypeEventSource, b.existingEventSource.Name, b.name)
+		notifier := NewMessageStageNotifier()
+		err = models.UpdateConnectionSourceNameInTransaction(tx, b.existingEventSource.CanvasID, b.existingEventSource.ID, models.SourceTypeEventSource, b.existingEventSource.Name, b.name, notifier)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to update connection source names: %v", err)
 		}
