@@ -52,12 +52,13 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
 	}
 
+	stageName := stage.Name
 	if newStage.Metadata != nil && newStage.Metadata.Name != "" && newStage.Metadata.Name != stage.Name {
 		_, err := models.FindStageByName(canvasID, newStage.Metadata.Name)
 		if err == nil {
 			return nil, status.Error(codes.InvalidArgument, "stage name already in use")
 		}
-		stage.Name = newStage.Metadata.Name
+		stageName = newStage.Metadata.Name
 	}
 
 	if newStage.Metadata != nil && newStage.Metadata.Description != "" {
@@ -123,7 +124,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 	stage, err = builders.NewStageBuilder(registry).
 		WithContext(ctx).
 		WithExistingStage(stage).
-		WithName(stage.Name).
+		WithName(stageName).
 		WithDescription(stage.Description).
 		WithEncryptor(encryptor).
 		InCanvas(uuid.MustParse(canvasID)).
@@ -137,6 +138,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		WithExecutorType(newStage.Spec.Executor.Type).
 		WithExecutorSpec(executorSpec).
 		WithExecutorName(newStage.Spec.Executor.Name).
+		WithDryRun(newStage.Spec.DryRun).
 		ForResource(resource).
 		ForIntegration(integration).
 		Update()

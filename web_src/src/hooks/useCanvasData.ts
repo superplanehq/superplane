@@ -204,6 +204,7 @@ export const useCreateStage = (canvasId: string) => {
       secrets?: SuperplaneValueDefinition[];
       conditions?: SuperplaneCondition[];
       inputMappings?: SuperplaneInputMapping[];
+      dryRun?: boolean;
     }) => {
       return await superplaneCreateStage(
         withOrganizationHeader({
@@ -222,7 +223,8 @@ export const useCreateStage = (canvasId: string) => {
                 executor: stageData.executor,
                 secrets: stageData.secrets || [],
                 conditions: stageData.conditions || [],
-                inputMappings: stageData.inputMappings || []
+                inputMappings: stageData.inputMappings || [],
+                dryRun: stageData.dryRun || false
               }
             }
           }
@@ -299,6 +301,7 @@ export const useUpdateStage = (canvasId: string) => {
       secrets?: SuperplaneValueDefinition[];
       conditions?: SuperplaneCondition[];
       inputMappings?: SuperplaneInputMapping[];
+      dryRun?: boolean;
     }) => {
       return await superplaneUpdateStage(
         withOrganizationHeader({
@@ -317,7 +320,8 @@ export const useUpdateStage = (canvasId: string) => {
                 executor: params.executor,
                 secrets: params.secrets || [],
                 conditions: params.conditions || [],
-                inputMappings: params.inputMappings || []
+                inputMappings: params.inputMappings || [],
+                dryRun: params.dryRun || false
               }
             }
           }

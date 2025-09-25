@@ -293,8 +293,24 @@ func CreateConnectionGroup(
 
 func (g *ConnectionGroup) Update(connections []Connection, spec ConnectionGroupSpec) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		var currentGroup ConnectionGroup
+		err := tx.Where("id = ?", g.ID).First(&currentGroup).Error
+		if err != nil {
+			return fmt.Errorf("failed to read current connection group: %v", err)
+		}
+
 		if err := tx.Where("target_id = ?", g.ID).Delete(&Connection{}).Error; err != nil {
 			return fmt.Errorf("failed to delete existing connections: %v", err)
+		}
+
+		//
+		// Update connection source names if connection group name changed
+		//
+		if currentGroup.Name != g.Name {
+			err := UpdateReferencesAfterNameUpdateInTransaction(tx, g.CanvasID, g.ID, SourceTypeConnectionGroup, currentGroup.Name, g.Name)
+			if err != nil {
+				return fmt.Errorf("failed to update connection source names: %v", err)
+			}
 		}
 
 		for _, connection := range connections {
@@ -307,7 +323,7 @@ func (g *ConnectionGroup) Update(connections []Connection, spec ConnectionGroupS
 		}
 
 		g.Spec = datatypes.NewJSONType(spec)
-		err := tx.Save(g).Error
+		err = tx.Save(g).Error
 		if err != nil {
 			return fmt.Errorf("failed to update connection group: %v", err)
 		}

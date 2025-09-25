@@ -296,6 +296,7 @@ export function Canvas() {
               onNodeAdd={(nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => {
                 handleAddNodeByType(nodeType, executorType, eventSourceType, focusedNodeInfo);
               }}
+              initialWidth="24rem"
             />
 
             {!isComponentSidebarOpen && (

@@ -30,6 +30,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   eventSourceKeys: {},
   selectedStageId: null,
   selectedEventSourceId: null,
+  selectedConnectionGroupId: null,
   focusedNodeId: null,
   editingStageId: null,
   editingEventSourceId: null,
@@ -186,17 +187,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   selectStageId: (stageId: string) => {
-    set({ selectedStageId: stageId, selectedEventSourceId: null });
+    set({ selectedStageId: stageId, selectedEventSourceId: null, selectedConnectionGroupId: null });
   },
 
   cleanSelectedStageId: () => {
     set({ selectedStageId: null });
   },
   selectEventSourceId: (eventSourceId: string) => {
-    set({ selectedEventSourceId: eventSourceId, selectedStageId: null });
+    set({ selectedEventSourceId: eventSourceId, selectedStageId: null, selectedConnectionGroupId: null });
   },
   cleanSelectedEventSourceId: () => {
     set({ selectedEventSourceId: null });
+  },
+
+  selectConnectionGroupId: (connectionGroupId: string) => {
+    set({ selectedConnectionGroupId: connectionGroupId, selectedStageId: null, selectedEventSourceId: null });
+  },
+
+  cleanSelectedConnectionGroupId: () => {
+    set({ selectedConnectionGroupId: null });
   },
 
   setFocusedNodeId: (stageId: string | null) => {
@@ -501,5 +510,72 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setLockedNodes: (locked: boolean) => {
     set({ lockedNodes: locked });
+  },
+
+  updateConnectionSourceNames: (oldName: string, newName: string) => {
+    set((state) => {
+      const updatedStages = state.stages.map(stage => {
+        if (!stage.spec?.connections) return stage;
+        
+        const updatedConnections = stage.spec.connections.map(connection => 
+          connection.name === oldName ? { ...connection, name: newName } : connection
+        );
+
+        return {
+          ...stage,
+          spec: {
+            ...stage.spec,
+            connections: updatedConnections,
+            inputMappings: stage.spec.inputMappings?.map(mapping => 
+              mapping.when?.triggeredBy?.connection === oldName ? {
+                ...mapping,
+                when: {
+                  ...mapping.when,
+                  triggeredBy: {
+                    ...mapping.when.triggeredBy,
+                    connection: newName
+                  },
+                },
+                values: mapping.values?.map(value => 
+                  value.valueFrom?.eventData?.connection === oldName ? {
+                    ...value,
+                    valueFrom: {
+                      ...value.valueFrom,
+                      eventData: {
+                        ...value.valueFrom.eventData,
+                        connection: newName
+                      }
+                    }
+                  } : value
+                )}
+               : mapping
+            )
+          }
+        } as Stage;
+      });
+
+      const updatedConnectionGroups = state.connectionGroups.map(cg => {
+        if (!cg.spec?.connections) return cg;
+        
+        const updatedConnections = cg.spec.connections.map(connection =>
+          connection.name === oldName ? { ...connection, name: newName } : connection
+        );
+
+        return {
+          ...cg,
+          spec: {
+            ...cg.spec,
+            connections: updatedConnections
+          }
+        };
+      });
+
+      return {
+        stages: updatedStages,
+        connectionGroups: updatedConnectionGroups
+      };
+    });
+    
+    get().syncToReactFlow();
   }
 }));

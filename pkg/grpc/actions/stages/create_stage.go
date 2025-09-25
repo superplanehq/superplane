@@ -76,11 +76,15 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	if stage.Spec.Executor == nil {
+		return nil, status.Error(codes.InvalidArgument, "stage.spec.executor is required")
+	}
+
 	//
 	// It is OK to create a stage without an integration.
 	//
 	var integration *models.Integration
-	if stage.Spec != nil && stage.Spec.Executor != nil && stage.Spec.Executor.Integration != nil {
+	if stage.Spec.Executor.Integration != nil && !stage.Spec.DryRun {
 		integration, err = actions.ValidateIntegration(canvas, stage.Spec.Executor.Integration)
 		if err != nil {
 			return nil, err
@@ -119,6 +123,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		WithExecutorType(stage.Spec.Executor.Type).
 		WithExecutorSpec(executorSpec).
 		WithExecutorName(stage.Spec.Executor.Name).
+		WithDryRun(stage.Spec.DryRun).
 		ForIntegration(integration).
 		ForResource(resource).
 		Create()
@@ -302,6 +307,7 @@ func serializeStage(
 			Outputs:       outputs,
 			InputMappings: inputMappings,
 			Secrets:       secrets,
+			DryRun:        stage.DryRun,
 		},
 	}
 

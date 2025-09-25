@@ -30,6 +30,7 @@ export interface ComponentSidebarProps {
   onClose: () => void;
   onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => void;
   className?: string;
+  initialWidth?: number | string;
 }
 
 interface ComponentDefinition {
@@ -39,7 +40,7 @@ interface ComponentDefinition {
   icon?: string;
   image?: string;
   category: string;
-  category_description: string;
+  category_description?: string;
   executorType?: string;
   eventSourceType?: string;
   comingSoon?: boolean;
@@ -50,6 +51,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
   onClose,
   onNodeAdd,
   className = '',
+  initialWidth = '24rem',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [hideComingSoon, setHideComingSoon] = useState<boolean>(true);
@@ -87,42 +89,77 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     return null;
   };
 
+  const categoryDescriptions: Record<string, string> = {
+    'Event Sources': 'Emit events that can be used to trigger workflows and provide data to stages',
+    'Stages': 'Execute remote operations',
+    'Groups': 'Group related workflow connections',
+  };
+
   const components: ComponentDefinition[] = [
+    // Event Sources
+    {
+      id: 'event_source',
+      name: 'Scheduled Event',
+      description: 'Emit an event on a schedule',
+      icon: 'schedule',
+      category: 'Event Sources',
+      eventSourceType: 'scheduled'
+    },
+    {
+      id: 'event_source',
+      name: 'Webhook',
+      description: 'Create a webhook endpoint to emit events',
+      icon: 'webhook',
+      category: 'Event Sources',
+      eventSourceType: 'webhook'
+    },
+    {
+      id: 'event_source',
+      name: 'GitHub Repository',
+      description: 'Listen to a webhook on GitHub repository',
+      image: GithubLogo,
+      category: 'Event Sources',
+      eventSourceType: 'github'
+    },
+    {
+      id: 'event_source',
+      name: 'Semaphore Project',
+      description: 'Listen to a webhook on Semaphore project',
+      image: SemaphoreLogo,
+      category: 'Event Sources',
+      eventSourceType: 'semaphore'
+    },
     // Stages - Available
     {
       id: 'stage',
-      name: 'Semaphore Stage',
-      description: 'Run CI/CD pipeline',
-      image: SemaphoreLogo,
-      category: 'Stages',
-      category_description: 'Execute remote operations',
-      executorType: 'semaphore'
-    },
-    {
-      id: 'stage',
-      name: 'HTTP Stage',
+      name: 'HTTP Request',
       description: 'Make HTTP requests to external services',
-      icon: 'rocket_launch',
+      icon: 'http',
       category: 'Stages',
-      category_description: 'Execute remote operations',
       executorType: 'http'
     },
     {
       id: 'stage',
-      name: 'GitHub Stage',
-      description: 'Add a GitHub-based stage to your canvas',
+      name: 'Semaphore Pipeline',
+      description: 'Run Semaphore pipeline or task',
+      image: SemaphoreLogo,
+      category: 'Stages',
+      executorType: 'semaphore'
+    },
+    {
+      id: 'stage',
+      name: 'GitHub Action',
+      description: 'Run a GitHub Action workflow',
       image: GithubLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       executorType: 'github'
     },
     {
       id: 'stage',
-      name: 'No-Op Stage',
-      description: 'A stage that does nothing but returns random outputs',
+      name: 'No Operation',
+      description: 'Don\'t run anything, return random output values',
       icon: 'check_circle',
       category: 'Stages',
-      category_description: 'Execute remote operations',
       executorType: 'noop'
     },
     // Stages - Coming Soon
@@ -132,7 +169,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Build and push Docker containers',
       image: DockerLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -141,7 +177,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Deploy applications to Kubernetes',
       image: KubernetesLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -150,7 +185,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Provision infrastructure with Terraform',
       image: TerraformLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -159,7 +193,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Execute AWS CLI commands',
       image: AwsLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -168,7 +201,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Perform Git operations and version control',
       image: GitLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -177,7 +209,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Build Node.js applications with NPM',
       image: NpmLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -186,7 +217,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Run Python tests with pytest',
       image: PythonLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -195,7 +225,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Deploy applications with Helm charts',
       image: HelmLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -204,7 +233,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Run Ansible playbooks for configuration',
       image: AnsibleLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
     },
     {
@@ -213,45 +241,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Code quality analysis with SonarQube',
       image: SonarqubeLogo,
       category: 'Stages',
-      category_description: 'Execute remote operations',
       comingSoon: true,
-    },
-    // Event Sources
-    {
-      id: 'event_source',
-      name: 'Webhook Event Source',
-      description: 'Trigger workflows from webhook events',
-      icon: 'webhook',
-      category: 'Event Sources',
-      category_description: 'Emit events that can be used to trigger executions',
-      eventSourceType: 'webhook'
-    },
-    {
-      id: 'event_source',
-      name: 'Scheduled Event Source',
-      description: 'Trigger workflows on a schedule',
-      icon: 'schedule',
-      category: 'Event Sources',
-      category_description: 'Emit events that can be used to trigger executions',
-      eventSourceType: 'scheduled'
-    },
-    {
-      id: 'event_source',
-      name: 'Semaphore Event Source',
-      description: 'Trigger workflows from Semaphore events',
-      image: SemaphoreLogo,
-      category: 'Event Sources',
-      category_description: 'Emit events that can be used to trigger executions',
-      eventSourceType: 'semaphore'
-    },
-    {
-      id: 'event_source',
-      name: 'GitHub Event Source',
-      description: 'Trigger workflows from GitHub events',
-      image: GithubLogo,
-      category: 'Event Sources',
-      category_description: 'Emit events that can be used to trigger executions',
-      eventSourceType: 'github'
     },
     // Groups
     {
@@ -260,7 +250,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Group related workflow connections',
       icon: 'account_tree',
       category: 'Groups',
-      category_description: 'Group related workflow connections',
     },
   ];
 
@@ -297,6 +286,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       {/* Sidebar */}
       <div
         className={`bg-white dark:bg-zinc-900 absolute top-0 bottom-0 transform transition-transform duration-300 ease-in-out z-50 ${className}`}
+        style={{ width: initialWidth }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="sidebar-title"
@@ -369,7 +359,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                   {category}
                 </h3>
                 <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                  {components.find(c => c.category === category)?.category_description}
+                  {categoryDescriptions[category]}
                 </div>
                 <div className="space-y-1">
                   {components
@@ -390,7 +380,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                           subtitle={component.description}
                           comingSoon={component.comingSoon}
                           disabled={disabled}
-                          showSubtitle={false}
+                          showSubtitle={true}
                           icon={
                             component.image ? (
                               <img

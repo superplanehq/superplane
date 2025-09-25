@@ -862,6 +862,7 @@ export type SuperplaneStageSpec = {
     inputMappings?: Array<SuperplaneInputMapping>;
     outputs?: Array<SuperplaneOutputDefinition>;
     secrets?: Array<SuperplaneValueDefinition>;
+    dryRun?: boolean;
 };
 
 export type SuperplaneStageStatus = {

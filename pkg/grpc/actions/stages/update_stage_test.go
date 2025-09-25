@@ -221,4 +221,61 @@ func Test__UpdateStage(t *testing.T) {
 		// Conditions are updated
 		require.Empty(t, res.Stage.Spec.Conditions)
 	})
+
+	t.Run("connection source names are updated when stage name changes", func(t *testing.T) {
+		connectedStage, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.Stage{
+			Metadata: &protos.Stage_Metadata{
+				Name: "connected-stage",
+			},
+			Spec: &protos.Stage_Spec{
+				Executor: executor,
+				Connections: []*protos.Connection{
+					{
+						Name: "new-stage-name",
+						Type: protos.Connection_TYPE_STAGE,
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		connectedStageUUID, err := uuid.Parse(connectedStage.Stage.Metadata.GetId())
+		require.NoError(t, err)
+		dbConnections, err := models.ListConnections(connectedStageUUID, models.SourceTypeStage)
+		require.NoError(t, err)
+		require.Len(t, dbConnections, 1)
+		assert.Equal(t, "new-stage-name", dbConnections[0].SourceName)
+
+		newSpec, err := structpb.NewStruct(map[string]any{
+			"ref":          "refs/heads/main",
+			"pipelineFile": ".semaphore/semaphore.yml",
+			"parameters":   map[string]any{},
+		})
+		require.NoError(t, err)
+
+		_, err = UpdateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), stageID, &protos.Stage{
+			Spec: &protos.Stage_Spec{
+				Executor: &protos.Executor{
+					Type:        executor.Type,
+					Integration: executor.Integration,
+					Resource:    executor.Resource,
+					Spec:        newSpec,
+				},
+				Connections: []*protos.Connection{
+					{
+						Name: r.Source.Name,
+						Type: protos.Connection_TYPE_EVENT_SOURCE,
+					},
+				},
+			},
+			Metadata: &protos.Stage_Metadata{
+				Name: "updated-stage-name",
+			},
+		})
+		require.NoError(t, err)
+
+		dbConnections, err = models.ListConnections(connectedStageUUID, models.SourceTypeStage)
+		require.NoError(t, err)
+		require.Len(t, dbConnections, 1)
+		assert.Equal(t, "updated-stage-name", dbConnections[0].SourceName)
+	})
 }

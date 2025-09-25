@@ -7,18 +7,6 @@ TEST_PACKAGES := ./...
 BASE_URL?=https://app.superplane.com
 
 #
-# Targets for prod-like environment
-#
-
-setup:
-	$(MAKE) db.create DOCKER_COMPOSE_OPTS="-f docker-compose.yml"
-	$(MAKE) db.migrate DOCKER_COMPOSE_OPTS="-f docker-compose.yml"
-	docker compose -f docker-compose.yml build
-
-start:
-	docker compose -f docker-compose.yml up
-
-#
 # Targets for test environment
 #
 
@@ -57,6 +45,15 @@ dev.start:
 
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash
+
+check.build.ui:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run build"
+
+check.build.app:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app go build cmd/server/main.go
+
+storybook:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash -c "cd web_src && npm install && npm run storybook"
 
 #
 # Database target helpers
@@ -116,6 +113,7 @@ openapi.client.gen:
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+
 #
 # Image and CLI build
 #

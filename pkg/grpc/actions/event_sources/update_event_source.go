@@ -49,12 +49,13 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, status.Error(codes.InvalidArgument, "event source metadata is required")
 	}
 
+	eventSourceName := eventSource.Name
 	if newSource.Metadata.Name != "" && newSource.Metadata.Name != eventSource.Name {
 		_, err := models.FindEventSourceByName(canvasID, newSource.Metadata.Name)
 		if err == nil {
 			return nil, status.Error(codes.InvalidArgument, "event source name already in use")
 		}
-		eventSource.Name = newSource.Metadata.Name
+		eventSourceName = newSource.Metadata.Name
 	}
 
 	if newSource.Metadata.Description != "" {
@@ -92,7 +93,7 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor, registry).
 		WithContext(ctx).
 		WithExistingEventSource(eventSource).
-		WithName(eventSource.Name).
+		WithName(eventSourceName).
 		WithDescription(eventSource.Description).
 		WithScope(models.EventSourceScopeExternal).
 		ForIntegration(integration).

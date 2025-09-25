@@ -45,6 +45,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const eventSourceId = currentEventSource?.metadata?.id;
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
+  const [isHovered, setIsHovered] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; spec: SuperplaneEventSourceSpec } | null>({
     name: props.data.name || '',
@@ -65,7 +66,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
   const [integrationError, setIntegrationError] = useState(false);
   const [showEmitEventModal, setShowEmitEventModal] = useState(false);
-  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource, updateConnectionSourceNames } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
@@ -192,6 +193,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           description: eventSourceDescription,
           spec: currentFormData.spec
         });
+
+        // Update connection source names if event source name changed
+        const oldEventSourceName = currentEventSource.metadata?.name;
+        if (oldEventSourceName && oldEventSourceName !== eventSourceName) {
+          updateConnectionSourceNames(oldEventSourceName, eventSourceName);
+        }
 
         // Update with the complete response including status
         updateEventSource({
@@ -373,10 +380,20 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   return (
     <div
-      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
-      style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+      className="relative pt-14"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {(focusedNodeId === props.id || isEditMode) && (
+      <div
+        className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
+        style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+        onClick={() => {
+          if (!isEditMode && eventSourceId && !props.id.match(/^\d+$/)) {
+            selectEventSourceId(eventSourceId);
+          }
+        }}
+      >
+      {(isHovered || isEditMode) && (
         <NodeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveEventSource}
@@ -385,7 +402,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onEdit={handleEditClick}
           onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
           onSend={eventSourceId ? () => setShowEmitEventModal(true) : undefined}
-          onSelect={eventSourceId && !props.id.match(/^\d+$/) ? () => selectEventSourceId(eventSourceId) : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
@@ -409,41 +425,41 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       {/* Header Section */}
       <div className="px-4 py-4 justify-between items-start">
         <div className="flex items-start justify-between w-full">
-        <div className="flex items-start flex-1 min-w-0">
-          <div className='max-w-8 mt-1 flex items-center justify-center'>
-            {EventSourceImageMap[eventSourceType as keyof typeof EventSourceImageMap]}
-          </div>
-          <div className="flex-1 min-w-0 ml-2">
-            <div className="mb-1">
-              <InlineEditable
-                value={eventSourceName}
-                onSave={handleEventSourceNameChange}
-                placeholder="Event source name"
-                className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
-                  nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
-                  isEditMode ? 'text-sm' : '')}
-                onKeyDown={() => isNewNode && setDirtyByUser(true)}
-                isEditMode={isEditMode}
-                autoFocus={isEditMode && eventSourceType === "webhook"}
-                dataTestId="event-source-name-input"
-              />
-              {nameError && isEditMode && (
-                <div className="text-xs text-red-600 text-left mt-1 px-2">
-                  {nameError}
-                </div>
-              )}
+          <div className="flex items-start flex-1 min-w-0">
+            <div className='max-w-8 mt-1 flex items-center justify-center'>
+              {EventSourceImageMap[eventSourceType as keyof typeof EventSourceImageMap]}
             </div>
-            <div>
-              {isEditMode && <InlineEditable
-                value={eventSourceDescription}
-                onSave={handleEventSourceDescriptionChange}
-                placeholder={isEditMode ? "Add description..." : ""}
-                className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
-                isEditMode={isEditMode}
-              />}
+            <div className="flex-1 min-w-0 ml-2">
+              <div className="mb-1">
+                <InlineEditable
+                  value={eventSourceName}
+                  onSave={handleEventSourceNameChange}
+                  placeholder="Event source name"
+                  className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                    nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                    isEditMode ? 'text-sm' : '')}
+                  onKeyDown={() => isNewNode && setDirtyByUser(true)}
+                  isEditMode={isEditMode}
+                  autoFocus={isEditMode && eventSourceType === "webhook"}
+                  dataTestId="event-source-name-input"
+                />
+                {nameError && isEditMode && (
+                  <div className="text-xs text-red-600 text-left mt-1 px-2">
+                    {nameError}
+                  </div>
+                )}
+              </div>
+              <div>
+                {isEditMode && <InlineEditable
+                  value={eventSourceDescription}
+                  onSave={handleEventSourceDescriptionChange}
+                  placeholder={isEditMode ? "Add description..." : ""}
+                  className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
+                  isEditMode={isEditMode}
+                />}
+              </div>
             </div>
           </div>
-        </div>
         </div>
         {!isEditMode && (
           <>
@@ -599,10 +615,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           isOpen={showEmitEventModal}
           onClose={() => setShowEmitEventModal(false)}
           sourceName={currentEventSource.metadata.name || ''}
+          nodeType="event_source"
           loadLastEvent={async () => {
             // For event sources, return the latest event immediately
             return currentEventSource.events?.[0] || null;
           }}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           onSubmit={async (eventType: string, eventData: any) => {
             await superplaneCreateEvent(withOrganizationHeader({
               path: { canvasIdOrName: canvasId! },
@@ -616,6 +634,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }}
         />
       )}
+      </div>
     </div>
   );
 }

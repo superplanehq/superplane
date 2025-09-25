@@ -14,6 +14,7 @@ export interface CanvasState {
   nodePositions: Record<string, { x: number, y: number }>;
   selectedStageId: string | null;
   selectedEventSourceId: string | null;
+  selectedConnectionGroupId: string | null;
   focusedNodeId: string | null;
   editingStageId: string | null;
   editingEventSourceId: string | null;
@@ -41,6 +42,8 @@ export interface CanvasState {
   cleanSelectedStageId: () => void;
   selectEventSourceId: (eventSourceId: string) => void;
   cleanSelectedEventSourceId: () => void;
+  selectConnectionGroupId: (connectionGroupId: string) => void;
+  cleanSelectedConnectionGroupId: () => void;
   setFocusedNodeId: (stageId: string | null) => void;
   cleanFocusedNodeId: () => void;
   setEditingStage: (stageId: string | null) => void;
@@ -89,6 +92,7 @@ export interface CanvasState {
   updateEventSourceKey: (eventSourceId: string, key: string) => void;
   resetEventSourceKey: (eventSourceId: string) => void;
   setLockedNodes: (locked: boolean) => void;
+  updateConnectionSourceNames: (oldName: string, newName: string) => void;
 }
 
 export type Stage = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; executions: Array<SuperplaneExecution>; isDraft?: boolean}
