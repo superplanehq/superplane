@@ -307,7 +307,7 @@ func (g *ConnectionGroup) Update(connections []Connection, spec ConnectionGroupS
 		// Update connection source names if connection group name changed
 		//
 		if currentGroup.Name != g.Name {
-			err := UpdateConnectionSourceNameInTransaction(tx, g.ID, SourceTypeConnectionGroup, currentGroup.Name, g.Name)
+			err := UpdateConnectionSourceNameInTransaction(tx, g.CanvasID, g.ID, SourceTypeConnectionGroup, currentGroup.Name, g.Name)
 			if err != nil {
 				return fmt.Errorf("failed to update connection source names: %v", err)
 			}

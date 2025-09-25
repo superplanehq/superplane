@@ -2,6 +2,7 @@ package models
 
 import (
 	uuid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -88,14 +89,67 @@ func ListConnectionsInTransaction(tx *gorm.DB, targetID uuid.UUID, targetType st
 	return connections, nil
 }
 
-func UpdateConnectionSourceNameInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceType string, oldName string, newName string) error {
-	err := tx.
+func UpdateConnectionSourceNameInTransaction(tx *gorm.DB, canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, oldName string, newName string) error {
+	// Update connection source names
+	if err := tx.
 		Model(&Connection{}).
 		Where("source_id = ?", sourceID).
 		Where("source_type = ?", sourceType).
 		Where("source_name = ?", oldName).
 		Update("source_name", newName).
-		Error
+		Error; err != nil {
+		return err
+	}
 
-	return err
+	var stages []Stage
+	if err := tx.Where("canvas_id = ?", canvasID).
+		Where(`EXISTS (
+			SELECT 1 FROM jsonb_array_elements(input_mappings) AS mapping
+			WHERE mapping->'when'->'triggered_by'->>'connection' = ?
+		)`, oldName).
+		Find(&stages).Error; err != nil {
+		return err
+	}
+
+	updatedStages := updateStageConnectionReferences(stages, oldName, newName)
+
+	for _, stage := range updatedStages {
+		if err := tx.Save(&stage).Error; err != nil {
+			log.Errorf("Failed to update stage input mappings: %v", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func updateStageConnectionReferences(stages []Stage, oldName, newName string) []Stage {
+	var updatedStages []Stage
+
+	for _, stage := range stages {
+		updated := false
+
+		for i := range stage.InputMappings {
+			mapping := &stage.InputMappings[i]
+
+			if mapping.When != nil && mapping.When.TriggeredBy != nil && mapping.When.TriggeredBy.Connection == oldName {
+				mapping.When.TriggeredBy.Connection = newName
+				updated = true
+			}
+
+			for j := range mapping.Values {
+				value := &mapping.Values[j]
+				if value.ValueFrom != nil && value.ValueFrom.EventData != nil && value.ValueFrom.EventData.Connection == oldName {
+					value.ValueFrom.EventData.Connection = newName
+					updated = true
+				}
+			}
+		}
+
+		if updated {
+			updatedStages = append(updatedStages, stage)
+		}
+	}
+
+	return updatedStages
 }

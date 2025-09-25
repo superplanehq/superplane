@@ -9,7 +9,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
@@ -416,59 +415,6 @@ func createTwoSources(t *testing.T, canvas *Canvas) (*EventSource, *EventSource)
 	require.NoError(t, err)
 
 	return source1, source2
-}
-
-func Test__UpdateConnectionSourceNameInTransaction(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-
-	user := uuid.New()
-	org, err := CreateOrganization(uuid.New().String(), "test")
-	require.NoError(t, err)
-	canvas, err := CreateCanvas(user, org.ID, "test", "test")
-	require.NoError(t, err)
-	source := &EventSource{
-		CanvasID:   canvas.ID,
-		Name:       "source-1",
-		Key:        []byte(`my-key`),
-		Scope:      EventSourceScopeExternal,
-		EventTypes: datatypes.NewJSONSlice([]EventType{}),
-	}
-
-	err = source.Create()
-	require.NoError(t, err)
-
-	connectionGroup, err := CreateConnectionGroup(
-		canvas.ID,
-		"test-group",
-		"test group",
-		user.String(),
-		[]Connection{
-			{SourceID: source.ID, SourceName: source.Name, SourceType: SourceTypeEventSource},
-		},
-		ConnectionGroupSpec{
-			GroupBy: &ConnectionGroupBySpec{
-				Fields: []ConnectionGroupByField{
-					{Name: "version", Expression: "$.ref"},
-				},
-			},
-		},
-	)
-	require.NoError(t, err)
-
-	connections, err := ListConnections(connectionGroup.ID, ConnectionTargetTypeConnectionGroup)
-	require.NoError(t, err)
-	require.Len(t, connections, 1)
-	assert.Equal(t, "source-1", connections[0].SourceName)
-
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return UpdateConnectionSourceNameInTransaction(tx, source.ID, SourceTypeEventSource, "source-1", "updated-source-name")
-	})
-	require.NoError(t, err)
-
-	connections, err = ListConnections(connectionGroup.ID, ConnectionTargetTypeConnectionGroup)
-	require.NoError(t, err)
-	require.Len(t, connections, 1)
-	assert.Equal(t, "updated-source-name", connections[0].SourceName)
 }
 
 func Test__ConnectionGroup__Update__UpdatesConnectionSourceNames(t *testing.T) {
