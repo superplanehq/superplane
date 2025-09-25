@@ -792,6 +792,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
           {currentStage?.metadata?.id && (
             <EmitEventModal
+              nodeType="stage"
               isOpen={showEmitEventModal}
               onClose={() => setShowEmitEventModal(false)}
               sourceName={currentStage.metadata.name || ''}
