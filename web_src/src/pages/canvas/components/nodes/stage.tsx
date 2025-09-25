@@ -786,6 +786,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             isOpen={showEmitEventModal}
             onClose={() => setShowEmitEventModal(false)}
             sourceName={currentStage.metadata.name || ''}
+            nodeType="stage"
             loadLastEvent={async () => {
               try {
                 const response = await superplaneListEvents(withOrganizationHeader({

@@ -11,9 +11,9 @@ interface ScheduleConfigurationProps {
 }
 
 const SCHEDULE_TYPE_OPTIONS = [
-  { value: 'TYPE_HOURLY', label: 'Hourly' },
-  { value: 'TYPE_DAILY', label: 'Daily' },
-  { value: 'TYPE_WEEKLY', label: 'Weekly' },
+  { value: 'TYPE_HOURLY', label: 'Hourly', icon: 'schedule' },
+  { value: 'TYPE_DAILY', label: 'Daily', icon: 'today' },
+  { value: 'TYPE_WEEKLY', label: 'Weekly', icon: 'calendar_view_week' },
 ];
 
 const WEEKDAY_OPTIONS = [
