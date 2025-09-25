@@ -105,9 +105,6 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
-		if errors.Is(err, builders.ErrResourceAlreadyUsed) {
-			return nil, status.Error(codes.InvalidArgument, "event source for this resource already exists")
-		}
 		return nil, err
 	}
 

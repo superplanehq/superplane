@@ -279,10 +279,15 @@ func (s *EventSource) CreateInTransaction(tx *gorm.DB) error {
 	s.UpdatedAt = &now
 	s.State = EventSourceStatePending
 
-	err := tx.
-		Clauses(clause.Returning{}).
-		Create(&s).
-		Error
+	// Prepare the query - omit schedule-related columns if they are nil
+	query := tx.Clauses(clause.Returning{})
+	
+	// If schedule-related fields are nil, omit them to avoid database column errors
+	if s.Schedule == nil && s.LastTriggeredAt == nil && s.NextTriggerAt == nil {
+		query = query.Omit("schedule", "last_triggered_at", "next_trigger_at")
+	}
+	
+	err := query.Create(&s).Error
 
 	if err == nil {
 		return nil

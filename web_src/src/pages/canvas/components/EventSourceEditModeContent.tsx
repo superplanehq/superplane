@@ -182,9 +182,8 @@ export function EventSourceEditModeContent({
       }
     }
 
-    if (errorMessage.includes('already exists')) {
-      errors.resourceName = 'An Event Source for this resource already exists. Please choose a different name.';
-    }
+    // Note: We no longer treat "already exists" for resources as an error
+    // This allows multiple event sources to listen to the same resource
 
     return errors;
   };
