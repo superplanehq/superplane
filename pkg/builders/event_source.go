@@ -330,6 +330,16 @@ func (b *EventSourceBuilder) updateWithoutIntegration(tx *gorm.DB) (*models.Even
 		return nil, "", err
 	}
 
+	//
+	// Update connection source names if event source name changed
+	//
+	if b.existingEventSource.Name != b.name {
+		err = models.UpdateReferencesAfterNameUpdateInTransaction(tx, b.existingEventSource.CanvasID, b.existingEventSource.ID, models.SourceTypeEventSource, b.existingEventSource.Name, b.name)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to update connection source names: %v", err)
+		}
+	}
+
 	now := time.Now()
 	updates := map[string]interface{}{
 		"name":        b.name,
@@ -395,6 +405,16 @@ func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSou
 	plainKey, err := b.encryptor.Decrypt(b.ctx, b.existingEventSource.Key, []byte(b.existingEventSource.ID.String()))
 	if err != nil {
 		return nil, "", err
+	}
+
+	//
+	// Update connection source names if event source name changed
+	//
+	if b.existingEventSource.Name != b.name {
+		err = models.UpdateReferencesAfterNameUpdateInTransaction(tx, b.existingEventSource.CanvasID, b.existingEventSource.ID, models.SourceTypeEventSource, b.existingEventSource.Name, b.name)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to update connection source names: %v", err)
+		}
 	}
 
 	now := time.Now()

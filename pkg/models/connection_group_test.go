@@ -416,3 +416,67 @@ func createTwoSources(t *testing.T, canvas *Canvas) (*EventSource, *EventSource)
 
 	return source1, source2
 }
+
+func Test__ConnectionGroup__Update__UpdatesConnectionSourceNames(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	user := uuid.New()
+	org, err := CreateOrganization(uuid.New().String(), "test")
+	require.NoError(t, err)
+	canvas, err := CreateCanvas(user, org.ID, "test", "test")
+	require.NoError(t, err)
+
+	connectionGroup, err := CreateConnectionGroup(
+		canvas.ID,
+		"original-group-name",
+		"test group",
+		user.String(),
+		[]Connection{},
+		ConnectionGroupSpec{
+			GroupBy: &ConnectionGroupBySpec{
+				Fields: []ConnectionGroupByField{
+					{Name: "version", Expression: "$.ref"},
+				},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	connectedGroup, err := CreateConnectionGroup(
+		canvas.ID,
+		"connected-group",
+		"connected group",
+		user.String(),
+		[]Connection{
+			{SourceID: connectionGroup.ID, SourceName: "original-group-name", SourceType: SourceTypeConnectionGroup},
+		},
+		ConnectionGroupSpec{
+			GroupBy: &ConnectionGroupBySpec{
+				Fields: []ConnectionGroupByField{
+					{Name: "version", Expression: "$.ref"},
+				},
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	connections, err := ListConnections(connectedGroup.ID, ConnectionTargetTypeConnectionGroup)
+	require.NoError(t, err)
+	require.Len(t, connections, 1)
+	assert.Equal(t, "original-group-name", connections[0].SourceName)
+
+	connectionGroup.Name = "updated-group-name"
+	err = connectionGroup.Update([]Connection{}, ConnectionGroupSpec{
+		GroupBy: &ConnectionGroupBySpec{
+			Fields: []ConnectionGroupByField{
+				{Name: "version", Expression: "$.ref"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	connections, err = ListConnections(connectedGroup.ID, ConnectionTargetTypeConnectionGroup)
+	require.NoError(t, err)
+	require.Len(t, connections, 1)
+	assert.Equal(t, "updated-group-name", connections[0].SourceName)
+}
