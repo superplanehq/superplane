@@ -31,6 +31,7 @@ type Stage struct {
 	UpdatedBy   uuid.UUID
 	DeletedAt   gorm.DeletedAt `gorm:"index"`
 
+	DryRun       bool
 	ExecutorType string
 	ExecutorSpec datatypes.JSON
 	ExecutorName string

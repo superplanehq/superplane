@@ -4910,6 +4910,9 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneValueDefinition"
           }
+        },
+        "dryRun": {
+          "type": "boolean"
         }
       }
     },
