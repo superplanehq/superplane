@@ -50,41 +50,39 @@ export function NodeActionButtons({
     return (
       <>
         <div
-          className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-lg rounded-lg px-1 py-[2px] border border-gray-200 dark:border-zinc-700 z-50"
+          className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex bg-white dark:bg-zinc-800 shadow-lg rounded-lg border border-gray-200 dark:border-zinc-700 z-50"
           onClick={(e) => e.stopPropagation()}
         >
           <Tippy content="View code" placement="top" theme="dark" arrow>
             <button
               onClick={handleCodeClick}
-              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-l-md transition-colors"
             >
               <MaterialSymbol name="code" size="lg" />
             </button>
           </Tippy>
 
-          <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600 self-center" />
+          <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />
 
           <Tippy content="Save" placement="top" theme="dark" arrow>
             <button
               onClick={() => onSave()}
-              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
             >
               <MaterialSymbol name="check" size="lg" />
             </button>
           </Tippy>
 
-          <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600 self-center" />
+          <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />
 
           <Tippy content="Cancel" placement="top" theme="dark" arrow>
             <button
               onClick={isNewNode ? onDiscard : onCancel}
-              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-r-md transition-colors"
             >
               <MaterialSymbol name="close" size="lg" />
             </button>
           </Tippy>
-
-
         </div>
 
         {isCodeEditorOpen && entityData && (
@@ -102,53 +100,57 @@ export function NodeActionButtons({
 
   return (
     <div
-      className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-lg rounded-lg px-1 py-[2px] border border-gray-200 dark:border-zinc-700 z-50"
+      className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex bg-white dark:bg-zinc-800 shadow-lg rounded-lg border border-gray-200 dark:border-zinc-700 z-50"
       onClick={(e) => e.stopPropagation()}
     >
       {onSelect && (
-        <>
-          <Tippy content="Open sidebar" placement="top" theme="dark" arrow>
-            <button
-              onClick={onSelect}
-              className="flex font-semibold items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-            >
-              <MaterialSymbol name="side_navigation" size="lg" />
-            </button>
-          </Tippy>
-          <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600 self-center" />
-        </>
+        <Tippy content="Open sidebar" placement="top" theme="dark" arrow>
+          <button
+            onClick={onSelect}
+            className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 bg-blue-100 dark:bg-blue-900/20 hover:bg-blue-200 dark:hover:bg-blue-900/40 rounded-l-md transition-colors border border-blue-500"
+          >
+            <MaterialSymbol name="checklist_rtl" size="lg" />
+          </button>
+        </Tippy>
       )}
 
       {onSend && (
         <>
+          {onSelect && <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />}
           <Tippy content="Manually emit an event" placement="top" theme="dark" arrow>
             <button
               onClick={onSend}
-              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              className={`flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${
+                !onSelect ? 'rounded-l-md' : ''
+              }`}
             >
               <MaterialSymbol name="send" size="lg" />
             </button>
           </Tippy>
-          <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600 self-center" />
         </>
       )}
 
-      <Tippy content="Edit" placement="top" theme="dark" arrow>
-        <button
-          onClick={onEdit}
-          className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
-        >
-          <MaterialSymbol name="edit" size="lg" />
-        </button>
-      </Tippy>
+      <>
+        {(onSelect || onSend) && <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />}
+        <Tippy content="Edit" placement="top" theme="dark" arrow>
+          <button
+            onClick={onEdit}
+            className={`flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${
+              !onSelect && !onSend ? 'rounded-l-md' : ''
+            }`}
+          >
+            <MaterialSymbol name="edit" size="lg" />
+          </button>
+        </Tippy>
+      </>
 
       {onDuplicate && (
         <>
-          <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600 self-center" />
+          <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />
           <Tippy content="Duplicate" placement="top" theme="dark" arrow>
             <button
               onClick={onDuplicate}
-              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+              className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
             >
               <MaterialSymbol name="content_copy" size="lg" />
             </button>
@@ -156,16 +158,17 @@ export function NodeActionButtons({
         </>
       )}
 
-      <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600 self-center" />
-
-      <Tippy content="Delete" placement="top" theme="dark" arrow>
-        <button
-          onClick={onDiscard}
-          className="flex font-semibold items-center justify-center w-8 h-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors focus:outline-none"
-        >
-          <MaterialSymbol name="delete" size="lg" />
-        </button>
-      </Tippy>
+      <>
+        <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />
+        <Tippy content="Delete" placement="top" theme="dark" arrow>
+          <button
+            onClick={onDiscard}
+            className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-r-md transition-colors focus:outline-none"
+          >
+            <MaterialSymbol name="delete" size="lg" />
+          </button>
+        </Tippy>
+      </>
     </div>
   );
 }
