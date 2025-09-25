@@ -14,7 +14,6 @@ import { ActivityTab } from "./tabs/ActivityTab";
 import { ExecutionsTab } from "./tabs/ExecutionsTab";
 import { QueueTab } from "./tabs/QueueTab";
 import { EventsTab } from "./tabs/EventsTab";
-import { SettingsTab } from "./tabs/SettingsTab";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
@@ -90,7 +89,6 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
     { key: 'executions', label: 'Executions' },
     { key: 'queue', label: 'Queue' },
     { key: 'events', label: 'Events' },
-    { key: 'settings', label: 'Settings' },
   ], []);
 
 
@@ -185,8 +183,6 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
           organizationId={organizationId!}
         />;
 
-      case 'settings':
-        return <SettingsTab selectedStage={selectedStage} />;
 
       default:
         return null;
