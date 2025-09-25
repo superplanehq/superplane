@@ -11,7 +11,6 @@ interface NodeActionButtonsProps {
   onEdit?: () => void; // For non-edit mode
   onDuplicate?: () => void; // For duplicating the node
   onSend?: () => void; // For manually emitting events
-  onSelect?: () => void; // For opening the sidebar
   entityType?: string; // e.g., "stage", "connection group", "event source"
   entityData?: unknown; // The current entity data for YAML editing
   onYamlApply?: (updatedData: unknown) => void; // Callback when YAML changes are applied
@@ -26,7 +25,6 @@ export function NodeActionButtons({
   onEdit,
   onDuplicate,
   onSend,
-  onSelect,
   entityType = "item",
   entityData,
   onYamlApply,
@@ -103,26 +101,12 @@ export function NodeActionButtons({
       className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex bg-white dark:bg-zinc-800 shadow-lg rounded-lg border border-gray-200 dark:border-zinc-700 z-50"
       onClick={(e) => e.stopPropagation()}
     >
-      {onSelect && (
-        <Tippy content="Open sidebar" placement="top" theme="dark" arrow>
-          <button
-            onClick={onSelect}
-            className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 bg-blue-100 dark:bg-blue-900/20 hover:bg-blue-200 dark:hover:bg-blue-900/40 rounded-l-md transition-colors border border-blue-500"
-          >
-            <MaterialSymbol name="checklist_rtl" size="lg" />
-          </button>
-        </Tippy>
-      )}
-
       {onSend && (
         <>
-          {onSelect && <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />}
           <Tippy content="Manually emit an event" placement="top" theme="dark" arrow>
             <button
               onClick={onSend}
-              className={`flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${
-                !onSelect ? 'rounded-l-md' : ''
-              }`}
+              className={`flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors rounded-l-md`}
             >
               <MaterialSymbol name="send" size="lg" />
             </button>
@@ -130,19 +114,18 @@ export function NodeActionButtons({
         </>
       )}
 
-      <>
-        {(onSelect || onSend) && <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />}
-        <Tippy content="Edit" placement="top" theme="dark" arrow>
-          <button
-            onClick={onEdit}
-            className={`flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${
-              !onSelect && !onSend ? 'rounded-l-md' : ''
-            }`}
-          >
-            <MaterialSymbol name="edit" size="lg" />
-          </button>
-        </Tippy>
-      </>
+      {onSend && <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />}
+
+      <Tippy content="Edit" placement="top" theme="dark" arrow>
+        <button
+          onClick={onEdit}
+          className={`flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${
+            !onSend ? 'rounded-l-md' : ''
+          }`}
+        >
+          <MaterialSymbol name="edit" size="lg" />
+        </button>
+      </Tippy>
 
       {onDuplicate && (
         <>
@@ -158,17 +141,15 @@ export function NodeActionButtons({
         </>
       )}
 
-      <>
-        <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />
-        <Tippy content="Delete" placement="top" theme="dark" arrow>
-          <button
-            onClick={onDiscard}
-            className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-r-md transition-colors focus:outline-none"
-          >
-            <MaterialSymbol name="delete" size="lg" />
-          </button>
-        </Tippy>
-      </>
+      <div className="w-px h-8 bg-gray-300 dark:bg-zinc-600" />
+      <Tippy content="Delete" placement="top" theme="dark" arrow>
+        <button
+          onClick={onDiscard}
+          className="flex font-semibold items-center justify-center w-8 h-8 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-r-md transition-colors focus:outline-none"
+        >
+          <MaterialSymbol name="delete" size="lg" />
+        </button>
+      </Tippy>
     </div>
   );
 }

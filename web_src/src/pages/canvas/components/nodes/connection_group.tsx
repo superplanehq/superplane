@@ -15,14 +15,15 @@ import { createConnectionGroupDuplicate, focusAndEditNode } from '../../utils/no
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
-  const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
+    const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
+  const [isHovered, setIsHovered] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; connections: SuperplaneConnection[]; groupByFields: GroupByField[]; timeout?: number; timeoutBehavior?: SpecTimeoutBehavior; isValid: boolean } | null>(null);
   const [connectionGroupName, setConnectionGroupName] = useState(props.data.name || '');
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId } = useCanvasStore();
+  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId, selectConnectionGroupId } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
@@ -257,11 +258,21 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   }, [props.selected, focusedNodeId, props.id, isPartiallyBroken])
 
   return (
-    <div
-      className={twMerge(`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 relative`, borderColor)}
-      style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+        <div
+      className="relative pt-14"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {(focusedNodeId === props.id || isEditMode) && (
+            <div
+        className={twMerge(`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 relative`, borderColor)}
+        style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+        onClick={() => {
+          if (!isEditMode && currentConnectionGroup?.metadata?.id) {
+            selectConnectionGroupId(props.id);
+          }
+        }}
+      >
+      {(isHovered || isEditMode) && (
         <NodeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveConnectionGroup}
@@ -441,7 +452,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
         onConfirm={handleDiscardConnectionGroup}
         onCancel={() => setShowDiscardConfirm(false)}
       />
-
+      </div>
     </div>
   );
 }

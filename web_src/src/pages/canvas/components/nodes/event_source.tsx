@@ -44,7 +44,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   );
   const eventSourceId = currentEventSource?.metadata?.id;
   const isNewNode = props.id && /^\d+$/.test(props.id);
-  const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
+    const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
+  const [isHovered, setIsHovered] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; spec: SuperplaneEventSourceSpec } | null>({
     name: props.data.name || '',
@@ -372,11 +373,21 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
 
   return (
-    <div
-      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
-      style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+        <div
+      className="relative pt-14"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {(focusedNodeId === props.id || isEditMode) && (
+            <div
+        className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${getBorderClass()} relative cursor-pointer`}
+        style={{ width: '340px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+        onClick={() => {
+          if (!isEditMode && eventSourceId && !props.id.match(/^\d+$/)) {
+            selectEventSourceId(eventSourceId);
+          }
+        }}
+      >
+      {(isHovered || isEditMode) && (
         <NodeActionButtons
           isNewNode={!!isNewNode}
           onSave={handleSaveEventSource}
@@ -385,7 +396,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onEdit={handleEditClick}
           onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
           onSend={eventSourceId ? () => setShowEmitEventModal(true) : undefined}
-          onSelect={eventSourceId && !props.id.match(/^\d+$/) ? () => selectEventSourceId(eventSourceId) : undefined}
           isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
@@ -616,6 +626,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }}
         />
       )}
+      </div>
     </div>
   );
 }
