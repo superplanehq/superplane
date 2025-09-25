@@ -516,9 +516,33 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           ...stage,
           spec: {
             ...stage.spec,
-            connections: updatedConnections
+            connections: updatedConnections,
+            inputMappings: stage.spec.inputMappings?.map(mapping => 
+              mapping.when?.triggeredBy?.connection === oldName ? {
+                ...mapping,
+                when: {
+                  ...mapping.when,
+                  triggeredBy: {
+                    ...mapping.when.triggeredBy,
+                    connection: newName
+                  },
+                },
+                values: mapping.values?.map(value => 
+                  value.valueFrom?.eventData?.connection === oldName ? {
+                    ...value,
+                    valueFrom: {
+                      ...value.valueFrom,
+                      eventData: {
+                        ...value.valueFrom.eventData,
+                        connection: newName
+                      }
+                    }
+                  } : value
+                )}
+               : mapping
+            )
           }
-        };
+        } as Stage;
       });
 
       const updatedConnectionGroups = state.connectionGroups.map(cg => {
