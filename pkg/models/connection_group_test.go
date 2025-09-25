@@ -422,7 +422,7 @@ func Test__UpdateConnectionSourceNameInTransaction(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
-	org, err := CreateOrganization(uuid.New().String(), "test", "")
+	org, err := CreateOrganization(uuid.New().String(), "test")
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
@@ -475,7 +475,7 @@ func Test__ConnectionGroup__Update__UpdatesConnectionSourceNames(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
-	org, err := CreateOrganization(uuid.New().String(), "test", "")
+	org, err := CreateOrganization(uuid.New().String(), "test")
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
