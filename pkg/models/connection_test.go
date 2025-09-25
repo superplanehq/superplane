@@ -112,7 +112,7 @@ func Test__UpdateReferencesAfterNameUpdateInTransaction_WithInputMappings(t *tes
 	assert.Equal(t, "source-1", retrievedStage.InputMappings[0].Values[1].ValueFrom.EventData.Connection)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return UpdateReferencesAfterNameUpdateInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name", nil)
+		return UpdateReferencesAfterNameUpdateInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name")
 	})
 	require.NoError(t, err)
 
@@ -176,7 +176,7 @@ func Test__UpdateReferencesAfterNameUpdateInTransaction(t *testing.T) {
 	assert.Equal(t, "source-1", connections[0].SourceName)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return UpdateReferencesAfterNameUpdateInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name", nil)
+		return UpdateReferencesAfterNameUpdateInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name")
 	})
 	require.NoError(t, err)
 

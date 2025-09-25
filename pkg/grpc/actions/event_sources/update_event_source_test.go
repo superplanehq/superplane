@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -135,23 +135,27 @@ func Test__UpdateEventSource(t *testing.T) {
 	})
 
 	t.Run("connection source names are updated when event source name changes", func(t *testing.T) {
-		connectedStage, err := stages.CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.Stage{
-			Metadata: &protos.Stage_Metadata{
-				Name: "connected-stage",
-			},
-			Spec: &protos.Stage_Spec{
-				Executor: support.ProtoExecutor(t, r),
-				Connections: []*protos.Connection{
-					{
-						Name: "standalone-event-source",
-						Type: protos.Connection_TYPE_EVENT_SOURCE,
-					},
+		executorType, executorSpec, resource := support.Executor(t, r)
+
+		connectedStage, err := builders.NewStageBuilder(r.Registry).
+			WithContext(ctx).
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas.ID).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			WithConnections([]models.Connection{
+				{
+					SourceName: "standalone-event-source",
+					SourceType: models.SourceTypeEventSource,
+					SourceID:   uuid.MustParse(eventSource.EventSource.Metadata.Id),
 				},
-			},
-		})
+			}).
+			Create()
 
 		require.NoError(t, err)
-		connectedStageUUID, err := uuid.Parse(connectedStage.Stage.Metadata.GetId())
+		connectedStageUUID, err := uuid.Parse(connectedStage.ID.String())
 		require.NoError(t, err)
 		dbConnections, err := models.ListConnections(connectedStageUUID, models.ConnectionTargetTypeStage)
 		require.NoError(t, err)

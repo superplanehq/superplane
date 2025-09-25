@@ -89,12 +89,7 @@ func ListConnectionsInTransaction(tx *gorm.DB, targetID uuid.UUID, targetType st
 	return connections, nil
 }
 
-type StageNotifier interface {
-	NotifyStageUpdated(stage *Stage)
-}
-
-func UpdateReferencesAfterNameUpdateInTransaction(tx *gorm.DB, canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, oldName string, newName string, notifier StageNotifier) error {
-	// Update connection source names
+func UpdateReferencesAfterNameUpdateInTransaction(tx *gorm.DB, canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, oldName string, newName string) error {
 	if err := tx.
 		Model(&Connection{}).
 		Where("source_id = ?", sourceID).
@@ -123,10 +118,6 @@ func UpdateReferencesAfterNameUpdateInTransaction(tx *gorm.DB, canvasID uuid.UUI
 			return err
 		}
 
-		if notifier != nil {
-			log.Infof("Stage updated due to stage name change: %s", stage.ID)
-			notifier.NotifyStageUpdated(&stage)
-		}
 	}
 
 	return nil
