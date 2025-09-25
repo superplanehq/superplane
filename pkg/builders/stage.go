@@ -211,6 +211,19 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 }
 
 func (b *StageBuilder) validateExecutorSpec() error {
+	//
+	// If the stage is being created in dry run mode,
+	// we use the no-op executor.
+	//
+	if b.newStage.DryRun {
+		executor, err := b.registry.NewExecutor(models.ExecutorTypeNoOp)
+		if err != nil {
+			return err
+		}
+
+		return executor.Validate(b.ctx, b.executorSpec)
+	}
+
 	if b.executorSpec == nil {
 		return fmt.Errorf("missing executor spec")
 	}
@@ -332,4 +345,3 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 
 	return b.existingStage, nil
 }
-

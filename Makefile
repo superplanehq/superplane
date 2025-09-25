@@ -58,6 +58,12 @@ dev.start:
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash
 
+check.build.ui:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run build"
+
+check.build.app:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app go build cmd/server/main.go
+
 #
 # Database target helpers
 #
@@ -116,6 +122,7 @@ openapi.client.gen:
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+
 #
 # Image and CLI build
 #

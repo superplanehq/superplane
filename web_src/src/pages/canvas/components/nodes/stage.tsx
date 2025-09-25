@@ -147,6 +147,11 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       return true;
     }
 
+    // Skip integration validation when DryRun mode is enabled
+    if (currentFormData.dryRun) {
+      return true;
+    }
+
     const executorType = currentFormData.executor.type || '';
     const requireIntegration = ['semaphore', 'github'].includes(executorType);
 
@@ -686,29 +691,35 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           <>
 
             {(executorBadges.length > 0 || props.data.dryRun) && (
-              <div className="flex items-center w-full gap-2 px-4 font-semibold min-w-0 overflow-hidden">
+              <div className="flex flex-col w-full gap-2 px-4 font-semibold min-w-0 overflow-hidden">
                 {props.data.dryRun && (
-                  <Badge
-                    color="yellow"
-                    icon="bug_report"
-                    className="flex-shrink-0"
-                    title="This stage is in dry run mode and will use the no-op executor"
-                  >
-                    Dry Run
-                  </Badge>
+                  <div className="flex items-center">
+                    <Badge
+                      color="yellow"
+                      icon="science"
+                      className="flex-shrink-0"
+                      title="This stage is in dry run mode and will use the no-op executor"
+                    >
+                      Dry Run Mode
+                    </Badge>
+                  </div>
                 )}
-                {executorBadges.map((badge, index) => (
-                  <Badge
-                    key={`${badge.icon}-${index}`}
-                    color="zinc"
-                    icon={badge.icon}
-                    truncate
-                    className="flex-shrink min-w-0 max-w-full"
-                    title={badge.text}
-                  >
-                    {badge.text}
-                  </Badge>
-                ))}
+                {executorBadges.length > 0 && !props.data.dryRun && (
+                  <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                    {executorBadges.map((badge, index) => (
+                      <Badge
+                        key={`${badge.icon}-${index}`}
+                        color="zinc"
+                        icon={badge.icon}
+                        truncate
+                        className="flex-shrink min-w-0 max-w-full"
+                        title={badge.text}
+                      >
+                        {badge.text}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             {/* Last Run Section */}

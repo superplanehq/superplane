@@ -33,6 +33,7 @@ import { WorkflowTooltip } from '@/components/Tooltip/workflow-tooltip';
 import { PipelineFileTooltip } from '@/components/Tooltip/pipeline-file-tooltip';
 import { StaticValueTooltip } from '@/components/Tooltip/static-value-tooltip';
 import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
+import { DryRunTooltip } from '@/components/Tooltip/dry-run-tooltip';
 import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
 import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
@@ -665,7 +666,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
     setOpenSections(sectionsToOpen);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setOpenSections, isNewStage, executor.resource?.type, executor.type]);
+  }, [setOpenSections, isNewStage, executor.type]);
 
   // Connection management
   const connectionManager = useConnectionManager({
@@ -1207,9 +1208,28 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   return (
     <NodeContentWrapper nodeId={currentStageId}>
-      <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && 'pb-1')}>
-        {/* Show zero state if executor type requires integrations but none are available */}
-        {requireIntegration && !hasRequiredIntegrations && (
+      <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && !dryRun && 'pb-1')}>
+        {/* DryRun Toggle - always visible */}
+        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MaterialSymbol name="science" size="sm" className="text-amber-600 dark:text-amber-400" />
+              <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Dry Run Mode
+              </span>
+              <DryRunTooltip className="flex items-center" />
+            </div>
+            <Switch
+              checked={dryRun}
+              onChange={setDryRun}
+              color="indigo"
+              aria-label="Toggle dry run mode"
+            />
+          </div>
+        </div>
+
+        {/* Show zero state if executor type requires integrations but none are available, except in dry-run mode */}
+        {requireIntegration && !hasRequiredIntegrations && !dryRun && (
           <IntegrationZeroState
             integrationType={executor?.type || ''}
             label={getZeroStateLabel()}
@@ -1219,28 +1239,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
           />
         )}
 
-        {/* Form sections - only show if integrations are available or not required */}
-        {hasRequiredIntegrations && (
+        {/* Form sections - only show if integrations are available or not required, or in dry-run mode */}
+        {(hasRequiredIntegrations || dryRun) && (
           <>
-            {/* DryRun Toggle */}
-            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={dryRun}
-                  onChange={setDryRun}
-                  color="indigo"
-                  aria-label="Toggle dry run mode"
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                    Dry Run Mode
-                  </span>
-                  <span className="text-xs text-amber-700 dark:text-amber-300">
-                    When enabled, this stage will use the no-op executor regardless of the configured executor type
-                  </span>
-                </div>
-              </div>
-            </div>
 
             {/* Connections Section */}
             <EditableAccordionSection
@@ -2020,7 +2021,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
               }
             >
               <div className="space-y-4">
-                {executor.type === 'semaphore' && (
+                {!dryRun && executor.type === 'semaphore' && (
                   <div className="space-y-4">
                     <ValidationField
                       label="Integration"
@@ -2209,7 +2210,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   </div>
                 )}
 
-                {executor.type === 'github' && (
+                {!dryRun && executor.type === 'github' && (
                   <div className="space-y-4">
                     <ValidationField
                       label="Integration"
@@ -2356,7 +2357,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   </div>
                 )}
 
-                {executor.type === 'http' && (
+                {!dryRun && executor.type === 'http' && (
                   <div className="space-y-4">
                     <ValidationField
                       label="URL"

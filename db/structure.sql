@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict lHJ61G4ftfbh3EA5dafSXJwuRvHTiqcWaaro4kb4xd9RxQeicVEVP4TE45hpoTm
+\restrict EV5goSciBdjgTQ0NVIK8eFuD3fJHcjQoVtAmbcQOYWHg250GEJbG4mWiDRhrddV
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -841,13 +841,6 @@ CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at)
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1173,13 +1166,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lHJ61G4ftfbh3EA5dafSXJwuRvHTiqcWaaro4kb4xd9RxQeicVEVP4TE45hpoTm
+\unrestrict EV5goSciBdjgTQ0NVIK8eFuD3fJHcjQoVtAmbcQOYWHg250GEJbG4mWiDRhrddV
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 6OoNbqj3NIdIHyYYCFD1gwjErlrGV2TLZR6ha53bwY9WCdQsupgT7KKBMHiJr4c
+\restrict Zsp65to2xzq89ruTlQ9OYgicZnbAdb8UxXGXMLhZnMg5o8MWLNhdVxRi6vMKsvX
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1209,5 +1202,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6OoNbqj3NIdIHyYYCFD1gwjErlrGV2TLZR6ha53bwY9WCdQsupgT7KKBMHiJr4c
+\unrestrict Zsp65to2xzq89ruTlQ9OYgicZnbAdb8UxXGXMLhZnMg5o8MWLNhdVxRi6vMKsvX
 
