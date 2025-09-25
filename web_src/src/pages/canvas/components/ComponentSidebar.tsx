@@ -358,7 +358,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                 <h3 className="text-sm font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
                   {category}
                 </h3>
-                                <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+                <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
                   {categoryDescriptions[category]}
                 </div>
                 <div className="space-y-1">

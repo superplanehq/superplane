@@ -35,7 +35,7 @@ const StageImageMap = {
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const { organizationId } = useParams<{ organizationId: string }>();
   const isNewNode = Boolean(props.data.isDraft) || !!(props.id && /^\d+$/.test(props.id));
-    const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
+  const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [isHovered, setIsHovered] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; dryRun: boolean; isValid: boolean } | null>(null);
@@ -564,12 +564,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   }, [props.selected, focusedNodeId, props.id, isPartiallyBroken])
 
   return (
-        <div
+    <div
       className="relative pt-14"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-                  <div
+      <div
         className={twMerge(`bg-transparent rounded-xl border-2 relative `, borderColor)}
         onClick={() => {
           if (!isEditMode && currentStage?.metadata?.id) {
