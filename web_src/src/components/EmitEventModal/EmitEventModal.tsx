@@ -96,7 +96,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
           url: "https://github.com/superplanehq/superplane/commit/7fcca06c1b2b2c482df382248610d46cfd789837",
           author: {
             name: "Lucas Pinheiro",
-            email: "lpinheiro@semaphore.io",
+            email: "lucas@superplane.com",
             username: "lucaspin"
           },
           committer: {
@@ -141,7 +141,7 @@ const EVENT_TEMPLATES: EventTemplate[] = [
         url: "https://github.com/superplanehq/superplane/commit/7fcca06c1b2b2c482df382248610d46cfd789837",
         author: {
           name: "Lucas Pinheiro",
-          email: "lpinheiro@semaphore.io",
+          email: "lucas@superplane.com",
           username: "lucaspin"
         },
         committer: {
@@ -187,31 +187,30 @@ const EVENT_TEMPLATES: EventTemplate[] = [
     getEventData: () => ({
       version: "1.0.0",
       organization: {
-        name: "test",
+        name: "superplanehq",
         id: crypto.randomUUID()
       },
       project: {
-        name: "test",
+        name: "superplane",
         id: crypto.randomUUID()
       },
       repository: {
-        url: "https://github.com/test/test",
-        slug: "test/test"
+        url: "https://github.com/superplanehq/superplane",
+        slug: "superplanehq/superplane"
       },
       revision: {
         sender: {
-          login: "testuser",
-          email: "1234567890+testuser@users.noreply.github.com",
-          avatar_url: "https://avatars2.githubusercontent.com/u/1234567890?v=4"
+          login: "lucaspin",
+          email: "lucas@superplane.com",
         },
         reference_type: "branch",
-        reference: "refs/heads/my-branch",
+        reference: "refs/heads/main",
         pull_request: null,
-        commit_sha: "2d9f5fcec1ca7c68fa7bd44dd58ec4ff65814563",
-        commit_message: "empty",
+        commit_sha: "7fcca06c1b2b2c482df382248610d46cfd789837",
+        commit_message: "refactor(ui): display only last processed event in event source node (#315)",
         branch: {
-          name: "my-branch",
-          commit_range: "36ebdf6e906cf3491391442d2f779b512ca49485...2d9f5fcec1ca7c68fa7bd44dd58ec4ff65814563"
+          name: "main",
+          commit_range: "2364960799e343f8cb594a81b1f34e7219f8254a...7fcca06c1b2b2c482df382248610d46cfd789837"
         }
       },
       workflow: {
@@ -225,8 +224,8 @@ const EVENT_TEMPLATES: EventTemplate[] = [
         stopping_at: new Date().toISOString(),
         state: "done",
         running_at: new Date().toISOString(),
-        result_reason: "user",
-        result: "stopped",
+        result_reason: "",
+        result: "passed",
         queuing_at: new Date().toISOString(),
         pending_at: new Date().toISOString(),
         name: "Pipeline",
@@ -238,20 +237,20 @@ const EVENT_TEMPLATES: EventTemplate[] = [
       blocks: [
         {
           state: "done",
-          result_reason: "user",
-          result: "stopped",
+          result_reason: "",
+          result: "passed",
           name: "List & Test & Build",
           jobs: [
             {
               status: "finished",
-              result: "stopped",
+              result: "passed",
               name: "Test",
               index: 1,
               id: crypto.randomUUID()
             },
             {
               status: "finished",
-              result: "stopped",
+              result: "passed",
               name: "Build",
               index: 2,
               id: crypto.randomUUID()
@@ -468,8 +467,8 @@ export function EmitEventModal({ isOpen, onClose, sourceName, nodeType, loadLast
                 />
                 <div className="text-sm text-gray-900 dark:text-zinc-100">
                   {hasLastEvent
-                    ? `Last event loaded. Modify it as needed before emitting a new event for "${sourceName}"`
-                    : `No events emitted yet. Choose a template to emit your first event for "${sourceName}"`
+                    ? <>{`Last event loaded. Modify it as needed before emitting a new event for ${nodeType === 'event_source' ? 'event source' : 'stage'} `}<span className="font-mono bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">{sourceName}</span></>
+                    : <>{`No events emitted yet. Choose a template to emit your first event for ${nodeType === 'event_source' ? 'event source' : 'stage'} `}<span className="font-mono bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">{sourceName}</span></>
                   }
                 </div>
               </div>
