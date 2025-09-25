@@ -272,7 +272,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		//
 		if b.existingStage.Name != b.newStage.Name {
 			notifier := NewMessageStageNotifier()
-			err := models.UpdateConnectionSourceNameInTransaction(tx, b.existingStage.CanvasID, b.existingStage.ID, models.SourceTypeStage, b.existingStage.Name, b.newStage.Name, notifier)
+			err := models.UpdateReferencesAfterNameUpdateInTransaction(tx, b.existingStage.CanvasID, b.existingStage.ID, models.SourceTypeStage, b.existingStage.Name, b.newStage.Name, notifier)
 			if err != nil {
 				return fmt.Errorf("failed to update connection source names: %v", err)
 			}

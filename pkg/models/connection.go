@@ -93,7 +93,7 @@ type StageNotifier interface {
 	NotifyStageUpdated(stage *Stage)
 }
 
-func UpdateConnectionSourceNameInTransaction(tx *gorm.DB, canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, oldName string, newName string, notifier StageNotifier) error {
+func UpdateReferencesAfterNameUpdateInTransaction(tx *gorm.DB, canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, oldName string, newName string, notifier StageNotifier) error {
 	// Update connection source names
 	if err := tx.
 		Model(&Connection{}).

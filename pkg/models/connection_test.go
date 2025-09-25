@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func Test__UpdateConnectionSourceNameInTransaction_WithInputMappings(t *testing.T) {
+func Test__UpdateReferencesAfterNameUpdateInTransaction_WithInputMappings(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
@@ -51,18 +51,18 @@ func Test__UpdateConnectionSourceNameInTransaction_WithInputMappings(t *testing.
 
 	now := time.Now()
 	stage := &Stage{
-		CanvasID:      canvas.ID,
-		Name:          "test-stage",
-		Description:   "test stage",
-		CreatedAt:     &now,
-		UpdatedAt:     &now,
-		CreatedBy:     user,
-		UpdatedBy:     user,
-		ExecutorType:  ExecutorTypeHTTP,
-		ExecutorSpec:  datatypes.JSON(`{}`),
-		ExecutorName:  "test-executor",
-		Conditions:    datatypes.NewJSONSlice([]StageCondition{}),
-		Inputs:        datatypes.NewJSONSlice([]InputDefinition{}),
+		CanvasID:     canvas.ID,
+		Name:         "test-stage",
+		Description:  "test stage",
+		CreatedAt:    &now,
+		UpdatedAt:    &now,
+		CreatedBy:    user,
+		UpdatedBy:    user,
+		ExecutorType: ExecutorTypeHTTP,
+		ExecutorSpec: datatypes.JSON(`{}`),
+		ExecutorName: "test-executor",
+		Conditions:   datatypes.NewJSONSlice([]StageCondition{}),
+		Inputs:       datatypes.NewJSONSlice([]InputDefinition{}),
 		InputMappings: datatypes.NewJSONSlice([]InputMapping{
 			{
 				When: &InputMappingWhen{
@@ -112,7 +112,7 @@ func Test__UpdateConnectionSourceNameInTransaction_WithInputMappings(t *testing.
 	assert.Equal(t, "source-1", retrievedStage.InputMappings[0].Values[1].ValueFrom.EventData.Connection)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return UpdateConnectionSourceNameInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name", nil)
+		return UpdateReferencesAfterNameUpdateInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name", nil)
 	})
 	require.NoError(t, err)
 
@@ -133,7 +133,7 @@ func Test__UpdateConnectionSourceNameInTransaction_WithInputMappings(t *testing.
 	assert.Equal(t, "updated-source-name", connections[0].SourceName)
 }
 
-func Test__UpdateConnectionSourceNameInTransaction(t *testing.T) {
+func Test__UpdateReferencesAfterNameUpdateInTransaction(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
@@ -176,7 +176,7 @@ func Test__UpdateConnectionSourceNameInTransaction(t *testing.T) {
 	assert.Equal(t, "source-1", connections[0].SourceName)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		return UpdateConnectionSourceNameInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name", nil)
+		return UpdateReferencesAfterNameUpdateInTransaction(tx, source.CanvasID, source.ID, SourceTypeEventSource, "source-1", "updated-source-name", nil)
 	})
 	require.NoError(t, err)
 
