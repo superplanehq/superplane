@@ -63,8 +63,12 @@ func (r *Resource) FindEventSourceInTransaction(tx *gorm.DB) (*EventSource, erro
 }
 
 func (r *Resource) FindChildren() ([]Resource, error) {
+	return r.FindChildrenInTransaction(database.Conn())
+}
+
+func (r *Resource) FindChildrenInTransaction(tx *gorm.DB) ([]Resource, error) {
 	var resources []Resource
-	err := database.Conn().
+	err := tx.
 		Where("parent_id = ?", r.ID).
 		Find(&resources).
 		Error
@@ -117,10 +121,14 @@ func FindResourceInTransaction(tx *gorm.DB, integrationID uuid.UUID, resourceTyp
 }
 
 func CountExternalEventSourcesUsingResource(resourceID uuid.UUID) (int64, error) {
+	return CountExternalEventSourcesUsingResourceInTransaction(database.Conn(), resourceID)
+}
+
+func CountExternalEventSourcesUsingResourceInTransaction(tx *gorm.DB, resourceID uuid.UUID) (int64, error) {
 	var count int64
 
 	// Count external event sources using this resource directly OR using any child of this resource
-	err := database.Conn().
+	err := tx.
 		Model(&EventSource{}).
 		Where("resource_id = ? AND scope = ?", resourceID, EventSourceScopeExternal).
 		Count(&count).
@@ -132,9 +140,13 @@ func CountExternalEventSourcesUsingResource(resourceID uuid.UUID) (int64, error)
 // Count other stages using the same resource (excluding current stage)
 // This indicates how many other internal event sources exist for this resource
 func CountOtherStagesUsingResource(resourceID uuid.UUID, currentStageID uuid.UUID) (int64, error) {
+	return CountOtherStagesUsingResourceInTransaction(database.Conn(), resourceID, currentStageID)
+}
+
+func CountOtherStagesUsingResourceInTransaction(tx *gorm.DB, resourceID uuid.UUID, currentStageID uuid.UUID) (int64, error) {
 	var count int64
 
-	query := database.Conn().
+	query := tx.
 		Model(&Stage{}).
 		Where("resource_id = ?", resourceID)
 

@@ -131,9 +131,13 @@ func FindIntegrationByName(domainType string, domainID uuid.UUID, name string) (
 }
 
 func FindIntegrationByID(id uuid.UUID) (*Integration, error) {
+	return FindIntegrationByIDInTransaction(database.Conn(), id)
+}
+
+func FindIntegrationByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*Integration, error) {
 	integration := Integration{}
 
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", id).
 		First(&integration).
 		Error
