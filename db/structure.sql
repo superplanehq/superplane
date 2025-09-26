@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict fNOMEDXyv0vreKGCpdmhaOQNiyEgETKJhkH2ud5zo1pUXEo68YSEzmHSkEdcPpc
+\restrict zTHPJSkWZd3VJdn1YpJXAf21mXk1gh1NWH7cWJ03BFMo1W3AiQrmgDIHcsKwzZ6
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -224,7 +224,8 @@ CREATE TABLE public.event_sources (
     deleted_at timestamp with time zone,
     schedule jsonb,
     last_triggered_at timestamp without time zone,
-    next_trigger_at timestamp without time zone
+    next_trigger_at timestamp without time zone,
+    type character varying(64) DEFAULT 'webhook'::character varying NOT NULL
 );
 
 
@@ -1194,16 +1195,16 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fNOMEDXyv0vreKGCpdmhaOQNiyEgETKJhkH2ud5zo1pUXEo68YSEzmHSkEdcPpc
+\unrestrict zTHPJSkWZd3VJdn1YpJXAf21mXk1gh1NWH7cWJ03BFMo1W3AiQrmgDIHcsKwzZ6
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict aLQboVDx6NFWbknRE3UzK71Ut8xHrIKoI7GVihTCSm93hSObZGLTEUlxe4iKaym
+\restrict L9a8LDFZVfWvzo3Q8z1XqJeUT4zJjSOGFYQwZoGaaIdFEav3DpgyN3sKfcLfUPE
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1222,7 +1223,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250925010754	f
+20250926133107	f
 \.
 
 
@@ -1230,5 +1231,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aLQboVDx6NFWbknRE3UzK71Ut8xHrIKoI7GVihTCSm93hSObZGLTEUlxe4iKaym
+\unrestrict L9a8LDFZVfWvzo3Q8z1XqJeUT4zJjSOGFYQwZoGaaIdFEav3DpgyN3sKfcLfUPE
 

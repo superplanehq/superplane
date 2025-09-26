@@ -792,8 +792,8 @@ curl -X POST \\
           </EditableAccordionSection>
         )}
 
-        {/* Event Types and Filters Section - Not for scheduled event sources */}
-        {eventSourceConfig.type !== 'TYPE_SCHEDULED' && (!requireIntegration || availableIntegrations.length > 0) && <EditableAccordionSection
+        {/* Event Types and Filters Section - Only for webhook and integration-resource event sources */}
+        {(eventSourceConfig.type === 'TYPE_WEBHOOK' || eventSourceConfig.type === 'TYPE_INTEGRATION_RESOURCE') && <EditableAccordionSection
           id="filters"
           title="Filters"
           isOpen={openSections.includes('filters')}

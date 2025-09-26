@@ -4,7 +4,7 @@ import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource } from '@/hooks/useCanvasData';
-import { SuperplaneEventSource, SuperplaneEventSourceSpec, superplaneCreateEvent } from '@/api-client';
+import { SuperplaneEventSource, SuperplaneEventSourceSpec, SuperplaneEventSourceType, superplaneCreateEvent } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { EventSourceConfig } from '../ComponentSidebar';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -347,7 +347,37 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
   }, [canvasIntegrations, props.data.integration?.name]);
 
-  const eventSourceConfig = props.data.eventSourceConfig || { type: 'TYPE_WEBHOOK' };
+  const eventSourceConfig = useMemo(() => {
+    // If we have explicit eventSourceConfig, use it
+    if (props.data.eventSourceConfig) {
+      return props.data.eventSourceConfig;
+    }
+
+    // Use spec.type from existing event sources
+    if (currentEventSource?.spec?.type) {
+      const specType = currentEventSource.spec.type;
+
+      if (specType === 'TYPE_INTEGRATION_RESOURCE') {
+        const integrationType = integration?.spec?.type;
+        return {
+          type: 'TYPE_INTEGRATION_RESOURCE' as SuperplaneEventSourceType,
+          integrationType: integrationType,
+          integrationLabel: integrationType === 'github' ? 'GitHub accounts' :
+                            integrationType === 'semaphore' ? 'Semaphore organizations' :
+                            'integrations',
+          resourceLabel: integrationType === 'github' ? 'Repository' :
+                         integrationType === 'semaphore' ? 'Project' :
+                         'Resource'
+        };
+      }
+
+      // For TYPE_SCHEDULED, TYPE_MANUAL, TYPE_WEBHOOK, just pass through the type
+      return { type: specType as SuperplaneEventSourceType };
+    }
+
+    // Default to webhook
+    return { type: 'TYPE_WEBHOOK' as SuperplaneEventSourceType };
+  }, [props.data.eventSourceConfig, currentEventSource?.spec?.type, integration]);
 
   // Auto-enter edit mode for webhook with key
   useEffect(() => {
@@ -527,8 +557,11 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 <div className="flex items-center gap-2 text-xs">
                   <MaterialSymbol name="touch_app" size="sm" className="text-blue-600 dark:text-blue-400" />
                   <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
-                    Manual trigger - events are created on demand
+                    Manual trigger
                   </span>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 ml-6 text-left">
+                  Events are created on demand
                 </div>
               </div>
             )}
@@ -563,7 +596,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }}
           canvasId={canvasId}
           organizationId={organizationId!}
-          eventSourceConfig={props.data.eventSourceConfig || { type: 'TYPE_WEBHOOK' }}
+          eventSourceConfig={eventSourceConfig}
           eventSourceKey={eventSourceKey}
           onDataChange={({ spec }) => {
             if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) {
@@ -606,8 +639,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             </div>
           ) : (
-            // Only show EventSourceZeroState for non-scheduled and non-manual event sources
-            eventSourceConfig.type !== 'TYPE_SCHEDULED' && eventSourceConfig.type !== 'TYPE_MANUAL' && (
+            // Only show EventSourceZeroState for webhook and integration-resource event sources
+            (eventSourceConfig.type === 'TYPE_WEBHOOK' || eventSourceConfig.type === 'TYPE_INTEGRATION_RESOURCE') && (
               <EventSourceZeroState
                 eventSourceConfig={eventSourceConfig}
               />
