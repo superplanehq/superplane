@@ -1,4 +1,5 @@
 import { SuperplaneStage, SuperplaneEventSource, SuperplaneConnectionGroup, SuperplaneConnection } from '@/api-client/types.gen';
+import { EventSourceConfig } from '../components/ComponentSidebar';
 
 /**
  * Factory functions to create empty/default nodes for different types
@@ -10,7 +11,7 @@ export interface CreateNodeParams {
   canvasId: string;
   name?: string;
   executorType?: string;
-  eventSourceType?: string;
+  eventSourceConfig?: EventSourceConfig;
   connections?: Array<SuperplaneConnection>;
 }
 

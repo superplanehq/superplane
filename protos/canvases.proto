@@ -436,10 +436,19 @@ message EventSource {
   }
 
   message Spec {
-    Integrations.IntegrationRef integration = 1;
-    Integrations.ResourceRef resource = 2;
-    repeated EventType events = 3;
-    Schedule schedule = 4;
+    Type type = 1;
+    Integrations.IntegrationRef integration = 2;
+    Integrations.ResourceRef resource = 3;
+    repeated EventType events = 4;
+    Schedule schedule = 5;
+  }
+
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    TYPE_MANUAL = 1;
+    TYPE_SCHEDULED = 2;
+    TYPE_WEBHOOK = 3;
+    TYPE_INTEGRATION_RESOURCE = 4;
   }
 
   message Schedule {

@@ -37,7 +37,7 @@ export const useNodeHandlers = (canvasId: string) => {
           const eventSourceWithEvents: EventSourceWithEvents = {
             ...eventSource,
             events: [],
-            eventSourceType: params.eventSourceType,
+            eventSourceConfig: params.eventSourceConfig,
           };
           addEventSource(eventSourceWithEvents);
           return eventSource.metadata?.id || '';

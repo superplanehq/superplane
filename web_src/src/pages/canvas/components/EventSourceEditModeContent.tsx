@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef, EventSourceEventType, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneEventSourceSchedule } from '@/api-client/types.gen';
+import { EventSourceConfig } from './ComponentSidebar';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
 import { useResetEventSourceKey } from '@/hooks/useCanvasData';
@@ -20,7 +21,7 @@ interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
   canvasId: string;
   organizationId: string;
-  eventSourceType?: string;
+  eventSourceConfig: EventSourceConfig;
   eventSourceKey?: string;
   nodeId?: string;
   onDataChange?: (data: {
@@ -37,7 +38,7 @@ export function EventSourceEditModeContent({
   data,
   canvasId,
   organizationId,
-  eventSourceType = 'webhook',
+  eventSourceConfig,
   eventSourceKey,
   nodeId,
   onDataChange,
@@ -92,14 +93,13 @@ export function EventSourceEditModeContent({
 
   // Filter management functions
   const addEventType = useCallback(() => {
-    const defaultType = eventSourceType === 'github' ? 'push' : eventSourceType === 'semaphore' ? 'pipeline_done' : '';
     const newEventType: EventSourceEventType = {
-      type: defaultType,
+      type: eventSourceConfig?.defaultEventType || '',
       filters: [],
       filterOperator: 'FILTER_OPERATOR_AND'
     };
     setEventTypes(prev => [...prev, newEventType]);
-  }, [eventSourceType]);
+  }, [eventSourceConfig]);
 
   const updateEventType = useCallback((index: number, updates: Partial<EventSourceEventType>) => {
     setEventTypes(prev => prev.map((eventType, i) =>
@@ -112,15 +112,9 @@ export function EventSourceEditModeContent({
   }, []);
 
   const addFilter = useCallback((eventTypeIndex: number) => {
-    const defaultExpression = eventSourceType === 'github'
-      ? '$.ref == "refs/heads/main"'
-      : eventSourceType === 'semaphore'
-        ? '$.pipeline.state == "done"'
-        : '';
-
     const newFilter: SuperplaneFilter = {
       type: 'FILTER_TYPE_DATA',
-      data: { expression: defaultExpression }
+      data: { expression: eventSourceConfig?.defaultFilterExpression || '' }
     };
 
     setEventTypes(prev => prev.map((eventType, i) =>
@@ -129,7 +123,7 @@ export function EventSourceEditModeContent({
         filters: [...(eventType.filters || []), newFilter]
       } : eventType
     ));
-  }, [eventSourceType]);
+  }, [eventSourceConfig]);
 
   const updateFilter = useCallback((eventTypeIndex: number, filterIndex: number, updates: Partial<SuperplaneFilter>) => {
     setEventTypes(prev => prev.map((eventType, i) =>
@@ -159,15 +153,8 @@ export function EventSourceEditModeContent({
     updateEventType(eventTypeIndex, { filterOperator: newOperator });
   }, [eventTypes, updateEventType]);
 
-  const getEventTypePlaceholder = (eventSourceType: string): string => {
-    switch (eventSourceType) {
-      case 'github':
-        return 'e.g., push, pull_request, deployment';
-      case 'semaphore':
-        return 'e.g., pipeline_done';
-      default:
-        return 'Event type';
-    }
+  const getEventTypePlaceholder = (): string => {
+    return eventSourceConfig?.eventTypePlaceholder || 'Event type';
   };
 
 
@@ -193,7 +180,7 @@ export function EventSourceEditModeContent({
     const errors: Record<string, string> = {};
 
     // Handle scheduled event sources separately
-    if (eventSourceType === 'scheduled') {
+    if (eventSourceConfig.type === 'TYPE_SCHEDULED') {
       validateScheduledEventSource(errors);
       if (setErrors) setErrors(errors);
       return Object.keys(errors).length === 0;
@@ -236,7 +223,7 @@ export function EventSourceEditModeContent({
   };
 
   const validateIntegrationRequirements = (errors: Record<string, string>) => {
-    if (eventSourceType !== 'semaphore' && eventSourceType !== 'github') {
+    if (eventSourceConfig.type !== 'TYPE_INTEGRATION_RESOURCE') {
       return;
     }
 
@@ -245,9 +232,9 @@ export function EventSourceEditModeContent({
     }
 
     if (!resourceName || resourceName.trim() === '') {
-      errors.resourceName = eventSourceType === 'semaphore'
-        ? 'Project name is required'
-        : 'Resource name is required';
+      errors.resourceName = eventSourceConfig?.resourceLabel ?
+        `${eventSourceConfig.resourceLabel} is required` :
+        'Resource name is required';
     }
   };
 
@@ -345,20 +332,25 @@ export function EventSourceEditModeContent({
         onValidationResult(isValid);
       }
     }
-  }, [shouldValidate, selectedIntegration, resourceName, eventSourceType, eventTypes, schedule, onValidationResult]);
+  }, [shouldValidate, selectedIntegration, resourceName, eventSourceConfig.type, eventTypes, schedule, onValidationResult]);
 
   useEffect(() => {
     const sections = ['general'];
 
-    if (eventSourceType === 'scheduled') {
+    if (eventSourceConfig.type === 'TYPE_SCHEDULED') {
       sections.push('schedule');
       setOpenSections(sections);
       return;
     }
 
-    if (eventSourceType === 'webhook') {
+    if (eventSourceConfig.type === 'TYPE_WEBHOOK') {
       sections.push('webhook');
       sections.push('filters');
+      setOpenSections(sections);
+      return;
+    }
+
+    if (eventSourceConfig.type === 'TYPE_MANUAL') {
       setOpenSections(sections);
       return;
     }
@@ -366,7 +358,7 @@ export function EventSourceEditModeContent({
     sections.push('integration');
     sections.push('filters');
     setOpenSections(sections);
-  }, [setOpenSections, eventSourceType]);
+  }, [setOpenSections, eventSourceConfig.type]);
 
   useEffect(() => {
     syncWithIncomingData(
@@ -380,13 +372,16 @@ export function EventSourceEditModeContent({
       },
       (incomingData) => {
         setSelectedIntegration(incomingData.spec.integration || null);
-        setResourceType(incomingData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+        const integrationData = [...canvasIntegrations, ...orgIntegrations].find(
+          int => int.metadata?.name === incomingData.spec.integration?.name
+        );
+        setResourceType(incomingData.spec.resource?.type || (integrationData?.spec?.type === 'semaphore' ? 'project' : ''));
         setResourceName(incomingData.spec.resource?.name || '');
         setEventTypes(incomingData.spec.events || []);
         setSchedule(incomingData.spec.schedule || null);
       }
     );
-  }, [data, eventSourceType, syncWithIncomingData]);
+  }, [data, eventSourceConfig.type, syncWithIncomingData]);
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
   const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
@@ -410,18 +405,11 @@ curl -X POST \\
   }, [eventSourceKey, webhookUrl]);
 
   const allIntegrations = [...canvasIntegrations, ...orgIntegrations];
-  const availableIntegrations = allIntegrations.filter(int => int.spec?.type === eventSourceType);
-  const requireIntegration = ['semaphore', 'github'].includes(eventSourceType);
+  const availableIntegrations = eventSourceConfig.type === 'TYPE_INTEGRATION_RESOURCE' ? allIntegrations : [];
+  const requireIntegration = eventSourceConfig.type === 'TYPE_INTEGRATION_RESOURCE';
   const zeroStateLabel = useMemo(() => {
-    switch (eventSourceType) {
-      case 'semaphore':
-        return 'Semaphore organizations';
-      case 'github':
-        return 'GitHub accounts';
-      default:
-        return `${eventSourceType} integrations`;
-    }
-  }, [eventSourceType]);
+    return eventSourceConfig?.integrationLabel || `${eventSourceConfig.type} integrations`;
+  }, [eventSourceConfig]);
 
   const normalizeSpecForComparison = (spec: SuperplaneEventSourceSpec) => {
     return {
@@ -447,7 +435,7 @@ curl -X POST \\
 
     const spec: SuperplaneEventSourceSpec = {};
 
-    if (eventSourceType === 'scheduled') {
+    if (eventSourceConfig.type === 'TYPE_SCHEDULED') {
       if (schedule) {
         spec.schedule = schedule;
       }
@@ -455,7 +443,7 @@ curl -X POST \\
       return;
     }
 
-    if ((eventSourceType === 'semaphore' || eventSourceType === 'github') && selectedIntegration) {
+    if (eventSourceConfig.type === 'TYPE_INTEGRATION_RESOURCE' && selectedIntegration) {
       spec.integration = selectedIntegration;
 
       if (resourceType && resourceName) {
@@ -471,7 +459,7 @@ curl -X POST \\
     }
 
     handleDataChange({ spec });
-  }, [selectedIntegration, resourceType, resourceName, eventTypes, schedule, eventSourceType, onDataChange, handleDataChange]);
+  }, [selectedIntegration, resourceType, resourceName, eventTypes, schedule, eventSourceConfig.type, onDataChange, handleDataChange]);
 
   // Auto-select first integration when integrations become available
   useEffect(() => {
@@ -499,7 +487,10 @@ curl -X POST \\
     switch (section) {
       case 'integration':
         setSelectedIntegration(originalData.spec.integration || null);
-        setResourceType(originalData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+        const integrationData = allIntegrations.find(
+          int => int.metadata?.name === originalData.spec.integration?.name
+        );
+        setResourceType(originalData.spec.resource?.type || (integrationData?.spec?.type === 'semaphore' ? 'project' : ''));
         setResourceName(originalData.spec.resource?.name || '');
         break;
       case 'schedule':
@@ -537,7 +528,7 @@ curl -X POST \\
       <div className="">
         {requireIntegration && availableIntegrations.length === 0 && (
           <IntegrationZeroState
-            integrationType={eventSourceType}
+            integrationType={eventSourceConfig.type}
             label={zeroStateLabel}
             canvasId={canvasId}
             organizationId={organizationId}
@@ -547,7 +538,7 @@ curl -X POST \\
 
 
         {/* Configuration Section */}
-        {availableIntegrations.length > 0 && eventSourceType === 'semaphore' && (
+        {availableIntegrations.length > 0 && eventSourceConfig?.integrationType === 'semaphore' && (
           <EditableAccordionSection
             id="integration"
             title="Semaphore Configuration"
@@ -583,7 +574,7 @@ curl -X POST \\
               {(selectedIntegration || combinedErrors.resourceName) && (
                 <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
                   <ValidationField
-                    label="Project Name"
+                    label={`${eventSourceConfig?.resourceLabel} Name`}
                     error={combinedErrors.resourceName}
                     required={true}
                   >
@@ -605,7 +596,7 @@ curl -X POST \\
           </EditableAccordionSection>
         )}
 
-        {availableIntegrations.length > 0 && eventSourceType === 'github' && (
+        {availableIntegrations.length > 0 && eventSourceConfig?.integrationType === 'github' && (
           <EditableAccordionSection
             id="integration"
             title="GitHub Configuration"
@@ -641,7 +632,7 @@ curl -X POST \\
               {(selectedIntegration || combinedErrors.resourceName) && (
                 <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
                   <ValidationField
-                    label="Repository Name"
+                    label={`${eventSourceConfig?.resourceLabel} Name`}
                     error={combinedErrors.resourceName}
                     required={true}
                   >
@@ -664,7 +655,7 @@ curl -X POST \\
         )}
 
         {/* Webhook Configuration Section */}
-        {eventSourceType === 'webhook' && (
+        {eventSourceConfig.type === 'TYPE_WEBHOOK' && (
           <EditableAccordionSection
             id="webhook"
             title="Webhook Configuration"
@@ -783,7 +774,7 @@ curl -X POST \\
         )}
 
         {/* Schedule Section - Only for scheduled event sources */}
-        {eventSourceType === 'scheduled' && (
+        {eventSourceConfig.type === 'TYPE_SCHEDULED' && (
           <EditableAccordionSection
             id="schedule"
             title="Schedule"
@@ -802,7 +793,7 @@ curl -X POST \\
         )}
 
         {/* Event Types and Filters Section - Not for scheduled event sources */}
-        {eventSourceType !== 'scheduled' && (!requireIntegration || availableIntegrations.length > 0) && <EditableAccordionSection
+        {eventSourceConfig.type !== 'TYPE_SCHEDULED' && (!requireIntegration || availableIntegrations.length > 0) && <EditableAccordionSection
           id="filters"
           title="Filters"
           isOpen={openSections.includes('filters')}
@@ -826,7 +817,7 @@ curl -X POST \\
                         type="text"
                         value={eventType.type || ''}
                         onChange={(e) => updateEventType(eventTypeIndex, { type: e.target.value })}
-                        placeholder={getEventTypePlaceholder(eventSourceType)}
+                        placeholder={getEventTypePlaceholder()}
                         className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors[`eventType_${eventTypeIndex}`]
                           ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
                           : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'

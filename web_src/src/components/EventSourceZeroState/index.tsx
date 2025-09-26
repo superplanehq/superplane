@@ -1,24 +1,30 @@
 import React from 'react';
+import { EventSourceConfig } from '../../pages/canvas/components/ComponentSidebar';
 
 interface EventSourceZeroStateProps {
-  eventSourceType: string;
+  eventSourceConfig: EventSourceConfig;
 }
 
-const getZeroStateMessage = (eventSourceType: string): string => {
-  switch (eventSourceType) {
-    case 'semaphore':
-      return 'Listening to changes in your Semaphore project';
-    case 'github':
-      return 'Listening to changes in your GitHub repository';
-    case 'webhook':
+const getZeroStateMessage = (eventSourceConfig: EventSourceConfig): string => {
+  switch (eventSourceConfig.type) {
+    case 'TYPE_INTEGRATION_RESOURCE':
+      if (eventSourceConfig.integrationLabel) {
+        return `Listening to changes in your ${eventSourceConfig.integrationLabel}`;
+      }
+      return 'Listening to changes in your resource';
+    case 'TYPE_WEBHOOK':
       return 'Ready to receive webhook events';
+    case 'TYPE_SCHEDULED':
+      return 'Ready to execute on schedule';
+    case 'TYPE_MANUAL':
+      return 'Ready for manual triggers';
     default:
       return 'Ready to receive events';
   }
 };
 
 export const EventSourceZeroState: React.FC<EventSourceZeroStateProps> = ({
-  eventSourceType
+  eventSourceConfig
 }) => {
   return (
     <div className="bg-zinc-50 dark:bg-zinc-800 px-4 rounded-b-lg border-t border-gray-200 dark:border-gray-700">
@@ -34,7 +40,7 @@ export const EventSourceZeroState: React.FC<EventSourceZeroStateProps> = ({
           Ready to receive events
         </h3>
         <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-xs text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-          {getZeroStateMessage(eventSourceType)}
+          {getZeroStateMessage(eventSourceConfig)}
         </p>
       </div>
     </div>

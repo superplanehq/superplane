@@ -6,6 +6,7 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource } from '@/hooks/useCanvasData';
 import { SuperplaneEventSource, SuperplaneEventSourceSpec, superplaneCreateEvent } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
+import { EventSourceConfig } from '../ComponentSidebar';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
@@ -23,11 +24,25 @@ import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { convertUTCToLocalTime, formatTimestampInUserTimezone, getUserTimezoneDisplay } from '@/utils/timezone';
 
-const EventSourceImageMap = {
-  'webhook': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="webhook" size="xl" />,
-  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
-  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
-  'scheduled': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="schedule" size="xl" />
+const getEventSourceIcon = (eventSourceConfig: EventSourceConfig) => {
+  switch (eventSourceConfig.type) {
+    case 'TYPE_SCHEDULED':
+      return <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="schedule" size="xl" />;
+    case 'TYPE_MANUAL':
+      return <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="touch_app" size="xl" />;
+    case 'TYPE_INTEGRATION_RESOURCE':
+      switch (eventSourceConfig.integrationType) {
+        case 'github':
+          return <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />;
+        case 'semaphore':
+          return <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />;
+        default:
+          return <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="webhook" size="xl" />;
+      }
+    case 'TYPE_WEBHOOK':
+    default:
+      return <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="webhook" size="xl" />;
+  }
 }
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
@@ -96,13 +111,13 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   };
 
   const validateIntegrationRequirement = () => {
-    const requireIntegration = ['semaphore', 'github'].includes(eventSourceType);
+    const requireIntegration = eventSourceConfig.type === 'TYPE_INTEGRATION_RESOURCE';
 
     if (!requireIntegration) {
       return true; // Integration not required for webhook type
     }
 
-    const typeIntegrations = canvasIntegrations.filter(int => int.spec?.type === eventSourceType);
+    const typeIntegrations = canvasIntegrations.filter(int => int.spec?.type === integration?.spec?.type);
     return typeIntegrations.length > 0;
   };
 
@@ -136,12 +151,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
     if (!validateIntegrationRequirement()) {
       setIntegrationError(true);
-      const integrationTypeLabel = eventSourceType;
+      const integrationTypeLabel = integration?.spec?.type || 'webhook';
       setApiError(`${integrationTypeLabel} integration is required but not configured. Please add a ${integrationTypeLabel} integration to continue.`);
       basicValidationPassed = false;
     }
 
-    if ((eventSourceType === 'webhook' || validationPassed === true) && basicValidationPassed) {
+    if ((eventSourceConfig.type === 'TYPE_WEBHOOK' || validationPassed === true) && basicValidationPassed) {
       proceedWithSave();
     }
     setValidationPassed(null);
@@ -163,7 +178,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         createEventSourceMutation.mutateAsync({
           name: eventSourceName,
           description: eventSourceDescription,
-          spec: currentFormData.spec
+          spec: {
+            ...currentFormData.spec,
+            type: eventSourceConfig.type
+          }
         }).then((result) => {
           const newEventSource = result.data?.eventSource;
 
@@ -175,7 +193,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             const newEventSourceWithEvents = {
               ...newEventSource,
               events: [],
-              eventSourceType: currentFormData.spec.schedule ? 'scheduled' : undefined,
+              eventSourceConfig: currentFormData.spec.schedule ? { type: 'TYPE_SCHEDULED' } as EventSourceConfig : eventSourceConfig,
             };
             addEventSource(newEventSourceWithEvents);
 
@@ -191,7 +209,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           eventSourceId: currentEventSource.metadata?.id || '',
           name: eventSourceName,
           description: eventSourceDescription,
-          spec: currentFormData.spec
+          spec: {
+            ...currentFormData.spec,
+            type: eventSourceConfig.type
+          }
         });
 
         // Update connection source names if event source name changed
@@ -326,24 +347,11 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
   }, [canvasIntegrations, props.data.integration?.name]);
 
-  const eventSourceType = useMemo(() => {
-    if (props.data.eventSourceType)
-      return props.data.eventSourceType;
-
-    // Check if this is a scheduled event source
-    if (props.data.schedule) {
-      return 'scheduled';
-    }
-
-    if (integration?.spec?.type) {
-      return integration.spec.type;
-    }
-    return "webhook";
-  }, [integration, props.data.eventSourceType, props.data.schedule]);
+  const eventSourceConfig = props.data.eventSourceConfig || { type: 'TYPE_WEBHOOK' };
 
   // Auto-enter edit mode for webhook with key
   useEffect(() => {
-    if (eventSourceKey && eventSourceType === 'webhook' && !isNewNode) {
+    if (eventSourceKey && eventSourceConfig.type === 'TYPE_WEBHOOK' && !isNewNode) {
       setIsEditMode(true);
       setEditingEventSource(props.id);
       setEventSourceName(props.data.name);
@@ -368,7 +376,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         setNodes(updatedNodes);
       }, 100);
     }
-  }, [eventSourceKey, eventSourceType, isNewNode, props.id, currentEventSource, props.data.name, props.data.description, setEditingEventSource, setNodes, setFocusedNodeId]);
+  }, [eventSourceKey, eventSourceConfig, isNewNode, props.id, currentEventSource, props.data.name, props.data.description, setEditingEventSource, setNodes, setFocusedNodeId]);
 
   const getBorderClass = () => {
     if (props.selected || focusedNodeId === props.id) {
@@ -427,7 +435,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         <div className="flex items-start justify-between w-full">
           <div className="flex items-start flex-1 min-w-0">
             <div className='max-w-8 mt-1 flex items-center justify-center'>
-              {EventSourceImageMap[eventSourceType as keyof typeof EventSourceImageMap]}
+              {getEventSourceIcon(eventSourceConfig)}
             </div>
             <div className="flex-1 min-w-0 ml-2">
               <div className="mb-1">
@@ -440,7 +448,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                     isEditMode ? 'text-sm' : '')}
                   onKeyDown={() => isNewNode && setDirtyByUser(true)}
                   isEditMode={isEditMode}
-                  autoFocus={isEditMode && eventSourceType === "webhook"}
+                  autoFocus={isEditMode && eventSourceConfig.type === "TYPE_WEBHOOK"}
                   dataTestId="event-source-name-input"
                 />
                 {nameError && isEditMode && (
@@ -512,6 +520,18 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 )}
               </div>
             )}
+
+            {/* Manual Trigger Status */}
+            {eventSourceConfig.type === 'TYPE_MANUAL' && (
+              <div className="w-full mt-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <MaterialSymbol name="touch_app" size="sm" className="text-blue-600 dark:text-blue-400" />
+                  <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
+                    Manual trigger - events are created on demand
+                  </span>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -521,7 +541,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         <EventSourceBadges
           resourceName={props.data.resource?.name}
           currentEventSource={currentEventSource}
-          eventSourceType={eventSourceType}
+          eventSourceConfig={eventSourceConfig}
           integration={integration}
         />
       )}
@@ -543,7 +563,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }}
           canvasId={canvasId}
           organizationId={organizationId!}
-          eventSourceType={eventSourceType}
+          eventSourceConfig={props.data.eventSourceConfig || { type: 'TYPE_WEBHOOK' }}
           eventSourceKey={eventSourceKey}
           onDataChange={({ spec }) => {
             if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) {
@@ -586,10 +606,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             </div>
           ) : (
-            // Only show EventSourceZeroState for non-scheduled event sources
-            eventSourceType !== 'scheduled' && (
+            // Only show EventSourceZeroState for non-scheduled and non-manual event sources
+            eventSourceConfig.type !== 'TYPE_SCHEDULED' && eventSourceConfig.type !== 'TYPE_MANUAL' && (
               <EventSourceZeroState
-                eventSourceType={eventSourceType}
+                eventSourceConfig={eventSourceConfig}
               />
             )
           )}

@@ -21,14 +21,25 @@ import { Switch } from '../../../components/Switch/switch';
 import { Badge } from '../../../components/Badge/badge';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
-import { SuperplaneConnectionType } from '@/api-client';
+import { SuperplaneConnectionType, SuperplaneEventSourceType } from '@/api-client';
 
 export type ConnectionInfo = { name: string; type: SuperplaneConnectionType };
+
+export type EventSourceConfig = {
+  type: SuperplaneEventSourceType;
+  integrationType?: string;
+  defaultEventType?: string;
+  eventTypePlaceholder?: string;
+  defaultFilterExpression?: string;
+  integrationLabel?: string;
+  resourceLabel?: string;
+  resourcePlaceholder?: string;
+};
 
 export interface ComponentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => void;
+  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceConfig?: EventSourceConfig, focusedNodeInfo?: ConnectionInfo | null) => void;
   className?: string;
   initialWidth?: number | string;
 }
@@ -42,8 +53,8 @@ interface ComponentDefinition {
   category: string;
   category_description?: string;
   executorType?: string;
-  eventSourceType?: string;
   comingSoon?: boolean;
+  eventSourceConfig?: EventSourceConfig;
 }
 
 export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
@@ -99,11 +110,23 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     // Event Sources
     {
       id: 'event_source',
+      name: 'Manual trigger',
+      description: 'Manually trigger events when needed',
+      icon: 'touch_app',
+      category: 'Event Sources',
+      eventSourceConfig: {
+        type: 'TYPE_MANUAL'
+      }
+    },
+    {
+      id: 'event_source',
       name: 'Scheduled Event',
       description: 'Emit an event on a schedule',
       icon: 'schedule',
       category: 'Event Sources',
-      eventSourceType: 'scheduled'
+      eventSourceConfig: {
+        type: 'TYPE_SCHEDULED'
+      }
     },
     {
       id: 'event_source',
@@ -111,7 +134,9 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Create a webhook endpoint to emit events',
       icon: 'webhook',
       category: 'Event Sources',
-      eventSourceType: 'webhook'
+      eventSourceConfig: {
+        type: 'TYPE_WEBHOOK'
+      }
     },
     {
       id: 'event_source',
@@ -119,7 +144,16 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Listen to a webhook on GitHub repository',
       image: GithubLogo,
       category: 'Event Sources',
-      eventSourceType: 'github'
+      eventSourceConfig: {
+        type: 'TYPE_INTEGRATION_RESOURCE',
+        integrationType: 'github',
+        defaultEventType: 'push',
+        eventTypePlaceholder: 'e.g., push, pull_request, deployment',
+        defaultFilterExpression: '$.ref == "refs/heads/main"',
+        integrationLabel: 'GitHub accounts',
+        resourceLabel: 'Repository',
+        resourcePlaceholder: 'my-repository'
+      }
     },
     {
       id: 'event_source',
@@ -127,7 +161,16 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Listen to a webhook on Semaphore project',
       image: SemaphoreLogo,
       category: 'Event Sources',
-      eventSourceType: 'semaphore'
+      eventSourceConfig: {
+        type: 'TYPE_INTEGRATION_RESOURCE',
+        integrationType: 'semaphore',
+        defaultEventType: 'pipeline_done',
+        eventTypePlaceholder: 'e.g., pipeline_done',
+        defaultFilterExpression: '$.pipeline.state == "done"',
+        integrationLabel: 'Semaphore organizations',
+        resourceLabel: 'Project',
+        resourcePlaceholder: 'my-semaphore-project'
+      }
     },
     // Stages - Available
     {
@@ -275,7 +318,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
   const handleAddComponent = (component: ComponentDefinition) => {
     if (!isComponentDisabled(component) && !component.comingSoon) {
       const focusedNodeInfo = getFocusedNodeInfo();
-      onNodeAdd(component.id, component.executorType, component.eventSourceType, focusedNodeInfo);
+      onNodeAdd(component.id, component.executorType, component.eventSourceConfig, focusedNodeInfo);
     }
   };
 

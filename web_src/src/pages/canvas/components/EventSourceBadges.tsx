@@ -2,18 +2,19 @@ import React, { useMemo, useCallback } from 'react';
 import { Badge } from '@/components/Badge/badge';
 import { SuperplaneEventSource, IntegrationsIntegration, SuperplaneFilter } from '@/api-client';
 import Tippy from '@tippyjs/react/headless';
+import { EventSourceConfig } from './ComponentSidebar';
 
 interface EventSourceBadgesProps {
   resourceName?: string;
   currentEventSource?: SuperplaneEventSource;
-  eventSourceType?: string;
+  eventSourceConfig?: EventSourceConfig;
   integration?: IntegrationsIntegration;
 }
 
 export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
   resourceName,
   currentEventSource,
-  eventSourceType,
+  eventSourceConfig,
   integration
 }) => {
   const totalFilters = currentEventSource?.spec?.events?.reduce(
@@ -24,10 +25,8 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
   const totalEventTypes = currentEventSource?.spec?.events?.length || 0;
 
   const getResourceTypeLabel = useCallback(() => {
-    if (eventSourceType === 'github') return 'Repository';
-    if (eventSourceType === 'semaphore') return 'Project';
-    return 'Resource';
-  }, [eventSourceType]);
+    return eventSourceConfig?.resourceLabel || 'Resource';
+  }, [eventSourceConfig]);
 
   const getFilterTypeLabel = useCallback((filter: SuperplaneFilter) => {
     if (filter.type === 'FILTER_TYPE_DATA') return 'Data';

@@ -20,6 +20,11 @@ const (
 	EventSourceScopeExternal = "external"
 	EventSourceScopeInternal = "internal"
 
+	EventSourceTypeManual             = "manual"
+	EventSourceTypeScheduled          = "scheduled"
+	EventSourceTypeWebhook            = "webhook"
+	EventSourceTypeIntegrationResource = "integration-resource"
+
 	ScheduleTypeHourly = "hourly"
 	ScheduleTypeDaily  = "daily"
 	ScheduleTypeWeekly = "weekly"
@@ -42,6 +47,7 @@ type EventSource struct {
 	Key             []byte
 	State           string
 	Scope           string
+	Type            string                        `gorm:"column:type"`
 	Schedule        *datatypes.JSONType[Schedule] `gorm:"column:schedule"`
 	LastTriggeredAt *time.Time                    `gorm:"column:last_triggered_at"`
 	NextTriggerAt   *time.Time                    `gorm:"column:next_trigger_at"`

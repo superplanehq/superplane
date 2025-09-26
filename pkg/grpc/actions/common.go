@@ -660,3 +660,35 @@ func StageEventStateReasonToProto(stateReason string) pb.StageEvent_StateReason 
 		return pb.StageEvent_STATE_REASON_UNKNOWN
 	}
 }
+
+func EventSourceTypeSpecToProto(eventSourceType string) pb.EventSource_Type {
+	switch eventSourceType {
+	case models.EventSourceTypeManual:
+		return pb.EventSource_TYPE_MANUAL
+	case models.EventSourceTypeScheduled:
+		return pb.EventSource_TYPE_SCHEDULED
+	case models.EventSourceTypeWebhook:
+		return pb.EventSource_TYPE_WEBHOOK
+	case models.EventSourceTypeIntegrationResource:
+		return pb.EventSource_TYPE_INTEGRATION_RESOURCE
+	default:
+		return pb.EventSource_TYPE_UNKNOWN
+	}
+}
+
+func ProtoToEventSourceTypeSpec(eventSourceType pb.EventSource_Type) (string, error) {
+	switch eventSourceType {
+	case pb.EventSource_TYPE_MANUAL:
+		return models.EventSourceTypeManual, nil
+	case pb.EventSource_TYPE_SCHEDULED:
+		return models.EventSourceTypeScheduled, nil
+	case pb.EventSource_TYPE_WEBHOOK:
+		return models.EventSourceTypeWebhook, nil
+	case pb.EventSource_TYPE_INTEGRATION_RESOURCE:
+		return models.EventSourceTypeIntegrationResource, nil
+	case pb.EventSource_TYPE_UNKNOWN:
+		return "", status.Error(codes.InvalidArgument, "event source type must be specified")
+	default:
+		return "", status.Error(codes.InvalidArgument, "invalid event source type")
+	}
+}
