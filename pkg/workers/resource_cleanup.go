@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
@@ -22,7 +23,11 @@ func NewResourceCleanupService(registry *registry.Registry) *ResourceCleanupServ
 }
 
 func (s *ResourceCleanupService) CleanupUnusedResource(oldResourceID, excludeStageID uuid.UUID) error {
-	oldResource, err := models.FindResourceByID(oldResourceID)
+	return s.CleanupUnusedResourceInTransaction(database.Conn(), oldResourceID, excludeStageID)
+}
+
+func (s *ResourceCleanupService) CleanupUnusedResourceInTransaction(tx *gorm.DB, oldResourceID, excludeStageID uuid.UUID) error {
+	oldResource, err := models.FindResourceByIDInTransaction(tx, oldResourceID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warningf("Old resource %s not found, skipping cleanup", oldResourceID)
@@ -34,13 +39,13 @@ func (s *ResourceCleanupService) CleanupUnusedResource(oldResourceID, excludeSta
 
 	logger := log.WithField("old_resource_id", oldResourceID)
 
-	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResource(oldResourceID)
+	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResourceInTransaction(tx, oldResourceID)
 	if err != nil {
 		logger.Errorf("Error counting external event sources using resource: %v", err)
 		return err
 	}
 
-	stagesCount, err := models.CountOtherStagesUsingResource(oldResourceID, excludeStageID)
+	stagesCount, err := models.CountOtherStagesUsingResourceInTransaction(tx, oldResourceID, excludeStageID)
 	if err != nil {
 		logger.Errorf("Error counting stages using resource: %v", err)
 		return err
@@ -53,7 +58,7 @@ func (s *ResourceCleanupService) CleanupUnusedResource(oldResourceID, excludeSta
 		return nil
 	}
 
-	integration, err := models.FindIntegrationByID(oldResource.IntegrationID)
+	integration, err := models.FindIntegrationByIDInTransaction(tx, oldResource.IntegrationID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Info("Integration not found, skipping cleanup")
@@ -69,7 +74,7 @@ func (s *ResourceCleanupService) CleanupUnusedResource(oldResourceID, excludeSta
 		return err
 	}
 
-	childResources, err := oldResource.FindChildren()
+	childResources, err := oldResource.FindChildrenInTransaction(tx)
 	if err != nil {
 		logger.Errorf("Error finding child resources: %v", err)
 		return err
@@ -85,7 +90,7 @@ func (s *ResourceCleanupService) CleanupUnusedResource(oldResourceID, excludeSta
 		}
 	}
 
-	err = models.DeleteResourceWithChildren(oldResourceID)
+	err = models.DeleteResourceWithChildrenInTransaction(tx, oldResourceID)
 	if err != nil {
 		logger.Errorf("Error deleting old resource and children from database: %v", err)
 		return err
@@ -132,13 +137,13 @@ func (s *ResourceCleanupService) CleanupUnusedResourceWithModel(oldResource *mod
 func (s *ResourceCleanupService) CleanupUnusedResourceWithModelInTransaction(tx *gorm.DB, oldResource *models.Resource, excludeStageID uuid.UUID) error {
 	logger := log.WithField("old_resource_id", oldResource.ID)
 
-	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResource(oldResource.ID)
+	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResourceInTransaction(tx, oldResource.ID)
 	if err != nil {
 		logger.Errorf("Error counting external event sources using resource: %v", err)
 		return err
 	}
 
-	stagesCount, err := models.CountOtherStagesUsingResource(oldResource.ID, excludeStageID)
+	stagesCount, err := models.CountOtherStagesUsingResourceInTransaction(tx, oldResource.ID, excludeStageID)
 	if err != nil {
 		logger.Errorf("Error counting stages using resource: %v", err)
 		return err
@@ -162,17 +167,21 @@ func (s *ResourceCleanupService) CleanupUnusedResourceWithModelInTransaction(tx 
 	return nil
 }
 
-func (s *ResourceCleanupService) CleanupStageWebhooks(stage *models.Stage) error {
+func (s *ResourceCleanupService) CleanupStageWebhooksInTransaction(tx *gorm.DB, stage *models.Stage) error {
 	if stage.ResourceID == nil {
 		return nil
 	}
 
 	// Use the existing resource cleanup service to handle webhook cleanup
 	// We pass uuid.Nil as excludeStageID since we're deleting the stage itself
-	return s.CleanupUnusedResource(*stage.ResourceID, uuid.Nil)
+	return s.CleanupUnusedResourceInTransaction(tx, *stage.ResourceID, uuid.Nil)
 }
 
 func (s *ResourceCleanupService) CleanupEventSourceWebhooks(eventSource *models.EventSource, resource *models.Resource) (bool, error) {
+	return s.CleanupEventSourceWebhooksInTransaction(database.Conn(), eventSource, resource)
+}
+
+func (s *ResourceCleanupService) CleanupEventSourceWebhooksInTransaction(tx *gorm.DB, eventSource *models.EventSource, resource *models.Resource) (bool, error) {
 	if eventSource.ResourceID == nil {
 		return false, nil
 	}
@@ -183,7 +192,7 @@ func (s *ResourceCleanupService) CleanupEventSourceWebhooks(eventSource *models.
 
 	logger := log.WithField("event_source_id", eventSource.ID)
 
-	count, err := models.CountExternalEventSourcesUsingResource(*eventSource.ResourceID)
+	count, err := models.CountExternalEventSourcesUsingResourceInTransaction(tx, *eventSource.ResourceID)
 	if err != nil {
 		return false, err
 	}
@@ -193,7 +202,7 @@ func (s *ResourceCleanupService) CleanupEventSourceWebhooks(eventSource *models.
 		return false, nil
 	}
 
-	integration, err := models.FindIntegrationByID(resource.IntegrationID)
+	integration, err := models.FindIntegrationByIDInTransaction(tx, resource.IntegrationID)
 	if err != nil {
 		return false, err
 	}
@@ -203,7 +212,7 @@ func (s *ResourceCleanupService) CleanupEventSourceWebhooks(eventSource *models.
 		return false, err
 	}
 
-	childResources, err := resource.FindChildren()
+	childResources, err := resource.FindChildrenInTransaction(tx)
 	if err != nil {
 		return false, err
 	}
