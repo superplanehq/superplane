@@ -54,6 +54,7 @@ func Test__ReceiveWebhookFromIntegration(t *testing.T) {
 		InCanvas(r.Canvas.ID).
 		WithName("demo-project").
 		WithScope(models.EventSourceScopeExternal).
+		WithType(models.EventSourceTypeIntegrationResource).
 		ForIntegration(r.Integration).
 		ForResource(&models.Resource{
 			ResourceType:  semaphore.ResourceTypeProject,

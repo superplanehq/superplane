@@ -20,9 +20,9 @@ const (
 	EventSourceScopeExternal = "external"
 	EventSourceScopeInternal = "internal"
 
-	EventSourceTypeManual             = "manual"
-	EventSourceTypeScheduled          = "scheduled"
-	EventSourceTypeWebhook            = "webhook"
+	EventSourceTypeManual              = "manual"
+	EventSourceTypeScheduled           = "scheduled"
+	EventSourceTypeWebhook             = "webhook"
 	EventSourceTypeIntegrationResource = "integration-resource"
 
 	ScheduleTypeHourly = "hourly"

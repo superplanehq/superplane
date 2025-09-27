@@ -555,12 +555,11 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             {eventSourceConfig.type === 'TYPE_MANUAL' && (
               <div className="w-full mt-3 space-y-2">
                 <div className="flex items-center gap-2 text-xs">
-                  <MaterialSymbol name="touch_app" size="sm" className="text-blue-600 dark:text-blue-400" />
                   <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
                     Manual trigger
                   </span>
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 ml-6 text-left">
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-left">
                   Events are created on demand
                 </div>
               </div>

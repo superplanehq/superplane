@@ -32,6 +32,9 @@ func Test__CreateEventSource(t *testing.T) {
 			Metadata: &protos.EventSource_Metadata{
 				Name: "test",
 			},
+			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_MANUAL,
+			},
 		})
 
 		s, ok := status.FromError(err)
@@ -51,6 +54,9 @@ func Test__CreateEventSource(t *testing.T) {
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
 			},
+			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_MANUAL,
+			},
 		})
 
 		require.NoError(t, err)
@@ -58,7 +64,7 @@ func Test__CreateEventSource(t *testing.T) {
 		require.NotNil(t, response.EventSource)
 		assert.NotEmpty(t, response.EventSource.Metadata.Id)
 		assert.NotEmpty(t, response.EventSource.Metadata.CreatedAt)
-		assert.NotEmpty(t, response.Key)
+		assert.Empty(t, response.Key)
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Nil(t, response.EventSource.Spec.Integration)
@@ -76,6 +82,9 @@ func Test__CreateEventSource(t *testing.T) {
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
 			},
+			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_MANUAL,
+			},
 		})
 		require.NoError(t, err)
 
@@ -85,6 +94,9 @@ func Test__CreateEventSource(t *testing.T) {
 		_, err = CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_MANUAL,
 			},
 		})
 		s, ok := status.FromError(err)
@@ -107,6 +119,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Description: description,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -122,7 +135,7 @@ func Test__CreateEventSource(t *testing.T) {
 		require.NotNil(t, response.EventSource)
 		assert.NotEmpty(t, response.EventSource.Metadata.Id)
 		assert.NotEmpty(t, response.EventSource.Metadata.CreatedAt)
-		assert.NotEmpty(t, response.Key)
+		assert.Empty(t, response.Key)
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, r.Integration.Name, response.EventSource.Spec.Integration.Name)
@@ -139,6 +152,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
 				Integration: &integrationPb.IntegrationRef{
 					Name: "does-not-exist",
 				},
@@ -189,6 +203,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
 				Integration: &integrationPb.IntegrationRef{
 					DomainType: authpb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					Name:       integration.Name,
@@ -205,7 +220,7 @@ func Test__CreateEventSource(t *testing.T) {
 		require.NotNil(t, response.EventSource)
 		assert.NotEmpty(t, response.EventSource.Metadata.Id)
 		assert.NotEmpty(t, response.EventSource.Metadata.CreatedAt)
-		assert.NotEmpty(t, response.Key)
+		assert.Empty(t, response.Key)
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, integration.Name, response.EventSource.Spec.Integration.Name)
@@ -222,6 +237,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -246,6 +262,7 @@ func Test__CreateEventSource(t *testing.T) {
 			InCanvas(r.Canvas.ID).
 			WithName(internalName).
 			WithScope(models.EventSourceScopeInternal).
+			WithType(models.EventSourceTypeIntegrationResource).
 			ForIntegration(r.Integration).
 			ForResource(&models.Resource{
 				ResourceName: "demo-project-2",
@@ -264,6 +281,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: externalName,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -279,7 +297,7 @@ func Test__CreateEventSource(t *testing.T) {
 		require.NotNil(t, response.EventSource)
 		assert.NotEmpty(t, response.EventSource.Metadata.Id)
 		assert.NotEmpty(t, response.EventSource.Metadata.CreatedAt)
-		assert.NotEmpty(t, response.Key)
+		assert.Empty(t, response.Key)
 		assert.Equal(t, externalName, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, r.Integration.Name, response.EventSource.Spec.Integration.Name)
@@ -304,6 +322,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_SCHEDULED,
 				Schedule: &protos.EventSource_Schedule{
 					Type: protos.EventSource_Schedule_TYPE_DAILY,
 					Daily: &protos.EventSource_DailySchedule{
@@ -332,6 +351,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_SCHEDULED,
 				Schedule: &protos.EventSource_Schedule{
 					Type: protos.EventSource_Schedule_TYPE_WEEKLY,
 					Weekly: &protos.EventSource_WeeklySchedule{
@@ -361,6 +381,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -380,7 +401,7 @@ func Test__CreateEventSource(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "schedules are not supported for event sources with integrations", s.Message())
+		assert.Equal(t, "schedule is only supported for scheduled event sources", s.Message())
 	})
 
 	t.Run("daily schedule without daily config -> error", func(t *testing.T) {
@@ -390,6 +411,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_SCHEDULED,
 				Schedule: &protos.EventSource_Schedule{
 					Type: protos.EventSource_Schedule_TYPE_DAILY,
 				},
@@ -409,6 +431,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_SCHEDULED,
 				Schedule: &protos.EventSource_Schedule{
 					Type: protos.EventSource_Schedule_TYPE_WEEKLY,
 				},
@@ -428,6 +451,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_SCHEDULED,
 				Schedule: &protos.EventSource_Schedule{
 					Type: protos.EventSource_Schedule_TYPE_DAILY,
 					Daily: &protos.EventSource_DailySchedule{
@@ -450,6 +474,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: protos.EventSource_TYPE_SCHEDULED,
 				Schedule: &protos.EventSource_Schedule{
 					Type: protos.EventSource_Schedule_TYPE_WEEKLY,
 					Weekly: &protos.EventSource_WeeklySchedule{

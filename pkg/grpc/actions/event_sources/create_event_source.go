@@ -342,20 +342,37 @@ func validateEventSourceType(eventSourceType string, spec *pb.EventSource_Spec) 
 		if spec == nil || spec.Integration == nil {
 			return status.Error(codes.InvalidArgument, "integration is required for integration-resource event sources")
 		}
+
 		if spec.Resource == nil {
 			return status.Error(codes.InvalidArgument, "resource is required for integration-resource event sources")
 		}
+
 	case models.EventSourceTypeScheduled:
 		if spec == nil || spec.Schedule == nil {
 			return status.Error(codes.InvalidArgument, "schedule is required for scheduled event sources")
 		}
+
 		if spec.Integration != nil {
 			return status.Error(codes.InvalidArgument, "scheduled event sources cannot have integrations")
 		}
+
 	case models.EventSourceTypeManual, models.EventSourceTypeWebhook:
 		if spec != nil && spec.Integration != nil {
 			return status.Error(codes.InvalidArgument, "manual and webhook event sources cannot have integrations")
 		}
 	}
+
+	if spec.Schedule != nil && eventSourceType != models.EventSourceTypeScheduled {
+		return status.Error(codes.InvalidArgument, "schedule is only supported for scheduled event sources")
+	}
+
+	if spec.Integration != nil && eventSourceType != models.EventSourceTypeIntegrationResource {
+		return status.Error(codes.InvalidArgument, "integration is only supported for integration-resource event sources")
+	}
+
+	if spec.Resource != nil && eventSourceType != models.EventSourceTypeIntegrationResource {
+		return status.Error(codes.InvalidArgument, "resource is only supported for integration-resource event sources")
+	}
+
 	return nil
 }
