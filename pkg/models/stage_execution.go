@@ -167,18 +167,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result, 
 		return nil, err
 	}
 
-	//
-	// Update stage event state.
-	//
-	err = UpdateStageEventsInTransaction(
-		tx, []string{e.StageEventID.String()}, StageEventStateProcessed, "",
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	inputs, err := e.GetInputs()
+	inputs, err := e.GetInputsInTransaction(tx)
 	if err != nil {
 		return nil, err
 	}
