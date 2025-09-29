@@ -7222,10 +7222,11 @@ func (x *EventSource_Metadata) GetUpdatedAt() *timestamp.Timestamp {
 
 type EventSource_Spec struct {
 	state         protoimpl.MessageState       `protogen:"open.v1"`
-	Integration   *integrations.IntegrationRef `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
-	Resource      *integrations.ResourceRef    `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
-	Events        []*EventSource_EventType     `protobuf:"bytes,3,rep,name=events,proto3" json:"events,omitempty"`
-	Schedule      *EventSource_Schedule        `protobuf:"bytes,4,opt,name=schedule,proto3" json:"schedule,omitempty"`
+	Type          string                       `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Integration   *integrations.IntegrationRef `protobuf:"bytes,2,opt,name=integration,proto3" json:"integration,omitempty"`
+	Resource      *integrations.ResourceRef    `protobuf:"bytes,3,opt,name=resource,proto3" json:"resource,omitempty"`
+	Events        []*EventSource_EventType     `protobuf:"bytes,4,rep,name=events,proto3" json:"events,omitempty"`
+	Schedule      *EventSource_Schedule        `protobuf:"bytes,5,opt,name=schedule,proto3" json:"schedule,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7258,6 +7259,13 @@ func (x *EventSource_Spec) ProtoReflect() protoreflect.Message {
 // Deprecated: Use EventSource_Spec.ProtoReflect.Descriptor instead.
 func (*EventSource_Spec) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{9, 1}
+}
+
+func (x *EventSource_Spec) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
 }
 
 func (x *EventSource_Spec) GetIntegration() *integrations.IntegrationRef {
@@ -8323,7 +8331,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"D\n" +
 	"\x16DescribeCanvasResponse\x12*\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\x94\x0e\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\xa8\x0e\n" +
 	"\vEventSource\x12<\n" +
 	"\bmetadata\x18\x01 \x01(\v2 .Superplane.EventSource.MetadataR\bmetadata\x120\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1c.Superplane.EventSource.SpecR\x04spec\x126\n" +
@@ -8336,12 +8344,13 @@ const file_canvases_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\x8c\x02\n" +
-	"\x04Spec\x12I\n" +
-	"\vintegration\x18\x01 \x01(\v2'.Superplane.Integrations.IntegrationRefR\vintegration\x12@\n" +
-	"\bresource\x18\x02 \x01(\v2$.Superplane.Integrations.ResourceRefR\bresource\x129\n" +
-	"\x06events\x18\x03 \x03(\v2!.Superplane.EventSource.EventTypeR\x06events\x12<\n" +
-	"\bschedule\x18\x04 \x01(\v2 .Superplane.EventSource.ScheduleR\bschedule\x1a\x8b\x04\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\xa0\x02\n" +
+	"\x04Spec\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12I\n" +
+	"\vintegration\x18\x02 \x01(\v2'.Superplane.Integrations.IntegrationRefR\vintegration\x12@\n" +
+	"\bresource\x18\x03 \x01(\v2$.Superplane.Integrations.ResourceRefR\bresource\x129\n" +
+	"\x06events\x18\x04 \x03(\v2!.Superplane.EventSource.EventTypeR\x06events\x12<\n" +
+	"\bschedule\x18\x05 \x01(\v2 .Superplane.EventSource.ScheduleR\bschedule\x1a\x8b\x04\n" +
 	"\bSchedule\x129\n" +
 	"\x04type\x18\x01 \x01(\x0e2%.Superplane.EventSource.Schedule.TypeR\x04type\x12>\n" +
 	"\x06hourly\x18\x02 \x01(\v2&.Superplane.EventSource.HourlyScheduleR\x06hourly\x12;\n" +

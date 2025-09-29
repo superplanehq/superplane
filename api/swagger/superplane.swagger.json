@@ -4275,6 +4275,9 @@
     "SuperplaneEventSourceSpec": {
       "type": "object",
       "properties": {
+        "type": {
+          "type": "string"
+        },
         "integration": {
           "$ref": "#/definitions/IntegrationsIntegrationRef"
         },

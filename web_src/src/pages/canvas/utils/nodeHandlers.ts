@@ -37,7 +37,6 @@ export const useNodeHandlers = (canvasId: string) => {
           const eventSourceWithEvents: EventSourceWithEvents = {
             ...eventSource,
             events: [],
-            eventSourceType: params.eventSourceType,
           };
           addEventSource(eventSourceWithEvents);
           return eventSource.metadata?.id || '';
@@ -83,7 +82,7 @@ export const useNodeHandlers = (canvasId: string) => {
    * Handles adding a stage with a specific executor type
    */
   const handleAddStageWithExecutor = (name: string, executorType: string) => {
-    handleAddNode('stage', { name, executorType });
+    handleAddNode('stage', { name, spec: { executor: { type: executorType } } });
   };
 
   return {

@@ -33,5 +33,6 @@
 - Tests end with _test.go
 - Always prefer early returns over else blocks when possible
 - GoLang: prefer `any` over `interface{}` types
+- GoLang: when checking for the existence of an item on a list, use `slice.Contains` or `slice.ContainsFunc`
 - When naming variables, avoid names like `*Str` or `*UUID`; Go is a typed language, we don't need types in the variables names
 - When writing tests that require specific timestamps to be used, always use timestamps based off of `time.Now()`, instead of absolute times created with `time.Date`

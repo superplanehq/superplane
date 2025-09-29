@@ -49,6 +49,15 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, status.Error(codes.InvalidArgument, "event source metadata is required")
 	}
 
+	if newSource.Spec == nil || newSource.Spec.Type == "" {
+		return nil, status.Error(codes.InvalidArgument, "event source type is required")
+	}
+
+	err = validateEventSourceType(newSource.Spec.Type, newSource.Spec, registry)
+	if err != nil {
+		return nil, err
+	}
+
 	eventSourceName := eventSource.Name
 	if newSource.Metadata.Name != "" && newSource.Metadata.Name != eventSource.Name {
 		_, err := models.FindEventSourceByName(canvasID, newSource.Metadata.Name)
@@ -96,6 +105,7 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		WithName(eventSourceName).
 		WithDescription(eventSource.Description).
 		WithScope(models.EventSourceScopeExternal).
+		WithType(newSource.Spec.Type).
 		ForIntegration(integration).
 		ForResource(resource).
 		WithEventTypes(eventTypes).
@@ -119,7 +129,11 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 
 	response := &pb.UpdateEventSourceResponse{
 		EventSource: serialized,
-		Key:         plainKey,
+	}
+
+	// Only return keys for webhook event sources
+	if newSource.Spec.Type == models.EventSourceTypeWebhook {
+		response.Key = plainKey
 	}
 
 	err = messages.NewEventSourceUpdatedMessage(eventSource, oldResourceID, eventSource.ResourceID).Publish()

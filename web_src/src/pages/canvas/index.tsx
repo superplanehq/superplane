@@ -10,7 +10,7 @@ import { EventSourceSidebar } from "./components/EventSourceSidebar";
 import { ComponentSidebar, ConnectionInfo } from "./components/ComponentSidebar";
 import { CanvasNavigation, CanvasNavigationContent, type CanvasView } from "../../components/CanvasNavigation";
 import { useNodeHandlers } from "./utils/nodeHandlers";
-import { NodeType } from "./utils/nodeFactories";
+import { NodeType, CreateNodeParams } from "./utils/nodeFactories";
 import { withOrganizationHeader } from "../../utils/withOrganizationHeader";
 import { useAutoLayout } from "./hooks/useAutoLayout";
 import { DEFAULT_SIDEBAR_WIDTH } from "./utils/constants";
@@ -213,10 +213,11 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
-  const handleAddNodeByType = async (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => {
+  const handleAddNodeByType = async (nodeType: NodeType, spec?: any, focusedNodeInfo?: ConnectionInfo | null) => {
     try {
-      const config = getNodeConfig(nodeType, executorType, eventSourceType, focusedNodeInfo);
-      const nodeId = handleAddNode(nodeType, config);
+      const nodeSpec = getNodeSpec(nodeType, spec, focusedNodeInfo);
+      console.log(nodeSpec);
+      const nodeId = handleAddNode(nodeType, nodeSpec);
 
       setFocusedNodeId(nodeId);
 
@@ -240,41 +241,31 @@ export function Canvas() {
     }
   };
 
-  const getNodeConfig = (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => {
-    const baseConfig: { connections?: Array<SuperplaneConnection> } = {};
+  const getNodeSpec = (nodeType: NodeType, spec?: any, focusedNodeInfo?: ConnectionInfo | null): Partial<CreateNodeParams> => {
+    const connections: Array<SuperplaneConnection> = [];
 
-    if (focusedNodeInfo && (nodeType !== 'event_source')) {
-      baseConfig.connections = [{
+    if (focusedNodeInfo && nodeType !== 'event_source') {
+      connections.push({
         name: focusedNodeInfo.name,
         type: focusedNodeInfo.type as SuperplaneConnectionType,
         filters: [],
         filterOperator: "FILTER_OPERATOR_AND"
-      }];
+      });
     }
 
-    switch (nodeType) {
-      case 'stage':
-        return executorType ? {
-          name: '',
-          executorType,
-          ...baseConfig
-        } : baseConfig;
+    const config: Partial<CreateNodeParams> = {
+      name: '',
+      spec
+    };
 
-      case 'event_source':
-        return eventSourceType ? {
-          name: '',
-          eventSourceType
-        } : undefined;
-
-      case 'connection_group':
-        return {
-          name: '',
-          ...baseConfig
-        };
-
-      default:
-        return undefined;
+    if (connections.length > 0) {
+      config.spec = {
+        ...spec,
+        connections: [...(spec?.connections || []), ...connections]
+      };
     }
+
+    return config;
   };
 
   return (
@@ -293,8 +284,8 @@ export function Canvas() {
             <ComponentSidebar
               isOpen={isComponentSidebarOpen}
               onClose={() => setIsComponentSidebarOpen(false)}
-              onNodeAdd={(nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => {
-                handleAddNodeByType(nodeType, executorType, eventSourceType, focusedNodeInfo);
+              onNodeAdd={(nodeType: NodeType, spec?: any, focusedNodeInfo?: ConnectionInfo | null) => {
+                handleAddNodeByType(nodeType, spec, focusedNodeInfo);
               }}
               initialWidth="24rem"
             />

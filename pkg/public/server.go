@@ -682,6 +682,12 @@ func (s *Server) HandleCustomWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only webhook event sources can receive webhook events
+	if source.Type != models.EventSourceTypeWebhook {
+		http.Error(w, "webhook events not supported for this event source type", http.StatusBadRequest)
+		return
+	}
+
 	//
 	// Only read up to the maximum event size we allow,
 	// and only proceed if payload is below that.
@@ -755,6 +761,11 @@ func (s *Server) HandleIntegrationWebhook(w http.ResponseWriter, r *http.Request
 	source, err := models.FindEventSource(sourceID)
 	if err != nil {
 		http.Error(w, "source not found", http.StatusNotFound)
+		return
+	}
+
+	if source.Type != integrationName {
+		http.Error(w, "events not supported for this event source type", http.StatusBadRequest)
 		return
 	}
 

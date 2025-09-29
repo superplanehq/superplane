@@ -25,10 +25,11 @@ import { SuperplaneConnectionType } from '@/api-client';
 
 export type ConnectionInfo = { name: string; type: SuperplaneConnectionType };
 
+
 export interface ComponentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceType?: string, focusedNodeInfo?: ConnectionInfo | null) => void;
+  onNodeAdd: (nodeType: NodeType, spec?: any, focusedNodeInfo?: ConnectionInfo | null) => void;
   className?: string;
   initialWidth?: number | string;
 }
@@ -41,9 +42,8 @@ interface ComponentDefinition {
   image?: string;
   category: string;
   category_description?: string;
-  executorType?: string;
-  eventSourceType?: string;
   comingSoon?: boolean;
+  spec?: any;
 }
 
 export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
@@ -99,11 +99,19 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     // Event Sources
     {
       id: 'event_source',
+      name: 'Manual trigger',
+      description: 'Manually trigger events when needed',
+      icon: 'touch_app',
+      category: 'Event Sources',
+      spec: { type: 'manual' }
+    },
+    {
+      id: 'event_source',
       name: 'Scheduled Event',
       description: 'Emit an event on a schedule',
       icon: 'schedule',
       category: 'Event Sources',
-      eventSourceType: 'scheduled'
+      spec: { type: 'scheduled' }
     },
     {
       id: 'event_source',
@@ -111,7 +119,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Create a webhook endpoint to emit events',
       icon: 'webhook',
       category: 'Event Sources',
-      eventSourceType: 'webhook'
+      spec: { type: 'webhook' }
     },
     {
       id: 'event_source',
@@ -119,7 +127,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Listen to a webhook on GitHub repository',
       image: GithubLogo,
       category: 'Event Sources',
-      eventSourceType: 'github'
+      spec: { type: 'github' }
     },
     {
       id: 'event_source',
@@ -127,7 +135,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Listen to a webhook on Semaphore project',
       image: SemaphoreLogo,
       category: 'Event Sources',
-      eventSourceType: 'semaphore'
+      spec: { type: 'semaphore' }
     },
     // Stages - Available
     {
@@ -136,7 +144,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Make HTTP requests to external services',
       icon: 'http',
       category: 'Stages',
-      executorType: 'http'
+      spec: { executor: { type: 'http' } }
     },
     {
       id: 'stage',
@@ -144,7 +152,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Run Semaphore pipeline or task',
       image: SemaphoreLogo,
       category: 'Stages',
-      executorType: 'semaphore'
+      spec: { executor: { type: 'semaphore' } }
     },
     {
       id: 'stage',
@@ -152,7 +160,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Run a GitHub Action workflow',
       image: GithubLogo,
       category: 'Stages',
-      executorType: 'github'
+      spec: { executor: { type: 'github' } }
     },
     {
       id: 'stage',
@@ -160,7 +168,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Don\'t run anything, return random output values',
       icon: 'check_circle',
       category: 'Stages',
-      executorType: 'noop'
+      spec: { executor: { type: 'noop' } }
     },
     // Stages - Coming Soon
     {
@@ -275,7 +283,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
   const handleAddComponent = (component: ComponentDefinition) => {
     if (!isComponentDisabled(component) && !component.comingSoon) {
       const focusedNodeInfo = getFocusedNodeInfo();
-      onNodeAdd(component.id, component.executorType, component.eventSourceType, focusedNodeInfo);
+      onNodeAdd(component.id, component.spec, focusedNodeInfo);
     }
   };
 
