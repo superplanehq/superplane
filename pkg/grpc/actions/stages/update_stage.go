@@ -65,26 +65,8 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		stage.Description = newStage.Metadata.Description
 	}
 
-	//
-	// It is OK to create a stage without an integration.
-	//
-	var integration *models.Integration
-	if newStage.Spec != nil && newStage.Spec.Executor != nil && newStage.Spec.Executor.Integration != nil {
-		integration, err = actions.ValidateIntegration(canvas, newStage.Spec.Executor.Integration)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	//
-	// If integration is defined, find the integration resource we are interested in.
-	//
-	var resource integrations.Resource
-	if integration != nil {
-		resource, err = actions.ValidateResource(ctx, registry, integration, newStage.Spec.Executor.Resource)
-		if err != nil {
-			return nil, err
-		}
+	if newStage.Spec.Executor == nil {
+		return nil, status.Error(codes.InvalidArgument, "stage.spec.executor is required")
 	}
 
 	inputValidator := inputs.NewValidator(
@@ -112,6 +94,11 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 	secrets, err := validateSecrets(ctx, encryptor, canvas, newStage.Spec.Secrets)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	integration, resource, err := validateResourceIntegration(ctx, stage, newStage, canvas, registry)
+	if err != nil {
+		return nil, err
 	}
 
 	executorSpec, err := newStage.Spec.Executor.Spec.MarshalJSON()
@@ -174,4 +161,55 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 	}
 
 	return response, nil
+}
+
+func validateResourceIntegration(ctx context.Context, currentStage *models.Stage, newStage *pb.Stage, canvas *models.Canvas, registry *registry.Registry) (*models.Integration, integrations.Resource, error) {
+	//
+	// Handle update when using dry-run mode.
+	// When dry-run is enabled, we want to keep the same integration
+	// and resource already used, if any.
+	//
+	if newStage.Spec.DryRun {
+		if currentStage.ResourceID == nil {
+			return nil, nil, nil
+		}
+
+		resource, err := currentStage.GetResource()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		integration, err := models.FindIntegrationByID(resource.IntegrationID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return integration, resource, nil
+	}
+
+	//
+	// Handle update when not using dry-run mode.
+	// Here, we allow integration resource updates.
+	//
+	var err error
+	var integration *models.Integration
+	if newStage.Spec.Executor.Integration != nil {
+		integration, err = actions.ValidateIntegration(canvas, newStage.Spec.Executor.Integration)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	//
+	// If integration is defined, find the integration resource we are interested in.
+	//
+	var resource integrations.Resource
+	if integration != nil {
+		resource, err = actions.ValidateResource(ctx, registry, integration, newStage.Spec.Executor.Resource)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return integration, resource, nil
 }

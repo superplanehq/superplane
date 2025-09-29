@@ -27,7 +27,8 @@ import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 
 const StageImageMap = {
-  'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
+  'http': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="rocket_launch" size="xl" />,
+  'noop': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="check_circle" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
   'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
 }
@@ -708,7 +709,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
               {(executorBadges.length > 0 || props.data.dryRun) && (
                 <div className="flex flex-col w-full gap-2 px-4 font-semibold min-w-0 overflow-hidden">
-                  {props.data.dryRun && (
+                  {props.data.dryRun && props.data.executor?.type != 'noop' && (
                     <div className="flex items-center">
                       <Badge
                         color="yellow"
