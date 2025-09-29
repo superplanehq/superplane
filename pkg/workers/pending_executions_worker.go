@@ -264,7 +264,7 @@ func (w *PendingExecutionsWorker) handleIntegrationExecutor(tx *gorm.DB, logger 
 		return err
 	}
 
-	integrationExecutor, err := w.Registry.NewIntegrationExecutor(tx, integration, resource)
+	integrationExecutor, err := w.Registry.NewIntegrationExecutorWithTx(tx, integration, resource)
 	if err != nil {
 		return err
 	}

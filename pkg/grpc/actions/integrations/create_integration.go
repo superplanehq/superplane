@@ -94,7 +94,7 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, registry 
 	//
 	// We instantiate the resource manager to validate that everything is OK with the integration.
 	//
-	_, err = registry.NewResourceManager(database.Conn(), ctx, record)
+	_, err = registry.NewResourceManager(ctx, record)
 	if err != nil {
 		return nil, err
 	}

@@ -237,7 +237,7 @@ func (b *StageBuilder) validateExecutorSpec() error {
 		return executor.Validate(b.ctx, b.executorSpec)
 	}
 
-	executor, err := b.registry.NewIntegrationExecutor(database.Conn(), b.integration, b.resource)
+	executor, err := b.registry.NewIntegrationExecutor(b.integration, b.resource)
 	if err != nil {
 		return err
 	}

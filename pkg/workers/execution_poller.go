@@ -7,7 +7,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -187,7 +186,7 @@ func (w *ExecutionPoller) cancelResource(logger *log.Entry, resource *models.Exe
 		return err
 	}
 
-	integrationImpl, err := w.Registry.NewResourceManager(database.Conn(), context.Background(), integration)
+	integrationImpl, err := w.Registry.NewResourceManager(context.Background(), integration)
 	if err != nil {
 		return err
 	}
@@ -233,7 +232,7 @@ func (w *ExecutionPoller) updateResourceStatus(logger *log.Entry, resource *mode
 		return err
 	}
 
-	integrationImpl, err := w.Registry.NewResourceManager(database.Conn(), context.Background(), integration)
+	integrationImpl, err := w.Registry.NewResourceManager(context.Background(), integration)
 	if err != nil {
 		return err
 	}

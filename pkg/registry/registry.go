@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/executors/http"
 	"github.com/superplanehq/superplane/pkg/executors/noop"
@@ -102,13 +103,17 @@ func (r *Registry) GetOIDCVerifier(integrationType string) (integrations.OIDCVer
 	return registration.OIDCVerifier, nil
 }
 
-func (r *Registry) NewResourceManager(tx *gorm.DB, ctx context.Context, integration *models.Integration) (integrations.ResourceManager, error) {
+func (r *Registry) NewResourceManager(ctx context.Context, integration *models.Integration) (integrations.ResourceManager, error) {
+	return r.NewResourceManagerInTransaction(ctx, database.Conn(), integration)
+}
+
+func (r *Registry) NewResourceManagerInTransaction(ctx context.Context, tx *gorm.DB, integration *models.Integration) (integrations.ResourceManager, error) {
 	registration, ok := r.Integrations[integration.Type]
 	if !ok {
 		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
 	}
 
-	authFn, err := r.getAuthFn(tx, ctx, integration)
+	authFn, err := r.getAuthFn(ctx, tx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error getting authentication function: %v", err)
 	}
@@ -116,7 +121,7 @@ func (r *Registry) NewResourceManager(tx *gorm.DB, ctx context.Context, integrat
 	return registration.NewResourceManager(ctx, integration.URL, authFn)
 }
 
-func (r *Registry) getAuthFn(tx *gorm.DB, ctx context.Context, integration *models.Integration) (integrations.AuthenticateFn, error) {
+func (r *Registry) getAuthFn(ctx context.Context, tx *gorm.DB, integration *models.Integration) (integrations.AuthenticateFn, error) {
 	switch integration.AuthType {
 	case models.IntegrationAuthTypeToken:
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
@@ -171,12 +176,16 @@ func (r *Registry) secretProvider(tx *gorm.DB, secretDef *models.ValueDefinition
 	return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
 }
 
-func (r *Registry) NewIntegrationExecutor(tx *gorm.DB, integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
+func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
+	return r.NewIntegrationExecutorWithTx(database.Conn(), integration, resource)
+}
+
+func (r *Registry) NewIntegrationExecutorWithTx(tx *gorm.DB, integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
 	if integration == nil {
 		return nil, fmt.Errorf("integration is required")
 	}
 
-	resourceManager, err := r.NewResourceManager(tx, context.Background(), integration)
+	resourceManager, err := r.NewResourceManagerInTransaction(context.Background(), tx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating integration: %v", err)
 	}

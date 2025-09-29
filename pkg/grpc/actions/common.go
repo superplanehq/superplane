@@ -8,7 +8,6 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
@@ -360,7 +359,7 @@ func ValidateResource(ctx context.Context, registry *registry.Registry, integrat
 	//
 	// If resource record does not exist yet, we need to go to the integration to find it.
 	//
-	integrationImpl, err := registry.NewResourceManager(database.Conn(), ctx, integration)
+	integrationImpl, err := registry.NewResourceManager(ctx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error starting integration implementation: %v", err)
 	}

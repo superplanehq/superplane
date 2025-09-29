@@ -82,7 +82,7 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 		return fmt.Errorf("error finding integration: %v", err)
 	}
 
-	integrationImpl, err := w.Registry.NewResourceManager(database.Conn(), context.Background(), integration)
+	integrationImpl, err := w.Registry.NewResourceManager(context.Background(), integration)
 	if err != nil {
 		return fmt.Errorf("error creating integration: %v", err)
 	}
