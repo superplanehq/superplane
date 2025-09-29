@@ -35,7 +35,6 @@ export const transformEventSourcesToNodes = (
         events: lastEvents,
         integration: es.spec?.integration,
         resource: es.spec?.resource,
-        eventSourceConfig: es.eventSourceConfig,
         schedule: es.spec?.schedule,
       },
       position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },

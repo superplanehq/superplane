@@ -3,7 +3,6 @@ import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneEventSource, Sup
 import { ReadyState } from "react-use-websocket";
 import { AllNodeType, EdgeType } from "../types/flow";
 import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
-import { EventSourceConfig } from "../components/ComponentSidebar";
 
 // Define the store state type
 export interface CanvasState {
@@ -97,5 +96,5 @@ export interface CanvasState {
 }
 
 export type Stage = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; executions: Array<SuperplaneExecution>; isDraft?: boolean}
-export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneEvent>; eventSourceConfig?: EventSourceConfig; eventFilters?: Array<EventSourceEventType>; isDuplicate?: boolean}
+export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneEvent>; eventFilters?: Array<EventSourceEventType>; isDuplicate?: boolean}
 export type ConnectionGroupWithEvents = SuperplaneConnectionGroup & {events: Array<SuperplaneEvent>}

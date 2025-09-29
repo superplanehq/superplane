@@ -21,25 +21,15 @@ import { Switch } from '../../../components/Switch/switch';
 import { Badge } from '../../../components/Badge/badge';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
-import { SuperplaneConnectionType, SuperplaneEventSourceType } from '@/api-client';
+import { SuperplaneConnectionType } from '@/api-client';
 
 export type ConnectionInfo = { name: string; type: SuperplaneConnectionType };
 
-export type EventSourceConfig = {
-  type: SuperplaneEventSourceType;
-  integrationType?: string;
-  defaultEventType?: string;
-  eventTypePlaceholder?: string;
-  defaultFilterExpression?: string;
-  integrationLabel?: string;
-  resourceLabel?: string;
-  resourcePlaceholder?: string;
-};
 
 export interface ComponentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceConfig?: EventSourceConfig, focusedNodeInfo?: ConnectionInfo | null) => void;
+  onNodeAdd: (nodeType: NodeType, spec?: any, focusedNodeInfo?: ConnectionInfo | null) => void;
   className?: string;
   initialWidth?: number | string;
 }
@@ -52,9 +42,8 @@ interface ComponentDefinition {
   image?: string;
   category: string;
   category_description?: string;
-  executorType?: string;
   comingSoon?: boolean;
-  eventSourceConfig?: EventSourceConfig;
+  spec?: any;
 }
 
 export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
@@ -114,9 +103,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Manually trigger events when needed',
       icon: 'touch_app',
       category: 'Event Sources',
-      eventSourceConfig: {
-        type: 'TYPE_MANUAL'
-      }
+      spec: { type: 'manual' }
     },
     {
       id: 'event_source',
@@ -124,9 +111,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Emit an event on a schedule',
       icon: 'schedule',
       category: 'Event Sources',
-      eventSourceConfig: {
-        type: 'TYPE_SCHEDULED'
-      }
+      spec: { type: 'scheduled' }
     },
     {
       id: 'event_source',
@@ -134,9 +119,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Create a webhook endpoint to emit events',
       icon: 'webhook',
       category: 'Event Sources',
-      eventSourceConfig: {
-        type: 'TYPE_WEBHOOK'
-      }
+      spec: { type: 'webhook' }
     },
     {
       id: 'event_source',
@@ -144,16 +127,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Listen to a webhook on GitHub repository',
       image: GithubLogo,
       category: 'Event Sources',
-      eventSourceConfig: {
-        type: 'TYPE_INTEGRATION_RESOURCE',
-        integrationType: 'github',
-        defaultEventType: 'push',
-        eventTypePlaceholder: 'e.g., push, pull_request, deployment',
-        defaultFilterExpression: '$.ref == "refs/heads/main"',
-        integrationLabel: 'GitHub accounts',
-        resourceLabel: 'Repository',
-        resourcePlaceholder: 'my-repository'
-      }
+      spec: { type: 'github' }
     },
     {
       id: 'event_source',
@@ -161,16 +135,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Listen to a webhook on Semaphore project',
       image: SemaphoreLogo,
       category: 'Event Sources',
-      eventSourceConfig: {
-        type: 'TYPE_INTEGRATION_RESOURCE',
-        integrationType: 'semaphore',
-        defaultEventType: 'pipeline_done',
-        eventTypePlaceholder: 'e.g., pipeline_done',
-        defaultFilterExpression: '$.pipeline.state == "done"',
-        integrationLabel: 'Semaphore organizations',
-        resourceLabel: 'Project',
-        resourcePlaceholder: 'my-semaphore-project'
-      }
+      spec: { type: 'semaphore' }
     },
     // Stages - Available
     {
@@ -179,7 +144,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Make HTTP requests to external services',
       icon: 'http',
       category: 'Stages',
-      executorType: 'http'
+      spec: { executor: { type: 'http' } }
     },
     {
       id: 'stage',
@@ -187,7 +152,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Run Semaphore pipeline or task',
       image: SemaphoreLogo,
       category: 'Stages',
-      executorType: 'semaphore'
+      spec: { executor: { type: 'semaphore' } }
     },
     {
       id: 'stage',
@@ -195,7 +160,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Run a GitHub Action workflow',
       image: GithubLogo,
       category: 'Stages',
-      executorType: 'github'
+      spec: { executor: { type: 'github' } }
     },
     {
       id: 'stage',
@@ -203,7 +168,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       description: 'Don\'t run anything, return random output values',
       icon: 'check_circle',
       category: 'Stages',
-      executorType: 'noop'
+      spec: { executor: { type: 'noop' } }
     },
     // Stages - Coming Soon
     {
@@ -318,7 +283,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
   const handleAddComponent = (component: ComponentDefinition) => {
     if (!isComponentDisabled(component) && !component.comingSoon) {
       const focusedNodeInfo = getFocusedNodeInfo();
-      onNodeAdd(component.id, component.executorType, component.eventSourceConfig, focusedNodeInfo);
+      onNodeAdd(component.id, component.spec, focusedNodeInfo);
     }
   };
 

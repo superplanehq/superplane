@@ -18,7 +18,6 @@ import {
   EventSourceEventType,
   SuperplaneEventSourceSchedule
 } from "@/api-client/types.gen";
-import { EventSourceConfig } from "../../components/ComponentSidebar";
 
 export type AllNodeType = EventSourceNodeType | StageNodeType | ConnectionGroupNodeType;
 export type EdgeType = Edge;
@@ -43,7 +42,6 @@ export type EventSourceNodeData = {
   eventFilters?: EventSourceEventType[];
   integration: IntegrationsIntegrationRef | null;
   resource: IntegrationsResourceRef | null;
-  eventSourceConfig?: EventSourceConfig;
   schedule?: SuperplaneEventSourceSchedule | null;
 }
 

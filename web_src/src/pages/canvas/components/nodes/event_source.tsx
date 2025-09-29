@@ -6,7 +6,6 @@ import { useCanvasStore } from '../../store/canvasStore';
 import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource } from '@/hooks/useCanvasData';
 import { SuperplaneEventSource, SuperplaneEventSourceSpec, SuperplaneEventSourceType, superplaneCreateEvent } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
-import { EventSourceConfig } from '../ComponentSidebar';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
@@ -23,27 +22,24 @@ import { createEventSourceDuplicate, focusAndEditNode } from '../../utils/nodeDu
 import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { convertUTCToLocalTime, formatTimestampInUserTimezone, getUserTimezoneDisplay } from '@/utils/timezone';
+import { isRegularEventSource } from '@/utils/components';
 
-const getEventSourceIcon = (eventSourceConfig: EventSourceConfig) => {
-  switch (eventSourceConfig.type) {
-    case 'TYPE_SCHEDULED':
+const getEventSourceIcon = (sourceType: string) => {
+  switch (sourceType) {
+    case 'scheduled':
       return <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="schedule" size="xl" />;
-    case 'TYPE_MANUAL':
+    case 'manual':
       return <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="touch_app" size="xl" />;
-    case 'TYPE_INTEGRATION_RESOURCE':
-      switch (eventSourceConfig.integrationType) {
-        case 'github':
-          return <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />;
-        case 'semaphore':
-          return <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />;
-        default:
-          return <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="webhook" size="xl" />;
-      }
-    case 'TYPE_WEBHOOK':
+    case 'github':
+      return <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />;
+    case 'semaphore':
+      return <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />;
+    case 'webhook':
     default:
       return <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="webhook" size="xl" />;
   }
-}
+};
+
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -110,17 +106,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return true;
   };
 
-  const validateIntegrationRequirement = () => {
-    const requireIntegration = eventSourceConfig.type === 'TYPE_INTEGRATION_RESOURCE';
-
-    if (!requireIntegration) {
-      return true; // Integration not required for webhook type
-    }
-
-    const typeIntegrations = canvasIntegrations.filter(int => int.spec?.type === integration?.spec?.type);
-    return typeIntegrations.length > 0;
-  };
-
   const handleEditClick = () => {
     setIsEditMode(true);
     setEditingEventSource(props.id);
@@ -149,14 +134,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       basicValidationPassed = false;
     }
 
-    if (!validateIntegrationRequirement()) {
-      setIntegrationError(true);
-      const integrationTypeLabel = integration?.spec?.type || 'webhook';
-      setApiError(`${integrationTypeLabel} integration is required but not configured. Please add a ${integrationTypeLabel} integration to continue.`);
-      basicValidationPassed = false;
+    // Check if integrations are required but none are available for this source type
+    if (!isRegularEventSource(sourceType)) {
+      const matchingIntegrations = canvasIntegrations.filter(int => int.spec?.type === sourceType);
+      if (matchingIntegrations.length === 0) {
+        setIntegrationError(true);
+        setApiError(`${sourceType} integration is required but not configured. Please add a ${sourceType} integration to continue.`);
+        basicValidationPassed = false;
+      }
     }
 
-    if ((eventSourceConfig.type === 'TYPE_WEBHOOK' || validationPassed === true) && basicValidationPassed) {
+    if ((sourceType === 'webhook' || validationPassed === true) && basicValidationPassed) {
       proceedWithSave();
     }
     setValidationPassed(null);
@@ -180,7 +168,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           description: eventSourceDescription,
           spec: {
             ...currentFormData.spec,
-            type: eventSourceConfig.type
+            type: sourceType
           }
         }).then((result) => {
           const newEventSource = result.data?.eventSource;
@@ -193,7 +181,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             const newEventSourceWithEvents = {
               ...newEventSource,
               events: [],
-              eventSourceConfig: currentFormData.spec.schedule ? { type: 'TYPE_SCHEDULED' } as EventSourceConfig : eventSourceConfig,
             };
             addEventSource(newEventSourceWithEvents);
 
@@ -211,7 +198,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           description: eventSourceDescription,
           spec: {
             ...currentFormData.spec,
-            type: eventSourceConfig.type
+            type: sourceType
           }
         });
 
@@ -347,41 +334,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
   }, [canvasIntegrations, props.data.integration?.name]);
 
-  const eventSourceConfig = useMemo(() => {
-    // If we have explicit eventSourceConfig, use it
-    if (props.data.eventSourceConfig) {
-      return props.data.eventSourceConfig;
-    }
-
+  const sourceType = useMemo(() => {
     // Use spec.type from existing event sources
     if (currentEventSource?.spec?.type) {
-      const specType = currentEventSource.spec.type;
-
-      if (specType === 'TYPE_INTEGRATION_RESOURCE') {
-        const integrationType = integration?.spec?.type;
-        return {
-          type: 'TYPE_INTEGRATION_RESOURCE' as SuperplaneEventSourceType,
-          integrationType: integrationType,
-          integrationLabel: integrationType === 'github' ? 'GitHub accounts' :
-                            integrationType === 'semaphore' ? 'Semaphore organizations' :
-                            'integrations',
-          resourceLabel: integrationType === 'github' ? 'Repository' :
-                         integrationType === 'semaphore' ? 'Project' :
-                         'Resource'
-        };
-      }
-
-      // For TYPE_SCHEDULED, TYPE_MANUAL, TYPE_WEBHOOK, just pass through the type
-      return { type: specType as SuperplaneEventSourceType };
+      return currentEventSource.spec.type;
     }
 
     // Default to webhook
-    return { type: 'TYPE_WEBHOOK' as SuperplaneEventSourceType };
-  }, [props.data.eventSourceConfig, currentEventSource?.spec?.type, integration]);
+    return 'webhook' as SuperplaneEventSourceType;
+  }, [currentEventSource?.spec?.type]);
 
   // Auto-enter edit mode for webhook with key
   useEffect(() => {
-    if (eventSourceKey && eventSourceConfig.type === 'TYPE_WEBHOOK' && !isNewNode) {
+    if (eventSourceKey && sourceType === 'webhook' && !isNewNode) {
       setIsEditMode(true);
       setEditingEventSource(props.id);
       setEventSourceName(props.data.name);
@@ -406,7 +371,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         setNodes(updatedNodes);
       }, 100);
     }
-  }, [eventSourceKey, eventSourceConfig, isNewNode, props.id, currentEventSource, props.data.name, props.data.description, setEditingEventSource, setNodes, setFocusedNodeId]);
+  }, [eventSourceKey, sourceType, isNewNode, props.id, currentEventSource, props.data.name, props.data.description, setEditingEventSource, setNodes, setFocusedNodeId]);
 
   const getBorderClass = () => {
     if (props.selected || focusedNodeId === props.id) {
@@ -465,7 +430,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         <div className="flex items-start justify-between w-full">
           <div className="flex items-start flex-1 min-w-0">
             <div className='max-w-8 mt-1 flex items-center justify-center'>
-              {getEventSourceIcon(eventSourceConfig)}
+              {getEventSourceIcon(sourceType)}
             </div>
             <div className="flex-1 min-w-0 ml-2">
               <div className="mb-1">
@@ -478,7 +443,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                     isEditMode ? 'text-sm' : '')}
                   onKeyDown={() => isNewNode && setDirtyByUser(true)}
                   isEditMode={isEditMode}
-                  autoFocus={isEditMode && eventSourceConfig.type === "TYPE_WEBHOOK"}
+                  autoFocus={isEditMode && sourceType === "webhook"}
                   dataTestId="event-source-name-input"
                 />
                 {nameError && isEditMode && (
@@ -552,7 +517,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             )}
 
             {/* Manual Trigger Status */}
-            {eventSourceConfig.type === 'TYPE_MANUAL' && (
+            {sourceType === 'manual' && (
               <div className="w-full mt-3 space-y-2">
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
@@ -573,7 +538,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         <EventSourceBadges
           resourceName={props.data.resource?.name}
           currentEventSource={currentEventSource}
-          eventSourceConfig={eventSourceConfig}
+          sourceType={sourceType}
           integration={integration}
         />
       )}
@@ -595,7 +560,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }}
           canvasId={canvasId}
           organizationId={organizationId!}
-          eventSourceConfig={eventSourceConfig}
+          sourceType={sourceType}
           eventSourceKey={eventSourceKey}
           onDataChange={({ spec }) => {
             if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) {
@@ -638,10 +603,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             </div>
           ) : (
-            // Only show EventSourceZeroState for webhook and integration-resource event sources
-            (eventSourceConfig.type === 'TYPE_WEBHOOK' || eventSourceConfig.type === 'TYPE_INTEGRATION_RESOURCE') && (
+            // Only show EventSourceZeroState for webhook and non-regular event sources
+            (sourceType === 'webhook' || !isRegularEventSource(sourceType)) && (
               <EventSourceZeroState
-                eventSourceConfig={eventSourceConfig}
+                sourceType={sourceType}
               />
             )
           )}

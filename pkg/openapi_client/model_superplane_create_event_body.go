@@ -32,7 +32,7 @@ type SuperplaneCreateEventBody struct {
 // will change when the set of required properties is changed
 func NewSuperplaneCreateEventBody() *SuperplaneCreateEventBody {
 	this := SuperplaneCreateEventBody{}
-	var sourceType SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_TYPE_UNKNOWN
+	var sourceType SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_EVENT_SOURCE_TYPE_UNKNOWN
 	this.SourceType = &sourceType
 	return &this
 }
@@ -42,7 +42,7 @@ func NewSuperplaneCreateEventBody() *SuperplaneCreateEventBody {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneCreateEventBodyWithDefaults() *SuperplaneCreateEventBody {
 	this := SuperplaneCreateEventBody{}
-	var sourceType SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_TYPE_UNKNOWN
+	var sourceType SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_EVENT_SOURCE_TYPE_UNKNOWN
 	this.SourceType = &sourceType
 	return &this
 }

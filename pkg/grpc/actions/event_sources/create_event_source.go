@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -37,17 +38,14 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, status.Error(codes.InvalidArgument, "event source name is required")
 	}
 
-	if newSource.Spec == nil || newSource.Spec.Type == pb.EventSource_TYPE_UNKNOWN {
+	if newSource.Spec == nil || newSource.Spec.Type == "" {
 		return nil, status.Error(codes.InvalidArgument, "event source type is required")
 	}
 
-	eventSourceType, err := actions.ProtoToEventSourceTypeSpec(newSource.Spec.Type)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid event source type")
-	}
+	eventSourceType := newSource.Spec.Type
 
 	// Validate event source type constraints
-	err = validateEventSourceType(eventSourceType, newSource.Spec)
+	err = validateEventSourceType(eventSourceType, newSource.Spec, registry)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +218,7 @@ func validateSchedule(spec *pb.EventSource_Spec, integration *models.Integration
 
 func serializeEventSource(eventSource models.EventSource, lastEvent *models.Event) (*pb.EventSource, error) {
 	spec := &pb.EventSource_Spec{
-		Type:   actions.EventSourceTypeSpecToProto(eventSource.Type),
+		Type:   eventSource.Type,
 		Events: []*pb.EventSource_EventType{},
 	}
 
@@ -336,42 +334,45 @@ func serializeEventSource(eventSource models.EventSource, lastEvent *models.Even
 	return pbEventSource, nil
 }
 
-func validateEventSourceType(eventSourceType string, spec *pb.EventSource_Spec) error {
-	switch eventSourceType {
-	case models.EventSourceTypeIntegrationResource:
-		if spec == nil || spec.Integration == nil {
-			return status.Error(codes.InvalidArgument, "integration is required for integration-resource event sources")
-		}
+func validateEventSourceType(eventSourceType string, spec *pb.EventSource_Spec, registry *registry.Registry) error {
+	// Check if this is a non-integration event source type
+	if slices.Contains(models.NonIntegrationEventSourceTypes, eventSourceType) {
+		return validateNonIntegrationEventSource(eventSourceType, spec)
+	}
 
-		if spec.Resource == nil {
-			return status.Error(codes.InvalidArgument, "resource is required for integration-resource event sources")
-		}
+	// Check if this is a valid integration type using the registry
+	if !registry.HasIntegrationWithType(eventSourceType) {
+		return status.Errorf(codes.InvalidArgument, "unknown event source type: %s", eventSourceType)
+	}
 
-	case models.EventSourceTypeScheduled:
+	// This is an integration resource type - validate required fields
+	if spec == nil || spec.Integration == nil {
+		return status.Errorf(codes.InvalidArgument, "integration is required for %s event sources", eventSourceType)
+	}
+
+	if spec.Resource == nil {
+		return status.Errorf(codes.InvalidArgument, "resource is required for %s event sources", eventSourceType)
+	}
+
+	return nil
+}
+
+func validateNonIntegrationEventSource(eventSourceType string, spec *pb.EventSource_Spec) error {
+	if eventSourceType == models.EventSourceTypeScheduled {
 		if spec == nil || spec.Schedule == nil {
 			return status.Error(codes.InvalidArgument, "schedule is required for scheduled event sources")
 		}
-
 		if spec.Integration != nil {
 			return status.Error(codes.InvalidArgument, "scheduled event sources cannot have integrations")
 		}
+		return nil
+	}
 
-	case models.EventSourceTypeManual, models.EventSourceTypeWebhook:
+	if eventSourceType == models.EventSourceTypeManual || eventSourceType == models.EventSourceTypeWebhook {
 		if spec != nil && spec.Integration != nil {
 			return status.Error(codes.InvalidArgument, "manual and webhook event sources cannot have integrations")
 		}
-	}
-
-	if spec.Schedule != nil && eventSourceType != models.EventSourceTypeScheduled {
-		return status.Error(codes.InvalidArgument, "schedule is only supported for scheduled event sources")
-	}
-
-	if spec.Integration != nil && eventSourceType != models.EventSourceTypeIntegrationResource {
-		return status.Error(codes.InvalidArgument, "integration is only supported for integration-resource event sources")
-	}
-
-	if spec.Resource != nil && eventSourceType != models.EventSourceTypeIntegrationResource {
-		return status.Error(codes.InvalidArgument, "resource is only supported for integration-resource event sources")
+		return nil
 	}
 
 	return nil

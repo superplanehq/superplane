@@ -20,10 +20,9 @@ const (
 	EventSourceScopeExternal = "external"
 	EventSourceScopeInternal = "internal"
 
-	EventSourceTypeManual              = "manual"
-	EventSourceTypeScheduled           = "scheduled"
-	EventSourceTypeWebhook             = "webhook"
-	EventSourceTypeIntegrationResource = "integration-resource"
+	EventSourceTypeManual    = "manual"
+	EventSourceTypeScheduled = "scheduled"
+	EventSourceTypeWebhook   = "webhook"
 
 	ScheduleTypeHourly = "hourly"
 	ScheduleTypeDaily  = "daily"
@@ -37,6 +36,12 @@ const (
 	WeekDaySaturday  = "saturday"
 	WeekDaySunday    = "sunday"
 )
+
+var NonIntegrationEventSourceTypes = []string{
+	EventSourceTypeManual,
+	EventSourceTypeScheduled,
+	EventSourceTypeWebhook,
+}
 
 type EventSource struct {
 	ID              uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`

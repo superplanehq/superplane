@@ -4276,7 +4276,7 @@
       "type": "object",
       "properties": {
         "type": {
-          "$ref": "#/definitions/SuperplaneEventSourceType"
+          "type": "string"
         },
         "integration": {
           "$ref": "#/definitions/IntegrationsIntegrationRef"
@@ -4310,13 +4310,12 @@
     "SuperplaneEventSourceType": {
       "type": "string",
       "enum": [
-        "TYPE_UNKNOWN",
-        "TYPE_MANUAL",
-        "TYPE_SCHEDULED",
-        "TYPE_WEBHOOK",
-        "TYPE_INTEGRATION_RESOURCE"
+        "EVENT_SOURCE_TYPE_UNKNOWN",
+        "EVENT_SOURCE_TYPE_EVENT_SOURCE",
+        "EVENT_SOURCE_TYPE_STAGE",
+        "EVENT_SOURCE_TYPE_CONNECTION_GROUP"
       ],
-      "default": "TYPE_UNKNOWN"
+      "default": "EVENT_SOURCE_TYPE_UNKNOWN"
     },
     "SuperplaneEventState": {
       "type": "string",

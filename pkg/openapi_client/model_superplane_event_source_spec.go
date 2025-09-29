@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneEventSourceSpec{}
 
 // SuperplaneEventSourceSpec struct for SuperplaneEventSourceSpec
 type SuperplaneEventSourceSpec struct {
-	Type *SuperplaneEventSourceType `json:"type,omitempty"`
+	Type *string `json:"type,omitempty"`
 	Integration *IntegrationsIntegrationRef `json:"integration,omitempty"`
 	Resource *IntegrationsResourceRef `json:"resource,omitempty"`
 	Events []EventSourceEventType `json:"events,omitempty"`
@@ -33,8 +33,6 @@ type SuperplaneEventSourceSpec struct {
 // will change when the set of required properties is changed
 func NewSuperplaneEventSourceSpec() *SuperplaneEventSourceSpec {
 	this := SuperplaneEventSourceSpec{}
-	var type_ SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_TYPE_UNKNOWN
-	this.Type = &type_
 	return &this
 }
 
@@ -43,15 +41,13 @@ func NewSuperplaneEventSourceSpec() *SuperplaneEventSourceSpec {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneEventSourceSpecWithDefaults() *SuperplaneEventSourceSpec {
 	this := SuperplaneEventSourceSpec{}
-	var type_ SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_TYPE_UNKNOWN
-	this.Type = &type_
 	return &this
 }
 
 // GetType returns the Type field value if set, zero value otherwise.
-func (o *SuperplaneEventSourceSpec) GetType() SuperplaneEventSourceType {
+func (o *SuperplaneEventSourceSpec) GetType() string {
 	if o == nil || IsNil(o.Type) {
-		var ret SuperplaneEventSourceType
+		var ret string
 		return ret
 	}
 	return *o.Type
@@ -59,7 +55,7 @@ func (o *SuperplaneEventSourceSpec) GetType() SuperplaneEventSourceType {
 
 // GetTypeOk returns a tuple with the Type field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSourceSpec) GetTypeOk() (*SuperplaneEventSourceType, bool) {
+func (o *SuperplaneEventSourceSpec) GetTypeOk() (*string, bool) {
 	if o == nil || IsNil(o.Type) {
 		return nil, false
 	}
@@ -75,8 +71,8 @@ func (o *SuperplaneEventSourceSpec) HasType() bool {
 	return false
 }
 
-// SetType gets a reference to the given SuperplaneEventSourceType and assigns it to the Type field.
-func (o *SuperplaneEventSourceSpec) SetType(v SuperplaneEventSourceType) {
+// SetType gets a reference to the given string and assigns it to the Type field.
+func (o *SuperplaneEventSourceSpec) SetType(v string) {
 	o.Type = &v
 }
 

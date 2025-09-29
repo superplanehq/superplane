@@ -764,9 +764,8 @@ func (s *Server) HandleIntegrationWebhook(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Only integration-resource event sources can receive integration webhook events
-	if source.Type != models.EventSourceTypeIntegrationResource {
-		http.Error(w, "integration webhook events not supported for this event source type", http.StatusBadRequest)
+	if source.Type != integrationName {
+		http.Error(w, "events not supported for this event source type", http.StatusBadRequest)
 		return
 	}
 

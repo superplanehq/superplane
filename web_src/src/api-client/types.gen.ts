@@ -644,7 +644,7 @@ export type SuperplaneEventSourceSchedule = {
 };
 
 export type SuperplaneEventSourceSpec = {
-    type?: SuperplaneEventSourceType;
+    type?: string;
     integration?: IntegrationsIntegrationRef;
     resource?: IntegrationsResourceRef;
     events?: Array<EventSourceEventType>;
@@ -656,7 +656,7 @@ export type SuperplaneEventSourceStatus = {
     schedule?: EventSourceStatusSchedule;
 };
 
-export type SuperplaneEventSourceType = 'TYPE_UNKNOWN' | 'TYPE_MANUAL' | 'TYPE_SCHEDULED' | 'TYPE_WEBHOOK' | 'TYPE_INTEGRATION_RESOURCE';
+export type SuperplaneEventSourceType = 'EVENT_SOURCE_TYPE_UNKNOWN' | 'EVENT_SOURCE_TYPE_EVENT_SOURCE' | 'EVENT_SOURCE_TYPE_STAGE' | 'EVENT_SOURCE_TYPE_CONNECTION_GROUP';
 
 export type SuperplaneEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_REJECTED' | 'STATE_PROCESSED';
 

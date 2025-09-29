@@ -49,17 +49,14 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, status.Error(codes.InvalidArgument, "event source metadata is required")
 	}
 
-	if newSource.Spec == nil || newSource.Spec.Type == pb.EventSource_TYPE_UNKNOWN {
+	if newSource.Spec == nil || newSource.Spec.Type == "" {
 		return nil, status.Error(codes.InvalidArgument, "event source type is required")
 	}
 
-	eventSourceType, err := actions.ProtoToEventSourceTypeSpec(newSource.Spec.Type)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid event source type")
-	}
+	eventSourceType := newSource.Spec.Type
 
 	// Validate event source type constraints
-	err = validateEventSourceType(eventSourceType, newSource.Spec)
+	err = validateEventSourceType(eventSourceType, newSource.Spec, registry)
 	if err != nil {
 		return nil, err
 	}

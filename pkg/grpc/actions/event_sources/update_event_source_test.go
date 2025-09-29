@@ -29,7 +29,7 @@ func Test__UpdateEventSource(t *testing.T) {
 			Name: "test-update-event-source",
 		},
 		Spec: &protos.EventSource_Spec{
-			Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
+			Type: "github",
 			Integration: &integrationPb.IntegrationRef{
 				Name: r.Integration.Name,
 			},
@@ -66,7 +66,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Name: "existing-source",
 			},
 			Spec: &protos.EventSource_Spec{
-				Type: protos.EventSource_TYPE_MANUAL,
+				Type: models.EventSourceTypeManual,
 			},
 		})
 		require.NoError(t, err)
@@ -76,7 +76,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Name: "existing-source",
 			},
 			Spec: &protos.EventSource_Spec{
-				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
+				Type: "github",
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -100,7 +100,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Description: "new-event-source-description",
 			},
 			Spec: &protos.EventSource_Spec{
-				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
+				Type: "github",
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -137,7 +137,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Description: "no integration",
 			},
 			Spec: &protos.EventSource_Spec{
-				Type: protos.EventSource_TYPE_MANUAL,
+				Type: models.EventSourceTypeManual,
 			},
 		})
 
@@ -185,7 +185,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Name: "updated-event-source-name",
 			},
 			Spec: &protos.EventSource_Spec{
-				Type: protos.EventSource_TYPE_INTEGRATION_RESOURCE,
+				Type: "github",
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -210,7 +210,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Description: "with schedule",
 			},
 			Spec: &protos.EventSource_Spec{
-				Type: protos.EventSource_TYPE_SCHEDULED,
+				Type: models.EventSourceTypeScheduled,
 				Schedule: &protos.EventSource_Schedule{
 					Type: protos.EventSource_Schedule_TYPE_DAILY,
 					Daily: &protos.EventSource_DailySchedule{
@@ -241,7 +241,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Description: "no schedule",
 			},
 			Spec: &protos.EventSource_Spec{
-				Type: protos.EventSource_TYPE_MANUAL,
+				Type: models.EventSourceTypeManual,
 			},
 		})
 
