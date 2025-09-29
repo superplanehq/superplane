@@ -45,7 +45,7 @@ func (w *ExecutionPoller) Start() error {
 }
 
 func (w *ExecutionPoller) Tick() error {
-	executions, err := models.ListExecutionsInState(models.ExecutionStarted)
+	executions, err := models.ListExecutionsInState(models.ExecutionStarted, MaxConcurrentExecutions)
 	if err != nil {
 		return err
 	}

@@ -6,6 +6,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -48,9 +49,13 @@ func (s *Secret) Delete() error {
 }
 
 func FindSecretByName(domainType string, domainID uuid.UUID, name string) (*Secret, error) {
+	return FindSecretByNameInTransaction(database.Conn(), domainType, domainID, name)
+}
+
+func FindSecretByNameInTransaction(tx *gorm.DB, domainType string, domainID uuid.UUID, name string) (*Secret, error) {
 	var secret Secret
 
-	err := database.Conn().
+	err := tx.
 		Where("domain_type = ?", domainType).
 		Where("domain_id = ?", domainID).
 		Where("name = ?", name).

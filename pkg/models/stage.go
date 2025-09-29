@@ -291,9 +291,13 @@ func (s *Stage) OutputNames() []string {
 }
 
 func (s *Stage) GetResource() (*Resource, error) {
+	return s.GetResourceInTransaction(database.Conn())
+}
+
+func (s *Stage) GetResourceInTransaction(tx *gorm.DB) (*Resource, error) {
 	var resource Resource
 
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", s.ResourceID).
 		First(&resource).
 		Error
@@ -324,9 +328,13 @@ func (s *Stage) GetIntegrationResource() (*IntegrationResource, error) {
 }
 
 func (s *Stage) FindIntegration() (*Integration, error) {
+	return s.FindIntegrationInTransaction(database.Conn())
+}
+
+func (s *Stage) FindIntegrationInTransaction(tx *gorm.DB) (*Integration, error) {
 	var integration Integration
 
-	err := database.Conn().
+	err := tx.
 		Table("resources").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
 		Where("resources.id = ?", s.ResourceID).

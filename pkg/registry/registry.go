@@ -3,16 +3,20 @@ package registry
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/executors/http"
+	httpexec "github.com/superplanehq/superplane/pkg/executors/http"
 	"github.com/superplanehq/superplane/pkg/executors/noop"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
+	"gorm.io/gorm"
 )
 
 type Integration struct {
@@ -23,6 +27,7 @@ type Integration struct {
 }
 
 type Registry struct {
+	httpClient   *http.Client
 	Encryptor    crypto.Encryptor
 	Integrations map[string]Integration
 	Executors    map[string]executors.Executor
@@ -33,6 +38,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		Encryptor:    encryptor,
 		Executors:    map[string]executors.Executor{},
 		Integrations: map[string]Integration{},
+		httpClient:   &http.Client{Timeout: 10 * time.Second},
 	}
 
 	r.Init()
@@ -61,7 +67,7 @@ func (r *Registry) Init() {
 	//
 	// Register the executors
 	//
-	r.Executors[models.ExecutorTypeHTTP] = http.NewHTTPExecutor()
+	r.Executors[models.ExecutorTypeHTTP] = httpexec.NewHTTPExecutor(r.httpClient)
 	r.Executors[models.ExecutorTypeNoOp] = noop.NewNoOpExecutor()
 }
 
@@ -102,12 +108,16 @@ func (r *Registry) GetOIDCVerifier(integrationType string) (integrations.OIDCVer
 }
 
 func (r *Registry) NewResourceManager(ctx context.Context, integration *models.Integration) (integrations.ResourceManager, error) {
+	return r.NewResourceManagerInTransaction(ctx, database.Conn(), integration)
+}
+
+func (r *Registry) NewResourceManagerInTransaction(ctx context.Context, tx *gorm.DB, integration *models.Integration) (integrations.ResourceManager, error) {
 	registration, ok := r.Integrations[integration.Type]
 	if !ok {
 		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
 	}
 
-	authFn, err := r.getAuthFn(ctx, integration)
+	authFn, err := r.getAuthFn(ctx, tx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error getting authentication function: %v", err)
 	}
@@ -115,11 +125,11 @@ func (r *Registry) NewResourceManager(ctx context.Context, integration *models.I
 	return registration.NewResourceManager(ctx, integration.URL, authFn)
 }
 
-func (r *Registry) getAuthFn(ctx context.Context, integration *models.Integration) (integrations.AuthenticateFn, error) {
+func (r *Registry) getAuthFn(ctx context.Context, tx *gorm.DB, integration *models.Integration) (integrations.AuthenticateFn, error) {
 	switch integration.AuthType {
 	case models.IntegrationAuthTypeToken:
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		provider, err := r.secretProvider(secretInfo, integration)
+		provider, err := r.secretProvider(tx, secretInfo, integration)
 		if err != nil {
 			return nil, fmt.Errorf("error creating secret provider: %v", err)
 		}
@@ -142,12 +152,12 @@ func (r *Registry) getAuthFn(ctx context.Context, integration *models.Integratio
 	return nil, fmt.Errorf("integration auth type %s not supported", integration.AuthType)
 }
 
-func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
+func (r *Registry) secretProvider(tx *gorm.DB, secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
 	//
 	// If the integration is scoped to an organization, the secret must also be scoped there.
 	//
 	if integration.DomainType == models.DomainTypeOrganization {
-		return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
+		return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
 	}
 
 	//
@@ -155,7 +165,7 @@ func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, i
 	// If the secret is also on the canvas level, we use the same domain type and ID.
 	//
 	if secretDef.DomainType == models.DomainTypeCanvas {
-		return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
+		return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
 	}
 
 	//
@@ -167,15 +177,19 @@ func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, i
 		return nil, fmt.Errorf("error finding canvas %s: %v", integration.DomainID, err)
 	}
 
-	return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
+	return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
 }
 
 func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
+	return r.NewIntegrationExecutorWithTx(database.Conn(), integration, resource)
+}
+
+func (r *Registry) NewIntegrationExecutorWithTx(tx *gorm.DB, integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
 	if integration == nil {
 		return nil, fmt.Errorf("integration is required")
 	}
 
-	resourceManager, err := r.NewResourceManager(context.Background(), integration)
+	resourceManager, err := r.NewResourceManagerInTransaction(context.Background(), tx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating integration: %v", err)
 	}

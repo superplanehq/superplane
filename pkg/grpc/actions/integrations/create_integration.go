@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -114,7 +115,7 @@ func validateAuth(ctx context.Context, encryptor crypto.Encryptor, integrationDo
 		}
 
 		name := auth.Token.ValueFrom.Secret.Name
-		provider, err := secrets.NewProvider(encryptor, name, domainType, *domainID)
+		provider, err := secrets.NewProvider(database.Conn(), encryptor, name, domainType, *domainID)
 		if err != nil {
 			return nil, "", err
 		}

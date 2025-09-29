@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const (
@@ -24,15 +24,15 @@ type Options struct {
 	Encryptor  crypto.Encryptor
 }
 
-func NewProvider(encryptor crypto.Encryptor, name, domainType string, domainID uuid.UUID) (Provider, error) {
-	secret, err := models.FindSecretByName(domainType, domainID, name)
+func NewProvider(tx *gorm.DB, encryptor crypto.Encryptor, name, domainType string, domainID uuid.UUID) (Provider, error) {
+	secret, err := models.FindSecretByNameInTransaction(tx, domainType, domainID, name)
 	if err != nil {
 		return nil, fmt.Errorf("error finding secret %s: %v", name, err)
 	}
 
 	switch secret.Provider {
 	case ProviderLocal:
-		return NewLocalProvider(database.Conn(), encryptor, secret), nil
+		return NewLocalProvider(tx, encryptor, secret), nil
 	default:
 		return nil, fmt.Errorf("provider not supported: %s", secret.Provider)
 	}

@@ -68,7 +68,7 @@ func (s *ResourceCleanupService) CleanupUnusedResourceInTransaction(tx *gorm.DB,
 		return err
 	}
 
-	resourceManager, err := s.Registry.NewResourceManager(context.Background(), integration)
+	resourceManager, err := s.Registry.NewResourceManagerInTransaction(context.Background(), tx, integration)
 	if err != nil {
 		logger.Errorf("Error creating resource manager: %v", err)
 		return err
@@ -207,7 +207,7 @@ func (s *ResourceCleanupService) CleanupEventSourceWebhooksInTransaction(tx *gor
 		return false, err
 	}
 
-	resourceManager, err := s.Registry.NewResourceManager(context.Background(), integration)
+	resourceManager, err := s.Registry.NewResourceManagerInTransaction(context.Background(), tx, integration)
 	if err != nil {
 		return false, err
 	}

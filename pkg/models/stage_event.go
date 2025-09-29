@@ -60,14 +60,6 @@ func (e *StageEvent) UpdateStateInTransaction(tx *gorm.DB, state, reason string)
 		Error
 }
 
-func UpdateStageEventsInTransaction(tx *gorm.DB, ids []string, state, reason string) error {
-	return tx.Table("stage_events").
-		Where("id IN ?", ids).
-		Update("state", state).
-		Update("state_reason", reason).
-		Error
-}
-
 func (e *StageEvent) Approve(requesterID uuid.UUID) error {
 	now := time.Now()
 

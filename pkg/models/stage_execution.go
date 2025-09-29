@@ -84,9 +84,13 @@ func (e *StageExecution) Cancel(userID uuid.UUID) error {
 }
 
 func (e *StageExecution) GetInputs() (map[string]any, error) {
+	return e.GetInputsInTransaction(database.Conn())
+}
+
+func (e *StageExecution) GetInputsInTransaction(tx *gorm.DB) (map[string]any, error) {
 	var inputs datatypes.JSONType[map[string]any]
 
-	err := database.Conn().
+	err := tx.
 		Table("stage_executions").
 		Select("stage_events.inputs").
 		Joins("inner join stage_events ON stage_executions.stage_event_id = stage_events.id").
@@ -119,9 +123,13 @@ func (e *StageExecution) FindSource() (string, error) {
 }
 
 func (e *StageExecution) Start() error {
+	return e.StartInTransaction(database.Conn())
+}
+
+func (e *StageExecution) StartInTransaction(tx *gorm.DB) error {
 	now := time.Now()
 
-	return database.Conn().Model(e).
+	return tx.Model(e).
 		Update("state", ExecutionStarted).
 		Update("started_at", &now).
 		Update("updated_at", &now).
@@ -159,18 +167,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result, 
 		return nil, err
 	}
 
-	//
-	// Update stage event state.
-	//
-	err = UpdateStageEventsInTransaction(
-		tx, []string{e.StageEventID.String()}, StageEventStateProcessed, "",
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	inputs, err := e.GetInputs()
+	inputs, err := e.GetInputsInTransaction(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +194,11 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result, 
 }
 
 func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {
-	return database.Conn().Model(e).
+	return e.UpdateOutputsInTransaction(database.Conn(), outputs)
+}
+
+func (e *StageExecution) UpdateOutputsInTransaction(tx *gorm.DB, outputs map[string]any) error {
+	return tx.Model(e).
 		Clauses(clause.Returning{}).
 		Update("outputs", datatypes.NewJSONType(outputs)).
 		Update("updated_at", time.Now()).
@@ -322,19 +323,40 @@ func FindExecutionInState(stageID uuid.UUID, states []string) (*StageExecution, 
 	return &execution, nil
 }
 
-func ListExecutionsInState(state string) ([]StageExecution, error) {
+func ListExecutionsInState(state string, limit int) ([]StageExecution, error) {
 	var executions []StageExecution
 
-	err := database.Conn().
-		Where("state = ?", state).
-		Find(&executions).
+	query := database.Conn().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("state = ?", state)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&executions).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func LockExecution(tx *gorm.DB, id uuid.UUID) (*StageExecution, error) {
+	var execution StageExecution
+
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", id).
+		Where("state = ?", ExecutionPending).
+		First(&execution).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return executions, nil
+	return &execution, nil
 }
 
 func CreateStageExecution(canvasID, stageID, stageEventID uuid.UUID) (*StageExecution, error) {
@@ -501,6 +523,10 @@ func FindExecutionResource(externalID string, parentResourceID uuid.UUID) (*Exec
 }
 
 func (e *StageExecution) AddResource(externalID string, externalType string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
+	return e.AddResourceInTransaction(database.Conn(), externalID, externalType, parentResourceID)
+}
+
+func (e *StageExecution) AddResourceInTransaction(tx *gorm.DB, externalID string, externalType string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
 	r := &ExecutionResource{
 		ExecutionID:      e.ID,
 		StageID:          e.StageID,
@@ -510,7 +536,7 @@ func (e *StageExecution) AddResource(externalID string, externalType string, par
 		State:            ExecutionResourcePending,
 	}
 
-	err := database.Conn().
+	err := tx.
 		Clauses(clause.Returning{}).
 		Create(r).
 		Error
