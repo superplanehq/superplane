@@ -25,6 +25,8 @@ import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicat
 import { showErrorToast } from '@/utils/toast';
 import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
+import { getResourceLinks } from '@/utils/resourceLinks';
+import { ClickableBadge } from '@/components/ClickableBadge/ClickableBadge';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="rocket_launch" size="xl" />,
@@ -723,18 +725,28 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   )}
                   {executorBadges.length > 0 && !props.data.dryRun && (
                     <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-                      {executorBadges.map((badge, index) => (
-                        <Badge
-                          key={`${badge.icon}-${index}`}
-                          color="zinc"
-                          icon={badge.icon}
-                          truncate
-                          className="flex-shrink min-w-0 max-w-full"
-                          title={badge.text}
-                        >
-                          {badge.text}
-                        </Badge>
-                      ))}
+                      {executorBadges.map((badge, index) => {
+                        const resourceLinks = getResourceLinks(
+                          props.data.executor?.type as string,
+                          availableIntegrations.find(int => int.metadata?.name === props.data.executor?.integration?.name)?.spec?.url,
+                          props.data.executor?.resource?.name,
+                          props.data.executor?.spec || {}
+                        );
+                        return (
+                          <ClickableBadge
+                            key={`${currentStage?.metadata?.id}-badge-${index}`}
+                            color="zinc"
+                            icon={badge.icon}
+                            truncate
+                            className="flex-shrink min-w-0 max-w-full"
+                            title={badge.text}
+                            resourceLinks={resourceLinks}
+                            badgeText={badge.text}
+                          >
+                            {badge.text}
+                          </ClickableBadge>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -845,7 +857,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   return null;
                 }
               }}
-              onSubmit={async (eventType: string, eventData: any) => {
+              onSubmit={async (eventType: string, eventData: unknown) => {
                 await superplaneCreateEvent(withOrganizationHeader({
                   path: { canvasIdOrName: canvasId! },
                   body: {

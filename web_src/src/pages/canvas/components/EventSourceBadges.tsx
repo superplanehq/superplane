@@ -1,8 +1,9 @@
 import React, { useMemo, useCallback } from 'react';
-import { Badge } from '@/components/Badge/badge';
 import { SuperplaneEventSource, IntegrationsIntegration, SuperplaneFilter } from '@/api-client';
 import Tippy from '@tippyjs/react/headless';
 import { getResourceLabel } from '@/utils/components';
+import { getResourceLinks } from '@/utils/resourceLinks';
+import { ClickableBadge } from '@/components/ClickableBadge/ClickableBadge';
 
 interface EventSourceBadgesProps {
   resourceName?: string;
@@ -38,13 +39,23 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
 
   const cleanResourceName = resourceName?.replace('.semaphore/', '') || '';
 
+  const resourceLinks = useMemo(() => {
+    return getResourceLinks(
+      sourceType as string,
+      integration?.spec?.url,
+      resourceName,
+      {}
+    );
+  }, [sourceType, integration?.spec?.url, resourceName]);
+
   const badgeItems = useMemo(() => {
-    const badges: Array<{ icon: string; text: string; tooltip: React.ReactNode }> = [];
+    const badges: Array<{ icon: string; text: string; tooltip: React.ReactNode; resourceLinks: typeof resourceLinks }> = [];
 
     if (resourceName) {
       badges.push({
         icon: 'assignment',
         text: cleanResourceName,
+        resourceLinks: resourceLinks,
         tooltip: (
           <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[250px]">
             <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">{getResourceLabel(sourceType)} Configuration</div>
@@ -73,6 +84,7 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
       badges.push({
         icon: 'filter_list',
         text: filterText,
+        resourceLinks: [],
         tooltip: (
           <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[280px]">
             <div className="space-y-3">
@@ -108,7 +120,7 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
     }
 
     return badges;
-  }, [resourceName, cleanResourceName, totalFilters, totalEventTypes, currentEventSource, integration, getFilterTypeLabel, getFilterExpression]);
+  }, [resourceName, cleanResourceName, totalFilters, totalEventTypes, currentEventSource, integration, sourceType, getFilterTypeLabel, getFilterExpression, resourceLinks]);
 
   if (badgeItems.length === 0) return null;
 
@@ -121,13 +133,14 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
           placement="top"
         >
           <div className="flex-shrink min-w-0 max-w-full">
-            <Badge
+            <ClickableBadge
               color="zinc"
               icon={badge.icon}
               truncate
+              resourceLinks={badge.resourceLinks}
             >
               {badge.text}
-            </Badge>
+            </ClickableBadge>
           </div>
         </Tippy>
       ))}
