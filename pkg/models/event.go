@@ -378,6 +378,27 @@ func CountEvents(canvasID uuid.UUID, sourceType string, sourceID string, states 
 	return count, nil
 }
 
+func DeleteOldEvents(retentionDuration time.Duration, states []string) (int64, error) {
+	return DeleteOldEventsInTransaction(database.Conn(), retentionDuration, states)
+}
+
+func DeleteOldEventsInTransaction(tx *gorm.DB, retentionDuration time.Duration, states []string) (int64, error) {
+	cutoffTime := time.Now().Add(-retentionDuration)
+
+	query := tx.Where("received_at < ?", cutoffTime)
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
+	result := query.Delete(&Event{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
+
 // CompileBooleanExpression compiles a boolean expression.
 //
 // variables: the variables to be used in the expression.
