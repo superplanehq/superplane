@@ -265,6 +265,7 @@ func (b *StageBuilder) findOrCreateEventSource(tx *gorm.DB) (*uuid.UUID, error) 
 		WithScope(models.EventSourceScopeInternal).
 		ForIntegration(b.integration).
 		ForResource(b.resource).
+		WithType(b.integration.Type).
 		Create()
 
 	if err != nil {

@@ -644,6 +644,7 @@ export type SuperplaneEventSourceSchedule = {
 };
 
 export type SuperplaneEventSourceSpec = {
+    type?: string;
     integration?: IntegrationsIntegrationRef;
     resource?: IntegrationsResourceRef;
     events?: Array<EventSourceEventType>;

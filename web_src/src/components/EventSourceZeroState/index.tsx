@@ -1,24 +1,32 @@
 import React from 'react';
+import { getIntegrationLabel } from '@/utils/components';
 
 interface EventSourceZeroStateProps {
-  eventSourceType: string;
+  sourceType: string;
 }
 
-const getZeroStateMessage = (eventSourceType: string): string => {
-  switch (eventSourceType) {
-    case 'semaphore':
-      return 'Listening to changes in your Semaphore project';
+const getZeroStateMessage = (sourceType: string): string => {
+  switch (sourceType) {
     case 'github':
-      return 'Listening to changes in your GitHub repository';
+    case 'semaphore':
+      const label = getIntegrationLabel(sourceType);
+      if (label) {
+        return `Listening to changes in your ${label}`;
+      }
+      return 'Listening to changes in your resource';
     case 'webhook':
       return 'Ready to receive webhook events';
+    case 'scheduled':
+      return 'Ready to execute on schedule';
+    case 'manual':
+      return 'Ready for manual triggers';
     default:
       return 'Ready to receive events';
   }
 };
 
 export const EventSourceZeroState: React.FC<EventSourceZeroStateProps> = ({
-  eventSourceType
+  sourceType
 }) => {
   return (
     <div className="bg-zinc-50 dark:bg-zinc-800 px-4 rounded-b-lg border-t border-gray-200 dark:border-gray-700">
@@ -34,7 +42,7 @@ export const EventSourceZeroState: React.FC<EventSourceZeroStateProps> = ({
           Ready to receive events
         </h3>
         <p className="text-zinc-600 dark:text-zinc-400 max-w-md mx-auto mb-6 !text-xs text-base/6 text-zinc-500 sm:text-sm/6 dark:text-zinc-400">
-          {getZeroStateMessage(eventSourceType)}
+          {getZeroStateMessage(sourceType)}
         </p>
       </div>
     </div>

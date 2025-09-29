@@ -42,7 +42,6 @@ export type EventSourceNodeData = {
   eventFilters?: EventSourceEventType[];
   integration: IntegrationsIntegrationRef | null;
   resource: IntegrationsResourceRef | null;
-  eventSourceType?: string;
   schedule?: SuperplaneEventSourceSchedule | null;
 }
 

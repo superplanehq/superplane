@@ -1,4 +1,4 @@
-import { SuperplaneStage, SuperplaneEventSource, SuperplaneConnectionGroup, SuperplaneConnection } from '@/api-client/types.gen';
+import { SuperplaneStage, SuperplaneEventSource, SuperplaneConnectionGroup } from '@/api-client/types.gen';
 
 /**
  * Factory functions to create empty/default nodes for different types
@@ -6,18 +6,19 @@ import { SuperplaneStage, SuperplaneEventSource, SuperplaneConnectionGroup, Supe
 
 export type NodeType = 'stage' | 'event_source' | 'connection_group';
 
+
 export interface CreateNodeParams {
   canvasId: string;
   name?: string;
-  executorType?: string;
-  eventSourceType?: string;
-  connections?: Array<SuperplaneConnection>;
+  spec?: any;
 }
 
 /**
  * Creates an empty stage with default configuration
  */
-export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, connections = [] }: CreateNodeParams): SuperplaneStage => {
+export const createEmptyStage = ({ canvasId, name = 'New Stage', spec }: CreateNodeParams): SuperplaneStage => {
+  const executorType = spec?.executor?.type;
+
   const getExecutorTemplate = (type?: string) => {
     switch (type) {
       case 'semaphore':
@@ -78,7 +79,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
       inputs: [],
       outputs: [],
       executor: getExecutorTemplate(executorType),
-      connections: connections,
+      connections: spec?.connections || [],
       inputMappings: [],
       secrets: [],
       dryRun: true
@@ -89,7 +90,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType, c
 /**
  * Creates an empty event source with default configuration
  */
-export const createEmptyEventSource = ({ canvasId, name = 'New Event Source' }: CreateNodeParams): SuperplaneEventSource => {
+export const createEmptyEventSource = ({ canvasId, name = 'New Event Source', spec }: CreateNodeParams): SuperplaneEventSource => {
   return {
     metadata: {
       canvasId,
@@ -97,7 +98,7 @@ export const createEmptyEventSource = ({ canvasId, name = 'New Event Source' }: 
       id: Date.now().toString(), // Temporary ID
     },
     spec: {
-      // Empty spec - will be configured in edit mode
+      type: spec?.type || 'webhook'
     }
   };
 };
@@ -105,7 +106,8 @@ export const createEmptyEventSource = ({ canvasId, name = 'New Event Source' }: 
 /**
  * Creates an empty connection group with default configuration
  */
-export const createEmptyConnectionGroup = ({ canvasId, name = 'New Connection Group', connections = [] }: CreateNodeParams): SuperplaneConnectionGroup => {
+export const createEmptyConnectionGroup = ({ canvasId, name = 'New Connection Group', spec }: CreateNodeParams): SuperplaneConnectionGroup => {
+  const connections = spec?.connections || [];
   return {
     metadata: {
       canvasId,

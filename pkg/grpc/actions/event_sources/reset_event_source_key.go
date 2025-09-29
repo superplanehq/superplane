@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,6 +22,11 @@ func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvas
 
 		log.Errorf("Error describing event source %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, err
+	}
+
+	// Only webhook event sources have keys that can be reset
+	if source.Type != models.EventSourceTypeWebhook {
+		return nil, status.Error(codes.InvalidArgument, "only webhook event sources have keys that can be reset")
 	}
 
 	plainKey, encryptedKey, err := crypto.NewRandomKey(ctx, encryptor, source.ID.String())
