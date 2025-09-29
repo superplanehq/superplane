@@ -12,10 +12,10 @@ import GithubLogo from '@/assets/github-mark.svg'
 import {
   GitHubIntegrationForm,
   SemaphoreIntegrationForm,
-  SettingsApiTokenForm,
   useIntegrationForm,
   NEW_SECRET_NAME
 } from '../../IntegrationForm'
+import { ApiTokenForm } from '../../IntegrationForm/ApiTokenForm'
 import { showErrorToast, showSuccessToast } from '../../../utils/toast'
 
 interface CanvasIntegrationsProps {
@@ -475,14 +475,19 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
               )}
 
               {/* API Token Form */}
-              <SettingsApiTokenForm
+              <ApiTokenForm
                 integrationData={integrationData}
                 setIntegrationData={setIntegrationData}
                 errors={errors}
                 setErrors={setErrors}
+                apiTokenTab={apiTokenTab}
+                setApiTokenTab={setApiTokenTab}
+                newSecretToken={newSecretToken}
+                setNewSecretToken={setNewSecretToken}
                 secrets={secrets}
                 organizationId={organizationId}
                 canvasId={canvasId}
+                orgUrlRef={orgUrlRef}
                 isEditMode={section === 'edit'}
                 newSecretValue={newSecretValue}
                 setNewSecretValue={setNewSecretValue}

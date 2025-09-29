@@ -112,7 +112,7 @@ func (w *HardDeletionWorker) hardDeleteStage(logger *log.Entry, stage *models.St
 		}
 
 		if stage.ResourceID != nil {
-			if err := w.CleanupService.CleanupStageWebhooks(stage); err != nil {
+			if err := w.CleanupService.CleanupStageWebhooksInTransaction(tx, stage); err != nil {
 				logger.Warnf("Failed to cleanup stage webhooks: %v", err)
 				// Don't fail the transaction, just log the warning
 			}
@@ -165,7 +165,7 @@ func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSourc
 			return err
 		}
 
-		shouldDeleteResource, resource := w.prepareResourceCleanup(logger, eventSource)
+		shouldDeleteResource, resource := w.prepareResourceCleanupInTransaction(tx, logger, eventSource)
 
 		if err := eventSource.HardDeleteInTransaction(tx); err != nil {
 			return fmt.Errorf("failed to hard delete event source: %v", err)
@@ -187,11 +187,15 @@ func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSourc
 }
 
 func (w *HardDeletionWorker) prepareResourceCleanup(logger *log.Entry, eventSource *models.EventSource) (bool, *models.Resource) {
+	return w.prepareResourceCleanupInTransaction(database.Conn(), logger, eventSource)
+}
+
+func (w *HardDeletionWorker) prepareResourceCleanupInTransaction(tx *gorm.DB, logger *log.Entry, eventSource *models.EventSource) (bool, *models.Resource) {
 	if eventSource.ResourceID == nil {
 		return false, nil
 	}
 
-	resource, err := models.FindResourceByID(*eventSource.ResourceID)
+	resource, err := models.FindResourceByIDInTransaction(tx, *eventSource.ResourceID)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Warnf("Failed to find resource for cleanup: %v", err)
@@ -199,7 +203,7 @@ func (w *HardDeletionWorker) prepareResourceCleanup(logger *log.Entry, eventSour
 		return false, nil
 	}
 
-	canDelete, err := w.CleanupService.CleanupEventSourceWebhooks(eventSource, resource)
+	canDelete, err := w.CleanupService.CleanupEventSourceWebhooksInTransaction(tx, eventSource, resource)
 	if err != nil {
 		logger.Warnf("Failed to cleanup event source webhooks: %v", err)
 		return false, resource

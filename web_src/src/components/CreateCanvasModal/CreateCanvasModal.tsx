@@ -11,6 +11,7 @@ import {
   DialogBody,
   DialogActions
 } from '../Dialog/dialog'
+import { showErrorToast } from '../../utils/toast'
 
 interface CreateCanvasModalProps {
   isOpen: boolean
@@ -30,27 +31,47 @@ export function CreateCanvasModal({
 }: CreateCanvasModalProps) {
   const [canvasName, setCanvasName] = useState('')
   const [canvasDescription, setCanvasDescription] = useState('')
+  const [nameError, setNameError] = useState('')
 
   const handleClose = () => {
     setCanvasName('')
     setCanvasDescription('')
+    setNameError('')
     onClose()
   }
 
   const handleSubmit = async () => {
-    if (canvasName.trim()) {
-      try {
-        await onSubmit({
-          name: canvasName.trim(),
-          description: canvasDescription.trim() || undefined
-        })
+    setNameError('')
 
-        // Reset form and close modal
-        setCanvasName('')
-        setCanvasDescription('')
-        onClose()
-      } catch (error) {
-        console.error('Error creating canvas:', error)
+    if (!canvasName.trim()) {
+      setNameError('Canvas name is required')
+      return
+    }
+
+    if (canvasName.trim().length > MAX_CANVAS_NAME_LENGTH) {
+      setNameError(`Canvas name must be ${MAX_CANVAS_NAME_LENGTH} characters or less`)
+      return
+    }
+
+    try {
+      await onSubmit({
+        name: canvasName.trim(),
+        description: canvasDescription.trim() || undefined
+      })
+
+      // Reset form and close modal
+      setCanvasName('')
+      setCanvasDescription('')
+      setNameError('')
+      onClose()
+    } catch (error) {
+      console.error('Error creating canvas:', error)
+      const errorMessage = ((error as Error)?.message) || error?.toString() || 'Failed to create canvas'
+
+      showErrorToast(errorMessage)
+
+      if (errorMessage.toLowerCase().includes('already') || errorMessage.toLowerCase().includes('exists')) {
+        setNameError('A canvas with this name already exists')
       }
     }
   }
@@ -79,15 +100,23 @@ export function CreateCanvasModal({
                 if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
                   setCanvasName(e.target.value)
                 }
+                if (nameError) {
+                  setNameError('')
+                }
               }}
               placeholder="Enter canvas name"
-              className="w-full"
+              className={`w-full ${nameError ? 'border-red-500' : ''}`}
               autoFocus
               maxLength={MAX_CANVAS_NAME_LENGTH}
             />
             <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
               {canvasName.length}/{MAX_CANVAS_NAME_LENGTH} characters
             </div>
+            {nameError && (
+              <div className="text-xs text-red-600 mt-1">
+                {nameError}
+              </div>
+            )}
           </Field>
 
           {/* Canvas Description */}
@@ -118,7 +147,7 @@ export function CreateCanvasModal({
         <Button
           color="blue"
           onClick={handleSubmit}
-          disabled={!canvasName.trim() || isLoading}
+          disabled={!canvasName.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"
         >
           {isLoading ? 'Creating...' : 'Create'}
