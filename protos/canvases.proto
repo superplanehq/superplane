@@ -436,10 +436,11 @@ message EventSource {
   }
 
   message Spec {
-    Integrations.IntegrationRef integration = 1;
-    Integrations.ResourceRef resource = 2;
-    repeated EventType events = 3;
-    Schedule schedule = 4;
+    string type = 1;
+    Integrations.IntegrationRef integration = 2;
+    Integrations.ResourceRef resource = 3;
+    repeated EventType events = 4;
+    Schedule schedule = 5;
   }
 
   message Schedule {

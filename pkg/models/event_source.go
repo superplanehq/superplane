@@ -20,6 +20,10 @@ const (
 	EventSourceScopeExternal = "external"
 	EventSourceScopeInternal = "internal"
 
+	EventSourceTypeManual    = "manual"
+	EventSourceTypeScheduled = "scheduled"
+	EventSourceTypeWebhook   = "webhook"
+
 	ScheduleTypeHourly = "hourly"
 	ScheduleTypeDaily  = "daily"
 	ScheduleTypeWeekly = "weekly"
@@ -33,6 +37,13 @@ const (
 	WeekDaySunday    = "sunday"
 )
 
+// Regular event types are the ones that don't require integration.
+var RegularEventSourceTypes = []string{
+	EventSourceTypeManual,
+	EventSourceTypeScheduled,
+	EventSourceTypeWebhook,
+}
+
 type EventSource struct {
 	ID              uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	CanvasID        uuid.UUID
@@ -42,6 +53,7 @@ type EventSource struct {
 	Key             []byte
 	State           string
 	Scope           string
+	Type            string                        `gorm:"column:type"`
 	Schedule        *datatypes.JSONType[Schedule] `gorm:"column:schedule"`
 	LastTriggeredAt *time.Time                    `gorm:"column:last_triggered_at"`
 	NextTriggerAt   *time.Time                    `gorm:"column:next_trigger_at"`

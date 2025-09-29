@@ -28,6 +28,7 @@ type EventSourceBuilder struct {
 	name                string
 	description         string
 	scope               string
+	eventSourceType     string
 	eventTypes          []models.EventType
 	schedule            *models.Schedule
 	integration         *models.Integration
@@ -70,6 +71,11 @@ func (b *EventSourceBuilder) WithDescription(description string) *EventSourceBui
 
 func (b *EventSourceBuilder) WithScope(scope string) *EventSourceBuilder {
 	b.scope = scope
+	return b
+}
+
+func (b *EventSourceBuilder) WithType(eventSourceType string) *EventSourceBuilder {
+	b.eventSourceType = eventSourceType
 	return b
 }
 
@@ -144,6 +150,7 @@ func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.Even
 		Description: b.description,
 		Key:         encryptedKey,
 		Scope:       b.scope,
+		Type:        b.eventSourceType,
 		EventTypes:  datatypes.NewJSONSlice(b.eventTypes),
 	}
 
@@ -223,6 +230,7 @@ func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSou
 		Description: b.description,
 		Key:         encryptedKey,
 		Scope:       b.scope,
+		Type:        b.eventSourceType,
 		EventTypes:  datatypes.NewJSONSlice(b.eventTypes),
 		ResourceID:  &resource.ID,
 	}
@@ -273,6 +281,7 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 	now := time.Now()
 	eventSource.Name = b.name
 	eventSource.Scope = b.scope
+	eventSource.Type = b.eventSourceType
 	eventSource.State = models.EventSourceStatePending
 	eventSource.EventTypes = datatypes.NewJSONSlice(b.eventTypes)
 	eventSource.UpdatedAt = &now
@@ -344,6 +353,7 @@ func (b *EventSourceBuilder) updateWithoutIntegration(tx *gorm.DB) (*models.Even
 	updates := map[string]interface{}{
 		"name":        b.name,
 		"description": b.description,
+		"type":        b.eventSourceType,
 		"updated_at":  now,
 		"event_types": datatypes.NewJSONSlice(b.eventTypes),
 		"resource_id": nil,
@@ -421,6 +431,7 @@ func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSou
 	updates := map[string]interface{}{
 		"name":        b.name,
 		"description": b.description,
+		"type":        b.eventSourceType,
 		"updated_at":  now,
 		"event_types": datatypes.NewJSONSlice(b.eventTypes),
 		"resource_id": &resource.ID,

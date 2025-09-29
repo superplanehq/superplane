@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -37,8 +38,17 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, status.Error(codes.InvalidArgument, "event source name is required")
 	}
 
+	if newSource.Spec == nil || newSource.Spec.Type == "" {
+		return nil, status.Error(codes.InvalidArgument, "event source type is required")
+	}
+
+	err = validateEventSourceType(newSource.Spec.Type, newSource.Spec, registry)
+	if err != nil {
+		return nil, err
+	}
+
 	//
-	// It is OK to create an event source without an integration.
+	// Validate integration if required by event source type.
 	//
 	var integration *models.Integration
 	if newSource.Spec != nil && newSource.Spec.Integration != nil {
@@ -77,6 +87,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		WithName(newSource.Metadata.Name).
 		WithDescription(newSource.Metadata.Description).
 		WithScope(models.EventSourceScopeExternal).
+		WithType(newSource.Spec.Type).
 		ForIntegration(integration).
 		ForResource(resource).
 		WithEventTypes(eventTypes).
@@ -103,7 +114,11 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 
 	response := &pb.CreateEventSourceResponse{
 		EventSource: protoSource,
-		Key:         string(plainKey),
+	}
+
+	// Only return keys for webhook event sources
+	if newSource.Spec.Type == models.EventSourceTypeWebhook {
+		response.Key = string(plainKey)
 	}
 
 	err = messages.NewEventSourceCreatedMessage(eventSource).Publish()
@@ -200,6 +215,7 @@ func validateSchedule(spec *pb.EventSource_Spec, integration *models.Integration
 
 func serializeEventSource(eventSource models.EventSource, lastEvent *models.Event) (*pb.EventSource, error) {
 	spec := &pb.EventSource_Spec{
+		Type:   eventSource.Type,
 		Events: []*pb.EventSource_EventType{},
 	}
 
@@ -313,4 +329,38 @@ func serializeEventSource(eventSource models.EventSource, lastEvent *models.Even
 	}
 
 	return pbEventSource, nil
+}
+
+func validateEventSourceType(eventSourceType string, spec *pb.EventSource_Spec, registry *registry.Registry) error {
+	if slices.Contains(models.RegularEventSourceTypes, eventSourceType) {
+		return validateRegularEventSource(eventSourceType, spec)
+	}
+
+	if !registry.HasIntegrationWithType(eventSourceType) {
+		return status.Errorf(codes.InvalidArgument, "unknown event source type: %s", eventSourceType)
+	}
+
+	if spec.Integration == nil {
+		return status.Errorf(codes.InvalidArgument, "integration is required for %s event sources", eventSourceType)
+	}
+
+	if spec.Resource == nil {
+		return status.Errorf(codes.InvalidArgument, "resource is required for %s event sources", eventSourceType)
+	}
+
+	return nil
+}
+
+func validateRegularEventSource(eventSourceType string, spec *pb.EventSource_Spec) error {
+	if spec.Integration != nil {
+		return status.Error(codes.InvalidArgument, "regular event sources cannot have integrations")
+	}
+
+	if eventSourceType == models.EventSourceTypeScheduled {
+		if spec.Schedule == nil {
+			return status.Error(codes.InvalidArgument, "schedule is required for scheduled event sources")
+		}
+	}
+
+	return nil
 }

@@ -660,3 +660,4 @@ func StageEventStateReasonToProto(stateReason string) pb.StageEvent_StateReason 
 		return pb.StageEvent_STATE_REASON_UNKNOWN
 	}
 }
+

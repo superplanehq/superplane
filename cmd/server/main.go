@@ -118,6 +118,13 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 
 		go w.Start()
 	}
+
+	if os.Getenv("START_EVENT_DELETION_WORKER") == "yes" {
+		log.Println("Starting Event Deletion Worker")
+
+		w := workers.NewEventDeletionWorker()
+		go w.Start()
+	}
 }
 
 func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {

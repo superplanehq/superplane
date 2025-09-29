@@ -140,6 +140,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			Name:       "gh",
 			Key:        []byte(`my-key`),
 			Scope:      models.EventSourceScopeExternal,
+			Type:       models.EventSourceTypeWebhook,
 			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
 

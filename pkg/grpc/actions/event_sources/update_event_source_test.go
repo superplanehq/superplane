@@ -29,6 +29,7 @@ func Test__UpdateEventSource(t *testing.T) {
 			Name: "test-update-event-source",
 		},
 		Spec: &protos.EventSource_Spec{
+			Type: "github",
 			Integration: &integrationPb.IntegrationRef{
 				Name: r.Integration.Name,
 			},
@@ -64,12 +65,25 @@ func Test__UpdateEventSource(t *testing.T) {
 			Metadata: &protos.EventSource_Metadata{
 				Name: "existing-source",
 			},
+			Spec: &protos.EventSource_Spec{
+				Type: models.EventSourceTypeManual,
+			},
 		})
 		require.NoError(t, err)
 
 		_, err = UpdateEventSource(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), eventSourceID, &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: "existing-source",
+			},
+			Spec: &protos.EventSource_Spec{
+				Type: "github",
+				Integration: &integrationPb.IntegrationRef{
+					Name: r.Integration.Name,
+				},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
+				},
 			},
 		})
 
@@ -86,6 +100,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Description: "new-event-source-description",
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: "github",
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -112,7 +127,7 @@ func Test__UpdateEventSource(t *testing.T) {
 		assert.Equal(t, "project", res.EventSource.Spec.Resource.Type)
 		require.Len(t, res.EventSource.Spec.Events, 1)
 		assert.Equal(t, "pipeline_done", res.EventSource.Spec.Events[0].Type)
-		assert.NotEmpty(t, res.Key)
+		assert.Empty(t, res.Key)
 	})
 
 	t.Run("event source updated to remove integration", func(t *testing.T) {
@@ -120,6 +135,9 @@ func Test__UpdateEventSource(t *testing.T) {
 			Metadata: &protos.EventSource_Metadata{
 				Name:        "standalone-event-source",
 				Description: "no integration",
+			},
+			Spec: &protos.EventSource_Spec{
+				Type: models.EventSourceTypeManual,
 			},
 		})
 
@@ -131,7 +149,7 @@ func Test__UpdateEventSource(t *testing.T) {
 		assert.Nil(t, res.EventSource.Spec.Integration)
 		assert.Nil(t, res.EventSource.Spec.Resource)
 		assert.Empty(t, res.EventSource.Spec.Events)
-		assert.NotEmpty(t, res.Key)
+		assert.Empty(t, res.Key)
 	})
 
 	t.Run("connection source names are updated when event source name changes", func(t *testing.T) {
@@ -167,6 +185,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Name: "updated-event-source-name",
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: "github",
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
@@ -191,6 +210,7 @@ func Test__UpdateEventSource(t *testing.T) {
 				Description: "with schedule",
 			},
 			Spec: &protos.EventSource_Spec{
+				Type: models.EventSourceTypeScheduled,
 				Schedule: &protos.EventSource_Schedule{
 					Type: protos.EventSource_Schedule_TYPE_DAILY,
 					Daily: &protos.EventSource_DailySchedule{
@@ -211,7 +231,7 @@ func Test__UpdateEventSource(t *testing.T) {
 		assert.Equal(t, protos.EventSource_Schedule_TYPE_DAILY, res.EventSource.Spec.Schedule.Type)
 		require.NotNil(t, res.EventSource.Spec.Schedule.Daily)
 		assert.Equal(t, "14:30", res.EventSource.Spec.Schedule.Daily.Time)
-		assert.NotEmpty(t, res.Key)
+		assert.Empty(t, res.Key)
 	})
 
 	t.Run("event source updated to remove schedule", func(t *testing.T) {
@@ -219,6 +239,9 @@ func Test__UpdateEventSource(t *testing.T) {
 			Metadata: &protos.EventSource_Metadata{
 				Name:        "no-schedule-event-source",
 				Description: "no schedule",
+			},
+			Spec: &protos.EventSource_Spec{
+				Type: models.EventSourceTypeManual,
 			},
 		})
 
@@ -230,6 +253,6 @@ func Test__UpdateEventSource(t *testing.T) {
 		assert.Nil(t, res.EventSource.Spec.Integration)
 		assert.Nil(t, res.EventSource.Spec.Resource)
 		assert.Nil(t, res.EventSource.Spec.Schedule)
-		assert.NotEmpty(t, res.Key)
+		assert.Empty(t, res.Key)
 	})
 }
