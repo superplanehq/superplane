@@ -45,13 +45,16 @@ func (w *PendingExecutionsWorker) Tick() error {
 	}
 
 	for _, execution := range executions {
+		e := execution
+		logger := logging.ForExecution(&e)
+
+		logger.Info("Processing")
 		stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
 		if err != nil {
 			log.Errorf("Error finding stage %s: %v", execution.StageID, err)
 			continue
 		}
 
-		logger := logging.ForStage(stage)
 		if err := w.ProcessExecution(logger, stage, execution); err != nil {
 			log.Errorf("Error processing execution %s: %v", execution.ID, err)
 			continue
@@ -70,11 +73,12 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding inputs for execution: %v", err)
 	}
 
-	secrets, err := w.FindSecrets(stage, w.Encryptor)
+	secrets, err := w.FindSecrets(logger, stage, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
 
+	logger.Info("Building executor spec")
 	spec, err := w.SpecBuilder.Build(stage.ExecutorSpec, inputMap, secrets)
 	if err != nil {
 		return err
@@ -84,6 +88,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	// If the stage is in dry run mode, we use the no-op executor.
 	//
 	if stage.DryRun {
+		logger.Info("Stage is in dry run mode, using no-op executor")
 		executor, err := w.Registry.NewExecutor(models.ExecutorTypeNoOp)
 		if err != nil {
 			return err
@@ -112,7 +117,8 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	return w.handleIntegrationExecutor(logger, spec, stage, execution)
 }
 
-func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {
+func (w *PendingExecutionsWorker) FindSecrets(logger *log.Entry, stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {
+	logger.Info("Loading secrets")
 	secretMap := map[string]string{}
 	for _, def := range stage.Secrets {
 		secretDef := def.ValueFrom.Secret
@@ -138,6 +144,7 @@ func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor cry
 }
 
 func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, executor executors.Executor, spec []byte, execution models.StageExecution, stage *models.Stage) error {
+	logger.Info("Calling executor")
 	response, err := executor.Execute(spec, executors.ExecutionParameters{
 		ExecutionID: execution.ID.String(),
 		StageID:     stage.ID.String(),
@@ -184,6 +191,7 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, executor exe
 		resultMessage = fmt.Sprintf("missing outputs: %v", missingOutputs)
 	}
 
+	logger.Infof("Finishing execution. Result: %s, Reason: %s, Message: %s", result, resultReason, resultMessage)
 	newEvent, err := execution.Finish(stage, result, resultReason, resultMessage)
 	if err != nil {
 		return err
@@ -213,6 +221,7 @@ func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, s
 		return err
 	}
 
+	logger.Info("Building execution parameters")
 	parameters, err := w.buildExecutionParameters(&execution, integration)
 	if err != nil {
 		return err
@@ -223,6 +232,7 @@ func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, s
 		return err
 	}
 
+	logger.Info("Calling integration executor")
 	statefulResource, err := integrationExecutor.Execute(spec, *parameters)
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
