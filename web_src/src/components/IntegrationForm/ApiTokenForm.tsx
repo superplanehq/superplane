@@ -7,10 +7,14 @@ import { Link } from '../Link/link';
 import { Text } from '../Text/text';
 import type { Tab } from '../Tabs/tabs';
 import type { BaseIntegrationFormProps } from './types';
+import { useSecret } from '../../pages/canvas/hooks/useSecrets';
 
 interface ApiTokenFormProps extends BaseIntegrationFormProps {
   organizationId: string;
   canvasId: string;
+  isEditMode?: boolean;
+  newSecretValue?: string;
+  setNewSecretValue?: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export function ApiTokenForm({
@@ -25,7 +29,50 @@ export function ApiTokenForm({
   secrets,
   organizationId,
   canvasId,
+  isEditMode = false,
+  newSecretValue = '',
+  setNewSecretValue
 }: ApiTokenFormProps) {
+
+  const { data: selectedSecret } = useSecret(
+    canvasId,
+    "DOMAIN_TYPE_CANVAS",
+    integrationData.apiToken.secretName
+  );
+
+  // In edit mode, show a simplified form that updates the secret value directly
+  if (isEditMode && integrationData.apiToken.secretName) {
+    return (
+      <div className="space-y-4">
+        <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center justify-between">
+          API Token
+        </div>
+        <Field>
+          <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
+            Update Token Value
+          </Label>
+          <Input
+            type="password"
+            placeholder="Enter new API token value"
+            value={newSecretValue}
+            className="w-full"
+            onChange={(e) => {
+              if (setNewSecretValue) {
+                setNewSecretValue(e.target.value);
+              }
+              if (errors.secretValue) {
+                setErrors(prev => ({ ...prev, secretValue: undefined }));
+              }
+            }}
+          />
+          <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+            Updating this value will modify the secret <strong>{integrationData.apiToken.secretName}</strong> in your canvas secrets.
+          </Text>
+          {errors.secretValue && <ErrorMessage>{errors.secretValue}</ErrorMessage>}
+        </Field>
+      </div>
+    );
+  }
 
   const apiTokenTabs: Tab[] = [
     {
@@ -40,7 +87,7 @@ export function ApiTokenForm({
     }
   ];
 
-  const selectedExistingSecret = secrets.find(secret =>
+  const selectedExistingSecret = selectedSecret || secrets.find(secret =>
     secret.metadata?.name === integrationData.apiToken.secretName
   );
 
