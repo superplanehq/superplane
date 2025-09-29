@@ -64,11 +64,12 @@ func (w *PendingExecutionsWorker) Tick() error {
 	}
 
 	for _, execution := range executions {
+		if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+			log.Errorf("Error acquiring semaphore: %v", err)
+			continue
+		}
+
 		go func(exec models.StageExecution) {
-			if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
-				log.Errorf("Error acquiring semaphore: %v", err)
-				return
-			}
 			defer w.semaphore.Release(1)
 
 			if err := w.LockAndProcessExecution(exec); err != nil {
