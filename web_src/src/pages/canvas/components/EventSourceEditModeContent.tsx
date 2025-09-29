@@ -431,7 +431,9 @@ curl -X POST \\
   useEffect(() => {
     if (!onDataChange) return;
 
-    const spec: SuperplaneEventSourceSpec = {};
+    const spec: SuperplaneEventSourceSpec = {
+      type: sourceType
+    };
 
     if (sourceType === 'scheduled') {
       if (schedule) {
