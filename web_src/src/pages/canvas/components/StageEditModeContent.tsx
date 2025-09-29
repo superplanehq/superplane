@@ -1209,24 +1209,30 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   return (
     <NodeContentWrapper nodeId={currentStageId}>
       <div className={twMerge('pb-0', requireIntegration && !hasRequiredIntegrations && !dryRun && 'pb-1')}>
-        {/* DryRun Toggle - always visible */}
-        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MaterialSymbol name="science" size="sm" className="text-amber-600 dark:text-amber-400" />
-              <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                Dry Run Mode
-              </span>
-              <DryRunTooltip className="flex items-center" />
+
+        {/* DryRun Toggle - hidden for noop stages */}
+        {executor.type != 'noop' && (
+          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MaterialSymbol name="science" size="sm" className="text-amber-600 dark:text-amber-400" />
+                <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Dry Run Mode
+                </span>
+                <DryRunTooltip className="flex items-center" />
+              </div>
+              <Switch
+                checked={dryRun}
+                onChange={checked => {
+                  setDryRun(checked);
+                  setFieldErrors(() => { return {}});
+                }}
+                color="indigo"
+                aria-label="Toggle dry run mode"
+              />
             </div>
-            <Switch
-              checked={dryRun}
-              onChange={setDryRun}
-              color="indigo"
-              aria-label="Toggle dry run mode"
-            />
           </div>
-        </div>
+        )}
 
         {/* Show zero state if executor type requires integrations but none are available, except in dry-run mode */}
         {requireIntegration && !hasRequiredIntegrations && !dryRun && (

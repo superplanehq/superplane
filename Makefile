@@ -44,7 +44,7 @@ dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up
 
 dev.console:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app /bin/bash
 
 check.build.ui:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run build"
