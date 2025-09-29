@@ -337,7 +337,10 @@ func FindExecutionInState(stageID uuid.UUID, states []string) (*StageExecution, 
 func ListExecutionsInState(state string, limit int) ([]StageExecution, error) {
 	var executions []StageExecution
 
-	query := database.Conn().Where("state = ?", state)
+	query := database.Conn().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("state = ?", state)
+
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
