@@ -782,7 +782,7 @@ curl -X POST \\
           </EditableAccordionSection>
         )}
 
-        {/* Event Types and Filters Section - Only for webhook and integration-resource event sources */}
+        {/* Event Types and Filters Section - Only for webhook and event sources with integrations */}
         {(sourceType === 'webhook' || (!isRegularEventSource(sourceType) && availableIntegrations.length > 0)) && <EditableAccordionSection
           id="filters"
           title="Filters"

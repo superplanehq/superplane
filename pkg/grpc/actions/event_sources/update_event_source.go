@@ -53,10 +53,7 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		return nil, status.Error(codes.InvalidArgument, "event source type is required")
 	}
 
-	eventSourceType := newSource.Spec.Type
-
-	// Validate event source type constraints
-	err = validateEventSourceType(eventSourceType, newSource.Spec, registry)
+	err = validateEventSourceType(newSource.Spec.Type, newSource.Spec, registry)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +105,7 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		WithName(eventSourceName).
 		WithDescription(eventSource.Description).
 		WithScope(models.EventSourceScopeExternal).
-		WithType(eventSourceType).
+		WithType(newSource.Spec.Type).
 		ForIntegration(integration).
 		ForResource(resource).
 		WithEventTypes(eventTypes).
@@ -135,7 +132,7 @@ func UpdateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	}
 
 	// Only return keys for webhook event sources
-	if eventSourceType == models.EventSourceTypeWebhook {
+	if newSource.Spec.Type == models.EventSourceTypeWebhook {
 		response.Key = plainKey
 	}
 

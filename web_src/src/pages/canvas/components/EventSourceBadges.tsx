@@ -24,10 +24,6 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
 
   const totalEventTypes = currentEventSource?.spec?.events?.length || 0;
 
-  const getResourceTypeLabel = useCallback(() => {
-    return getResourceLabel(sourceType) || 'Resource';
-  }, [sourceType]);
-
   const getFilterTypeLabel = useCallback((filter: SuperplaneFilter) => {
     if (filter.type === 'FILTER_TYPE_DATA') return 'Data';
     if (filter.type === 'FILTER_TYPE_HEADER') return 'Header';
@@ -51,10 +47,10 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
         text: cleanResourceName,
         tooltip: (
           <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-            <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">{getResourceTypeLabel()} Configuration</div>
+            <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">{getResourceLabel(sourceType)} Configuration</div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-zinc-600 dark:text-zinc-400">{getResourceTypeLabel()}:</span>
+                <span className="text-sm text-zinc-600 dark:text-zinc-400">{getResourceLabel(sourceType)}:</span>
                 <span className="text-sm font-mono text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded">{cleanResourceName}</span>
               </div>
               {integration && (
@@ -112,7 +108,7 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
     }
 
     return badges;
-  }, [resourceName, cleanResourceName, totalFilters, totalEventTypes, currentEventSource, integration, getResourceTypeLabel, getFilterTypeLabel, getFilterExpression]);
+  }, [resourceName, cleanResourceName, totalFilters, totalEventTypes, currentEventSource, integration, getFilterTypeLabel, getFilterExpression]);
 
   if (badgeItems.length === 0) return null;
 

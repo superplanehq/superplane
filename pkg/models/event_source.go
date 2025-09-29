@@ -37,7 +37,8 @@ const (
 	WeekDaySunday    = "sunday"
 )
 
-var NonIntegrationEventSourceTypes = []string{
+// Regular event types are the ones that don't require integration.
+var RegularEventSourceTypes = []string{
 	EventSourceTypeManual,
 	EventSourceTypeScheduled,
 	EventSourceTypeWebhook,
