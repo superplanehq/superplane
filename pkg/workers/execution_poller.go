@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -45,20 +46,31 @@ func (w *ExecutionPoller) Start() error {
 }
 
 func (w *ExecutionPoller) Tick() error {
-	executions, err := models.ListExecutionsInState(models.ExecutionStarted)
+	executions, err := models.ListExecutionsInState(models.ExecutionStarted, MaxConcurrentExecutions)
 	if err != nil {
 		return err
 	}
 
-	for _, execution := range executions {
-		e := execution
-		logger := logging.ForExecution(&e)
-		err := w.ProcessExecution(logger, &e)
-		if err != nil {
-			logger.Errorf("Error processing execution: %v", err)
-		}
+	if len(executions) == 0 {
+		return nil
 	}
 
+	var wg sync.WaitGroup
+
+	for _, execution := range executions {
+		wg.Add(1)
+		go func(exec models.StageExecution) {
+			defer wg.Done()
+
+			logger := logging.ForExecution(&exec)
+			err := w.ProcessExecution(logger, &exec)
+			if err != nil {
+				logger.Errorf("Error processing execution: %v", err)
+			}
+		}(execution)
+	}
+
+	wg.Wait()
 	return nil
 }
 

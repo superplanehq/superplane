@@ -322,14 +322,15 @@ func FindExecutionInState(stageID uuid.UUID, states []string) (*StageExecution, 
 	return &execution, nil
 }
 
-func ListExecutionsInState(state string) ([]StageExecution, error) {
+func ListExecutionsInState(state string, limit int) ([]StageExecution, error) {
 	var executions []StageExecution
 
-	err := database.Conn().
-		Where("state = ?", state).
-		Find(&executions).
-		Error
+	query := database.Conn().Where("state = ?", state)
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
 
+	err := query.Find(&executions).Error
 	if err != nil {
 		return nil, err
 	}

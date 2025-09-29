@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -17,7 +18,8 @@ import (
 )
 
 const (
-	ExecutionTokenDuration = 24 * time.Hour
+	ExecutionTokenDuration  = 24 * time.Hour
+	MaxConcurrentExecutions = 25
 )
 
 type PendingExecutionsWorker struct {
@@ -39,28 +41,39 @@ func (w *PendingExecutionsWorker) Start() {
 }
 
 func (w *PendingExecutionsWorker) Tick() error {
-	executions, err := models.ListExecutionsInState(models.ExecutionPending)
+	executions, err := models.ListExecutionsInState(models.ExecutionPending, MaxConcurrentExecutions)
 	if err != nil {
 		return fmt.Errorf("error listing pending stage executions: %v", err)
 	}
 
-	for _, execution := range executions {
-		e := execution
-		logger := logging.ForExecution(&e)
-
-		logger.Info("Processing")
-		stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
-		if err != nil {
-			log.Errorf("Error finding stage %s: %v", execution.StageID, err)
-			continue
-		}
-
-		if err := w.ProcessExecution(logger, stage, execution); err != nil {
-			log.Errorf("Error processing execution %s: %v", execution.ID, err)
-			continue
-		}
+	if len(executions) == 0 {
+		return nil
 	}
 
+	var wg sync.WaitGroup
+
+	for _, execution := range executions {
+		wg.Add(1)
+		go func(exec models.StageExecution) {
+			defer wg.Done()
+
+			logger := logging.ForExecution(&exec)
+			logger.Info("Processing")
+
+			stage, err := models.FindStageByID(exec.CanvasID.String(), exec.StageID.String())
+			if err != nil {
+				log.Errorf("Error finding stage %s: %v", exec.StageID, err)
+				return
+			}
+
+			if err := w.ProcessExecution(logger, stage, exec); err != nil {
+				log.Errorf("Error processing execution %s: %v", exec.ID, err)
+				return
+			}
+		}(execution)
+	}
+
+	wg.Wait()
 	return nil
 }
 
