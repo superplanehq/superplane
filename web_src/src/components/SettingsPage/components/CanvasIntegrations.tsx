@@ -17,6 +17,7 @@ import {
 } from '../../IntegrationForm'
 import { ApiTokenForm } from '../../IntegrationForm/ApiTokenForm'
 import { showErrorToast, showSuccessToast } from '../../../utils/toast'
+import { getResourceLinks } from '@/utils/resourceLinks'
 
 interface CanvasIntegrationsProps {
   canvasId: string
@@ -353,9 +354,45 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
                         <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">
                           <img className="w-8 h-8 p-2 object-contain" src={INTEGRATION_TYPES[integration.spec?.type || '']?.icon as string} alt={integration.metadata?.name} />
                         </div>
-                        <Heading level={3} className="max-w-50 truncate">
-                          {integration.metadata?.name}
-                        </Heading>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {getResourceLinks(
+                            integration.spec?.type as string,
+                            integration.spec?.url,
+                            integration.metadata?.name,
+                            {}
+                          ).length > 0 ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const links = getResourceLinks(
+                                  integration.spec?.type as string,
+                                  integration.spec?.url,
+                                  '',
+                                  {}
+                                );
+                                if (links.length > 0) {
+                                  window.open(links[0].url, '_blank', 'noopener,noreferrer');
+                                }
+                              }}
+                              className="flex items-center gap-2 min-w-0 flex-1 text-left hover:opacity-80 transition-opacity"
+                              title={getResourceLinks(
+                                integration.spec?.type as string,
+                                integration.spec?.url,
+                                '',
+                                {}
+                              )[0]?.tooltip}
+                            >
+                              <Heading level={3} className="truncate flex-1 min-w-0 max-w-40">
+                                {integration.metadata?.name}
+                              </Heading>
+                              <MaterialSymbol name="open_in_new" size="sm" className="text-zinc-500 dark:text-zinc-400 flex-shrink-0" />
+                            </button>
+                          ) : (
+                            <Heading level={3} className="truncate flex-1 min-w-0 max-w-50">
+                              {integration.metadata?.name}
+                            </Heading>
+                          )}
+                        </div>
                       </div>
 
                     </div>
