@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
+	"gorm.io/gorm"
 )
 
 type Integration struct {
@@ -101,13 +102,13 @@ func (r *Registry) GetOIDCVerifier(integrationType string) (integrations.OIDCVer
 	return registration.OIDCVerifier, nil
 }
 
-func (r *Registry) NewResourceManager(ctx context.Context, integration *models.Integration) (integrations.ResourceManager, error) {
+func (r *Registry) NewResourceManager(tx *gorm.DB, ctx context.Context, integration *models.Integration) (integrations.ResourceManager, error) {
 	registration, ok := r.Integrations[integration.Type]
 	if !ok {
 		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
 	}
 
-	authFn, err := r.getAuthFn(ctx, integration)
+	authFn, err := r.getAuthFn(tx, ctx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error getting authentication function: %v", err)
 	}
@@ -115,11 +116,11 @@ func (r *Registry) NewResourceManager(ctx context.Context, integration *models.I
 	return registration.NewResourceManager(ctx, integration.URL, authFn)
 }
 
-func (r *Registry) getAuthFn(ctx context.Context, integration *models.Integration) (integrations.AuthenticateFn, error) {
+func (r *Registry) getAuthFn(tx *gorm.DB, ctx context.Context, integration *models.Integration) (integrations.AuthenticateFn, error) {
 	switch integration.AuthType {
 	case models.IntegrationAuthTypeToken:
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		provider, err := r.secretProvider(secretInfo, integration)
+		provider, err := r.secretProvider(tx, secretInfo, integration)
 		if err != nil {
 			return nil, fmt.Errorf("error creating secret provider: %v", err)
 		}
@@ -142,12 +143,12 @@ func (r *Registry) getAuthFn(ctx context.Context, integration *models.Integratio
 	return nil, fmt.Errorf("integration auth type %s not supported", integration.AuthType)
 }
 
-func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
+func (r *Registry) secretProvider(tx *gorm.DB, secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
 	//
 	// If the integration is scoped to an organization, the secret must also be scoped there.
 	//
 	if integration.DomainType == models.DomainTypeOrganization {
-		return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
+		return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
 	}
 
 	//
@@ -155,7 +156,7 @@ func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, i
 	// If the secret is also on the canvas level, we use the same domain type and ID.
 	//
 	if secretDef.DomainType == models.DomainTypeCanvas {
-		return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
+		return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
 	}
 
 	//
@@ -167,15 +168,15 @@ func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, i
 		return nil, fmt.Errorf("error finding canvas %s: %v", integration.DomainID, err)
 	}
 
-	return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
+	return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
 }
 
-func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
+func (r *Registry) NewIntegrationExecutor(tx *gorm.DB, integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
 	if integration == nil {
 		return nil, fmt.Errorf("integration is required")
 	}
 
-	resourceManager, err := r.NewResourceManager(context.Background(), integration)
+	resourceManager, err := r.NewResourceManager(tx, context.Background(), integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating integration: %v", err)
 	}

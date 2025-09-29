@@ -178,6 +178,10 @@ func ListCanvasesByIDs(ids []string, organizationID string) ([]Canvas, error) {
 }
 
 func FindUnscopedCanvasByID(id string) (*Canvas, error) {
+	return FindUnscopedCanvasByIDInTransaction(database.Conn(), id)
+}
+
+func FindUnscopedCanvasByIDInTransaction(tx *gorm.DB, id string) (*Canvas, error) {
 	canvas := Canvas{}
 
 	err := database.Conn().
