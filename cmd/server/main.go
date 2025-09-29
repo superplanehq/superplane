@@ -74,12 +74,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_PENDING_EXECUTIONS_WORKER") == "yes" {
 		log.Println("Starting Pending Stage Events Worker")
 
-		w := workers.PendingExecutionsWorker{
-			JwtSigner:   jwtSigner,
-			Encryptor:   encryptor,
-			SpecBuilder: executors.SpecBuilder{},
-			Registry:    registry,
-		}
+		w := workers.NewPendingExecutionsWorker(jwtSigner, encryptor, executors.SpecBuilder{}, registry)
 
 		go w.Start()
 	}

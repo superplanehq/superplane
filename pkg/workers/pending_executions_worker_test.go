@@ -3,6 +3,7 @@ package workers
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,12 +30,12 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 
 	defer r.Close()
 
-	w := PendingExecutionsWorker{
-		JwtSigner:   jwt.NewSigner("test"),
-		Encryptor:   &crypto.NoOpEncryptor{},
-		SpecBuilder: executors.SpecBuilder{},
-		Registry:    r.Registry,
-	}
+	w := NewPendingExecutionsWorker(
+		jwt.NewSigner("test"),
+		&crypto.NoOpEncryptor{},
+		executors.SpecBuilder{},
+		r.Registry,
+	)
 
 	amqpURL, _ := config.RabbitMQURL()
 
@@ -76,6 +77,10 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		err = w.Tick()
 		require.NoError(t, err)
+
+		// Wait for goroutines to complete processing
+		time.Sleep(100 * time.Millisecond)
+
 		execution, err = stage.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.ExecutionStarted, execution.State)
@@ -179,6 +184,10 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		err = w.Tick()
 		require.NoError(t, err)
+
+		// Wait for goroutines to complete processing
+		time.Sleep(100 * time.Millisecond)
+
 		execution, err = stage.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.ExecutionStarted, execution.State)
@@ -246,6 +255,9 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		err = w.Tick()
 		assert.NoError(t, err)
 
+		// Wait for goroutines to complete processing
+		time.Sleep(100 * time.Millisecond)
+
 		//
 		// Verify that the valid execution was processed (moved to started state).
 		// The execution for the soft-deleted stage should be filtered out by ListExecutionsInState.
@@ -312,6 +324,9 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		err = w.Tick()
 		assert.NoError(t, err)
+
+		// Wait for goroutines to complete processing
+		time.Sleep(100 * time.Millisecond)
 
 		//
 		// Verify that the valid execution was processed successfully (moved to started state).

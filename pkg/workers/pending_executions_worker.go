@@ -3,7 +3,6 @@ package workers
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -15,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -27,6 +27,17 @@ type PendingExecutionsWorker struct {
 	Encryptor   crypto.Encryptor
 	SpecBuilder executors.SpecBuilder
 	Registry    *registry.Registry
+	semaphore   *semaphore.Weighted
+}
+
+func NewPendingExecutionsWorker(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, specBuilder executors.SpecBuilder, registry *registry.Registry) *PendingExecutionsWorker {
+	return &PendingExecutionsWorker{
+		JwtSigner:   jwtSigner,
+		Encryptor:   encryptor,
+		SpecBuilder: specBuilder,
+		Registry:    registry,
+		semaphore:   semaphore.NewWeighted(MaxConcurrentExecutions),
+	}
 }
 
 func (w *PendingExecutionsWorker) Start() {
@@ -50,12 +61,14 @@ func (w *PendingExecutionsWorker) Tick() error {
 		return nil
 	}
 
-	var wg sync.WaitGroup
-
 	for _, execution := range executions {
-		wg.Add(1)
 		go func(exec models.StageExecution) {
-			defer wg.Done()
+			if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				log.Errorf("Error acquiring semaphore: %v", err)
+				return
+			}
+
+			defer w.semaphore.Release(1)
 
 			logger := logging.ForExecution(&exec)
 			logger.Info("Processing")
@@ -73,7 +86,6 @@ func (w *PendingExecutionsWorker) Tick() error {
 		}(execution)
 	}
 
-	wg.Wait()
 	return nil
 }
 
