@@ -14,10 +14,12 @@ import (
 
 const MaxHTTPResponseSize = 8 * 1024
 
-type HTTPExecutor struct{}
+type HTTPExecutor struct {
+	httpClient *http.Client
+}
 
-func NewHTTPExecutor() executors.Executor {
-	return &HTTPExecutor{}
+func NewHTTPExecutor(httpClient *http.Client) executors.Executor {
+	return &HTTPExecutor{httpClient: httpClient}
 }
 
 type HTTPSpec struct {
@@ -80,7 +82,7 @@ func (e *HTTPExecutor) Execute(specData []byte, parameters executors.ExecutionPa
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
+	res, err := e.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

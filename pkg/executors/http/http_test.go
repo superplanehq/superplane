@@ -17,7 +17,7 @@ import (
 )
 
 func Test_HTTP__Execute(t *testing.T) {
-	executor := NewHTTPExecutor()
+	executor := NewHTTPExecutor(http.DefaultClient)
 
 	executionID := uuid.New()
 	stageID := uuid.New()
@@ -222,7 +222,7 @@ func Test_HTTP__Execute(t *testing.T) {
 }
 
 func Test_HTTP__Validate(t *testing.T) {
-	executor := NewHTTPExecutor()
+	executor := NewHTTPExecutor(http.DefaultClient)
 
 	t.Run("HTTP spec with empty URL -> error", func(t *testing.T) {
 		spec := HTTPSpec{URL: ""}

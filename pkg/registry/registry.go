@@ -3,11 +3,13 @@ package registry
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/executors/http"
+	httpexec "github.com/superplanehq/superplane/pkg/executors/http"
 	"github.com/superplanehq/superplane/pkg/executors/noop"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
@@ -25,6 +27,7 @@ type Integration struct {
 }
 
 type Registry struct {
+	httpClient   *http.Client
 	Encryptor    crypto.Encryptor
 	Integrations map[string]Integration
 	Executors    map[string]executors.Executor
@@ -35,6 +38,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		Encryptor:    encryptor,
 		Executors:    map[string]executors.Executor{},
 		Integrations: map[string]Integration{},
+		httpClient:   &http.Client{Timeout: 10 * time.Second},
 	}
 
 	r.Init()
@@ -63,7 +67,7 @@ func (r *Registry) Init() {
 	//
 	// Register the executors
 	//
-	r.Executors[models.ExecutorTypeHTTP] = http.NewHTTPExecutor()
+	r.Executors[models.ExecutorTypeHTTP] = httpexec.NewHTTPExecutor(r.httpClient)
 	r.Executors[models.ExecutorTypeNoOp] = noop.NewNoOpExecutor()
 }
 
