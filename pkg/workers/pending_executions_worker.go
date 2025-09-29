@@ -71,7 +71,7 @@ func (w *PendingExecutionsWorker) Tick() error {
 			}
 			defer w.semaphore.Release(1)
 
-			if err := w.LockExecution(exec); err != nil {
+			if err := w.LockAndProcessExecution(exec); err != nil {
 				log.Errorf("Error processing execution %s: %v", exec.ID, err)
 			}
 		}(execution)
@@ -80,7 +80,7 @@ func (w *PendingExecutionsWorker) Tick() error {
 	return nil
 }
 
-func (w *PendingExecutionsWorker) LockExecution(execution models.StageExecution) error {
+func (w *PendingExecutionsWorker) LockAndProcessExecution(execution models.StageExecution) error {
 	logger := logging.ForExecution(&execution)
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {

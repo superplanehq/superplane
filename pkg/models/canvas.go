@@ -184,7 +184,7 @@ func FindUnscopedCanvasByID(id string) (*Canvas, error) {
 func FindUnscopedCanvasByIDInTransaction(tx *gorm.DB, id string) (*Canvas, error) {
 	canvas := Canvas{}
 
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", id).
 		First(&canvas).
 		Error
