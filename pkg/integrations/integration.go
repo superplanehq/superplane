@@ -45,6 +45,11 @@ type ResourceManager interface {
 	Get(resourceType, id string) (Resource, error)
 
 	//
+	// List all resources of a specific type.
+	//
+	List(ctx context.Context, resourceType string) ([]Resource, error)
+
+	//
 	// Get the status of a resource created by the executor.
 	// Used by the execution resource poller. Ideally, not needed at all, since the status
 	// should be received in a webhook, through WebhookStatus().
@@ -101,6 +106,7 @@ type Resource interface {
 	Id() string
 	Name() string
 	Type() string
+	URL() string
 }
 
 // Similar to Resource, but with additional state information.
@@ -109,6 +115,7 @@ type StatefulResource interface {
 	Type() string
 	Finished() bool
 	Successful() bool
+	URL() string
 }
 
 // Used to represent events received from the integration.

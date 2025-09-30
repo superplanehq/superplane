@@ -393,6 +393,7 @@ type ExecutionResource struct {
 	ParentResourceID uuid.UUID
 	ExternalID       string
 	ResourceType     string `gorm:"column:type"`
+	ResourceURL      string `gorm:"column:url"`
 	State            string
 	Result           string
 	LastPolledAt     *time.Time
@@ -522,11 +523,11 @@ func FindExecutionResource(externalID string, parentResourceID uuid.UUID) (*Exec
 	return &resource, nil
 }
 
-func (e *StageExecution) AddResource(externalID string, externalType string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
-	return e.AddResourceInTransaction(database.Conn(), externalID, externalType, parentResourceID)
+func (e *StageExecution) AddResource(externalID, externalType, URL string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
+	return e.AddResourceInTransaction(database.Conn(), externalID, externalType, URL, parentResourceID)
 }
 
-func (e *StageExecution) AddResourceInTransaction(tx *gorm.DB, externalID string, externalType string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
+func (e *StageExecution) AddResourceInTransaction(tx *gorm.DB, externalID, externalType, URL string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
 	r := &ExecutionResource{
 		ExecutionID:      e.ID,
 		StageID:          e.StageID,
@@ -534,6 +535,7 @@ func (e *StageExecution) AddResourceInTransaction(tx *gorm.DB, externalID string
 		ExternalID:       externalID,
 		ResourceType:     externalType,
 		State:            ExecutionResourcePending,
+		ResourceURL:      URL,
 	}
 
 	err := tx.

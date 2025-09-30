@@ -359,9 +359,15 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                           <div key={resource.id} className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded border border-gray-200 dark:border-zinc-700">
                             <div className="flex items-center gap-2 mb-2">
                               <MaterialSymbol name="inventory_2" size="sm" className="text-gray-500 dark:text-zinc-400 flex-shrink-0" />
-                              <div className="text-xs text-gray-800 dark:text-gray-200 font-medium break-all">
-                                {resource.id}
-                              </div>
+                              {resource.url ? (
+                                <a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 dark:text-blue-400 font-medium break-all hover:underline">
+                                  {resource.id}
+                                </a>
+                              ) : (
+                                <div className="text-xs text-gray-800 dark:text-gray-200 font-medium break-all">
+                                  {resource.id}
+                                </div>
+                              )}
                             </div>
                             <div className="pl-6 space-y-1">
                               {resource.type && (

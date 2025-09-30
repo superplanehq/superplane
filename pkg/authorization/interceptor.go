@@ -52,6 +52,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbIntegrations.Integrations_ListIntegrations_FullMethodName:    {Resource: "integration", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
 		pbIntegrations.Integrations_CreateIntegration_FullMethodName:   {Resource: "integration", Action: "create", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
 		pbIntegrations.Integrations_UpdateIntegration_FullMethodName:   {Resource: "integration", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbIntegrations.Integrations_ListResources_FullMethodName:       {Resource: "integration", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
 
 		// Canvases rules
 		pbSuperplane.Superplane_CreateCanvas_FullMethodName:                 {Resource: "canvas", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},

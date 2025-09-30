@@ -64,6 +64,8 @@ docs/IntegrationsIntegrationMetadata.md
 docs/IntegrationsIntegrationRef.md
 docs/IntegrationsIntegrationSpec.md
 docs/IntegrationsListIntegrationsResponse.md
+docs/IntegrationsListResourcesResponse.md
+docs/IntegrationsResource.md
 docs/IntegrationsResourceRef.md
 docs/IntegrationsUpdateIntegrationBody.md
 docs/IntegrationsUpdateIntegrationResponse.md
@@ -248,6 +250,8 @@ model_integrations_integration_metadata.go
 model_integrations_integration_ref.go
 model_integrations_integration_spec.go
 model_integrations_list_integrations_response.go
+model_integrations_list_resources_response.go
+model_integrations_resource.go
 model_integrations_resource_ref.go
 model_integrations_update_integration_body.go
 model_integrations_update_integration_response.go

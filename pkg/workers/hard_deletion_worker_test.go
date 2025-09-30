@@ -57,10 +57,10 @@ func Test__HardDeletionWorker(t *testing.T) {
 		stageExecution, err := models.CreateStageExecution(r.Canvas.ID, stage.ID, stageEvent.ID)
 		require.NoError(t, err)
 
-		resource, err := r.Integration.CreateResource("test-type", "test-external-id", "test-resource")
+		resource, err := r.Integration.CreateResource("test-type", "test-external-id", "test-resource", "")
 		require.NoError(t, err)
 
-		executionResource, err := stageExecution.AddResource("test-resource-id", "test-type", resource.ID)
+		executionResource, err := stageExecution.AddResource("test-resource-id", "test-type", "", resource.ID)
 		require.NoError(t, err)
 
 		connection := models.Connection{
@@ -349,7 +349,7 @@ func Test__HardDeletionWorker(t *testing.T) {
 		err = database.Conn().Create(&resource).Error
 		require.NoError(t, err)
 
-		executionResource, err := stageExecution.AddResource("test-exec-resource", "test-type", resource.ID)
+		executionResource, err := stageExecution.AddResource("test-exec-resource", "test-type", "", resource.ID)
 		require.NoError(t, err)
 
 		childResource := models.Resource{
@@ -362,7 +362,7 @@ func Test__HardDeletionWorker(t *testing.T) {
 		err = database.Conn().Create(&childResource).Error
 		require.NoError(t, err)
 
-		childExecutionResource, err := stageExecution.AddResource("child-exec-resource", "child-type", childResource.ID)
+		childExecutionResource, err := stageExecution.AddResource("child-exec-resource", "child-type", "", childResource.ID)
 		require.NoError(t, err)
 
 		err = stage.Delete()
@@ -431,7 +431,7 @@ func Test__HardDeletionWorker(t *testing.T) {
 		stageExecution, err := models.CreateStageExecution(r.Canvas.ID, stage.ID, stageEvent.ID)
 		require.NoError(t, err)
 
-		executionResource, err := stageExecution.AddResource("test-exec-resource", "test-type", resource.ID)
+		executionResource, err := stageExecution.AddResource("test-exec-resource", "test-type", "", resource.ID)
 		require.NoError(t, err)
 
 		err = models.DeleteResourceWithChildren(resource.ID)

@@ -24,6 +24,7 @@ type SuperplaneExecutionResource struct {
 	Type *string `json:"type,omitempty"`
 	State *string `json:"state,omitempty"`
 	Result *string `json:"result,omitempty"`
+	Url *string `json:"url,omitempty"`
 }
 
 // NewSuperplaneExecutionResource instantiates a new SuperplaneExecutionResource object
@@ -171,6 +172,38 @@ func (o *SuperplaneExecutionResource) SetResult(v string) {
 	o.Result = &v
 }
 
+// GetUrl returns the Url field value if set, zero value otherwise.
+func (o *SuperplaneExecutionResource) GetUrl() string {
+	if o == nil || IsNil(o.Url) {
+		var ret string
+		return ret
+	}
+	return *o.Url
+}
+
+// GetUrlOk returns a tuple with the Url field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecutionResource) GetUrlOk() (*string, bool) {
+	if o == nil || IsNil(o.Url) {
+		return nil, false
+	}
+	return o.Url, true
+}
+
+// HasUrl returns a boolean if a field has been set.
+func (o *SuperplaneExecutionResource) HasUrl() bool {
+	if o != nil && !IsNil(o.Url) {
+		return true
+	}
+
+	return false
+}
+
+// SetUrl gets a reference to the given string and assigns it to the Url field.
+func (o *SuperplaneExecutionResource) SetUrl(v string) {
+	o.Url = &v
+}
+
 func (o SuperplaneExecutionResource) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -192,6 +225,9 @@ func (o SuperplaneExecutionResource) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Result) {
 		toSerialize["result"] = o.Result
+	}
+	if !IsNil(o.Url) {
+		toSerialize["url"] = o.Url
 	}
 	return toSerialize, nil
 }

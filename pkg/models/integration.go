@@ -86,16 +86,17 @@ func (i *Integration) ListResources(resourceType string) ([]*Resource, error) {
 	return resources, nil
 }
 
-func (i *Integration) CreateResource(resourceType, externalID, name string) (*Resource, error) {
-	return i.CreateResourceInTransaction(database.Conn(), resourceType, externalID, name)
+func (i *Integration) CreateResource(resourceType, externalID, name, URL string) (*Resource, error) {
+	return i.CreateResourceInTransaction(database.Conn(), resourceType, externalID, name, URL)
 }
 
-func (i *Integration) CreateResourceInTransaction(tx *gorm.DB, resourceType, externalID, name string) (*Resource, error) {
+func (i *Integration) CreateResourceInTransaction(tx *gorm.DB, resourceType, externalID, name, URL string) (*Resource, error) {
 	now := time.Now()
 
 	resource := Resource{
 		ExternalID:    externalID,
 		ResourceName:  name,
+		ResourceURL:   URL,
 		CreatedAt:     &now,
 		IntegrationID: i.ID,
 		ResourceType:  resourceType,
@@ -185,6 +186,7 @@ func ListIntegrations(domainType string, domainID uuid.UUID) ([]*Integration, er
 type IntegrationResource struct {
 	Name            string
 	Type            string
+	URL             string
 	IntegrationName string
 	DomainType      string
 }

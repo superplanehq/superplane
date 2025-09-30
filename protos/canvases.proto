@@ -972,6 +972,7 @@ message ExecutionResource {
   string type = 2;
   string state = 3;
   string result = 4;
+  string url = 5;
 }
 
 message StageEventApproval {

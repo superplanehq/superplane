@@ -83,6 +83,15 @@ func (i *SemaphoreResourceManager) Get(resourceType, id string) (integrations.Re
 	}
 }
 
+func (i *SemaphoreResourceManager) List(ctx context.Context, resourceType string) ([]integrations.Resource, error) {
+	switch resourceType {
+	case ResourceTypeProject:
+		return i.listProjects()
+	default:
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}
+
 type CreateWorkflowRequest struct {
 	ProjectID    string            `json:"project_id"`
 	Reference    string            `json:"reference"`
@@ -165,6 +174,11 @@ func (p *Secret) Type() string {
 	return ResourceTypeSecret
 }
 
+// TODO: do we need that here?
+func (p *Secret) URL() string {
+	return ""
+}
+
 type SecretMetadata struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -241,6 +255,11 @@ func (p *Notification) Name() string {
 
 func (p *Notification) Type() string {
 	return ResourceTypeNotification
+}
+
+// TODO: do we need that here?
+func (p *Notification) URL() string {
+	return ""
 }
 
 type NotificationMetadata struct {
@@ -342,7 +361,10 @@ func (i *SemaphoreResourceManager) runWorkflow(params any) (integrations.Statefu
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	return &Workflow{WfID: response.WorkflowID}, nil
+	return &Workflow{
+		WfID:            response.WorkflowID,
+		OrganizationURL: i.URL,
+	}, nil
 }
 
 func (i *SemaphoreResourceManager) listTasks(parentIDs ...string) ([]integrations.Resource, error) {
@@ -404,6 +426,8 @@ func (i *SemaphoreResourceManager) getWorkflow(id string) (integrations.Resource
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
+	workflow.Workflow.OrganizationURL = i.URL
+
 	return workflow.Workflow, nil
 }
 
@@ -430,6 +454,8 @@ func (i *SemaphoreResourceManager) getPipeline(id string) (integrations.Resource
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
+	pipelineResponse.Pipeline.OrganizationURL = i.URL
+
 	return pipelineResponse.Pipeline, nil
 }
 
@@ -445,6 +471,8 @@ func (i *SemaphoreResourceManager) getProject(id string) (integrations.Resource,
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
+
+	project.OrganizationURL = i.URL
 
 	return &project, nil
 }
@@ -469,6 +497,8 @@ func (i *SemaphoreResourceManager) getTask(id string, parentIDs ...string) (inte
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
+
+	task.Task.OrganizationURL = i.URL
 
 	return task.Task, nil
 }
@@ -503,9 +533,11 @@ type WorkflowResponse struct {
 }
 
 type Workflow struct {
-	WfID         string    `json:"wf_id"`
-	InitialPplID string    `json:"initial_ppl_id"`
-	Pipeline     *Pipeline `json:"pipeline"`
+	WfID            string    `json:"wf_id"`
+	InitialPplID    string    `json:"initial_ppl_id"`
+	Pipeline        *Pipeline `json:"pipeline"`
+	ProjectID       string    `json:"project_id"`
+	OrganizationURL string
 }
 
 func (w *Workflow) Id() string {
@@ -514,6 +546,10 @@ func (w *Workflow) Id() string {
 
 func (w *Workflow) Name() string {
 	return ""
+}
+
+func (w *Workflow) URL() string {
+	return fmt.Sprintf("%s/workflows/%s", w.OrganizationURL, w.WfID)
 }
 
 func (w *Workflow) Type() string {
@@ -529,7 +565,8 @@ func (w *Workflow) Successful() bool {
 }
 
 type Project struct {
-	Metadata *ProjectMetadata `json:"metadata"`
+	Metadata        *ProjectMetadata `json:"metadata"`
+	OrganizationURL string
 }
 
 func (p *Project) Id() string {
@@ -544,14 +581,20 @@ func (p *Project) Type() string {
 	return ResourceTypeProject
 }
 
+func (p *Project) URL() string {
+	return fmt.Sprintf("%s/projects/%s", p.OrganizationURL, p.Id())
+}
+
 type ProjectMetadata struct {
 	ProjectName string `json:"name"`
 	ProjectID   string `json:"id"`
 }
 
 type Task struct {
-	ID       string `json:"id"`
-	TaskName string `json:"name"`
+	ID              string `json:"id"`
+	TaskName        string `json:"name"`
+	ProjectId       string `json:"project_id"`
+	OrganizationURL string
 }
 
 func (t *Task) Id() string {
@@ -566,16 +609,22 @@ func (t *Task) Type() string {
 	return ResourceTypeTask
 }
 
+func (t *Task) URL() string {
+	return fmt.Sprintf("%s/projects/%s/schedulers/%s", t.OrganizationURL, t.ProjectId, t.Id())
+}
+
 type PipelineResponse struct {
 	Pipeline *Pipeline `json:"pipeline"`
 }
 
 type Pipeline struct {
-	PipelineName string `json:"name"`
-	PipelineID   string `json:"ppl_id"`
-	WorkflowID   string `json:"wf_id"`
-	State        string `json:"state"`
-	Result       string `json:"result"`
+	PipelineName    string `json:"name"`
+	PipelineID      string `json:"ppl_id"`
+	WorkflowID      string `json:"wf_id"`
+	State           string `json:"state"`
+	Result          string `json:"result"`
+	ProjectID       string `json:"project_id"`
+	OrganizationURL string
 }
 
 func (p *Pipeline) Id() string {
@@ -588,6 +637,10 @@ func (p *Pipeline) Name() string {
 
 func (p *Pipeline) Type() string {
 	return ResourceTypePipeline
+}
+
+func (p *Pipeline) URL() string {
+	return fmt.Sprintf("%s/workflows/%s?pipeline_id=%s", p.OrganizationURL, p.WorkflowID, p.Id())
 }
 
 func (p *Pipeline) Finished() bool {

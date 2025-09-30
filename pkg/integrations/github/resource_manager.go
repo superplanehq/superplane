@@ -179,6 +179,15 @@ func (i *GitHubResourceManager) CleanupWebhook(parentResource integrations.Resou
 	return nil
 }
 
+func (i *GitHubResourceManager) List(ctx context.Context, resourceType string) ([]integrations.Resource, error) {
+	switch resourceType {
+	case ResourceTypeRepository:
+		return i.listRepositories(ctx)
+	default:
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}
+
 func (i *GitHubResourceManager) Get(resourceType, id string) (integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeRepository:
@@ -232,7 +241,26 @@ func (i *GitHubResourceManager) getRepository(repoName string) (integrations.Res
 	return &Repository{
 		ID:             repository.GetID(),
 		RepositoryName: repository.GetName(),
+		HTMLURL:        repository.GetHTMLURL(),
 	}, nil
+}
+
+func (i *GitHubResourceManager) listRepositories(ctx context.Context) ([]integrations.Resource, error) {
+	repositories, _, err := i.client.Repositories.ListByAuthenticatedUser(ctx, &github.RepositoryListByAuthenticatedUserOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting repository: %v", err)
+	}
+
+	values := make([]integrations.Resource, len(repositories))
+	for _, repository := range repositories {
+		values = append(values, &Repository{
+			ID:             repository.GetID(),
+			RepositoryName: repository.GetName(),
+			HTMLURL:        repository.GetHTMLURL(),
+		})
+	}
+
+	return values, nil
 }
 
 func (i *GitHubResourceManager) getWorkflowRun(parentResource integrations.Resource, id string) (integrations.StatefulResource, error) {
@@ -256,6 +284,7 @@ func (i *GitHubResourceManager) getWorkflowRun(parentResource integrations.Resou
 type Repository struct {
 	ID             int64
 	RepositoryName string
+	HTMLURL        string
 }
 
 func (r *Repository) Id() string {
@@ -270,10 +299,15 @@ func (r *Repository) Type() string {
 	return ResourceTypeRepository
 }
 
+func (r *Repository) URL() string {
+	return r.HTMLURL
+}
+
 type WorkflowRun struct {
 	ID         int64
 	Status     string
 	Conclusion string
+	HtmlUTL    string
 }
 
 func (w *WorkflowRun) Id() string {
@@ -290,4 +324,8 @@ func (w *WorkflowRun) Finished() bool {
 
 func (w *WorkflowRun) Successful() bool {
 	return w.Conclusion == "success"
+}
+
+func (w *WorkflowRun) URL() string {
+	return w.HtmlUTL
 }

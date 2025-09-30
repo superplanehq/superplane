@@ -608,7 +608,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		execution := support.CreateExecution(t, r.Source, stage)
 		resource, err := models.FindResource(r.Integration.ID, integrationResource.Type(), integrationResource.Name())
 		require.NoError(t, err)
-		_, err = execution.AddResource(workflowID, semaphore.ResourceTypeWorkflow, resource.ID)
+		_, err = execution.AddResource(workflowID, semaphore.ResourceTypeWorkflow, "", resource.ID)
 		require.NoError(t, err)
 
 		//

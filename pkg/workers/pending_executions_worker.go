@@ -292,7 +292,14 @@ func (w *PendingExecutionsWorker) handleIntegrationExecutor(tx *gorm.DB, logger 
 		return nil
 	}
 
-	_, err = execution.AddResourceInTransaction(tx, statefulResource.Id(), statefulResource.Type(), *stage.ResourceID)
+	_, err = execution.AddResourceInTransaction(
+		tx,
+		statefulResource.Id(),
+		statefulResource.Type(),
+		statefulResource.URL(),
+		*stage.ResourceID,
+	)
+
 	if err != nil {
 		return fmt.Errorf("error adding resource to execution: %v", err)
 	}

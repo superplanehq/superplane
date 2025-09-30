@@ -102,3 +102,8 @@ func (h *Webhook) Name() string {
 func (h *Webhook) Type() string {
 	return ResourceTypeWebHook
 }
+
+// TODO: do we need to provide URL here?
+func (h *Webhook) URL() string {
+	return ""
+}

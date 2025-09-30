@@ -253,7 +253,13 @@ func (b *EventSourceBuilder) findOrCreateResource(tx *gorm.DB) (*models.Resource
 		return nil, err
 	}
 
-	return b.integration.CreateResourceInTransaction(tx, b.resource.Type(), b.resource.Id(), b.resource.Name())
+	return b.integration.CreateResourceInTransaction(
+		tx,
+		b.resource.Type(),
+		b.resource.Id(),
+		b.resource.Name(),
+		b.resource.URL(),
+	)
 }
 
 func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *models.EventSource) (*models.EventSource, string, error) {

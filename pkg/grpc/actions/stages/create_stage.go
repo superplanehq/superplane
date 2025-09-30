@@ -520,6 +520,7 @@ func serializeExecutor(stage models.Stage) (*pb.Executor, error) {
 		Resource: &integrationpb.ResourceRef{
 			Type: integrationResource.Type,
 			Name: integrationResource.Name,
+			Url:  integrationResource.URL,
 		},
 	}, nil
 }

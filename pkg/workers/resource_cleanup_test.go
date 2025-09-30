@@ -26,7 +26,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 	})
 
 	t.Run("resource used by external event source -> skips cleanup", func(t *testing.T) {
-		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource")
+		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource", "")
 		require.NoError(t, err)
 
 		_, _, err = builders.NewEventSourceBuilder(r.Encryptor, r.Registry).
@@ -47,7 +47,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 	})
 
 	t.Run("resource used by stage -> skips cleanup", func(t *testing.T) {
-		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-2")
+		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-2", "")
 		require.NoError(t, err)
 
 		_, err = builders.NewStageBuilder(r.Registry).
@@ -71,7 +71,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 	})
 
 	t.Run("resource used by excluded stage -> performs cleanup", func(t *testing.T) {
-		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-3")
+		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-3", "")
 		require.NoError(t, err)
 
 		stage, err := builders.NewStageBuilder(r.Registry).
@@ -94,7 +94,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 	})
 
 	t.Run("unused resource -> performs cleanup", func(t *testing.T) {
-		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-4")
+		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-4", "")
 		require.NoError(t, err)
 
 		err = service.CleanupUnusedResource(resource.ID, uuid.Nil)
@@ -105,7 +105,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 	})
 
 	t.Run("resource with no integrations using it -> performs cleanup", func(t *testing.T) {
-		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-cleanup")
+		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-cleanup", "")
 		require.NoError(t, err)
 
 		err = service.CleanupUnusedResource(resource.ID, uuid.Nil)
@@ -116,7 +116,7 @@ func Test__ResourceCleanupService(t *testing.T) {
 	})
 
 	t.Run("resource used by multiple stages except excluded one -> skips cleanup", func(t *testing.T) {
-		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-shared")
+		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-shared", "")
 		require.NoError(t, err)
 
 		_, err = builders.NewStageBuilder(r.Registry).
@@ -170,7 +170,7 @@ func Test__ResourceCleanupService_CleanupEventSourceWebhooks(t *testing.T) {
 	})
 
 	t.Run("event source with resource -> performs webhook cleanup", func(t *testing.T) {
-		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-single")
+		resource, err := r.Integration.CreateResource(semaphore.ResourceTypeProject, uuid.NewString(), "test-resource-single", "")
 		require.NoError(t, err)
 
 		eventSource, _, err := builders.NewEventSourceBuilder(r.Encryptor, r.Registry).

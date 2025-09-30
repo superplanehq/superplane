@@ -260,6 +260,7 @@ func serializeExecution(execution models.StageExecution) (*pb.Execution, error) 
 			Type:   r.ResourceType,
 			State:  r.State,
 			Result: r.Result,
+			Url:    r.ResourceURL,
 		})
 	}
 

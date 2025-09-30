@@ -121,6 +121,7 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 		ID:         workflowRun.GetID(),
 		Status:     workflowRun.GetStatus(),
 		Conclusion: workflowRun.GetConclusion(),
+		HtmlUTL:    workflowRun.GetHTMLURL(),
 	}, nil
 }
 

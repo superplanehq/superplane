@@ -257,6 +257,7 @@ func serializeEventSource(eventSource models.EventSource, lastEvent *models.Even
 		spec.Resource = &integrationPb.ResourceRef{
 			Type: resource.Type(),
 			Name: resource.Name(),
+			Url:  resource.URL(),
 		}
 	}
 

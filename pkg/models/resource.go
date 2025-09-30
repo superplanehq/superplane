@@ -15,6 +15,7 @@ type Resource struct {
 	ExternalID    string
 	ResourceName  string `gorm:"column:name"`
 	ResourceType  string `gorm:"column:type"`
+	ResourceURL   string `gorm:"column:url"`
 	CreatedAt     *time.Time
 }
 
@@ -28,6 +29,10 @@ func (r *Resource) Name() string {
 
 func (r *Resource) Type() string {
 	return r.ResourceType
+}
+
+func (r *Resource) URL() string {
+	return r.ResourceURL
 }
 
 func (r *Resource) ListEventSources() ([]EventSource, error) {

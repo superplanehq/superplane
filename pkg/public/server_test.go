@@ -365,7 +365,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	require.NoError(t, err)
 
 	workflowID := uuid.NewString()
-	_, err = execution.AddResource(workflowID, "workflow", *stage.ResourceID)
+	_, err = execution.AddResource(workflowID, "workflow", "", *stage.ResourceID)
 	require.NoError(t, err)
 
 	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}

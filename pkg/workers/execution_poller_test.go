@@ -83,7 +83,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", "", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultFailed))
 
@@ -142,7 +142,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		_, err := execution.AddResource(workflowID, "workflow", resource.ID)
+		_, err := execution.AddResource(workflowID, "workflow", "", resource.ID)
 		require.NoError(t, err)
 
 		//
@@ -229,7 +229,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", "", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
@@ -267,7 +267,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", "", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
@@ -327,7 +327,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		_, err = execution.AddResource(workflowID, "workflow", resource.ID)
+		_, err = execution.AddResource(workflowID, "workflow", "", resource.ID)
 		require.NoError(t, err)
 
 		// Cancel the execution
@@ -405,7 +405,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		_, err = execution.AddResource(workflowID, "workflow", resource.ID)
+		_, err = execution.AddResource(workflowID, "workflow", "", resource.ID)
 		require.NoError(t, err)
 
 		// Create a worker with a very short timeout and mock nowFunc to simulate timeout

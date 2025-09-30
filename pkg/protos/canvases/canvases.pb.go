@@ -4614,6 +4614,7 @@ type ExecutionResource struct {
 	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	State         string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
 	Result        string                 `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
+	Url           string                 `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4672,6 +4673,13 @@ func (x *ExecutionResource) GetState() string {
 func (x *ExecutionResource) GetResult() string {
 	if x != nil {
 		return x.Result
+	}
+	return ""
+}
+
+func (x *ExecutionResource) GetUrl() string {
+	if x != nil {
+		return x.Url
 	}
 	return ""
 }
@@ -8735,12 +8743,13 @@ const file_canvases_proto_rawDesc = "" +
 	"\x13RESULT_REASON_ERROR\x10\x01\x12!\n" +
 	"\x1dRESULT_REASON_MISSING_OUTPUTS\x10\x02\x12\x19\n" +
 	"\x15RESULT_REASON_TIMEOUT\x10\x03\x12\x16\n" +
-	"\x12RESULT_REASON_USER\x10\x04\"e\n" +
+	"\x12RESULT_REASON_USER\x10\x04\"w\n" +
 	"\x11ExecutionResource\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +
 	"\x05state\x18\x03 \x01(\tR\x05state\x12\x16\n" +
-	"\x06result\x18\x04 \x01(\tR\x06result\"r\n" +
+	"\x06result\x18\x04 \x01(\tR\x06result\x12\x10\n" +
+	"\x03url\x18\x05 \x01(\tR\x03url\"r\n" +
 	"\x12StageEventApproval\x12\x1f\n" +
 	"\vapproved_by\x18\x01 \x01(\tR\n" +
 	"approvedBy\x12;\n" +

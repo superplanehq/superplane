@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VZpd98Zs1tmCdbn0jdgMmgKcan2ghGnpiujbf0UwRdIm9pLiVxmZIQ4LeSmDw1u
+\restrict 4NOHfcBkJrGenvbL1d0I1oIQcDGVDrf3ln1IzbB4iHuAHEkVSapNRtuymebqRA3
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -265,7 +265,8 @@ CREATE TABLE public.execution_resources (
     result character varying(64) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    last_polled_at timestamp without time zone
+    last_polled_at timestamp without time zone,
+    url character varying(255)
 );
 
 
@@ -346,7 +347,8 @@ CREATE TABLE public.resources (
     integration_id uuid NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone,
-    parent_id uuid
+    parent_id uuid,
+    url character varying(255)
 );
 
 
@@ -1188,13 +1190,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VZpd98Zs1tmCdbn0jdgMmgKcan2ghGnpiujbf0UwRdIm9pLiVxmZIQ4LeSmDw1u
+\unrestrict 4NOHfcBkJrGenvbL1d0I1oIQcDGVDrf3ln1IzbB4iHuAHEkVSapNRtuymebqRA3
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict O8bgG5WOk1UR7bwccg9b8Cles1fg5LWPBuWqbgiDFYBh5sbEtKL5SKTgaLr3i15
+\restrict ICQEV5KUl3D05Glacy8aSiaxBajSOWUFbQtxDRPgtff2dDPPgCRW8vb8uu0cdsY
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
@@ -1216,7 +1218,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250926133107	f
+20250930181145	f
 \.
 
 
@@ -1224,5 +1226,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict O8bgG5WOk1UR7bwccg9b8Cles1fg5LWPBuWqbgiDFYBh5sbEtKL5SKTgaLr3i15
+\unrestrict ICQEV5KUl3D05Glacy8aSiaxBajSOWUFbQtxDRPgtff2dDPPgCRW8vb8uu0cdsY
 

@@ -38,13 +38,16 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
 
   const cleanResourceName = resourceName?.replace('.semaphore/', '') || '';
 
+  const resourceUrl = currentEventSource?.spec?.resource?.url;
+
   const badgeItems = useMemo(() => {
-    const badges: Array<{ icon: string; text: string; tooltip: React.ReactNode }> = [];
+    const badges: Array<{ icon: string; text: string; tooltip: React.ReactNode; url?: string }> = [];
 
     if (resourceName) {
       badges.push({
         icon: 'assignment',
         text: cleanResourceName,
+        url: resourceUrl,
         tooltip: (
           <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg p-4 min-w-[250px]">
             <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">{getResourceLabel(sourceType)} Configuration</div>
@@ -108,7 +111,7 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
     }
 
     return badges;
-  }, [resourceName, cleanResourceName, totalFilters, totalEventTypes, currentEventSource, integration, getFilterTypeLabel, getFilterExpression]);
+  }, [resourceName, cleanResourceName, totalFilters, totalEventTypes, currentEventSource, integration, getFilterTypeLabel, getFilterExpression, resourceUrl]);
 
   if (badgeItems.length === 0) return null;
 
@@ -121,13 +124,25 @@ export const EventSourceBadges: React.FC<EventSourceBadgesProps> = ({
           placement="top"
         >
           <div className="flex-shrink min-w-0 max-w-full">
-            <Badge
-              color="zinc"
-              icon={badge.icon}
-              truncate
-            >
-              {badge.text}
-            </Badge>
+            {badge.url ? (
+              <a href={badge.url} target="_blank" rel="noopener noreferrer" className="inline-block">
+                <Badge
+                  color="zinc"
+                  icon={badge.icon}
+                  truncate
+                >
+                  {badge.text}
+                </Badge>
+              </a>
+            ) : (
+              <Badge
+                color="zinc"
+                icon={badge.icon}
+                truncate
+              >
+                {badge.text}
+              </Badge>
+            )}
           </div>
         </Tippy>
       ))}
