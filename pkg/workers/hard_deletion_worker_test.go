@@ -446,6 +446,144 @@ func Test__HardDeletionWorker(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("hard delete with shared resource - delete event source first then stage", func(t *testing.T) {
+		resource, err := r.Integration.CreateResource("shared-type", "shared-external-id", "shared-resource")
+		require.NoError(t, err)
+
+		eventSource := models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       "test-event-source-shared-resource",
+			Key:        []byte(`test-key`),
+			Scope:      models.EventSourceScopeExternal,
+			ResourceID: &resource.ID,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+		}
+		err = eventSource.Create()
+		require.NoError(t, err)
+
+		stage := models.Stage{
+			CanvasID:      r.Canvas.ID,
+			Name:          "test-stage-shared-resource",
+			Description:   "Test Stage with Shared Resource",
+			ExecutorType:  models.ExecutorTypeHTTP,
+			ExecutorName:  "test-executor",
+			ExecutorSpec:  datatypes.JSON(`{}`),
+			ResourceID:    &resource.ID,
+			Conditions:    datatypes.NewJSONSlice([]models.StageCondition{}),
+			Inputs:        datatypes.NewJSONSlice([]models.InputDefinition{}),
+			InputMappings: datatypes.NewJSONSlice([]models.InputMapping{}),
+			Outputs:       datatypes.NewJSONSlice([]models.OutputDefinition{}),
+			Secrets:       datatypes.NewJSONSlice([]models.ValueDefinition{}),
+		}
+		err = database.Conn().Create(&stage).Error
+		require.NoError(t, err)
+
+		err = eventSource.Delete()
+		require.NoError(t, err)
+
+		err = worker.processEventSources()
+		require.NoError(t, err)
+
+		var foundEventSource models.EventSource
+		err = database.Conn().Unscoped().Where("id = ?", eventSource.ID).First(&foundEventSource).Error
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "record not found")
+		}
+
+		var foundResource models.Resource
+		err = database.Conn().Where("id = ?", resource.ID).First(&foundResource).Error
+		assert.NoError(t, err)
+
+		err = stage.Delete()
+		require.NoError(t, err)
+
+		err = worker.processStages()
+		require.NoError(t, err)
+
+		var foundStage models.Stage
+		err = database.Conn().Unscoped().Where("id = ?", stage.ID).First(&foundStage).Error
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "record not found")
+		}
+
+		err = database.Conn().Where("id = ?", resource.ID).First(&foundResource).Error
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "record not found")
+		}
+	})
+
+	t.Run("hard delete with shared resource - delete stage first then event source", func(t *testing.T) {
+		resource, err := r.Integration.CreateResource("shared-type-reverse", "shared-external-id-reverse", "shared-resource-reverse")
+		require.NoError(t, err)
+
+		eventSource := models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       "test-event-source-shared-resource-reverse",
+			Key:        []byte(`test-key`),
+			Scope:      models.EventSourceScopeExternal,
+			ResourceID: &resource.ID,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+		}
+		err = eventSource.Create()
+		require.NoError(t, err)
+
+		stage := models.Stage{
+			CanvasID:      r.Canvas.ID,
+			Name:          "test-stage-shared-resource-reverse",
+			Description:   "Test Stage with Shared Resource Reverse",
+			ExecutorType:  models.ExecutorTypeHTTP,
+			ExecutorName:  "test-executor",
+			ExecutorSpec:  datatypes.JSON(`{}`),
+			ResourceID:    &resource.ID,
+			Conditions:    datatypes.NewJSONSlice([]models.StageCondition{}),
+			Inputs:        datatypes.NewJSONSlice([]models.InputDefinition{}),
+			InputMappings: datatypes.NewJSONSlice([]models.InputMapping{}),
+			Outputs:       datatypes.NewJSONSlice([]models.OutputDefinition{}),
+			Secrets:       datatypes.NewJSONSlice([]models.ValueDefinition{}),
+		}
+		err = database.Conn().Create(&stage).Error
+		require.NoError(t, err)
+
+		err = stage.Delete()
+		require.NoError(t, err)
+
+		err = worker.processStages()
+		require.NoError(t, err)
+
+		var foundStage models.Stage
+		err = database.Conn().Unscoped().Where("id = ?", stage.ID).First(&foundStage).Error
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "record not found")
+		}
+
+		var foundResource models.Resource
+		err = database.Conn().Where("id = ?", resource.ID).First(&foundResource).Error
+		assert.NoError(t, err)
+
+		err = eventSource.Delete()
+		require.NoError(t, err)
+
+		err = worker.processEventSources()
+		require.NoError(t, err)
+
+		var foundEventSource models.EventSource
+		err = database.Conn().Unscoped().Where("id = ?", eventSource.ID).First(&foundEventSource).Error
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "record not found")
+		}
+
+		err = database.Conn().Where("id = ?", resource.ID).First(&foundResource).Error
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "record not found")
+		}
+	})
+
 	t.Run("full worker tick processes all component types", func(t *testing.T) {
 
 		err := worker.Tick()
