@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -175,7 +174,7 @@ func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSourc
 		// Now that the event source is deleted, we can safely delete the resource if it's safe to do so
 		//
 		if resource != nil && shouldDeleteResource {
-			if err := w.CleanupService.CleanupUnusedResourceWithModelInTransaction(tx, resource, uuid.Nil); err != nil {
+			if err := w.CleanupService.DeleteUnusedResourceWithChildrenInTransaction(tx, resource); err != nil {
 				logger.Errorf("Failed to cleanup unused resource: %v", err)
 				// Don't fail the transaction, just log the warning
 			}
