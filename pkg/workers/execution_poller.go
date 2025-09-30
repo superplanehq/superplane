@@ -14,7 +14,7 @@ import (
 
 const (
 	DefaultExecutionTimeout          = 3 * time.Hour
-	ExecutionResourcePollingInterval = 5 * time.Minute
+	ExecutionResourcePollingInterval = 1 * time.Minute
 )
 
 type ExecutionPoller struct {
