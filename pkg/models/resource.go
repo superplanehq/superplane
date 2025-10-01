@@ -137,6 +137,14 @@ func CountExternalEventSourcesUsingResourceInTransaction(tx *gorm.DB, resourceID
 	return count, err
 }
 
+func CountStagesUsingResource(resourceID uuid.UUID) (int64, error) {
+	return CountStagesUsingResourceInTransaction(database.Conn(), resourceID)
+}
+
+func CountStagesUsingResourceInTransaction(tx *gorm.DB, resourceID uuid.UUID) (int64, error) {
+	return CountOtherStagesUsingResourceInTransaction(tx, resourceID, uuid.Nil)
+}
+
 // Count other stages using the same resource (excluding current stage)
 // This indicates how many other internal event sources exist for this resource
 func CountOtherStagesUsingResource(resourceID uuid.UUID, currentStageID uuid.UUID) (int64, error) {

@@ -101,62 +101,14 @@ func (s *ResourceCleanupService) CleanupUnusedResourceInTransaction(tx *gorm.DB,
 	return nil
 }
 
-func (s *ResourceCleanupService) CleanupUnusedResourceWithModel(oldResource *models.Resource, excludeStageID uuid.UUID) error {
-	logger := log.WithField("old_resource_id", oldResource.ID)
-
-	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResource(oldResource.ID)
-	if err != nil {
-		logger.Errorf("Error counting external event sources using resource: %v", err)
-		return err
-	}
-
-	stagesCount, err := models.CountOtherStagesUsingResource(oldResource.ID, excludeStageID)
-	if err != nil {
-		logger.Errorf("Error counting stages using resource: %v", err)
-		return err
-	}
-
-	totalUsages := externalEventSourceCount + stagesCount
-	if totalUsages > 0 {
-		logger.Infof("Resource is used by %d external event sources and %d stages, skipping cleanup",
-			externalEventSourceCount, stagesCount)
-		return nil
-	}
-
-	err = models.DeleteResourceWithChildren(oldResource.ID)
-	if err != nil {
-		logger.Errorf("Error deleting old resource and children from database: %v", err)
-		return err
-	}
-
-	logger.Infof("Successfully deleted old resource %s from database", oldResource.ID)
-
-	return nil
+func (s *ResourceCleanupService) DeleteUnusedResourceWithChildren(oldResource *models.Resource) error {
+	return s.DeleteUnusedResourceWithChildrenInTransaction(database.Conn(), oldResource)
 }
 
-func (s *ResourceCleanupService) CleanupUnusedResourceWithModelInTransaction(tx *gorm.DB, oldResource *models.Resource, excludeStageID uuid.UUID) error {
+func (s *ResourceCleanupService) DeleteUnusedResourceWithChildrenInTransaction(tx *gorm.DB, oldResource *models.Resource) error {
 	logger := log.WithField("old_resource_id", oldResource.ID)
 
-	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResourceInTransaction(tx, oldResource.ID)
-	if err != nil {
-		logger.Errorf("Error counting external event sources using resource: %v", err)
-		return err
-	}
-
-	stagesCount, err := models.CountOtherStagesUsingResourceInTransaction(tx, oldResource.ID, excludeStageID)
-	if err != nil {
-		logger.Errorf("Error counting stages using resource: %v", err)
-		return err
-	}
-
-	totalUsages := externalEventSourceCount + stagesCount
-	if totalUsages > 0 {
-		logger.Infof("Resource is used by %d external event sources and %d stages, skipping cleanup",
-			externalEventSourceCount, stagesCount)
-		return nil
-	}
-
-	err = models.DeleteResourceWithChildrenInTransaction(tx, oldResource.ID)
+	err := models.DeleteResourceWithChildrenInTransaction(tx, oldResource.ID)
 	if err != nil {
 		logger.Errorf("Error deleting old resource and children from database: %v", err)
 		return err
@@ -192,13 +144,25 @@ func (s *ResourceCleanupService) CleanupEventSourceWebhooksInTransaction(tx *gor
 
 	logger := log.WithField("event_source_id", eventSource.ID)
 
-	count, err := models.CountExternalEventSourcesUsingResourceInTransaction(tx, *eventSource.ResourceID)
+	externalEventSourceCount, err := models.CountExternalEventSourcesUsingResourceInTransaction(tx, *eventSource.ResourceID)
 	if err != nil {
 		return false, err
 	}
 
-	// Do not clean up if there are other event sources using this resource
-	if count > 1 {
+	stagesCount, err := models.CountStagesUsingResourceInTransaction(tx, *eventSource.ResourceID)
+	if err != nil {
+		return false, err
+	}
+
+	logger.Infof("Resource %s is used by %d external event sources and %d stages", *eventSource.ResourceID, externalEventSourceCount, stagesCount)
+
+	totalUsages := externalEventSourceCount + stagesCount
+
+	//
+	// Soft deleted event sources are not considered in scoped queries,
+	// So we dont consider them in the total usages count
+	//
+	if totalUsages > 0 {
 		return false, nil
 	}
 
