@@ -396,6 +396,10 @@ export type StatusQueue = {
     items?: Array<SuperplaneStageEvent>;
 };
 
+export type SuperplaneAcknowledgeAlertResponse = {
+    alert?: SuperplaneAlert;
+};
+
 export type SuperplaneAddUserBody = {
     userId?: string;
 };
@@ -411,6 +415,7 @@ export type SuperplaneAlert = {
     sourceId?: string;
     sourceType?: SuperplaneEventSourceType;
     acknowledged?: boolean;
+    acknowledgedAt?: string;
     createdAt?: string;
 };
 
@@ -1075,7 +1080,7 @@ export type SuperplaneListAlertsData = {
         canvasIdOrName: string;
     };
     query?: {
-        unread?: boolean;
+        includeAcked?: boolean;
         before?: string;
     };
     url: '/api/v1/canvases/{canvasIdOrName}/alerts';
@@ -1098,6 +1103,34 @@ export type SuperplaneListAlertsResponses = {
 };
 
 export type SuperplaneListAlertsResponse2 = SuperplaneListAlertsResponses[keyof SuperplaneListAlertsResponses];
+
+export type SuperplaneAcknowledgeAlertData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        alertId: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/alerts/{alertId}/acknowledge';
+};
+
+export type SuperplaneAcknowledgeAlertErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneAcknowledgeAlertError = SuperplaneAcknowledgeAlertErrors[keyof SuperplaneAcknowledgeAlertErrors];
+
+export type SuperplaneAcknowledgeAlertResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneAcknowledgeAlertResponse;
+};
+
+export type SuperplaneAcknowledgeAlertResponse2 = SuperplaneAcknowledgeAlertResponses[keyof SuperplaneAcknowledgeAlertResponses];
 
 export type SuperplaneListConnectionGroupsData = {
     body?: never;

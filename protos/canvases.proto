@@ -392,6 +392,17 @@ service Superplane {
       tags: "Alert";
     };
   }
+
+  rpc AcknowledgeAlert(AcknowledgeAlertRequest) returns (AcknowledgeAlertResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id_or_name}/alerts/{alert_id}/acknowledge"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Acknowledge an alert";
+      description: "Acknowledge the specified alert (canvas can be referenced by ID or name)";
+      tags: "Alert";
+    };
+  }
 }
 
 message ListCanvasesRequest {}
@@ -1152,12 +1163,21 @@ message ListEventRejectionsResponse {
 
 message ListAlertsRequest {
   string canvas_id_or_name = 1;
-  bool unread = 2;
+  bool include_acked = 2;
   google.protobuf.Timestamp before = 3;
 }
 
 message ListAlertsResponse {
   repeated Alert alerts = 1;
+}
+
+message AcknowledgeAlertRequest {
+  string canvas_id_or_name = 1;
+  string alert_id = 2;
+}
+
+message AcknowledgeAlertResponse {
+  Alert alert = 1;
 }
 
 message Alert {
@@ -1174,7 +1194,8 @@ message Alert {
   string source_id = 4;
   EventSourceType source_type = 5;
   bool acknowledged = 6;
-  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp acknowledged_at = 7;
+  google.protobuf.Timestamp created_at = 8;
 }
 
 message StageCreated {

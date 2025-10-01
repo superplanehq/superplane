@@ -27,6 +27,7 @@ type SuperplaneAlert struct {
 	SourceId *string `json:"sourceId,omitempty"`
 	SourceType *SuperplaneEventSourceType `json:"sourceType,omitempty"`
 	Acknowledged *bool `json:"acknowledged,omitempty"`
+	AcknowledgedAt *time.Time `json:"acknowledgedAt,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
 
@@ -247,6 +248,38 @@ func (o *SuperplaneAlert) SetAcknowledged(v bool) {
 	o.Acknowledged = &v
 }
 
+// GetAcknowledgedAt returns the AcknowledgedAt field value if set, zero value otherwise.
+func (o *SuperplaneAlert) GetAcknowledgedAt() time.Time {
+	if o == nil || IsNil(o.AcknowledgedAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.AcknowledgedAt
+}
+
+// GetAcknowledgedAtOk returns a tuple with the AcknowledgedAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneAlert) GetAcknowledgedAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.AcknowledgedAt) {
+		return nil, false
+	}
+	return o.AcknowledgedAt, true
+}
+
+// HasAcknowledgedAt returns a boolean if a field has been set.
+func (o *SuperplaneAlert) HasAcknowledgedAt() bool {
+	if o != nil && !IsNil(o.AcknowledgedAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetAcknowledgedAt gets a reference to the given time.Time and assigns it to the AcknowledgedAt field.
+func (o *SuperplaneAlert) SetAcknowledgedAt(v time.Time) {
+	o.AcknowledgedAt = &v
+}
+
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
 func (o *SuperplaneAlert) GetCreatedAt() time.Time {
 	if o == nil || IsNil(o.CreatedAt) {
@@ -306,6 +339,9 @@ func (o SuperplaneAlert) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Acknowledged) {
 		toSerialize["acknowledged"] = o.Acknowledged
+	}
+	if !IsNil(o.AcknowledgedAt) {
+		toSerialize["acknowledgedAt"] = o.AcknowledgedAt
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt

@@ -129,7 +129,7 @@
             "type": "string"
           },
           {
-            "name": "unread",
+            "name": "includeAcked",
             "in": "query",
             "required": false,
             "type": "boolean"
@@ -140,6 +140,44 @@
             "required": false,
             "type": "string",
             "format": "date-time"
+          }
+        ],
+        "tags": [
+          "Alert"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/alerts/{alertId}/acknowledge": {
+      "patch": {
+        "summary": "Acknowledge an alert",
+        "description": "Acknowledge the specified alert (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_AcknowledgeAlert",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneAcknowledgeAlertResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "alertId",
+            "in": "path",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
@@ -3765,6 +3803,14 @@
         }
       }
     },
+    "SuperplaneAcknowledgeAlertResponse": {
+      "type": "object",
+      "properties": {
+        "alert": {
+          "$ref": "#/definitions/SuperplaneAlert"
+        }
+      }
+    },
     "SuperplaneAddUserBody": {
       "type": "object",
       "properties": {
@@ -3796,6 +3842,10 @@
         },
         "acknowledged": {
           "type": "boolean"
+        },
+        "acknowledgedAt": {
+          "type": "string",
+          "format": "date-time"
         },
         "createdAt": {
           "type": "string",

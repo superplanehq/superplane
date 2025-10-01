@@ -25,16 +25,131 @@ import (
 // AlertAPIService AlertAPI service
 type AlertAPIService service
 
+type ApiSuperplaneAcknowledgeAlertRequest struct {
+	ctx context.Context
+	ApiService *AlertAPIService
+	canvasIdOrName string
+	alertId string
+}
+
+func (r ApiSuperplaneAcknowledgeAlertRequest) Execute() (*SuperplaneAcknowledgeAlertResponse, *http.Response, error) {
+	return r.ApiService.SuperplaneAcknowledgeAlertExecute(r)
+}
+
+/*
+SuperplaneAcknowledgeAlert Acknowledge an alert
+
+Acknowledge the specified alert (canvas can be referenced by ID or name)
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasIdOrName
+ @param alertId
+ @return ApiSuperplaneAcknowledgeAlertRequest
+*/
+func (a *AlertAPIService) SuperplaneAcknowledgeAlert(ctx context.Context, canvasIdOrName string, alertId string) ApiSuperplaneAcknowledgeAlertRequest {
+	return ApiSuperplaneAcknowledgeAlertRequest{
+		ApiService: a,
+		ctx: ctx,
+		canvasIdOrName: canvasIdOrName,
+		alertId: alertId,
+	}
+}
+
+// Execute executes the request
+//  @return SuperplaneAcknowledgeAlertResponse
+func (a *AlertAPIService) SuperplaneAcknowledgeAlertExecute(r ApiSuperplaneAcknowledgeAlertRequest) (*SuperplaneAcknowledgeAlertResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPatch
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *SuperplaneAcknowledgeAlertResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AlertAPIService.SuperplaneAcknowledgeAlert")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/alerts/{alertId}/acknowledge"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"alertId"+"}", url.PathEscape(parameterValueToString(r.alertId, "alertId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiSuperplaneListAlertsRequest struct {
 	ctx context.Context
 	ApiService *AlertAPIService
 	canvasIdOrName string
-	unread *bool
+	includeAcked *bool
 	before *time.Time
 }
 
-func (r ApiSuperplaneListAlertsRequest) Unread(unread bool) ApiSuperplaneListAlertsRequest {
-	r.unread = &unread
+func (r ApiSuperplaneListAlertsRequest) IncludeAcked(includeAcked bool) ApiSuperplaneListAlertsRequest {
+	r.includeAcked = &includeAcked
 	return r
 }
 
@@ -86,8 +201,8 @@ func (a *AlertAPIService) SuperplaneListAlertsExecute(r ApiSuperplaneListAlertsR
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.unread != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "unread", r.unread, "", "")
+	if r.includeAcked != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeAcked", r.includeAcked, "", "")
 	}
 	if r.before != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
