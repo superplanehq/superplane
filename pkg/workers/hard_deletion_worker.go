@@ -80,10 +80,7 @@ func (w *HardDeletionWorker) processStages() error {
 
 		if err := w.hardDeleteStage(logger, &stage); err != nil {
 			logger.Errorf("Failed to hard delete stage: %v", err)
-			continue
 		}
-
-		logger.Info("Successfully hard deleted stage")
 	}
 
 	return nil
@@ -145,10 +142,7 @@ func (w *HardDeletionWorker) processEventSources() error {
 
 		if err := w.hardDeleteEventSource(logger, &eventSource); err != nil {
 			logger.Errorf("Failed to hard delete event source: %v", err)
-			continue
 		}
-
-		logger.Info("Successfully hard deleted event source")
 	}
 
 	return nil
@@ -156,8 +150,9 @@ func (w *HardDeletionWorker) processEventSources() error {
 
 // hardDeleteEventSource handles hard deletion of soft-deleted event sources:
 // 1. Delete connections where this event source is the source
-// 2. Clean up integration webhooks if event source has a resource
-// 3. Finally, hard delete the event source itself
+// 2. Check if resource is still being used by other stages/event sources
+// 3. If resource is shared, convert event source to internal instead of hard deleting
+// 4. If resource is not shared, clean up webhooks and hard delete the event source
 func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSource *models.EventSource) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := eventSource.DeleteConnectionsInTransaction(tx); err != nil {
@@ -165,6 +160,19 @@ func (w *HardDeletionWorker) hardDeleteEventSource(logger *log.Entry, eventSourc
 		}
 
 		shouldDeleteResource, resource := w.prepareResourceCleanupInTransaction(tx, logger, eventSource)
+
+		//
+		// If resource is shared with other stages/event sources, convert to internal instead of deleting.
+		// So the webhooks are not deleted and keeps functional.
+		//
+		if resource != nil && !shouldDeleteResource {
+			logger.Info("Resource is shared, converting event source to internal instead of hard deleting")
+			if err := eventSource.ConvertToInternalInTransaction(tx); err != nil {
+				return fmt.Errorf("failed to convert event source to internal: %v", err)
+			}
+			logger.Info("Successfully converted event source to internal")
+			return nil
+		}
 
 		if err := eventSource.HardDeleteInTransaction(tx); err != nil {
 			return fmt.Errorf("failed to hard delete event source: %v", err)

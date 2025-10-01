@@ -446,7 +446,7 @@ func Test__HardDeletionWorker(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("hard delete with shared resource - delete event source first then stage", func(t *testing.T) {
+	t.Run("hard delete with shared resource - convert event source to internal and then the stage + event source", func(t *testing.T) {
 		resource, err := r.Integration.CreateResource("shared-type", "shared-external-id", "shared-resource")
 		require.NoError(t, err)
 
@@ -485,11 +485,9 @@ func Test__HardDeletionWorker(t *testing.T) {
 		require.NoError(t, err)
 
 		var foundEventSource models.EventSource
-		err = database.Conn().Unscoped().Where("id = ?", eventSource.ID).First(&foundEventSource).Error
-		assert.Error(t, err)
-		if err != nil {
-			assert.Contains(t, err.Error(), "record not found")
-		}
+		err = database.Conn().Where("id = ?", eventSource.ID).First(&foundEventSource).Error
+		assert.NoError(t, err)
+		assert.Equal(t, models.EventSourceScopeInternal, foundEventSource.Scope)
 
 		var foundResource models.Resource
 		err = database.Conn().Where("id = ?", resource.ID).First(&foundResource).Error
@@ -509,6 +507,15 @@ func Test__HardDeletionWorker(t *testing.T) {
 		}
 
 		err = database.Conn().Where("id = ?", resource.ID).First(&foundResource).Error
+		assert.Error(t, err)
+		if err != nil {
+			assert.Contains(t, err.Error(), "record not found")
+		}
+
+		//
+		// Internal Event Source should be deleted after Stage deletion
+		//
+		err = database.Conn().Unscoped().Where("id = ?", eventSource.ID).First(&foundEventSource).Error
 		assert.Error(t, err)
 		if err != nil {
 			assert.Contains(t, err.Error(), "record not found")

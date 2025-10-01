@@ -323,6 +323,14 @@ func (s *EventSource) UpdateStateInTransaction(tx *gorm.DB, state string) error 
 	return tx.Save(s).Error
 }
 
+func (s *EventSource) ConvertToInternalInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+	s.Scope = EventSourceScopeInternal
+	s.DeletedAt = gorm.DeletedAt{}
+	s.UpdatedAt = &now
+	return tx.Unscoped().Save(s).Error
+}
+
 func (s *EventSource) FindIntegration() (*Integration, error) {
 	var integration Integration
 
