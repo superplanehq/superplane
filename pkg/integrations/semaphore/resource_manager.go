@@ -716,3 +716,12 @@ func (i *SemaphoreResourceManager) CleanupWebhook(parentResource integrations.Re
 
 	return nil
 }
+
+func (i *SemaphoreResourceManager) List(ctx context.Context, resourceType string) ([]integrations.Resource, error) {
+	switch resourceType {
+	case ResourceTypeProject:
+		return i.listProjects()
+	default:
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}

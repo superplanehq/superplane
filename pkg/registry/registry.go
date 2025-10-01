@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
+	"github.com/superplanehq/superplane/pkg/manifest"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/gorm"
@@ -27,18 +28,20 @@ type Integration struct {
 }
 
 type Registry struct {
-	httpClient   *http.Client
-	Encryptor    crypto.Encryptor
-	Integrations map[string]Integration
-	Executors    map[string]executors.Executor
+	httpClient        *http.Client
+	Encryptor         crypto.Encryptor
+	Integrations      map[string]Integration
+	Executors         map[string]executors.Executor
+	ManifestRegistry  *manifest.Registry
 }
 
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
 	r := &Registry{
-		Encryptor:    encryptor,
-		Executors:    map[string]executors.Executor{},
-		Integrations: map[string]Integration{},
-		httpClient:   &http.Client{Timeout: 10 * time.Second},
+		Encryptor:        encryptor,
+		Executors:        map[string]executors.Executor{},
+		Integrations:     map[string]Integration{},
+		ManifestRegistry: manifest.NewRegistry(),
+		httpClient:       &http.Client{Timeout: 10 * time.Second},
 	}
 
 	r.Init()
@@ -50,25 +53,47 @@ func (r *Registry) Init() {
 	//
 	// Register the integrations
 	//
+	semaphoreEventHandler := &semaphore.SemaphoreEventHandler{}
+	// Create a dummy executor just to get the manifest (executor requires resource manager and resource)
+	semaphoreExecutor := &semaphore.SemaphoreExecutor{}
 	r.Integrations[models.IntegrationTypeSemaphore] = Integration{
-		EventHandler:       &semaphore.SemaphoreEventHandler{},
+		EventHandler:       semaphoreEventHandler,
 		OIDCVerifier:       &semaphore.SemaphoreOIDCVerifier{},
 		NewResourceManager: semaphore.NewSemaphoreResourceManager,
 		NewExecutor:        semaphore.NewSemaphoreExecutor,
 	}
+	r.ManifestRegistry.RegisterEventSource(semaphoreEventHandler.Manifest())
+	r.ManifestRegistry.RegisterExecutor(semaphoreExecutor.Manifest())
 
+	githubEventHandler := &github.GitHubEventHandler{}
+	// Create a dummy executor just to get the manifest
+	githubExecutor := &github.GitHubExecutor{}
 	r.Integrations[models.IntegrationTypeGithub] = Integration{
-		EventHandler:       &github.GitHubEventHandler{},
+		EventHandler:       githubEventHandler,
 		OIDCVerifier:       &github.GitHubOIDCVerifier{},
 		NewResourceManager: github.NewGitHubResourceManager,
 		NewExecutor:        github.NewGitHubExecutor,
 	}
+	r.ManifestRegistry.RegisterEventSource(githubEventHandler.Manifest())
+	r.ManifestRegistry.RegisterExecutor(githubExecutor.Manifest())
 
 	//
 	// Register the executors
 	//
-	r.Executors[models.ExecutorTypeHTTP] = httpexec.NewHTTPExecutor(r.httpClient)
-	r.Executors[models.ExecutorTypeNoOp] = noop.NewNoOpExecutor()
+	httpExecutor := httpexec.NewHTTPExecutor(r.httpClient)
+	r.Executors[models.ExecutorTypeHTTP] = httpExecutor
+	r.ManifestRegistry.RegisterExecutor(httpExecutor.Manifest())
+
+	noopExecutor := noop.NewNoOpExecutor()
+	r.Executors[models.ExecutorTypeNoOp] = noopExecutor
+	r.ManifestRegistry.RegisterExecutor(noopExecutor.Manifest())
+
+	//
+	// Register built-in event source manifests
+	//
+	r.ManifestRegistry.RegisterEventSource(manifest.GetManualEventSourceManifest())
+	r.ManifestRegistry.RegisterEventSource(manifest.GetScheduledEventSourceManifest())
+	r.ManifestRegistry.RegisterEventSource(manifest.GetWebhookEventSourceManifest())
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {

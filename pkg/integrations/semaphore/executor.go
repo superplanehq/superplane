@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/manifest"
 )
 
 type SemaphoreExecutor struct {
@@ -120,4 +121,58 @@ func (e *SemaphoreExecutor) workflowParameters(fromSpec map[string]string, fromE
 	}
 
 	return parameters
+}
+
+func (e *SemaphoreExecutor) Manifest() *manifest.TypeManifest {
+	return &manifest.TypeManifest{
+		Type:            "semaphore",
+		DisplayName:     "Semaphore CI",
+		Description:     "Execute Semaphore CI workflows and tasks",
+		Category:        "executor",
+		IntegrationType: "semaphore",
+		Icon:            "semaphore",
+		Fields: []manifest.FieldManifest{
+			{
+				Name:         "resource",
+				DisplayName:  "Project",
+				Type:         manifest.FieldTypeResource,
+				Required:     true,
+				Description:  "The Semaphore project to execute in",
+				ResourceType: "project",
+			},
+			{
+				Name:        "task",
+				DisplayName: "Task",
+				Type:        manifest.FieldTypeString,
+				Required:    false,
+				Description: "Optional task name or UUID to trigger",
+				Placeholder: "Task name or UUID",
+				DependsOn:   "resource",
+			},
+			{
+				Name:        "ref",
+				DisplayName: "Git Reference",
+				Type:        manifest.FieldTypeString,
+				Required:    true,
+				Description: "Git branch or tag reference to execute",
+				Placeholder: "refs/heads/main",
+			},
+			{
+				Name:        "pipelineFile",
+				DisplayName: "Pipeline File",
+				Type:        manifest.FieldTypeString,
+				Required:    false,
+				Description: "Path to the pipeline configuration file",
+				Placeholder: ".semaphore/semaphore.yml",
+			},
+			{
+				Name:        "parameters",
+				DisplayName: "Parameters",
+				Type:        manifest.FieldTypeMap,
+				Required:    false,
+				Description: "Environment parameters to pass to the workflow",
+				Placeholder: "Add workflow parameters",
+			},
+		},
+	}
 }

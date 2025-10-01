@@ -12,6 +12,7 @@ import (
 	canvasPb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	manifestPb "github.com/superplanehq/superplane/pkg/protos/manifests"
 	mepb "github.com/superplanehq/superplane/pkg/protos/me"
 	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -88,6 +89,9 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 
 	meService := NewMeService()
 	mepb.RegisterMeServer(grpcServer, meService)
+
+	manifestService := NewManifestService(registry)
+	manifestPb.RegisterManifestServiceServer(grpcServer, manifestService)
 
 	reflection.Register(grpcServer)
 

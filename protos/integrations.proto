@@ -72,6 +72,17 @@ service Integrations {
       tags: "Integration";
     };
   }
+
+  rpc ListResources(ListResourcesRequest) returns (ListResourcesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/integrations/{id_or_name}/resources"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List resources";
+      description: "List available resources for an integration (repositories, projects, etc.)";
+      tags: "Integration";
+    };
+  }
 }
 
 message CreateIntegrationRequest {
@@ -112,6 +123,22 @@ message DescribeIntegrationRequest {
 
 message DescribeIntegrationResponse {
   Integration integration = 1;
+}
+
+message ListResourcesRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string id_or_name = 3;
+  string type = 4;  // Resource type: "repository", "project", etc.
+}
+
+message ListResourcesResponse {
+  repeated Resource resources = 1;
+}
+
+message Resource {
+  string name = 1;
+  string id = 2;
 }
 
 message Integration {

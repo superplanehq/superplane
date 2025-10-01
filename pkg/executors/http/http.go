@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/manifest"
 )
 
 const MaxHTTPResponseSize = 8 * 1024
@@ -148,4 +149,58 @@ func (r *HTTPResponse) Outputs() map[string]any {
 	}
 
 	return nil
+}
+
+func (e *HTTPExecutor) Manifest() *manifest.TypeManifest {
+	return &manifest.TypeManifest{
+		Type:        "http",
+		DisplayName: "HTTP",
+		Description: "Execute HTTP POST requests to external APIs",
+		Category:    "executor",
+		Icon:        "http",
+		Fields: []manifest.FieldManifest{
+			{
+				Name:        "url",
+				DisplayName: "URL",
+				Type:        manifest.FieldTypeString,
+				Required:    true,
+				Description: "The HTTP endpoint URL to send the POST request to",
+				Placeholder: "https://api.example.com/webhook",
+			},
+			{
+				Name:        "payload",
+				DisplayName: "Payload",
+				Type:        manifest.FieldTypeMap,
+				Required:    false,
+				Description: "Key-value pairs to include in the request body (in addition to stageId and executionId)",
+				Placeholder: "Add custom payload fields",
+			},
+			{
+				Name:        "headers",
+				DisplayName: "Headers",
+				Type:        manifest.FieldTypeMap,
+				Required:    false,
+				Description: "Custom HTTP headers to include in the request",
+				Placeholder: "Add custom headers",
+			},
+			{
+				Name:        "responsePolicy",
+				DisplayName: "Response Policy",
+				Type:        manifest.FieldTypeObject,
+				Required:    false,
+				Description: "Define which HTTP status codes should be considered successful",
+				Fields: []manifest.FieldManifest{
+					{
+						Name:        "statusCodes",
+						DisplayName: "Status Codes",
+						Type:        manifest.FieldTypeArray,
+						ItemType:    manifest.FieldTypeNumber,
+						Required:    false,
+						Description: "List of HTTP status codes that indicate success",
+						Placeholder: "e.g., 200, 201, 204",
+					},
+				},
+			},
+		},
+	}
 }

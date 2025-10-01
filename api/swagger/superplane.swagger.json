@@ -33,6 +33,9 @@
     },
     {
       "name": "Me"
+    },
+    {
+      "name": "ManifestService"
     }
   ],
   "schemes": [
@@ -1910,6 +1913,96 @@
         ]
       }
     },
+    "/api/v1/integrations/{idOrName}/resources": {
+      "get": {
+        "summary": "List resources",
+        "description": "List available resources for an integration (repositories, projects, etc.)",
+        "operationId": "Integrations_ListResources",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/IntegrationsListResourcesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "type",
+            "description": "Resource type: \"repository\", \"project\", etc.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      }
+    },
+    "/api/v1/manifests": {
+      "get": {
+        "summary": "Get type manifests",
+        "description": "Returns all executor and event source type manifests",
+        "operationId": "ManifestService_GetManifests",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneGetManifestsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "category",
+            "description": "Required: \"executor\" or \"event_source\"",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Manifests"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "summary": "Get current user",
@@ -3241,6 +3334,29 @@
         }
       }
     },
+    "IntegrationsListResourcesResponse": {
+      "type": "object",
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/IntegrationsResource"
+          }
+        }
+      }
+    },
+    "IntegrationsResource": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
     "IntegrationsResourceRef": {
       "type": "object",
       "properties": {
@@ -4437,6 +4553,61 @@
         }
       }
     },
+    "SuperplaneFieldManifest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOption"
+          }
+        },
+        "resourceType": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "default": {},
+        "validation": {
+          "$ref": "#/definitions/SuperplaneValidation"
+        },
+        "dependsOn": {
+          "type": "string"
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneFieldManifest"
+          },
+          "title": "For nested object fields"
+        },
+        "itemType": {
+          "type": "string",
+          "title": "For array fields"
+        }
+      }
+    },
     "SuperplaneFilter": {
       "type": "object",
       "properties": {
@@ -4468,6 +4639,18 @@
         "FILTER_TYPE_HEADER"
       ],
       "default": "FILTER_TYPE_UNKNOWN"
+    },
+    "SuperplaneGetManifestsResponse": {
+      "type": "object",
+      "properties": {
+        "manifests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneTypeManifest"
+          }
+        }
+      }
     },
     "SuperplaneHeaderFilter": {
       "type": "object",
@@ -4709,6 +4892,20 @@
         }
       }
     },
+    "SuperplaneOption": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneOrganizationsRemoveUserResponse": {
       "type": "object"
     },
@@ -4930,6 +5127,36 @@
         }
       }
     },
+    "SuperplaneTypeManifest": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "integrationType": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneFieldManifest"
+          }
+        }
+      }
+    },
     "SuperplaneUpdateConnectionGroupBody": {
       "type": "object",
       "properties": {
@@ -4992,6 +5219,33 @@
         },
         "status": {
           "$ref": "#/definitions/UsersUserStatus"
+        }
+      }
+    },
+    "SuperplaneValidation": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "max": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "minLength": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxLength": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "customRule": {
+          "type": "string"
         }
       }
     },

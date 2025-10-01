@@ -253,6 +253,46 @@ func (i *GitHubResourceManager) getWorkflowRun(parentResource integrations.Resou
 	}, nil
 }
 
+func (i *GitHubResourceManager) List(ctx context.Context, resourceType string) ([]integrations.Resource, error) {
+	switch resourceType {
+	case ResourceTypeRepository:
+		return i.listRepositories(ctx)
+	default:
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}
+
+func (i *GitHubResourceManager) listRepositories(ctx context.Context) ([]integrations.Resource, error) {
+	opt := &github.RepositoryListByAuthenticatedUserOptions{
+		Affiliation: "owner",
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var allRepos []*github.Repository
+	for {
+		repos, resp, err := i.client.Repositories.ListByAuthenticatedUser(ctx, opt)
+		if err != nil {
+			return nil, fmt.Errorf("error listing repositories: %v", err)
+		}
+
+		allRepos = append(allRepos, repos...)
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	resources := make([]integrations.Resource, 0, len(allRepos))
+	for _, repo := range allRepos {
+		resources = append(resources, &Repository{
+			ID:             repo.GetID(),
+			RepositoryName: repo.GetName(),
+		})
+	}
+
+	return resources, nil
+}
+
 type Repository struct {
 	ID             int64
 	RepositoryName string

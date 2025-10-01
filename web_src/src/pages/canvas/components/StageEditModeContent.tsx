@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import debounce from 'lodash.debounce';
+import { useState, useEffect, useCallback } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
 import { useSecrets } from '../hooks/useSecrets';
@@ -12,32 +11,25 @@ import { EditableAccordionSection } from './shared/EditableAccordionSection';
 import { InlineEditor } from './shared/InlineEditor';
 import { ValidationField } from '../../../components/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
-import { ProTip } from './shared/ProTip';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { ControlledTabs } from '@/components/Tabs/tabs';
 import IntegrationZeroState from '@/components/IntegrationZeroState';
 import { createInputMappingHandlers } from '../utils/inputMappingHandlers';
 import { twMerge } from 'tailwind-merge';
 import { OutputsTooltip } from '@/components/Tooltip/outputs-tooltip';
 import { OutputsHelpTooltip } from '@/components/Tooltip/outputs-help-tooltip';
-import { ParametersTooltip } from '@/components/Tooltip';
 import { ConnectionsTooltip } from '@/components/Tooltip/connections-tooltip';
 import { InputsTooltip } from '@/components/Tooltip/inputs-tooltip';
 import { ConditionsTooltip } from '@/components/Tooltip/conditions-tooltip';
 import { SecretsTooltip } from '@/components/Tooltip/secrets-tooltip';
 import { ExecutorTooltip } from '@/components/Tooltip/executor-tooltip';
 import { InputMappingsTooltip } from '@/components/Tooltip/input-mappings-tooltip';
-import { RefTooltip } from '@/components/Tooltip/ref-tooltip';
-import { TaskTooltip } from '@/components/Tooltip/task-tooltip';
-import { WorkflowTooltip } from '@/components/Tooltip/workflow-tooltip';
-import { PipelineFileTooltip } from '@/components/Tooltip/pipeline-file-tooltip';
 import { StaticValueTooltip } from '@/components/Tooltip/static-value-tooltip';
 import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
 import { DryRunTooltip } from '@/components/Tooltip/dry-run-tooltip';
 import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
-import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
 import { Switch } from '@/components/Switch/switch';
+import { ExecutorFormSection } from './stage/ExecutorFormSection';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -65,14 +57,7 @@ interface StageEditModeContentProps {
   onFieldErrorsChange?: (setFieldErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>) => void;
 }
 
-interface ParameterWithId {
-  id: string;
-  key: string;
-  value: string;
-}
-
-
-export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, dirtyByUser = false, onDataChange, onTriggerSectionValidation, onStageNameChange, integrationError = false, onFieldErrorsChange }: StageEditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, isNewStage, onDataChange, onTriggerSectionValidation, integrationError = false, onFieldErrorsChange }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -89,52 +74,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   });
   const [inputMappings, setInputMappings] = useState<SuperplaneInputMapping[]>(data.inputMappings || []);
   const [dryRun, setDryRun] = useState<boolean>(data.dryRun || false);
-  const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
-    ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
-  );
-  const [payloadDisplay, setPayloadDisplay] = useState(
-    JSON.stringify(executor.spec?.payload || {}, null, 2)
-  );
-  const [semaphoreExecutionType, setSemaphoreExecutionType] = useState<'workflow' | 'task'>(
-    (executor.spec?.task as string) ? 'task' : 'workflow'
-  );
-
-  const [semaphoreParameters, setSemaphoreParameters] = useState<ParameterWithId[]>(() => {
-    const params = executor.spec?.parameters as Record<string, string>;
-    if (!params) return [];
-    return Object.entries(params).map(([key, value], index) => ({
-      id: `param_${Date.now()}_${index}`,
-      key,
-      value
-    }));
-  });
-  const [githubInputs, setGithubInputs] = useState<ParameterWithId[]>(() => {
-    const inputs = executor.spec?.inputs as Record<string, string>;
-    if (!inputs) return [];
-    return Object.entries(inputs).map(([key, value], index) => ({
-      id: `input_${Date.now()}_${index}`,
-      key,
-      value
-    }));
-  });
-  const [httpHeaders, setHttpHeaders] = useState<ParameterWithId[]>(() => {
-    const headers = executor.spec?.headers as Record<string, string>;
-    if (!headers) return [];
-    return Object.entries(headers).map(([key, value], index) => ({
-      id: `header_${Date.now()}_${index}`,
-      key,
-      value
-    }));
-  });
-  const [nextIdCounter, setNextIdCounter] = useState(1);
-  const resourceInputRef = useRef<HTMLInputElement>(null);
-  const hasAutoFocused = useRef(false);
-
-  const generateId = useCallback(() => {
-    const id = `param_${nextIdCounter}`;
-    setNextIdCounter(prev => prev + 1);
-    return id;
-  }, [nextIdCounter]);
 
   // Pass setFieldErrors to parent component
   useEffect(() => {
@@ -142,15 +81,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       onFieldErrorsChange(setFieldErrors);
     }
   }, [onFieldErrorsChange]);
-
-  const parametersWithIdToRecord = useCallback((params: ParameterWithId[]): Record<string, string> => {
-    return params.reduce((acc, param) => {
-      if (param.key.trim() !== '') {
-        acc[param.key] = param.value;
-      }
-      return acc;
-    }, {} as Record<string, string>);
-  }, []);
 
   // Validation
   const { validateName } = useValidation();
@@ -204,56 +134,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   const getAllIntegrations = () => [...canvasIntegrations, ...orgIntegrations];
 
-  // Helper function to generate input options for TaggedInput
-  const getInputOptions = (): TaggedInputOption[] => {
-    return inputs.map(input => ({
-      id: input.name || '',
-      label: input.name || '',
-      value: `\${{ inputs.${input.name} }}`,
-      description: input.description || 'Stage input'
-    })).filter(option => option.id); // Only include inputs with names
-  };
-
   const getSecretKeys = (secretName: string) => {
     const allSecrets = getAllSecrets();
     const selectedSecret = allSecrets.find(secret => secret.name === secretName);
     return selectedSecret ? Object.keys(selectedSecret.data) : [];
   };
-
-  const generateStageName = (resourceName: string, resourceType?: string) => {
-    if (!resourceName || !resourceType) return '';
-    return `Run: ${resourceName}`;
-  };
-
-  // Debounced auto-generation to prevent input interference
-  const debouncedAutoGeneration = useCallback(
-    debounce((resourceName: string, resourceType: string) => {
-      if (isNewStage && !dirtyByUser && onStageNameChange) {
-        const generatedName = generateStageName(resourceName, resourceType);
-        if (generatedName) {
-          onStageNameChange(generatedName);
-        }
-      }
-    }, 300),
-    [isNewStage, dirtyByUser, onStageNameChange]
-  );
-
-  // Auto focus on resource input for new stages (only once)
-  useEffect(() => {
-    if (isNewStage && executor.resource?.type && !hasAutoFocused.current) {
-      const attemptFocus = () => {
-        if (resourceInputRef.current) {
-          resourceInputRef.current.focus();
-          hasAutoFocused.current = true;
-        } else {
-          // Retry if element not ready yet
-          setTimeout(attemptFocus, 100);
-        }
-      };
-
-      setTimeout(attemptFocus, 200);
-    }
-  }, [isNewStage, executor.resource?.type]);
 
   // Validation functions
   const validateInput = (input: SuperplaneInputDefinition, index: number): string[] => {
@@ -723,39 +608,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
 
 
-  useEffect(() => {
-    if (executor.type === 'semaphore' && semaphoreParameters.length > 0) {
-      const newParams = parametersWithIdToRecord(semaphoreParameters);
-      const currentParams = executor.spec?.parameters as Record<string, string>;
-
-      if (JSON.stringify(newParams) !== JSON.stringify(currentParams || {})) {
-        updateExecutorField('parameters', newParams);
-      }
-    }
-  }, [semaphoreParameters, executor.type, executor.spec?.parameters, parametersWithIdToRecord]);
-
-  useEffect(() => {
-    if (executor.type === 'github' && githubInputs.length > 0) {
-      const newInputs = parametersWithIdToRecord(githubInputs);
-      const currentInputs = executor.spec?.inputs as Record<string, string>;
-
-      if (JSON.stringify(newInputs) !== JSON.stringify(currentInputs || {})) {
-        updateExecutorField('inputs', newInputs);
-      }
-    }
-  }, [githubInputs, executor.type, executor.spec?.inputs, parametersWithIdToRecord]);
-
-  useEffect(() => {
-    if (executor.type === 'http' && httpHeaders.length > 0) {
-      const newHeaders = parametersWithIdToRecord(httpHeaders);
-      const currentHeaders = executor.spec?.headers as Record<string, string>;
-
-      if (JSON.stringify(newHeaders) !== JSON.stringify(currentHeaders || {})) {
-        updateExecutorField('headers', newHeaders);
-      }
-    }
-  }, [httpHeaders, executor.type, executor.spec?.headers, parametersWithIdToRecord]);
-
   // Sync component state with incoming data prop changes
   useEffect(() => {
     syncWithIncomingData(
@@ -781,12 +633,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         setExecutor(incomingData.executor);
         setInputMappings(incomingData.inputMappings);
         setDryRun(incomingData.dryRun || false);
-        setResponsePolicyStatusCodesDisplay(
-          ((incomingData.executor?.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
-        );
-        setPayloadDisplay(
-          JSON.stringify(incomingData.executor?.spec?.payload || {}, null, 2)
-        );
       }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -835,7 +681,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
         break;
       case 'executor':
         setExecutor({ ...originalData.executor });
-        setPayloadDisplay((originalData.executor?.spec as Record<string, unknown>)?.payload as string || '{}');
         break;
     }
   };
@@ -855,125 +700,6 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   };
 
   // Executor helper functions
-  const updateExecutorField = (field: string, value: unknown) => {
-    setExecutor(prev => ({
-      ...prev,
-      spec: {
-        ...prev.spec,
-        [field]: value
-      }
-    }));
-  };
-
-  const updateExecutorNestedField = (parentField: string, field: string, value: unknown) => {
-    setExecutor(prev => ({
-      ...prev,
-      spec: {
-        ...prev.spec,
-        [parentField]: {
-          ...(prev.spec?.[parentField] as Record<string, unknown> || {}),
-          [field]: value
-        }
-      }
-    }));
-  };
-
-  const addExecutorParameter = () => {
-    const newParam: ParameterWithId = {
-      id: generateId(),
-      key: `PARAM_${semaphoreParameters.length + 1}`,
-      value: ''
-    };
-    setSemaphoreParameters(prev => [...prev, newParam]);
-  };
-
-  const updateExecutorParameter = (id: string, key: string, value: string) => {
-    setSemaphoreParameters(prev =>
-      prev.map(param =>
-        param.id === id ? { ...param, key, value } : param
-      )
-    );
-  };
-
-  const removeExecutorParameter = (id: string) => {
-    setSemaphoreParameters(prev => prev.filter(param => param.id !== id));
-  };
-
-  const addExecutorInput = () => {
-    const newInput: ParameterWithId = {
-      id: generateId(),
-      key: `INPUT_${githubInputs.length + 1}`,
-      value: ''
-    };
-    setGithubInputs(prev => [...prev, newInput]);
-  };
-
-  const updateExecutorInput = (id: string, key: string, value: string) => {
-    setGithubInputs(prev =>
-      prev.map(input =>
-        input.id === id ? { ...input, key, value } : input
-      )
-    );
-  };
-
-  const removeExecutorInput = (id: string) => {
-    setGithubInputs(prev => prev.filter(input => input.id !== id));
-  };
-
-  const addExecutorHeader = () => {
-    const newHeader: ParameterWithId = {
-      id: generateId(),
-      key: `Header_${httpHeaders.length + 1}`,
-      value: ''
-    };
-    setHttpHeaders(prev => [...prev, newHeader]);
-  };
-
-  const updateExecutorHeader = (id: string, key: string, value: string) => {
-    setHttpHeaders(prev =>
-      prev.map(header =>
-        header.id === id ? { ...header, key, value } : header
-      )
-    );
-  };
-
-  const removeExecutorHeader = (id: string) => {
-    setHttpHeaders(prev => prev.filter(header => header.id !== id));
-  };
-
-  const updateExecutorIntegration = (integrationName: string) => {
-    const availableIntegrations = getAllIntegrations();
-    const integration = availableIntegrations.find(int => int.metadata?.name === integrationName);
-    if (integration) {
-      setExecutor(prev => ({
-        ...prev,
-        integration: {
-          name: integration.metadata?.name,
-          domainType: integration.metadata?.domainType
-        }
-      }));
-    }
-  };
-
-  const updateExecutorResource = (field: 'type' | 'name', value: string) => {
-    setExecutor(prev => ({
-      ...prev,
-      resource: {
-        ...prev.resource,
-        [field]: value
-      }
-    }));
-  };
-
-  const updateSemaphoreExecutionType = (type: 'workflow' | 'task') => {
-    setSemaphoreExecutionType(type);
-
-    // If switching to workflow, clear the task field
-    if (type === 'workflow') {
-      updateExecutorField('task', '');
-    }
-  };
-
   const availableIntegrations = getAllIntegrations();
   const semaphoreIntegrations = availableIntegrations.filter(int => int.spec?.type === 'semaphore');
   const githubIntegrations = availableIntegrations.filter(int => int.spec?.type === 'github');
@@ -2026,458 +1752,21 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 Object.values(fieldErrors || {}).some(Boolean)
               }
             >
-              <div className="space-y-4">
-                {!dryRun && executor.type === 'semaphore' && (
-                  <div className="space-y-4">
-                    <ValidationField
-                      label="Integration"
-                      error={validationErrors.executorIntegration}
-                    >
-                      <select
-                        value={executor.integration?.name || ''}
-                        onChange={(e) => updateExecutorIntegration(e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorIntegration
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      >
-                        <option value="">Select an integration...</option>
-                        {getAllIntegrations()
-                          .filter(integration => integration.spec?.type === 'semaphore')
-                          .map((integration) => (
-                            <option key={integration.metadata?.id} value={integration.metadata?.name}>
-                              {integration.metadata?.name}
-                            </option>
-                          ))}
-                      </select>
-                      {getAllIntegrations().filter(int => int.spec?.type === 'semaphore').length === 0 && (
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                          No Semaphore integrations available. Create one in canvas settings.
-                        </div>
-                      )}
-                    </ValidationField>
-
-                    <ValidationField
-                      label="Project Name"
-                      error={validationErrors.executorProject || fieldErrors.project}
-                    >
-                      <input
-                        ref={resourceInputRef}
-                        type="text"
-                        value={(executor.resource?.name as string) || ''}
-                        onChange={(e) => {
-                          if (executor.resource?.type !== 'project')
-                            updateExecutorResource('type', 'project');
-
-                          updateExecutorResource('name', e.target.value);
-
-                          debouncedAutoGeneration(e.target.value, 'project');
-
-                          if (fieldErrors.project) {
-                            setFieldErrors(prev => {
-                              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                              const { project, ...rest } = prev;
-                              return rest;
-                            });
-                          }
-                        }}
-                        placeholder="my-semaphore-project"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${fieldErrors.project
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-
-                    <ValidationField
-                      label="Execution Type"
-                    >
-                      <ControlledTabs
-                        className="text-left m-0 w-full"
-                        buttonClasses='w-full'
-                        tabs={[
-                          { id: 'workflow', label: 'Workflow' },
-                          { id: 'task', label: 'Task' },
-                        ]}
-                        variant="pills"
-                        activeTab={semaphoreExecutionType}
-                        onTabChange={(tabId) => {
-                          if (tabId === 'task')
-                            updateExecutorField('task', 'my-task')
-                          updateSemaphoreExecutionType(tabId as 'workflow' | 'task')
-                        }}
-                      />
-                    </ValidationField>
-
-                    {semaphoreExecutionType === 'task' && (
-                      <ValidationField
-                        label={
-                          <div className="flex items-center gap-2">
-                            Task
-                            <TaskTooltip />
-                          </div>
-                        }
-                      >
-                        <input
-                          type="text"
-                          value={(executor.spec?.task as string) || ''}
-                          onChange={(e) => updateExecutorField('task', e.target.value)}
-                          placeholder="my-task"
-                          className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                        />
-                      </ValidationField>
-                    )}
-
-                    <ValidationField
-                      label={
-                        <div className="flex items-center gap-2">
-                          Ref
-                          <RefTooltip />
-                        </div>
-                      }
-                      error={validationErrors.executorRef}
-                    >
-                      <input
-                        type="text"
-                        value={(executor.spec?.ref as string) || ''}
-                        onChange={(e) => updateExecutorField('ref', e.target.value)}
-                        placeholder="refs/heads/main"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorRef
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-
-                    <ValidationField
-                      label={
-                        <div className="flex items-center gap-2">
-                          Pipeline File
-                          <PipelineFileTooltip />
-                        </div>
-                      }
-                      error={validationErrors.executorPipelineFile}
-                    >
-                      <input
-                        type="text"
-                        value={(executor.spec?.pipelineFile as string) || ''}
-                        onChange={(e) => updateExecutorField('pipelineFile', e.target.value)}
-                        placeholder=".semaphore/semaphore.yml"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorPipelineFile
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-
-                    <ValidationField label={
-                      <div className="flex items-center gap-2">
-                        Pipeline Parameters (optional)
-                        <ParametersTooltip executorType="semaphore" />
-                      </div>
-                    }>
-                      <ProTip show={semaphoreParameters.length > 0} />
-                      <div className="space-y-2">
-                        {semaphoreParameters.map((param) => (
-                          <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                            <input
-                              type="text"
-                              value={param.key}
-                              onChange={(e) => updateExecutorParameter(param.id, e.target.value, param.value)}
-                              placeholder="Parameter name"
-                              className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
-                            />
-                            <div className="w-2/3">
-                              <TaggedInput
-                                value={param.value}
-                                onChange={(value) => updateExecutorParameter(param.id, param.key, value)}
-                                options={getInputOptions()}
-                                placeholder="Parameter value"
-                                className="text-sm"
-                              />
-                            </div>
-                            <button
-                              onClick={() => removeExecutorParameter(param.id)}
-                              className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                            >
-                              <MaterialSymbol name="delete" size="sm" />
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          onClick={addExecutorParameter}
-                          className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                        >
-                          <MaterialSymbol name="add" size="sm" />
-                          Add Parameter
-                        </button>
-                      </div>
-                    </ValidationField>
-                  </div>
-                )}
-
-                {!dryRun && executor.type === 'github' && (
-                  <div className="space-y-4">
-                    <ValidationField
-                      label="Integration"
-                      error={validationErrors.executorIntegration}
-                    >
-                      <select
-                        value={executor.integration?.name || ''}
-                        onChange={(e) => updateExecutorIntegration(e.target.value)}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorIntegration
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      >
-                        <option value="">Select an integration...</option>
-                        {getAllIntegrations()
-                          .filter(integration => integration.spec?.type === 'github')
-                          .map((integration) => (
-                            <option key={integration.metadata?.id} value={integration.metadata?.name}>
-                              {integration.metadata?.name}
-                            </option>
-                          ))}
-                      </select>
-                      {getAllIntegrations().filter(int => int.spec?.type === 'github').length === 0 && (
-                        <div className="text-xs text-zinc-500 mt-1">
-                          No GitHub integrations available. Create one in canvas settings.
-                        </div>
-                      )}
-                    </ValidationField>
-
-                    <ValidationField
-                      label="Repository Name"
-                      error={validationErrors.executorRepository || fieldErrors.repository}
-                    >
-                      <input
-                        ref={resourceInputRef}
-                        type="text"
-                        value={(executor.resource?.name as string) || ''}
-                        onChange={(e) => {
-                          if (executor.resource?.type !== 'repository')
-                            updateExecutorResource('type', 'repository');
-
-                          updateExecutorResource('name', e.target.value);
-
-                          debouncedAutoGeneration(e.target.value, 'repository');
-
-                          setFieldErrors(prev => ({ ...prev, repository: '' }));
-                        }}
-                        placeholder="my-repository"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorRepository
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-
-                    <ValidationField
-                      label={
-                        <div className="flex items-center gap-2">
-                          Workflow
-                          <WorkflowTooltip />
-                        </div>
-                      }
-                      error={validationErrors.executorWorkflow || fieldErrors.workflow}
-                    >
-                      <input
-                        type="text"
-                        value={(executor.spec?.workflow as string) || ''}
-                        onChange={(e) => {
-                          updateExecutorField('workflow', e.target.value);
-                          setFieldErrors(prev => ({ ...prev, workflow: '' }));
-                        }}
-                        placeholder=".github/workflows/task.yml"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorWorkflow
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-
-                    <ValidationField
-                      label={
-                        <div className="flex items-center gap-2">
-                          Ref
-                          <RefTooltip />
-                        </div>
-                      }
-                      error={validationErrors.executorRef}
-                    >
-                      <input
-                        type="text"
-                        value={(executor.spec?.ref as string) || ''}
-                        onChange={(e) => updateExecutorField('ref', e.target.value)}
-                        placeholder="main"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorRef
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-
-                    <ValidationField label={
-                      <div className="flex items-center gap-2">
-                        Inputs (optional)
-                        <ParametersTooltip executorType="github" />
-                      </div>
-                    }>
-                      <ProTip show={githubInputs.length > 0} />
-                      <div className="space-y-2">
-                        {githubInputs.map((input) => (
-                          <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                            <input
-                              type="text"
-                              value={input.key}
-                              onChange={(e) => updateExecutorInput(input.id, e.target.value, input.value)}
-                              placeholder="Input name"
-                              className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
-                            />
-                            <div className="w-2/3">
-                              <TaggedInput
-                                value={input.value}
-                                onChange={(value) => updateExecutorInput(input.id, input.key, value)}
-                                options={getInputOptions()}
-                                placeholder="Input value"
-                                className="text-sm"
-                              />
-                            </div>
-                            <button
-                              onClick={() => removeExecutorInput(input.id)}
-                              className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                            >
-                              <MaterialSymbol name="delete" size="sm" />
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          onClick={addExecutorInput}
-                          className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                        >
-                          <MaterialSymbol name="add" size="sm" />
-                          Add Input
-                        </button>
-                      </div>
-                    </ValidationField>
-                  </div>
-                )}
-
-                {!dryRun && executor.type === 'http' && (
-                  <div className="space-y-4">
-                    <ValidationField
-                      label="URL"
-                      error={validationErrors.executorUrl}
-                    >
-                      <input
-                        type="text"
-                        value={(executor.spec?.url as string) || ''}
-                        onChange={(e) => updateExecutorField('url', e.target.value)}
-                        placeholder="https://api.example.com/endpoint"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.executorUrl
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-
-                    <ValidationField label="Payload (JSON)">
-                      <textarea
-                        value={payloadDisplay}
-                        onChange={(e) => {
-                          setPayloadDisplay(e.target.value);
-                          try {
-                            const parsed = JSON.parse(e.target.value);
-                            updateExecutorField('payload', parsed);
-                          } catch {
-                            // Keep the display value but don't update payload until valid JSON
-                          }
-                        }}
-                        placeholder='{\n  "key1": "value1",\n  "key2": "{{ inputs.KEY2 }}"\n}'
-                        rows={6}
-                        className="nodrag w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500 font-mono"
-                      />
-                    </ValidationField>
-
-                    <ValidationField label={
-                      <div className="flex items-center gap-2">
-                        Headers (optional)
-                        <ParametersTooltip executorType="http" />
-                      </div>
-                    }>
-                      <ProTip show={httpHeaders.length > 0} />
-                      <div className="space-y-2">
-                        {httpHeaders.map((header) => (
-                          <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                            <input
-                              type="text"
-                              value={header.key}
-                              onChange={(e) => updateExecutorHeader(header.id, e.target.value, header.value)}
-                              placeholder="Header name"
-                              className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                            />
-                            <div className="w-2/3">
-                              <TaggedInput
-                                value={header.value}
-                                onChange={(value) => updateExecutorHeader(header.id, header.key, value)}
-                                options={getInputOptions()}
-                                placeholder="Header value"
-                                className="text-sm"
-                              />
-                            </div>
-                            <button
-                              onClick={() => removeExecutorHeader(header.id)}
-                              className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                            >
-                              <MaterialSymbol name="delete" size="sm" />
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          onClick={addExecutorHeader}
-                          className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                        >
-                          <MaterialSymbol name="add" size="sm" />
-                          Add Header
-                        </button>
-                      </div>
-                    </ValidationField>
-
-                    <ValidationField label="Response Policy - Success Status Codes" error={fieldErrors.statusCodes}>
-                      <input
-                        type="text"
-                        value={responsePolicyStatusCodesDisplay}
-                        onChange={(e) => {
-                          const endsWithComma = e.target.value.endsWith(',');
-                          const codes = e.target.value.split(',').map(code => parseInt(code.trim())).filter(code => !isNaN(code));
-                          updateExecutorNestedField('responsePolicy', 'statusCodes', codes);
-                          setResponsePolicyStatusCodesDisplay(endsWithComma ? codes.join(',') + ',' : codes.join(','));
-                        }}
-                        placeholder="200, 201, 202"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${fieldErrors.statusCodes
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`} />
-                    </ValidationField>
-                  </div>
-                )}
-
-                {/* Unified Execution Name Field - appears for all executor types */}
-                {executor.type && (
-                  <ValidationField
-                    label="Execution name (optional)"
-                  >
-                    <TaggedInput
-                      value={executor.name || ''}
-                      onChange={(value) => setExecutor(prev => ({ ...prev, name: value }))}
-                      options={getInputOptions()}
-                      placeholder={'${{ inputs.VERSION }} deployment'}
-                      className="text-sm"
-                    />
-                    <ProTip show />
-                  </ValidationField>
-                )}
-              </div>
+              <ExecutorFormSection
+                executor={executor}
+                dryRun={dryRun}
+                availableIntegrations={getAllIntegrations()}
+                validationErrors={validationErrors}
+                fieldErrors={fieldErrors}
+                onExecutorChange={(updates) => {
+                  setExecutor(prev => ({ ...prev, ...updates }));
+                }}
+                onFieldErrorChange={(field, error) => {
+                  setFieldErrors(prev => ({ ...prev, [field]: error }));
+                }}
+                organizationId={organizationId}
+                canvasId={canvasId}
+              />
             </EditableAccordionSection>
           </>
         )}

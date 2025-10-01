@@ -7,6 +7,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/manifest"
 )
 
 var ErrInvalidSignature = errors.New("invalid signature")
@@ -33,6 +34,11 @@ type EventHandler interface {
 	// List of event types supported by the integration.
 	//
 	EventTypes() []string
+
+	//
+	// Returns the manifest describing the event source configuration.
+	//
+	Manifest() *manifest.TypeManifest
 }
 
 type ResourceManager interface {
@@ -43,6 +49,12 @@ type ResourceManager interface {
 	// or executor really exists.
 	//
 	Get(resourceType, id string) (Resource, error)
+
+	//
+	// List resources of a given type.
+	// Used to populate UI dropdowns for selecting resources.
+	//
+	List(ctx context.Context, resourceType string) ([]Resource, error)
 
 	//
 	// Get the status of a resource created by the executor.
@@ -84,6 +96,11 @@ type Executor interface {
 	// Triggers a new execution.
 	//
 	Execute([]byte, executors.ExecutionParameters) (StatefulResource, error)
+
+	//
+	// Returns the manifest describing the executor configuration.
+	//
+	Manifest() *manifest.TypeManifest
 }
 
 type OIDCVerifier interface {

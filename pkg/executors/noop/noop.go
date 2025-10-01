@@ -7,6 +7,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/manifest"
 )
 
 type NoOpExecutor struct{}
@@ -57,4 +58,15 @@ func (r *NoOpResponse) Successful() bool {
 
 func (r *NoOpResponse) Outputs() map[string]any {
 	return r.OutputMap
+}
+
+func (e *NoOpExecutor) Manifest() *manifest.TypeManifest {
+	return &manifest.TypeManifest{
+		Type:        "noop",
+		DisplayName: "No-Op",
+		Description: "A test executor that does nothing and always succeeds",
+		Category:    "executor",
+		Icon:        "noop",
+		Fields:      []manifest.FieldManifest{},
+	}
 }

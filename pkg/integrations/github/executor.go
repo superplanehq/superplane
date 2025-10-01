@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-github/v74/github"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/manifest"
 	"github.com/superplanehq/superplane/pkg/retry"
 )
 
@@ -201,4 +202,50 @@ func (e *GitHubExecutor) buildWorkflowInputs(fromSpec map[string]string, fromExe
 
 	inputs["superplane_execution_id"] = fromExecution.ExecutionID
 	return inputs
+}
+
+func (e *GitHubExecutor) Manifest() *manifest.TypeManifest {
+	return &manifest.TypeManifest{
+		Type:            "github",
+		DisplayName:     "GitHub Actions",
+		Description:     "Execute GitHub Actions workflows",
+		Category:        "executor",
+		IntegrationType: "github",
+		Icon:            "github",
+		Fields: []manifest.FieldManifest{
+			{
+				Name:         "resource",
+				DisplayName:  "Repository",
+				Type:         manifest.FieldTypeResource,
+				Required:     true,
+				Description:  "The GitHub repository to execute in",
+				ResourceType: "repository",
+			},
+			{
+				Name:        "workflow",
+				DisplayName: "Workflow",
+				Type:        manifest.FieldTypeString,
+				Required:    true,
+				Description: "Workflow name or path to trigger",
+				Placeholder: "Workflow name or .github/workflows/workflow.yml",
+				DependsOn:   "resource",
+			},
+			{
+				Name:        "ref",
+				DisplayName: "Git Reference",
+				Type:        manifest.FieldTypeString,
+				Required:    true,
+				Description: "Git branch or tag reference to execute",
+				Placeholder: "main",
+			},
+			{
+				Name:        "inputs",
+				DisplayName: "Inputs",
+				Type:        manifest.FieldTypeMap,
+				Required:    false,
+				Description: "Workflow inputs to pass to the GitHub Actions workflow",
+				Placeholder: "Add workflow inputs",
+			},
+		},
+	}
 }

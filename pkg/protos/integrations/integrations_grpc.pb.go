@@ -23,6 +23,7 @@ const (
 	Integrations_DescribeIntegration_FullMethodName = "/Superplane.Integrations.Integrations/DescribeIntegration"
 	Integrations_CreateIntegration_FullMethodName   = "/Superplane.Integrations.Integrations/CreateIntegration"
 	Integrations_UpdateIntegration_FullMethodName   = "/Superplane.Integrations.Integrations/UpdateIntegration"
+	Integrations_ListResources_FullMethodName       = "/Superplane.Integrations.Integrations/ListResources"
 )
 
 // IntegrationsClient is the client API for Integrations service.
@@ -33,6 +34,7 @@ type IntegrationsClient interface {
 	DescribeIntegration(ctx context.Context, in *DescribeIntegrationRequest, opts ...grpc.CallOption) (*DescribeIntegrationResponse, error)
 	CreateIntegration(ctx context.Context, in *CreateIntegrationRequest, opts ...grpc.CallOption) (*CreateIntegrationResponse, error)
 	UpdateIntegration(ctx context.Context, in *UpdateIntegrationRequest, opts ...grpc.CallOption) (*UpdateIntegrationResponse, error)
+	ListResources(ctx context.Context, in *ListResourcesRequest, opts ...grpc.CallOption) (*ListResourcesResponse, error)
 }
 
 type integrationsClient struct {
@@ -83,6 +85,16 @@ func (c *integrationsClient) UpdateIntegration(ctx context.Context, in *UpdateIn
 	return out, nil
 }
 
+func (c *integrationsClient) ListResources(ctx context.Context, in *ListResourcesRequest, opts ...grpc.CallOption) (*ListResourcesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListResourcesResponse)
+	err := c.cc.Invoke(ctx, Integrations_ListResources_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IntegrationsServer is the server API for Integrations service.
 // All implementations should embed UnimplementedIntegrationsServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type IntegrationsServer interface {
 	DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error)
 	CreateIntegration(context.Context, *CreateIntegrationRequest) (*CreateIntegrationResponse, error)
 	UpdateIntegration(context.Context, *UpdateIntegrationRequest) (*UpdateIntegrationResponse, error)
+	ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error)
 }
 
 // UnimplementedIntegrationsServer should be embedded to have
@@ -111,6 +124,9 @@ func (UnimplementedIntegrationsServer) CreateIntegration(context.Context, *Creat
 }
 func (UnimplementedIntegrationsServer) UpdateIntegration(context.Context, *UpdateIntegrationRequest) (*UpdateIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateIntegration not implemented")
+}
+func (UnimplementedIntegrationsServer) ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListResources not implemented")
 }
 func (UnimplementedIntegrationsServer) testEmbeddedByValue() {}
 
@@ -204,6 +220,24 @@ func _Integrations_UpdateIntegration_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Integrations_ListResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListResourcesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IntegrationsServer).ListResources(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Integrations_ListResources_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IntegrationsServer).ListResources(ctx, req.(*ListResourcesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Integrations_ServiceDesc is the grpc.ServiceDesc for Integrations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -226,6 +260,10 @@ var Integrations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateIntegration",
 			Handler:    _Integrations_UpdateIntegration_Handler,
+		},
+		{
+			MethodName: "ListResources",
+			Handler:    _Integrations_ListResources_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

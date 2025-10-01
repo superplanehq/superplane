@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package Superplane;
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/manifests";
+
+service ManifestService {
+  rpc GetManifests(GetManifestsRequest) returns (GetManifestsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/manifests"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get type manifests";
+      description: "Returns all executor and event source type manifests";
+      tags: "Manifests";
+    };
+  }
+}
+
+message GetManifestsRequest {
+  string category = 1;  // Required: "executor" or "event_source"
+}
+
+message GetManifestsResponse {
+  repeated TypeManifest manifests = 1;
+}
+
+message TypeManifest {
+  string type = 1;
+  string display_name = 2;
+  string description = 3;
+  string category = 4;
+  string integration_type = 5;
+  string icon = 6;
+  repeated FieldManifest fields = 7;
+}
+
+message FieldManifest {
+  string name = 1;
+  string display_name = 2;
+  string type = 3;
+  bool required = 4;
+  string description = 5;
+  repeated Option options = 6;
+  string resource_type = 7;
+  string placeholder = 8;
+  google.protobuf.Value default = 9;
+  Validation validation = 10;
+  string depends_on = 11;
+  bool hidden = 12;
+  repeated FieldManifest fields = 13;  // For nested object fields
+  string item_type = 14;  // For array fields
+}
+
+message Option {
+  string value = 1;
+  string label = 2;
+  string description = 3;
+}
+
+message Validation {
+  optional int32 min = 1;
+  optional int32 max = 2;
+  string pattern = 3;
+  optional int32 min_length = 4;
+  optional int32 max_length = 5;
+  string custom_rule = 6;
+}

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/manifest"
 )
 
 const (
@@ -84,4 +85,130 @@ func (e *SemaphoreEvent) Type() string {
 
 func (e *SemaphoreEvent) Signature() string {
 	return e.PayloadSignature
+}
+
+func (i *SemaphoreEventHandler) Manifest() *manifest.TypeManifest {
+	return &manifest.TypeManifest{
+		Type:            "semaphore",
+		DisplayName:     "Semaphore CI",
+		Description:     "Receive events from Semaphore CI webhooks",
+		Category:        "event_source",
+		IntegrationType: "semaphore",
+		Icon:            "semaphore",
+		Fields: []manifest.FieldManifest{
+			{
+				Name:         "resource",
+				DisplayName:  "Project",
+				Type:         manifest.FieldTypeResource,
+				Required:     true,
+				Description:  "The Semaphore project to listen to",
+				ResourceType: "project",
+			},
+			{
+				Name:        "eventTypes",
+				DisplayName: "Event Type Filters",
+				Type:        manifest.FieldTypeArray,
+				ItemType:    manifest.FieldTypeObject,
+				Required:    false,
+				Description: "Filter which events should trigger executions",
+				Fields: []manifest.FieldManifest{
+					{
+						Name:        "type",
+						DisplayName: "Event Type",
+						Type:        manifest.FieldTypeSelect,
+						Required:    true,
+						Description: "The Semaphore event type",
+						Options: []manifest.Option{
+							{Value: PipelineDoneEvent, Label: "Pipeline Done"},
+						},
+					},
+					{
+						Name:        "filter_operator",
+						DisplayName: "Filter Operator",
+						Type:        manifest.FieldTypeSelect,
+						Required:    false,
+						Description: "How to combine multiple filters",
+						Options: []manifest.Option{
+							{Value: "and", Label: "AND"},
+							{Value: "or", Label: "OR"},
+						},
+						Default: "and",
+					},
+					{
+						Name:        "filters",
+						DisplayName: "Filters",
+						Type:        manifest.FieldTypeArray,
+						ItemType:    manifest.FieldTypeObject,
+						Required:    false,
+						Description: "Conditions to match on event data",
+						Fields: []manifest.FieldManifest{
+							{
+								Name:        "type",
+								DisplayName: "Filter Type",
+								Type:        manifest.FieldTypeSelect,
+								Required:    true,
+								Description: "What to filter on",
+								Options: []manifest.Option{
+									{Value: "data", Label: "Event Data"},
+									{Value: "header", Label: "HTTP Header"},
+								},
+							},
+							{
+								Name:        "data",
+								DisplayName: "Data Filter",
+								Type:        manifest.FieldTypeObject,
+								Required:    false,
+								Description: "Filter on event payload data",
+								DependsOn:   "type",
+								Fields: []manifest.FieldManifest{
+									{
+										Name:        "path",
+										DisplayName: "JSON Path",
+										Type:        manifest.FieldTypeString,
+										Required:    true,
+										Description: "JSON path to the field",
+										Placeholder: "$.pipeline.result",
+									},
+									{
+										Name:        "value",
+										DisplayName: "Value",
+										Type:        manifest.FieldTypeString,
+										Required:    true,
+										Description: "Value to match",
+										Placeholder: "passed",
+									},
+								},
+							},
+							{
+								Name:        "header",
+								DisplayName: "Header Filter",
+								Type:        manifest.FieldTypeObject,
+								Required:    false,
+								Description: "Filter on HTTP headers",
+								DependsOn:   "type",
+								Fields: []manifest.FieldManifest{
+									{
+										Name:        "name",
+										DisplayName: "Header Name",
+										Type:        manifest.FieldTypeString,
+										Required:    true,
+										Description: "HTTP header name",
+										Placeholder: "X-Semaphore-Signature-256",
+									},
+									{
+										Name:        "value",
+										DisplayName: "Value",
+										Type:        manifest.FieldTypeString,
+										Required:    true,
+										Description: "Value to match",
+										Placeholder: "value",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }

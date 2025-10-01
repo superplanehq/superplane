@@ -15,7 +15,8 @@ import { showErrorToast } from '@/utils/toast';
 import { EventSourceFilterTooltip } from '@/components/Tooltip/EventSourceFilterTooltip';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
 import { ScheduleConfiguration } from '../../../components/ScheduleConfiguration';
-import { getDefaultEventType, getDefaultFilterExpression, getResourceLabel, getResourcePlaceholder, getResourceType, getIntegrationLabel, getEventTypePlaceholder, isRegularEventSource } from '@/utils/components';
+import { getDefaultEventType, getDefaultFilterExpression, getResourceLabel, getResourceType, getIntegrationLabel, getEventTypePlaceholder, isRegularEventSource } from '@/utils/components';
+import { EventSourceFormSection } from './eventsource/EventSourceFormSection';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -80,16 +81,6 @@ export function EventSourceEditModeContent({
     }
   };
 
-  const handleResourceNameChange = (value: string) => {
-    setResourceName(value);
-
-    if (value.trim() !== '') {
-      setValidationErrors(prev => ({
-        ...prev,
-        resourceName: ''
-      }));
-    }
-  };
 
   // Filter management functions
   const addEventType = useCallback(() => {
@@ -529,120 +520,39 @@ curl -X POST \\
         )}
 
 
-        {/* Configuration Section */}
-        {availableIntegrations.length > 0 && sourceType === 'semaphore' && (
+        {/* Configuration Section - Dynamic forms driven by manifests */}
+        {availableIntegrations.length > 0 && !isRegularEventSource(sourceType) && (
           <EditableAccordionSection
             id="integration"
-            title="Semaphore Configuration"
+            title={`${sourceType === 'github' ? 'GitHub' : sourceType === 'semaphore' ? 'Semaphore' : 'Integration'} Configuration`}
             isOpen={openSections.includes('integration')}
             onToggle={handleAccordionToggle}
             isModified={hasActualChanges()}
             onRevert={revertSection}
             requiredBadge={true}
           >
-            <div className="space-y-3">
-              <ValidationField
-                label="Semaphore integration"
-                error={combinedErrors.integration}
-                required={true}
-              >
-                <select
-                  value={selectedIntegration?.name || ''}
-                  onChange={(e) => handleIntegrationChange(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors.integration
-                    ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
-                    : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                    }`}
-                >
-                  <option value="">Select a Semaphore integration...</option>
-                  {availableIntegrations.map((integration) => (
-                    <option key={integration.metadata?.id} value={integration.metadata?.name}>
-                      {integration.metadata?.name}
-                    </option>
-                  ))}
-                </select>
-              </ValidationField>
-
-              {(selectedIntegration || combinedErrors.resourceName) && (
-                <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
-                  <ValidationField
-                    label={`${getResourceLabel(sourceType)} Name`}
-                    error={combinedErrors.resourceName}
-                    required={true}
-                  >
-                    <input
-                      ref={resourceNameRef}
-                      type="text"
-                      value={resourceName}
-                      onChange={(e) => handleResourceNameChange(e.target.value)}
-                      placeholder={getResourcePlaceholder(sourceType)}
-                      className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors.resourceName
-                        ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
-                        : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                        }`}
-                    />
-                  </ValidationField>
-                </div>
-              )}
-            </div>
-          </EditableAccordionSection>
-        )}
-
-        {availableIntegrations.length > 0 && sourceType === 'github' && (
-          <EditableAccordionSection
-            id="integration"
-            title="GitHub Configuration"
-            isOpen={openSections.includes('integration')}
-            onToggle={handleAccordionToggle}
-            isModified={hasActualChanges()}
-            onRevert={revertSection}
-            requiredBadge={true}
-          >
-            <div className="space-y-3">
-              <ValidationField
-                label="GitHub integration"
-                error={combinedErrors.integration}
-                required={true}
-              >
-                <select
-                  value={selectedIntegration?.name || ''}
-                  onChange={(e) => handleIntegrationChange(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors.integration
-                    ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
-                    : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                    }`}
-                >
-                  <option value="">Select a GitHub integration...</option>
-                  {availableIntegrations.map((integration) => (
-                    <option key={integration.metadata?.id} value={integration.metadata?.name}>
-                      {integration.metadata?.name}
-                    </option>
-                  ))}
-                </select>
-              </ValidationField>
-
-              {(selectedIntegration || combinedErrors.resourceName) && (
-                <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
-                  <ValidationField
-                    label={`${getResourceLabel(sourceType)} Name`}
-                    error={combinedErrors.resourceName}
-                    required={true}
-                  >
-                    <input
-                      ref={resourceNameRef}
-                      type="text"
-                      value={resourceName}
-                      onChange={(e) => handleResourceNameChange(e.target.value)}
-                      placeholder={getResourcePlaceholder(sourceType)}
-                      className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors.resourceName
-                        ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
-                        : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                        }`}
-                    />
-                  </ValidationField>
-                </div>
-              )}
-            </div>
+            <EventSourceFormSection
+              eventSource={{
+                spec: {
+                  type: sourceType,
+                  integration: selectedIntegration || undefined,
+                  resource: resourceType && resourceName ? { type: resourceType, name: resourceName } : undefined,
+                },
+              }}
+              availableIntegrations={availableIntegrations}
+              validationErrors={combinedErrors}
+              fieldErrors={{}}
+              onEventSourceChange={(updates) => {
+                if (updates.spec?.integration) {
+                  handleIntegrationChange(updates.spec.integration.name || '');
+                }
+                if (updates.spec?.resource) {
+                  setResourceName(updates.spec.resource.name || '');
+                }
+              }}
+              organizationId={organizationId}
+              canvasId={canvasId}
+            />
           </EditableAccordionSection>
         )}
 

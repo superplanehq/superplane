@@ -190,6 +190,15 @@ export type IntegrationsListIntegrationsResponse = {
     integrations?: Array<IntegrationsIntegration>;
 };
 
+export type IntegrationsListResourcesResponse = {
+    resources?: Array<IntegrationsResource>;
+};
+
+export type IntegrationsResource = {
+    name?: string;
+    id?: string;
+};
+
 export type IntegrationsResourceRef = {
     type?: string;
     name?: string;
@@ -696,6 +705,23 @@ export type SuperplaneExecutor = {
     name?: string;
 };
 
+export type SuperplaneFieldManifest = {
+    name?: string;
+    displayName?: string;
+    type?: string;
+    required?: boolean;
+    description?: string;
+    options?: Array<SuperplaneOption>;
+    resourceType?: string;
+    placeholder?: string;
+    default?: unknown;
+    validation?: SuperplaneValidation;
+    dependsOn?: string;
+    hidden?: boolean;
+    fields?: Array<SuperplaneFieldManifest>;
+    itemType?: string;
+};
+
 export type SuperplaneFilter = {
     type?: SuperplaneFilterType;
     data?: SuperplaneDataFilter;
@@ -705,6 +731,10 @@ export type SuperplaneFilter = {
 export type SuperplaneFilterOperator = 'FILTER_OPERATOR_AND' | 'FILTER_OPERATOR_OR';
 
 export type SuperplaneFilterType = 'FILTER_TYPE_UNKNOWN' | 'FILTER_TYPE_DATA' | 'FILTER_TYPE_HEADER';
+
+export type SuperplaneGetManifestsResponse = {
+    manifests?: Array<SuperplaneTypeManifest>;
+};
 
 export type SuperplaneHeaderFilter = {
     expression?: string;
@@ -791,6 +821,12 @@ export type SuperplaneMeUser = {
     hasToken?: boolean;
 };
 
+export type SuperplaneOption = {
+    value?: string;
+    label?: string;
+    description?: string;
+};
+
 export type SuperplaneOrganizationsRemoveUserResponse = {
     [key: string]: unknown;
 };
@@ -871,6 +907,16 @@ export type SuperplaneStageStatus = {
     queue?: StatusQueue;
 };
 
+export type SuperplaneTypeManifest = {
+    type?: string;
+    displayName?: string;
+    description?: string;
+    category?: string;
+    integrationType?: string;
+    icon?: string;
+    fields?: Array<SuperplaneFieldManifest>;
+};
+
 export type SuperplaneUpdateConnectionGroupBody = {
     connectionGroup?: SuperplaneConnectionGroup;
 };
@@ -900,6 +946,15 @@ export type SuperplaneUsersUser = {
     metadata?: UsersUserMetadata;
     spec?: UsersUserSpec;
     status?: UsersUserStatus;
+};
+
+export type SuperplaneValidation = {
+    min?: number;
+    max?: number;
+    pattern?: string;
+    minLength?: number;
+    maxLength?: number;
+    customRule?: string;
 };
 
 export type SuperplaneValueDefinition = {
@@ -2212,6 +2267,70 @@ export type IntegrationsUpdateIntegrationResponses = {
 };
 
 export type IntegrationsUpdateIntegrationResponse2 = IntegrationsUpdateIntegrationResponses[keyof IntegrationsUpdateIntegrationResponses];
+
+export type IntegrationsListResourcesData = {
+    body?: never;
+    path: {
+        idOrName: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+        /**
+         * Resource type: "repository", "project", etc.
+         */
+        type?: string;
+    };
+    url: '/api/v1/integrations/{idOrName}/resources';
+};
+
+export type IntegrationsListResourcesErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type IntegrationsListResourcesError = IntegrationsListResourcesErrors[keyof IntegrationsListResourcesErrors];
+
+export type IntegrationsListResourcesResponses = {
+    /**
+     * A successful response.
+     */
+    200: IntegrationsListResourcesResponse;
+};
+
+export type IntegrationsListResourcesResponse2 = IntegrationsListResourcesResponses[keyof IntegrationsListResourcesResponses];
+
+export type ManifestServiceGetManifestsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Required: "executor" or "event_source"
+         */
+        category?: string;
+    };
+    url: '/api/v1/manifests';
+};
+
+export type ManifestServiceGetManifestsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type ManifestServiceGetManifestsError = ManifestServiceGetManifestsErrors[keyof ManifestServiceGetManifestsErrors];
+
+export type ManifestServiceGetManifestsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneGetManifestsResponse;
+};
+
+export type ManifestServiceGetManifestsResponse = ManifestServiceGetManifestsResponses[keyof ManifestServiceGetManifestsResponses];
 
 export type MeMeData = {
     body?: never;
