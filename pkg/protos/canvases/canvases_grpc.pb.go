@@ -50,6 +50,7 @@ const (
 	Superplane_ListEventRejections_FullMethodName          = "/Superplane.Superplane/ListEventRejections"
 	Superplane_AddUser_FullMethodName                      = "/Superplane.Superplane/AddUser"
 	Superplane_RemoveUser_FullMethodName                   = "/Superplane.Superplane/RemoveUser"
+	Superplane_ListAlerts_FullMethodName                   = "/Superplane.Superplane/ListAlerts"
 )
 
 // SuperplaneClient is the client API for Superplane service.
@@ -87,6 +88,7 @@ type SuperplaneClient interface {
 	ListEventRejections(ctx context.Context, in *ListEventRejectionsRequest, opts ...grpc.CallOption) (*ListEventRejectionsResponse, error)
 	AddUser(ctx context.Context, in *AddUserRequest, opts ...grpc.CallOption) (*AddUserResponse, error)
 	RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error)
+	ListAlerts(ctx context.Context, in *ListAlertsRequest, opts ...grpc.CallOption) (*ListAlertsResponse, error)
 }
 
 type superplaneClient struct {
@@ -407,6 +409,16 @@ func (c *superplaneClient) RemoveUser(ctx context.Context, in *RemoveUserRequest
 	return out, nil
 }
 
+func (c *superplaneClient) ListAlerts(ctx context.Context, in *ListAlertsRequest, opts ...grpc.CallOption) (*ListAlertsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAlertsResponse)
+	err := c.cc.Invoke(ctx, Superplane_ListAlerts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SuperplaneServer is the server API for Superplane service.
 // All implementations should embed UnimplementedSuperplaneServer
 // for forward compatibility.
@@ -442,6 +454,7 @@ type SuperplaneServer interface {
 	ListEventRejections(context.Context, *ListEventRejectionsRequest) (*ListEventRejectionsResponse, error)
 	AddUser(context.Context, *AddUserRequest) (*AddUserResponse, error)
 	RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error)
+	ListAlerts(context.Context, *ListAlertsRequest) (*ListAlertsResponse, error)
 }
 
 // UnimplementedSuperplaneServer should be embedded to have
@@ -543,6 +556,9 @@ func (UnimplementedSuperplaneServer) AddUser(context.Context, *AddUserRequest) (
 }
 func (UnimplementedSuperplaneServer) RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveUser not implemented")
+}
+func (UnimplementedSuperplaneServer) ListAlerts(context.Context, *ListAlertsRequest) (*ListAlertsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAlerts not implemented")
 }
 func (UnimplementedSuperplaneServer) testEmbeddedByValue() {}
 
@@ -1122,6 +1138,24 @@ func _Superplane_RemoveUser_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_ListAlerts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAlertsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).ListAlerts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_ListAlerts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).ListAlerts(ctx, req.(*ListAlertsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Superplane_ServiceDesc is the grpc.ServiceDesc for Superplane service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1252,6 +1286,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveUser",
 			Handler:    _Superplane_RemoveUser_Handler,
+		},
+		{
+			MethodName: "ListAlerts",
+			Handler:    _Superplane_ListAlerts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

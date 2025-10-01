@@ -381,6 +381,17 @@ service Superplane {
       tags: "Canvas";
     };
   }
+
+  rpc ListAlerts(ListAlertsRequest) returns (ListAlertsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/alerts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List alerts";
+      description: "Returns a list of alerts for the specified canvas (canvas can be referenced by ID or name)";
+      tags: "Alert";
+    };
+  }
 }
 
 message ListCanvasesRequest {}
@@ -1137,6 +1148,33 @@ message ListEventRejectionsResponse {
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message ListAlertsRequest {
+  string canvas_id_or_name = 1;
+  bool unread = 2;
+  google.protobuf.Timestamp before = 3;
+}
+
+message ListAlertsResponse {
+  repeated Alert alerts = 1;
+}
+
+message Alert {
+  enum AlertType {
+    ALERT_TYPE_UNKNOWN = 0;
+    ALERT_TYPE_ERROR = 1;
+    ALERT_TYPE_WARNING = 2;
+    ALERT_TYPE_INFO = 3;
+  }
+
+  string id = 1;
+  AlertType type = 2;
+  string message = 3;
+  string source_id = 4;
+  EventSourceType source_type = 5;
+  bool acknowledged = 6;
+  google.protobuf.Timestamp created_at = 7;
 }
 
 message StageCreated {
