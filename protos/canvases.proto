@@ -1296,6 +1296,11 @@ message StageExecutionCancelled {
   google.protobuf.Timestamp timestamp = 5;
 }
 
+message EventRejectionCreated {
+  string rejection_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
 message AlertCreated {
   string canvas_id = 1;
   string alert_id = 2;

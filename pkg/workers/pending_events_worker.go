@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -215,7 +216,7 @@ func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *model
 func (w *PendingEventsWorker) handleEventForConnection(tx *gorm.DB, event *models.Event, connection models.Connection) error {
 	accept, err := connection.Accept(event)
 	if err != nil {
-		_, err := models.RejectEventInTransaction(
+		err := rejectAndPublishInTransaction(
 			tx,
 			event.ID,
 			connection.TargetID,
@@ -228,7 +229,7 @@ func (w *PendingEventsWorker) handleEventForConnection(tx *gorm.DB, event *model
 	}
 
 	if !accept {
-		_, err := models.RejectEventInTransaction(
+		err := rejectAndPublishInTransaction(
 			tx,
 			event.ID,
 			connection.TargetID,
@@ -260,7 +261,7 @@ func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Eve
 
 	inputs, err := w.buildInputs(tx, event, *stage)
 	if err != nil {
-		_, err := models.RejectEventInTransaction(
+		err := rejectAndPublishInTransaction(
 			tx,
 			event.ID,
 			connection.TargetID,
@@ -274,7 +275,7 @@ func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Eve
 
 	executorName, err := w.buildExecutorName(inputs, *stage)
 	if err != nil {
-		_, err := models.RejectEventInTransaction(
+		err := rejectAndPublishInTransaction(
 			tx,
 			event.ID,
 			connection.TargetID,
@@ -311,7 +312,7 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 	//
 	fields, hash, err := connectionGroup.CalculateFieldSet(event)
 	if err != nil {
-		_, err := models.RejectEventInTransaction(
+		err := rejectAndPublishInTransaction(
 			tx,
 			event.ID,
 			connection.TargetID,
@@ -404,4 +405,13 @@ func sourceNamesFromConnections(connections []models.Connection) []string {
 		sourceNames = append(sourceNames, connection.SourceName)
 	}
 	return sourceNames
+}
+
+func rejectAndPublishInTransaction(tx *gorm.DB, eventID, targetID uuid.UUID, targetType, reason, message string) error {
+	eventRejection, err := models.RejectEventInTransaction(tx, eventID, targetID, targetType, reason, message)
+	if err != nil {
+		return err
+	}
+
+	return messages.NewEventRejectionCreatedMessage(eventRejection).Publish()
 }
