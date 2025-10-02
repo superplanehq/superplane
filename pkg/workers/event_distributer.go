@@ -55,6 +55,7 @@ func (e *EventDistributer) Start() error {
 		{messages.DeliveryHubCanvasExchange, messages.StageCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.ConnectionGroupCreatedRoutingKey, e.createHandler(eventdistributer.HandleConnectionGroupCreated)},
 		{messages.DeliveryHubCanvasExchange, messages.StageUpdatedRoutingKey, e.createHandler(eventdistributer.HandleStageUpdated)},
+		{messages.DeliveryHubCanvasExchange, messages.AlertCreatedRoutingKey, e.createHandler(eventdistributer.HandleAlertCreated)},
 	}
 
 	// Start a consumer for each route

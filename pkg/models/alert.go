@@ -15,15 +15,15 @@ const (
 )
 
 type Alert struct {
-	ID             uuid.UUID  `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID       uuid.UUID  `gorm:"column:canvas_id"`
-	SourceID       uuid.UUID  `gorm:"column:source_id"`
-	SourceType     string     `gorm:"column:source_type"`
-	Message        string     `gorm:"column:message"`
-	Acknowledged   bool       `gorm:"column:acknowledged"`
-	AcknowledgedAt *time.Time `gorm:"column:acknowledged_at"`
-	Type           string     `gorm:"column:type"`
-	CreatedAt      *time.Time `gorm:"column:created_at"`
+	ID             uuid.UUID  `gorm:"primary_key;default:uuid_generate_v4()" json:"id"`
+	CanvasID       uuid.UUID  `gorm:"column:canvas_id" json:"canvasId"`
+	SourceID       uuid.UUID  `gorm:"column:source_id" json:"sourceId"`
+	SourceType     string     `gorm:"column:source_type" json:"sourceType"`
+	Message        string     `gorm:"column:message" json:"message"`
+	Acknowledged   bool       `gorm:"column:acknowledged" json:"acknowledged"`
+	AcknowledgedAt *time.Time `gorm:"column:acknowledged_at" json:"acknowledgedAt"`
+	Type           string     `gorm:"column:type" json:"type"`
+	CreatedAt      *time.Time `gorm:"column:created_at" json:"createdAt"`
 }
 
 func NewAlert(canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, message string, alertType string) (*Alert, error) {
