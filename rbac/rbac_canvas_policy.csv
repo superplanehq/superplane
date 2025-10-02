@@ -42,3 +42,4 @@ p,role:canvas_admin,canvas:{CANVAS_ID},secret,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},group,create
 p,role:canvas_admin,canvas:{CANVAS_ID},group,update
 p,role:canvas_admin,canvas:{CANVAS_ID},group,delete
+p,role:canvas_admin,canvas:{CANVAS_ID},alert,acknowledge
