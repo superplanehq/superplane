@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
@@ -32,6 +34,11 @@ func AcknowledgeAlert(ctx context.Context, canvasID string, alertID string) (*pb
 	}
 
 	serialized := serializeAlert(alert)
+
+	err = messages.NewAlertAcknowledgedMessage(alert).Publish()
+	if err != nil {
+		log.Errorf("failed to publish alert acknowledged message: %v", err)
+	}
 
 	response := &pb.AcknowledgeAlertResponse{
 		Alert: serialized,

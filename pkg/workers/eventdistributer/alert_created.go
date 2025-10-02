@@ -25,24 +25,9 @@ func HandleAlertCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to unmarshal AlertCreated message: %w", err)
 	}
 
-	alertID, err := uuid.Parse(pbMsg.AlertId)
+	alertJSON, err := FindAndParseAlert(pbMsg.AlertId, pbMsg.CanvasId)
 	if err != nil {
-		return fmt.Errorf("failed to parse alert ID: %w", err)
-	}
-
-	canvasID, err := uuid.Parse(pbMsg.CanvasId)
-	if err != nil {
-		return fmt.Errorf("failed to parse canvas ID: %w", err)
-	}
-
-	alert, err := models.FindAlertByID(alertID, canvasID)
-	if err != nil {
-		return fmt.Errorf("failed to find alert: %w", err)
-	}
-
-	alertJSON, err := json.Marshal(alert)
-	if err != nil {
-		return fmt.Errorf("failed to serialize alert: %w", err)
+		return fmt.Errorf("failed to find and parse alert: %w", err)
 	}
 
 	event, err := json.Marshal(AlertCreatedWebsocketEvent{
@@ -58,4 +43,28 @@ func HandleAlertCreated(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Broadcasted alert_created event to canvas %s", pbMsg.CanvasId)
 
 	return nil
+}
+
+func FindAndParseAlert(alertID string, canvasID string) ([]byte, error) {
+	alertUUID, err := uuid.Parse(alertID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse alert ID: %w", err)
+	}
+
+	canvasUUID, err := uuid.Parse(canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse canvas ID: %w", err)
+	}
+
+	alert, err := models.FindAlertByID(alertUUID, canvasUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find alert: %w", err)
+	}
+
+	alertJSON, err := json.Marshal(alert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize alert: %w", err)
+	}
+
+	return alertJSON, nil
 }
