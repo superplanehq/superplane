@@ -38,11 +38,10 @@ func NewAlert(canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, message
 	}, nil
 }
 
-func (a *Alert) Acknowledge() error {
+func (a *Alert) Acknowledge() {
 	now := time.Now()
 	a.Acknowledged = true
 	a.AcknowledgedAt = &now
-	return nil
 }
 
 func (a *Alert) Create() error {
@@ -83,4 +82,17 @@ func ListAlerts(canvasID uuid.UUID, includeAcknowledged bool, before *time.Time)
 	}
 
 	return alerts, nil
+}
+
+func FindAlertByID(alertID uuid.UUID, canvasID uuid.UUID) (*Alert, error) {
+	var alert Alert
+	err := database.Conn().
+		Where("id = ? AND canvas_id = ?", alertID, canvasID).
+		First(&alert).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &alert, nil
 }

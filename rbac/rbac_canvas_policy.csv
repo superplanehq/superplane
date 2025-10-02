@@ -12,6 +12,7 @@ p,role:canvas_viewer,canvas:{CANVAS_ID},integration,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},group,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},member,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},role,read
+p,role:canvas_viewer,canvas:{CANVAS_ID},alert,read
 p,role:canvas_admin,canvas:{CANVAS_ID},member,create
 p,role:canvas_admin,canvas:{CANVAS_ID},member,update
 p,role:canvas_admin,canvas:{CANVAS_ID},member,delete
