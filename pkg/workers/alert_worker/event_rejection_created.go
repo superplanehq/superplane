@@ -27,8 +27,8 @@ func HandleEventRejectionCreated(messageBody []byte) (*models.Alert, error) {
 
 	alert, err := models.NewAlert(
 		rejection.Event.CanvasID,
-		rejection.Event.SourceID,
-		rejection.Event.SourceType,
+		rejection.TargetID,
+		rejection.TargetType,
 		rejection.Message,
 		rejectionReasonToAlertType(rejection.Reason),
 	)
