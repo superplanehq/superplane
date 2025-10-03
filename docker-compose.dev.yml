@@ -41,6 +41,7 @@ services:
       START_HARD_DELETION_WORKER: "yes"
       START_EVENT_SOURCE_SCHEDULE_WORKER: "yes"
       START_EVENT_DELETION_WORKER: "yes"
+      START_ALERT_WORKER: "yes"
       WEB_BASE_PATH: ""
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
