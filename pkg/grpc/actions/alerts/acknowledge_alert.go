@@ -33,7 +33,7 @@ func AcknowledgeAlert(ctx context.Context, canvasID string, alertID string) (*pb
 		return nil, fmt.Errorf("failed to update alert: %w", err)
 	}
 
-	serialized := serializeAlert(alert)
+	serialized := SerializeAlert(alert)
 
 	err = messages.NewAlertAcknowledgedMessage(alert).Publish()
 	if err != nil {

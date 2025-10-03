@@ -6,9 +6,11 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/alerts"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -61,7 +63,8 @@ func FindAndParseAlert(alertID string, canvasID string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to find alert: %w", err)
 	}
 
-	alertJSON, err := json.Marshal(alert)
+	serializedAlert := alerts.SerializeAlert(alert)
+	alertJSON, err := protojson.Marshal(serializedAlert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize alert: %w", err)
 	}

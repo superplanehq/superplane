@@ -13,13 +13,13 @@ func serializeAlerts(alerts []models.Alert) ([]*pb.Alert, error) {
 
 	result := make([]*pb.Alert, len(alerts))
 	for i, alert := range alerts {
-		result[i] = serializeAlert(&alert)
+		result[i] = SerializeAlert(&alert)
 	}
 
 	return result, nil
 }
 
-func serializeAlert(alert *models.Alert) *pb.Alert {
+func SerializeAlert(alert *models.Alert) *pb.Alert {
 	pbAlert := &pb.Alert{
 		Id:           alert.ID.String(),
 		Type:         alertTypeToProto(alert.Type),

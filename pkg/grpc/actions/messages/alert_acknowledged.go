@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const AlertAcknowledgedRoutingKey = "alert-created"
+const AlertAcknowledgedRoutingKey = "alert-acknowledged"
 
 type AlertAcknowledgedMessage struct {
 	message *pb.AlertAcknowledged
