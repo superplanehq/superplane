@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useUpdateStage, useCreateStage, useDeleteStage } from '@/hooks/useCanvasData';
+import { useUpdateStage, useCreateStage, useDeleteStage, useAlertsBySourceId, useAcknowledgeAlert } from '@/hooks/useCanvasData';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent } from '@/api-client';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { StageEditModeContent } from '../StageEditModeContent';
@@ -25,6 +25,7 @@ import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicat
 import { showErrorToast } from '@/utils/toast';
 import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
+import { AlertsTooltip } from '@/components/Tooltip/alerts-tooltip';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="rocket_launch" size="xl" />,
@@ -174,6 +175,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
   const deleteStageMutation = useDeleteStage(canvasId);
+  const { data: alerts = {} } = useAlertsBySourceId(canvasId)
+  const stageAlerts = alerts[props.id] || []
+  const acknowledgeAlertMutation = useAcknowledgeAlert(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
   const { data: availableIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
 
@@ -482,6 +486,15 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
+  const handleAcknowledgeAlert = async (alertId: string) => {
+    try {
+      await acknowledgeAlertMutation.mutateAsync(alertId);
+    } catch (error) {
+      console.error('Failed to acknowledge alert:', error);
+      showErrorToast('Failed to acknowledge alert');
+    }
+  };
+
 
   const handleDataChange = useCallback((data: typeof currentFormData) => {
     setCurrentFormData(data);
@@ -670,6 +683,15 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   </div>
                 </div>
               </div>
+              {!isEditMode && stageAlerts.length > 0 && (
+                <div className="ml-2">
+                  <AlertsTooltip
+                    alerts={stageAlerts}
+                    onAcknowledge={handleAcknowledgeAlert}
+                    className="flex-shrink-0"
+                  />
+                </div>
+              )}
             </div>
             {!isEditMode && (
               <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{stageDescription || ''}</div>

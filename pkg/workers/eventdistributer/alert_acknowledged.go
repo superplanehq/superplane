@@ -16,7 +16,7 @@ type AlertAcknowledgedWebsocketEvent struct {
 }
 
 func HandleAlertAcknowledged(messageBody []byte, wsHub *ws.Hub) error {
-	log.Debugf("Received alert_created event")
+	log.Debugf("Received alert_acknowledged event")
 
 	pbMsg := &pb.AlertAcknowledged{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
