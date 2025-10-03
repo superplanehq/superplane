@@ -43,7 +43,7 @@ func Test__AlertWorker(t *testing.T) {
 		_, err = alertworker.HandleEventRejectionCreated(messageBody)
 		require.NoError(t, err)
 
-		alerts, err := models.ListAlerts(event.CanvasID, false, nil)
+		alerts, err := models.ListAlerts(event.CanvasID, false, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, alerts, 1)
 
