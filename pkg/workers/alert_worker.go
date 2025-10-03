@@ -8,7 +8,10 @@ import (
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/workers/alert_worker"
 )
 
 type AlertWorker struct {
@@ -33,7 +36,9 @@ func (e *AlertWorker) Start() error {
 		Exchange   string
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
-	}{}
+	}{
+		{messages.DeliveryHubCanvasExchange, messages.EventRejectionCreatedRoutingKey, e.createHandler(alert_worker.HandleEventRejectionCreated)},
+	}
 
 	for _, route := range routes {
 		go e.consumeMessages(amqpURL, route.Exchange, route.RoutingKey, route.Handler)
@@ -43,15 +48,21 @@ func (e *AlertWorker) Start() error {
 	return nil
 }
 
-func (e *AlertWorker) createHandler(processFn func([]byte) error) func(delivery tackle.Delivery) error {
+func (e *AlertWorker) createHandler(processFn func([]byte) (*models.Alert, error)) func(delivery tackle.Delivery) error {
 	return func(delivery tackle.Delivery) error {
-
 		messageBody := delivery.Body()
-		err := processFn(messageBody)
+		alert, err := processFn(messageBody)
 		if err != nil {
-			log.Errorf("Error processing message: %v", err)
-
+			log.Errorf("Error processing alert creation message: %v", err)
+			return err
 		}
+
+		err = messages.NewAlertCreatedMessage(alert).Publish()
+		if err != nil {
+			log.Errorf("Error publishing alert created message: %v", err)
+			return err
+		}
+
 		return nil
 	}
 }
