@@ -381,6 +381,28 @@ service Superplane {
       tags: "Canvas";
     };
   }
+
+  rpc ListAlerts(ListAlertsRequest) returns (ListAlertsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/alerts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List alerts";
+      description: "Returns a list of alerts for the specified canvas (canvas can be referenced by ID or name)";
+      tags: "Alert";
+    };
+  }
+
+  rpc AcknowledgeAlert(AcknowledgeAlertRequest) returns (AcknowledgeAlertResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id_or_name}/alerts/{alert_id}/acknowledge"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Acknowledge an alert";
+      description: "Acknowledge the specified alert (canvas can be referenced by ID or name)";
+      tags: "Alert";
+    };
+  }
 }
 
 message ListCanvasesRequest {}
@@ -1139,6 +1161,44 @@ message ListEventRejectionsResponse {
   google.protobuf.Timestamp last_timestamp = 4;
 }
 
+message ListAlertsRequest {
+  string canvas_id_or_name = 1;
+  bool include_acked = 2;
+  google.protobuf.Timestamp before = 3;
+  uint32 limit = 4;
+}
+
+message ListAlertsResponse {
+  repeated Alert alerts = 1;
+}
+
+message AcknowledgeAlertRequest {
+  string canvas_id_or_name = 1;
+  string alert_id = 2;
+}
+
+message AcknowledgeAlertResponse {
+  Alert alert = 1;
+}
+
+message Alert {
+  enum AlertType {
+    ALERT_TYPE_UNKNOWN = 0;
+    ALERT_TYPE_ERROR = 1;
+    ALERT_TYPE_WARNING = 2;
+    ALERT_TYPE_INFO = 3;
+  }
+
+  string id = 1;
+  AlertType type = 2;
+  string message = 3;
+  string source_id = 4;
+  EventSourceType source_type = 5;
+  bool acknowledged = 6;
+  google.protobuf.Timestamp acknowledged_at = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
 message StageCreated {
   string canvas_id = 1;
   string stage_id = 2;
@@ -1235,4 +1295,21 @@ message StageExecutionCancelled {
   string stage_id = 3;
   string event_id = 4;
   google.protobuf.Timestamp timestamp = 5;
+}
+
+message EventRejectionCreated {
+  string rejection_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message AlertCreated {
+  string canvas_id = 1;
+  string alert_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message AlertAcknowledged {
+  string canvas_id = 1;
+  string alert_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
 }

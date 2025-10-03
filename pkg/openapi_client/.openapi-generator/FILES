@@ -3,6 +3,7 @@
 .travis.yml
 README.md
 api/openapi.yaml
+api_alert.go
 api_canvas.go
 api_connection_group.go
 api_event.go
@@ -18,6 +19,8 @@ api_stage.go
 api_users.go
 client.go
 configuration.go
+docs/AlertAPI.md
+docs/AlertAlertType.md
 docs/AuthToken.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
@@ -109,7 +112,9 @@ docs/SpecGroupBy.md
 docs/SpecTimeoutBehavior.md
 docs/StageAPI.md
 docs/StatusQueue.md
+docs/SuperplaneAcknowledgeAlertResponse.md
 docs/SuperplaneAddUserBody.md
+docs/SuperplaneAlert.md
 docs/SuperplaneApproveStageEventResponse.md
 docs/SuperplaneCancelStageExecutionResponse.md
 docs/SuperplaneCanvas.md
@@ -166,6 +171,7 @@ docs/SuperplaneInputMapping.md
 docs/SuperplaneIntegrationsValueFrom.md
 docs/SuperplaneIntegrationsValueFromSecret.md
 docs/SuperplaneKeyValuePair.md
+docs/SuperplaneListAlertsResponse.md
 docs/SuperplaneListCanvasesResponse.md
 docs/SuperplaneListConnectionGroupFieldSetsResponse.md
 docs/SuperplaneListConnectionGroupsResponse.md
@@ -209,6 +215,7 @@ docs/UsersUserRoleAssignment.md
 docs/UsersUserSpec.md
 docs/UsersUserStatus.md
 git_push.sh
+model_alert_alert_type.go
 model_auth_token.go
 model_authorization_domain_type.go
 model_authorization_permission.go
@@ -288,7 +295,9 @@ model_secrets_update_secret_response.go
 model_spec_group_by.go
 model_spec_timeout_behavior.go
 model_status_queue.go
+model_superplane_acknowledge_alert_response.go
 model_superplane_add_user_body.go
+model_superplane_alert.go
 model_superplane_approve_stage_event_response.go
 model_superplane_cancel_stage_execution_response.go
 model_superplane_canvas.go
@@ -345,6 +354,7 @@ model_superplane_input_mapping.go
 model_superplane_integrations_value_from.go
 model_superplane_integrations_value_from_secret.go
 model_superplane_key_value_pair.go
+model_superplane_list_alerts_response.go
 model_superplane_list_canvases_response.go
 model_superplane_list_connection_group_field_sets_response.go
 model_superplane_list_connection_groups_response.go
@@ -387,6 +397,7 @@ model_users_user_role_assignment.go
 model_users_user_spec.go
 model_users_user_status.go
 response.go
+test/api_alert_test.go
 test/api_canvas_test.go
 test/api_connection_group_test.go
 test/api_event_source_test.go

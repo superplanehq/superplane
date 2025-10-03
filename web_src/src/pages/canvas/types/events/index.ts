@@ -1,4 +1,4 @@
-import { SuperplaneCanvas } from "@/api-client";
+import { SuperplaneAlert, SuperplaneCanvas } from "@/api-client";
 import { ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from "../../store/types";
 
 export type ExecutionPayload = { id: string; stage_id: string; canvas_id: string; result: string; timestamp: string }
@@ -7,6 +7,7 @@ export type EventPayload = { id: string; stage_id: string; source_id: string, so
 
 // event_name: payload_type
 export type EventMap = {
+    alert_created: SuperplaneAlert;
     stage_added: Stage;
     connection_group_added: ConnectionGroupWithEvents;
     stage_updated: Stage;

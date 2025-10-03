@@ -102,6 +102,96 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/alerts": {
+      "get": {
+        "summary": "List alerts",
+        "description": "Returns a list of alerts for the specified canvas (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_ListAlerts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListAlertsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "includeAcked",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          }
+        ],
+        "tags": [
+          "Alert"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/alerts/{alertId}/acknowledge": {
+      "patch": {
+        "summary": "Acknowledge an alert",
+        "description": "Acknowledge the specified alert (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_AcknowledgeAlert",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneAcknowledgeAlertResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "alertId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Alert"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/connection-groups": {
       "get": {
         "summary": "List connection groups",
@@ -2776,6 +2866,16 @@
     }
   },
   "definitions": {
+    "AlertAlertType": {
+      "type": "string",
+      "enum": [
+        "ALERT_TYPE_UNKNOWN",
+        "ALERT_TYPE_ERROR",
+        "ALERT_TYPE_WARNING",
+        "ALERT_TYPE_INFO"
+      ],
+      "default": "ALERT_TYPE_UNKNOWN"
+    },
     "AuthToken": {
       "type": "object",
       "properties": {
@@ -3710,6 +3810,14 @@
         }
       }
     },
+    "SuperplaneAcknowledgeAlertResponse": {
+      "type": "object",
+      "properties": {
+        "alert": {
+          "$ref": "#/definitions/SuperplaneAlert"
+        }
+      }
+    },
     "SuperplaneAddUserBody": {
       "type": "object",
       "properties": {
@@ -3720,6 +3828,37 @@
     },
     "SuperplaneAddUserResponse": {
       "type": "object"
+    },
+    "SuperplaneAlert": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/AlertAlertType"
+        },
+        "message": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "sourceType": {
+          "$ref": "#/definitions/SuperplaneEventSourceType"
+        },
+        "acknowledged": {
+          "type": "boolean"
+        },
+        "acknowledgedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     },
     "SuperplaneApproveStageEventBody": {
       "type": "object"
@@ -4533,6 +4672,18 @@
         },
         "value": {
           "type": "string"
+        }
+      }
+    },
+    "SuperplaneListAlertsResponse": {
+      "type": "object",
+      "properties": {
+        "alerts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneAlert"
+          }
         }
       }
     },

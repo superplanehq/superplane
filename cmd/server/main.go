@@ -125,6 +125,13 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		w := workers.NewEventDeletionWorker()
 		go w.Start()
 	}
+
+	if os.Getenv("START_ALERT_WORKER") == "yes" {
+		log.Println("Starting Alerts Worker")
+
+		w := workers.NewAlertWorker()
+		go w.Start()
+	}
 }
 
 func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {

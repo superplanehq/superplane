@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/alerts"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
 	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
@@ -210,4 +211,18 @@ func (s *CanvasService) CreateEvent(ctx context.Context, req *pb.CreateEventRequ
 func (s *CanvasService) ListEventRejections(ctx context.Context, req *pb.ListEventRejectionsRequest) (*pb.ListEventRejectionsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return canvases.ListEventRejections(ctx, canvasID, req.TargetType, req.TargetId, req.Limit, req.Before)
+}
+
+func (s *CanvasService) ListAlerts(ctx context.Context, req *pb.ListAlertsRequest) (*pb.ListAlertsResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	var limit *uint32
+	if req.Limit > 0 {
+		limit = &req.Limit
+	}
+	return alerts.ListAlerts(ctx, canvasID, req.IncludeAcked, req.Before, limit)
+}
+
+func (s *CanvasService) AcknowledgeAlert(ctx context.Context, req *pb.AcknowledgeAlertRequest) (*pb.AcknowledgeAlertResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return alerts.AcknowledgeAlert(ctx, canvasID, req.AlertId)
 }

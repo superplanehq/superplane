@@ -50,6 +50,8 @@ type APIClient struct {
 
 	// API Services
 
+	AlertAPI *AlertAPIService
+
 	CanvasAPI *CanvasAPIService
 
 	ConnectionGroupAPI *ConnectionGroupAPIService
@@ -93,6 +95,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.common.client = c
 
 	// API Services
+	c.AlertAPI = (*AlertAPIService)(&c.common)
 	c.CanvasAPI = (*CanvasAPIService)(&c.common)
 	c.ConnectionGroupAPI = (*ConnectionGroupAPIService)(&c.common)
 	c.EventAPI = (*EventAPIService)(&c.common)

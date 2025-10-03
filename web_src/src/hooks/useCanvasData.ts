@@ -25,12 +25,15 @@ import {
   superplaneListStageEvents,
   superplaneListStageExecutions,
   superplaneListEventRejections,
+  superplaneListAlerts,
+  superplaneAcknowledgeAlert,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
-import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState } from '../api-client/types.gen'
+import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState, SuperplaneAlert } from '../api-client/types.gen'
 
 export const canvasKeys = {
   all: ['canvas'] as const,
+  alerts: (canvasId: string) => [...canvasKeys.all, 'alerts', canvasId] as const,
   details: (canvasId: string) => [...canvasKeys.all, 'details', canvasId] as const,
   users: (canvasId: string) => [...canvasKeys.all, 'users', canvasId] as const,
   roles: (canvasId: string) => [...canvasKeys.all, 'roles', canvasId] as const,
@@ -749,5 +752,108 @@ export const useEventRejections = (canvasId: string, targetType: string, targetI
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!canvasId && !!targetType && !!targetId
+  })
+}
+
+
+export const useAlertsBySourceId = (canvasId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.alerts(canvasId),
+    queryFn: async () => {
+      const response = await superplaneListAlerts(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+        })
+      )
+
+      const alertsBySourceId = response.data?.alerts?.reduce((acc, alert) => {
+        if (!alert.sourceId) return acc
+
+        if (!acc[alert.sourceId]) {
+          acc[alert.sourceId] = []
+        }
+        acc[alert.sourceId].push(alert)
+        return acc
+      }, {} as Record<string, SuperplaneAlert[]>) || {}
+      return alertsBySourceId
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId
+  })
+}
+
+// Alert-related hooks
+export const useAcknowledgeAlert = (canvasId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (alertId: string) => {
+      return await superplaneAcknowledgeAlert(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, alertId }
+        })
+      )
+    },
+    onMutate: async (alertId) => {
+      await queryClient.cancelQueries({ queryKey: canvasKeys.alerts(canvasId) })
+
+      const previousAlerts = queryClient.getQueryData<Record<string, SuperplaneAlert[]>>(canvasKeys.alerts(canvasId))
+
+      if (previousAlerts) {
+        const updatedAlerts = { ...previousAlerts }
+
+        for (const sourceId in updatedAlerts) {
+          updatedAlerts[sourceId] = updatedAlerts[sourceId].filter(alert => alert.id !== alertId)
+
+          if (updatedAlerts[sourceId].length === 0) {
+            delete updatedAlerts[sourceId]
+          }
+        }
+
+        queryClient.setQueryData(canvasKeys.alerts(canvasId), updatedAlerts)
+      }
+
+      return { previousAlerts }
+    },
+    onError: (_err, _alertId, context) => {
+      if (context?.previousAlerts) {
+        queryClient.setQueryData(canvasKeys.alerts(canvasId), context.previousAlerts)
+      }
+    }
+  })
+}
+
+export const useAddAlert = (canvasId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (alert: SuperplaneAlert) => {
+      return { alert }
+    },
+    onMutate: async (newAlert) => {
+      await queryClient.cancelQueries({ queryKey: canvasKeys.alerts(canvasId) })
+
+      const previousAlerts = queryClient.getQueryData<Record<string, SuperplaneAlert[]>>(canvasKeys.alerts(canvasId))
+
+      if (newAlert.sourceId) {
+        const updatedAlerts = { ...(previousAlerts || {}) }
+
+        if (!updatedAlerts[newAlert.sourceId]) {
+          updatedAlerts[newAlert.sourceId] = []
+        }
+
+        updatedAlerts[newAlert.sourceId] = [newAlert, ...updatedAlerts[newAlert.sourceId]]
+
+        queryClient.setQueryData(canvasKeys.alerts(canvasId), updatedAlerts)
+      }
+
+      return { previousAlerts }
+    },
+    onError: (_err, _newAlert, context) => {
+      if (context?.previousAlerts) {
+        queryClient.setQueryData(canvasKeys.alerts(canvasId), context.previousAlerts)
+      }
+    }
   })
 }

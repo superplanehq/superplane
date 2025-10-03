@@ -579,7 +579,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.Len(t, rejections, 1)
 		rejection := rejections[0]
 		assert.Equal(t, models.EventRejectionReasonFiltered, rejection.Reason)
-		assert.Empty(t, rejection.Message)
+		assert.Equal(t, rejection.Message, "event was filtered by connection")
 	})
 
 	t.Run("execution resource is updated", func(t *testing.T) {

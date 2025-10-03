@@ -7,7 +7,7 @@ import { ConnectionGroupWithEvents, EventSourceWithEvents, Stage } from '../stor
 import { pollConnectionGroupUntilNoPending, pollEventSourceUntilNoPending, pollStageUntilNoPending } from '../utils/eventSourcePolling';
 import { stageUpdateQueue } from '../utils/stageUpdateQueue';
 import { SuperplaneEventSource } from '@/api-client';
-import { canvasKeys } from '@/hooks/useCanvasData';
+import { canvasKeys, useAddAlert } from '@/hooks/useCanvasData';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
 
@@ -35,6 +35,8 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
   const updateCanvas = useCanvasStore((s) => s.updateCanvas);
   const syncToReactFlow = useCanvasStore((s) => s.syncToReactFlow);
   const lockedNodes = useCanvasStore((s) => s.lockedNodes);
+
+  const addAlert = useAddAlert(canvasId);
 
   // WebSocket setup
   const { lastJsonMessage, readyState } = useWebSocket<ServerEvent>(
@@ -69,6 +71,7 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
     const { event, payload } = lastJsonMessage;
 
     // Declare variables outside of case statements to avoid lexical declaration errors
+    let alertCreatedPayload: EventMap['alert_created'];
     let newEventPayload: EventMap['new_stage_event'];
     let approvedEventPayload: EventMap['stage_event_approved'];
     let discardedEventPayload: EventMap['stage_event_discarded'];
@@ -82,6 +85,10 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
     
     // Route the event to the appropriate handler
     switch (event) {
+      case 'alert_created':
+        alertCreatedPayload = payload as EventMap['alert_created'];
+        addAlert.mutateAsync(alertCreatedPayload);
+        break;
       case 'stage_added':
         addStage(payload as EventMap['stage_added'], false);
         syncReactFlowWithTimeout(lockedNodes);

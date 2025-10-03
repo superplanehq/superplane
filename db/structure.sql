@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict VZpd98Zs1tmCdbn0jdgMmgKcan2ghGnpiujbf0UwRdIm9pLiVxmZIQ4LeSmDw1u
+\restrict E7i4TlN25YfW7G5aeMGfAbv2vBDU56l0bYYcgnR0mmUchideXZc1fHZv5yZobjT
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -68,6 +68,23 @@ CREATE TABLE public.accounts (
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: alerts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.alerts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    canvas_id uuid NOT NULL,
+    source_id uuid NOT NULL,
+    source_type character varying(255) NOT NULL,
+    message text NOT NULL,
+    acknowledged boolean DEFAULT false NOT NULL,
+    acknowledged_at timestamp with time zone,
+    type character varying(50) NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -541,6 +558,14 @@ ALTER TABLE ONLY public.accounts
 
 
 --
+-- Name: alerts alerts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alerts
+    ADD CONSTRAINT alerts_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: canvases canvases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -832,6 +857,27 @@ CREATE INDEX idx_account_providers_account_id ON public.account_providers USING 
 --
 
 CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
+
+
+--
+-- Name: idx_alerts_canvas_acknowledged; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_alerts_canvas_acknowledged ON public.alerts USING btree (canvas_id, acknowledged);
+
+
+--
+-- Name: idx_alerts_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_alerts_canvas_id ON public.alerts USING btree (canvas_id);
+
+
+--
+-- Name: idx_alerts_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_alerts_created_at ON public.alerts USING btree (created_at DESC);
 
 
 --
@@ -1188,16 +1234,16 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VZpd98Zs1tmCdbn0jdgMmgKcan2ghGnpiujbf0UwRdIm9pLiVxmZIQ4LeSmDw1u
+\unrestrict E7i4TlN25YfW7G5aeMGfAbv2vBDU56l0bYYcgnR0mmUchideXZc1fHZv5yZobjT
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict O8bgG5WOk1UR7bwccg9b8Cles1fg5LWPBuWqbgiDFYBh5sbEtKL5SKTgaLr3i15
+\restrict nL8A741NBsbgepvQ30dfvafyd5NwYu6RrM2mpUkdvR2Wtj6hLTbcQhIHfol9Dtn
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1216,7 +1262,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250926133107	f
+20251002195822	f
 \.
 
 
@@ -1224,5 +1270,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict O8bgG5WOk1UR7bwccg9b8Cles1fg5LWPBuWqbgiDFYBh5sbEtKL5SKTgaLr3i15
+\unrestrict nL8A741NBsbgepvQ30dfvafyd5NwYu6RrM2mpUkdvR2Wtj6hLTbcQhIHfol9Dtn
 

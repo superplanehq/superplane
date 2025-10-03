@@ -48,6 +48,19 @@ func RejectEventInTransaction(tx *gorm.DB, eventID, targetID uuid.UUID, targetTy
 	return rejection, nil
 }
 
+func FindEventRejectionByID(id uuid.UUID) (*EventRejection, error) {
+	var rejection EventRejection
+	err := database.Conn().
+		Preload("Event").
+		Where("id = ?", id).
+		First(&rejection).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &rejection, nil
+}
+
 func ListEventRejections(targetType string, targetID uuid.UUID) ([]EventRejection, error) {
 	query := database.Conn().
 		Preload("Event").

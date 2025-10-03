@@ -3,7 +3,7 @@ import { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { ConnectionGroupNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useCreateConnectionGroup, useUpdateConnectionGroup, useDeleteConnectionGroup } from '@/hooks/useCanvasData';
+import { useCreateConnectionGroup, useUpdateConnectionGroup, useDeleteConnectionGroup, useAlertsBySourceId, useAcknowledgeAlert } from '@/hooks/useCanvasData';
 import { SuperplaneConnection, GroupByField, SpecTimeoutBehavior, SuperplaneConnectionGroup } from '@/api-client';
 import { ConnectionGroupEditModeContent } from '../ConnectionGroupEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -12,6 +12,8 @@ import { NodeActionButtons } from '@/components/NodeActionButtons';
 import { twMerge } from 'tailwind-merge';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { createConnectionGroupDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
+import { AlertsTooltip } from '@/components/Tooltip/alerts-tooltip';
+import { showErrorToast } from '@/utils/toast';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
@@ -70,6 +72,9 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const deleteConnectionGroupMutation = useDeleteConnectionGroup(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
   const groupByFields = props.data.groupBy?.fields || [];
+  const { data: alerts = {}, isLoading: alertsLoading } = useAlertsBySourceId(canvasId);
+  const connectionGroupAlerts = alerts[props.id] || [];
+  const acknowledgeAlertMutation = useAcknowledgeAlert(canvasId);
 
   const handleEditClick = () => {
     setIsEditMode(true);
@@ -252,6 +257,15 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     setApiError(null);
   }, []);
 
+  const handleAcknowledgeAlert = async (alertId: string) => {
+    try {
+      await acknowledgeAlertMutation.mutateAsync(alertId);
+    } catch (error) {
+      console.error('Failed to acknowledge alert:', error);
+      showErrorToast('Failed to acknowledge alert');
+    }
+  };
+
   const borderColor = useMemo(() => {
     if (isPartiallyBroken) {
       return 'border-red-400 dark:border-red-200'
@@ -356,6 +370,16 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
               </div>
             </div>
           </div>
+          {!isEditMode && (connectionGroupAlerts.length > 0 || alertsLoading) && (
+            <div className="ml-2">
+              <AlertsTooltip
+                alerts={connectionGroupAlerts}
+                onAcknowledge={handleAcknowledgeAlert}
+                className="flex-shrink-0"
+                isLoading={alertsLoading}
+              />
+            </div>
+          )}
         </div>
         {!isEditMode && (
           <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || ''}</div>
