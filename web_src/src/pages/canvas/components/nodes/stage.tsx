@@ -175,7 +175,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
   const deleteStageMutation = useDeleteStage(canvasId);
-  const { data: alerts = {} } = useAlertsBySourceId(canvasId)
+  const { data: alerts = {}, isLoading: alertsLoading } = useAlertsBySourceId(canvasId)
   const stageAlerts = alerts[props.id] || []
   const acknowledgeAlertMutation = useAcknowledgeAlert(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
@@ -683,12 +683,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   </div>
                 </div>
               </div>
-              {!isEditMode && stageAlerts.length > 0 && (
+              {!isEditMode && (stageAlerts.length > 0 || alertsLoading) && (
                 <div className="ml-2">
                   <AlertsTooltip
                     alerts={stageAlerts}
                     onAcknowledge={handleAcknowledgeAlert}
                     className="flex-shrink-0"
+                    isLoading={alertsLoading}
                   />
                 </div>
               )}

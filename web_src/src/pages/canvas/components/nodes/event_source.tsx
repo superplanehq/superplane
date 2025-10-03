@@ -3,7 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource } from '@/hooks/useCanvasData';
+import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource, useAlertsBySourceId, useAcknowledgeAlert } from '@/hooks/useCanvasData';
 import { SuperplaneEventSource, SuperplaneEventSourceSpec, SuperplaneEventSourceType, superplaneCreateEvent } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -23,6 +23,8 @@ import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { convertUTCToLocalTime, formatTimestampInUserTimezone, getUserTimezoneDisplay } from '@/utils/timezone';
 import { isRegularEventSource } from '@/utils/components';
+import { AlertsTooltip } from '@/components/Tooltip/alerts-tooltip';
+import { showErrorToast } from '@/utils/toast';
 
 const getEventSourceIcon = (sourceType: string) => {
   switch (sourceType) {
@@ -80,6 +82,9 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource, updateConnectionSourceNames } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
+  const { data: alerts = {}, isLoading: alertsLoading } = useAlertsBySourceId(canvasId);
+  const eventSourceAlerts = alerts[props.id] || [];
+  const acknowledgeAlertMutation = useAcknowledgeAlert(canvasId);
 
   const generateEventSourceName = (resourceName: string) => {
     if (!resourceName) return '';
@@ -329,6 +334,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
+  const handleAcknowledgeAlert = async (alertId: string) => {
+    try {
+      await acknowledgeAlertMutation.mutateAsync(alertId);
+    } catch (error) {
+      console.error('Failed to acknowledge alert:', error);
+      showErrorToast('Failed to acknowledge alert');
+    }
+  };
+
   const integration = useMemo(() => {
     const integrationName = props.data.integration?.name;
     return canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
@@ -463,6 +477,16 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             </div>
           </div>
+          {!isEditMode && (eventSourceAlerts.length > 0 || alertsLoading) && (
+            <div className="ml-2">
+              <AlertsTooltip
+                alerts={eventSourceAlerts}
+                onAcknowledge={handleAcknowledgeAlert}
+                className="flex-shrink-0"
+                isLoading={alertsLoading}
+              />
+            </div>
+          )}
         </div>
         {!isEditMode && (
           <>
