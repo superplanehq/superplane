@@ -235,7 +235,7 @@ func (w *PendingEventsWorker) handleEventForConnection(tx *gorm.DB, event *model
 			connection.TargetID,
 			connection.TargetType,
 			models.EventRejectionReasonFiltered,
-			"",
+			"event was filtered by connection",
 		)
 
 		return err
