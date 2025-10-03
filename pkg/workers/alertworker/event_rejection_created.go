@@ -1,4 +1,4 @@
-package alert_worker
+package alertworker
 
 import (
 	"fmt"

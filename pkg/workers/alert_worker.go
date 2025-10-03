@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/workers/alert_worker"
+	"github.com/superplanehq/superplane/pkg/workers/alertworker"
 )
 
 type AlertWorker struct {
@@ -37,7 +37,7 @@ func (e *AlertWorker) Start() error {
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
 	}{
-		{messages.DeliveryHubCanvasExchange, messages.EventRejectionCreatedRoutingKey, e.createHandler(alert_worker.HandleEventRejectionCreated)},
+		{messages.DeliveryHubCanvasExchange, messages.EventRejectionCreatedRoutingKey, e.createHandler(alertworker.HandleEventRejectionCreated)},
 	}
 
 	for _, route := range routes {
