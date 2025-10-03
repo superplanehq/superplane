@@ -25,12 +25,19 @@ func HandleEventRejectionCreated(messageBody []byte) (*models.Alert, error) {
 		return nil, fmt.Errorf("failed to find rejection: %w", err)
 	}
 
+	//
+	// Only create alerts for errors in case of event rejections
+	//
+	if rejection.Reason != models.EventRejectionReasonError {
+		return nil, fmt.Errorf("skipping alert creation for rejection reason: %s", rejection.Reason)
+	}
+
 	alert, err := models.NewAlert(
 		rejection.Event.CanvasID,
 		rejection.TargetID,
 		rejection.TargetType,
 		rejection.Message,
-		rejectionReasonToAlertType(rejection.Reason),
+		models.AlertTypeError,
 	)
 
 	if err != nil {
@@ -43,15 +50,4 @@ func HandleEventRejectionCreated(messageBody []byte) (*models.Alert, error) {
 	}
 
 	return alert, nil
-}
-
-func rejectionReasonToAlertType(reason string) string {
-	switch reason {
-	case models.EventRejectionReasonFiltered:
-		return models.AlertTypeWarning
-	case models.EventRejectionReasonError:
-		return models.AlertTypeError
-	default:
-		return models.AlertTypeWarning
-	}
 }
