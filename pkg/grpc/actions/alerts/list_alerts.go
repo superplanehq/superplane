@@ -11,8 +11,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const MaxTimespan = 30 * 24 * time.Hour
-
 func ListAlerts(ctx context.Context, canvasID string, includeAcknowledged bool, before *timestamppb.Timestamp) (*pb.ListAlertsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
@@ -23,11 +21,6 @@ func ListAlerts(ctx context.Context, canvasID string, includeAcknowledged bool, 
 	if before != nil && before.IsValid() {
 		t := before.AsTime()
 		beforeTime = &t
-	}
-
-	maxTime := time.Now().Add(-MaxTimespan)
-	if beforeTime == nil || beforeTime.After(maxTime) {
-		beforeTime = &maxTime
 	}
 
 	alerts, err := models.ListAlerts(canvasUUID, includeAcknowledged, beforeTime)
