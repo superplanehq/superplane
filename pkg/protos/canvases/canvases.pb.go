@@ -6177,6 +6177,7 @@ type ListAlertsRequest struct {
 	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	IncludeAcked   bool                   `protobuf:"varint,2,opt,name=include_acked,json=includeAcked,proto3" json:"include_acked,omitempty"`
 	Before         *timestamp.Timestamp   `protobuf:"bytes,3,opt,name=before,proto3" json:"before,omitempty"`
+	Limit          uint32                 `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -6230,6 +6231,13 @@ func (x *ListAlertsRequest) GetBefore() *timestamp.Timestamp {
 		return x.Before
 	}
 	return nil
+}
+
+func (x *ListAlertsRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
 }
 
 type ListAlertsResponse struct {
@@ -9390,11 +9398,12 @@ const file_canvases_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\x97\x01\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xad\x01\n" +
 	"\x11ListAlertsRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12#\n" +
 	"\rinclude_acked\x18\x02 \x01(\bR\fincludeAcked\x122\n" +
-	"\x06before\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\"?\n" +
+	"\x06before\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\rR\x05limit\"?\n" +
 	"\x12ListAlertsResponse\x12)\n" +
 	"\x06alerts\x18\x01 \x03(\v2\x11.Superplane.AlertR\x06alerts\"_\n" +
 	"\x17AcknowledgeAlertRequest\x12)\n" +

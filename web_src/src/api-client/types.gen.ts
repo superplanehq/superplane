@@ -1082,6 +1082,7 @@ export type SuperplaneListAlertsData = {
     query?: {
         includeAcked?: boolean;
         before?: string;
+        limit?: number;
     };
     url: '/api/v1/canvases/{canvasIdOrName}/alerts';
 };

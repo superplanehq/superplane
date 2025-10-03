@@ -1165,6 +1165,7 @@ message ListAlertsRequest {
   string canvas_id_or_name = 1;
   bool include_acked = 2;
   google.protobuf.Timestamp before = 3;
+  uint32 limit = 4;
 }
 
 message ListAlertsResponse {

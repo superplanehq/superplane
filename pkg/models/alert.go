@@ -60,7 +60,7 @@ func (a *Alert) UpdateInTransaction(tx *gorm.DB) error {
 	return tx.Save(a).Error
 }
 
-func ListAlerts(canvasID uuid.UUID, includeAcknowledged bool, before *time.Time) ([]Alert, error) {
+func ListAlerts(canvasID uuid.UUID, includeAcknowledged bool, before *time.Time, limit *uint32) ([]Alert, error) {
 	var alerts []Alert
 
 	query := database.Conn().
@@ -73,6 +73,10 @@ func ListAlerts(canvasID uuid.UUID, includeAcknowledged bool, before *time.Time)
 
 	if before != nil {
 		query = query.Where("created_at < ?", before)
+	}
+
+	if limit != nil && *limit > 0 {
+		query = query.Limit(int(*limit))
 	}
 
 	err := query.Find(&alerts).Error

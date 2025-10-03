@@ -215,7 +215,11 @@ func (s *CanvasService) ListEventRejections(ctx context.Context, req *pb.ListEve
 
 func (s *CanvasService) ListAlerts(ctx context.Context, req *pb.ListAlertsRequest) (*pb.ListAlertsResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return alerts.ListAlerts(ctx, canvasID, req.IncludeAcked, req.Before)
+	var limit *uint32
+	if req.Limit > 0 {
+		limit = &req.Limit
+	}
+	return alerts.ListAlerts(ctx, canvasID, req.IncludeAcked, req.Before, limit)
 }
 
 func (s *CanvasService) AcknowledgeAlert(ctx context.Context, req *pb.AcknowledgeAlertRequest) (*pb.AcknowledgeAlertResponse, error) {

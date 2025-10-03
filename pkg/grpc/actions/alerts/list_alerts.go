@@ -11,7 +11,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListAlerts(ctx context.Context, canvasID string, includeAcknowledged bool, before *timestamppb.Timestamp) (*pb.ListAlertsResponse, error) {
+const (
+	MinLimit     = 1
+	MaxLimit     = 100
+	DefaultLimit = 50
+)
+
+func ListAlerts(ctx context.Context, canvasID string, includeAcknowledged bool, before *timestamppb.Timestamp, limit *uint32) (*pb.ListAlertsResponse, error) {
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid canvas ID: %w", err)
@@ -23,7 +29,8 @@ func ListAlerts(ctx context.Context, canvasID string, includeAcknowledged bool, 
 		beforeTime = &t
 	}
 
-	alerts, err := models.ListAlerts(canvasUUID, includeAcknowledged, beforeTime)
+	normalizedLimit := getLimit(limit)
+	alerts, err := models.ListAlerts(canvasUUID, includeAcknowledged, beforeTime, &normalizedLimit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list alerts for canvas: %w", err)
 	}
@@ -38,4 +45,20 @@ func ListAlerts(ctx context.Context, canvasID string, includeAcknowledged bool, 
 	}
 
 	return response, nil
+}
+
+func getLimit(limit *uint32) uint32 {
+	if limit == nil || *limit == 0 {
+		return DefaultLimit
+	}
+
+	if *limit > MaxLimit {
+		return MaxLimit
+	}
+
+	if *limit < MinLimit {
+		return MinLimit
+	}
+
+	return *limit
 }

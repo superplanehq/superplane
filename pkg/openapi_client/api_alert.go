@@ -146,6 +146,7 @@ type ApiSuperplaneListAlertsRequest struct {
 	canvasIdOrName string
 	includeAcked *bool
 	before *time.Time
+	limit *int64
 }
 
 func (r ApiSuperplaneListAlertsRequest) IncludeAcked(includeAcked bool) ApiSuperplaneListAlertsRequest {
@@ -155,6 +156,11 @@ func (r ApiSuperplaneListAlertsRequest) IncludeAcked(includeAcked bool) ApiSuper
 
 func (r ApiSuperplaneListAlertsRequest) Before(before time.Time) ApiSuperplaneListAlertsRequest {
 	r.before = &before
+	return r
+}
+
+func (r ApiSuperplaneListAlertsRequest) Limit(limit int64) ApiSuperplaneListAlertsRequest {
+	r.limit = &limit
 	return r
 }
 
@@ -206,6 +212,9 @@ func (a *AlertAPIService) SuperplaneListAlertsExecute(r ApiSuperplaneListAlertsR
 	}
 	if r.before != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
+	}
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
