@@ -202,10 +202,10 @@ func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSou
 	}
 
 	//
-	// Check if event source exists.
-	// If it does, we might either update it or fail the creation.
+	// Check if an internal event source exists for this resource.
+	// If it does, we upgrade it to external.
 	//
-	existingSource, err := resource.FindEventSourceInTransaction(tx)
+	existingSource, err := b.findInternalEventSourceForResource(tx, resource.ID)
 	if err == nil {
 		return b.createForExistingSource(tx, existingSource)
 	}
@@ -215,7 +215,7 @@ func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSou
 	}
 
 	//
-	// If event source does not exist, create it.
+	// If no internal event source exists, create a new one.
 	//
 	id := uuid.New()
 	plainKey, encryptedKey, err := crypto.NewRandomKey(b.ctx, b.encryptor, id.String())
@@ -256,6 +256,21 @@ func (b *EventSourceBuilder) findOrCreateResource(tx *gorm.DB) (*models.Resource
 	return b.integration.CreateResourceInTransaction(tx, b.resource.Type(), b.resource.Id(), b.resource.Name())
 }
 
+func (b *EventSourceBuilder) findInternalEventSourceForResource(tx *gorm.DB, resourceID uuid.UUID) (*models.EventSource, error) {
+	var eventSource models.EventSource
+	err := tx.
+		Where("resource_id = ?", resourceID).
+		Where("scope = ?", models.EventSourceScopeInternal).
+		First(&eventSource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventSource, nil
+}
+
 func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *models.EventSource) (*models.EventSource, string, error) {
 	//
 	// If the creation is for an internal event source,
@@ -263,14 +278,6 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 	//
 	if b.scope == models.EventSourceScopeInternal {
 		return eventSource, "", nil
-	}
-
-	//
-	// If the creation is for an external event source,
-	// and there's already an existing external one, fail the creation, to avoid a duplicate.
-	//
-	if eventSource.Scope == models.EventSourceScopeExternal {
-		return nil, "", ErrResourceAlreadyUsed
 	}
 
 	//
@@ -403,13 +410,6 @@ func (b *EventSourceBuilder) updateForIntegration(tx *gorm.DB) (*models.EventSou
 	resource, err := b.findOrCreateResource(tx)
 	if err != nil {
 		return nil, "", err
-	}
-
-	existingSource, err := resource.FindEventSourceInTransaction(tx)
-	if err == nil && existingSource.ID != b.existingEventSource.ID {
-		if existingSource.Scope == models.EventSourceScopeExternal {
-			return nil, "", ErrResourceAlreadyUsed
-		}
 	}
 
 	plainKey, err := b.encryptor.Decrypt(b.ctx, b.existingEventSource.Key, []byte(b.existingEventSource.ID.String()))
