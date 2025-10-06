@@ -23,7 +23,7 @@ func Test__ListAlerts(t *testing.T) {
 	})
 
 	t.Run("return list of alerts in the canvas", func(t *testing.T) {
-		alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", "Test alert message", models.AlertTypeError)
+		alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", "Test alert message", models.AlertTypeError, models.AlertOriginTypeEventRejection)
 		require.NoError(t, err)
 		require.NoError(t, alert.Create())
 
@@ -39,7 +39,7 @@ func Test__ListAlerts(t *testing.T) {
 	})
 
 	t.Run("filter out acknowledged alerts when includeAcked is false", func(t *testing.T) {
-		alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", "Test acknowledged alert", models.AlertTypeWarning)
+		alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", "Test acknowledged alert", models.AlertTypeWarning, models.AlertOriginTypeEventRejection)
 		require.NoError(t, err)
 		require.NoError(t, alert.Create())
 		alert.Acknowledge()
@@ -56,7 +56,7 @@ func Test__ListAlerts(t *testing.T) {
 
 	t.Run("limit number of returned alerts", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
-			alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", fmt.Sprintf("Test alert %d", i), models.AlertTypeInfo)
+			alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", fmt.Sprintf("Test alert %d", i), models.AlertTypeInfo, models.AlertOriginTypeEventRejection)
 			require.NoError(t, err)
 			require.NoError(t, alert.Create())
 		}
@@ -76,7 +76,7 @@ func Test__ListAlerts(t *testing.T) {
 
 	t.Run("validate limit constraints", func(t *testing.T) {
 		for i := 0; i < 150; i++ {
-			alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", fmt.Sprintf("Test alert %d", i), models.AlertTypeInfo)
+			alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", fmt.Sprintf("Test alert %d", i), models.AlertTypeInfo, models.AlertOriginTypeEventRejection)
 			require.NoError(t, err)
 			require.NoError(t, alert.Create())
 		}
