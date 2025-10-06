@@ -12,7 +12,7 @@ import { NodeActionButtons } from '@/components/NodeActionButtons';
 import { twMerge } from 'tailwind-merge';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { createConnectionGroupDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
-import { AlertsTooltip } from '@/components/Tooltip/alerts-tooltip';
+import { ErrorsTooltip } from '@/components/Tooltip/errors-tooltip';
 import { showErrorToast } from '@/utils/toast';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
@@ -292,196 +292,197 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           }
         }}
       >
-      {(isHovered || isEditMode) && (
-        <NodeActionButtons
-          isNewNode={!!isNewNode}
-          onSave={handleSaveConnectionGroup}
-          onCancel={handleCancelEdit}
-          onDiscard={() => setShowDiscardConfirm(true)}
-          onEdit={handleEditClick}
-          onDuplicate={!isNewNode ? handleDuplicateConnectionGroup : undefined}
-          isEditMode={isEditMode}
-          entityType="connection group"
-          entityData={currentFormData ? {
-            metadata: {
-              name: connectionGroupName,
-              description: connectionGroupDescription
-            },
-            spec: {
-              connections: currentFormData.connections,
-              groupBy: {
-                fields: currentFormData.groupByFields
+        {(isHovered || isEditMode) && (
+          <NodeActionButtons
+            isNewNode={!!isNewNode}
+            onSave={handleSaveConnectionGroup}
+            onCancel={handleCancelEdit}
+            onDiscard={() => setShowDiscardConfirm(true)}
+            onEdit={handleEditClick}
+            onDuplicate={!isNewNode ? handleDuplicateConnectionGroup : undefined}
+            isEditMode={isEditMode}
+            entityType="connection group"
+            entityData={currentFormData ? {
+              metadata: {
+                name: connectionGroupName,
+                description: connectionGroupDescription
               },
-              timeout: currentFormData.timeout,
-              timeoutBehavior: currentFormData.timeoutBehavior
-            }
-          } : (currentConnectionGroup ? {
-            metadata: {
-              name: currentConnectionGroup.metadata?.name,
-              description: currentConnectionGroup.metadata?.description
-            },
-            spec: {
-              connections: currentConnectionGroup.spec?.connections || [],
-              groupBy: {
-                fields: currentConnectionGroup.spec?.groupBy?.fields || []
+              spec: {
+                connections: currentFormData.connections,
+                groupBy: {
+                  fields: currentFormData.groupByFields
+                },
+                timeout: currentFormData.timeout,
+                timeoutBehavior: currentFormData.timeoutBehavior
+              }
+            } : (currentConnectionGroup ? {
+              metadata: {
+                name: currentConnectionGroup.metadata?.name,
+                description: currentConnectionGroup.metadata?.description
               },
-              timeout: currentConnectionGroup.spec?.timeout,
-              timeoutBehavior: currentConnectionGroup.spec?.timeoutBehavior || 'TIMEOUT_BEHAVIOR_DROP'
-            }
-          } : null)}
-          onYamlApply={handleYamlApply}
-        />
-      )}
+              spec: {
+                connections: currentConnectionGroup.spec?.connections || [],
+                groupBy: {
+                  fields: currentConnectionGroup.spec?.groupBy?.fields || []
+                },
+                timeout: currentConnectionGroup.spec?.timeout,
+                timeoutBehavior: currentConnectionGroup.spec?.timeoutBehavior || 'TIMEOUT_BEHAVIOR_DROP'
+              }
+            } : null)}
+            onYamlApply={handleYamlApply}
+          />
+        )}
 
-      {/* Header Section */}
-      <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-start justify-between w-full">
-          <div className="flex items-start flex-1 min-w-0">
-            <div className='max-w-8 mt-1 flex items-center justify-center'>
-              <MaterialSymbol name="account_tree" size="lg" />
+        {/* Header Section */}
+        <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-start justify-between w-full">
+            <div className="flex items-start flex-1 min-w-0">
+              <div className='max-w-8 mt-1 flex items-center justify-center'>
+                <MaterialSymbol name="account_tree" size="lg" />
+              </div>
+              <div className="flex-1 min-w-0 ml-2">
+                <div className="mb-1">
+                  <InlineEditable
+                    value={connectionGroupName}
+                    onSave={handleConnectionGroupNameChange}
+                    placeholder="Connection group name"
+                    className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                      nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                      isEditMode ? 'text-sm' : '')}
+                    isEditMode={isEditMode}
+                    autoFocus={!!isNewNode}
+                    dataTestId="event-source-name-input"
+                  />
+                  {nameError && isEditMode && (
+                    <div className="text-xs text-red-600 text-left mt-1 px-2">
+                      {nameError}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  {isEditMode && <InlineEditable
+                    value={connectionGroupDescription}
+                    onSave={handleConnectionGroupDescriptionChange}
+                    placeholder={isEditMode ? "Add description..." : ""}
+                    className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
+                    isEditMode={isEditMode}
+                  />}
+                </div>
+              </div>
             </div>
-            <div className="flex-1 min-w-0 ml-2">
-              <div className="mb-1">
-                <InlineEditable
-                  value={connectionGroupName}
-                  onSave={handleConnectionGroupNameChange}
-                  placeholder="Connection group name"
-                  className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
-                    nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
-                    isEditMode ? 'text-sm' : '')}
-                  isEditMode={isEditMode}
-                  autoFocus={!!isNewNode}
-                  dataTestId="event-source-name-input"
+            {!isEditMode && (connectionGroupAlerts.length > 0 || alertsLoading) && (
+              <div className="ml-2">
+                <ErrorsTooltip
+                  alerts={connectionGroupAlerts}
+                  onAcknowledge={handleAcknowledgeAlert}
+                  className="flex-shrink-0"
+                  isLoading={alertsLoading}
+                  title="Alerts"
                 />
-                {nameError && isEditMode && (
-                  <div className="text-xs text-red-600 text-left mt-1 px-2">
-                    {nameError}
-                  </div>
-                )}
               </div>
-              <div>
-                {isEditMode && <InlineEditable
-                  value={connectionGroupDescription}
-                  onSave={handleConnectionGroupDescriptionChange}
-                  placeholder={isEditMode ? "Add description..." : ""}
-                  className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
-                  isEditMode={isEditMode}
-                />}
-              </div>
-            </div>
+            )}
           </div>
-          {!isEditMode && (connectionGroupAlerts.length > 0 || alertsLoading) && (
-            <div className="ml-2">
-              <AlertsTooltip
-                alerts={connectionGroupAlerts}
-                onAcknowledge={handleAcknowledgeAlert}
-                className="flex-shrink-0"
-                isLoading={alertsLoading}
-              />
-            </div>
+          {!isEditMode && (
+            <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || ''}</div>
           )}
         </div>
-        {!isEditMode && (
-          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || ''}</div>
-        )}
-      </div>
 
-      {isEditMode ? (
-        <ConnectionGroupEditModeContent
-          data={{
-            ...props.data,
-            name: connectionGroupName,
-            description: connectionGroupDescription,
-            ...(currentFormData && {
-              connections: currentFormData.connections,
-              groupBy: { fields: currentFormData.groupByFields },
-              timeout: currentFormData.timeout,
-              timeoutBehavior: currentFormData.timeoutBehavior
-            })
-          }}
-          currentConnectionGroupId={props.id}
-          apiError={apiError}
-          onDataChange={handleDataChange}
-        />
-      ) : (
-        <>
-          {/* Group By Section */}
-          <div className="px-3 py-3">
-            <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Group By Fields</div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">
-                {groupByFields.length} fields
+        {isEditMode ? (
+          <ConnectionGroupEditModeContent
+            data={{
+              ...props.data,
+              name: connectionGroupName,
+              description: connectionGroupDescription,
+              ...(currentFormData && {
+                connections: currentFormData.connections,
+                groupBy: { fields: currentFormData.groupByFields },
+                timeout: currentFormData.timeout,
+                timeoutBehavior: currentFormData.timeoutBehavior
+              })
+            }}
+            currentConnectionGroupId={props.id}
+            apiError={apiError}
+            onDataChange={handleDataChange}
+          />
+        ) : (
+          <>
+            {/* Group By Section */}
+            <div className="px-3 py-3">
+              <div className="flex items-center w-full justify-between mb-2">
+                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Group By Fields</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  {groupByFields.length} fields
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-1">
-              {groupByFields.length > 0 ? (
-                groupByFields.map((field, index) => (
-                  <div key={index} className="bg-gray-100 dark:bg-gray-700 rounded p-2">
-                    <div className="flex justify-start items-center gap-3 overflow-hidden">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-blue)] black-60 p-1">label</i>
-                      </span>
-                      <span className="truncate font-medium">{field.name}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">→</span>
-                      <span className="truncate text-sm">{field.expression}</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No group by fields configured</div>
-              )}
-            </div>
-          </div>
-
-          {/* Connections Section */}
-          <div className="px-3 py-3 border-t w-full border-gray-200 dark:border-zinc-700">
-            <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Connections</div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">
-                {props.data.connections?.length || 0} connections
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              {props.data.connections?.length ? (
-                props.data.connections.map((connection, index) => (
-                  <div key={index} className="bg-gray-100 dark:bg-gray-700 rounded p-2">
-                    <div className="flex justify-between items-center gap-3 overflow-hidden">
-                      <div className="flex items-center gap-2">
+              <div className="space-y-1">
+                {groupByFields.length > 0 ? (
+                  groupByFields.map((field, index) => (
+                    <div key={index} className="bg-gray-100 dark:bg-gray-700 rounded p-2">
+                      <div className="flex justify-start items-center gap-3 overflow-hidden">
                         <span className="text-sm text-gray-600 dark:text-gray-400">
-                          <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-green)] black-60 p-1">link</i>
+                          <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-blue)] black-60 p-1">label</i>
                         </span>
-                        <span className="truncate font-medium">{connection.name}</span>
+                        <span className="truncate font-medium">{field.name}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">→</span>
+                        <span className="truncate text-sm">{field.expression}</span>
                       </div>
-                      <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
-                        {connection.type?.toString().replace('TYPE_', '').replace('_', ' ').toLowerCase()}
-                      </span>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No connections configured</div>
-              )}
+                  ))
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No group by fields configured</div>
+                )}
+              </div>
             </div>
-          </div>
-        </>
-      )}
 
-      <CustomBarHandle type="target" connections={props.data.connections} />
-      <CustomBarHandle type="source" />
+            {/* Connections Section */}
+            <div className="px-3 py-3 border-t w-full border-gray-200 dark:border-zinc-700">
+              <div className="flex items-center w-full justify-between mb-2">
+                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Connections</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  {props.data.connections?.length || 0} connections
+                </div>
+              </div>
 
-      {/* Discard Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={showDiscardConfirm}
-        title="Discard Connection Group"
-        message="Are you sure you want to discard this connection group? This action cannot be undone."
-        confirmText="Discard"
-        cancelText="Cancel"
-        confirmVariant="danger"
-        onConfirm={handleDiscardConnectionGroup}
-        onCancel={() => setShowDiscardConfirm(false)}
-      />
+              <div className="space-y-1">
+                {props.data.connections?.length ? (
+                  props.data.connections.map((connection, index) => (
+                    <div key={index} className="bg-gray-100 dark:bg-gray-700 rounded p-2">
+                      <div className="flex justify-between items-center gap-3 overflow-hidden">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-green)] black-60 p-1">link</i>
+                          </span>
+                          <span className="truncate font-medium">{connection.name}</span>
+                        </div>
+                        <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
+                          {connection.type?.toString().replace('TYPE_', '').replace('_', ' ').toLowerCase()}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No connections configured</div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        <CustomBarHandle type="target" connections={props.data.connections} />
+        <CustomBarHandle type="source" />
+
+        {/* Discard Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showDiscardConfirm}
+          title="Discard Connection Group"
+          message="Are you sure you want to discard this connection group? This action cannot be undone."
+          confirmText="Discard"
+          cancelText="Cancel"
+          confirmVariant="danger"
+          onConfirm={handleDiscardConnectionGroup}
+          onCancel={() => setShowDiscardConfirm(false)}
+        />
       </div>
     </div>
   );

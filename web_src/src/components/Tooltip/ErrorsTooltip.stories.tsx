@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { AlertsTooltip } from './alerts-tooltip'
+import { ErrorsTooltip } from './alerts-tooltip'
 import { SuperplaneAlert, AlertAlertType } from '@/api-client'
 
-const meta: Meta<typeof AlertsTooltip> = {
-  title: 'Components/Tooltip/AlertsTooltip',
-  component: AlertsTooltip,
+const meta: Meta<typeof ErrorsTooltip> = {
+  title: 'Components/Tooltip/ErrorsTooltip',
+  component: ErrorsTooltip,
   parameters: {
     layout: 'centered',
   },

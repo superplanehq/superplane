@@ -25,7 +25,7 @@ import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicat
 import { showErrorToast } from '@/utils/toast';
 import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
-import { AlertsTooltip } from '@/components/Tooltip/alerts-tooltip';
+import { ErrorsTooltip } from '@/components/Tooltip/errors-tooltip';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="rocket_launch" size="xl" />,
@@ -692,12 +692,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               </div>
               {!isEditMode && (stageAlerts.length > 0 || alertsLoading) && (
                 <div className="ml-2">
-                  <AlertsTooltip
+                  <ErrorsTooltip
                     alerts={stageAlerts}
                     onAcknowledge={handleAcknowledgeAlert}
                     onAlertClick={handleAlertClick}
                     className="flex-shrink-0"
                     isLoading={alertsLoading}
+                    title="Alerts"
                   />
                 </div>
               )}

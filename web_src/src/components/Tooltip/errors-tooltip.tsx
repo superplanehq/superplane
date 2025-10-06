@@ -3,15 +3,16 @@ import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { SuperplaneAlert, AlertAlertType } from '@/api-client';
 import { useState } from 'react';
 
-interface AlertsTooltipProps {
+interface ErrorsTooltipProps {
   alerts: SuperplaneAlert[];
   onAcknowledge: (alertId: string) => void;
   onAlertClick?: (alert: SuperplaneAlert) => void;
   className?: string;
   isLoading?: boolean;
+  title?: string;
 }
 
-export function AlertsTooltip({ alerts, onAcknowledge, onAlertClick, className = '', isLoading = false }: AlertsTooltipProps) {
+export function ErrorsTooltip({ alerts, onAcknowledge, onAlertClick, title = 'Errors', className = '', isLoading = false }: ErrorsTooltipProps) {
   const [hoveredGroupIndex, setHoveredGroupIndex] = useState<number | null>(null);
   const getIconName = (type: AlertAlertType) => {
     switch (type) {
@@ -123,7 +124,7 @@ export function AlertsTooltip({ alerts, onAcknowledge, onAlertClick, className =
       render={() => (
         <div className="p-3 min-w-[350px] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
           <div className="text-left font-medium text-sm mb-3 text-gray-900 dark:text-gray-100">
-            Alerts
+            {title}
           </div>
           <div className="space-y-2 flex flex-col gap-6">
             {sortedGroups.map((group, index) => (
