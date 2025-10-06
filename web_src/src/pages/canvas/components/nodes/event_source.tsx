@@ -25,6 +25,7 @@ import { convertUTCToLocalTime, formatTimestampInUserTimezone, getUserTimezoneDi
 import { isRegularEventSource } from '@/utils/components';
 import { ErrorsTooltip } from '@/components/Tooltip/errors-tooltip';
 import { showErrorToast } from '@/utils/toast';
+import { alertsToErrorTooltip } from '@/utils/errors';
 
 const getEventSourceIcon = (sourceType: string) => {
   switch (sourceType) {
@@ -480,7 +481,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             {!isEditMode && (eventSourceAlerts.length > 0 || alertsLoading) && (
               <div className="ml-2">
                 <ErrorsTooltip
-                  alerts={eventSourceAlerts}
+                  errors={alertsToErrorTooltip(eventSourceAlerts)}
                   onAcknowledge={handleAcknowledgeAlert}
                   className="flex-shrink-0"
                   isLoading={alertsLoading}

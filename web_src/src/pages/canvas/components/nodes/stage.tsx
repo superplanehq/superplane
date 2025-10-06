@@ -5,7 +5,7 @@ import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useUpdateStage, useCreateStage, useDeleteStage, useAlertsBySourceId, useAcknowledgeAlert } from '@/hooks/useCanvasData';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent, SuperplaneAlert } from '@/api-client';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent } from '@/api-client';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -25,7 +25,8 @@ import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicat
 import { showErrorToast } from '@/utils/toast';
 import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
-import { ErrorsTooltip } from '@/components/Tooltip/errors-tooltip';
+import { ErrorsTooltip, TooltipError } from '@/components/Tooltip/errors-tooltip';
+import { alertsToErrorTooltip } from '@/utils/errors';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="rocket_launch" size="xl" />,
@@ -495,9 +496,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
-  const handleAlertClick = (alert: SuperplaneAlert) => {
-    if (alert.originType === 'ALERT_ORIGIN_TYPE_EVENT_REJECTION') {
-      // Open sidebar to Events tab with Rejected filter
+  const handleAlertClick = (error: TooltipError) => {
+    const alert = stageAlerts.find(alert => alert.id === error.id);
+    if (alert?.originType === 'ALERT_ORIGIN_TYPE_EVENT_REJECTION') {
       selectStageId(props.id, { tab: 'events', eventFilter: 'rejected' });
     }
   };
@@ -693,9 +694,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               {!isEditMode && (stageAlerts.length > 0 || alertsLoading) && (
                 <div className="ml-2">
                   <ErrorsTooltip
-                    alerts={stageAlerts}
+                    errors={alertsToErrorTooltip(stageAlerts)}
                     onAcknowledge={handleAcknowledgeAlert}
-                    onAlertClick={handleAlertClick}
+                    onErrorClick={handleAlertClick}
                     className="flex-shrink-0"
                     isLoading={alertsLoading}
                     title="Alerts"

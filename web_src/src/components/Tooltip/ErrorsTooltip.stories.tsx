@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { ErrorsTooltip } from './alerts-tooltip'
+import { ErrorsTooltip } from './errors-tooltip'
 import { SuperplaneAlert, AlertAlertType } from '@/api-client'
 
 const meta: Meta<typeof ErrorsTooltip> = {
@@ -32,10 +32,10 @@ const createAlert = (id: string, type: AlertAlertType, message: string): Superpl
 
 export const Default: Story = {
   args: {
-    alerts: [
-      createAlert('1', 'ALERT_TYPE_ERROR', 'Database connection failed'),
-      createAlert('2', 'ALERT_TYPE_WARNING', 'High memory usage detected'),
-      createAlert('3', 'ALERT_TYPE_INFO', 'Deployment completed successfully'),
+    errors: [
+      createAlert('1', 'ERROR', 'Database connection failed'),
+      createAlert('2', 'WARNING', 'High memory usage detected'),
+      createAlert('3', 'INFO', 'Deployment completed successfully'),
     ],
     onAcknowledge: (alertId: string) => {
       console.log('Acknowledging alert:', alertId)
@@ -45,9 +45,9 @@ export const Default: Story = {
 
 export const ErrorOnly: Story = {
   args: {
-    alerts: [
-      createAlert('1', 'ALERT_TYPE_ERROR', 'Critical system failure'),
-      createAlert('2', 'ALERT_TYPE_ERROR', 'Database connection timeout'),
+    errors: [
+      createAlert('1', 'ERROR', 'Critical system failure'),
+      createAlert('2', 'ERROR', 'Database connection timeout'),
     ],
     onAcknowledge: (alertId: string) => {
       console.log('Acknowledging alert:', alertId)
@@ -57,9 +57,9 @@ export const ErrorOnly: Story = {
 
 export const WarningOnly: Story = {
   args: {
-    alerts: [
-      createAlert('1', 'ALERT_TYPE_WARNING', 'High CPU usage'),
-      createAlert('2', 'ALERT_TYPE_WARNING', 'Disk space running low'),
+    errors: [
+      createAlert('1', 'WARNING', 'High CPU usage'),
+      createAlert('2', 'WARNING', 'Disk space running low'),
     ],
     onAcknowledge: (alertId: string) => {
       console.log('Acknowledging alert:', alertId)
@@ -69,9 +69,9 @@ export const WarningOnly: Story = {
 
 export const InfoOnly: Story = {
   args: {
-    alerts: [
-      createAlert('1', 'ALERT_TYPE_INFO', 'System update available'),
-      createAlert('2', 'ALERT_TYPE_INFO', 'Backup completed'),
+    errors: [
+      createAlert('1', 'INFO', 'System update available'),
+      createAlert('2', 'INFO', 'Backup completed'),
     ],
     onAcknowledge: (alertId: string) => {
       console.log('Acknowledging alert:', alertId)
@@ -81,13 +81,13 @@ export const InfoOnly: Story = {
 
 export const MultipleGrouped: Story = {
   args: {
-    alerts: [
-      createAlert('1', 'ALERT_TYPE_ERROR', 'Database connection failed'),
-      createAlert('2', 'ALERT_TYPE_ERROR', 'Database connection failed'),
-      createAlert('3', 'ALERT_TYPE_WARNING', 'High memory usage'),
-      createAlert('4', 'ALERT_TYPE_WARNING', 'High memory usage'),
-      createAlert('5', 'ALERT_TYPE_WARNING', 'High memory usage'),
-      createAlert('6', 'ALERT_TYPE_INFO', 'System healthy'),
+    errors: [
+      createAlert('1', 'ERROR', 'Database connection failed'),
+      createAlert('2', 'ERROR', 'Database connection failed'),
+      createAlert('3', 'WARNING', 'High memory usage'),
+      createAlert('4', 'WARNING', 'High memory usage'),
+      createAlert('5', 'WARNING', 'High memory usage'),
+      createAlert('6', 'INFO', 'System healthy'),
     ],
     onAcknowledge: (alertId: string) => {
       console.log('Acknowledging alert:', alertId)
@@ -97,7 +97,7 @@ export const MultipleGrouped: Story = {
 
 export const Loading: Story = {
   args: {
-    alerts: [],
+    errors: [],
     isLoading: true,
     onAcknowledge: (alertId: string) => {
       console.log('Acknowledging alert:', alertId)
@@ -107,7 +107,7 @@ export const Loading: Story = {
 
 export const Empty: Story = {
   args: {
-    alerts: [],
+    errors: [],
     isLoading: false,
     onAcknowledge: (alertId: string) => {
       console.log('Acknowledging alert:', alertId)

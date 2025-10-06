@@ -14,6 +14,7 @@ import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { createConnectionGroupDuplicate, focusAndEditNode } from '../../utils/nodeDuplicationUtils';
 import { ErrorsTooltip } from '@/components/Tooltip/errors-tooltip';
 import { showErrorToast } from '@/utils/toast';
+import { alertsToErrorTooltip } from '@/utils/errors';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
@@ -373,7 +374,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
             {!isEditMode && (connectionGroupAlerts.length > 0 || alertsLoading) && (
               <div className="ml-2">
                 <ErrorsTooltip
-                  alerts={connectionGroupAlerts}
+                  errors={alertsToErrorTooltip(connectionGroupAlerts)}
                   onAcknowledge={handleAcknowledgeAlert}
                   className="flex-shrink-0"
                   isLoading={alertsLoading}

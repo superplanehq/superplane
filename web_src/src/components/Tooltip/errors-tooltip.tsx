@@ -1,26 +1,37 @@
 import Tippy from '@tippyjs/react/headless';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { SuperplaneAlert, AlertAlertType } from '@/api-client';
 import { useState } from 'react';
 
+export interface TooltipError {
+  id: string;
+  message: string;
+  type: ErrorType;
+}
+
+export enum ErrorType {
+  ERROR = 'ERROR',
+  WARNING = 'WARNING',
+  INFO = 'INFO'
+}
+
 interface ErrorsTooltipProps {
-  alerts: SuperplaneAlert[];
-  onAcknowledge: (alertId: string) => void;
-  onAlertClick?: (alert: SuperplaneAlert) => void;
+  errors: TooltipError[];
+  onAcknowledge: (errorId: string) => void;
+  onErrorClick?: (error: TooltipError) => void;
   className?: string;
   isLoading?: boolean;
   title?: string;
 }
 
-export function ErrorsTooltip({ alerts, onAcknowledge, onAlertClick, title = 'Errors', className = '', isLoading = false }: ErrorsTooltipProps) {
+export function ErrorsTooltip({ errors, onAcknowledge, onErrorClick, title = 'Errors', className = '', isLoading = false }: ErrorsTooltipProps) {
   const [hoveredGroupIndex, setHoveredGroupIndex] = useState<number | null>(null);
-  const getIconName = (type: AlertAlertType) => {
+  const getIconName = (type: ErrorType) => {
     switch (type) {
-      case 'ALERT_TYPE_ERROR':
+      case 'ERROR':
         return 'error';
-      case 'ALERT_TYPE_WARNING':
+      case 'WARNING':
         return 'warning';
-      case 'ALERT_TYPE_INFO':
+      case 'INFO':
         return 'info';
       default:
         return 'info';
@@ -28,60 +39,59 @@ export function ErrorsTooltip({ alerts, onAcknowledge, onAlertClick, title = 'Er
   };
 
 
-  const getIconColor = (type: AlertAlertType) => {
+  const getIconColor = (type: ErrorType) => {
     switch (type) {
-      case 'ALERT_TYPE_ERROR':
+      case 'ERROR':
         return 'text-red-600 dark:text-red-500';
-      case 'ALERT_TYPE_WARNING':
+      case 'WARNING':
         return 'text-yellow-600 dark:text-yellow-500';
-      case 'ALERT_TYPE_INFO':
+      case 'INFO':
         return 'text-blue-600 dark:text-blue-500';
       default:
         return 'text-blue-600 dark:text-blue-500';
     }
   };
 
-  const groupedAlerts = alerts.reduce((acc, alert) => {
-    const key = `${alert.type}-${alert.message}`;
+  const groupedErrors = errors.reduce((acc, error) => {
+    const key = `${error.type}-${error.message}`;
     if (!acc[key]) {
       acc[key] = {
-        type: alert.type || 'ALERT_TYPE_INFO',
-        message: alert.message || 'No message',
+        type: error.type || 'INFO',
+        message: error.message || 'No message',
         count: 0,
-        alertIds: [],
-        alerts: []
+        errorIds: [],
+        errors: []
       };
     }
     acc[key].count++;
-    if (alert.id) {
-      acc[key].alertIds.push(alert.id);
+    if (error.id) {
+      acc[key].errorIds.push(error.id);
     }
-    acc[key].alerts.push(alert);
+    acc[key].errors.push(error);
     return acc;
-  }, {} as Record<string, { type: AlertAlertType; message: string; count: number; alertIds: string[]; alerts: SuperplaneAlert[] }>);
+  }, {} as Record<string, { type: ErrorType; message: string; count: number; errorIds: string[]; errors: TooltipError[] }>);
 
-  const sortedGroups = Object.values(groupedAlerts).sort((a, b) => {
-    const typeOrder = { 'ALERT_TYPE_ERROR': 0, 'ALERT_TYPE_WARNING': 1, 'ALERT_TYPE_INFO': 2 };
+  const sortedGroups = Object.values(groupedErrors).sort((a, b) => {
+    const typeOrder = { 'ERROR': 0, 'WARNING': 1, 'INFO': 2 };
     return (typeOrder[a.type as keyof typeof typeOrder] || 3) - (typeOrder[b.type as keyof typeof typeOrder] || 3);
   });
 
-  const getTypeLabel = (type: AlertAlertType, count: number) => {
-    const labels = {
-      'ALERT_TYPE_ERROR': count === 1 ? 'error' : 'errors',
-      'ALERT_TYPE_WARNING': count === 1 ? 'warning' : 'warnings',
-      'ALERT_TYPE_INFO': count === 1 ? 'info alert' : 'info alerts',
-      'ALERT_TYPE_UNKNOWN': count === 1 ? 'alert' : 'alerts',
+  const getTypeLabel = (type: ErrorType, count: number) => {
+    const labels: Record<ErrorType, string> = {
+      'ERROR': count === 1 ? 'error' : 'errors',
+      'WARNING': count === 1 ? 'warning' : 'warnings',
+      'INFO': count === 1 ? 'info' : 'infos',
     };
-    return labels[type] || 'alerts';
+    return labels[type] || 'errors';
   };
 
-  const getBackgroundColor = (type: AlertAlertType) => {
+  const getBackgroundColor = (type: ErrorType) => {
     switch (type) {
-      case 'ALERT_TYPE_ERROR':
+      case 'ERROR':
         return 'bg-red-50 dark:bg-red-900/20';
-      case 'ALERT_TYPE_WARNING':
+      case 'WARNING':
         return 'bg-yellow-50 dark:bg-yellow-900/20';
-      case 'ALERT_TYPE_INFO':
+      case 'INFO':
         return 'bg-blue-50 dark:bg-blue-900/20';
       default:
         return 'bg-blue-50 dark:bg-blue-900/20';
@@ -89,19 +99,19 @@ export function ErrorsTooltip({ alerts, onAcknowledge, onAlertClick, title = 'Er
   };
 
 
-  const alertCounts = {
-    error: alerts.filter(alert => alert.type === 'ALERT_TYPE_ERROR').length,
-    warning: alerts.filter(alert => alert.type === 'ALERT_TYPE_WARNING').length,
-    info: alerts.filter(alert => alert.type === 'ALERT_TYPE_INFO').length
+  const errorCounts = {
+    error: errors.filter(error => error.type === 'ERROR').length,
+    warning: errors.filter(error => error.type === 'WARNING').length,
+    info: errors.filter(error => error.type === 'INFO').length
   };
 
-  const dominantAlertType = (() => {
-    if (alertCounts.error > 0) return 'ALERT_TYPE_ERROR';
-    if (alertCounts.warning > 0) return 'ALERT_TYPE_WARNING';
-    return 'ALERT_TYPE_INFO';
+  const dominantErrorType = (() => {
+    if (errorCounts.error > 0) return 'ERROR';
+    if (errorCounts.warning > 0) return 'WARNING';
+    return 'INFO';
   })();
 
-  if (alerts.length === 0 && !isLoading) {
+  if (errors.length === 0 && !isLoading) {
     return null;
   }
 
@@ -140,8 +150,8 @@ export function ErrorsTooltip({ alerts, onAcknowledge, onAlertClick, title = 'Er
                     className="flex-1 min-w-0 text-left cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (onAlertClick && group.alerts.length > 0) {
-                        onAlertClick(group.alerts[0]);
+                      if (onErrorClick && group.errors.length > 0) {
+                        onErrorClick(group.errors[0]);
                       }
                     }}
                   >
@@ -157,7 +167,7 @@ export function ErrorsTooltip({ alerts, onAcknowledge, onAlertClick, title = 'Er
                       <button
                         onClick={async (e: React.MouseEvent) => {
                           e.stopPropagation();
-                          await Promise.all(group.alertIds.map(id => onAcknowledge(id)));
+                          await Promise.all(group.errorIds.map(id => onAcknowledge(id)));
                         }}
                         className="border-none bg-transparent rounded cursor-pointer transition-all hover:scale-110"
                       >
@@ -179,8 +189,8 @@ export function ErrorsTooltip({ alerts, onAcknowledge, onAlertClick, title = 'Er
             <button
               onClick={async (e) => {
                 e.stopPropagation()
-                const allAlertIds = sortedGroups.flatMap(group => group.alertIds);
-                await Promise.all(allAlertIds.map(id => onAcknowledge(id)));
+                const allErrorIds = sortedGroups.flatMap(group => group.errorIds);
+                await Promise.all(allErrorIds.map(id => onAcknowledge(id)));
               }}
               className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-xs underline"
             >
@@ -198,23 +208,23 @@ export function ErrorsTooltip({ alerts, onAcknowledge, onAlertClick, title = 'Er
         role="button"
         tabIndex={0}
       >
-        <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${getBackgroundColor(dominantAlertType)}`}>
-          {alertCounts.error > 0 && (
+        <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${getBackgroundColor(dominantErrorType as ErrorType)}`}>
+          {errorCounts.error > 0 && (
             <div className="flex items-center gap-0.5">
               <MaterialSymbol name="error" size="sm" className="text-red-600 dark:text-red-500" fill={1} />
-              <span className="text-xs font-medium text-red-600 dark:text-red-500">{alertCounts.error}</span>
+              <span className="text-xs font-medium text-red-600 dark:text-red-500">{errorCounts.error}</span>
             </div>
           )}
-          {alertCounts.warning > 0 && (
+          {errorCounts.warning > 0 && (
             <div className="flex items-center gap-0.5">
               <MaterialSymbol name="warning" size="sm" className="text-yellow-600 dark:text-yellow-500" fill={1} />
-              <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500">{alertCounts.warning}</span>
+              <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500">{errorCounts.warning}</span>
             </div>
           )}
-          {alertCounts.info > 0 && (
+          {errorCounts.info > 0 && (
             <div className="flex items-center gap-0.5">
               <MaterialSymbol name="info" size="sm" className="text-blue-600 dark:text-blue-500" fill={1} />
-              <span className="text-xs font-medium text-blue-600 dark:text-blue-500">{alertCounts.info}</span>
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-500">{errorCounts.info}</span>
             </div>
           )}
         </div>
