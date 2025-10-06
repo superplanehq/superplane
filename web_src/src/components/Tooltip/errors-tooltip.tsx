@@ -16,14 +16,15 @@ export enum ErrorType {
 
 interface ErrorsTooltipProps {
   errors: TooltipError[];
-  onAcknowledge: (errorId: string) => void;
+  onAcknowledge?: (errorId: string) => void;
   onErrorClick?: (error: TooltipError) => void;
   className?: string;
   isLoading?: boolean;
   title?: string;
+  disableCount?: boolean;
 }
 
-export function ErrorsTooltip({ errors, onAcknowledge, onErrorClick, title = 'Errors', className = '', isLoading = false }: ErrorsTooltipProps) {
+export function ErrorsTooltip({ errors, onAcknowledge, onErrorClick, title = 'Errors', className = '', isLoading = false, disableCount = false }: ErrorsTooltipProps) {
   const [hoveredGroupIndex, setHoveredGroupIndex] = useState<number | null>(null);
   const getIconName = (type: ErrorType) => {
     switch (type) {
@@ -136,11 +137,11 @@ export function ErrorsTooltip({ errors, onAcknowledge, onErrorClick, title = 'Er
           <div className="text-left font-medium text-sm mb-3 text-gray-900 dark:text-gray-100">
             {title}
           </div>
-          <div className="space-y-2 flex flex-col gap-6">
+          <div className="space-y-2 flex flex-col">
             {sortedGroups.map((group, index) => (
               <div
                 key={index}
-                className={`text-xs p-2 -m-2 rounded transition-colors ${getBackgroundColor(group.type)}`}
+                className={`text-xs p-2 rounded transition-colors ${getBackgroundColor(group.type)}`}
                 onMouseEnter={() => setHoveredGroupIndex(index)}
                 onMouseLeave={() => setHoveredGroupIndex(null)}
               >
@@ -155,15 +156,19 @@ export function ErrorsTooltip({ errors, onAcknowledge, onErrorClick, title = 'Er
                       }
                     }}
                   >
-                    <span className={`font-medium ${getIconColor(group.type)}`}>
-                      {group.count} {getTypeLabel(group.type, group.count)}:
-                    </span>
+                    {
+                      !disableCount && (
+                        <span className={`font-medium ${getIconColor(group.type)}`}>
+                          {group.count} {getTypeLabel(group.type, group.count)}:
+                        </span>
+                      )
+                    }
                     <span className="text-gray-600 dark:text-gray-400 ml-1 break-words">
                       {group.message}
                     </span>
                   </div>
                   <div className="w-6 flex justify-center">
-                    {hoveredGroupIndex === index && (
+                    {onAcknowledge && hoveredGroupIndex === index && (
                       <button
                         onClick={async (e: React.MouseEvent) => {
                           e.stopPropagation();
@@ -184,19 +189,22 @@ export function ErrorsTooltip({ errors, onAcknowledge, onErrorClick, title = 'Er
               </div>
             ))}
           </div>
-
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-            <button
-              onClick={async (e) => {
-                e.stopPropagation()
-                const allErrorIds = sortedGroups.flatMap(group => group.errorIds);
-                await Promise.all(allErrorIds.map(id => onAcknowledge(id)));
-              }}
-              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-xs underline"
-            >
-              Acknowledge all →
-            </button>
-          </div>
+          {
+            onAcknowledge && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation()
+                    const allErrorIds = sortedGroups.flatMap(group => group.errorIds);
+                    await Promise.all(allErrorIds.map(id => onAcknowledge(id)));
+                  }}
+                  className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-xs underline"
+                >
+                  Acknowledge all →
+                </button>
+              </div>
+            )
+          }
         </div>
       )}
       placement="bottom-end"

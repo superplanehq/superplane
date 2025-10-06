@@ -25,7 +25,7 @@ import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicat
 import { showErrorToast } from '@/utils/toast';
 import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
-import { ErrorsTooltip, TooltipError } from '@/components/Tooltip/errors-tooltip';
+import { ErrorsTooltip, ErrorType, TooltipError } from '@/components/Tooltip/errors-tooltip';
 import { alertsToErrorTooltip } from '@/utils/errors';
 
 const StageImageMap = {
@@ -109,21 +109,42 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     state.stages.find(stage => stage.metadata?.id === props.id)
   );
 
-  const isPartiallyBroken = useMemo(() => {
+  const connectionIssues = useMemo(() => {
+    const issues: TooltipError[] = []
     if (!currentStage || isNewNode)
-      return false;
+      return issues;
 
     const hasNoConnections = currentStage.spec?.connections?.length === 0
+    if (hasNoConnections)
+      issues.push({
+        id: `${currentStage.metadata?.id}-no-connections`,
+        message: 'No connections found for stage',
+        type: ErrorType.ERROR
+      })
 
-    const hasInvalidConnections = currentStage.spec?.connections?.some(connection => {
+    const invalidConnections = currentStage.spec?.connections?.filter(connection => {
       return !nodes.some(node => node?.data?.name === connection.name)
     })
 
-    const hasInvalidInputMappings = currentStage.spec?.inputMappings?.some(mapping => {
+    if (invalidConnections && invalidConnections.length > 0)
+      issues.push({
+        id: `${currentStage.metadata?.id}-invalid-connections`,
+        message: 'Invalid connections found: ' + invalidConnections.map(connection => connection.name).join(', '),
+        type: ErrorType.ERROR
+      })
+
+    const invalidInputMappings = currentStage.spec?.inputMappings?.filter(mapping => {
       return !currentStage.spec?.connections?.some(connection => connection.name === mapping.when?.triggeredBy?.connection)
     })
 
-    return hasNoConnections || hasInvalidConnections || hasInvalidInputMappings
+    if (invalidInputMappings && invalidInputMappings.length > 0)
+      issues.push({
+        id: `${currentStage.metadata?.id}-invalid-input-mappings`,
+        message: 'Invalid connections for input mappings: ' + invalidInputMappings.map(mapping => mapping.when?.triggeredBy?.connection).join(', '),
+        type: ErrorType.ERROR
+      })
+
+    return issues
   }, [currentStage, isNewNode, nodes])
 
   const validateStageName = (name: string) => {
@@ -581,7 +602,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
 
   const borderColor = useMemo(() => {
-    if (isPartiallyBroken) {
+    if (connectionIssues.length > 0) {
       return 'border-red-400 dark:border-red-200'
     }
 
@@ -589,7 +610,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       return 'border-blue-400 dark:border-gray-200'
     }
     return 'border-transparent dark:border-transparent'
-  }, [props.selected, focusedNodeId, props.id, isPartiallyBroken])
+  }, [props.selected, focusedNodeId, props.id, connectionIssues.length])
 
   return (
     <div
@@ -691,6 +712,17 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   </div>
                 </div>
               </div>
+              {!isEditMode && connectionIssues.length > 0 && (
+                <div className="ml-2">
+                  <ErrorsTooltip
+                    errors={connectionIssues}
+                    className="flex-shrink-0"
+                    isLoading={alertsLoading}
+                    title="Issues"
+                    disableCount
+                  />
+                </div>
+              )}
               {!isEditMode && (stageAlerts.length > 0 || alertsLoading) && (
                 <div className="ml-2">
                   <ErrorsTooltip
