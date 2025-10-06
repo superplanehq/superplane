@@ -37,7 +37,7 @@ export interface CanvasState {
   updateEventSource: (eventSource: EventSourceWithEvents) => void;
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
-  approveStageEvent: (stageEventId: string, stageId: string) => Promise<any>;
+  approveStageEvent: (stageEventId: string, stageId: string) => Promise<unknown>;
   discardStageEvent: (stageEventId: string, stageId: string) => Promise<void>;
   cancelStageExecution: (executionId: string, stageId: string) => Promise<void>;
   selectStageId: (stageId: string, options?: { tab?: string; eventFilter?: string }) => void;
@@ -95,6 +95,7 @@ export interface CanvasState {
   resetEventSourceKey: (eventSourceId: string) => void;
   setLockedNodes: (locked: boolean) => void;
   updateConnectionSourceNames: (oldName: string, newName: string) => void;
+  removeConnectionSourceNames: (deletedName: string) => void;
 }
 
 export type Stage = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; executions: Array<SuperplaneExecution>; isDraft?: boolean}

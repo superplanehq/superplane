@@ -26,7 +26,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId, selectConnectionGroupId, updateConnectionSourceNames } = useCanvasStore();
+  const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup, addConnectionGroup, setFocusedNodeId, selectConnectionGroupId, updateConnectionSourceNames, removeConnectionSourceNames } = useCanvasStore();
   const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
@@ -188,6 +188,12 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           return;
         }
       }
+
+      const connectionGroupName = currentConnectionGroup.metadata?.name;
+      if (connectionGroupName) {
+        removeConnectionSourceNames(connectionGroupName);
+      }
+
       removeConnectionGroup(currentConnectionGroup.metadata.id);
     }
     setShowDiscardConfirm(false);

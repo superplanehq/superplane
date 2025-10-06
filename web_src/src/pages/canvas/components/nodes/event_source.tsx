@@ -80,7 +80,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
   const [integrationError, setIntegrationError] = useState(false);
   const [showEmitEventModal, setShowEmitEventModal] = useState(false);
-  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource, updateConnectionSourceNames } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource, updateConnectionSourceNames, removeConnectionSourceNames } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
   const { data: alerts = {}, isLoading: alertsLoading } = useAlertsBySourceId(canvasId);
@@ -268,6 +268,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           return;
         }
       }
+
+      const eventSourceName = currentEventSource.metadata?.name;
+      if (eventSourceName) {
+        removeConnectionSourceNames(eventSourceName);
+      }
+
       removeEventSource(currentEventSource.metadata.id);
     }
     setShowDiscardConfirm(false);

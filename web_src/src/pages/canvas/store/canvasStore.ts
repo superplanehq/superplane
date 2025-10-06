@@ -585,5 +585,51 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
     
     get().syncToReactFlow();
+  },
+
+  removeConnectionSourceNames: (deletedName: string) => {
+    set((state) => {
+      const updatedStages = state.stages.map(stage => {
+        if (!stage.spec?.connections) return stage;
+
+        const updatedConnections = stage.spec.connections.filter(connection =>
+          connection.name !== deletedName
+        );
+
+        return {
+          ...stage,
+          spec: {
+            ...stage.spec,
+            connections: updatedConnections,
+            inputMappings: stage.spec.inputMappings?.filter(mapping =>
+              mapping.when?.triggeredBy?.connection !== deletedName
+            )
+          }
+        } as Stage;
+      });
+
+      const updatedConnectionGroups = state.connectionGroups.map(cg => {
+        if (!cg.spec?.connections) return cg;
+
+        const updatedConnections = cg.spec.connections.filter(connection =>
+          connection.name !== deletedName
+        );
+
+        return {
+          ...cg,
+          spec: {
+            ...cg.spec,
+            connections: updatedConnections
+          }
+        };
+      });
+
+      return {
+        stages: updatedStages,
+        connectionGroups: updatedConnectionGroups
+      };
+    });
+
+    get().syncToReactFlow();
   }
 }));

@@ -50,7 +50,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showEmitEventModal, setShowEmitEventModal] = useState(false);
   const triggerSectionValidationRef = useRef<(() => void) | null>(null);
   const setFieldErrorsRef = useRef<React.Dispatch<React.SetStateAction<Record<string, string>>> | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId, updateConnectionSourceNames } = useCanvasStore();
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId, updateConnectionSourceNames, removeConnectionSourceNames } = useCanvasStore();
 
   const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
     if (!errorMessage) return null;
@@ -109,6 +109,15 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     state.stages.find(stage => stage.metadata?.id === props.id)
   );
 
+  const invalidInputMappingsConnections = useMemo(() => {
+    if (!currentStage || isNewNode)
+      return [];
+
+    return currentStage.spec?.inputMappings?.filter(mapping => {
+      return !currentStage.spec?.connections?.some(connection => connection.name === mapping.when?.triggeredBy?.connection)
+    }).map(mapping => mapping.when?.triggeredBy?.connection)
+  }, [currentStage, isNewNode]);
+
   const connectionIssues = useMemo(() => {
     const issues: TooltipError[] = []
     if (!currentStage || isNewNode)
@@ -130,17 +139,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       issues.push({
         id: `${currentStage.metadata?.id}-invalid-connections`,
         message: 'Invalid connections found: ' + invalidConnections.map(connection => connection.name).join(', '),
-        type: ErrorType.ERROR
-      })
-
-    const invalidInputMappings = currentStage.spec?.inputMappings?.filter(mapping => {
-      return !currentStage.spec?.connections?.some(connection => connection.name === mapping.when?.triggeredBy?.connection)
-    })
-
-    if (invalidInputMappings && invalidInputMappings.length > 0)
-      issues.push({
-        id: `${currentStage.metadata?.id}-invalid-input-mappings`,
-        message: 'Invalid connections for input mappings: ' + invalidInputMappings.map(mapping => mapping.when?.triggeredBy?.connection).join(', '),
         type: ErrorType.ERROR
       })
 
@@ -433,6 +431,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           return;
         }
       }
+
+      const stageName = currentStage.metadata?.name;
+      if (stageName) {
+        removeConnectionSourceNames(stageName);
+      }
+
       removeStage(currentStage.metadata.id);
     }
     setShowDiscardConfirm(false);
@@ -667,7 +671,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   executor: currentStage.spec?.executor || { type: '', spec: {} },
                   secrets: currentStage.spec?.secrets || [],
                   conditions: currentStage.spec?.conditions || [],
-                  inputMappings: currentStage.spec?.inputMappings || []
+                  inputMappings: currentStage.spec?.inputMappings?.filter(mapping => !invalidInputMappingsConnections?.includes(mapping.when?.triggeredBy?.connection)) || []
                 }
               } : null)}
               onYamlApply={handleYamlApply}
@@ -754,7 +758,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   executor: currentFormData.executor,
                   secrets: currentFormData.secrets,
                   conditions: currentFormData.conditions,
-                  inputMappings: currentFormData.inputMappings,
+                  inputMappings: currentFormData.inputMappings?.filter(mapping => !invalidInputMappingsConnections?.includes(mapping.when?.triggeredBy?.connection)),
                   dryRun: currentFormData.dryRun
                 })
               }}
