@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stage } from "../store/types";
+import { useCanvasStore } from "../store/canvasStore";
 
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { useStageExecutions, useStageEvents, canvasKeys } from "@/hooks/useCanvasData";
@@ -34,7 +35,9 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStageEvent, cancelStageExecution, initialWidth = DEFAULT_SIDEBAR_WIDTH }: SidebarProps) => {
-  const [activeTab, setActiveTab] = useState('activity');
+  const sidebarTab = useCanvasStore(state => state.sidebarTab);
+  const sidebarEventFilter = useCanvasStore(state => state.sidebarEventFilter);
+  const [activeTab, setActiveTab] = useState(sidebarTab || 'activity');
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(initialWidth);
   const queryClient = useQueryClient();
@@ -181,6 +184,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
           canvasId={canvasId!}
           selectedStage={selectedStage}
           organizationId={organizationId!}
+          initialFilter={sidebarEventFilter || undefined}
         />;
 
 

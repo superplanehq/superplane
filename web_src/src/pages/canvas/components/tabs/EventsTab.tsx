@@ -10,10 +10,11 @@ interface EventsTabProps {
   selectedStage: Stage;
   organizationId: string;
   canvasId: string;
+  initialFilter?: string;
 }
 
-export const EventsTab = ({ selectedStage, canvasId }: EventsTabProps) => {
-  const [activeFilter, setActiveFilter] = useState('received');
+export const EventsTab = ({ selectedStage, canvasId, initialFilter }: EventsTabProps) => {
+  const [activeFilter, setActiveFilter] = useState(initialFilter || 'received');
 
   // Fetch rejected events (using the new hook)
   const {
@@ -207,7 +208,7 @@ export const EventsTab = ({ selectedStage, canvasId }: EventsTabProps) => {
                 <EventItem
                   key={eventId}
                   eventId={eventId!}
-                  timestamp={sourceEvent?.receivedAt!}
+                  timestamp={sourceEvent?.receivedAt as string}
                   state={sourceEvent?.state}
                   stateReason={sourceEvent?.stateReason}
                   stateMessage={sourceEvent?.stateMessage}

@@ -5,7 +5,7 @@ import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useUpdateStage, useCreateStage, useDeleteStage, useAlertsBySourceId, useAcknowledgeAlert } from '@/hooks/useCanvasData';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent } from '@/api-client';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent, SuperplaneAlert } from '@/api-client';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -495,6 +495,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
+  const handleAlertClick = (alert: SuperplaneAlert) => {
+    if (alert.originType === 'ALERT_ORIGIN_TYPE_EVENT_REJECTION') {
+      // Open sidebar to Events tab with Rejected filter
+      selectStageId(props.id, { tab: 'events', eventFilter: 'rejected' });
+    }
+  };
+
 
   const handleDataChange = useCallback((data: typeof currentFormData) => {
     setCurrentFormData(data);
@@ -688,6 +695,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   <AlertsTooltip
                     alerts={stageAlerts}
                     onAcknowledge={handleAcknowledgeAlert}
+                    onAlertClick={handleAlertClick}
                     className="flex-shrink-0"
                     isLoading={alertsLoading}
                   />
@@ -868,7 +876,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   return null;
                 }
               }}
-              onSubmit={async (eventType: string, eventData: any) => {
+              onSubmit={async (eventType: string, eventData: unknown) => {
                 await superplaneCreateEvent(withOrganizationHeader({
                   path: { canvasIdOrName: canvasId! },
                   body: {

@@ -6,11 +6,12 @@ import { useState } from 'react';
 interface AlertsTooltipProps {
   alerts: SuperplaneAlert[];
   onAcknowledge: (alertId: string) => void;
+  onAlertClick?: (alert: SuperplaneAlert) => void;
   className?: string;
   isLoading?: boolean;
 }
 
-export function AlertsTooltip({ alerts, onAcknowledge, className = '', isLoading = false }: AlertsTooltipProps) {
+export function AlertsTooltip({ alerts, onAcknowledge, onAlertClick, className = '', isLoading = false }: AlertsTooltipProps) {
   const [hoveredGroupIndex, setHoveredGroupIndex] = useState<number | null>(null);
   const getIconName = (type: AlertAlertType) => {
     switch (type) {
@@ -25,7 +26,6 @@ export function AlertsTooltip({ alerts, onAcknowledge, className = '', isLoading
     }
   };
 
-  console.log(alerts)
 
   const getIconColor = (type: AlertAlertType) => {
     switch (type) {
@@ -47,15 +47,17 @@ export function AlertsTooltip({ alerts, onAcknowledge, className = '', isLoading
         type: alert.type || 'ALERT_TYPE_INFO',
         message: alert.message || 'No message',
         count: 0,
-        alertIds: []
+        alertIds: [],
+        alerts: []
       };
     }
     acc[key].count++;
     if (alert.id) {
       acc[key].alertIds.push(alert.id);
     }
+    acc[key].alerts.push(alert);
     return acc;
-  }, {} as Record<string, { type: AlertAlertType; message: string; count: number; alertIds: string[] }>);
+  }, {} as Record<string, { type: AlertAlertType; message: string; count: number; alertIds: string[]; alerts: SuperplaneAlert[] }>);
 
   const sortedGroups = Object.values(groupedAlerts).sort((a, b) => {
     const typeOrder = { 'ALERT_TYPE_ERROR': 0, 'ALERT_TYPE_WARNING': 1, 'ALERT_TYPE_INFO': 2 };
@@ -127,17 +129,21 @@ export function AlertsTooltip({ alerts, onAcknowledge, className = '', isLoading
             {sortedGroups.map((group, index) => (
               <div
                 key={index}
-                className={`text-xs cursor-pointer p-2 -m-2 rounded transition-colors ${getBackgroundColor(group.type)}`}
+                className={`text-xs p-2 -m-2 rounded transition-colors ${getBackgroundColor(group.type)}`}
                 onMouseEnter={() => setHoveredGroupIndex(index)}
                 onMouseLeave={() => setHoveredGroupIndex(null)}
-                onClick={async (e) => {
-                  e.stopPropagation()
-                  await Promise.all(group.alertIds.map(id => onAcknowledge(id)));
-                }}
               >
                 <div className="flex items-center gap-2">
                   <MaterialSymbol name={getIconName(group.type)} size="sm" className={`${getIconColor(group.type)} flex-shrink-0`} fill={1} />
-                  <div className="flex-1 min-w-0 text-left">
+                  <div
+                    className="flex-1 min-w-0 text-left cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onAlertClick && group.alerts.length > 0) {
+                        onAlertClick(group.alerts[0]);
+                      }
+                    }}
+                  >
                     <span className={`font-medium ${getIconColor(group.type)}`}>
                       {group.count} {getTypeLabel(group.type, group.count)}:
                     </span>
@@ -147,12 +153,20 @@ export function AlertsTooltip({ alerts, onAcknowledge, className = '', isLoading
                   </div>
                   <div className="w-6 flex justify-center">
                     {hoveredGroupIndex === index && (
-                      <MaterialSymbol
-                        name="close"
-                        size="sm"
-                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
-                        fill={1}
-                      />
+                      <button
+                        onClick={async (e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          await Promise.all(group.alertIds.map(id => onAcknowledge(id)));
+                        }}
+                        className="border-none bg-transparent rounded cursor-pointer transition-all hover:scale-110"
+                      >
+                        <MaterialSymbol
+                          name="close"
+                          size="sm"
+                          className="m-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
+                          fill={1}
+                        />
+                      </button>
                     )}
                   </div>
                 </div>
