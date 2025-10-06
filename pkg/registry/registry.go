@@ -15,7 +15,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/primitives"
 	"github.com/superplanehq/superplane/pkg/secrets"
+
+	"github.com/superplanehq/superplane/pkg/primitives/filter"
+	httpPrimitive "github.com/superplanehq/superplane/pkg/primitives/http"
+	ifp "github.com/superplanehq/superplane/pkg/primitives/if"
+	switchp "github.com/superplanehq/superplane/pkg/primitives/switch"
 	"gorm.io/gorm"
 )
 
@@ -31,6 +37,7 @@ type Registry struct {
 	Encryptor    crypto.Encryptor
 	Integrations map[string]Integration
 	Executors    map[string]executors.Executor
+	Primitives   map[string]primitives.Primitive
 }
 
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
@@ -39,6 +46,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		Executors:    map[string]executors.Executor{},
 		Integrations: map[string]Integration{},
 		httpClient:   &http.Client{Timeout: 10 * time.Second},
+		Primitives:   map[string]primitives.Primitive{},
 	}
 
 	r.Init()
@@ -69,6 +77,14 @@ func (r *Registry) Init() {
 	//
 	r.Executors[models.ExecutorTypeHTTP] = httpexec.NewHTTPExecutor(r.httpClient)
 	r.Executors[models.ExecutorTypeNoOp] = noop.NewNoOpExecutor()
+
+	//
+	// Register the primitives
+	//
+	r.Primitives["if"] = &ifp.If{}
+	r.Primitives["filter"] = &filter.Filter{}
+	r.Primitives["switch"] = &switchp.Switch{}
+	r.Primitives["http"] = &httpPrimitive.HTTP{}
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {
@@ -209,4 +225,22 @@ func (r *Registry) NewExecutor(executorType string) (executors.Executor, error) 
 	}
 
 	return executor, nil
+}
+
+func (r *Registry) ListPrimitives() []primitives.Primitive {
+	primitives := make([]primitives.Primitive, 0, len(r.Primitives))
+	for _, primitive := range r.Primitives {
+		primitives = append(primitives, primitive)
+	}
+
+	return primitives
+}
+
+func (r *Registry) GetPrimitive(name string) (primitives.Primitive, error) {
+	primitive, ok := r.Primitives[name]
+	if !ok {
+		return nil, fmt.Errorf("primitive %s not registered", name)
+	}
+
+	return primitive, nil
 }

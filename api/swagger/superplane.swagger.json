@@ -33,6 +33,15 @@
     },
     {
       "name": "Me"
+    },
+    {
+      "name": "Primitives"
+    },
+    {
+      "name": "Blueprints"
+    },
+    {
+      "name": "Workflows"
     }
   ],
   "schemes": [
@@ -46,6 +55,132 @@
     "application/json"
   ],
   "paths": {
+    "/api/v1/blueprints": {
+      "get": {
+        "summary": "List blueprints",
+        "description": "Returns a list of all blueprints",
+        "operationId": "Blueprints_ListBlueprints",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListBlueprintsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Blueprint"
+        ]
+      },
+      "post": {
+        "summary": "Create blueprint",
+        "description": "Creates a new blueprint",
+        "operationId": "Blueprints_CreateBlueprint",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateBlueprintResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateBlueprintRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blueprint"
+        ]
+      }
+    },
+    "/api/v1/blueprints/{id}": {
+      "get": {
+        "summary": "Describe blueprint",
+        "description": "Returns a blueprint",
+        "operationId": "Blueprints_DescribeBlueprint",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeBlueprintResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blueprint"
+        ]
+      },
+      "patch": {
+        "summary": "Update blueprint",
+        "description": "Updates an existing blueprint",
+        "operationId": "Blueprints_UpdateBlueprint",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateBlueprintResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/BlueprintsUpdateBlueprintBody"
+            }
+          }
+        ],
+        "tags": [
+          "Blueprint"
+        ]
+      }
+    },
     "/api/v1/canvases": {
       "get": {
         "summary": "List canvases",
@@ -2256,6 +2391,62 @@
         ]
       }
     },
+    "/api/v1/primitives": {
+      "get": {
+        "summary": "List primitives",
+        "description": "Returns a list of all primitives",
+        "operationId": "Primitives_ListPrimitives",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListPrimitivesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Primitive"
+        ]
+      }
+    },
+    "/api/v1/primitives/{name}": {
+      "get": {
+        "summary": "Describe primitive",
+        "description": "Returns a primitive by its name",
+        "operationId": "Primitives_DescribePrimitive",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribePrimitiveResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Primitive"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "summary": "List roles",
@@ -2863,6 +3054,162 @@
           "Users"
         ]
       }
+    },
+    "/api/v1/workflows": {
+      "get": {
+        "summary": "List workflows",
+        "description": "Returns a list of all workflows",
+        "operationId": "Workflows_ListWorkflows",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListWorkflowsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Workflow"
+        ]
+      },
+      "post": {
+        "summary": "Create workflow",
+        "description": "Creates a new workflow",
+        "operationId": "Workflows_CreateWorkflow",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateWorkflowResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateWorkflowRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Workflow"
+        ]
+      }
+    },
+    "/api/v1/workflows/{id}": {
+      "get": {
+        "summary": "Describe workflow",
+        "description": "Returns a workflow by ID",
+        "operationId": "Workflows_DescribeWorkflow",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeWorkflowResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Workflow"
+        ]
+      },
+      "delete": {
+        "summary": "Delete workflow",
+        "description": "Deletes an existing workflow",
+        "operationId": "Workflows_DeleteWorkflow",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDeleteWorkflowResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Workflow"
+        ]
+      },
+      "put": {
+        "summary": "Update workflow",
+        "description": "Updates an existing workflow",
+        "operationId": "Workflows_UpdateWorkflow",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateWorkflowResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsUpdateWorkflowBody"
+            }
+          }
+        ],
+        "tags": [
+          "Workflow"
+        ]
+      }
     }
   },
   "definitions": {
@@ -2908,6 +3255,14 @@
         }
       },
       "title": "Common data structures"
+    },
+    "BlueprintsUpdateBlueprintBody": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/SuperplaneBlueprint"
+        }
+      }
     },
     "EventRejectionRejectionReason": {
       "type": "string",
@@ -3871,6 +4226,94 @@
         }
       }
     },
+    "SuperplaneBlueprint": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneBlueprintNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneBlueprintEdge"
+          }
+        }
+      }
+    },
+    "SuperplaneBlueprintEdge": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneBlueprintNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "refType": {
+          "$ref": "#/definitions/SuperplaneBlueprintNodeRefType"
+        },
+        "primitive": {
+          "$ref": "#/definitions/SuperplaneBlueprintNodePrimitiveRef"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "SuperplaneBlueprintNodePrimitiveRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneBlueprintNodeRefType": {
+      "type": "string",
+      "enum": [
+        "REF_TYPE_PRIMITIVE"
+      ],
+      "default": "REF_TYPE_PRIMITIVE"
+    },
     "SuperplaneCancelStageExecutionBody": {
       "type": "object"
     },
@@ -3960,6 +4403,23 @@
         "CONDITION_TYPE_TIME_WINDOW"
       ],
       "default": "CONDITION_TYPE_UNKNOWN"
+    },
+    "SuperplaneConfigurationField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
     },
     "SuperplaneConnection": {
       "type": "object",
@@ -4131,6 +4591,22 @@
       ],
       "default": "TYPE_UNKNOWN"
     },
+    "SuperplaneCreateBlueprintRequest": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/SuperplaneBlueprint"
+        }
+      }
+    },
+    "SuperplaneCreateBlueprintResponse": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/SuperplaneBlueprint"
+        }
+      }
+    },
     "SuperplaneCreateCanvasRequest": {
       "type": "object",
       "properties": {
@@ -4223,6 +4699,22 @@
         }
       }
     },
+    "SuperplaneCreateWorkflowRequest": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/SuperplaneWorkflow"
+        }
+      }
+    },
+    "SuperplaneCreateWorkflowResponse": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/SuperplaneWorkflow"
+        }
+      }
+    },
     "SuperplaneDataFilter": {
       "type": "object",
       "properties": {
@@ -4242,6 +4734,17 @@
     },
     "SuperplaneDeleteStageResponse": {
       "type": "object"
+    },
+    "SuperplaneDeleteWorkflowResponse": {
+      "type": "object"
+    },
+    "SuperplaneDescribeBlueprintResponse": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/SuperplaneBlueprint"
+        }
+      }
     },
     "SuperplaneDescribeCanvasResponse": {
       "type": "object",
@@ -4267,11 +4770,27 @@
         }
       }
     },
+    "SuperplaneDescribePrimitiveResponse": {
+      "type": "object",
+      "properties": {
+        "primitive": {
+          "$ref": "#/definitions/SuperplanePrimitive"
+        }
+      }
+    },
     "SuperplaneDescribeStageResponse": {
       "type": "object",
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
+        }
+      }
+    },
+    "SuperplaneDescribeWorkflowResponse": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/SuperplaneWorkflow"
         }
       }
     },
@@ -4687,6 +5206,18 @@
         }
       }
     },
+    "SuperplaneListBlueprintsResponse": {
+      "type": "object",
+      "properties": {
+        "blueprints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneBlueprint"
+          }
+        }
+      }
+    },
     "SuperplaneListCanvasesResponse": {
       "type": "object",
       "properties": {
@@ -4781,6 +5312,18 @@
         }
       }
     },
+    "SuperplaneListPrimitivesResponse": {
+      "type": "object",
+      "properties": {
+        "primitives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplanePrimitive"
+          }
+        }
+      }
+    },
     "SuperplaneListStageEventsResponse": {
       "type": "object",
       "properties": {
@@ -4839,6 +5382,18 @@
         }
       }
     },
+    "SuperplaneListWorkflowsResponse": {
+      "type": "object",
+      "properties": {
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneWorkflow"
+          }
+        }
+      }
+    },
     "SuperplaneMeUser": {
       "type": "object",
       "properties": {
@@ -4863,6 +5418,17 @@
     "SuperplaneOrganizationsRemoveUserResponse": {
       "type": "object"
     },
+    "SuperplaneOutputBranch": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneOutputDefinition": {
       "type": "object",
       "properties": {
@@ -4885,6 +5451,31 @@
         },
         "value": {
           "type": "string"
+        }
+      }
+    },
+    "SuperplanePrimitive": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConfigurationField"
+          }
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputBranch"
+          }
         }
       }
     },
@@ -5081,6 +5672,14 @@
         }
       }
     },
+    "SuperplaneUpdateBlueprintResponse": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/SuperplaneBlueprint"
+        }
+      }
+    },
     "SuperplaneUpdateConnectionGroupBody": {
       "type": "object",
       "properties": {
@@ -5129,6 +5728,14 @@
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
+        }
+      }
+    },
+    "SuperplaneUpdateWorkflowResponse": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/SuperplaneWorkflow"
         }
       }
     },
@@ -5209,6 +5816,95 @@
           "type": "string"
         }
       }
+    },
+    "SuperplaneWorkflow": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneWorkflowNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneWorkflowEdge"
+          }
+        }
+      }
+    },
+    "SuperplaneWorkflowEdge": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneWorkflowNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "refType": {
+          "$ref": "#/definitions/SuperplaneWorkflowNodeRefType"
+        },
+        "primitive": {
+          "$ref": "#/definitions/SuperplaneWorkflowNodePrimitiveRef"
+        },
+        "blueprint": {
+          "$ref": "#/definitions/WorkflowNodeBlueprintRef"
+        }
+      }
+    },
+    "SuperplaneWorkflowNodePrimitiveRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneWorkflowNodeRefType": {
+      "type": "string",
+      "enum": [
+        "REF_TYPE_PRIMITIVE",
+        "REF_TYPE_BLUEPRINT"
+      ],
+      "default": "REF_TYPE_PRIMITIVE"
     },
     "UsersAccountProvider": {
       "type": "object",
@@ -5359,6 +6055,22 @@
             "type": "object",
             "$ref": "#/definitions/UsersUserRoleAssignment"
           }
+        }
+      }
+    },
+    "WorkflowNodeBlueprintRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "WorkflowsUpdateWorkflowBody": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/SuperplaneWorkflow"
         }
       }
     },

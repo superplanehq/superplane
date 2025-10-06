@@ -9,11 +9,13 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	canvasPb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	mepb "github.com/superplanehq/superplane/pkg/protos/me"
 	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	pbPrimitives "github.com/superplanehq/superplane/pkg/protos/primitives"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	secretPb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
@@ -88,6 +90,11 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 
 	meService := NewMeService()
 	mepb.RegisterMeServer(grpcServer, meService)
+
+	primitiveService := NewPrimitiveService(registry)
+	pbPrimitives.RegisterPrimitivesServer(grpcServer, primitiveService)
+	blueprintService := NewBlueprintService(registry)
+	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
 	reflection.Register(grpcServer)
 

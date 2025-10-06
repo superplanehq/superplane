@@ -1,0 +1,159 @@
+syntax = "proto3";
+
+package Superplane;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/workflows";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Workflows API";
+    version: "1.0";
+    description: "API for Superplane workflows";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Workflows {
+  rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/workflows"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List workflows";
+      description: "Returns a list of all workflows";
+      tags: "Workflow";
+    };
+  }
+
+  rpc CreateWorkflow(CreateWorkflowRequest) returns (CreateWorkflowResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/workflows"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create workflow";
+      description: "Creates a new workflow";
+      tags: "Workflow";
+    };
+  }
+
+  rpc DescribeWorkflow(DescribeWorkflowRequest) returns (DescribeWorkflowResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/workflows/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe workflow";
+      description: "Returns a workflow by ID";
+      tags: "Workflow";
+    };
+  }
+
+  rpc UpdateWorkflow(UpdateWorkflowRequest) returns (UpdateWorkflowResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/workflows/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update workflow";
+      description: "Updates an existing workflow";
+      tags: "Workflow";
+    };
+  }
+
+  rpc DeleteWorkflow(DeleteWorkflowRequest) returns (DeleteWorkflowResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/workflows/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete workflow";
+      description: "Deletes an existing workflow";
+      tags: "Workflow";
+    };
+  }
+}
+
+message ListWorkflowsRequest {}
+
+message ListWorkflowsResponse {
+  repeated Workflow workflows = 1;
+}
+
+message DescribeWorkflowRequest {
+  string id = 1;
+}
+
+message DescribeWorkflowResponse {
+  Workflow workflow = 1;
+}
+
+message CreateWorkflowRequest {
+  Workflow workflow = 1;
+}
+
+message CreateWorkflowResponse {
+  Workflow workflow = 1;
+}
+
+message UpdateWorkflowRequest {
+  string id = 1;
+  Workflow workflow = 2;
+}
+
+message UpdateWorkflowResponse {
+  Workflow workflow = 1;
+}
+
+message DeleteWorkflowRequest {
+  string id = 1;
+}
+
+message DeleteWorkflowResponse {}
+
+message Workflow {
+  string id = 1;
+  string organization_id = 2;
+  string name = 3;
+  string description = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  repeated WorkflowNode nodes = 7;
+  repeated WorkflowEdge edges = 8;
+}
+
+message WorkflowNode {
+  enum RefType {
+    REF_TYPE_PRIMITIVE = 0;
+    REF_TYPE_BLUEPRINT = 1;
+  }
+
+  message PrimitiveRef {
+    string name = 1;
+  }
+
+  message BlueprintRef {
+    string name = 1;
+  }
+
+  string id = 1;
+  string name = 2;
+  RefType ref_type = 3;
+  PrimitiveRef primitive = 4;
+  BlueprintRef blueprint = 5;
+}
+
+message WorkflowEdge {
+  string source_id = 1;
+  string target_id = 2;
+  string branch = 3;
+}

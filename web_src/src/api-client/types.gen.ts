@@ -14,6 +14,10 @@ export type AuthorizationPermission = {
     domainType?: AuthorizationDomainType;
 };
 
+export type BlueprintsUpdateBlueprintBody = {
+    blueprint?: SuperplaneBlueprint;
+};
+
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
 export type EventSourceDailySchedule = {
@@ -427,6 +431,39 @@ export type SuperplaneApproveStageEventResponse = {
     event?: SuperplaneStageEvent;
 };
 
+export type SuperplaneBlueprint = {
+    id?: string;
+    organizationId?: string;
+    name?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    nodes?: Array<SuperplaneBlueprintNode>;
+    edges?: Array<SuperplaneBlueprintEdge>;
+};
+
+export type SuperplaneBlueprintEdge = {
+    sourceId?: string;
+    targetId?: string;
+    branch?: string;
+};
+
+export type SuperplaneBlueprintNode = {
+    id?: string;
+    name?: string;
+    refType?: SuperplaneBlueprintNodeRefType;
+    primitive?: SuperplaneBlueprintNodePrimitiveRef;
+    configuration?: {
+        [key: string]: unknown;
+    };
+};
+
+export type SuperplaneBlueprintNodePrimitiveRef = {
+    name?: string;
+};
+
+export type SuperplaneBlueprintNodeRefType = 'REF_TYPE_PRIMITIVE';
+
 export type SuperplaneCancelStageExecutionBody = {
     [key: string]: unknown;
 };
@@ -464,6 +501,13 @@ export type SuperplaneConditionTimeWindow = {
 };
 
 export type SuperplaneConditionType = 'CONDITION_TYPE_UNKNOWN' | 'CONDITION_TYPE_APPROVAL' | 'CONDITION_TYPE_TIME_WINDOW';
+
+export type SuperplaneConfigurationField = {
+    name?: string;
+    type?: string;
+    description?: string;
+    required?: boolean;
+};
 
 export type SuperplaneConnection = {
     type?: SuperplaneConnectionType;
@@ -519,6 +563,14 @@ export type SuperplaneConnectionGroupSpec = {
 
 export type SuperplaneConnectionType = 'TYPE_UNKNOWN' | 'TYPE_EVENT_SOURCE' | 'TYPE_STAGE' | 'TYPE_CONNECTION_GROUP';
 
+export type SuperplaneCreateBlueprintRequest = {
+    blueprint?: SuperplaneBlueprint;
+};
+
+export type SuperplaneCreateBlueprintResponse = {
+    blueprint?: SuperplaneBlueprint;
+};
+
 export type SuperplaneCreateCanvasRequest = {
     canvas?: SuperplaneCanvas;
 };
@@ -565,6 +617,14 @@ export type SuperplaneCreateStageResponse = {
     stage?: SuperplaneStage;
 };
 
+export type SuperplaneCreateWorkflowRequest = {
+    workflow?: SuperplaneWorkflow;
+};
+
+export type SuperplaneCreateWorkflowResponse = {
+    workflow?: SuperplaneWorkflow;
+};
+
 export type SuperplaneDataFilter = {
     expression?: string;
 };
@@ -585,6 +645,14 @@ export type SuperplaneDeleteStageResponse = {
     [key: string]: unknown;
 };
 
+export type SuperplaneDeleteWorkflowResponse = {
+    [key: string]: unknown;
+};
+
+export type SuperplaneDescribeBlueprintResponse = {
+    blueprint?: SuperplaneBlueprint;
+};
+
 export type SuperplaneDescribeCanvasResponse = {
     canvas?: SuperplaneCanvas;
 };
@@ -597,8 +665,16 @@ export type SuperplaneDescribeEventSourceResponse = {
     eventSource?: SuperplaneEventSource;
 };
 
+export type SuperplaneDescribePrimitiveResponse = {
+    primitive?: SuperplanePrimitive;
+};
+
 export type SuperplaneDescribeStageResponse = {
     stage?: SuperplaneStage;
+};
+
+export type SuperplaneDescribeWorkflowResponse = {
+    workflow?: SuperplaneWorkflow;
 };
 
 export type SuperplaneDiscardStageEventBody = {
@@ -756,6 +832,10 @@ export type SuperplaneListAlertsResponse = {
     alerts?: Array<SuperplaneAlert>;
 };
 
+export type SuperplaneListBlueprintsResponse = {
+    blueprints?: Array<SuperplaneBlueprint>;
+};
+
 export type SuperplaneListCanvasesResponse = {
     canvases?: Array<SuperplaneCanvas>;
 };
@@ -786,6 +866,10 @@ export type SuperplaneListEventsResponse = {
     lastTimestamp?: string;
 };
 
+export type SuperplaneListPrimitivesResponse = {
+    primitives?: Array<SuperplanePrimitive>;
+};
+
 export type SuperplaneListStageEventsResponse = {
     events?: Array<SuperplaneStageEvent>;
     totalCount?: number;
@@ -804,6 +888,10 @@ export type SuperplaneListStagesResponse = {
     stages?: Array<SuperplaneStage>;
 };
 
+export type SuperplaneListWorkflowsResponse = {
+    workflows?: Array<SuperplaneWorkflow>;
+};
+
 export type SuperplaneMeUser = {
     id?: string;
     email?: string;
@@ -816,6 +904,11 @@ export type SuperplaneOrganizationsRemoveUserResponse = {
     [key: string]: unknown;
 };
 
+export type SuperplaneOutputBranch = {
+    name?: string;
+    description?: string;
+};
+
 export type SuperplaneOutputDefinition = {
     name?: string;
     description?: string;
@@ -825,6 +918,13 @@ export type SuperplaneOutputDefinition = {
 export type SuperplaneOutputValue = {
     name?: string;
     value?: string;
+};
+
+export type SuperplanePrimitive = {
+    name?: string;
+    description?: string;
+    configuration?: Array<SuperplaneConfigurationField>;
+    branches?: Array<SuperplaneOutputBranch>;
 };
 
 export type SuperplaneRemoveUserResponse = {
@@ -892,6 +992,10 @@ export type SuperplaneStageStatus = {
     queue?: StatusQueue;
 };
 
+export type SuperplaneUpdateBlueprintResponse = {
+    blueprint?: SuperplaneBlueprint;
+};
+
 export type SuperplaneUpdateConnectionGroupBody = {
     connectionGroup?: SuperplaneConnectionGroup;
 };
@@ -915,6 +1019,10 @@ export type SuperplaneUpdateStageBody = {
 
 export type SuperplaneUpdateStageResponse = {
     stage?: SuperplaneStage;
+};
+
+export type SuperplaneUpdateWorkflowResponse = {
+    workflow?: SuperplaneWorkflow;
 };
 
 export type SuperplaneUsersUser = {
@@ -949,6 +1057,37 @@ export type SuperplaneValueFromSecret = {
     name?: string;
     key?: string;
 };
+
+export type SuperplaneWorkflow = {
+    id?: string;
+    organizationId?: string;
+    name?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    nodes?: Array<SuperplaneWorkflowNode>;
+    edges?: Array<SuperplaneWorkflowEdge>;
+};
+
+export type SuperplaneWorkflowEdge = {
+    sourceId?: string;
+    targetId?: string;
+    branch?: string;
+};
+
+export type SuperplaneWorkflowNode = {
+    id?: string;
+    name?: string;
+    refType?: SuperplaneWorkflowNodeRefType;
+    primitive?: SuperplaneWorkflowNodePrimitiveRef;
+    blueprint?: WorkflowNodeBlueprintRef;
+};
+
+export type SuperplaneWorkflowNodePrimitiveRef = {
+    name?: string;
+};
+
+export type SuperplaneWorkflowNodeRefType = 'REF_TYPE_PRIMITIVE' | 'REF_TYPE_BLUEPRINT';
 
 export type UsersAccountProvider = {
     providerType?: string;
@@ -1003,6 +1142,14 @@ export type UsersUserStatus = {
     roleAssignments?: Array<UsersUserRoleAssignment>;
 };
 
+export type WorkflowNodeBlueprintRef = {
+    name?: string;
+};
+
+export type WorkflowsUpdateWorkflowBody = {
+    workflow?: SuperplaneWorkflow;
+};
+
 export type GooglerpcStatus = {
     code?: number;
     message?: string;
@@ -1023,6 +1170,110 @@ export type ProtobufAny = {
  * - NULL_VALUE: Null value.
  */
 export type ProtobufNullValue = 'NULL_VALUE';
+
+export type BlueprintsListBlueprintsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/blueprints';
+};
+
+export type BlueprintsListBlueprintsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type BlueprintsListBlueprintsError = BlueprintsListBlueprintsErrors[keyof BlueprintsListBlueprintsErrors];
+
+export type BlueprintsListBlueprintsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListBlueprintsResponse;
+};
+
+export type BlueprintsListBlueprintsResponse = BlueprintsListBlueprintsResponses[keyof BlueprintsListBlueprintsResponses];
+
+export type BlueprintsCreateBlueprintData = {
+    body: SuperplaneCreateBlueprintRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/blueprints';
+};
+
+export type BlueprintsCreateBlueprintErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type BlueprintsCreateBlueprintError = BlueprintsCreateBlueprintErrors[keyof BlueprintsCreateBlueprintErrors];
+
+export type BlueprintsCreateBlueprintResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneCreateBlueprintResponse;
+};
+
+export type BlueprintsCreateBlueprintResponse = BlueprintsCreateBlueprintResponses[keyof BlueprintsCreateBlueprintResponses];
+
+export type BlueprintsDescribeBlueprintData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/blueprints/{id}';
+};
+
+export type BlueprintsDescribeBlueprintErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type BlueprintsDescribeBlueprintError = BlueprintsDescribeBlueprintErrors[keyof BlueprintsDescribeBlueprintErrors];
+
+export type BlueprintsDescribeBlueprintResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDescribeBlueprintResponse;
+};
+
+export type BlueprintsDescribeBlueprintResponse = BlueprintsDescribeBlueprintResponses[keyof BlueprintsDescribeBlueprintResponses];
+
+export type BlueprintsUpdateBlueprintData = {
+    body: BlueprintsUpdateBlueprintBody;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/blueprints/{id}';
+};
+
+export type BlueprintsUpdateBlueprintErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type BlueprintsUpdateBlueprintError = BlueprintsUpdateBlueprintErrors[keyof BlueprintsUpdateBlueprintErrors];
+
+export type BlueprintsUpdateBlueprintResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneUpdateBlueprintResponse;
+};
+
+export type BlueprintsUpdateBlueprintResponse = BlueprintsUpdateBlueprintResponses[keyof BlueprintsUpdateBlueprintResponses];
 
 export type SuperplaneListCanvasesData = {
     body?: never;
@@ -2506,6 +2757,58 @@ export type OrganizationsRemoveUserResponses = {
 
 export type OrganizationsRemoveUserResponse = OrganizationsRemoveUserResponses[keyof OrganizationsRemoveUserResponses];
 
+export type PrimitivesListPrimitivesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/primitives';
+};
+
+export type PrimitivesListPrimitivesErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type PrimitivesListPrimitivesError = PrimitivesListPrimitivesErrors[keyof PrimitivesListPrimitivesErrors];
+
+export type PrimitivesListPrimitivesResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListPrimitivesResponse;
+};
+
+export type PrimitivesListPrimitivesResponse = PrimitivesListPrimitivesResponses[keyof PrimitivesListPrimitivesResponses];
+
+export type PrimitivesDescribePrimitiveData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/primitives/{name}';
+};
+
+export type PrimitivesDescribePrimitiveErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type PrimitivesDescribePrimitiveError = PrimitivesDescribePrimitiveErrors[keyof PrimitivesDescribePrimitiveErrors];
+
+export type PrimitivesDescribePrimitiveResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDescribePrimitiveResponse;
+};
+
+export type PrimitivesDescribePrimitiveResponse = PrimitivesDescribePrimitiveResponses[keyof PrimitivesDescribePrimitiveResponses];
+
 export type RolesListRolesData = {
     body?: never;
     path?: never;
@@ -2900,6 +3203,137 @@ export type UsersListUserRolesResponses = {
 };
 
 export type UsersListUserRolesResponse2 = UsersListUserRolesResponses[keyof UsersListUserRolesResponses];
+
+export type WorkflowsListWorkflowsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/workflows';
+};
+
+export type WorkflowsListWorkflowsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsListWorkflowsError = WorkflowsListWorkflowsErrors[keyof WorkflowsListWorkflowsErrors];
+
+export type WorkflowsListWorkflowsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListWorkflowsResponse;
+};
+
+export type WorkflowsListWorkflowsResponse = WorkflowsListWorkflowsResponses[keyof WorkflowsListWorkflowsResponses];
+
+export type WorkflowsCreateWorkflowData = {
+    body: SuperplaneCreateWorkflowRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/workflows';
+};
+
+export type WorkflowsCreateWorkflowErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsCreateWorkflowError = WorkflowsCreateWorkflowErrors[keyof WorkflowsCreateWorkflowErrors];
+
+export type WorkflowsCreateWorkflowResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneCreateWorkflowResponse;
+};
+
+export type WorkflowsCreateWorkflowResponse = WorkflowsCreateWorkflowResponses[keyof WorkflowsCreateWorkflowResponses];
+
+export type WorkflowsDeleteWorkflowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/workflows/{id}';
+};
+
+export type WorkflowsDeleteWorkflowErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsDeleteWorkflowError = WorkflowsDeleteWorkflowErrors[keyof WorkflowsDeleteWorkflowErrors];
+
+export type WorkflowsDeleteWorkflowResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDeleteWorkflowResponse;
+};
+
+export type WorkflowsDeleteWorkflowResponse = WorkflowsDeleteWorkflowResponses[keyof WorkflowsDeleteWorkflowResponses];
+
+export type WorkflowsDescribeWorkflowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/workflows/{id}';
+};
+
+export type WorkflowsDescribeWorkflowErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsDescribeWorkflowError = WorkflowsDescribeWorkflowErrors[keyof WorkflowsDescribeWorkflowErrors];
+
+export type WorkflowsDescribeWorkflowResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDescribeWorkflowResponse;
+};
+
+export type WorkflowsDescribeWorkflowResponse = WorkflowsDescribeWorkflowResponses[keyof WorkflowsDescribeWorkflowResponses];
+
+export type WorkflowsUpdateWorkflowData = {
+    body: WorkflowsUpdateWorkflowBody;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/workflows/{id}';
+};
+
+export type WorkflowsUpdateWorkflowErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsUpdateWorkflowError = WorkflowsUpdateWorkflowErrors[keyof WorkflowsUpdateWorkflowErrors];
+
+export type WorkflowsUpdateWorkflowResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneUpdateWorkflowResponse;
+};
+
+export type WorkflowsUpdateWorkflowResponse = WorkflowsUpdateWorkflowResponses[keyof WorkflowsUpdateWorkflowResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

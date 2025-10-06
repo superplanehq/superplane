@@ -5,6 +5,8 @@ p,role:org_viewer,org:{ORG_ID},org,read
 p,role:org_viewer,org:{ORG_ID},role,read
 p,role:org_viewer,org:{ORG_ID},group,read
 p,role:org_viewer,org:{ORG_ID},member,read
+p,role:org_viewer,org:{ORG_ID},workflow,read
+p,role:org_viewer,org:{ORG_ID},blueprint,read
 p,role:org_admin,org:{ORG_ID},canvas,create
 p,role:org_admin,org:{ORG_ID},canvas,update
 p,role:org_admin,org:{ORG_ID},canvas,delete
@@ -24,5 +26,11 @@ p,role:org_admin,org:{ORG_ID},secret,delete
 p,role:org_admin,org:{ORG_ID},role,create
 p,role:org_admin,org:{ORG_ID},role,update
 p,role:org_admin,org:{ORG_ID},role,delete
+p,role:org_admin,org:{ORG_ID},workflow,create
+p,role:org_admin,org:{ORG_ID},workflow,update
+p,role:org_admin,org:{ORG_ID},workflow,delete
+p,role:org_admin,org:{ORG_ID},blueprint,create
+p,role:org_admin,org:{ORG_ID},blueprint,update
+p,role:org_admin,org:{ORG_ID},blueprint,delete
 p,role:org_owner,org:{ORG_ID},org,update
 p,role:org_owner,org:{ORG_ID},org,delete

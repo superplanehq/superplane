@@ -1,0 +1,138 @@
+syntax = "proto3";
+
+package Superplane;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/blueprints";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Blueprints API";
+    version: "1.0";
+    description: "API for Superplane blueprints";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Blueprints {
+  rpc ListBlueprints(ListBlueprintsRequest) returns (ListBlueprintsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/blueprints"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List blueprints";
+      description: "Returns a list of all blueprints";
+      tags: "Blueprint";
+    };
+  }
+
+  rpc DescribeBlueprint(DescribeBlueprintRequest) returns (DescribeBlueprintResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/blueprints/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe blueprint";
+      description: "Returns a blueprint";
+      tags: "Blueprint";
+    };
+  }
+
+  rpc CreateBlueprint(CreateBlueprintRequest) returns (CreateBlueprintResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/blueprints"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create blueprint";
+      description: "Creates a new blueprint";
+      tags: "Blueprint";
+    };
+  }
+
+  rpc UpdateBlueprint(UpdateBlueprintRequest) returns (UpdateBlueprintResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/blueprints/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update blueprint";
+      description: "Updates an existing blueprint";
+      tags: "Blueprint";
+    };
+  }
+}
+
+message ListBlueprintsRequest {}
+
+message ListBlueprintsResponse {
+  repeated Blueprint blueprints = 1;
+}
+
+message DescribeBlueprintRequest {
+  string id = 1;
+}
+
+message DescribeBlueprintResponse {
+  Blueprint blueprint = 1;
+}
+
+message CreateBlueprintRequest {
+  Blueprint blueprint = 1;
+}
+
+message CreateBlueprintResponse {
+  Blueprint blueprint = 1;
+}
+
+message UpdateBlueprintRequest {
+  string id = 1;
+  Blueprint blueprint = 2;
+}
+
+message UpdateBlueprintResponse {
+  Blueprint blueprint = 1;
+}
+
+message Blueprint {
+  string id = 1;
+  string organization_id = 2;
+  string name = 3;
+  string description = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  repeated BlueprintNode nodes = 7;
+  repeated BlueprintEdge edges = 8;
+}
+
+message BlueprintNode {
+  enum RefType {
+    REF_TYPE_PRIMITIVE = 0;
+  }
+
+  message PrimitiveRef {
+    string name = 1;
+  }
+
+  string id = 1;
+  string name = 2;
+  RefType ref_type = 3;
+  PrimitiveRef primitive = 4;
+  google.protobuf.Struct configuration = 5;
+}
+
+message BlueprintEdge {
+  string source_id = 1;
+  string target_id = 2;
+  string branch = 3;
+}

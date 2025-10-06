@@ -1,0 +1,51 @@
+package grpc
+
+import (
+	"context"
+
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
+	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+type WorkflowService struct {
+	registry *registry.Registry
+}
+
+func NewWorkflowService(registry *registry.Registry) *WorkflowService {
+	return &WorkflowService{registry: registry}
+}
+
+func (s *WorkflowService) ListWorkflows(ctx context.Context, req *pb.ListWorkflowsRequest) (*pb.ListWorkflowsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return workflows.ListWorkflows(ctx, s.registry, organizationID)
+}
+
+func (s *WorkflowService) DescribeWorkflow(ctx context.Context, req *pb.DescribeWorkflowRequest) (*pb.DescribeWorkflowResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return workflows.DescribeWorkflow(ctx, s.registry, organizationID, req.Id)
+}
+
+func (s *WorkflowService) CreateWorkflow(ctx context.Context, req *pb.CreateWorkflowRequest) (*pb.CreateWorkflowResponse, error) {
+	if req.Workflow == nil {
+		return nil, status.Error(codes.InvalidArgument, "workflow is required")
+	}
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return workflows.CreateWorkflow(ctx, s.registry, organizationID, req.Workflow)
+}
+
+func (s *WorkflowService) UpdateWorkflow(ctx context.Context, req *pb.UpdateWorkflowRequest) (*pb.UpdateWorkflowResponse, error) {
+	if req.Workflow == nil {
+		return nil, status.Error(codes.InvalidArgument, "workflow is required")
+	}
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return workflows.UpdateWorkflow(ctx, s.registry, organizationID, req.Id, req.Workflow)
+}
+
+func (s *WorkflowService) DeleteWorkflow(ctx context.Context, req *pb.DeleteWorkflowRequest) (*pb.DeleteWorkflowResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return workflows.DeleteWorkflow(ctx, s.registry, organizationID, req.Id)
+}
