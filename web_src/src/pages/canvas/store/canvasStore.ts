@@ -198,6 +198,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
   },
 
+  setSidebarTab: (tab: string) => {
+    set({
+      sidebarTab: tab
+    })
+  },
+
   cleanSelectedStageId: () => {
     set({ selectedStageId: null, sidebarTab: null, sidebarEventFilter: null });
   },
