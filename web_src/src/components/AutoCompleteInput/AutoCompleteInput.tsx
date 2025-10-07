@@ -11,16 +11,20 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   disabled?: boolean;
 }
 
+let blurTimeout: NodeJS.Timeout;
+
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, ...props }, ref) => {
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, ...props }) => {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [isOpen, setIsOpen] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [flattenedData, setFlattenedData] = useState<Record<string, string[]>>({});
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Flatten the example object when it changes
     useEffect(() => {
@@ -43,19 +47,20 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         const similarSuggestions = newSuggestions.filter((suggestion: string) => suggestion.startsWith(lastKey) && suggestion !== lastKey);
         const allSuggestions = [...new Set([...arraySuggestions, ...similarSuggestions])];
         setSuggestions(allSuggestions);
-        setIsOpen(allSuggestions.length > 0);
+        setIsOpen(isFocused && allSuggestions.length > 0);
         setHighlightedIndex(-1);
       } else {
         setSuggestions([]);
         setIsOpen(false);
       }
-    }, [inputValue, flattenedData]);
+    }, [inputValue, flattenedData, isFocused]);
 
     // Handle clicking outside to close suggestions
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
         if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
           setIsOpen(false);
+          setIsFocused(false);
           setHighlightedIndex(-1);
         }
       };
@@ -79,8 +84,19 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       newValue += (nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions) ? '.' : '';
       setInputValue(newValue);
       onChange?.(newValue);
-      setIsOpen(false);
       setHighlightedIndex(-1);
+
+      if (nextSuggestions.length === 0) {
+        setIsOpen(false);
+        return;
+      }
+
+      clearTimeout(blurTimeout);
+      setTimeout(() => {
+        setIsFocused(true);
+        setIsOpen(true);
+        setHighlightedIndex(highlightedIndex);
+      }, 100);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -140,15 +156,23 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           ])}
         >
           <input
-            ref={ref}
+            ref={inputRef}
             type="text"
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onFocus={() => {
+              setIsFocused(true);
               if (suggestions.length > 0) {
                 setIsOpen(true);
               }
+            }}
+            onBlur={() => {
+              // Small delay to allow click on suggestions
+              blurTimeout = setTimeout(() => {
+                setIsFocused(false);
+                setIsOpen(false);
+              }, 150);
             }}
             placeholder={placeholder}
             disabled={disabled}

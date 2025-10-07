@@ -38,6 +38,9 @@ import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-e
 import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
 import { Switch } from '@/components/Switch/switch';
+import { AutoCompleteInput } from '@/components/AutoCompleteInput/AutoCompleteInput';
+import { EVENT_TEMPLATES } from '@/constants/eventTemplates';
+import { useStageEvents } from '@/hooks/useCanvasData';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -98,6 +101,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const [semaphoreExecutionType, setSemaphoreExecutionType] = useState<'workflow' | 'task'>(
     (executor.spec?.task as string) ? 'task' : 'workflow'
   );
+
+  const { data: lastReceivedEvents } = useStageEvents(canvasId, currentStageId || '', []);
 
   const [semaphoreParameters, setSemaphoreParameters] = useState<ParameterWithId[]>(() => {
     const params = executor.spec?.parameters as Record<string, string>;
@@ -224,6 +229,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     if (!resourceName || !resourceType) return '';
     return `Run: ${resourceName}`;
   };
+
+  const getEventTemplate = useCallback(() => {
+    const lastReceivedEvent = lastReceivedEvents?.pages[0]?.events[0];
+    if (lastReceivedEvent?.triggerEvent?.raw) {
+      return { $: lastReceivedEvent.triggerEvent.raw };
+    }
+
+    const customTemplate = EVENT_TEMPLATES.find(template => template.eventType === 'execution_finished');
+    return customTemplate ? { $: customTemplate.getEventData() } : {};
+  }, [lastReceivedEvents]);
 
   // Debounced auto-generation to prevent input interference
   const debouncedAutoGeneration = useCallback(
@@ -1225,7 +1240,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 checked={dryRun}
                 onChange={checked => {
                   setDryRun(checked);
-                  setFieldErrors(() => { return {}});
+                  setFieldErrors(() => { return {} });
                 }}
                 color="indigo"
                 aria-label="Toggle dry run mode"
@@ -1521,11 +1536,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                 /* Event Data Mode */
                                                 <div>
                                                   <label className="block text-xs font-medium mb-1">Expression</label>
-                                                  <input
+                                                  <AutoCompleteInput
                                                     value={inputValue.valueFrom.eventData.expression || ''}
-                                                    onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
-                                                    placeholder="eg. $.commit[0].message"
-                                                    className="w-full px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
+                                                    onChange={(value) => inputMappingHandlers.handleEventDataExpressionChange(value, actualMappingIndex, input.name)}
+                                                    placeholder="eg. $.commits[0].message"
+                                                    className="text-xs"
+                                                    exampleObj={getEventTemplate()}
                                                   />
                                                 </div>
                                               ) : inputValue?.valueFrom?.lastExecution ? (
