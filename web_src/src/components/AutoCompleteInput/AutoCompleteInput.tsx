@@ -39,9 +39,9 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       if (flattenedData) {
         const parsedInput = inputValue.split('.').slice(0, -1).join('.');
         const newSuggestions = getAutocompleteSuggestions(flattenedData, parsedInput || 'root');
-        const arraySuggestions = getAutocompleteSuggestions(flattenedData, `${parsedInput}.${lastKey}`).filter((suggestion: string) => suggestion.match(/\[\d+\]$/));
+        const arraySuggestions = getAutocompleteSuggestions(flattenedData, parsedInput ? `${parsedInput}.${lastKey}` : lastKey).filter((suggestion: string) => suggestion.match(/\[\d+\]$/));
         const similarSuggestions = newSuggestions.filter((suggestion: string) => suggestion.startsWith(lastKey) && suggestion !== lastKey);
-        const allSuggestions = [...arraySuggestions, ...similarSuggestions];
+        const allSuggestions = [...new Set([...arraySuggestions, ...similarSuggestions])];
         setSuggestions(allSuggestions);
         setIsOpen(allSuggestions.length > 0);
         setHighlightedIndex(-1);
@@ -71,15 +71,12 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     };
 
     const handleSuggestionClick = (suggestion: string) => {
-
       const allPreviousKeys = inputValue.split('.');
       const withoutLastKey = allPreviousKeys.slice(0, -1).join('.');
       let newValue = suggestion.startsWith(withoutLastKey) ? suggestion : `${withoutLastKey}.${suggestion}`;
       const nextSuggestions = getAutocompleteSuggestions(flattenedData, newValue);
       const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) => suggestion.match(/\[\d+\]$/));
-      console.log(nextSuggestions, newValue)
       newValue += (nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions) ? '.' : '';
-
       setInputValue(newValue);
       onChange?.(newValue);
       setIsOpen(false);
