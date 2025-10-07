@@ -23,3 +23,7 @@ func (s *PrimitiveService) ListPrimitives(ctx context.Context, req *pb.ListPrimi
 func (s *PrimitiveService) DescribePrimitive(ctx context.Context, req *pb.DescribePrimitiveRequest) (*pb.DescribePrimitiveResponse, error) {
 	return primitives.DescribePrimitive(ctx, s.registry, req.Name)
 }
+
+func (s *PrimitiveService) ListPrimitiveActions(ctx context.Context, req *pb.ListPrimitiveActionsRequest) (*pb.ListPrimitiveActionsResponse, error) {
+	return primitives.ListPrimitiveActions(ctx, s.registry, req.Name)
+}

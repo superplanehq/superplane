@@ -54,21 +54,29 @@ func (e *HTTP) Configuration() []primitives.ConfigurationField {
 	}
 }
 
-func (e *HTTP) Execute(ctx primitives.ExecutionContext) (*primitives.Result, error) {
+func (e *HTTP) Actions() []primitives.Action {
+	return []primitives.Action{}
+}
+
+func (e *HTTP) HandleAction(ctx primitives.ActionContext) error {
+	return fmt.Errorf("http primitive does not support actions")
+}
+
+func (e *HTTP) Execute(ctx primitives.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	body, err := e.getBody(ctx, spec)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	req, err := http.NewRequest(spec.Method, spec.URL, body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -78,33 +86,38 @@ func (e *HTTP) Execute(ctx primitives.ExecutionContext) (*primitives.Result, err
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return fmt.Errorf("request failed: %w", err)
 	}
 
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var response map[string]any
+	var bodyData any
 	if len(respBody) > 0 {
-		err := json.Unmarshal(respBody, &response)
+		err := json.Unmarshal(respBody, &bodyData)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse response: %w", err)
+			return fmt.Errorf("failed to parse response: %w", err)
 		}
 	}
 
-	return &primitives.Result{
-		Branches: map[string][]any{
-			primitives.DefaultBranchName: {response},
-		},
-	}, nil
+	// Build response with status, headers, and body
+	response := map[string]any{
+		"status":  resp.StatusCode,
+		"headers": resp.Header,
+		"body":    bodyData,
+	}
+
+	return ctx.State.Finish(map[string][]any{
+		primitives.DefaultBranchName: {response},
+	})
 }
 
 func (e *HTTP) getBody(ctx primitives.ExecutionContext, spec Spec) (io.Reader, error) {

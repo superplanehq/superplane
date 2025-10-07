@@ -46,10 +46,6 @@ export type EventSourceWeeklySchedule = {
     time?: string;
 };
 
-export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
-
-export type ExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR' | 'RESULT_REASON_MISSING_OUTPUTS' | 'RESULT_REASON_TIMEOUT' | 'RESULT_REASON_USER';
-
 export type GroupByField = {
     name?: string;
     expression?: string;
@@ -758,8 +754,8 @@ export type SuperplaneEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_
 export type SuperplaneExecution = {
     id?: string;
     state?: SuperplaneExecutionState;
-    result?: ExecutionResult;
-    resultReason?: ExecutionResultReason;
+    result?: SuperplaneExecutionResult;
+    resultReason?: SuperplaneExecutionResultReason;
     resultMessage?: string;
     createdAt?: string;
     startedAt?: string;
@@ -776,6 +772,10 @@ export type SuperplaneExecutionResource = {
     state?: string;
     result?: string;
 };
+
+export type SuperplaneExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
+
+export type SuperplaneExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR' | 'RESULT_REASON_MISSING_OUTPUTS' | 'RESULT_REASON_TIMEOUT' | 'RESULT_REASON_USER';
 
 export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
 
@@ -823,6 +823,10 @@ export type SuperplaneIntegrationsValueFromSecret = {
     key?: string;
 };
 
+export type SuperplaneInvokeNodeExecutionActionResponse = {
+    [key: string]: unknown;
+};
+
 export type SuperplaneKeyValuePair = {
     name?: string;
     value?: string;
@@ -864,6 +868,24 @@ export type SuperplaneListEventsResponse = {
     totalCount?: number;
     hasNextPage?: boolean;
     lastTimestamp?: string;
+};
+
+export type SuperplaneListNodeExecutionsResponse = {
+    executions?: Array<SuperplaneWorkflowNodeExecution>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
+};
+
+export type SuperplaneListNodeQueueItemsResponse = {
+    queueItems?: Array<SuperplaneWorkflowQueueItem>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
+};
+
+export type SuperplaneListPrimitiveActionsResponse = {
+    actions?: Array<SuperplanePrimitiveAction>;
 };
 
 export type SuperplaneListPrimitivesResponse = {
@@ -924,6 +946,12 @@ export type SuperplanePrimitive = {
     description?: string;
     configuration?: Array<SuperplaneConfigurationField>;
     branches?: Array<SuperplaneOutputBranch>;
+};
+
+export type SuperplanePrimitiveAction = {
+    name?: string;
+    description?: string;
+    parameters?: Array<SuperplaneConfigurationField>;
 };
 
 export type SuperplaneRemoveUserResponse = {
@@ -1048,7 +1076,7 @@ export type SuperplaneValueFromEventData = {
 };
 
 export type SuperplaneValueFromLastExecution = {
-    results?: Array<ExecutionResult>;
+    results?: Array<SuperplaneExecutionResult>;
 };
 
 export type SuperplaneValueFromSecret = {
@@ -1074,6 +1102,19 @@ export type SuperplaneWorkflowEdge = {
     branch?: string;
 };
 
+export type SuperplaneWorkflowEvent = {
+    id?: string;
+    workflowId?: string;
+    parentEventId?: string;
+    blueprintName?: string;
+    data?: {
+        [key: string]: unknown;
+    };
+    state?: string;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
 export type SuperplaneWorkflowNode = {
     id?: string;
     name?: string;
@@ -1085,11 +1126,46 @@ export type SuperplaneWorkflowNode = {
     };
 };
 
+export type SuperplaneWorkflowNodeExecution = {
+    id?: string;
+    eventId?: string;
+    workflowId?: string;
+    nodeId?: string;
+    state?: SuperplaneWorkflowNodeExecutionState;
+    result?: SuperplaneWorkflowNodeExecutionResult;
+    resultReason?: SuperplaneWorkflowNodeExecutionResultReason;
+    resultMessage?: string;
+    inputs?: {
+        [key: string]: unknown;
+    };
+    outputs?: {
+        [key: string]: unknown;
+    };
+    createdAt?: string;
+    updatedAt?: string;
+    event?: SuperplaneWorkflowEvent;
+    metadata?: {
+        [key: string]: unknown;
+    };
+};
+
+export type SuperplaneWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
+
+export type SuperplaneWorkflowNodeExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR';
+
+export type SuperplaneWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_FINISHED';
+
 export type SuperplaneWorkflowNodePrimitiveRef = {
     name?: string;
 };
 
 export type SuperplaneWorkflowNodeRefType = 'REF_TYPE_PRIMITIVE' | 'REF_TYPE_BLUEPRINT';
+
+export type SuperplaneWorkflowQueueItem = {
+    eventId?: string;
+    createdAt?: string;
+    event?: SuperplaneWorkflowEvent;
+};
 
 export type UsersAccountProvider = {
     providerType?: string;
@@ -1146,6 +1222,12 @@ export type UsersUserStatus = {
 
 export type WorkflowNodeBlueprintRef = {
     name?: string;
+};
+
+export type WorkflowsInvokeNodeExecutionActionBody = {
+    parameters?: {
+        [key: string]: unknown;
+    };
 };
 
 export type WorkflowsUpdateWorkflowBody = {
@@ -2811,6 +2893,33 @@ export type PrimitivesDescribePrimitiveResponses = {
 
 export type PrimitivesDescribePrimitiveResponse = PrimitivesDescribePrimitiveResponses[keyof PrimitivesDescribePrimitiveResponses];
 
+export type PrimitivesListPrimitiveActionsData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/primitives/{name}/actions';
+};
+
+export type PrimitivesListPrimitiveActionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type PrimitivesListPrimitiveActionsError = PrimitivesListPrimitiveActionsErrors[keyof PrimitivesListPrimitiveActionsErrors];
+
+export type PrimitivesListPrimitiveActionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListPrimitiveActionsResponse;
+};
+
+export type PrimitivesListPrimitiveActionsResponse = PrimitivesListPrimitiveActionsResponses[keyof PrimitivesListPrimitiveActionsResponses];
+
 export type RolesListRolesData = {
     body?: never;
     path?: never;
@@ -3256,6 +3365,34 @@ export type WorkflowsCreateWorkflowResponses = {
 
 export type WorkflowsCreateWorkflowResponse = WorkflowsCreateWorkflowResponses[keyof WorkflowsCreateWorkflowResponses];
 
+export type WorkflowsInvokeNodeExecutionActionData = {
+    body: WorkflowsInvokeNodeExecutionActionBody;
+    path: {
+        executionId: string;
+        actionName: string;
+    };
+    query?: never;
+    url: '/api/v1/workflows/executions/{executionId}/actions/{actionName}';
+};
+
+export type WorkflowsInvokeNodeExecutionActionErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsInvokeNodeExecutionActionError = WorkflowsInvokeNodeExecutionActionErrors[keyof WorkflowsInvokeNodeExecutionActionErrors];
+
+export type WorkflowsInvokeNodeExecutionActionResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneInvokeNodeExecutionActionResponse;
+};
+
+export type WorkflowsInvokeNodeExecutionActionResponse = WorkflowsInvokeNodeExecutionActionResponses[keyof WorkflowsInvokeNodeExecutionActionResponses];
+
 export type WorkflowsDeleteWorkflowData = {
     body?: never;
     path: {
@@ -3336,6 +3473,70 @@ export type WorkflowsUpdateWorkflowResponses = {
 };
 
 export type WorkflowsUpdateWorkflowResponse = WorkflowsUpdateWorkflowResponses[keyof WorkflowsUpdateWorkflowResponses];
+
+export type WorkflowsListNodeExecutionsData = {
+    body?: never;
+    path: {
+        workflowId: string;
+        nodeId: string;
+    };
+    query?: {
+        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_FINISHED'>;
+        results?: Array<'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED'>;
+        limit?: number;
+        before?: string;
+    };
+    url: '/api/v1/workflows/{workflowId}/nodes/{nodeId}/executions';
+};
+
+export type WorkflowsListNodeExecutionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsListNodeExecutionsError = WorkflowsListNodeExecutionsErrors[keyof WorkflowsListNodeExecutionsErrors];
+
+export type WorkflowsListNodeExecutionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListNodeExecutionsResponse;
+};
+
+export type WorkflowsListNodeExecutionsResponse = WorkflowsListNodeExecutionsResponses[keyof WorkflowsListNodeExecutionsResponses];
+
+export type WorkflowsListNodeQueueItemsData = {
+    body?: never;
+    path: {
+        workflowId: string;
+        nodeId: string;
+    };
+    query?: {
+        limit?: number;
+        before?: string;
+    };
+    url: '/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue';
+};
+
+export type WorkflowsListNodeQueueItemsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsListNodeQueueItemsError = WorkflowsListNodeQueueItemsErrors[keyof WorkflowsListNodeQueueItemsErrors];
+
+export type WorkflowsListNodeQueueItemsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListNodeQueueItemsResponse;
+};
+
+export type WorkflowsListNodeQueueItemsResponse = WorkflowsListNodeQueueItemsResponses[keyof WorkflowsListNodeQueueItemsResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

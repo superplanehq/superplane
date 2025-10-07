@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Primitives_ListPrimitives_FullMethodName    = "/Superplane.Primitives/ListPrimitives"
-	Primitives_DescribePrimitive_FullMethodName = "/Superplane.Primitives/DescribePrimitive"
+	Primitives_ListPrimitives_FullMethodName       = "/Superplane.Primitives/ListPrimitives"
+	Primitives_DescribePrimitive_FullMethodName    = "/Superplane.Primitives/DescribePrimitive"
+	Primitives_ListPrimitiveActions_FullMethodName = "/Superplane.Primitives/ListPrimitiveActions"
 )
 
 // PrimitivesClient is the client API for Primitives service.
@@ -29,6 +30,7 @@ const (
 type PrimitivesClient interface {
 	ListPrimitives(ctx context.Context, in *ListPrimitivesRequest, opts ...grpc.CallOption) (*ListPrimitivesResponse, error)
 	DescribePrimitive(ctx context.Context, in *DescribePrimitiveRequest, opts ...grpc.CallOption) (*DescribePrimitiveResponse, error)
+	ListPrimitiveActions(ctx context.Context, in *ListPrimitiveActionsRequest, opts ...grpc.CallOption) (*ListPrimitiveActionsResponse, error)
 }
 
 type primitivesClient struct {
@@ -59,12 +61,23 @@ func (c *primitivesClient) DescribePrimitive(ctx context.Context, in *DescribePr
 	return out, nil
 }
 
+func (c *primitivesClient) ListPrimitiveActions(ctx context.Context, in *ListPrimitiveActionsRequest, opts ...grpc.CallOption) (*ListPrimitiveActionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPrimitiveActionsResponse)
+	err := c.cc.Invoke(ctx, Primitives_ListPrimitiveActions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PrimitivesServer is the server API for Primitives service.
 // All implementations should embed UnimplementedPrimitivesServer
 // for forward compatibility.
 type PrimitivesServer interface {
 	ListPrimitives(context.Context, *ListPrimitivesRequest) (*ListPrimitivesResponse, error)
 	DescribePrimitive(context.Context, *DescribePrimitiveRequest) (*DescribePrimitiveResponse, error)
+	ListPrimitiveActions(context.Context, *ListPrimitiveActionsRequest) (*ListPrimitiveActionsResponse, error)
 }
 
 // UnimplementedPrimitivesServer should be embedded to have
@@ -79,6 +92,9 @@ func (UnimplementedPrimitivesServer) ListPrimitives(context.Context, *ListPrimit
 }
 func (UnimplementedPrimitivesServer) DescribePrimitive(context.Context, *DescribePrimitiveRequest) (*DescribePrimitiveResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribePrimitive not implemented")
+}
+func (UnimplementedPrimitivesServer) ListPrimitiveActions(context.Context, *ListPrimitiveActionsRequest) (*ListPrimitiveActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListPrimitiveActions not implemented")
 }
 func (UnimplementedPrimitivesServer) testEmbeddedByValue() {}
 
@@ -136,6 +152,24 @@ func _Primitives_DescribePrimitive_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Primitives_ListPrimitiveActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPrimitiveActionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PrimitivesServer).ListPrimitiveActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Primitives_ListPrimitiveActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PrimitivesServer).ListPrimitiveActions(ctx, req.(*ListPrimitiveActionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Primitives_ServiceDesc is the grpc.ServiceDesc for Primitives service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -150,6 +184,10 @@ var Primitives_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DescribePrimitive",
 			Handler:    _Primitives_DescribePrimitive_Handler,
+		},
+		{
+			MethodName: "ListPrimitiveActions",
+			Handler:    _Primitives_ListPrimitiveActions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

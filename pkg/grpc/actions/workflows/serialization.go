@@ -280,3 +280,29 @@ func validateAcyclic(nodes []*pb.WorkflowNode, edges []*pb.WorkflowEdge) error {
 
 	return nil
 }
+
+func SerializeWorkflowEvent(event *models.WorkflowEvent) *pb.WorkflowEvent {
+	data, err := structpb.NewStruct(event.Data.Data())
+	if err != nil {
+		data = &structpb.Struct{}
+	}
+
+	result := &pb.WorkflowEvent{
+		Id:         event.ID.String(),
+		WorkflowId: event.WorkflowID.String(),
+		Data:       data,
+		State:      event.State,
+		CreatedAt:  timestamppb.New(*event.CreatedAt),
+		UpdatedAt:  timestamppb.New(*event.UpdatedAt),
+	}
+
+	if event.ParentEventID != nil {
+		result.ParentEventId = event.ParentEventID.String()
+	}
+
+	if event.BlueprintName != nil {
+		result.BlueprintName = *event.BlueprintName
+	}
+
+	return result
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/primitives"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type PendingNodeExecutionWorker struct {
@@ -158,9 +159,6 @@ func (w *PendingNodeExecutionWorker) executePrimitiveNode(execution *models.Work
 		return fmt.Errorf("primitive %s not found: %w", node.Ref.Primitive.Name, err)
 	}
 
-	//
-	// Build execution context
-	//
 	event, err := models.FindWorkflowEvent(execution.EventID.String())
 	if err != nil {
 		return err
@@ -178,23 +176,18 @@ func (w *PendingNodeExecutionWorker) executePrimitiveNode(execution *models.Work
 	ctx := primitives.ExecutionContext{
 		Configuration: node.Configuration,
 		Data:          inputs,
+		Metadata:      contexts.NewMetadataContext(execution),
+		State:         contexts.NewExecutionStateContext(execution, event),
 	}
 
 	//
-	// Execute primitive and finish execution according to its result.
+	// Execute primitive - it handles its own lifecycle
 	//
-	result, err := primitive.Execute(ctx)
+	err = primitive.Execute(ctx)
 	if err != nil {
 		return execution.Fail(err.Error())
 	}
 
-	err = execution.Pass(result.Branches)
-	if err != nil {
-		return fmt.Errorf("failed to pass execution: %w", err)
-	}
-
-	//
-	// Move workflow event back to 'route' state.
-	//
-	return event.Route()
+	// Save any metadata changes
+	return database.Conn().Save(execution).Error
 }

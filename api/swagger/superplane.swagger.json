@@ -2447,6 +2447,38 @@
         ]
       }
     },
+    "/api/v1/primitives/{name}/actions": {
+      "get": {
+        "summary": "List primitive actions",
+        "description": "Returns available actions for a primitive",
+        "operationId": "Primitives_ListPrimitiveActions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListPrimitiveActionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Primitive"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "summary": "List roles",
@@ -3111,6 +3143,52 @@
         ]
       }
     },
+    "/api/v1/workflows/executions/{executionId}/actions/{actionName}": {
+      "post": {
+        "summary": "Invoke execution action",
+        "description": "Invokes a custom action on a workflow node execution",
+        "operationId": "Workflows_InvokeNodeExecutionAction",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneInvokeNodeExecutionActionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "actionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNodeExecution"
+        ]
+      }
+    },
     "/api/v1/workflows/{id}": {
       "get": {
         "summary": "Describe workflow",
@@ -3208,6 +3286,143 @@
         ],
         "tags": [
           "Workflow"
+        ]
+      }
+    },
+    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/executions": {
+      "get": {
+        "summary": "List node executions",
+        "description": "Returns a list of executions for a specific workflow node",
+        "operationId": "Workflows_ListNodeExecutions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListNodeExecutionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "states",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STATE_UNKNOWN",
+                "STATE_PENDING",
+                "STATE_WAITING",
+                "STATE_STARTED",
+                "STATE_FINISHED"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "results",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "RESULT_UNKNOWN",
+                "RESULT_PASSED",
+                "RESULT_FAILED",
+                "RESULT_CANCELLED"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      }
+    },
+    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue": {
+      "get": {
+        "summary": "List node queue items",
+        "description": "Returns a list of queued events for a specific workflow node",
+        "operationId": "Workflows_ListNodeQueueItems",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListNodeQueueItemsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
         ]
       }
     }
@@ -3344,27 +3559,6 @@
           "title": "Format: \"HH:MM\" in UTC (24-hour format)"
         }
       }
-    },
-    "ExecutionResult": {
-      "type": "string",
-      "enum": [
-        "RESULT_UNKNOWN",
-        "RESULT_PASSED",
-        "RESULT_FAILED",
-        "RESULT_CANCELLED"
-      ],
-      "default": "RESULT_UNKNOWN"
-    },
-    "ExecutionResultReason": {
-      "type": "string",
-      "enum": [
-        "RESULT_REASON_OK",
-        "RESULT_REASON_ERROR",
-        "RESULT_REASON_MISSING_OUTPUTS",
-        "RESULT_REASON_TIMEOUT",
-        "RESULT_REASON_USER"
-      ],
-      "default": "RESULT_REASON_OK"
     },
     "GroupByField": {
       "type": "object",
@@ -5005,10 +5199,10 @@
           "$ref": "#/definitions/SuperplaneExecutionState"
         },
         "result": {
-          "$ref": "#/definitions/ExecutionResult"
+          "$ref": "#/definitions/SuperplaneExecutionResult"
         },
         "resultReason": {
-          "$ref": "#/definitions/ExecutionResultReason"
+          "$ref": "#/definitions/SuperplaneExecutionResultReason"
         },
         "resultMessage": {
           "type": "string"
@@ -5064,6 +5258,27 @@
           "type": "string"
         }
       }
+    },
+    "SuperplaneExecutionResult": {
+      "type": "string",
+      "enum": [
+        "RESULT_UNKNOWN",
+        "RESULT_PASSED",
+        "RESULT_FAILED",
+        "RESULT_CANCELLED"
+      ],
+      "default": "RESULT_UNKNOWN"
+    },
+    "SuperplaneExecutionResultReason": {
+      "type": "string",
+      "enum": [
+        "RESULT_REASON_OK",
+        "RESULT_REASON_ERROR",
+        "RESULT_REASON_MISSING_OUTPUTS",
+        "RESULT_REASON_TIMEOUT",
+        "RESULT_REASON_USER"
+      ],
+      "default": "RESULT_REASON_OK"
     },
     "SuperplaneExecutionState": {
       "type": "string",
@@ -5182,6 +5397,9 @@
           "type": "string"
         }
       }
+    },
+    "SuperplaneInvokeNodeExecutionActionResponse": {
+      "type": "object"
     },
     "SuperplaneKeyValuePair": {
       "type": "object",
@@ -5309,6 +5527,64 @@
         "lastTimestamp": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneListNodeExecutionsResponse": {
+      "type": "object",
+      "properties": {
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneWorkflowNodeExecution"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneListNodeQueueItemsResponse": {
+      "type": "object",
+      "properties": {
+        "queueItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneWorkflowQueueItem"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneListPrimitiveActionsResponse": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplanePrimitiveAction"
+          }
         }
       }
     },
@@ -5472,6 +5748,24 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneOutputBranch"
+          }
+        }
+      }
+    },
+    "SuperplanePrimitiveAction": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConfigurationField"
           }
         }
       }
@@ -5795,7 +6089,7 @@
         "results": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ExecutionResult"
+            "$ref": "#/definitions/SuperplaneExecutionResult"
           }
         }
       }
@@ -5867,6 +6161,37 @@
         }
       }
     },
+    "SuperplaneWorkflowEvent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "workflowId": {
+          "type": "string"
+        },
+        "parentEventId": {
+          "type": "string"
+        },
+        "blueprintName": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        },
+        "state": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "SuperplaneWorkflowNode": {
       "type": "object",
       "properties": {
@@ -5890,6 +6215,84 @@
         }
       }
     },
+    "SuperplaneWorkflowNodeExecution": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "eventId": {
+          "type": "string"
+        },
+        "workflowId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/SuperplaneWorkflowNodeExecutionState"
+        },
+        "result": {
+          "$ref": "#/definitions/SuperplaneWorkflowNodeExecutionResult"
+        },
+        "resultReason": {
+          "$ref": "#/definitions/SuperplaneWorkflowNodeExecutionResultReason"
+        },
+        "resultMessage": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "object"
+        },
+        "outputs": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "event": {
+          "$ref": "#/definitions/SuperplaneWorkflowEvent"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      }
+    },
+    "SuperplaneWorkflowNodeExecutionResult": {
+      "type": "string",
+      "enum": [
+        "RESULT_UNKNOWN",
+        "RESULT_PASSED",
+        "RESULT_FAILED",
+        "RESULT_CANCELLED"
+      ],
+      "default": "RESULT_UNKNOWN"
+    },
+    "SuperplaneWorkflowNodeExecutionResultReason": {
+      "type": "string",
+      "enum": [
+        "RESULT_REASON_OK",
+        "RESULT_REASON_ERROR"
+      ],
+      "default": "RESULT_REASON_OK"
+    },
+    "SuperplaneWorkflowNodeExecutionState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_WAITING",
+        "STATE_STARTED",
+        "STATE_FINISHED"
+      ],
+      "default": "STATE_UNKNOWN"
+    },
     "SuperplaneWorkflowNodePrimitiveRef": {
       "type": "object",
       "properties": {
@@ -5905,6 +6308,21 @@
         "REF_TYPE_BLUEPRINT"
       ],
       "default": "REF_TYPE_PRIMITIVE"
+    },
+    "SuperplaneWorkflowQueueItem": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "event": {
+          "$ref": "#/definitions/SuperplaneWorkflowEvent"
+        }
+      }
     },
     "UsersAccountProvider": {
       "type": "object",
@@ -6063,6 +6481,14 @@
       "properties": {
         "name": {
           "type": "string"
+        }
+      }
+    },
+    "WorkflowsInvokeNodeExecutionActionBody": {
+      "type": "object",
+      "properties": {
+        "parameters": {
+          "type": "object"
         }
       }
     },

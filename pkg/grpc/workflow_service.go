@@ -49,3 +49,15 @@ func (s *WorkflowService) DeleteWorkflow(ctx context.Context, req *pb.DeleteWork
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return workflows.DeleteWorkflow(ctx, s.registry, organizationID, req.Id)
 }
+
+func (s *WorkflowService) ListNodeQueueItems(ctx context.Context, req *pb.ListNodeQueueItemsRequest) (*pb.ListNodeQueueItemsResponse, error) {
+	return workflows.ListNodeQueueItems(ctx, s.registry, req.WorkflowId, req.NodeId, req.Limit, req.Before)
+}
+
+func (s *WorkflowService) ListNodeExecutions(ctx context.Context, req *pb.ListNodeExecutionsRequest) (*pb.ListNodeExecutionsResponse, error) {
+	return workflows.ListNodeExecutions(ctx, s.registry, req.WorkflowId, req.NodeId, req.States, req.Results, req.Limit, req.Before)
+}
+
+func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionRequest) (*pb.InvokeNodeExecutionActionResponse, error) {
+	return workflows.InvokeNodeExecutionAction(ctx, s.registry, req.ExecutionId, req.ActionName, req.Parameters.AsMap())
+}

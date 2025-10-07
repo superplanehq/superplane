@@ -57,15 +57,15 @@ func (w *WorkflowQueueWorker) processQueueItem(entry *models.WorkflowQueueItem) 
 	_, err := models.FindLastNodeExecutionForNode(
 		entry.WorkflowID,
 		entry.NodeID,
-		[]string{models.WorkflowNodeExecutionStatePending, models.WorkflowNodeExecutionStateStarted},
+		[]string{models.WorkflowNodeExecutionStatePending, models.WorkflowNodeExecutionStateWaiting, models.WorkflowNodeExecutionStateStarted},
 	)
 
 	//
-	// A pending/started execution already exists for this node.
+	// A pending/waiting/started execution already exists for this node.
 	// Do not process this queue entry yet.
 	//
 	if err == nil {
-		log.Printf("[WorkflowQueueWorker] Execution pending/started already exists for workflow=%s, node=%s", entry.WorkflowID, entry.NodeID)
+		log.Printf("[WorkflowQueueWorker] Execution pending/waiting/started already exists for workflow=%s, node=%s", entry.WorkflowID, entry.NodeID)
 		return nil
 	}
 

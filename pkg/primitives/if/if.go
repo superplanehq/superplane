@@ -42,11 +42,11 @@ func (f *If) Configuration() []primitives.ConfigurationField {
 	}
 }
 
-func (f *If) Execute(ctx primitives.ExecutionContext) (*primitives.Result, error) {
+func (f *If) Execute(ctx primitives.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	env := map[string]any{
@@ -61,30 +61,37 @@ func (f *If) Execute(ctx primitives.ExecutionContext) (*primitives.Result, error
 	}...)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	output, err := expr.Run(vm, env)
 	if err != nil {
-		return nil, fmt.Errorf("expression evaluation failed: %w", err)
+		return fmt.Errorf("expression evaluation failed: %w", err)
 	}
 
 	matches, ok := output.(bool)
 	if !ok {
-		return nil, fmt.Errorf("expression must evaluate to boolean, got %T", output)
+		return fmt.Errorf("expression must evaluate to boolean, got %T", output)
 	}
 
+	var outputs map[string][]any
 	if matches {
-		return &primitives.Result{
-			Branches: map[string][]any{
-				BranchNameTrue: {ctx.Data},
-			},
-		}, nil
+		outputs = map[string][]any{
+			BranchNameTrue: {ctx.Data},
+		}
+	} else {
+		outputs = map[string][]any{
+			BranchNameFalse: {ctx.Data},
+		}
 	}
 
-	return &primitives.Result{
-		Branches: map[string][]any{
-			BranchNameFalse: {ctx.Data},
-		},
-	}, nil
+	return ctx.State.Finish(outputs)
+}
+
+func (f *If) Actions() []primitives.Action {
+	return []primitives.Action{}
+}
+
+func (f *If) HandleAction(ctx primitives.ActionContext) error {
+	return fmt.Errorf("if primitive does not support actions")
 }

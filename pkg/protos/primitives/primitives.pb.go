@@ -371,6 +371,154 @@ func (x *OutputBranch) GetName() string {
 	return ""
 }
 
+type ListPrimitiveActionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPrimitiveActionsRequest) Reset() {
+	*x = ListPrimitiveActionsRequest{}
+	mi := &file_primitives_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPrimitiveActionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPrimitiveActionsRequest) ProtoMessage() {}
+
+func (x *ListPrimitiveActionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_primitives_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPrimitiveActionsRequest.ProtoReflect.Descriptor instead.
+func (*ListPrimitiveActionsRequest) Descriptor() ([]byte, []int) {
+	return file_primitives_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListPrimitiveActionsRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type PrimitiveAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Parameters    []*ConfigurationField  `protobuf:"bytes,3,rep,name=parameters,proto3" json:"parameters,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PrimitiveAction) Reset() {
+	*x = PrimitiveAction{}
+	mi := &file_primitives_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrimitiveAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrimitiveAction) ProtoMessage() {}
+
+func (x *PrimitiveAction) ProtoReflect() protoreflect.Message {
+	mi := &file_primitives_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrimitiveAction.ProtoReflect.Descriptor instead.
+func (*PrimitiveAction) Descriptor() ([]byte, []int) {
+	return file_primitives_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *PrimitiveAction) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PrimitiveAction) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *PrimitiveAction) GetParameters() []*ConfigurationField {
+	if x != nil {
+		return x.Parameters
+	}
+	return nil
+}
+
+type ListPrimitiveActionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Actions       []*PrimitiveAction     `protobuf:"bytes,1,rep,name=actions,proto3" json:"actions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPrimitiveActionsResponse) Reset() {
+	*x = ListPrimitiveActionsResponse{}
+	mi := &file_primitives_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPrimitiveActionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPrimitiveActionsResponse) ProtoMessage() {}
+
+func (x *ListPrimitiveActionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_primitives_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPrimitiveActionsResponse.ProtoReflect.Descriptor instead.
+func (*ListPrimitiveActionsResponse) Descriptor() ([]byte, []int) {
+	return file_primitives_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListPrimitiveActionsResponse) GetActions() []*PrimitiveAction {
+	if x != nil {
+		return x.Actions
+	}
+	return nil
+}
+
 var File_primitives_proto protoreflect.FileDescriptor
 
 const file_primitives_proto_rawDesc = "" +
@@ -397,13 +545,25 @@ const file_primitives_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1a\n" +
 	"\brequired\x18\x04 \x01(\bR\brequired\"\"\n" +
 	"\fOutputBranch\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name2\x8c\x03\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"1\n" +
+	"\x1bListPrimitiveActionsRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x87\x01\n" +
+	"\x0fPrimitiveAction\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12>\n" +
+	"\n" +
+	"parameters\x18\x03 \x03(\v2\x1e.Superplane.ConfigurationFieldR\n" +
+	"parameters\"U\n" +
+	"\x1cListPrimitiveActionsResponse\x125\n" +
+	"\aactions\x18\x01 \x03(\v2\x1b.Superplane.PrimitiveActionR\aactions2\xf4\x04\n" +
 	"\n" +
 	"Primitives\x12\xb4\x01\n" +
 	"\x0eListPrimitives\x12!.Superplane.ListPrimitivesRequest\x1a\".Superplane.ListPrimitivesResponse\"[\x92A>\n" +
 	"\tPrimitive\x12\x0fList primitives\x1a Returns a list of all primitives\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/primitives\x12\xc6\x01\n" +
 	"\x11DescribePrimitive\x12$.Superplane.DescribePrimitiveRequest\x1a%.Superplane.DescribePrimitiveResponse\"d\x92A@\n" +
-	"\tPrimitive\x12\x12Describe primitive\x1a\x1fReturns a primitive by its name\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/primitives/{name}B\xce\x01\x92A\x90\x01\x12f\n" +
+	"\tPrimitive\x12\x12Describe primitive\x1a\x1fReturns a primitive by its name\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/primitives/{name}\x12\xe5\x01\n" +
+	"\x14ListPrimitiveActions\x12'.Superplane.ListPrimitiveActionsRequest\x1a(.Superplane.ListPrimitiveActionsResponse\"z\x92AN\n" +
+	"\tPrimitive\x12\x16List primitive actions\x1a)Returns available actions for a primitive\x82\xd3\xe4\x93\x02#\x12!/api/v1/primitives/{name}/actionsB\xce\x01\x92A\x90\x01\x12f\n" +
 	"\x19Superplane Primitives API\x12\x1dAPI for Superplane primitives\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/primitivesb\x06proto3"
 
@@ -419,30 +579,37 @@ func file_primitives_proto_rawDescGZIP() []byte {
 	return file_primitives_proto_rawDescData
 }
 
-var file_primitives_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_primitives_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_primitives_proto_goTypes = []any{
-	(*ListPrimitivesRequest)(nil),     // 0: Superplane.ListPrimitivesRequest
-	(*ListPrimitivesResponse)(nil),    // 1: Superplane.ListPrimitivesResponse
-	(*DescribePrimitiveRequest)(nil),  // 2: Superplane.DescribePrimitiveRequest
-	(*DescribePrimitiveResponse)(nil), // 3: Superplane.DescribePrimitiveResponse
-	(*Primitive)(nil),                 // 4: Superplane.Primitive
-	(*ConfigurationField)(nil),        // 5: Superplane.ConfigurationField
-	(*OutputBranch)(nil),              // 6: Superplane.OutputBranch
+	(*ListPrimitivesRequest)(nil),        // 0: Superplane.ListPrimitivesRequest
+	(*ListPrimitivesResponse)(nil),       // 1: Superplane.ListPrimitivesResponse
+	(*DescribePrimitiveRequest)(nil),     // 2: Superplane.DescribePrimitiveRequest
+	(*DescribePrimitiveResponse)(nil),    // 3: Superplane.DescribePrimitiveResponse
+	(*Primitive)(nil),                    // 4: Superplane.Primitive
+	(*ConfigurationField)(nil),           // 5: Superplane.ConfigurationField
+	(*OutputBranch)(nil),                 // 6: Superplane.OutputBranch
+	(*ListPrimitiveActionsRequest)(nil),  // 7: Superplane.ListPrimitiveActionsRequest
+	(*PrimitiveAction)(nil),              // 8: Superplane.PrimitiveAction
+	(*ListPrimitiveActionsResponse)(nil), // 9: Superplane.ListPrimitiveActionsResponse
 }
 var file_primitives_proto_depIdxs = []int32{
 	4, // 0: Superplane.ListPrimitivesResponse.primitives:type_name -> Superplane.Primitive
 	4, // 1: Superplane.DescribePrimitiveResponse.primitive:type_name -> Superplane.Primitive
 	5, // 2: Superplane.Primitive.configuration:type_name -> Superplane.ConfigurationField
 	6, // 3: Superplane.Primitive.branches:type_name -> Superplane.OutputBranch
-	0, // 4: Superplane.Primitives.ListPrimitives:input_type -> Superplane.ListPrimitivesRequest
-	2, // 5: Superplane.Primitives.DescribePrimitive:input_type -> Superplane.DescribePrimitiveRequest
-	1, // 6: Superplane.Primitives.ListPrimitives:output_type -> Superplane.ListPrimitivesResponse
-	3, // 7: Superplane.Primitives.DescribePrimitive:output_type -> Superplane.DescribePrimitiveResponse
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	5, // 4: Superplane.PrimitiveAction.parameters:type_name -> Superplane.ConfigurationField
+	8, // 5: Superplane.ListPrimitiveActionsResponse.actions:type_name -> Superplane.PrimitiveAction
+	0, // 6: Superplane.Primitives.ListPrimitives:input_type -> Superplane.ListPrimitivesRequest
+	2, // 7: Superplane.Primitives.DescribePrimitive:input_type -> Superplane.DescribePrimitiveRequest
+	7, // 8: Superplane.Primitives.ListPrimitiveActions:input_type -> Superplane.ListPrimitiveActionsRequest
+	1, // 9: Superplane.Primitives.ListPrimitives:output_type -> Superplane.ListPrimitivesResponse
+	3, // 10: Superplane.Primitives.DescribePrimitive:output_type -> Superplane.DescribePrimitiveResponse
+	9, // 11: Superplane.Primitives.ListPrimitiveActions:output_type -> Superplane.ListPrimitiveActionsResponse
+	9, // [9:12] is the sub-list for method output_type
+	6, // [6:9] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_primitives_proto_init() }
@@ -456,7 +623,7 @@ func file_primitives_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_primitives_proto_rawDesc), len(file_primitives_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

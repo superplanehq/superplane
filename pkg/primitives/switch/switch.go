@@ -52,41 +52,47 @@ func (s *Switch) Configuration() []primitives.ConfigurationField {
 	}
 }
 
-func (s *Switch) Execute(ctx primitives.ExecutionContext) (*primitives.Result, error) {
+func (s *Switch) Execute(ctx primitives.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	env := map[string]any{
 		"$": ctx.Data,
 	}
 
-	result := &primitives.Result{
-		Branches: make(map[string][]any),
-	}
+	outputs := make(map[string][]any)
 
 	for _, branch := range spec.Branches {
 		vm, err := expr.Compile(branch.Expression, expr.Env(env), expr.AsBool())
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		output, err := expr.Run(vm, env)
 		if err != nil {
-			return nil, fmt.Errorf("branch %s evaluation failed: %w", branch.Name, err)
+			return fmt.Errorf("branch %s evaluation failed: %w", branch.Name, err)
 		}
 
 		matches, ok := output.(bool)
 		if !ok {
-			return nil, fmt.Errorf("branch %s expression must evaluate to boolean, got %T", branch.Name, output)
+			return fmt.Errorf("branch %s expression must evaluate to boolean, got %T", branch.Name, output)
 		}
 
 		if matches {
-			result.Branches[branch.Name] = []any{ctx.Data}
+			outputs[branch.Name] = []any{ctx.Data}
 		}
 	}
 
-	return result, nil
+	return ctx.State.Finish(outputs)
+}
+
+func (s *Switch) Actions() []primitives.Action {
+	return []primitives.Action{}
+}
+
+func (s *Switch) HandleAction(ctx primitives.ActionContext) error {
+	return fmt.Errorf("switch primitive does not support actions")
 }

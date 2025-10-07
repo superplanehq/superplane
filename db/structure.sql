@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TF39F6eiABKITmDQwc8Ct8D4WQ1WkDKfXCZjtXnZhYmR0FEvGtiT077ImGntIBH
+\restrict qWE5cr0TbofHGXbJUKhKDD7McjAem2WF9PcuQcm0EwfKQzf99p72gs6bx78ZPIo
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -557,6 +557,7 @@ CREATE TABLE public.workflow_node_executions (
     result_message text,
     inputs jsonb,
     outputs jsonb,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
 );
@@ -962,7 +963,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_queue_items
-    ADD CONSTRAINT workflow_queue_items_pkey PRIMARY KEY (workflow_id, node_id);
+    ADD CONSTRAINT workflow_queue_items_pkey PRIMARY KEY (workflow_id, node_id, event_id);
 
 
 --
@@ -1467,13 +1468,13 @@ ALTER TABLE ONLY public.workflow_queue_items
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TF39F6eiABKITmDQwc8Ct8D4WQ1WkDKfXCZjtXnZhYmR0FEvGtiT077ImGntIBH
+\unrestrict qWE5cr0TbofHGXbJUKhKDD7McjAem2WF9PcuQcm0EwfKQzf99p72gs6bx78ZPIo
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 4vIgcGDuezQOvxvvNYosmZ9psB8SlB3gy2fb4bXgT5ol8ZxUlJe2kfCVzwR4QLP
+\restrict bfdZmoBTa3ODzR8ud9NsddSuY9HiF5X4bcG5rZylo7bgkajQwPrbk6kyHf6jcAn
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1503,5 +1504,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4vIgcGDuezQOvxvvNYosmZ9psB8SlB3gy2fb4bXgT5ol8ZxUlJe2kfCVzwR4QLP
+\unrestrict bfdZmoBTa3ODzR8ud9NsddSuY9HiF5X4bcG5rZylo7bgkajQwPrbk6kyHf6jcAn
 

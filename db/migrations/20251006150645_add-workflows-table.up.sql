@@ -53,7 +53,7 @@ CREATE TABLE workflow_queue_items (
   event_id    uuid NOT NULL,
   created_at  TIMESTAMP NOT NULL,
 
-  PRIMARY KEY (workflow_id, node_id),
+  PRIMARY KEY (workflow_id, node_id, event_id),
   FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
   FOREIGN KEY (event_id) REFERENCES workflow_events(id) ON DELETE CASCADE
 );
@@ -75,6 +75,7 @@ CREATE TABLE workflow_node_executions (
   result_message  TEXT,
   inputs          JSONB,
   outputs         JSONB,
+  metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at      TIMESTAMP NOT NULL,
   updated_at      TIMESTAMP NOT NULL,
 

@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/primitives"
 	"github.com/superplanehq/superplane/pkg/secrets"
 
+	"github.com/superplanehq/superplane/pkg/primitives/approval"
 	"github.com/superplanehq/superplane/pkg/primitives/filter"
 	httpPrimitive "github.com/superplanehq/superplane/pkg/primitives/http"
 	ifp "github.com/superplanehq/superplane/pkg/primitives/if"
@@ -85,6 +86,7 @@ func (r *Registry) Init() {
 	r.Primitives["filter"] = &filter.Filter{}
 	r.Primitives["switch"] = &switchp.Switch{}
 	r.Primitives["http"] = &httpPrimitive.HTTP{}
+	r.Primitives["approval"] = &approval.ApprovalPrimitive{}
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {

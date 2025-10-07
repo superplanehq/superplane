@@ -34,13 +34,16 @@ import { IfNode } from '../blueprint/components/nodes/IfNode'
 import { HttpNode } from '../blueprint/components/nodes/HttpNode'
 import { FilterNode } from '../blueprint/components/nodes/FilterNode'
 import { SwitchNode } from '../blueprint/components/nodes/SwitchNode'
+import { ApprovalNode } from '../blueprint/components/nodes/ApprovalNode'
 import { DefaultNode } from '../blueprint/components/nodes/DefaultNode'
+import { WorkflowNodeSidebar } from '../../components/WorkflowNodeSidebar'
 
 const nodeTypes = {
   if: IfNode,
   http: HttpNode,
   filter: FilterNode,
   switch: SwitchNode,
+  approval: ApprovalNode,
   default: DefaultNode,
 }
 
@@ -63,6 +66,7 @@ export const Workflow = () => {
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; branch: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'primitives' | 'blueprints'>('primitives')
+  const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string } | null>(null)
 
   // Fetch workflow, primitives, and blueprints
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!)
@@ -149,6 +153,15 @@ export const Workflow = () => {
     const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, '-')
     return `${sanitizedBlock}-${sanitizedName}-${randomChars}`
   }
+
+  const handleNodeClick = useCallback((_: any, node: Node) => {
+    setSelectedNode({
+      id: node.id,
+      name: node.data.label,
+      isBlueprintNode: node.data.blockType === 'blueprint',
+      nodeType: node.data.blockName
+    })
+  }, [])
 
   const handleNodeDoubleClick = useCallback((_: any, node: Node) => {
     const block = buildingBlocks.find((b: BuildingBlock) =>
@@ -438,6 +451,7 @@ export const Workflow = () => {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodeClick={handleNodeClick}
             onNodeDoubleClick={handleNodeDoubleClick}
             fitView
             colorMode="system"
@@ -450,6 +464,18 @@ export const Workflow = () => {
             <Controls />
           </ReactFlow>
         </div>
+
+        {/* Node Details Sidebar */}
+        {selectedNode && (
+          <WorkflowNodeSidebar
+            workflowId={workflowId!}
+            nodeId={selectedNode.id}
+            nodeName={selectedNode.name}
+            onClose={() => setSelectedNode(null)}
+            isBlueprintNode={selectedNode.isBlueprintNode}
+            nodeType={selectedNode.nodeType}
+          />
+        )}
       </div>
 
       {/* Add/Edit Node Modal */}
@@ -509,6 +535,16 @@ export const Workflow = () => {
                     }}
                     placeholder={`Enter ${field.name} as JSON array`}
                     rows={4}
+                  />
+                ) : field.type === 'number' ? (
+                  <Input
+                    type="number"
+                    value={nodeConfiguration[field.name] ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? undefined : Number(e.target.value)
+                      setNodeConfiguration({ ...nodeConfiguration, [field.name]: value })
+                    }}
+                    placeholder={`Enter ${field.name}`}
                   />
                 ) : (
                   <Input

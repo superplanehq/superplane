@@ -122,17 +122,19 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:   {Resource: "org", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 
 		// Blueprints rules
-		pbBlueprints.Blueprints_ListBlueprints_FullMethodName:     {Resource: "blueprint", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbBlueprints.Blueprints_ListBlueprints_FullMethodName:    {Resource: "blueprint", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbBlueprints.Blueprints_DescribeBlueprint_FullMethodName: {Resource: "blueprint", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbBlueprints.Blueprints_CreateBlueprint_FullMethodName:   {Resource: "blueprint", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbBlueprints.Blueprints_UpdateBlueprint_FullMethodName:   {Resource: "blueprint", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
 
 		// Workflows rules
-		pbWorkflows.Workflows_ListWorkflows_FullMethodName:     {Resource: "workflow", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbWorkflows.Workflows_DescribeWorkflow_FullMethodName: {Resource: "workflow", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbWorkflows.Workflows_CreateWorkflow_FullMethodName:   {Resource: "workflow", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbWorkflows.Workflows_UpdateWorkflow_FullMethodName:   {Resource: "workflow", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbWorkflows.Workflows_DeleteWorkflow_FullMethodName:   {Resource: "workflow", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbWorkflows.Workflows_ListWorkflows_FullMethodName:      {Resource: "workflow", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbWorkflows.Workflows_DescribeWorkflow_FullMethodName:   {Resource: "workflow", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbWorkflows.Workflows_CreateWorkflow_FullMethodName:     {Resource: "workflow", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbWorkflows.Workflows_UpdateWorkflow_FullMethodName:     {Resource: "workflow", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbWorkflows.Workflows_DeleteWorkflow_FullMethodName:     {Resource: "workflow", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbWorkflows.Workflows_ListNodeQueueItems_FullMethodName: {Resource: "workflow", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbWorkflows.Workflows_ListNodeExecutions_FullMethodName: {Resource: "workflow", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 	}
 
 	return &AuthorizationInterceptor{

@@ -12,6 +12,7 @@ import (
 
 const (
 	WorkflowNodeExecutionStatePending  = "pending"
+	WorkflowNodeExecutionStateWaiting  = "waiting"
 	WorkflowNodeExecutionStateStarted  = "started"
 	WorkflowNodeExecutionStateFinished = "finished"
 
@@ -58,6 +59,7 @@ type WorkflowNodeExecution struct {
 	ResultMessage string
 	Inputs        datatypes.JSONType[map[string]any]
 	Outputs       datatypes.JSONType[map[string][]any]
+	Metadata      datatypes.JSONType[map[string]any]
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
 }
@@ -126,6 +128,17 @@ func (e *WorkflowNodeExecution) StartInTransaction(tx *gorm.DB) error {
 
 func (e *WorkflowNodeExecution) Pass(outputs map[string][]any) error {
 	return e.PassInTransaction(database.Conn(), outputs)
+}
+
+func (e *WorkflowNodeExecution) Wait() error {
+	return e.WaitInTransaction(database.Conn())
+}
+
+func (e *WorkflowNodeExecution) WaitInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+	e.State = WorkflowNodeExecutionStateWaiting
+	e.UpdatedAt = &now
+	return tx.Save(e).Error
 }
 
 func (e *WorkflowNodeExecution) PassInTransaction(tx *gorm.DB, outputs map[string][]any) error {

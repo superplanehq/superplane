@@ -45,6 +45,17 @@ service Primitives {
       tags: "Primitive";
     };
   }
+
+  rpc ListPrimitiveActions(ListPrimitiveActionsRequest) returns (ListPrimitiveActionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/primitives/{name}/actions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List primitive actions";
+      description: "Returns available actions for a primitive";
+      tags: "Primitive";
+    };
+  }
 }
 
 message ListPrimitivesRequest {}
@@ -77,4 +88,18 @@ message ConfigurationField {
 
 message OutputBranch {
   string name = 1;
+}
+
+message ListPrimitiveActionsRequest {
+  string name = 1;
+}
+
+message PrimitiveAction {
+  string name = 1;
+  string description = 2;
+  repeated ConfigurationField parameters = 3;
+}
+
+message ListPrimitiveActionsResponse {
+  repeated PrimitiveAction actions = 1;
 }
