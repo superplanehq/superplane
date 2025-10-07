@@ -7,6 +7,7 @@
 package workflows
 
 import (
+	_struct "github.com/golang/protobuf/ptypes/struct"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
@@ -609,6 +610,7 @@ type WorkflowNode struct {
 	RefType       WorkflowNode_RefType       `protobuf:"varint,3,opt,name=ref_type,json=refType,proto3,enum=Superplane.WorkflowNode_RefType" json:"ref_type,omitempty"`
 	Primitive     *WorkflowNode_PrimitiveRef `protobuf:"bytes,4,opt,name=primitive,proto3" json:"primitive,omitempty"`
 	Blueprint     *WorkflowNode_BlueprintRef `protobuf:"bytes,5,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
+	Configuration *_struct.Struct            `protobuf:"bytes,6,opt,name=configuration,proto3" json:"configuration,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -674,6 +676,13 @@ func (x *WorkflowNode) GetPrimitive() *WorkflowNode_PrimitiveRef {
 func (x *WorkflowNode) GetBlueprint() *WorkflowNode_BlueprintRef {
 	if x != nil {
 		return x.Blueprint
+	}
+	return nil
+}
+
+func (x *WorkflowNode) GetConfiguration() *_struct.Struct {
+	if x != nil {
+		return x.Configuration
 	}
 	return nil
 }
@@ -831,7 +840,7 @@ var File_workflows_proto protoreflect.FileDescriptor
 const file_workflows_proto_rawDesc = "" +
 	"\n" +
 	"\x0fworkflows.proto\x12\n" +
-	"Superplane\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x16\n" +
+	"Superplane\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x16\n" +
 	"\x14ListWorkflowsRequest\"K\n" +
 	"\x15ListWorkflowsResponse\x122\n" +
 	"\tworkflows\x18\x01 \x03(\v2\x14.Superplane.WorkflowR\tworkflows\")\n" +
@@ -861,13 +870,14 @@ const file_workflows_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12.\n" +
 	"\x05nodes\x18\a \x03(\v2\x18.Superplane.WorkflowNodeR\x05nodes\x12.\n" +
-	"\x05edges\x18\b \x03(\v2\x18.Superplane.WorkflowEdgeR\x05edges\"\xfc\x02\n" +
+	"\x05edges\x18\b \x03(\v2\x18.Superplane.WorkflowEdgeR\x05edges\"\xbb\x03\n" +
 	"\fWorkflowNode\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12;\n" +
 	"\bref_type\x18\x03 \x01(\x0e2 .Superplane.WorkflowNode.RefTypeR\arefType\x12C\n" +
 	"\tprimitive\x18\x04 \x01(\v2%.Superplane.WorkflowNode.PrimitiveRefR\tprimitive\x12C\n" +
-	"\tblueprint\x18\x05 \x01(\v2%.Superplane.WorkflowNode.BlueprintRefR\tblueprint\x1a\"\n" +
+	"\tblueprint\x18\x05 \x01(\v2%.Superplane.WorkflowNode.BlueprintRefR\tblueprint\x12=\n" +
+	"\rconfiguration\x18\x06 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x1a\"\n" +
 	"\fPrimitiveRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a\"\n" +
 	"\fBlueprintRef\x12\x12\n" +
@@ -925,6 +935,7 @@ var file_workflows_proto_goTypes = []any{
 	(*WorkflowNode_PrimitiveRef)(nil), // 14: Superplane.WorkflowNode.PrimitiveRef
 	(*WorkflowNode_BlueprintRef)(nil), // 15: Superplane.WorkflowNode.BlueprintRef
 	(*timestamp.Timestamp)(nil),       // 16: google.protobuf.Timestamp
+	(*_struct.Struct)(nil),            // 17: google.protobuf.Struct
 }
 var file_workflows_proto_depIdxs = []int32{
 	11, // 0: Superplane.ListWorkflowsResponse.workflows:type_name -> Superplane.Workflow
@@ -940,21 +951,22 @@ var file_workflows_proto_depIdxs = []int32{
 	0,  // 10: Superplane.WorkflowNode.ref_type:type_name -> Superplane.WorkflowNode.RefType
 	14, // 11: Superplane.WorkflowNode.primitive:type_name -> Superplane.WorkflowNode.PrimitiveRef
 	15, // 12: Superplane.WorkflowNode.blueprint:type_name -> Superplane.WorkflowNode.BlueprintRef
-	1,  // 13: Superplane.Workflows.ListWorkflows:input_type -> Superplane.ListWorkflowsRequest
-	5,  // 14: Superplane.Workflows.CreateWorkflow:input_type -> Superplane.CreateWorkflowRequest
-	3,  // 15: Superplane.Workflows.DescribeWorkflow:input_type -> Superplane.DescribeWorkflowRequest
-	7,  // 16: Superplane.Workflows.UpdateWorkflow:input_type -> Superplane.UpdateWorkflowRequest
-	9,  // 17: Superplane.Workflows.DeleteWorkflow:input_type -> Superplane.DeleteWorkflowRequest
-	2,  // 18: Superplane.Workflows.ListWorkflows:output_type -> Superplane.ListWorkflowsResponse
-	6,  // 19: Superplane.Workflows.CreateWorkflow:output_type -> Superplane.CreateWorkflowResponse
-	4,  // 20: Superplane.Workflows.DescribeWorkflow:output_type -> Superplane.DescribeWorkflowResponse
-	8,  // 21: Superplane.Workflows.UpdateWorkflow:output_type -> Superplane.UpdateWorkflowResponse
-	10, // 22: Superplane.Workflows.DeleteWorkflow:output_type -> Superplane.DeleteWorkflowResponse
-	18, // [18:23] is the sub-list for method output_type
-	13, // [13:18] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	17, // 13: Superplane.WorkflowNode.configuration:type_name -> google.protobuf.Struct
+	1,  // 14: Superplane.Workflows.ListWorkflows:input_type -> Superplane.ListWorkflowsRequest
+	5,  // 15: Superplane.Workflows.CreateWorkflow:input_type -> Superplane.CreateWorkflowRequest
+	3,  // 16: Superplane.Workflows.DescribeWorkflow:input_type -> Superplane.DescribeWorkflowRequest
+	7,  // 17: Superplane.Workflows.UpdateWorkflow:input_type -> Superplane.UpdateWorkflowRequest
+	9,  // 18: Superplane.Workflows.DeleteWorkflow:input_type -> Superplane.DeleteWorkflowRequest
+	2,  // 19: Superplane.Workflows.ListWorkflows:output_type -> Superplane.ListWorkflowsResponse
+	6,  // 20: Superplane.Workflows.CreateWorkflow:output_type -> Superplane.CreateWorkflowResponse
+	4,  // 21: Superplane.Workflows.DescribeWorkflow:output_type -> Superplane.DescribeWorkflowResponse
+	8,  // 22: Superplane.Workflows.UpdateWorkflow:output_type -> Superplane.UpdateWorkflowResponse
+	10, // 23: Superplane.Workflows.DeleteWorkflow:output_type -> Superplane.DeleteWorkflowResponse
+	19, // [19:24] is the sub-list for method output_type
+	14, // [14:19] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_workflows_proto_init() }

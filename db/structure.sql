@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict tan0AC63JP2CfUYP8lLYEQJ3Y0H3gVG8QFrJ8gp9g7rU9YDQTN9Gyk9fcvMIjIA
+\restrict TF39F6eiABKITmDQwc8Ct8D4WQ1WkDKfXCZjtXnZhYmR0FEvGtiT077ImGntIBH
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -527,29 +527,50 @@ CREATE TABLE public.users (
 
 
 --
+-- Name: workflow_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_events (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    parent_event_id uuid,
+    blueprint_name character varying(128),
+    data jsonb NOT NULL,
+    state character varying(32) NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: workflow_node_executions; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.workflow_node_executions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    event_id uuid NOT NULL,
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
     state character varying(32) NOT NULL,
     result character varying(32),
     result_reason character varying(128),
     result_message text,
-    input jsonb,
-    output jsonb
+    inputs jsonb,
+    outputs jsonb,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
 );
 
 
 --
--- Name: workflow_queues; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_queue_items; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.workflow_queues (
+CREATE TABLE public.workflow_queue_items (
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
-    data jsonb NOT NULL
+    event_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL
 );
 
 
@@ -921,19 +942,27 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_node_executions workflow_node_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_pkey PRIMARY KEY (workflow_id, node_id);
+    ADD CONSTRAINT workflow_node_executions_pkey PRIMARY KEY (workflow_id, node_id, event_id);
 
 
 --
--- Name: workflow_queues workflow_queues_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_queue_items workflow_queue_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.workflow_queues
-    ADD CONSTRAINT workflow_queues_pkey PRIMARY KEY (workflow_id, node_id);
+ALTER TABLE ONLY public.workflow_queue_items
+    ADD CONSTRAINT workflow_queue_items_pkey PRIMARY KEY (workflow_id, node_id);
 
 
 --
@@ -1114,6 +1143,27 @@ CREATE INDEX idx_stages_deleted_at ON public.stages USING btree (deleted_at);
 
 
 --
+-- Name: idx_workflow_events_parent_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_parent_event_id ON public.workflow_events USING btree (parent_event_id);
+
+
+--
+-- Name: idx_workflow_events_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_state ON public.workflow_events USING btree (state);
+
+
+--
+-- Name: idx_workflow_events_workflow_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_workflow_id ON public.workflow_events USING btree (workflow_id);
+
+
+--
 -- Name: idx_workflow_node_executions_workflow_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1121,10 +1171,10 @@ CREATE INDEX idx_workflow_node_executions_workflow_id ON public.workflow_node_ex
 
 
 --
--- Name: idx_workflow_queues_workflow_node_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_queue_items_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_queues_workflow_node_id ON public.workflow_queues USING btree (workflow_id, node_id);
+CREATE INDEX idx_workflow_queue_items_workflow_node_id ON public.workflow_queue_items USING btree (workflow_id, node_id);
 
 
 --
@@ -1366,6 +1416,30 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: workflow_events workflow_events_parent_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_parent_event_id_fkey FOREIGN KEY (parent_event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_events workflow_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_executions workflow_node_executions_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_executions
+    ADD CONSTRAINT workflow_node_executions_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_node_executions workflow_node_executions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1374,24 +1448,32 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_queues workflow_queues_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_queue_items workflow_queue_items_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.workflow_queues
-    ADD CONSTRAINT workflow_queues_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.workflow_queue_items
+    ADD CONSTRAINT workflow_queue_items_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_queue_items workflow_queue_items_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_queue_items
+    ADD CONSTRAINT workflow_queue_items_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tan0AC63JP2CfUYP8lLYEQJ3Y0H3gVG8QFrJ8gp9g7rU9YDQTN9Gyk9fcvMIjIA
+\unrestrict TF39F6eiABKITmDQwc8Ct8D4WQ1WkDKfXCZjtXnZhYmR0FEvGtiT077ImGntIBH
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict OCodBHbcqO5ABKzd7tQBLnFlBf3k6IICedt96Qgzx2NvNF3IeaAJlWtYBwXIKYC
+\restrict 4vIgcGDuezQOvxvvNYosmZ9psB8SlB3gy2fb4bXgT5ol8ZxUlJe2kfCVzwR4QLP
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1421,5 +1503,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OCodBHbcqO5ABKzd7tQBLnFlBf3k6IICedt96Qgzx2NvNF3IeaAJlWtYBwXIKYC
+\unrestrict 4vIgcGDuezQOvxvvNYosmZ9psB8SlB3gy2fb4bXgT5ol8ZxUlJe2kfCVzwR4QLP
 

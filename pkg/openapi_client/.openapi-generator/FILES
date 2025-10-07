@@ -204,6 +204,7 @@ docs/SuperplaneListStageExecutionsResponse.md
 docs/SuperplaneListStagesResponse.md
 docs/SuperplaneListWorkflowsResponse.md
 docs/SuperplaneMeUser.md
+docs/SuperplaneOutputBranch.md
 docs/SuperplaneOutputDefinition.md
 docs/SuperplaneOutputValue.md
 docs/SuperplanePrimitive.md
@@ -415,6 +416,7 @@ model_superplane_list_stage_executions_response.go
 model_superplane_list_stages_response.go
 model_superplane_list_workflows_response.go
 model_superplane_me_user.go
+model_superplane_output_branch.go
 model_superplane_output_definition.go
 model_superplane_output_value.go
 model_superplane_primitive.go

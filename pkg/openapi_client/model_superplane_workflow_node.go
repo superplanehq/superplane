@@ -25,6 +25,7 @@ type SuperplaneWorkflowNode struct {
 	RefType *SuperplaneWorkflowNodeRefType `json:"refType,omitempty"`
 	Primitive *SuperplaneWorkflowNodePrimitiveRef `json:"primitive,omitempty"`
 	Blueprint *WorkflowNodeBlueprintRef `json:"blueprint,omitempty"`
+	Configuration map[string]interface{} `json:"configuration,omitempty"`
 }
 
 // NewSuperplaneWorkflowNode instantiates a new SuperplaneWorkflowNode object
@@ -208,6 +209,38 @@ func (o *SuperplaneWorkflowNode) SetBlueprint(v WorkflowNodeBlueprintRef) {
 	o.Blueprint = &v
 }
 
+// GetConfiguration returns the Configuration field value if set, zero value otherwise.
+func (o *SuperplaneWorkflowNode) GetConfiguration() map[string]interface{} {
+	if o == nil || IsNil(o.Configuration) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.Configuration
+}
+
+// GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneWorkflowNode) GetConfigurationOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Configuration) {
+		return map[string]interface{}{}, false
+	}
+	return o.Configuration, true
+}
+
+// HasConfiguration returns a boolean if a field has been set.
+func (o *SuperplaneWorkflowNode) HasConfiguration() bool {
+	if o != nil && !IsNil(o.Configuration) {
+		return true
+	}
+
+	return false
+}
+
+// SetConfiguration gets a reference to the given map[string]interface{} and assigns it to the Configuration field.
+func (o *SuperplaneWorkflowNode) SetConfiguration(v map[string]interface{}) {
+	o.Configuration = v
+}
+
 func (o SuperplaneWorkflowNode) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -232,6 +265,9 @@ func (o SuperplaneWorkflowNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Blueprint) {
 		toSerialize["blueprint"] = o.Blueprint
+	}
+	if !IsNil(o.Configuration) {
+		toSerialize["configuration"] = o.Configuration
 	}
 	return toSerialize, nil
 }

@@ -9,6 +9,7 @@ import './App.css'
 import HomePage from './pages/home'
 import { Canvas } from './pages/canvas'
 import { Blueprint } from './pages/blueprint'
+import { Workflow } from './pages/workflow'
 import { OrganizationSettings } from './pages/organization/settings'
 import Navigation from './components/Navigation'
 import AuthGuard from './components/AuthGuard'
@@ -53,6 +54,7 @@ function App() {
             <Route path=":organizationId" element={withAuthAndNavigation(HomePage)} />
             <Route path=":organizationId/canvas/:canvasId" element={withAuthOnly(Canvas)} />
             <Route path=":organizationId/blueprints/:blueprintId" element={withAuthOnly(Blueprint)} />
+            <Route path=":organizationId/workflows/:workflowId" element={withAuthOnly(Workflow)} />
             <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
 
             {/* Organization selection and creation */}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -131,6 +132,27 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 
 		w := workers.NewAlertWorker()
 		go w.Start()
+	}
+
+	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" {
+		log.Println("Starting Workflow Event Router")
+
+		w := workers.NewWorkflowEventRouter()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_WORKFLOW_QUEUE_WORKER") == "yes" {
+		log.Println("Starting Workflow Queue Worker")
+
+		w := workers.NewWorkflowQueueWorker()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_PENDING_NODE_EXECUTION_WORKER") == "yes" {
+		log.Println("Starting Pending Node Execution Worker")
+
+		w := workers.NewPendingNodeExecutionWorker(registry)
+		go w.Start(context.Background())
 	}
 }
 

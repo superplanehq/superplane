@@ -19,6 +19,7 @@ import (
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	secretPb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
+	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
@@ -95,6 +96,8 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	pbPrimitives.RegisterPrimitivesServer(grpcServer, primitiveService)
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
+	workflowService := NewWorkflowService(registry)
+	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
 
 	reflection.Register(grpcServer)
 

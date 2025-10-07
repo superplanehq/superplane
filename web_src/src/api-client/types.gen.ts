@@ -906,7 +906,6 @@ export type SuperplaneOrganizationsRemoveUserResponse = {
 
 export type SuperplaneOutputBranch = {
     name?: string;
-    description?: string;
 };
 
 export type SuperplaneOutputDefinition = {
@@ -1081,6 +1080,9 @@ export type SuperplaneWorkflowNode = {
     refType?: SuperplaneWorkflowNodeRefType;
     primitive?: SuperplaneWorkflowNodePrimitiveRef;
     blueprint?: WorkflowNodeBlueprintRef;
+    configuration?: {
+        [key: string]: unknown;
+    };
 };
 
 export type SuperplaneWorkflowNodePrimitiveRef = {

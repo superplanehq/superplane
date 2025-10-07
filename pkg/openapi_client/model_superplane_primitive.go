@@ -23,6 +23,7 @@ type SuperplanePrimitive struct {
 	Name *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Configuration []SuperplaneConfigurationField `json:"configuration,omitempty"`
+	Branches []SuperplaneOutputBranch `json:"branches,omitempty"`
 }
 
 // NewSuperplanePrimitive instantiates a new SuperplanePrimitive object
@@ -138,6 +139,38 @@ func (o *SuperplanePrimitive) SetConfiguration(v []SuperplaneConfigurationField)
 	o.Configuration = v
 }
 
+// GetBranches returns the Branches field value if set, zero value otherwise.
+func (o *SuperplanePrimitive) GetBranches() []SuperplaneOutputBranch {
+	if o == nil || IsNil(o.Branches) {
+		var ret []SuperplaneOutputBranch
+		return ret
+	}
+	return o.Branches
+}
+
+// GetBranchesOk returns a tuple with the Branches field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplanePrimitive) GetBranchesOk() ([]SuperplaneOutputBranch, bool) {
+	if o == nil || IsNil(o.Branches) {
+		return nil, false
+	}
+	return o.Branches, true
+}
+
+// HasBranches returns a boolean if a field has been set.
+func (o *SuperplanePrimitive) HasBranches() bool {
+	if o != nil && !IsNil(o.Branches) {
+		return true
+	}
+
+	return false
+}
+
+// SetBranches gets a reference to the given []SuperplaneOutputBranch and assigns it to the Branches field.
+func (o *SuperplanePrimitive) SetBranches(v []SuperplaneOutputBranch) {
+	o.Branches = v
+}
+
 func (o SuperplanePrimitive) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -156,6 +189,9 @@ func (o SuperplanePrimitive) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
+	}
+	if !IsNil(o.Branches) {
+		toSerialize["branches"] = o.Branches
 	}
 	return toSerialize, nil
 }

@@ -5423,9 +5423,6 @@
       "properties": {
         "name": {
           "type": "string"
-        },
-        "description": {
-          "type": "string"
         }
       }
     },
@@ -5887,6 +5884,9 @@
         },
         "blueprint": {
           "$ref": "#/definitions/WorkflowNodeBlueprintRef"
+        },
+        "configuration": {
+          "type": "object"
         }
       }
     },

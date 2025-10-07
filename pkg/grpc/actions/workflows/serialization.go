@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -29,10 +30,11 @@ func ProtoToNodes(nodes []*pb.WorkflowNode) []models.Node {
 	result := make([]models.Node, len(nodes))
 	for i, node := range nodes {
 		result[i] = models.Node{
-			ID:      node.Id,
-			Name:    node.Name,
-			RefType: ProtoToRefType(node.RefType),
-			Ref:     ProtoToNodeRef(node),
+			ID:            node.Id,
+			Name:          node.Name,
+			RefType:       ProtoToRefType(node.RefType),
+			Ref:           ProtoToNodeRef(node),
+			Configuration: node.Configuration.AsMap(),
 		}
 	}
 	return result
@@ -41,10 +43,16 @@ func ProtoToNodes(nodes []*pb.WorkflowNode) []models.Node {
 func NodesToProto(nodes []models.Node) []*pb.WorkflowNode {
 	result := make([]*pb.WorkflowNode, len(nodes))
 	for i, node := range nodes {
+		configuration, err := structpb.NewStruct(node.Configuration)
+		if err != nil {
+			configuration = &structpb.Struct{}
+		}
+
 		result[i] = &pb.WorkflowNode{
-			Id:      node.ID,
-			Name:    node.Name,
-			RefType: RefTypeToProto(node.RefType),
+			Id:            node.ID,
+			Name:          node.Name,
+			RefType:       RefTypeToProto(node.RefType),
+			Configuration: configuration,
 		}
 
 		ref := node.Ref
