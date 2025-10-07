@@ -23,6 +23,7 @@ var _ MappedNullable = &SuperplaneAlert{}
 type SuperplaneAlert struct {
 	Id *string `json:"id,omitempty"`
 	Type *AlertAlertType `json:"type,omitempty"`
+	OriginType *AlertAlertOriginType `json:"originType,omitempty"`
 	Message *string `json:"message,omitempty"`
 	SourceId *string `json:"sourceId,omitempty"`
 	SourceType *SuperplaneEventSourceType `json:"sourceType,omitempty"`
@@ -39,6 +40,8 @@ func NewSuperplaneAlert() *SuperplaneAlert {
 	this := SuperplaneAlert{}
 	var type_ AlertAlertType = ALERTALERTTYPE_ALERT_TYPE_UNKNOWN
 	this.Type = &type_
+	var originType AlertAlertOriginType = ALERTALERTORIGINTYPE_ALERT_ORIGIN_TYPE_UNKNOWN
+	this.OriginType = &originType
 	var sourceType SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_EVENT_SOURCE_TYPE_UNKNOWN
 	this.SourceType = &sourceType
 	return &this
@@ -51,6 +54,8 @@ func NewSuperplaneAlertWithDefaults() *SuperplaneAlert {
 	this := SuperplaneAlert{}
 	var type_ AlertAlertType = ALERTALERTTYPE_ALERT_TYPE_UNKNOWN
 	this.Type = &type_
+	var originType AlertAlertOriginType = ALERTALERTORIGINTYPE_ALERT_ORIGIN_TYPE_UNKNOWN
+	this.OriginType = &originType
 	var sourceType SuperplaneEventSourceType = SUPERPLANEEVENTSOURCETYPE_EVENT_SOURCE_TYPE_UNKNOWN
 	this.SourceType = &sourceType
 	return &this
@@ -118,6 +123,38 @@ func (o *SuperplaneAlert) HasType() bool {
 // SetType gets a reference to the given AlertAlertType and assigns it to the Type field.
 func (o *SuperplaneAlert) SetType(v AlertAlertType) {
 	o.Type = &v
+}
+
+// GetOriginType returns the OriginType field value if set, zero value otherwise.
+func (o *SuperplaneAlert) GetOriginType() AlertAlertOriginType {
+	if o == nil || IsNil(o.OriginType) {
+		var ret AlertAlertOriginType
+		return ret
+	}
+	return *o.OriginType
+}
+
+// GetOriginTypeOk returns a tuple with the OriginType field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneAlert) GetOriginTypeOk() (*AlertAlertOriginType, bool) {
+	if o == nil || IsNil(o.OriginType) {
+		return nil, false
+	}
+	return o.OriginType, true
+}
+
+// HasOriginType returns a boolean if a field has been set.
+func (o *SuperplaneAlert) HasOriginType() bool {
+	if o != nil && !IsNil(o.OriginType) {
+		return true
+	}
+
+	return false
+}
+
+// SetOriginType gets a reference to the given AlertAlertOriginType and assigns it to the OriginType field.
+func (o *SuperplaneAlert) SetOriginType(v AlertAlertOriginType) {
+	o.OriginType = &v
 }
 
 // GetMessage returns the Message field value if set, zero value otherwise.
@@ -327,6 +364,9 @@ func (o SuperplaneAlert) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
+	}
+	if !IsNil(o.OriginType) {
+		toSerialize["originType"] = o.OriginType
 	}
 	if !IsNil(o.Message) {
 		toSerialize["message"] = o.Message

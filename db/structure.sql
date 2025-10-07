@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict E7i4TlN25YfW7G5aeMGfAbv2vBDU56l0bYYcgnR0mmUchideXZc1fHZv5yZobjT
+\restrict BEh7gGlIzFZRKG7JPMjib0hku4XDgPe5DesZ6CRxq7wl6GUn1JyQ6Sab50mRgin
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -84,7 +84,8 @@ CREATE TABLE public.alerts (
     acknowledged boolean DEFAULT false NOT NULL,
     acknowledged_at timestamp with time zone,
     type character varying(50) NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    origin_type character varying(255)
 );
 
 
@@ -1234,13 +1235,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict E7i4TlN25YfW7G5aeMGfAbv2vBDU56l0bYYcgnR0mmUchideXZc1fHZv5yZobjT
+\unrestrict BEh7gGlIzFZRKG7JPMjib0hku4XDgPe5DesZ6CRxq7wl6GUn1JyQ6Sab50mRgin
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict nL8A741NBsbgepvQ30dfvafyd5NwYu6RrM2mpUkdvR2Wtj6hLTbcQhIHfol9Dtn
+\restrict OzyenkWxv3X5PKoo1N1BtWASfd2oNHlfn5AguF5vXwnp6vHLEt2MDbSGfb0HIeM
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1262,7 +1263,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251002195822	f
+20251006144130	f
 \.
 
 
@@ -1270,5 +1271,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nL8A741NBsbgepvQ30dfvafyd5NwYu6RrM2mpUkdvR2Wtj6hLTbcQhIHfol9Dtn
+\unrestrict OzyenkWxv3X5PKoo1N1BtWASfd2oNHlfn5AguF5vXwnp6vHLEt2MDbSGfb0HIeM
 

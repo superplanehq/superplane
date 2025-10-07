@@ -15,7 +15,7 @@ func Test__AcknowledgeAlert(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("successfully acknowledge an alert", func(t *testing.T) {
-		alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", "Test alert message", models.AlertTypeError)
+		alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", "Test alert message", models.AlertTypeError, models.AlertOriginTypeEventRejection)
 		require.NoError(t, err)
 		require.NoError(t, alert.Create())
 
@@ -29,7 +29,7 @@ func Test__AcknowledgeAlert(t *testing.T) {
 	})
 
 	t.Run("return error for invalid canvas ID", func(t *testing.T) {
-		alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", "Test alert message", models.AlertTypeError)
+		alert, err := models.NewAlert(r.Canvas.ID, r.Stage.ID, "stage", "Test alert message", models.AlertTypeError, models.AlertOriginTypeEventRejection)
 		require.NoError(t, err)
 		require.NoError(t, alert.Create())
 

@@ -25,7 +25,8 @@ import { createStageDuplicate, focusAndEditNode } from '../../utils/nodeDuplicat
 import { showErrorToast } from '@/utils/toast';
 import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
-import { AlertsTooltip } from '@/components/Tooltip/alerts-tooltip';
+import { ErrorsTooltip, ErrorType, TooltipError } from '@/components/Tooltip/errors-tooltip';
+import { alertsToErrorTooltip } from '@/utils/errors';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='-mt-1 -mb-1 text-gray-700 dark:text-gray-300' name="rocket_launch" size="xl" />,
@@ -49,7 +50,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showEmitEventModal, setShowEmitEventModal] = useState(false);
   const triggerSectionValidationRef = useRef<(() => void) | null>(null);
   const setFieldErrorsRef = useRef<React.Dispatch<React.SetStateAction<Record<string, string>>> | null>(null);
-  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId, updateConnectionSourceNames } = useCanvasStore();
+  const { selectStageId, updateStage, setEditingStage, removeStage, approveStageEvent, addStage, setFocusedNodeId, updateConnectionSourceNames, removeConnectionSourceNames } = useCanvasStore();
 
   const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
     if (!errorMessage) return null;
@@ -108,21 +109,40 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     state.stages.find(stage => stage.metadata?.id === props.id)
   );
 
-  const isPartiallyBroken = useMemo(() => {
+  const invalidInputMappingsConnections = useMemo(() => {
     if (!currentStage || isNewNode)
-      return false;
+      return [];
+
+    return currentStage.spec?.inputMappings?.filter(mapping => {
+      return !currentStage.spec?.connections?.some(connection => connection.name === mapping.when?.triggeredBy?.connection)
+    }).map(mapping => mapping.when?.triggeredBy?.connection)
+  }, [currentStage, isNewNode]);
+
+  const connectionIssues = useMemo(() => {
+    const issues: TooltipError[] = []
+    if (!currentStage || isNewNode)
+      return issues;
 
     const hasNoConnections = currentStage.spec?.connections?.length === 0
+    if (hasNoConnections)
+      issues.push({
+        id: `${currentStage.metadata?.id}-no-connections`,
+        message: 'No connections found for stage',
+        type: ErrorType.ERROR
+      })
 
-    const hasInvalidConnections = currentStage.spec?.connections?.some(connection => {
+    const invalidConnections = currentStage.spec?.connections?.filter(connection => {
       return !nodes.some(node => node?.data?.name === connection.name)
     })
 
-    const hasInvalidInputMappings = currentStage.spec?.inputMappings?.some(mapping => {
-      return !currentStage.spec?.connections?.some(connection => connection.name === mapping.when?.triggeredBy?.connection)
-    })
+    if (invalidConnections && invalidConnections.length > 0)
+      issues.push({
+        id: `${currentStage.metadata?.id}-invalid-connections`,
+        message: 'Invalid connections found: ' + invalidConnections.map(connection => connection.name).join(', '),
+        type: ErrorType.ERROR
+      })
 
-    return hasNoConnections || hasInvalidConnections || hasInvalidInputMappings
+    return issues
   }, [currentStage, isNewNode, nodes])
 
   const validateStageName = (name: string) => {
@@ -411,6 +431,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           return;
         }
       }
+
+      const stageName = currentStage.metadata?.name;
+      if (stageName) {
+        removeConnectionSourceNames(stageName);
+      }
+
       removeStage(currentStage.metadata.id);
     }
     setShowDiscardConfirm(false);
@@ -495,6 +521,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
+  const handleAlertClick = (error: TooltipError) => {
+    const alert = stageAlerts.find(alert => alert.id === error.id);
+    if (alert?.originType === 'ALERT_ORIGIN_TYPE_EVENT_REJECTION') {
+      selectStageId(props.id, { tab: 'events', eventFilter: 'rejected' });
+    }
+  };
+
 
   const handleDataChange = useCallback((data: typeof currentFormData) => {
     setCurrentFormData(data);
@@ -573,7 +606,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
 
   const borderColor = useMemo(() => {
-    if (isPartiallyBroken) {
+    if (connectionIssues.length > 0) {
       return 'border-red-400 dark:border-red-200'
     }
 
@@ -581,7 +614,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       return 'border-blue-400 dark:border-gray-200'
     }
     return 'border-transparent dark:border-transparent'
-  }, [props.selected, focusedNodeId, props.id, isPartiallyBroken])
+  }, [props.selected, focusedNodeId, props.id, connectionIssues.length])
 
   return (
     <div
@@ -638,7 +671,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   executor: currentStage.spec?.executor || { type: '', spec: {} },
                   secrets: currentStage.spec?.secrets || [],
                   conditions: currentStage.spec?.conditions || [],
-                  inputMappings: currentStage.spec?.inputMappings || []
+                  inputMappings: currentStage.spec?.inputMappings?.filter(mapping => !invalidInputMappingsConnections?.includes(mapping.when?.triggeredBy?.connection)) || []
                 }
               } : null)}
               onYamlApply={handleYamlApply}
@@ -683,13 +716,26 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   </div>
                 </div>
               </div>
-              {!isEditMode && (stageAlerts.length > 0 || alertsLoading) && (
+              {!isEditMode && connectionIssues.length > 0 && (
                 <div className="ml-2">
-                  <AlertsTooltip
-                    alerts={stageAlerts}
-                    onAcknowledge={handleAcknowledgeAlert}
+                  <ErrorsTooltip
+                    errors={connectionIssues}
                     className="flex-shrink-0"
                     isLoading={alertsLoading}
+                    title="Issues"
+                    disableCount
+                  />
+                </div>
+              )}
+              {!isEditMode && (stageAlerts.length > 0 || alertsLoading) && (
+                <div className="ml-2">
+                  <ErrorsTooltip
+                    errors={alertsToErrorTooltip(stageAlerts)}
+                    onAcknowledge={handleAcknowledgeAlert}
+                    onErrorClick={handleAlertClick}
+                    className="flex-shrink-0"
+                    isLoading={alertsLoading}
+                    title="Alerts"
                   />
                 </div>
               )}
@@ -712,7 +758,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   executor: currentFormData.executor,
                   secrets: currentFormData.secrets,
                   conditions: currentFormData.conditions,
-                  inputMappings: currentFormData.inputMappings,
+                  inputMappings: currentFormData.inputMappings?.filter(mapping => !invalidInputMappingsConnections?.includes(mapping.when?.triggeredBy?.connection)),
                   dryRun: currentFormData.dryRun
                 })
               }}
@@ -868,7 +914,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                   return null;
                 }
               }}
-              onSubmit={async (eventType: string, eventData: any) => {
+              onSubmit={async (eventType: string, eventData: unknown) => {
                 await superplaneCreateEvent(withOrganizationHeader({
                   path: { canvasIdOrName: canvasId! },
                   body: {

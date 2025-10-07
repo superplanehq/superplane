@@ -53,5 +53,6 @@ func Test__AlertWorker(t *testing.T) {
 		assert.Equal(t, rejection.TargetType, foundAlert.SourceType)
 		assert.Equal(t, rejection.Message, foundAlert.Message)
 		assert.Equal(t, models.AlertTypeError, foundAlert.Type)
+		assert.Equal(t, models.AlertOriginTypeEventRejection, foundAlert.OriginType)
 	})
 }

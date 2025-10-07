@@ -20,6 +20,7 @@ api_users.go
 client.go
 configuration.go
 docs/AlertAPI.md
+docs/AlertAlertOriginType.md
 docs/AlertAlertType.md
 docs/AuthToken.md
 docs/AuthorizationDomainType.md
@@ -215,6 +216,7 @@ docs/UsersUserRoleAssignment.md
 docs/UsersUserSpec.md
 docs/UsersUserStatus.md
 git_push.sh
+model_alert_alert_origin_type.go
 model_alert_alert_type.go
 model_auth_token.go
 model_authorization_domain_type.go

@@ -2866,6 +2866,14 @@
     }
   },
   "definitions": {
+    "AlertAlertOriginType": {
+      "type": "string",
+      "enum": [
+        "ALERT_ORIGIN_TYPE_UNKNOWN",
+        "ALERT_ORIGIN_TYPE_EVENT_REJECTION"
+      ],
+      "default": "ALERT_ORIGIN_TYPE_UNKNOWN"
+    },
     "AlertAlertType": {
       "type": "string",
       "enum": [
@@ -3837,6 +3845,9 @@
         },
         "type": {
           "$ref": "#/definitions/AlertAlertType"
+        },
+        "originType": {
+          "$ref": "#/definitions/AlertAlertOriginType"
         },
         "message": {
           "type": "string"

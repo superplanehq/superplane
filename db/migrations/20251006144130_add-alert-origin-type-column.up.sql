@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE alerts ADD COLUMN origin_type VARCHAR(255);
+
+COMMIT;
