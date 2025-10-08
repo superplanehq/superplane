@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 import { StageNodeType } from '@/canvas/types/flow';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping, SuperplaneStageEvent } from '@/api-client/types.gen';
 import { useSecrets } from '../hooks/useSecrets';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
@@ -40,7 +40,7 @@ import { NodeContentWrapper } from './shared/NodeContentWrapper';
 import { Switch } from '@/components/Switch/switch';
 import { AutoCompleteInput } from '@/components/AutoCompleteInput/AutoCompleteInput';
 import { EVENT_TEMPLATES } from '@/constants/eventTemplates';
-import { useStageEvents } from '@/hooks/useCanvasData';
+import { useEventRejections, useStageEvents } from '@/hooks/useCanvasData';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -103,6 +103,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   );
 
   const { data: lastReceivedEvents } = useStageEvents(canvasId, currentStageId || '', []);
+  const { data: rejectedEventsData } = useEventRejections(canvasId, 'TYPE_STAGE', currentStageId || '');
+
+  const allEvents = useMemo(() => {
+    const rejectedEvents = rejectedEventsData?.pages.flatMap(page => page.rejections.flatMap(rejection => rejection.event)).filter(Boolean) || [];
+    const receivedEvents = lastReceivedEvents?.pages.flatMap(page => page.events.map((event: SuperplaneStageEvent) => event.triggerEvent).filter(Boolean)) || [];
+    return [...rejectedEvents, ...receivedEvents].sort((a, b) => new Date(b?.receivedAt || '').getTime() - new Date(a?.receivedAt || '').getTime());
+  }, [rejectedEventsData?.pages, lastReceivedEvents?.pages]);
 
   const [semaphoreParameters, setSemaphoreParameters] = useState<ParameterWithId[]>(() => {
     const params = executor.spec?.parameters as Record<string, string>;
@@ -230,15 +237,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     return `Run: ${resourceName}`;
   };
 
-  const getEventTemplate = useCallback(() => {
-    const lastReceivedEvent = lastReceivedEvents?.pages[0]?.events[0];
-    if (lastReceivedEvent?.triggerEvent?.raw) {
-      return { $: lastReceivedEvent.triggerEvent.raw };
+  const getEventTemplate = useCallback((connectionName: string) => {
+    const lastReceivedEvent = allEvents.find(event => event?.sourceName === connectionName);
+
+    if (lastReceivedEvent?.raw) {
+      return { $: lastReceivedEvent.raw };
     }
 
     const customTemplate = EVENT_TEMPLATES.find(template => template.eventType === 'execution_finished');
     return customTemplate ? { $: customTemplate.getEventData() } : {};
-  }, [lastReceivedEvents]);
+  }, [allEvents]);
 
   // Debounced auto-generation to prevent input interference
   const debouncedAutoGeneration = useCallback(
@@ -1541,7 +1549,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     onChange={(value) => inputMappingHandlers.handleEventDataExpressionChange(value, actualMappingIndex, input.name)}
                                                     placeholder="eg. $.commits[0].message"
                                                     className="text-xs"
-                                                    exampleObj={getEventTemplate()}
+                                                    exampleObj={getEventTemplate(inputValue?.valueFrom?.eventData?.connection || '')}
                                                   />
                                                 </div>
                                               ) : inputValue?.valueFrom?.lastExecution ? (
