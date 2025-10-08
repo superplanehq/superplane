@@ -23,8 +23,12 @@ func (f *If) Name() string {
 	return ComponentName
 }
 
+func (f *If) Label() string {
+	return "If"
+}
+
 func (f *If) Description() string {
-	return "Evaluate input data against condition and route to true or false branches"
+	return "Route events based on expression"
 }
 
 func (f *If) OutputBranches(configuration any) []string {
@@ -35,7 +39,7 @@ func (f *If) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{
 			Name:        "expression",
-			Type:        "string",
+			Type:        components.FieldTypeString,
 			Description: "Boolean expression to evaluate",
 			Required:    true,
 		},

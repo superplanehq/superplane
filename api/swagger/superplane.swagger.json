@@ -4555,6 +4555,9 @@
         "name": {
           "type": "string"
         },
+        "label": {
+          "type": "string"
+        },
         "description": {
           "type": "string"
         },
@@ -4655,6 +4658,37 @@
         },
         "required": {
           "type": "boolean"
+        },
+        "defaultValue": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneFieldOption"
+          }
+        },
+        "min": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "max": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "listItem": {
+          "$ref": "#/definitions/SuperplaneListItemDefinition"
+        },
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConfigurationField"
+          }
+        },
+        "label": {
+          "type": "string"
         }
       }
     },
@@ -5353,6 +5387,17 @@
         }
       }
     },
+    "SuperplaneFieldOption": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneFilter": {
       "type": "object",
       "properties": {
@@ -5594,6 +5639,21 @@
         "lastTimestamp": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneListItemDefinition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConfigurationField"
+          }
         }
       }
     },

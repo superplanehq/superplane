@@ -2,13 +2,6 @@ package components
 
 const DefaultBranchName = "default"
 
-type ConfigurationField struct {
-	Name        string
-	Type        string
-	Description string
-	Required    bool
-}
-
 type Component interface {
 
 	/*
@@ -16,6 +9,12 @@ type Component interface {
 	 * This is how nodes reference it, and is used for registration.
 	 */
 	Name() string
+
+	/*
+	 * The label for the component.
+	 * This is how nodes are displayed in the UI.
+	 */
+	Label() string
 
 	/*
 	 * A good description of what the component does.
@@ -105,4 +104,92 @@ type ActionContext struct {
 	Parameters            map[string]any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
+}
+
+const (
+	FieldTypeString      = "string"
+	FieldTypeNumber      = "number"
+	FieldTypeBool        = "boolean"
+	FieldTypeSelect      = "select"
+	FieldTypeMultiSelect = "multi_select"
+	FieldTypeDate        = "date"
+	FieldTypeURL         = "url"
+	FieldTypeList        = "list"
+	FieldTypeObject      = "object"
+)
+
+type ConfigurationField struct {
+	/*
+	 * Unique name identifier for the field
+	 */
+	Name string
+
+	/*
+	 * Human-readable label for the field (displayed in forms)
+	 */
+	Label string
+
+	/*
+	 * Type of the field. Supported types are:
+	 * - string
+	 * - number
+	 * - boolean
+	 * - select
+	 * - multi_select
+	 * - date
+	 * - url
+	 * - list
+	 * - object
+	 */
+	Type        string
+	Description string
+	Required    bool
+	Default     any
+
+	/*
+	 * Used for select / multi_select types
+	 */
+	Options []FieldOption
+
+	/*
+	 * Used for number type to specify minimum value
+	 */
+	Min *int
+
+	/*
+	 * Used for number type to specify maximum value
+	 */
+	Max *int
+
+	/*
+	 *
+	 */
+	ListItem *ListItemDefinition
+
+	/*
+	 * Schema allows us to define nested object structures for 'object' type.
+	 */
+	Schema []ConfigurationField
+
+	/*
+	 * Optional custom validation function.
+	 * Returns an error if validation fails, nil if valid.
+	 */
+	Validate func(value any) error
+}
+
+/*
+ * FieldOption represents a selectable option for select / multi_select field types
+ */
+type FieldOption struct {
+	Label string
+	Value string
+}
+
+/*
+ * ListItemDefinition defines the structure of items in an 'list' field
+ */
+type ListItemDefinition struct {
+	Type   string
+	Schema []ConfigurationField
 }

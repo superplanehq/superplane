@@ -6,11 +6,13 @@ interface IfNodeData {
   label: string
   component: string
   branches?: string[]
+  configuration?: Record<string, any>
   onAddNode?: (sourceId: string, branch: string) => void
 }
 
 export const IfNode = memo(({ data, id }: NodeProps<IfNodeData>) => {
   const branches = data.branches || ['true', 'false']
+  const expression = data.configuration?.expression
 
   return (
     <div className="bg-white dark:bg-zinc-800 border-2 border-zinc-400 dark:border-zinc-500 rounded-lg shadow-md min-w-[180px]">
@@ -18,18 +20,25 @@ export const IfNode = memo(({ data, id }: NodeProps<IfNodeData>) => {
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-zinc-500 !border-2 !border-white dark:!border-zinc-800"
+        className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white dark:!border-zinc-800"
       />
 
       {/* Node header */}
       <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-900/20">
         <div className="flex items-center gap-2">
-          <MaterialSymbol name="alt_route" size="sm" className="text-zinc-600 dark:text-zinc-400" />
+          <MaterialSymbol name="alt_route" size="sm" className="text-blue-600 dark:text-blue-400" />
           <div className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
             {data.label}
           </div>
         </div>
       </div>
+
+      {/* Configuration */}
+      {expression && (
+        <div className="px-4 py-2 border-t border-zinc-200 dark:border-zinc-700 text-xs text-slate-600 dark:text-slate-400 font-mono truncate text-left" title={expression}>
+          {expression}
+        </div>
+      )}
 
       {/* Output branches */}
       <div className="border-t border-zinc-200 dark:border-zinc-700">
@@ -51,7 +60,7 @@ export const IfNode = memo(({ data, id }: NodeProps<IfNodeData>) => {
               type="source"
               position={Position.Right}
               id={branch}
-              className="!w-3 !h-3 !bg-zinc-500 !border-2 !border-white dark:!border-zinc-800 !right-[-6px]"
+              className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white dark:!border-zinc-800 !right-[-6px]"
               style={{
                 top: '50%',
                 transform: 'translateY(-50%)',

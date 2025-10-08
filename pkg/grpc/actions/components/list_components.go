@@ -28,16 +28,12 @@ func serializeComponents(in []components.Component) []*pb.Component {
 		configFields := component.Configuration()
 		configuration := make([]*pb.ConfigurationField, len(configFields))
 		for j, field := range configFields {
-			configuration[j] = &pb.ConfigurationField{
-				Name:        field.Name,
-				Type:        field.Type,
-				Description: field.Description,
-				Required:    field.Required,
-			}
+			configuration[j] = ConfigurationFieldToProto(field)
 		}
 
 		out[i] = &pb.Component{
 			Name:          component.Name(),
+			Label:         component.Label(),
 			Description:   component.Description(),
 			Branches:      branches,
 			Configuration: configuration,

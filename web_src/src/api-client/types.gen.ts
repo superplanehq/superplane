@@ -482,6 +482,7 @@ export type SuperplaneCanvasMetadata = {
 
 export type SuperplaneComponent = {
     name?: string;
+    label?: string;
     description?: string;
     configuration?: Array<SuperplaneConfigurationField>;
     branches?: Array<SuperplaneOutputBranch>;
@@ -516,6 +517,13 @@ export type SuperplaneConfigurationField = {
     type?: string;
     description?: string;
     required?: boolean;
+    defaultValue?: string;
+    options?: Array<SuperplaneFieldOption>;
+    min?: number;
+    max?: number;
+    listItem?: SuperplaneListItemDefinition;
+    schema?: Array<SuperplaneConfigurationField>;
+    label?: string;
 };
 
 export type SuperplaneConnection = {
@@ -802,6 +810,11 @@ export type SuperplaneExecutor = {
     name?: string;
 };
 
+export type SuperplaneFieldOption = {
+    label?: string;
+    value?: string;
+};
+
 export type SuperplaneFilter = {
     type?: SuperplaneFilterType;
     data?: SuperplaneDataFilter;
@@ -889,6 +902,11 @@ export type SuperplaneListEventsResponse = {
     totalCount?: number;
     hasNextPage?: boolean;
     lastTimestamp?: string;
+};
+
+export type SuperplaneListItemDefinition = {
+    type?: string;
+    schema?: Array<SuperplaneConfigurationField>;
 };
 
 export type SuperplaneListNodeExecutionsResponse = {

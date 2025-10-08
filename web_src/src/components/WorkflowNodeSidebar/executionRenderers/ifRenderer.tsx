@@ -10,7 +10,8 @@ registerExecutionRenderer('if', {
     const inputs = execution.inputs
     const outputs = execution.outputs
 
-    // Extract condition information
+    // Extract condition expression from configuration
+    const conditionExpression = execution.configuration?.expression
     const condition = inputs?.condition
 
     // Determine which branch was taken
@@ -48,9 +49,19 @@ registerExecutionRenderer('if', {
                     {branchTaken.toUpperCase()}
                   </span>
                 </div>
+                {conditionExpression && (
+                  <div className="mt-2">
+                    <div className="text-gray-500 dark:text-zinc-400 mb-1">Expression:</div>
+                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-2 rounded">
+                      <code className="text-gray-800 dark:text-gray-200 font-mono text-xs break-all">
+                        {conditionExpression}
+                      </code>
+                    </div>
+                  </div>
+                )}
                 {condition !== undefined && (
                   <div className="mt-2">
-                    <div className="text-gray-500 dark:text-zinc-400 mb-1">Condition Expression:</div>
+                    <div className="text-gray-500 dark:text-zinc-400 mb-1">Evaluated Result:</div>
                     <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-2 rounded font-mono text-xs">
                       <JsonView
                         value={condition}

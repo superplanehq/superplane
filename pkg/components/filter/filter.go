@@ -21,8 +21,12 @@ func (f *Filter) Name() string {
 	return ComponentName
 }
 
+func (f *Filter) Label() string {
+	return "Filter"
+}
+
 func (f *Filter) Description() string {
-	return "Evaluate input data against condition. If true, input data is sent to default output branch"
+	return "Filter events based on their content"
 }
 
 func (f *Filter) OutputBranches(configuration any) []string {
@@ -33,7 +37,8 @@ func (f *Filter) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{
 			Name:        "expression",
-			Type:        "string",
+			Label:       "Filter Expression",
+			Type:        components.FieldTypeString,
 			Description: "Boolean expression to filter data",
 			Required:    true,
 		},

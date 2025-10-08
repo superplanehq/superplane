@@ -185,6 +185,7 @@ docs/SuperplaneExecutionResult.md
 docs/SuperplaneExecutionResultReason.md
 docs/SuperplaneExecutionState.md
 docs/SuperplaneExecutor.md
+docs/SuperplaneFieldOption.md
 docs/SuperplaneFilter.md
 docs/SuperplaneFilterOperator.md
 docs/SuperplaneFilterType.md
@@ -204,6 +205,7 @@ docs/SuperplaneListConnectionGroupsResponse.md
 docs/SuperplaneListEventRejectionsResponse.md
 docs/SuperplaneListEventSourcesResponse.md
 docs/SuperplaneListEventsResponse.md
+docs/SuperplaneListItemDefinition.md
 docs/SuperplaneListNodeExecutionsResponse.md
 docs/SuperplaneListNodeQueueItemsResponse.md
 docs/SuperplaneListStageEventsResponse.md
@@ -410,6 +412,7 @@ model_superplane_execution_result.go
 model_superplane_execution_result_reason.go
 model_superplane_execution_state.go
 model_superplane_executor.go
+model_superplane_field_option.go
 model_superplane_filter.go
 model_superplane_filter_operator.go
 model_superplane_filter_type.go
@@ -429,6 +432,7 @@ model_superplane_list_connection_groups_response.go
 model_superplane_list_event_rejections_response.go
 model_superplane_list_event_sources_response.go
 model_superplane_list_events_response.go
+model_superplane_list_item_definition.go
 model_superplane_list_node_executions_response.go
 model_superplane_list_node_queue_items_response.go
 model_superplane_list_stage_events_response.go

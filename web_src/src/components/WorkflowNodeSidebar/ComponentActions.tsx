@@ -3,11 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { componentsListComponentActions, workflowsInvokeNodeExecutionAction } from '../../api-client/sdk.gen'
 import { withOrganizationHeader } from '../../utils/withOrganizationHeader'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
-import { Button } from '../Button/button'
-import { Field, Label } from '../Fieldset/fieldset'
-import { Input } from '../Input/input'
+import { Button } from '../ui/button'
+import { Label } from '../ui/label'
+import { Input } from '../ui/input'
 import { Textarea } from '../Textarea/textarea'
-import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from '../Dialog/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 
 interface ComponentActionsProps {
@@ -127,22 +127,24 @@ export const ComponentActions = ({ executionId, componentName, executionState }:
       </div>
 
       {/* Action Modal */}
-      <Dialog open={isModalOpen} onClose={handleCloseModal}>
-        <DialogTitle>{selectedAction?.name}</DialogTitle>
-        <DialogDescription>
-          {selectedAction?.description}
-        </DialogDescription>
-        <DialogBody>
+      <Dialog open={isModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedAction?.name}</DialogTitle>
+            <DialogDescription>
+              {selectedAction?.description}
+            </DialogDescription>
+          </DialogHeader>
           {selectedAction?.parameters && selectedAction.parameters.length > 0 ? (
             <div className="space-y-4">
               {selectedAction.parameters.map((param: any) => (
-                <Field key={param.name}>
+                <div key={param.name} className="space-y-2">
                   <Label>
                     {param.name}
                     {param.required && <span className="text-red-500 ml-1">*</span>}
                   </Label>
                   {param.description && (
-                    <div className="text-xs text-gray-500 dark:text-zinc-400 mb-1">
+                    <div className="text-xs text-gray-500 dark:text-zinc-400">
                       {param.description}
                     </div>
                   )}
@@ -177,7 +179,7 @@ export const ComponentActions = ({ executionId, componentName, executionState }:
                       placeholder={`Enter ${param.name}`}
                     />
                   )}
-                </Field>
+                </div>
               ))}
             </div>
           ) : (
@@ -185,29 +187,28 @@ export const ComponentActions = ({ executionId, componentName, executionState }:
               No parameters required
             </div>
           )}
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={handleCloseModal}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleInvokeAction}
-            disabled={invokeActionMutation.isPending}
-            color="blue"
-          >
-            {invokeActionMutation.isPending ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Executing...
-              </>
-            ) : (
-              <>
-                <MaterialSymbol name="send" size="sm" />
-                Execute
-              </>
-            )}
-          </Button>
-        </DialogActions>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseModal}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleInvokeAction}
+              disabled={invokeActionMutation.isPending}
+            >
+              {invokeActionMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  Executing...
+                </>
+              ) : (
+                <>
+                  <MaterialSymbol name="send" size="sm" />
+                  Execute
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </>
   )

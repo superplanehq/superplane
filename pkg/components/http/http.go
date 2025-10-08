@@ -23,8 +23,12 @@ func (e *HTTP) Name() string {
 	return "http"
 }
 
+func (e *HTTP) Label() string {
+	return "HTTP"
+}
+
 func (e *HTTP) Description() string {
-	return "Send HTTP request. The HTTP response is sent to the default output branch"
+	return "Make HTTP requests"
 }
 
 func (e *HTTP) OutputBranches(configuration any) []string {
@@ -34,22 +38,47 @@ func (e *HTTP) OutputBranches(configuration any) []string {
 func (e *HTTP) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{
-			Name:        "url",
-			Type:        "string",
-			Description: "URL to send the HTTP request to",
-			Required:    true,
+			Name:     "url",
+			Label:    "URL",
+			Type:     components.FieldTypeURL,
+			Required: true,
 		},
 		{
-			Name:        "method",
-			Type:        "string",
-			Description: "HTTP method (GET, POST, PUT, DELETE, etc.)",
-			Required:    true,
+			Name:     "method",
+			Type:     components.FieldTypeSelect,
+			Label:    "HTTP method",
+			Required: true,
+			Default:  "POST",
+			Options: []components.FieldOption{
+				{Label: "GET", Value: "GET"},
+				{Label: "POST", Value: "POST"},
+				{Label: "PUT", Value: "PUT"},
+				{Label: "DELETE", Value: "DELETE"},
+				{Label: "PATCH", Value: "PATCH"},
+			},
 		},
 		{
-			Name:        "headers",
-			Type:        "map",
-			Description: "HTTP headers to include in the request",
-			Required:    false,
+			Name:     "headers",
+			Label:    "Headers",
+			Type:     components.FieldTypeList,
+			Required: false,
+			ListItem: &components.ListItemDefinition{
+				Type: components.FieldTypeObject,
+				Schema: []components.ConfigurationField{
+					{
+						Name:     "name",
+						Type:     components.FieldTypeString,
+						Label:    "Header Name",
+						Required: true,
+					},
+					{
+						Name:     "value",
+						Type:     components.FieldTypeString,
+						Label:    "Header value",
+						Required: true,
+					},
+				},
+			},
 		},
 	}
 }

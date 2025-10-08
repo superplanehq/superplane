@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { registerExecutionRenderer, CollapsedViewProps, ExpandedViewProps } from './registry'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
-import { Button } from '../../Button/button'
-import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from '../../Dialog/dialog'
-import { Field, Label } from '../../Fieldset/fieldset'
+import { Button } from '../../ui/button'
+import { Badge } from '../../ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../ui/dialog'
+import { Label } from '../../ui/label'
 import { Textarea } from '../../Textarea/textarea'
 import { workflowsInvokeNodeExecutionAction } from '../../../api-client/sdk.gen'
 import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
@@ -88,15 +89,14 @@ const ApprovalActions = ({ execution }: { execution: any }) => {
         <div className="flex gap-2">
           <Button
             onClick={() => setIsApproveModalOpen(true)}
-            color="green"
-            className="flex-1"
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
           >
             <MaterialSymbol name="check_circle" size="sm" />
             Approve
           </Button>
           <Button
             onClick={() => setIsRejectModalOpen(true)}
-            color="red"
+            variant="destructive"
             className="flex-1"
           >
             <MaterialSymbol name="cancel" size="sm" />
@@ -106,13 +106,15 @@ const ApprovalActions = ({ execution }: { execution: any }) => {
       </div>
 
       {/* Approve Modal */}
-      <Dialog open={isApproveModalOpen} onClose={() => setIsApproveModalOpen(false)}>
-        <DialogTitle>Approve Execution</DialogTitle>
-        <DialogDescription>
-          Add an optional comment for this approval
-        </DialogDescription>
-        <DialogBody>
-          <Field>
+      <Dialog open={isApproveModalOpen} onOpenChange={(open) => !open && setIsApproveModalOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Execution</DialogTitle>
+            <DialogDescription>
+              Add an optional comment for this approval
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
             <Label>Comment (optional)</Label>
             <Textarea
               value={comment}
@@ -120,40 +122,42 @@ const ApprovalActions = ({ execution }: { execution: any }) => {
               placeholder="Enter an optional comment"
               rows={3}
             />
-          </Field>
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={() => setIsApproveModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleApprove}
-            disabled={invokeActionMutation.isPending}
-            color="green"
-          >
-            {invokeActionMutation.isPending ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Approving...
-              </>
-            ) : (
-              <>
-                <MaterialSymbol name="check_circle" size="sm" />
-                Approve
-              </>
-            )}
-          </Button>
-        </DialogActions>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsApproveModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApprove}
+              disabled={invokeActionMutation.isPending}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {invokeActionMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  Approving...
+                </>
+              ) : (
+                <>
+                  <MaterialSymbol name="check_circle" size="sm" />
+                  Approve
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
 
       {/* Reject Modal */}
-      <Dialog open={isRejectModalOpen} onClose={() => setIsRejectModalOpen(false)}>
-        <DialogTitle>Reject Execution</DialogTitle>
-        <DialogDescription>
-          Provide a reason for rejecting this execution
-        </DialogDescription>
-        <DialogBody>
-          <Field>
+      <Dialog open={isRejectModalOpen} onOpenChange={(open) => !open && setIsRejectModalOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Execution</DialogTitle>
+            <DialogDescription>
+              Provide a reason for rejecting this execution
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
             <Label>
               Reason <span className="text-red-500">*</span>
             </Label>
@@ -163,30 +167,30 @@ const ApprovalActions = ({ execution }: { execution: any }) => {
               placeholder="Enter a reason for rejection"
               rows={3}
             />
-          </Field>
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={() => setIsRejectModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleReject}
-            disabled={invokeActionMutation.isPending}
-            color="red"
-          >
-            {invokeActionMutation.isPending ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                Rejecting...
-              </>
-            ) : (
-              <>
-                <MaterialSymbol name="cancel" size="sm" />
-                Reject
-              </>
-            )}
-          </Button>
-        </DialogActions>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRejectModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReject}
+              disabled={invokeActionMutation.isPending}
+              variant="destructive"
+            >
+              {invokeActionMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  Rejecting...
+                </>
+              ) : (
+                <>
+                  <MaterialSymbol name="cancel" size="sm" />
+                  Reject
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </>
   )
@@ -204,50 +208,41 @@ registerExecutionRenderer('approval', {
     // Determine label and styling
     let label = ''
     let iconName = 'pending'
-    let colorClasses = 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30'
-    let badgeClasses = 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+    let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' = 'secondary'
+    let badgeClassName = 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800'
 
     if (isRejected) {
       label = 'Rejected'
       iconName = 'cancel'
-      colorClasses = 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30'
-      badgeClasses = 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+      badgeVariant = 'destructive'
+      badgeClassName = ''
     } else if (isComplete) {
       label = 'Approved'
       iconName = 'check_circle'
-      colorClasses = 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
-      badgeClasses = 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+      badgeClassName = 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800'
     } else {
       label = `${approvals.length}/${requiredCount} Approvals`
       iconName = 'pending'
-      colorClasses = 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30'
-      badgeClasses = 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+      badgeClassName = 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800'
     }
 
     return (
       <div
-        className="flex items-start gap-3 cursor-pointer"
+        className="flex items-center gap-3 cursor-pointer"
         onClick={onClick}
       >
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${colorClasses}`}>
-          <MaterialSymbol name={iconName} size="sm" />
-        </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeClasses}`}>
+          <div className="flex items-center gap-2">
+            <Badge variant={badgeVariant} className={badgeClassName}>
+              <MaterialSymbol name={iconName} size="sm" />
               {label}
-            </span>
+            </Badge>
           </div>
-
-          <p className="text-xs font-mono text-gray-600 dark:text-zinc-400 truncate mb-1">
-            {execution.id}
-          </p>
-
+        </div>
+        <div className="flex-shrink-0 flex items-center gap-2">
           <p className="text-xs text-gray-400 dark:text-zinc-500">
             {formatTimeAgo(new Date(execution.createdAt))}
           </p>
-        </div>
-        <div className="flex-shrink-0">
           <MaterialSymbol
             name="expand_more"
             size="xl"

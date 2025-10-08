@@ -44,9 +44,9 @@ func (w *WorkflowEventRouter) processEvents() error {
 
 	for _, event := range events {
 		if err := w.routeEvent(&event); err != nil {
-			log.Printf("Error routing event %s: %v", event.ID, err)
+			w.log("Error routing event %s: %v", event.ID, err)
 			if err := event.Fail(); err != nil {
-				log.Printf("Error marking event %s as failed: %v", event.ID, err)
+				w.log("Error marking event %s as failed: %v", event.ID, err)
 			}
 		}
 	}
@@ -60,7 +60,7 @@ func (w *WorkflowEventRouter) routeEvent(event *models.WorkflowEvent) error {
 		return fmt.Errorf("failed to determine nodes and edges for event: %v", err)
 	}
 
-	nextNodeID, err := w.findNextNode(event.ID, nodes, edges)
+	nextNodes, err := w.findNextNodes(event.ID, nodes, edges)
 	if err != nil {
 		return fmt.Errorf("failed to find next node: %w", err)
 	}
@@ -68,8 +68,8 @@ func (w *WorkflowEventRouter) routeEvent(event *models.WorkflowEvent) error {
 	//
 	// No more nodes to execute, complete workflow event.
 	//
-	if nextNodeID == "" {
-		log.Printf("[WorkflowEventRouter] Event %s: no more nodes, completing event", event.ID)
+	if len(nextNodes) == 0 {
+		w.log("Event %s: no more nodes, completing event", event.ID)
 		if event.ParentEventID != nil {
 			return w.completeBlueprintExecution(event)
 		}
@@ -77,7 +77,7 @@ func (w *WorkflowEventRouter) routeEvent(event *models.WorkflowEvent) error {
 		return event.Complete()
 	}
 
-	log.Printf("[WorkflowEventRouter] Event %s: routing to node %s", event.ID, nextNodeID)
+	w.log("Event %s: routing to nodes %v", event.ID, nextNodes)
 
 	//
 	// Create queue entry for next node and
@@ -85,16 +85,19 @@ func (w *WorkflowEventRouter) routeEvent(event *models.WorkflowEvent) error {
 	//
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		now := time.Now()
-		queueEntry := &models.WorkflowQueueItem{
-			WorkflowID: event.WorkflowID,
-			EventID:    event.ID,
-			NodeID:     nextNodeID,
-			CreatedAt:  &now,
-		}
 
-		err := tx.Create(queueEntry).Error
-		if err != nil {
-			return err
+		for _, node := range nextNodes {
+			queueEntry := &models.WorkflowQueueItem{
+				WorkflowID: event.WorkflowID,
+				EventID:    event.ID,
+				NodeID:     node,
+				CreatedAt:  &now,
+			}
+
+			err := tx.Create(queueEntry).Error
+			if err != nil {
+				return err
+			}
 		}
 
 		return event.ProcessingInTransaction(tx)
@@ -106,7 +109,7 @@ func (w *WorkflowEventRouter) findNodesAndEdges(event *models.WorkflowEvent) ([]
 	// If this event is for a blueprint, load the blueprint structure
 	//
 	if event.BlueprintName != nil {
-		log.Printf("[WorkflowEventRouter] Event %s: routing through blueprint '%s'", event.ID, *event.BlueprintName)
+		w.log("Event %s: routing through blueprint '%s'", event.ID, *event.BlueprintName)
 		blueprint, err := models.FindBlueprintByName(*event.BlueprintName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to find blueprint %s: %w", *event.BlueprintName, err)
@@ -118,7 +121,7 @@ func (w *WorkflowEventRouter) findNodesAndEdges(event *models.WorkflowEvent) ([]
 	//
 	// Otherwise, load the workflow structure.
 	//
-	log.Printf("[WorkflowEventRouter] Event %s: routing through workflow %s", event.ID, event.WorkflowID)
+	w.log("Event %s: routing through workflow %s", event.ID, event.WorkflowID)
 	workflow, err := models.FindWorkflow(event.WorkflowID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to find workflow %s: %w", event.WorkflowID, err)
@@ -127,7 +130,7 @@ func (w *WorkflowEventRouter) findNodesAndEdges(event *models.WorkflowEvent) ([]
 	return workflow.Nodes, workflow.Edges, nil
 }
 
-func (w *WorkflowEventRouter) findNextNode(workflowEventID uuid.UUID, nodes []models.Node, edges []models.Edge) (string, error) {
+func (w *WorkflowEventRouter) findNextNodes(workflowEventID uuid.UUID, nodes []models.Node, edges []models.Edge) ([]string, error) {
 
 	//
 	// Find the last execution for this workflow event.
@@ -143,7 +146,7 @@ func (w *WorkflowEventRouter) findNextNode(workflowEventID uuid.UUID, nodes []mo
 	}
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Find outgoing edges from last executed node
@@ -159,26 +162,26 @@ func (w *WorkflowEventRouter) findNextNode(workflowEventID uuid.UUID, nodes []mo
 	// we have reached the end of the workflow event chain.
 	//
 	if len(outgoingEdges) == 0 {
-		return "", nil
+		return []string{}, nil
 	}
 
-	// Check which branch has data in outputs
+	//
+	// Compile list of node IDs to send event to.
+	// The edge between source/target nodes must specify the branch
+	// that should be taken.
+	//
+	outNodes := []string{}
 	for _, edge := range outgoingEdges {
-		if edge.Branch == "" {
-			// No branch specified, use this edge
-			return edge.TargetID, nil
-		}
-
 		outputs := lastExecution.Outputs.Data()
 		if _, exists := outputs[edge.Branch]; exists {
-			return edge.TargetID, nil
+			outNodes = append(outNodes, edge.TargetID)
 		}
 	}
 
-	return "", nil
+	return outNodes, nil
 }
 
-func (w *WorkflowEventRouter) findStartNode(nodes []models.Node, edges []models.Edge) (string, error) {
+func (w *WorkflowEventRouter) findStartNode(nodes []models.Node, edges []models.Edge) ([]string, error) {
 	//
 	// Find nodes with no incoming edges
 	// TODO: this should somehow be connected to "triggers" / "event sources"
@@ -190,15 +193,15 @@ func (w *WorkflowEventRouter) findStartNode(nodes []models.Node, edges []models.
 
 	for _, node := range nodes {
 		if !hasIncoming[node.ID] {
-			return node.ID, nil
+			return []string{node.ID}, nil
 		}
 	}
 
-	return "", nil
+	return []string{}, nil
 }
 
 func (w *WorkflowEventRouter) completeBlueprintExecution(childEvent *models.WorkflowEvent) error {
-	log.Printf("[WorkflowEventRouter] Completing blueprint execution for child event %s", childEvent.ID)
+	w.log("Completing blueprint execution for child event %s", childEvent.ID)
 
 	parentEvent, err := models.FindWorkflowEvent(childEvent.ParentEventID.String())
 	if err != nil {
@@ -217,7 +220,7 @@ func (w *WorkflowEventRouter) completeBlueprintExecution(childEvent *models.Work
 		return fmt.Errorf("failed to find blueprint node execution: %w", err)
 	}
 
-	log.Printf("[WorkflowEventRouter] Completing blueprint node execution: workflow=%s, node=%s", execution.WorkflowID, execution.NodeID)
+	w.log("Completing blueprint node execution: workflow=%s, node=%s", execution.WorkflowID, execution.NodeID)
 
 	//
 	// If this is a child event (blueprint execution), we need to:
@@ -238,7 +241,11 @@ func (w *WorkflowEventRouter) completeBlueprintExecution(childEvent *models.Work
 			return fmt.Errorf("failed to route parent event: %w", err)
 		}
 
-		log.Printf("[WorkflowEventRouter] Blueprint execution completed, parent event %s moved back to routing", parentEvent.ID)
+		w.log("Blueprint execution completed, parent event %s moved back to routing", parentEvent.ID)
 		return nil
 	})
+}
+
+func (w *WorkflowEventRouter) log(format string, v ...any) {
+	log.Printf("[WorkflowEventRouter] "+format, v...)
 }

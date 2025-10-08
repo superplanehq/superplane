@@ -74,9 +74,10 @@ message DescribeComponentResponse {
 
 message Component {
   string name = 1;
-  string description = 2;
-  repeated ConfigurationField configuration = 3;
-  repeated OutputBranch branches = 4;
+  string label = 2;
+  string description = 3;
+  repeated ConfigurationField configuration = 4;
+  repeated OutputBranch branches = 5;
 }
 
 message ConfigurationField {
@@ -84,6 +85,23 @@ message ConfigurationField {
   string type = 2;
   string description = 3;
   bool required = 4;
+  optional string default_value = 5;
+  repeated FieldOption options = 6;
+  optional int32 min = 7;
+  optional int32 max = 8;
+  optional ListItemDefinition list_item = 9;
+  repeated ConfigurationField schema = 10;
+  string label = 11;
+}
+
+message FieldOption {
+  string label = 1;
+  string value = 2;
+}
+
+message ListItemDefinition {
+  string type = 1;
+  repeated ConfigurationField schema = 2;
 }
 
 message OutputBranch {

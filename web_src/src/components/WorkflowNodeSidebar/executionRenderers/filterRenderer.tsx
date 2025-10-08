@@ -1,5 +1,6 @@
 import { registerExecutionRenderer, CollapsedViewProps, ExpandedViewProps } from './registry'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
+import { Badge } from '../../ui/badge'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
@@ -27,38 +28,28 @@ registerExecutionRenderer('filter', {
 
     // Determine icon, colors, and label based on filter result
     const iconName = matched ? 'fast_forward' : 'filter_alt_off'
-    const colorClasses = matched
-      ? 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
-      : 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30'
-    const badgeClasses = matched
-      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-      : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+    const badgeClassName = matched
+      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800'
+      : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800'
     const label = matched ? 'Forwarded' : 'Filtered'
 
     return (
       <div
-        className="flex items-start gap-3 cursor-pointer"
+        className="flex items-center gap-3 cursor-pointer"
         onClick={onClick}
       >
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${colorClasses}`}>
-          <MaterialSymbol name={iconName} size="sm" />
-        </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeClasses}`}>
+          <div className="flex items-center gap-2">
+            <Badge className={badgeClassName}>
+              <MaterialSymbol name={iconName} size="sm" />
               {label}
-            </span>
+            </Badge>
           </div>
-
-          <p className="text-xs font-mono text-gray-600 dark:text-zinc-400 truncate mb-1">
-            {execution.id}
-          </p>
-
+        </div>
+        <div className="flex-shrink-0 flex items-center gap-2">
           <p className="text-xs text-gray-400 dark:text-zinc-500">
             {formatTimeAgo(new Date(execution.createdAt))}
           </p>
-        </div>
-        <div className="flex-shrink-0">
           <MaterialSymbol
             name="expand_more"
             size="xl"
@@ -71,9 +62,24 @@ registerExecutionRenderer('filter', {
 
   renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
     const inputs = execution.inputs
+    const filterExpression = execution.configuration?.expression
 
     return (
       <div className="mt-4 space-y-4 text-left">
+        {/* Filter Expression Section */}
+        {filterExpression && (
+          <div className="space-y-3">
+            <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+              Filter Expression
+            </div>
+            <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs">
+              <code className="text-gray-800 dark:text-gray-200 font-mono text-xs break-all">
+                {filterExpression}
+              </code>
+            </div>
+          </div>
+        )}
+
         {/* Inputs Section */}
         {inputs && Object.keys(inputs).length > 0 && (
           <div className="space-y-3">

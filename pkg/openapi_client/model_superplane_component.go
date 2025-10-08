@@ -21,6 +21,7 @@ var _ MappedNullable = &SuperplaneComponent{}
 // SuperplaneComponent struct for SuperplaneComponent
 type SuperplaneComponent struct {
 	Name *string `json:"name,omitempty"`
+	Label *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Configuration []SuperplaneConfigurationField `json:"configuration,omitempty"`
 	Branches []SuperplaneOutputBranch `json:"branches,omitempty"`
@@ -73,6 +74,38 @@ func (o *SuperplaneComponent) HasName() bool {
 // SetName gets a reference to the given string and assigns it to the Name field.
 func (o *SuperplaneComponent) SetName(v string) {
 	o.Name = &v
+}
+
+// GetLabel returns the Label field value if set, zero value otherwise.
+func (o *SuperplaneComponent) GetLabel() string {
+	if o == nil || IsNil(o.Label) {
+		var ret string
+		return ret
+	}
+	return *o.Label
+}
+
+// GetLabelOk returns a tuple with the Label field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneComponent) GetLabelOk() (*string, bool) {
+	if o == nil || IsNil(o.Label) {
+		return nil, false
+	}
+	return o.Label, true
+}
+
+// HasLabel returns a boolean if a field has been set.
+func (o *SuperplaneComponent) HasLabel() bool {
+	if o != nil && !IsNil(o.Label) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabel gets a reference to the given string and assigns it to the Label field.
+func (o *SuperplaneComponent) SetLabel(v string) {
+	o.Label = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
@@ -183,6 +216,9 @@ func (o SuperplaneComponent) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
+	}
+	if !IsNil(o.Label) {
+		toSerialize["label"] = o.Label
 	}
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description

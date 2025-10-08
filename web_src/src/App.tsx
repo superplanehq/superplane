@@ -16,6 +16,7 @@ import AuthGuard from './components/AuthGuard'
 import OrganizationSelect from './pages/auth/OrganizationSelect'
 import OrganizationCreate from './pages/auth/OrganizationCreate'
 import { AccountProvider } from './contexts/AccountContext'
+import { useDarkMode } from './hooks/useDarkMode'
 
 // Create a client
 const queryClient = new QueryClient({
@@ -44,6 +45,9 @@ const withAuthOnly = (Component: React.ComponentType) => (
 
 // Main App component with router
 function App() {
+  // Initialize dark mode handling
+  useDarkMode()
+
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>

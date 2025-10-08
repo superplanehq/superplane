@@ -38,19 +38,9 @@ func validateConfiguration(nodeID string, config any, component components.Compo
 		return fmt.Errorf("node %s: invalid configuration format", nodeID)
 	}
 
-	// Check required fields
-	for _, field := range configFields {
-		if field.Required {
-			value, exists := configMap[field.Name]
-			if !exists {
-				return fmt.Errorf("node %s: required configuration field '%s' is missing", nodeID, field.Name)
-			}
-
-			// Check if the value is empty
-			if value == nil || value == "" {
-				return fmt.Errorf("node %s: required configuration field '%s' cannot be empty", nodeID, field.Name)
-			}
-		}
+	// Validate configuration using the components validation function
+	if err := components.ValidateConfiguration(configFields, configMap); err != nil {
+		return fmt.Errorf("node %s: %w", nodeID, err)
 	}
 
 	return nil

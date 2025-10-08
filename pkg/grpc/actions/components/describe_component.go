@@ -24,12 +24,7 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 	configFields := component.Configuration()
 	configuration := make([]*pb.ConfigurationField, len(configFields))
 	for i, field := range configFields {
-		configuration[i] = &pb.ConfigurationField{
-			Name:        field.Name,
-			Type:        field.Type,
-			Description: field.Description,
-			Required:    field.Required,
-		}
+		configuration[i] = ConfigurationFieldToProto(field)
 	}
 
 	return &pb.DescribeComponentResponse{

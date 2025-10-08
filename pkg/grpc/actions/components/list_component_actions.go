@@ -20,12 +20,7 @@ func ListComponentActions(ctx context.Context, registry *registry.Registry, name
 		// Convert ConfigurationFields to protobuf format
 		parameters := make([]*pb.ConfigurationField, len(action.Parameters))
 		for j, param := range action.Parameters {
-			parameters[j] = &pb.ConfigurationField{
-				Name:        param.Name,
-				Type:        param.Type,
-				Description: param.Description,
-				Required:    param.Required,
-			}
+			parameters[j] = ConfigurationFieldToProto(param)
 		}
 
 		pbActions[i] = &pb.ComponentAction{

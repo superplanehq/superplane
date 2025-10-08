@@ -18,13 +18,13 @@ export const DefaultNode = memo(({ data, id }: NodeProps<DefaultNodeData>) => {
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-zinc-500 !border-2 !border-white dark:!border-zinc-800"
+        className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white dark:!border-zinc-800"
       />
 
       {/* Node header */}
       <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-900/20">
         <div className="flex items-center gap-2">
-          <MaterialSymbol name="widgets" size="sm" className="text-zinc-600 dark:text-zinc-400" />
+          <MaterialSymbol name="widgets" size="sm" className="text-blue-600 dark:text-blue-400" />
           <div className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
             {data.label}
           </div>
@@ -51,7 +51,7 @@ export const DefaultNode = memo(({ data, id }: NodeProps<DefaultNodeData>) => {
               type="source"
               position={Position.Right}
               id={branch}
-              className="!w-3 !h-3 !bg-zinc-500 !border-2 !border-white dark:!border-zinc-800 !right-[-6px]"
+              className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white dark:!border-zinc-800 !right-[-6px]"
               style={{
                 top: '50%',
                 transform: 'translateY(-50%)',

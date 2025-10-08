@@ -1,5 +1,6 @@
 import { registerExecutionRenderer, CollapsedViewProps, ExpandedViewProps } from './registry'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
+import { Badge } from '../../ui/badge'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
@@ -7,11 +8,26 @@ import { darkTheme } from '@uiw/react-json-view/dark'
 const getResultBadge = (result: string) => {
   switch (result) {
     case 'RESULT_PASSED':
-      return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Passed</span>
+      return (
+        <Badge className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800">
+          <MaterialSymbol name="check_circle" size="sm" />
+          Passed
+        </Badge>
+      )
     case 'RESULT_FAILED':
-      return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">Failed</span>
+      return (
+        <Badge variant="destructive">
+          <MaterialSymbol name="cancel" size="sm" />
+          Failed
+        </Badge>
+      )
     case 'RESULT_CANCELLED':
-      return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300">Cancelled</span>
+      return (
+        <Badge variant="secondary">
+          <MaterialSymbol name="block" size="sm" />
+          Cancelled
+        </Badge>
+      )
     default:
       return null
   }
@@ -51,7 +67,7 @@ registerExecutionRenderer('http', {
 
     return (
       <div
-        className="flex items-start gap-3 cursor-pointer"
+        className="flex items-center gap-3 cursor-pointer"
         onClick={onClick}
       >
         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center`}>
@@ -60,7 +76,7 @@ registerExecutionRenderer('http', {
           </span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2">
             {statusCode && method && url ? (
               <>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-gray-300 dark:text-zinc-400`}>
@@ -87,7 +103,7 @@ registerExecutionRenderer('http', {
             )}
           </div>
         </div>
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 flex items-center gap-2">
           <p className="text-xs text-gray-400 dark:text-zinc-500">
             {formatTimeAgo(new Date(execution.createdAt))}
           </p>
@@ -104,8 +120,8 @@ registerExecutionRenderer('http', {
   renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
     const outputs = execution.outputs
 
-    // Extract HTTP-specific information
-    const method = execution.configuration?.method
+    // Extract HTTP-specific information from configuration
+    const method = execution.configuration?.method || 'GET'
     const url = execution.configuration?.url || ''
 
     // Extract response information from outputs
@@ -124,7 +140,7 @@ registerExecutionRenderer('http', {
           <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-gray-800 dark:text-gray-200 font-mono break-all">{method}</span>
+                <span className="text-gray-800 dark:text-gray-200 font-mono font-semibold">{method}</span>
                 <span className="text-gray-800 dark:text-gray-200 font-mono break-all">{url}</span>
               </div>
 

@@ -3,6 +3,7 @@ package workflows
 import (
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
@@ -200,9 +201,16 @@ func validateNodeRef(registry *registry.Registry, node *pb.WorkflowNode) error {
 			return fmt.Errorf("component name is required")
 		}
 
-		_, err := registry.GetComponent(node.Component.Name)
+		component, err := registry.GetComponent(node.Component.Name)
 		if err != nil {
 			return fmt.Errorf("component %s not found", node.Component.Name)
+		}
+
+		// Validate component configuration
+		configMap := node.Configuration.AsMap()
+		configFields := component.Configuration()
+		if err := components.ValidateConfiguration(configFields, configMap); err != nil {
+			return fmt.Errorf("configuration validation failed: %w", err)
 		}
 
 		return nil

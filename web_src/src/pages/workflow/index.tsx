@@ -16,19 +16,19 @@ import {
 import '@xyflow/react/dist/style.css'
 import { useWorkflow, useUpdateWorkflow } from '../../hooks/useWorkflowData'
 import { useComponents, useBlueprints } from '../../hooks/useBlueprintData'
-import { Button } from '../../components/Button/button'
+import { Button } from '../../components/ui/button'
 import { MaterialSymbol } from '../../components/MaterialSymbol/material-symbol'
 import { Heading } from '../../components/Heading/heading'
 import { Text } from '../../components/Text/text'
-import { Input } from '../../components/Input/input'
-import { Field, Label } from '../../components/Fieldset/fieldset'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 import {
   Dialog,
-  DialogTitle,
-  DialogDescription,
-  DialogBody,
-  DialogActions
-} from '../../components/Dialog/dialog'
+  DialogContent,
+  DialogFooter,
+} from '../../components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs'
+import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from '../../components/ui/item'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 import { IfNode } from '../blueprint/components/nodes/IfNode'
 import { HttpNode } from '../blueprint/components/nodes/HttpNode'
@@ -37,6 +37,10 @@ import { SwitchNode } from '../blueprint/components/nodes/SwitchNode'
 import { ApprovalNode } from '../blueprint/components/nodes/ApprovalNode'
 import { DefaultNode } from '../blueprint/components/nodes/DefaultNode'
 import { WorkflowNodeSidebar } from '../../components/WorkflowNodeSidebar'
+import { ConfigurationFieldRenderer } from '../../components/ConfigurationFieldRenderer'
+import { ScrollArea } from '../../components/ui/scroll-area'
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../../components/ui/resizable'
+import ELK from 'elkjs/lib/elk.bundled.js'
 
 const nodeTypes = {
   if: IfNode,
@@ -47,8 +51,48 @@ const nodeTypes = {
   default: DefaultNode,
 }
 
+const elk = new ELK()
+
+const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
+  const graph = {
+    id: 'root',
+    layoutOptions: {
+      'elk.algorithm': 'layered',
+      'elk.direction': 'RIGHT',
+      'elk.spacing.nodeNode': '80',
+      'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+    },
+    children: nodes.map((node) => ({
+      id: node.id,
+      width: 180,
+      height: 100,
+    })),
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      sources: [edge.source],
+      targets: [edge.target],
+    })),
+  }
+
+  const layoutedGraph = await elk.layout(graph)
+
+  const layoutedNodes = nodes.map((node) => {
+    const layoutedNode = layoutedGraph.children?.find((n) => n.id === node.id)
+    return {
+      ...node,
+      position: {
+        x: layoutedNode?.x ?? 0,
+        y: layoutedNode?.y ?? 0,
+      },
+    }
+  })
+
+  return { nodes: layoutedNodes, edges }
+}
+
 type BuildingBlock = {
   name: string
+  label?: string
   description?: string
   type: 'component' | 'blueprint'
   branches?: { name: string }[]
@@ -66,7 +110,7 @@ export const Workflow = () => {
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; branch: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'components' | 'blueprints'>('components')
-  const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string } | null>(null)
+  const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string; componentLabel?: string } | null>(null)
 
   // Fetch workflow, components, and blueprints
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!)
@@ -91,7 +135,7 @@ export const Workflow = () => {
   useEffect(() => {
     if (!workflow || buildingBlocks.length === 0) return
 
-    const loadedNodes: Node[] = (workflow.nodes || []).map((node: any, index: number) => {
+    const loadedNodes: Node[] = (workflow.nodes || []).map((node: any) => {
       const isComponent = node.refType === 'REF_TYPE_COMPONENT'
       const blockName = isComponent ? node.component?.name : node.blueprint?.name
       const block = buildingBlocks.find((b: BuildingBlock) =>
@@ -116,7 +160,7 @@ export const Workflow = () => {
           configuration: node.configuration || {},
           onAddNode: handleAddNodeFromBranch,
         },
-        position: { x: index * 250, y: 100 },
+        position: { x: 0, y: 0 }, // Will be set by elk
       }
     })
 
@@ -126,16 +170,19 @@ export const Workflow = () => {
       sourceHandle: edge.branch || 'default',
       target: edge.targetId,
       label: edge.branch,
-      markerEnd: { type: MarkerType.ArrowClosed },
+      style: { strokeWidth: 2, stroke: '#64748b' },
     }))
 
-    setNodes(loadedNodes)
-    setEdges(loadedEdges)
+    // Apply elk layout
+    getLayoutedElements(loadedNodes, loadedEdges).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+      setNodes(layoutedNodes)
+      setEdges(layoutedEdges)
+    })
   }, [workflow, buildingBlocks.length, setNodes, setEdges, handleAddNodeFromBranch])
 
   const onConnect = useCallback(
     (params: Connection) => {
-      setEdges((eds) => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed } }, eds))
+      setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 2, stroke: '#64748b' } }, eds))
     },
     [setEdges]
   )
@@ -155,13 +202,17 @@ export const Workflow = () => {
   }
 
   const handleNodeClick = useCallback((_: any, node: Node) => {
+    const block = buildingBlocks.find((b: BuildingBlock) =>
+      b.name === node.data.blockName && b.type === node.data.blockType
+    )
     setSelectedNode({
       id: node.id,
       name: node.data.label,
       isBlueprintNode: node.data.blockType === 'blueprint',
-      nodeType: node.data.blockName
+      nodeType: node.data.blockName,
+      componentLabel: block?.label
     })
-  }, [])
+  }, [buildingBlocks])
 
   const handleNodeDoubleClick = useCallback((_: any, node: Node) => {
     const block = buildingBlocks.find((b: BuildingBlock) =>
@@ -230,7 +281,7 @@ export const Workflow = () => {
           sourceHandle: connectingFrom.branch,
           target: newNodeId,
           label: connectingFrom.branch,
-          markerEnd: { type: MarkerType.ArrowClosed },
+          style: { strokeWidth: 2, stroke: '#64748b' },
         }
         setEdges((eds) => [...eds, newEdge])
         setConnectingFrom(null)
@@ -306,7 +357,7 @@ export const Workflow = () => {
       <div className="flex flex-col items-center justify-center h-screen">
         <MaterialSymbol name="error" className="text-red-500 mb-4" size="xl" />
         <Heading level={2}>Workflow not found</Heading>
-        <Button onClick={() => navigate(`/${organizationId}`)} className="mt-4">
+        <Button variant="outline" onClick={() => navigate(`/${organizationId}`)} className="mt-4">
           Go back to home
         </Button>
       </div>
@@ -322,7 +373,7 @@ export const Workflow = () => {
       {/* Header */}
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button plain onClick={() => navigate(`/${organizationId}`)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/${organizationId}`)}>
             <MaterialSymbol name="arrow_back" />
           </Button>
           <div>
@@ -334,10 +385,8 @@ export const Workflow = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button
-            color="blue"
             onClick={handleSave}
             disabled={updateWorkflowMutation.isPending}
-            className="flex items-center gap-2"
           >
             <MaterialSymbol name="save" />
             {updateWorkflowMutation.isPending ? 'Saving...' : 'Save'}
@@ -350,226 +399,210 @@ export const Workflow = () => {
         {/* Sidebar */}
         {isSidebarOpen && (
           <div className="w-96 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col z-50">
-            {/* Sidebar Header */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-0">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setIsSidebarOpen(false)}
-                  aria-label="Close sidebar"
-                  className="px-2 py-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 rounded-md shadow-md hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all duration-300 flex items-center gap-2"
-                >
-                  <MaterialSymbol name="menu_open" size="lg" className="text-gray-600 dark:text-zinc-300" />
-                </button>
-                <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">
-                  Building Blocks
-                </h2>
-              </div>
+            {/* Sidebar Header with Tabs */}
+            <div className="flex items-center gap-3 px-4 pt-4 pb-0">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsSidebarOpen(false)}
+                aria-label="Close sidebar"
+              >
+                <MaterialSymbol name="menu_open" size="lg" />
+              </Button>
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'components' | 'blueprints')} className="flex-1">
+                <TabsList className="w-full">
+                  <TabsTrigger value="components" className="flex-1">
+                    Components
+                  </TabsTrigger>
+                  <TabsTrigger value="blueprints" className="flex-1">
+                    Blueprints
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
 
-            {/* Tab selector */}
-            <div className="px-4 pt-4">
-              <div className="flex gap-2 border-b border-zinc-200 dark:border-zinc-700">
-                <button
-                  onClick={() => setActiveTab('components')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === 'components'
-                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                      : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
-                  }`}
-                >
-                  Components
-                </button>
-                <button
-                  onClick={() => setActiveTab('blueprints')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === 'blueprints'
-                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                      : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
-                  }`}
-                >
-                  Blueprints
-                </button>
-              </div>
-            </div>
+            {/* Tab Content */}
+            <div className="flex-1 overflow-hidden px-4">
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'components' | 'blueprints')} className="flex-1 flex flex-col h-full">
+                <TabsContent value="components" className="flex-1 overflow-y-auto text-left mt-4 data-[state=inactive]:hidden">
+                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+                    Click on a component to add it to your workflow
+                  </div>
+                  <ItemGroup>
+                    {buildingBlocks.filter(b => b.type === 'component').map((block: BuildingBlock) => {
+                      // Map block name to icon
+                      const iconMap: Record<string, string> = {
+                        if: 'alt_route',
+                        http: 'http',
+                        filter: 'filter_alt',
+                        switch: 'settings_input_component',
+                      }
+                      const icon = block.type === 'component'
+                        ? (iconMap[block.name] || 'widgets')
+                        : 'account_tree'
 
-            {/* Sidebar Content */}
-            <div className="flex-1 overflow-y-auto text-left p-4">
-              <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                Click on a {activeTab === 'components' ? 'component' : 'blueprint'} to add it to your workflow
-              </div>
-              <div className="space-y-1">
-                {displayedBlocks.map((block: BuildingBlock) => {
-                  // Map block name to icon
-                  const iconMap: Record<string, string> = {
-                    if: 'alt_route',
-                    http: 'http',
-                    filter: 'filter_alt',
-                    switch: 'settings_input_component',
-                  }
-                  const icon = block.type === 'component'
-                    ? (iconMap[block.name] || 'widgets')
-                    : 'account_tree'
+                      return (
+                        <Item
+                          key={`${block.type}-${block.name}`}
+                          onClick={() => handleBlockClick(block)}
+                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                          size="sm"
+                        >
+                          <ItemMedia>
+                            <MaterialSymbol name={icon} size="lg" className="text-blue-600 dark:text-blue-400" />
+                          </ItemMedia>
+                          <ItemContent>
+                            <ItemTitle>{block.label || block.name}</ItemTitle>
+                            {block.description && (
+                              <ItemDescription>{block.description}</ItemDescription>
+                            )}
+                          </ItemContent>
+                        </Item>
+                      )
+                    })}
+                  </ItemGroup>
+                </TabsContent>
 
-                  return (
-                    <div
-                      key={`${block.type}-${block.name}`}
-                      onClick={() => handleBlockClick(block)}
-                      className="p-3 rounded-lg cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 transition-colors"
-                    >
-                      <div className="flex items-start gap-3">
-                        <MaterialSymbol name={icon} size="lg" className="text-zinc-600 dark:text-zinc-400 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-gray-900 dark:text-zinc-100 mb-1">{block.name}</div>
-                          {block.description && (
-                            <div className="text-xs text-gray-500 dark:text-zinc-400">{block.description}</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                <TabsContent value="blueprints" className="flex-1 overflow-y-auto text-left mt-4 data-[state=inactive]:hidden">
+                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+                    Click on a blueprint to add it to your workflow
+                  </div>
+                  <ItemGroup>
+                    {buildingBlocks.filter(b => b.type === 'blueprint').map((block: BuildingBlock) => {
+                      const icon = 'account_tree'
+
+                      return (
+                        <Item
+                          key={`${block.type}-${block.name}`}
+                          onClick={() => handleBlockClick(block)}
+                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                          size="sm"
+                        >
+                          <ItemMedia>
+                            <MaterialSymbol name={icon} size="lg" className="text-blue-600 dark:text-blue-400" />
+                          </ItemMedia>
+                          <ItemContent>
+                            <ItemTitle>{block.label || block.name}</ItemTitle>
+                            {block.description && (
+                              <ItemDescription>{block.description}</ItemDescription>
+                            )}
+                          </ItemContent>
+                        </Item>
+                      )
+                    })}
+                  </ItemGroup>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         )}
 
-        {/* React Flow Canvas */}
-        <div className="flex-1 relative">
-          {!isSidebarOpen && (
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="absolute top-4 left-4 z-10 px-2 py-1 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 rounded-md shadow-md hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all duration-300 flex items-center gap-2"
-              aria-label="Open sidebar"
-            >
-              <MaterialSymbol name="menu" size="lg" className="text-gray-600 dark:text-zinc-300" />
-            </button>
-          )}
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={handleNodeClick}
-            onNodeDoubleClick={handleNodeDoubleClick}
-            fitView
-            colorMode="system"
-          >
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={24}
-              size={1}
-            />
-            <Controls />
-          </ReactFlow>
-        </div>
+        {/* React Flow Canvas and Right Sidebar */}
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
+          <ResizablePanel defaultSize={selectedNode ? 65 : 100} minSize={30}>
+            <div className="relative h-full">
+              {!isSidebarOpen && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsSidebarOpen(true)}
+                  aria-label="Open sidebar"
+                  className="absolute top-4 left-4 z-10 shadow-md"
+                >
+                  <MaterialSymbol name="menu" size="lg" />
+                </Button>
+              )}
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                nodeTypes={nodeTypes}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={handleNodeClick}
+                onNodeDoubleClick={handleNodeDoubleClick}
+                fitView
+                colorMode="system"
+              >
+                <Background
+                  variant={BackgroundVariant.Dots}
+                  gap={24}
+                  size={1}
+                />
+                <Controls />
+              </ReactFlow>
+            </div>
+          </ResizablePanel>
 
-        {/* Node Details Sidebar */}
-        {selectedNode && (
-          <WorkflowNodeSidebar
-            workflowId={workflowId!}
-            nodeId={selectedNode.id}
-            nodeName={selectedNode.name}
-            onClose={() => setSelectedNode(null)}
-            isBlueprintNode={selectedNode.isBlueprintNode}
-            nodeType={selectedNode.nodeType}
-          />
-        )}
+          {/* Node Details Sidebar */}
+          {selectedNode && (
+            <>
+              <ResizableHandle />
+              <ResizablePanel defaultSize={35} minSize={20} maxSize={60}>
+                <WorkflowNodeSidebar
+                  workflowId={workflowId!}
+                  nodeId={selectedNode.id}
+                  nodeName={selectedNode.name}
+                  onClose={() => setSelectedNode(null)}
+                  isBlueprintNode={selectedNode.isBlueprintNode}
+                  nodeType={selectedNode.nodeType}
+                  componentLabel={selectedNode.componentLabel}
+                />
+              </ResizablePanel>
+            </>
+          )}
+        </ResizablePanelGroup>
       </div>
 
       {/* Add/Edit Node Modal */}
-      <Dialog open={isAddNodeModalOpen} onClose={handleCloseModal} size="lg">
-        <DialogTitle>{editingNodeId ? 'Edit' : 'Add'} {selectedBlock?.name}</DialogTitle>
-        <DialogDescription>
-          Configure the node for this {selectedBlock?.type}
-        </DialogDescription>
-        <DialogBody>
-          <div className="space-y-4">
-            <Field>
-              <Label>Node Name *</Label>
-              <Input
-                type="text"
-                value={nodeName}
-                onChange={(e) => setNodeName(e.target.value)}
-                placeholder="Enter a name for this node"
-                autoFocus
-              />
-            </Field>
-
-            {/* Dynamic configuration fields */}
-            {selectedBlock?.configuration?.map((field: any) => (
-              <Field key={field.name}>
-                <Label>
-                  {field.name} {field.required && '*'}
-                </Label>
-                {field.description && (
-                  <p className="text-xs text-gray-500 dark:text-zinc-400 mb-1">{field.description}</p>
-                )}
-                {field.type === 'map' ? (
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100"
-                    value={nodeConfiguration[field.name] ? JSON.stringify(nodeConfiguration[field.name], null, 2) : ''}
-                    onChange={(e) => {
-                      try {
-                        const parsed = e.target.value ? JSON.parse(e.target.value) : {}
-                        setNodeConfiguration({ ...nodeConfiguration, [field.name]: parsed })
-                      } catch {
-                        // Invalid JSON, keep as string for now
-                      }
-                    }}
-                    placeholder={`Enter ${field.name} as JSON`}
-                    rows={3}
-                  />
-                ) : field.type === 'array' ? (
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100"
-                    value={nodeConfiguration[field.name] ? JSON.stringify(nodeConfiguration[field.name], null, 2) : ''}
-                    onChange={(e) => {
-                      try {
-                        const parsed = e.target.value ? JSON.parse(e.target.value) : []
-                        setNodeConfiguration({ ...nodeConfiguration, [field.name]: parsed })
-                      } catch {
-                        // Invalid JSON, keep as string for now
-                      }
-                    }}
-                    placeholder={`Enter ${field.name} as JSON array`}
-                    rows={4}
-                  />
-                ) : field.type === 'number' ? (
-                  <Input
-                    type="number"
-                    value={nodeConfiguration[field.name] ?? ''}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? undefined : Number(e.target.value)
-                      setNodeConfiguration({ ...nodeConfiguration, [field.name]: value })
-                    }}
-                    placeholder={`Enter ${field.name}`}
-                  />
-                ) : (
+      <Dialog open={isAddNodeModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
+        <DialogContent className="max-w-2xl p-0" showCloseButton={false}>
+          <ScrollArea className="max-h-[80vh]">
+            <div className="p-6">
+              <div className="space-y-6">
+                {/* Node identification section */}
+                <div className="flex items-center gap-3">
+                  <Label className="min-w-[100px] text-left">Node Name</Label>
                   <Input
                     type="text"
-                    value={nodeConfiguration[field.name] || ''}
-                    onChange={(e) => setNodeConfiguration({ ...nodeConfiguration, [field.name]: e.target.value })}
-                    placeholder={`Enter ${field.name}`}
+                    value={nodeName}
+                    onChange={(e) => setNodeName(e.target.value)}
+                    placeholder="Enter a name for this node"
+                    autoFocus
+                    className="flex-1"
                   />
+                </div>
+
+                {/* Configuration section */}
+                {selectedBlock?.configuration && selectedBlock.configuration.length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
+                    {selectedBlock.configuration.map((field: any) => (
+                      <ConfigurationFieldRenderer
+                        key={field.name}
+                        field={field}
+                        value={nodeConfiguration[field.name]}
+                        onChange={(value) => setNodeConfiguration({ ...nodeConfiguration, [field.name]: value })}
+                      />
+                    ))}
+                  </div>
                 )}
-              </Field>
-            ))}
-          </div>
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={handleCloseModal}>
-            Cancel
-          </Button>
-          <Button
-            color="blue"
-            onClick={handleAddNode}
-            disabled={!nodeName.trim()}
-          >
-            {editingNodeId ? 'Save' : 'Add Node'}
-          </Button>
-        </DialogActions>
+              </div>
+
+              <DialogFooter className="mt-6">
+                <Button variant="outline" onClick={handleCloseModal}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={handleAddNode}
+                  disabled={!nodeName.trim()}
+                >
+                  {editingNodeId ? 'Save' : 'Add Node'}
+                </Button>
+              </DialogFooter>
+            </div>
+          </ScrollArea>
+        </DialogContent>
       </Dialog>
     </div>
   )

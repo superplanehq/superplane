@@ -6,12 +6,14 @@ interface ApprovalNodeData {
   label: string
   component: string
   branches?: string[]
+  configuration?: Record<string, any>
   onAddNode?: (sourceId: string, branch: string) => void
 }
 
 export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
   const branches = data.branches || ['default']
   const branch = branches[0]
+  const requiredCount = data.configuration?.count
 
   return (
     <div className="bg-white dark:bg-zinc-800 border-2 border-zinc-400 dark:border-zinc-500 rounded-lg shadow-md min-w-[180px]">
@@ -19,18 +21,25 @@ export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-zinc-500 !border-2 !border-white dark:!border-zinc-800"
+        className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white dark:!border-zinc-800"
       />
 
       {/* Node header */}
       <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-900/20">
         <div className="flex items-center gap-2">
-          <MaterialSymbol name="check" size="sm" className="text-zinc-600 dark:text-zinc-400" />
+          <MaterialSymbol name="check" size="sm" className="text-blue-600 dark:text-blue-400" />
           <div className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
             {data.label}
           </div>
         </div>
       </div>
+
+      {/* Configuration */}
+      {requiredCount && (
+        <div className="px-4 py-2 border-t border-zinc-200 dark:border-zinc-700 text-xs text-slate-600 dark:text-slate-400 text-left">
+          Requires {requiredCount} approval{requiredCount !== 1 ? 's' : ''}
+        </div>
+      )}
 
       {/* Output branch */}
       <div className="border-t border-zinc-200 dark:border-zinc-700">
@@ -44,7 +53,7 @@ export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
             type="source"
             position={Position.Right}
             id={branch}
-            className="!w-3 !h-3 !bg-zinc-500 !border-2 !border-white dark:!border-zinc-800 !right-[-6px]"
+            className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white dark:!border-zinc-800 !right-[-6px]"
             style={{
               top: '50%',
               transform: 'translateY(-50%)',

@@ -53,6 +53,23 @@ func InvokeNodeExecutionAction(ctx context.Context, registry *registry.Registry,
 		return nil, fmt.Errorf("component not found: %w", err)
 	}
 
+	// Validate action exists and parameters
+	var actionDef *components.Action
+	for _, action := range component.Actions() {
+		if action.Name == actionName {
+			actionDef = &action
+			break
+		}
+	}
+	if actionDef == nil {
+		return nil, fmt.Errorf("action '%s' not found for component '%s'", actionName, node.Ref.Component.Name)
+	}
+
+	// Validate action parameters
+	if err := components.ValidateConfiguration(actionDef.Parameters, parameters); err != nil {
+		return nil, fmt.Errorf("action parameter validation failed: %w", err)
+	}
+
 	event, err := models.FindWorkflowEvent(execution.EventID.String())
 	if err != nil {
 		return nil, fmt.Errorf("workflow event not found: %w", err)

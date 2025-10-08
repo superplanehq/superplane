@@ -8,8 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/components"
 )
 
-const ComponentName = "approval"
-
 /*
  * Configuration for the component.
  * Filled when the component is added to a blueprint/workflow.
@@ -62,11 +60,15 @@ type ApprovalRecord struct {
 type Approval struct{}
 
 func (a *Approval) Name() string {
-	return ComponentName
+	return "approval"
+}
+
+func (a *Approval) Label() string {
+	return "Approval"
 }
 
 func (a *Approval) Description() string {
-	return "Wait for approvals before continuing execution. Execution moves to waiting state until required approvals are received."
+	return "Collect approvals on events"
 }
 
 func (a *Approval) OutputBranches(configuration any) []string {
@@ -74,12 +76,15 @@ func (a *Approval) OutputBranches(configuration any) []string {
 }
 
 func (a *Approval) Configuration() []components.ConfigurationField {
+	min := 1
 	return []components.ConfigurationField{
 		{
 			Name:        "count",
-			Type:        "number",
+			Label:       "Number of approvals",
+			Type:        components.FieldTypeNumber,
 			Description: "Number of approvals required before execution continues",
 			Required:    true,
+			Min:         &min,
 		},
 	}
 }
@@ -89,13 +94,6 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return err
-	}
-
-	//
-	// TODO: this should be validated before it even gets here.
-	//
-	if config.Count < 1 {
-		return fmt.Errorf("count must be at least 1")
 	}
 
 	//
@@ -114,8 +112,9 @@ func (a *Approval) Actions() []components.Action {
 			Parameters: []components.ConfigurationField{
 				{
 					Name:        "comment",
-					Type:        "string",
-					Description: "Optional comment for the approval",
+					Label:       "Comment",
+					Type:        components.FieldTypeString,
+					Description: "Leave a comment before approving",
 					Required:    false,
 				},
 			},
@@ -126,7 +125,8 @@ func (a *Approval) Actions() []components.Action {
 			Parameters: []components.ConfigurationField{
 				{
 					Name:        "reason",
-					Type:        "string",
+					Label:       "Reason",
+					Type:        components.FieldTypeString,
 					Description: "Reason for rejection",
 					Required:    true,
 				},

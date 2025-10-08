@@ -24,6 +24,13 @@ type SuperplaneConfigurationField struct {
 	Type *string `json:"type,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Required *bool `json:"required,omitempty"`
+	DefaultValue *string `json:"defaultValue,omitempty"`
+	Options []SuperplaneFieldOption `json:"options,omitempty"`
+	Min *int32 `json:"min,omitempty"`
+	Max *int32 `json:"max,omitempty"`
+	ListItem *SuperplaneListItemDefinition `json:"listItem,omitempty"`
+	Schema []SuperplaneConfigurationField `json:"schema,omitempty"`
+	Label *string `json:"label,omitempty"`
 }
 
 // NewSuperplaneConfigurationField instantiates a new SuperplaneConfigurationField object
@@ -171,6 +178,230 @@ func (o *SuperplaneConfigurationField) SetRequired(v bool) {
 	o.Required = &v
 }
 
+// GetDefaultValue returns the DefaultValue field value if set, zero value otherwise.
+func (o *SuperplaneConfigurationField) GetDefaultValue() string {
+	if o == nil || IsNil(o.DefaultValue) {
+		var ret string
+		return ret
+	}
+	return *o.DefaultValue
+}
+
+// GetDefaultValueOk returns a tuple with the DefaultValue field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConfigurationField) GetDefaultValueOk() (*string, bool) {
+	if o == nil || IsNil(o.DefaultValue) {
+		return nil, false
+	}
+	return o.DefaultValue, true
+}
+
+// HasDefaultValue returns a boolean if a field has been set.
+func (o *SuperplaneConfigurationField) HasDefaultValue() bool {
+	if o != nil && !IsNil(o.DefaultValue) {
+		return true
+	}
+
+	return false
+}
+
+// SetDefaultValue gets a reference to the given string and assigns it to the DefaultValue field.
+func (o *SuperplaneConfigurationField) SetDefaultValue(v string) {
+	o.DefaultValue = &v
+}
+
+// GetOptions returns the Options field value if set, zero value otherwise.
+func (o *SuperplaneConfigurationField) GetOptions() []SuperplaneFieldOption {
+	if o == nil || IsNil(o.Options) {
+		var ret []SuperplaneFieldOption
+		return ret
+	}
+	return o.Options
+}
+
+// GetOptionsOk returns a tuple with the Options field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConfigurationField) GetOptionsOk() ([]SuperplaneFieldOption, bool) {
+	if o == nil || IsNil(o.Options) {
+		return nil, false
+	}
+	return o.Options, true
+}
+
+// HasOptions returns a boolean if a field has been set.
+func (o *SuperplaneConfigurationField) HasOptions() bool {
+	if o != nil && !IsNil(o.Options) {
+		return true
+	}
+
+	return false
+}
+
+// SetOptions gets a reference to the given []SuperplaneFieldOption and assigns it to the Options field.
+func (o *SuperplaneConfigurationField) SetOptions(v []SuperplaneFieldOption) {
+	o.Options = v
+}
+
+// GetMin returns the Min field value if set, zero value otherwise.
+func (o *SuperplaneConfigurationField) GetMin() int32 {
+	if o == nil || IsNil(o.Min) {
+		var ret int32
+		return ret
+	}
+	return *o.Min
+}
+
+// GetMinOk returns a tuple with the Min field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConfigurationField) GetMinOk() (*int32, bool) {
+	if o == nil || IsNil(o.Min) {
+		return nil, false
+	}
+	return o.Min, true
+}
+
+// HasMin returns a boolean if a field has been set.
+func (o *SuperplaneConfigurationField) HasMin() bool {
+	if o != nil && !IsNil(o.Min) {
+		return true
+	}
+
+	return false
+}
+
+// SetMin gets a reference to the given int32 and assigns it to the Min field.
+func (o *SuperplaneConfigurationField) SetMin(v int32) {
+	o.Min = &v
+}
+
+// GetMax returns the Max field value if set, zero value otherwise.
+func (o *SuperplaneConfigurationField) GetMax() int32 {
+	if o == nil || IsNil(o.Max) {
+		var ret int32
+		return ret
+	}
+	return *o.Max
+}
+
+// GetMaxOk returns a tuple with the Max field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConfigurationField) GetMaxOk() (*int32, bool) {
+	if o == nil || IsNil(o.Max) {
+		return nil, false
+	}
+	return o.Max, true
+}
+
+// HasMax returns a boolean if a field has been set.
+func (o *SuperplaneConfigurationField) HasMax() bool {
+	if o != nil && !IsNil(o.Max) {
+		return true
+	}
+
+	return false
+}
+
+// SetMax gets a reference to the given int32 and assigns it to the Max field.
+func (o *SuperplaneConfigurationField) SetMax(v int32) {
+	o.Max = &v
+}
+
+// GetListItem returns the ListItem field value if set, zero value otherwise.
+func (o *SuperplaneConfigurationField) GetListItem() SuperplaneListItemDefinition {
+	if o == nil || IsNil(o.ListItem) {
+		var ret SuperplaneListItemDefinition
+		return ret
+	}
+	return *o.ListItem
+}
+
+// GetListItemOk returns a tuple with the ListItem field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConfigurationField) GetListItemOk() (*SuperplaneListItemDefinition, bool) {
+	if o == nil || IsNil(o.ListItem) {
+		return nil, false
+	}
+	return o.ListItem, true
+}
+
+// HasListItem returns a boolean if a field has been set.
+func (o *SuperplaneConfigurationField) HasListItem() bool {
+	if o != nil && !IsNil(o.ListItem) {
+		return true
+	}
+
+	return false
+}
+
+// SetListItem gets a reference to the given SuperplaneListItemDefinition and assigns it to the ListItem field.
+func (o *SuperplaneConfigurationField) SetListItem(v SuperplaneListItemDefinition) {
+	o.ListItem = &v
+}
+
+// GetSchema returns the Schema field value if set, zero value otherwise.
+func (o *SuperplaneConfigurationField) GetSchema() []SuperplaneConfigurationField {
+	if o == nil || IsNil(o.Schema) {
+		var ret []SuperplaneConfigurationField
+		return ret
+	}
+	return o.Schema
+}
+
+// GetSchemaOk returns a tuple with the Schema field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConfigurationField) GetSchemaOk() ([]SuperplaneConfigurationField, bool) {
+	if o == nil || IsNil(o.Schema) {
+		return nil, false
+	}
+	return o.Schema, true
+}
+
+// HasSchema returns a boolean if a field has been set.
+func (o *SuperplaneConfigurationField) HasSchema() bool {
+	if o != nil && !IsNil(o.Schema) {
+		return true
+	}
+
+	return false
+}
+
+// SetSchema gets a reference to the given []SuperplaneConfigurationField and assigns it to the Schema field.
+func (o *SuperplaneConfigurationField) SetSchema(v []SuperplaneConfigurationField) {
+	o.Schema = v
+}
+
+// GetLabel returns the Label field value if set, zero value otherwise.
+func (o *SuperplaneConfigurationField) GetLabel() string {
+	if o == nil || IsNil(o.Label) {
+		var ret string
+		return ret
+	}
+	return *o.Label
+}
+
+// GetLabelOk returns a tuple with the Label field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConfigurationField) GetLabelOk() (*string, bool) {
+	if o == nil || IsNil(o.Label) {
+		return nil, false
+	}
+	return o.Label, true
+}
+
+// HasLabel returns a boolean if a field has been set.
+func (o *SuperplaneConfigurationField) HasLabel() bool {
+	if o != nil && !IsNil(o.Label) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabel gets a reference to the given string and assigns it to the Label field.
+func (o *SuperplaneConfigurationField) SetLabel(v string) {
+	o.Label = &v
+}
+
 func (o SuperplaneConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -192,6 +423,27 @@ func (o SuperplaneConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Required) {
 		toSerialize["required"] = o.Required
+	}
+	if !IsNil(o.DefaultValue) {
+		toSerialize["defaultValue"] = o.DefaultValue
+	}
+	if !IsNil(o.Options) {
+		toSerialize["options"] = o.Options
+	}
+	if !IsNil(o.Min) {
+		toSerialize["min"] = o.Min
+	}
+	if !IsNil(o.Max) {
+		toSerialize["max"] = o.Max
+	}
+	if !IsNil(o.ListItem) {
+		toSerialize["listItem"] = o.ListItem
+	}
+	if !IsNil(o.Schema) {
+		toSerialize["schema"] = o.Schema
+	}
+	if !IsNil(o.Label) {
+		toSerialize["label"] = o.Label
 	}
 	return toSerialize, nil
 }
