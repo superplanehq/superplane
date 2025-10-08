@@ -26,6 +26,28 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const suggestionsRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    const getWordAtCursor = (text: string, position: number) => {
+      const beforeCursor = text.substring(0, position);
+      const afterCursor = text.substring(position);
+
+      const wordStart = Math.max(0, beforeCursor.lastIndexOf(' ') + 1);
+      const wordEndInAfter = afterCursor.indexOf(' ');
+      const wordEnd = wordEndInAfter === -1 ? text.length : position + wordEndInAfter;
+
+      const word = text.substring(wordStart, wordEnd);
+      return {
+        word,
+        start: wordStart,
+        end: wordEnd
+      };
+    };
+
+    // Helper function to replace word at cursor position
+    const replaceWordAtCursor = (text: string, position: number, newWord: string) => {
+      const { start, end } = getWordAtCursor(text, position);
+      return text.substring(0, start) + newWord + text.substring(end);
+    };
+
     // Flatten the example object when it changes
     useEffect(() => {
       if (exampleObj) {
@@ -39,20 +61,25 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     }, [value]);
 
     useEffect(() => {
-      const lastKey = inputValue.split('.').slice(-1)[0];
-      if (flattenedData) {
-        const parsedInput = inputValue.split('.').slice(0, -1).join('.');
-        const newSuggestions = getAutocompleteSuggestions(flattenedData, parsedInput || 'root');
-        const arraySuggestions = getAutocompleteSuggestions(flattenedData, parsedInput ? `${parsedInput}.${lastKey}` : lastKey).filter((suggestion: string) => suggestion.match(/\[\d+\]$/));
-        const similarSuggestions = newSuggestions.filter((suggestion: string) => suggestion.startsWith(lastKey) && suggestion !== lastKey);
-        const allSuggestions = [...new Set([...arraySuggestions, ...similarSuggestions])];
-        setSuggestions(allSuggestions);
-        setIsOpen(isFocused && allSuggestions.length > 0);
-        setHighlightedIndex(-1);
-      } else {
+      if (!flattenedData || !isFocused) {
         setSuggestions([]);
         setIsOpen(false);
+        return;
       }
+
+      const cursorPosition = inputRef.current?.selectionStart || 0;
+      const { word } = getWordAtCursor(inputValue, cursorPosition);
+      const lastKey = word.split('.').slice(-1)[0];
+      const parsedInput = word.split('.').slice(0, -1).join('.');
+
+      const newSuggestions = getAutocompleteSuggestions(flattenedData, parsedInput || 'root');
+      const arraySuggestions = getAutocompleteSuggestions(flattenedData, parsedInput ? `${parsedInput}.${lastKey}` : lastKey).filter((suggestion: string) => suggestion.match(/\[\d+\]$/));
+      const similarSuggestions = newSuggestions.filter((suggestion: string) => suggestion.startsWith(lastKey) && suggestion !== lastKey);
+      const allSuggestions = [...new Set([...arraySuggestions, ...similarSuggestions])];
+
+      setSuggestions(allSuggestions);
+      setIsOpen(allSuggestions.length > 0);
+      setHighlightedIndex(-1);
     }, [inputValue, flattenedData, isFocused]);
 
     // Handle clicking outside to close suggestions
@@ -76,12 +103,16 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     };
 
     const handleSuggestionClick = (suggestion: string) => {
-      const allPreviousKeys = inputValue.split('.');
+      const cursorPosition = inputRef.current?.selectionStart || 0;
+      const { word } = getWordAtCursor(inputValue, cursorPosition);
+
+      const allPreviousKeys = word.split('.');
       const withoutLastKey = allPreviousKeys.slice(0, -1).join('.');
       let newValue = suggestion.startsWith(withoutLastKey) ? suggestion : `${withoutLastKey}.${suggestion}`;
       const nextSuggestions = getAutocompleteSuggestions(flattenedData, newValue);
       const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) => suggestion.match(/\[\d+\]$/));
       newValue += (nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions) ? '.' : '';
+      newValue = replaceWordAtCursor(inputValue, cursorPosition, newValue);
       setInputValue(newValue);
       onChange?.(newValue);
       setHighlightedIndex(-1);
