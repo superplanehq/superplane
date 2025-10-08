@@ -4,7 +4,7 @@ import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
 
-// Custom renderer for IF primitive executions
+// Custom renderer for IF component executions
 registerExecutionRenderer('if', {
   renderCustomSections: ({ execution, isDarkMode }: ExecutionRendererProps) => {
     const inputs = execution.inputs

@@ -448,17 +448,17 @@ export type SuperplaneBlueprintNode = {
     id?: string;
     name?: string;
     refType?: SuperplaneBlueprintNodeRefType;
-    primitive?: SuperplaneBlueprintNodePrimitiveRef;
+    component?: SuperplaneBlueprintNodeComponentRef;
     configuration?: {
         [key: string]: unknown;
     };
 };
 
-export type SuperplaneBlueprintNodePrimitiveRef = {
+export type SuperplaneBlueprintNodeComponentRef = {
     name?: string;
 };
 
-export type SuperplaneBlueprintNodeRefType = 'REF_TYPE_PRIMITIVE';
+export type SuperplaneBlueprintNodeRefType = 'REF_TYPE_COMPONENT';
 
 export type SuperplaneCancelStageExecutionBody = {
     [key: string]: unknown;
@@ -478,6 +478,19 @@ export type SuperplaneCanvasMetadata = {
     description?: string;
     createdBy?: string;
     createdAt?: string;
+};
+
+export type SuperplaneComponent = {
+    name?: string;
+    description?: string;
+    configuration?: Array<SuperplaneConfigurationField>;
+    branches?: Array<SuperplaneOutputBranch>;
+};
+
+export type SuperplaneComponentAction = {
+    name?: string;
+    description?: string;
+    parameters?: Array<SuperplaneConfigurationField>;
 };
 
 export type SuperplaneCondition = {
@@ -653,16 +666,16 @@ export type SuperplaneDescribeCanvasResponse = {
     canvas?: SuperplaneCanvas;
 };
 
+export type SuperplaneDescribeComponentResponse = {
+    component?: SuperplaneComponent;
+};
+
 export type SuperplaneDescribeConnectionGroupResponse = {
     connectionGroup?: SuperplaneConnectionGroup;
 };
 
 export type SuperplaneDescribeEventSourceResponse = {
     eventSource?: SuperplaneEventSource;
-};
-
-export type SuperplaneDescribePrimitiveResponse = {
-    primitive?: SuperplanePrimitive;
 };
 
 export type SuperplaneDescribeStageResponse = {
@@ -844,6 +857,14 @@ export type SuperplaneListCanvasesResponse = {
     canvases?: Array<SuperplaneCanvas>;
 };
 
+export type SuperplaneListComponentActionsResponse = {
+    actions?: Array<SuperplaneComponentAction>;
+};
+
+export type SuperplaneListComponentsResponse = {
+    components?: Array<SuperplaneComponent>;
+};
+
 export type SuperplaneListConnectionGroupFieldSetsResponse = {
     fieldSets?: Array<SuperplaneConnectionGroupFieldSet>;
 };
@@ -882,14 +903,6 @@ export type SuperplaneListNodeQueueItemsResponse = {
     totalCount?: number;
     hasNextPage?: boolean;
     lastTimestamp?: string;
-};
-
-export type SuperplaneListPrimitiveActionsResponse = {
-    actions?: Array<SuperplanePrimitiveAction>;
-};
-
-export type SuperplaneListPrimitivesResponse = {
-    primitives?: Array<SuperplanePrimitive>;
 };
 
 export type SuperplaneListStageEventsResponse = {
@@ -939,19 +952,6 @@ export type SuperplaneOutputDefinition = {
 export type SuperplaneOutputValue = {
     name?: string;
     value?: string;
-};
-
-export type SuperplanePrimitive = {
-    name?: string;
-    description?: string;
-    configuration?: Array<SuperplaneConfigurationField>;
-    branches?: Array<SuperplaneOutputBranch>;
-};
-
-export type SuperplanePrimitiveAction = {
-    name?: string;
-    description?: string;
-    parameters?: Array<SuperplaneConfigurationField>;
 };
 
 export type SuperplaneRemoveUserResponse = {
@@ -1119,11 +1119,15 @@ export type SuperplaneWorkflowNode = {
     id?: string;
     name?: string;
     refType?: SuperplaneWorkflowNodeRefType;
-    primitive?: SuperplaneWorkflowNodePrimitiveRef;
+    component?: SuperplaneWorkflowNodeComponentRef;
     blueprint?: WorkflowNodeBlueprintRef;
     configuration?: {
         [key: string]: unknown;
     };
+};
+
+export type SuperplaneWorkflowNodeComponentRef = {
+    name?: string;
 };
 
 export type SuperplaneWorkflowNodeExecution = {
@@ -1155,11 +1159,7 @@ export type SuperplaneWorkflowNodeExecutionResultReason = 'RESULT_REASON_OK' | '
 
 export type SuperplaneWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_FINISHED';
 
-export type SuperplaneWorkflowNodePrimitiveRef = {
-    name?: string;
-};
-
-export type SuperplaneWorkflowNodeRefType = 'REF_TYPE_PRIMITIVE' | 'REF_TYPE_BLUEPRINT';
+export type SuperplaneWorkflowNodeRefType = 'REF_TYPE_COMPONENT' | 'REF_TYPE_BLUEPRINT';
 
 export type SuperplaneWorkflowQueueItem = {
     eventId?: string;
@@ -2294,6 +2294,85 @@ export type SuperplaneDescribeCanvasResponses = {
 
 export type SuperplaneDescribeCanvasResponse2 = SuperplaneDescribeCanvasResponses[keyof SuperplaneDescribeCanvasResponses];
 
+export type ComponentsListComponentsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/components';
+};
+
+export type ComponentsListComponentsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type ComponentsListComponentsError = ComponentsListComponentsErrors[keyof ComponentsListComponentsErrors];
+
+export type ComponentsListComponentsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListComponentsResponse;
+};
+
+export type ComponentsListComponentsResponse = ComponentsListComponentsResponses[keyof ComponentsListComponentsResponses];
+
+export type ComponentsDescribeComponentData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/components/{name}';
+};
+
+export type ComponentsDescribeComponentErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type ComponentsDescribeComponentError = ComponentsDescribeComponentErrors[keyof ComponentsDescribeComponentErrors];
+
+export type ComponentsDescribeComponentResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDescribeComponentResponse;
+};
+
+export type ComponentsDescribeComponentResponse = ComponentsDescribeComponentResponses[keyof ComponentsDescribeComponentResponses];
+
+export type ComponentsListComponentActionsData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/components/{name}/actions';
+};
+
+export type ComponentsListComponentActionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type ComponentsListComponentActionsError = ComponentsListComponentActionsErrors[keyof ComponentsListComponentActionsErrors];
+
+export type ComponentsListComponentActionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListComponentActionsResponse;
+};
+
+export type ComponentsListComponentActionsResponse = ComponentsListComponentActionsResponses[keyof ComponentsListComponentActionsResponses];
+
 export type GroupsListGroupsData = {
     body?: never;
     path?: never;
@@ -2840,85 +2919,6 @@ export type OrganizationsRemoveUserResponses = {
 };
 
 export type OrganizationsRemoveUserResponse = OrganizationsRemoveUserResponses[keyof OrganizationsRemoveUserResponses];
-
-export type PrimitivesListPrimitivesData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/primitives';
-};
-
-export type PrimitivesListPrimitivesErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type PrimitivesListPrimitivesError = PrimitivesListPrimitivesErrors[keyof PrimitivesListPrimitivesErrors];
-
-export type PrimitivesListPrimitivesResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneListPrimitivesResponse;
-};
-
-export type PrimitivesListPrimitivesResponse = PrimitivesListPrimitivesResponses[keyof PrimitivesListPrimitivesResponses];
-
-export type PrimitivesDescribePrimitiveData = {
-    body?: never;
-    path: {
-        name: string;
-    };
-    query?: never;
-    url: '/api/v1/primitives/{name}';
-};
-
-export type PrimitivesDescribePrimitiveErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type PrimitivesDescribePrimitiveError = PrimitivesDescribePrimitiveErrors[keyof PrimitivesDescribePrimitiveErrors];
-
-export type PrimitivesDescribePrimitiveResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneDescribePrimitiveResponse;
-};
-
-export type PrimitivesDescribePrimitiveResponse = PrimitivesDescribePrimitiveResponses[keyof PrimitivesDescribePrimitiveResponses];
-
-export type PrimitivesListPrimitiveActionsData = {
-    body?: never;
-    path: {
-        name: string;
-    };
-    query?: never;
-    url: '/api/v1/primitives/{name}/actions';
-};
-
-export type PrimitivesListPrimitiveActionsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type PrimitivesListPrimitiveActionsError = PrimitivesListPrimitiveActionsErrors[keyof PrimitivesListPrimitiveActionsErrors];
-
-export type PrimitivesListPrimitiveActionsResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneListPrimitiveActionsResponse;
-};
-
-export type PrimitivesListPrimitiveActionsResponse = PrimitivesListPrimitiveActionsResponses[keyof PrimitivesListPrimitiveActionsResponses];
 
 export type RolesListRolesData = {
     body?: never;

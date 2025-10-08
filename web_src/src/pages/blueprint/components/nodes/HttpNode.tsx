@@ -4,12 +4,12 @@ import { MaterialSymbol } from '../../../../components/MaterialSymbol/material-s
 
 interface HttpNodeData {
   label: string
-  primitive: string
+  component: string
   branches?: string[]
   onAddNode?: (sourceId: string, branch: string) => void
 }
 
-export const HttpNode = memo(({ data, id }: NodeProps<HttpNodeData>) => {
+export const HttpNode = memo(({ data }: NodeProps<HttpNodeData>) => {
   const branches = data.branches || ['default']
   const branch = branches[0]
 

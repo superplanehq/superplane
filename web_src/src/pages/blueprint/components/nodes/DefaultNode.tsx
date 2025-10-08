@@ -4,7 +4,7 @@ import { MaterialSymbol } from '../../../../components/MaterialSymbol/material-s
 
 interface DefaultNodeData {
   label: string
-  primitive: string
+  component: string
   branches?: string[]
   onAddNode?: (sourceId: string, branch: string) => void
 }

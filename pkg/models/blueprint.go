@@ -9,6 +9,11 @@ import (
 	"gorm.io/datatypes"
 )
 
+const (
+	NodeRefTypeComponent = "component"
+	NodeRefTypeBlueprint = "blueprint"
+)
+
 type Blueprint struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
@@ -53,11 +58,11 @@ type Node struct {
 }
 
 type NodeRef struct {
-	Primitive *PrimitiveRef `json:"primitive"`
+	Component *ComponentRef `json:"component"`
 	Blueprint *BlueprintRef `json:"blueprint"`
 }
 
-type PrimitiveRef struct {
+type ComponentRef struct {
 	Name string `json:"name"`
 }
 

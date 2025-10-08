@@ -48,9 +48,9 @@ func NodesToProto(nodes []models.Node) []*pb.BlueprintNode {
 			RefType: RefTypeToProto(node.RefType),
 		}
 
-		if node.Ref.Primitive != nil {
-			result[i].Primitive = &pb.BlueprintNode_PrimitiveRef{
-				Name: node.Ref.Primitive.Name,
+		if node.Ref.Component != nil {
+			result[i].Component = &pb.BlueprintNode_ComponentRef{
+				Name: node.Ref.Component.Name,
 			}
 		}
 
@@ -87,8 +87,8 @@ func EdgesToProto(edges []models.Edge) []*pb.BlueprintEdge {
 
 func ProtoToRefType(refType pb.BlueprintNode_RefType) string {
 	switch refType {
-	case pb.BlueprintNode_REF_TYPE_PRIMITIVE:
-		return "primitive"
+	case pb.BlueprintNode_REF_TYPE_COMPONENT:
+		return "component"
 	default:
 		return ""
 	}
@@ -96,10 +96,10 @@ func ProtoToRefType(refType pb.BlueprintNode_RefType) string {
 
 func RefTypeToProto(refType string) pb.BlueprintNode_RefType {
 	switch refType {
-	case "primitive":
-		return pb.BlueprintNode_REF_TYPE_PRIMITIVE
+	case "component":
+		return pb.BlueprintNode_REF_TYPE_COMPONENT
 	default:
-		return pb.BlueprintNode_REF_TYPE_PRIMITIVE
+		return pb.BlueprintNode_REF_TYPE_COMPONENT
 	}
 }
 
@@ -107,10 +107,10 @@ func ProtoToNodeRef(node *pb.BlueprintNode) models.NodeRef {
 	ref := models.NodeRef{}
 
 	switch node.RefType {
-	case pb.BlueprintNode_REF_TYPE_PRIMITIVE:
-		if node.Primitive != nil {
-			ref.Primitive = &models.PrimitiveRef{
-				Name: node.Primitive.Name,
+	case pb.BlueprintNode_REF_TYPE_COMPONENT:
+		if node.Component != nil {
+			ref.Component = &models.ComponentRef{
+				Name: node.Component.Name,
 			}
 		}
 	}
@@ -169,19 +169,18 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 
 func validateNodeRef(registry *registry.Registry, node *pb.BlueprintNode) error {
 	switch node.RefType {
-	case pb.BlueprintNode_REF_TYPE_PRIMITIVE:
-		if node.Primitive == nil {
-			return fmt.Errorf("primitive reference is required for primitive ref type")
+	case pb.BlueprintNode_REF_TYPE_COMPONENT:
+		if node.Component == nil {
+			return fmt.Errorf("component reference is required for component ref type")
 		}
 
-		if node.Primitive.Name == "" {
-			return fmt.Errorf("primitive name is required")
+		if node.Component.Name == "" {
+			return fmt.Errorf("component name is required")
 		}
 
-		// Check if primitive exists in registry
-		_, err := registry.GetPrimitive(node.Primitive.Name)
+		_, err := registry.GetComponent(node.Component.Name)
 		if err != nil {
-			return fmt.Errorf("primitive %s not found", node.Primitive.Name)
+			return fmt.Errorf("component %s not found", node.Component.Name)
 		}
 
 		return nil

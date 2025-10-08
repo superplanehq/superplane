@@ -21,12 +21,12 @@ type SuperplaneBlueprintNodeRefType string
 
 // List of SuperplaneBlueprintNodeRefType
 const (
-	SUPERPLANEBLUEPRINTNODEREFTYPE_REF_TYPE_PRIMITIVE SuperplaneBlueprintNodeRefType = "REF_TYPE_PRIMITIVE"
+	SUPERPLANEBLUEPRINTNODEREFTYPE_REF_TYPE_COMPONENT SuperplaneBlueprintNodeRefType = "REF_TYPE_COMPONENT"
 )
 
 // All allowed values of SuperplaneBlueprintNodeRefType enum
 var AllowedSuperplaneBlueprintNodeRefTypeEnumValues = []SuperplaneBlueprintNodeRefType{
-	"REF_TYPE_PRIMITIVE",
+	"REF_TYPE_COMPONENT",
 }
 
 func (v *SuperplaneBlueprintNodeRefType) UnmarshalJSON(src []byte) error {

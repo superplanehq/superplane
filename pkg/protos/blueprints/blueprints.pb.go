@@ -28,16 +28,16 @@ const (
 type BlueprintNode_RefType int32
 
 const (
-	BlueprintNode_REF_TYPE_PRIMITIVE BlueprintNode_RefType = 0
+	BlueprintNode_REF_TYPE_COMPONENT BlueprintNode_RefType = 0
 )
 
 // Enum value maps for BlueprintNode_RefType.
 var (
 	BlueprintNode_RefType_name = map[int32]string{
-		0: "REF_TYPE_PRIMITIVE",
+		0: "REF_TYPE_COMPONENT",
 	}
 	BlueprintNode_RefType_value = map[string]int32{
-		"REF_TYPE_PRIMITIVE": 0,
+		"REF_TYPE_COMPONENT": 0,
 	}
 )
 
@@ -525,7 +525,7 @@ type BlueprintNode struct {
 	Id            string                      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                      `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	RefType       BlueprintNode_RefType       `protobuf:"varint,3,opt,name=ref_type,json=refType,proto3,enum=Superplane.BlueprintNode_RefType" json:"ref_type,omitempty"`
-	Primitive     *BlueprintNode_PrimitiveRef `protobuf:"bytes,4,opt,name=primitive,proto3" json:"primitive,omitempty"`
+	Component     *BlueprintNode_ComponentRef `protobuf:"bytes,4,opt,name=component,proto3" json:"component,omitempty"`
 	Configuration *_struct.Struct             `protobuf:"bytes,5,opt,name=configuration,proto3" json:"configuration,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -579,12 +579,12 @@ func (x *BlueprintNode) GetRefType() BlueprintNode_RefType {
 	if x != nil {
 		return x.RefType
 	}
-	return BlueprintNode_REF_TYPE_PRIMITIVE
+	return BlueprintNode_REF_TYPE_COMPONENT
 }
 
-func (x *BlueprintNode) GetPrimitive() *BlueprintNode_PrimitiveRef {
+func (x *BlueprintNode) GetComponent() *BlueprintNode_ComponentRef {
 	if x != nil {
-		return x.Primitive
+		return x.Component
 	}
 	return nil
 }
@@ -656,27 +656,27 @@ func (x *BlueprintEdge) GetBranch() string {
 	return ""
 }
 
-type BlueprintNode_PrimitiveRef struct {
+type BlueprintNode_ComponentRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *BlueprintNode_PrimitiveRef) Reset() {
-	*x = BlueprintNode_PrimitiveRef{}
+func (x *BlueprintNode_ComponentRef) Reset() {
+	*x = BlueprintNode_ComponentRef{}
 	mi := &file_blueprints_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *BlueprintNode_PrimitiveRef) String() string {
+func (x *BlueprintNode_ComponentRef) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BlueprintNode_PrimitiveRef) ProtoMessage() {}
+func (*BlueprintNode_ComponentRef) ProtoMessage() {}
 
-func (x *BlueprintNode_PrimitiveRef) ProtoReflect() protoreflect.Message {
+func (x *BlueprintNode_ComponentRef) ProtoReflect() protoreflect.Message {
 	mi := &file_blueprints_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -688,12 +688,12 @@ func (x *BlueprintNode_PrimitiveRef) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BlueprintNode_PrimitiveRef.ProtoReflect.Descriptor instead.
-func (*BlueprintNode_PrimitiveRef) Descriptor() ([]byte, []int) {
+// Deprecated: Use BlueprintNode_ComponentRef.ProtoReflect.Descriptor instead.
+func (*BlueprintNode_ComponentRef) Descriptor() ([]byte, []int) {
 	return file_blueprints_proto_rawDescGZIP(), []int{9, 0}
 }
 
-func (x *BlueprintNode_PrimitiveRef) GetName() string {
+func (x *BlueprintNode_ComponentRef) GetName() string {
 	if x != nil {
 		return x.Name
 	}
@@ -739,12 +739,12 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12<\n" +
 	"\bref_type\x18\x03 \x01(\x0e2!.Superplane.BlueprintNode.RefTypeR\arefType\x12D\n" +
-	"\tprimitive\x18\x04 \x01(\v2&.Superplane.BlueprintNode.PrimitiveRefR\tprimitive\x12=\n" +
+	"\tcomponent\x18\x04 \x01(\v2&.Superplane.BlueprintNode.ComponentRefR\tcomponent\x12=\n" +
 	"\rconfiguration\x18\x05 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x1a\"\n" +
-	"\fPrimitiveRef\x12\x12\n" +
+	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"!\n" +
 	"\aRefType\x12\x16\n" +
-	"\x12REF_TYPE_PRIMITIVE\x10\x00\"a\n" +
+	"\x12REF_TYPE_COMPONENT\x10\x00\"a\n" +
 	"\rBlueprintEdge\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x16\n" +
@@ -789,7 +789,7 @@ var file_blueprints_proto_goTypes = []any{
 	(*Blueprint)(nil),                  // 9: Superplane.Blueprint
 	(*BlueprintNode)(nil),              // 10: Superplane.BlueprintNode
 	(*BlueprintEdge)(nil),              // 11: Superplane.BlueprintEdge
-	(*BlueprintNode_PrimitiveRef)(nil), // 12: Superplane.BlueprintNode.PrimitiveRef
+	(*BlueprintNode_ComponentRef)(nil), // 12: Superplane.BlueprintNode.ComponentRef
 	(*timestamp.Timestamp)(nil),        // 13: google.protobuf.Timestamp
 	(*_struct.Struct)(nil),             // 14: google.protobuf.Struct
 }
@@ -805,7 +805,7 @@ var file_blueprints_proto_depIdxs = []int32{
 	10, // 8: Superplane.Blueprint.nodes:type_name -> Superplane.BlueprintNode
 	11, // 9: Superplane.Blueprint.edges:type_name -> Superplane.BlueprintEdge
 	0,  // 10: Superplane.BlueprintNode.ref_type:type_name -> Superplane.BlueprintNode.RefType
-	12, // 11: Superplane.BlueprintNode.primitive:type_name -> Superplane.BlueprintNode.PrimitiveRef
+	12, // 11: Superplane.BlueprintNode.component:type_name -> Superplane.BlueprintNode.ComponentRef
 	14, // 12: Superplane.BlueprintNode.configuration:type_name -> google.protobuf.Struct
 	1,  // 13: Superplane.Blueprints.ListBlueprints:input_type -> Superplane.ListBlueprintsRequest
 	3,  // 14: Superplane.Blueprints.DescribeBlueprint:input_type -> Superplane.DescribeBlueprintRequest

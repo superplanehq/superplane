@@ -1,13 +1,17 @@
 package contexts
 
 import (
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/primitives"
 	"gorm.io/datatypes"
 )
 
 type MetadataContext struct {
 	execution *models.WorkflowNodeExecution
+}
+
+func NewMetadataContext(execution *models.WorkflowNodeExecution) components.MetadataContext {
+	return &MetadataContext{execution: execution}
 }
 
 func (m *MetadataContext) Get(key string) (any, bool) {
@@ -30,9 +34,4 @@ func (m *MetadataContext) Set(key string, value any) {
 
 func (m *MetadataContext) GetAll() map[string]any {
 	return m.execution.Metadata.Data()
-}
-
-// NewMetadataContext creates a MetadataContext for a workflow node execution
-func NewMetadataContext(execution *models.WorkflowNodeExecution) primitives.MetadataContext {
-	return &MetadataContext{execution: execution}
 }

@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
-	"github.com/superplanehq/superplane/pkg/primitives"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -40,14 +40,17 @@ func InvokeNodeExecutionAction(ctx context.Context, registry *registry.Registry,
 		return nil, fmt.Errorf("node not found: %w", err)
 	}
 
-	// Blueprint nodes don't have actions for now
-	if node.Ref.Primitive == nil {
-		return nil, fmt.Errorf("node is not a primitive node")
+	//
+	// TODO
+	// Blueprint nodes don't expose actions for now.
+	//
+	if node.Ref.Component == nil {
+		return nil, fmt.Errorf("node is not a component node")
 	}
 
-	primitive, err := registry.GetPrimitive(node.Ref.Primitive.Name)
+	component, err := registry.GetComponent(node.Ref.Component.Name)
 	if err != nil {
-		return nil, fmt.Errorf("primitive not found: %w", err)
+		return nil, fmt.Errorf("component not found: %w", err)
 	}
 
 	event, err := models.FindWorkflowEvent(execution.EventID.String())
@@ -56,14 +59,14 @@ func InvokeNodeExecutionAction(ctx context.Context, registry *registry.Registry,
 	}
 
 	// TODO: Get user ID from context
-	actionCtx := primitives.ActionContext{
+	actionCtx := components.ActionContext{
 		Name:       actionName,
 		Parameters: parameters,
 		Metadata:   contexts.NewMetadataContext(&execution),
 		State:      contexts.NewExecutionStateContext(&execution, event),
 	}
 
-	err = primitive.HandleAction(actionCtx)
+	err = component.HandleAction(actionCtx)
 	if err != nil {
 		return nil, fmt.Errorf("action execution failed: %w", err)
 	}

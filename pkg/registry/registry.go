@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/executors"
@@ -15,14 +16,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/primitives"
 	"github.com/superplanehq/superplane/pkg/secrets"
 
-	"github.com/superplanehq/superplane/pkg/primitives/approval"
-	"github.com/superplanehq/superplane/pkg/primitives/filter"
-	httpPrimitive "github.com/superplanehq/superplane/pkg/primitives/http"
-	ifp "github.com/superplanehq/superplane/pkg/primitives/if"
-	switchp "github.com/superplanehq/superplane/pkg/primitives/switch"
+	"github.com/superplanehq/superplane/pkg/components/approval"
+	"github.com/superplanehq/superplane/pkg/components/filter"
+	httpComponent "github.com/superplanehq/superplane/pkg/components/http"
+	ifp "github.com/superplanehq/superplane/pkg/components/if"
+	switchp "github.com/superplanehq/superplane/pkg/components/switch"
 	"gorm.io/gorm"
 )
 
@@ -38,7 +38,7 @@ type Registry struct {
 	Encryptor    crypto.Encryptor
 	Integrations map[string]Integration
 	Executors    map[string]executors.Executor
-	Primitives   map[string]primitives.Primitive
+	Components   map[string]components.Component
 }
 
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
@@ -47,7 +47,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		Executors:    map[string]executors.Executor{},
 		Integrations: map[string]Integration{},
 		httpClient:   &http.Client{Timeout: 10 * time.Second},
-		Primitives:   map[string]primitives.Primitive{},
+		Components:   map[string]components.Component{},
 	}
 
 	r.Init()
@@ -80,13 +80,13 @@ func (r *Registry) Init() {
 	r.Executors[models.ExecutorTypeNoOp] = noop.NewNoOpExecutor()
 
 	//
-	// Register the primitives
+	// Register the components
 	//
-	r.Primitives["if"] = &ifp.If{}
-	r.Primitives["filter"] = &filter.Filter{}
-	r.Primitives["switch"] = &switchp.Switch{}
-	r.Primitives["http"] = &httpPrimitive.HTTP{}
-	r.Primitives["approval"] = &approval.ApprovalPrimitive{}
+	r.Components["if"] = &ifp.If{}
+	r.Components["filter"] = &filter.Filter{}
+	r.Components["switch"] = &switchp.Switch{}
+	r.Components["http"] = &httpComponent.HTTP{}
+	r.Components["approval"] = &approval.Approval{}
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {
@@ -229,20 +229,20 @@ func (r *Registry) NewExecutor(executorType string) (executors.Executor, error) 
 	return executor, nil
 }
 
-func (r *Registry) ListPrimitives() []primitives.Primitive {
-	primitives := make([]primitives.Primitive, 0, len(r.Primitives))
-	for _, primitive := range r.Primitives {
-		primitives = append(primitives, primitive)
+func (r *Registry) ListComponents() []components.Component {
+	components := make([]components.Component, 0, len(r.Components))
+	for _, component := range r.Components {
+		components = append(components, component)
 	}
 
-	return primitives
+	return components
 }
 
-func (r *Registry) GetPrimitive(name string) (primitives.Primitive, error) {
-	primitive, ok := r.Primitives[name]
+func (r *Registry) GetComponent(name string) (components.Component, error) {
+	component, ok := r.Components[name]
 	if !ok {
-		return nil, fmt.Errorf("primitive %s not registered", name)
+		return nil, fmt.Errorf("component %s not registered", name)
 	}
 
-	return primitive, nil
+	return component, nil
 }

@@ -4,8 +4,8 @@ import {
   blueprintsDescribeBlueprint,
   blueprintsCreateBlueprint,
   blueprintsUpdateBlueprint,
-  primitivesListPrimitives,
-  primitivesDescribePrimitive,
+  componentsListComponents,
+  componentsDescribeComponent,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 
@@ -18,15 +18,14 @@ export const blueprintKeys = {
   detail: (orgId: string, id: string) => [...blueprintKeys.details(), orgId, id] as const,
 }
 
-export const primitiveKeys = {
-  all: ['primitives'] as const,
-  lists: () => [...primitiveKeys.all, 'list'] as const,
-  list: (orgId: string) => [...primitiveKeys.lists(), orgId] as const,
-  details: () => [...primitiveKeys.all, 'detail'] as const,
-  detail: (orgId: string, name: string) => [...primitiveKeys.details(), orgId, name] as const,
+export const componentKeys = {
+  all: ['components'] as const,
+  lists: () => [...componentKeys.all, 'list'] as const,
+  list: (orgId: string) => [...componentKeys.lists(), orgId] as const,
+  details: () => [...componentKeys.all, 'detail'] as const,
+  detail: (orgId: string, name: string) => [...componentKeys.details(), orgId, name] as const,
 }
 
-// Hooks for fetching blueprints
 export const useBlueprints = (organizationId: string) => {
   return useQuery({
     queryKey: blueprintKeys.list(organizationId),
@@ -107,31 +106,30 @@ export const useUpdateBlueprint = (organizationId: string, blueprintId: string) 
   })
 }
 
-// Hooks for fetching primitives
-export const usePrimitives = (organizationId: string) => {
+export const useComponents = (organizationId: string) => {
   return useQuery({
-    queryKey: primitiveKeys.list(organizationId),
+    queryKey: componentKeys.list(organizationId),
     queryFn: async () => {
-      const response = await primitivesListPrimitives(
+      const response = await componentsListComponents(
         withOrganizationHeader({})
       )
-      return response.data?.primitives || []
+      return response.data?.components || []
     },
     enabled: !!organizationId,
   })
 }
 
-export const usePrimitive = (organizationId: string, primitiveName: string) => {
+export const useComponent = (organizationId: string, componentName: string) => {
   return useQuery({
-    queryKey: primitiveKeys.detail(organizationId, primitiveName),
+    queryKey: componentKeys.detail(organizationId, componentName),
     queryFn: async () => {
-      const response = await primitivesDescribePrimitive(
+      const response = await componentsDescribeComponent(
         withOrganizationHeader({
-          path: { name: primitiveName }
+          path: { name: componentName }
         })
       )
-      return response.data?.primitive
+      return response.data?.component
     },
-    enabled: !!organizationId && !!primitiveName,
+    enabled: !!organizationId && !!componentName,
   })
 }

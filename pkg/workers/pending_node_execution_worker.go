@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/primitives"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -73,8 +73,8 @@ func (w *PendingNodeExecutionWorker) executeNode(execution *models.WorkflowNodeE
 		return w.executeBlueprintNode(execution, node)
 	}
 
-	log.Printf("[PendingNodeExecutionWorker] Node %s is a primitive node (%s)", execution.NodeID, node.Ref.Primitive.Name)
-	return w.executePrimitiveNode(execution, node)
+	log.Printf("[PendingNodeExecutionWorker] Node %s is a component node (%s)", execution.NodeID, node.Ref.Component.Name)
+	return w.executeComponentNode(execution, node)
 }
 
 func (w *PendingNodeExecutionWorker) findNode(execution *models.WorkflowNodeExecution) (*models.Node, error) {
@@ -148,15 +148,15 @@ func (w *PendingNodeExecutionWorker) executeBlueprintNode(execution *models.Work
 	})
 }
 
-func (w *PendingNodeExecutionWorker) executePrimitiveNode(execution *models.WorkflowNodeExecution, node *models.Node) error {
+func (w *PendingNodeExecutionWorker) executeComponentNode(execution *models.WorkflowNodeExecution, node *models.Node) error {
 	err := execution.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start execution: %w", err)
 	}
 
-	primitive, err := w.registry.GetPrimitive(node.Ref.Primitive.Name)
+	component, err := w.registry.GetComponent(node.Ref.Component.Name)
 	if err != nil {
-		return fmt.Errorf("primitive %s not found: %w", node.Ref.Primitive.Name, err)
+		return fmt.Errorf("component %s not found: %w", node.Ref.Component.Name, err)
 	}
 
 	event, err := models.FindWorkflowEvent(execution.EventID.String())
@@ -173,7 +173,7 @@ func (w *PendingNodeExecutionWorker) executePrimitiveNode(execution *models.Work
 		inputs = event.Data.Data()
 	}
 
-	ctx := primitives.ExecutionContext{
+	ctx := components.ExecutionContext{
 		Configuration: node.Configuration,
 		Data:          inputs,
 		Metadata:      contexts.NewMetadataContext(execution),
@@ -181,9 +181,9 @@ func (w *PendingNodeExecutionWorker) executePrimitiveNode(execution *models.Work
 	}
 
 	//
-	// Execute primitive - it handles its own lifecycle
+	// Execute component - it handles its own lifecycle
 	//
-	err = primitive.Execute(ctx)
+	err = component.Execute(ctx)
 	if err != nil {
 		return execution.Fail(err.Error())
 	}

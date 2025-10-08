@@ -15,7 +15,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useWorkflow, useUpdateWorkflow } from '../../hooks/useWorkflowData'
-import { usePrimitives, useBlueprints } from '../../hooks/useBlueprintData'
+import { useComponents, useBlueprints } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/Button/button'
 import { MaterialSymbol } from '../../components/MaterialSymbol/material-symbol'
 import { Heading } from '../../components/Heading/heading'
@@ -50,7 +50,7 @@ const nodeTypes = {
 type BuildingBlock = {
   name: string
   description?: string
-  type: 'primitive' | 'blueprint'
+  type: 'component' | 'blueprint'
   branches?: { name: string }[]
   configuration?: any[]
 }
@@ -65,12 +65,12 @@ export const Workflow = () => {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; branch: string } | null>(null)
-  const [activeTab, setActiveTab] = useState<'primitives' | 'blueprints'>('primitives')
+  const [activeTab, setActiveTab] = useState<'components' | 'blueprints'>('components')
   const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string } | null>(null)
 
-  // Fetch workflow, primitives, and blueprints
+  // Fetch workflow, components, and blueprints
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!)
-  const { data: primitives = [], isLoading: primitivesLoading } = usePrimitives(organizationId!)
+  const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!)
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!)
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!)
 
@@ -81,9 +81,9 @@ export const Workflow = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
 
-  // Combine primitives and blueprints into building blocks
+  // Combine components and blueprints into building blocks
   const buildingBlocks: BuildingBlock[] = [
-    ...primitives.map((p: any) => ({ ...p, type: 'primitive' as const })),
+    ...components.map((p: any) => ({ ...p, type: 'component' as const })),
     ...blueprints.map((b: any) => ({ ...b, type: 'blueprint' as const }))
   ]
 
@@ -92,16 +92,16 @@ export const Workflow = () => {
     if (!workflow || buildingBlocks.length === 0) return
 
     const loadedNodes: Node[] = (workflow.nodes || []).map((node: any, index: number) => {
-      const isPrimitive = node.refType === 'REF_TYPE_PRIMITIVE'
-      const blockName = isPrimitive ? node.primitive?.name : node.blueprint?.name
+      const isComponent = node.refType === 'REF_TYPE_COMPONENT'
+      const blockName = isComponent ? node.component?.name : node.blueprint?.name
       const block = buildingBlocks.find((b: BuildingBlock) =>
-        b.name === blockName && b.type === (isPrimitive ? 'primitive' : 'blueprint')
+        b.name === blockName && b.type === (isComponent ? 'component' : 'blueprint')
       )
 
       const branches = block?.branches?.map((branch: any) => branch.name) || ['default']
 
-      // Use primitive name as node type if it exists in nodeTypes, otherwise use 'default'
-      const nodeType = isPrimitive && blockName && nodeTypes[blockName as keyof typeof nodeTypes]
+      // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
+      const nodeType = isComponent && blockName && nodeTypes[blockName as keyof typeof nodeTypes]
         ? blockName
         : 'default'
 
@@ -111,7 +111,7 @@ export const Workflow = () => {
         data: {
           label: node.name,
           blockName,
-          blockType: isPrimitive ? 'primitive' : 'blueprint',
+          blockType: isComponent ? 'component' : 'blueprint',
           branches,
           configuration: node.configuration || {},
           onAddNode: handleAddNodeFromBranch,
@@ -200,8 +200,8 @@ export const Workflow = () => {
       const branches = selectedBlock?.branches?.map((branch: any) => branch.name) || ['default']
       const newNodeId = generateNodeId(selectedBlock.name, nodeName.trim())
 
-      // Use block name as node type if it exists in nodeTypes and is a primitive
-      const nodeType = selectedBlock.type === 'primitive' &&
+      // Use block name as node type if it exists in nodeTypes and is a component
+      const nodeType = selectedBlock.type === 'component' &&
                       selectedBlock.name &&
                       nodeTypes[selectedBlock.name as keyof typeof nodeTypes]
         ? selectedBlock.name
@@ -258,13 +258,13 @@ export const Workflow = () => {
         const baseNode: any = {
           id: node.id,
           name: node.data.label,
-          refType: node.data.blockType === 'primitive' ? 'REF_TYPE_PRIMITIVE' : 'REF_TYPE_BLUEPRINT',
+          refType: node.data.blockType === 'component' ? 'REF_TYPE_COMPONENT' : 'REF_TYPE_BLUEPRINT',
           configuration: node.data.configuration || {},
         }
 
-        // Add either primitive or blueprint reference directly on the node
-        if (node.data.blockType === 'primitive') {
-          baseNode.primitive = { name: node.data.blockName }
+        // Add either component or blueprint reference directly on the node
+        if (node.data.blockType === 'component') {
+          baseNode.component = { name: node.data.blockName }
         } else {
           baseNode.blueprint = { name: node.data.blockName }
         }
@@ -292,7 +292,7 @@ export const Workflow = () => {
     }
   }
 
-  if (workflowLoading || primitivesLoading || blueprintsLoading) {
+  if (workflowLoading || componentsLoading || blueprintsLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -313,8 +313,8 @@ export const Workflow = () => {
     )
   }
 
-  const displayedBlocks = activeTab === 'primitives'
-    ? buildingBlocks.filter(b => b.type === 'primitive')
+  const displayedBlocks = activeTab === 'components'
+    ? buildingBlocks.filter(b => b.type === 'component')
     : buildingBlocks.filter(b => b.type === 'blueprint')
 
   return (
@@ -370,14 +370,14 @@ export const Workflow = () => {
             <div className="px-4 pt-4">
               <div className="flex gap-2 border-b border-zinc-200 dark:border-zinc-700">
                 <button
-                  onClick={() => setActiveTab('primitives')}
+                  onClick={() => setActiveTab('components')}
                   className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === 'primitives'
+                    activeTab === 'components'
                       ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                       : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
                   }`}
                 >
-                  Primitives
+                  Components
                 </button>
                 <button
                   onClick={() => setActiveTab('blueprints')}
@@ -395,7 +395,7 @@ export const Workflow = () => {
             {/* Sidebar Content */}
             <div className="flex-1 overflow-y-auto text-left p-4">
               <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                Click on a {activeTab === 'primitives' ? 'primitive' : 'blueprint'} to add it to your workflow
+                Click on a {activeTab === 'components' ? 'component' : 'blueprint'} to add it to your workflow
               </div>
               <div className="space-y-1">
                 {displayedBlocks.map((block: BuildingBlock) => {
@@ -406,7 +406,7 @@ export const Workflow = () => {
                     filter: 'filter_alt',
                     switch: 'settings_input_component',
                   }
-                  const icon = block.type === 'primitive'
+                  const icon = block.type === 'component'
                     ? (iconMap[block.name] || 'widgets')
                     : 'account_tree'
 

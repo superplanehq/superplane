@@ -117,17 +117,17 @@ message Blueprint {
 
 message BlueprintNode {
   enum RefType {
-    REF_TYPE_PRIMITIVE = 0;
+    REF_TYPE_COMPONENT = 0;
   }
 
-  message PrimitiveRef {
+  message ComponentRef {
     string name = 1;
   }
 
   string id = 1;
   string name = 2;
   RefType ref_type = 3;
-  PrimitiveRef primitive = 4;
+  ComponentRef component = 4;
   google.protobuf.Struct configuration = 5;
 }
 

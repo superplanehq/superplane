@@ -12,11 +12,10 @@ import {
   useNodesState,
   useEdgesState,
   MarkerType,
-  Position,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useBlueprint, useUpdateBlueprint } from '../../hooks/useBlueprintData'
-import { usePrimitives } from '../../hooks/useBlueprintData'
+import { useComponents } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/Button/button'
 import { MaterialSymbol } from '../../components/MaterialSymbol/material-symbol'
 import { Heading } from '../../components/Heading/heading'
@@ -50,15 +49,15 @@ export const Blueprint = () => {
   const navigate = useNavigate()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isAddNodeModalOpen, setIsAddNodeModalOpen] = useState(false)
-  const [selectedPrimitive, setSelectedPrimitive] = useState<any>(null)
+  const [selectedComponent, setSelectedComponent] = useState<any>(null)
   const [nodeName, setNodeName] = useState('')
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; branch: string } | null>(null)
 
-  // Fetch blueprint and primitives
+  // Fetch blueprint and components
   const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId!, blueprintId!)
-  const { data: primitives = [], isLoading: primitivesLoading } = usePrimitives(organizationId!)
+  const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!)
   const updateBlueprintMutation = useUpdateBlueprint(organizationId!, blueprintId!)
 
   const handleAddNodeFromBranch = useCallback((sourceNodeId: string, branch: string) => {
@@ -68,29 +67,29 @@ export const Blueprint = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
 
-  // Update nodes and edges when blueprint or primitives data changes
+  // Update nodes and edges when blueprint or components data changes
   useEffect(() => {
-    if (!blueprint || primitives.length === 0) return
+    if (!blueprint || components.length === 0) return
 
     const loadedNodes: Node[] = (blueprint.nodes || []).map((node: any, index: number) => {
-      const primitive = primitives.find((p: any) => p.name === node.primitive?.name)
-      const branches = primitive?.branches?.map((branch: any) => branch.name) || ['default']
-      const primitiveName = node.primitive?.name
+      const component = components.find((p: any) => p.name === node.component?.name)
+      const branches = component?.branches?.map((branch: any) => branch.name) || ['default']
+      const componentName = node.component?.name
 
-      // Use primitive name as node type if it exists in nodeTypes, otherwise use 'default'
-      const nodeType = primitiveName && nodeTypes[primitiveName as keyof typeof nodeTypes] ? primitiveName : 'default'
+      // Use the component name as node type if it exists in nodeTypes, otherwise use 'default'
+      const nodeType = componentName && nodeTypes[componentName as keyof typeof nodeTypes] ? componentName : 'default'
 
       return {
         id: node.id,
         type: nodeType,
         data: {
           label: node.name,
-          primitive: primitiveName,
+          component: componentName,
           branches,
           configuration: node.configuration || {},
           onAddNode: handleAddNodeFromBranch,
         },
-        position: { x: index * 250, y: 100 }, // Left-to-right layout
+        position: { x: index * 250, y: 100 },
       }
     })
 
@@ -105,7 +104,7 @@ export const Blueprint = () => {
 
     setNodes(loadedNodes)
     setEdges(loadedEdges)
-  }, [blueprint, primitives, setNodes, setEdges, handleAddNodeFromBranch])
+  }, [blueprint, components, setNodes, setEdges, handleAddNodeFromBranch])
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -114,33 +113,33 @@ export const Blueprint = () => {
     [setEdges]
   )
 
-  const handlePrimitiveClick = (primitive: any) => {
-    setSelectedPrimitive(primitive)
-    setNodeName(primitive.name)
+  const handleComponentClick = (component: any) => {
+    setSelectedComponent(component)
+    setNodeName(component.name)
     setNodeConfiguration({})
     setIsAddNodeModalOpen(true)
   }
 
-  const generateNodeId = (primitiveName: string, nodeName: string) => {
+  const generateNodeId = (componentName: string, nodeName: string) => {
     const randomChars = Math.random().toString(36).substring(2, 8)
-    const sanitizedPrimitive = primitiveName.toLowerCase().replace(/[^a-z0-9]/g, '-')
+    const sanitizedComponent = componentName.toLowerCase().replace(/[^a-z0-9]/g, '-')
     const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, '-')
-    return `${sanitizedPrimitive}-${sanitizedName}-${randomChars}`
+    return `${sanitizedComponent}-${sanitizedName}-${randomChars}`
   }
 
   const handleNodeDoubleClick = useCallback((_: any, node: Node) => {
-    const primitive = primitives.find((p: any) => p.name === node.data.primitive)
-    if (!primitive) return
+    const component = components.find((p: any) => p.name === node.data.component)
+    if (!component) return
 
     setEditingNodeId(node.id)
-    setSelectedPrimitive(primitive)
+    setSelectedComponent(component)
     setNodeName(node.data.label)
     setNodeConfiguration(node.data.configuration || {})
     setIsAddNodeModalOpen(true)
-  }, [primitives])
+  }, [components])
 
   const handleAddNode = () => {
-    if (!selectedPrimitive || !nodeName.trim()) return
+    if (!selectedComponent || !nodeName.trim()) return
 
     if (editingNodeId) {
       // Update existing node
@@ -160,12 +159,12 @@ export const Blueprint = () => {
       )
     } else {
       // Add new node with left-to-right positioning
-      const branches = selectedPrimitive?.branches?.map((branch: any) => branch.name) || ['default']
-      const newNodeId = generateNodeId(selectedPrimitive.name, nodeName.trim())
+      const branches = selectedComponent?.branches?.map((branch: any) => branch.name) || ['default']
+      const newNodeId = generateNodeId(selectedComponent.name, nodeName.trim())
 
-      // Use primitive name as node type if it exists in nodeTypes, otherwise use 'default'
-      const nodeType = selectedPrimitive.name && nodeTypes[selectedPrimitive.name as keyof typeof nodeTypes]
-        ? selectedPrimitive.name
+      // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
+      const nodeType = selectedComponent.name && nodeTypes[selectedComponent.name as keyof typeof nodeTypes]
+        ? selectedComponent.name
         : 'default'
 
       const newNode: Node = {
@@ -174,7 +173,7 @@ export const Blueprint = () => {
         position: { x: nodes.length * 250, y: 100 },
         data: {
           label: nodeName.trim(),
-          primitive: selectedPrimitive.name,
+          component: selectedComponent.name,
           branches,
           configuration: nodeConfiguration,
           onAddNode: handleAddNodeFromBranch,
@@ -198,7 +197,7 @@ export const Blueprint = () => {
     }
 
     setIsAddNodeModalOpen(false)
-    setSelectedPrimitive(null)
+    setSelectedComponent(null)
     setNodeName('')
     setNodeConfiguration({})
     setEditingNodeId(null)
@@ -206,7 +205,7 @@ export const Blueprint = () => {
 
   const handleCloseModal = () => {
     setIsAddNodeModalOpen(false)
-    setSelectedPrimitive(null)
+    setSelectedComponent(null)
     setNodeName('')
     setNodeConfiguration({})
     setEditingNodeId(null)
@@ -217,9 +216,9 @@ export const Blueprint = () => {
       const blueprintNodes = nodes.map((node) => ({
         id: node.id,
         name: node.data.label,
-        refType: 'REF_TYPE_PRIMITIVE',
-        primitive: {
-          name: node.data.primitive,
+        refType: 'REF_TYPE_COMPONENT',
+        component: {
+          name: node.data.component,
         },
         configuration: node.data.configuration || {},
       }))
@@ -244,7 +243,7 @@ export const Blueprint = () => {
     }
   }
 
-  if (blueprintLoading || primitivesLoading) {
+  if (blueprintLoading || componentsLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -309,7 +308,7 @@ export const Blueprint = () => {
                   <MaterialSymbol name="menu_open" size="lg" className="text-gray-600 dark:text-zinc-300" />
                 </button>
                 <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">
-                  Primitives
+                  Components
                 </h2>
               </div>
             </div>
@@ -317,31 +316,30 @@ export const Blueprint = () => {
             {/* Sidebar Content */}
             <div className="flex-1 overflow-y-auto text-left p-4">
               <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                Click on a primitive to add it to your blueprint
+                Click on a component to add it to your blueprint
               </div>
               <div className="space-y-1">
-                {primitives.map((primitive: any) => {
-                  // Map primitive name to icon
+                {components.map((component: any) => {
                   const iconMap: Record<string, string> = {
                     if: 'alt_route',
                     http: 'http',
                     filter: 'filter_alt',
                     switch: 'settings_input_component',
                   }
-                  const icon = iconMap[primitive.name] || 'widgets'
+                  const icon = iconMap[component.name] || 'widgets'
 
                   return (
                     <div
-                      key={primitive.name}
-                      onClick={() => handlePrimitiveClick(primitive)}
+                      key={component.name}
+                      onClick={() => handleComponentClick(component)}
                       className="p-3 rounded-lg cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700 transition-colors"
                     >
                       <div className="flex items-start gap-3">
                         <MaterialSymbol name={icon} size="lg" className="text-zinc-600 dark:text-zinc-400 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-gray-900 dark:text-zinc-100 mb-1">{primitive.name}</div>
-                          {primitive.description && (
-                            <div className="text-xs text-gray-500 dark:text-zinc-400">{primitive.description}</div>
+                          <div className="font-medium text-sm text-gray-900 dark:text-zinc-100 mb-1">{component.name}</div>
+                          {component.description && (
+                            <div className="text-xs text-gray-500 dark:text-zinc-400">{component.description}</div>
                           )}
                         </div>
                       </div>
@@ -387,9 +385,9 @@ export const Blueprint = () => {
 
       {/* Add/Edit Node Modal */}
       <Dialog open={isAddNodeModalOpen} onClose={handleCloseModal} size="lg">
-        <DialogTitle>{editingNodeId ? 'Edit' : 'Add'} {selectedPrimitive?.name}</DialogTitle>
+        <DialogTitle>{editingNodeId ? 'Edit' : 'Add'} {selectedComponent?.name}</DialogTitle>
         <DialogDescription>
-          Configure the node for this primitive
+          Configure the node for this component
         </DialogDescription>
         <DialogBody>
           <div className="space-y-4">
@@ -405,7 +403,7 @@ export const Blueprint = () => {
             </Field>
 
             {/* Dynamic configuration fields */}
-            {selectedPrimitive?.configuration?.map((field: any) => (
+            {selectedComponent?.configuration?.map((field: any) => (
               <Field key={field.name}>
                 <Label>
                   {field.name} {field.required && '*'}

@@ -1,0 +1,89 @@
+package filter
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/expr-lang/expr"
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/components"
+)
+
+const ComponentName = "filter"
+
+type Spec struct {
+	Expression string `json:"expression"`
+}
+
+type Filter struct{}
+
+func (f *Filter) Name() string {
+	return ComponentName
+}
+
+func (f *Filter) Description() string {
+	return "Evaluate input data against condition. If true, input data is sent to default output branch"
+}
+
+func (f *Filter) Outputs(configuration any) []string {
+	return []string{components.DefaultBranchName}
+}
+
+func (f *Filter) Configuration() []components.ConfigurationField {
+	return []components.ConfigurationField{
+		{
+			Name:        "expression",
+			Type:        "string",
+			Description: "Boolean expression to filter data",
+			Required:    true,
+		},
+	}
+}
+
+func (f *Filter) Execute(ctx components.ExecutionContext) error {
+	spec := Spec{}
+	err := mapstructure.Decode(ctx.Configuration, &spec)
+	if err != nil {
+		return err
+	}
+
+	env := map[string]any{
+		"$": ctx.Data,
+	}
+
+	vm, err := expr.Compile(spec.Expression, []expr.Option{
+		expr.Env(env),
+		expr.AsBool(),
+		expr.WithContext("ctx"),
+		expr.Timezone(time.UTC.String()),
+	}...)
+
+	if err != nil {
+		return err
+	}
+
+	output, err := expr.Run(vm, env)
+	if err != nil {
+		return fmt.Errorf("expression evaluation failed: %w", err)
+	}
+
+	matches, ok := output.(bool)
+	if !ok {
+		return fmt.Errorf("expression must evaluate to boolean, got %T", output)
+	}
+
+	outputs := map[string][]any{}
+	if matches {
+		outputs[components.DefaultBranchName] = []any{ctx.Data}
+	}
+
+	return ctx.State.Finish(outputs)
+}
+
+func (f *Filter) Actions() []components.Action {
+	return []components.Action{}
+}
+
+func (f *Filter) HandleAction(ctx components.ActionContext) error {
+	return fmt.Errorf("filter does not support actions")
+}

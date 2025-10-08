@@ -35,7 +35,7 @@
       "name": "Me"
     },
     {
-      "name": "Primitives"
+      "name": "Components"
     },
     {
       "name": "Blueprints"
@@ -1631,6 +1631,94 @@
         ]
       }
     },
+    "/api/v1/components": {
+      "get": {
+        "summary": "List components",
+        "description": "Returns a list of all components",
+        "operationId": "Components_ListComponents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListComponentsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Component"
+        ]
+      }
+    },
+    "/api/v1/components/{name}": {
+      "get": {
+        "summary": "Describe component",
+        "description": "Returns a component by its name",
+        "operationId": "Components_DescribeComponent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeComponentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Component"
+        ]
+      }
+    },
+    "/api/v1/components/{name}/actions": {
+      "get": {
+        "summary": "List component actions",
+        "description": "Returns available actions for a component",
+        "operationId": "Components_ListComponentActions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListComponentActionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Component"
+        ]
+      }
+    },
     "/api/v1/groups": {
       "get": {
         "summary": "List groups",
@@ -2388,94 +2476,6 @@
         ],
         "tags": [
           "Organization"
-        ]
-      }
-    },
-    "/api/v1/primitives": {
-      "get": {
-        "summary": "List primitives",
-        "description": "Returns a list of all primitives",
-        "operationId": "Primitives_ListPrimitives",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneListPrimitivesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Primitive"
-        ]
-      }
-    },
-    "/api/v1/primitives/{name}": {
-      "get": {
-        "summary": "Describe primitive",
-        "description": "Returns a primitive by its name",
-        "operationId": "Primitives_DescribePrimitive",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneDescribePrimitiveResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Primitive"
-        ]
-      }
-    },
-    "/api/v1/primitives/{name}/actions": {
-      "get": {
-        "summary": "List primitive actions",
-        "description": "Returns available actions for a primitive",
-        "operationId": "Primitives_ListPrimitiveActions",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneListPrimitiveActionsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Primitive"
         ]
       }
     },
@@ -4485,15 +4485,15 @@
         "refType": {
           "$ref": "#/definitions/SuperplaneBlueprintNodeRefType"
         },
-        "primitive": {
-          "$ref": "#/definitions/SuperplaneBlueprintNodePrimitiveRef"
+        "component": {
+          "$ref": "#/definitions/SuperplaneBlueprintNodeComponentRef"
         },
         "configuration": {
           "type": "object"
         }
       }
     },
-    "SuperplaneBlueprintNodePrimitiveRef": {
+    "SuperplaneBlueprintNodeComponentRef": {
       "type": "object",
       "properties": {
         "name": {
@@ -4504,9 +4504,9 @@
     "SuperplaneBlueprintNodeRefType": {
       "type": "string",
       "enum": [
-        "REF_TYPE_PRIMITIVE"
+        "REF_TYPE_COMPONENT"
       ],
-      "default": "REF_TYPE_PRIMITIVE"
+      "default": "REF_TYPE_COMPONENT"
     },
     "SuperplaneCancelStageExecutionBody": {
       "type": "object"
@@ -4546,6 +4546,49 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneComponent": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConfigurationField"
+          }
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputBranch"
+          }
+        }
+      }
+    },
+    "SuperplaneComponentAction": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConfigurationField"
+          }
         }
       }
     },
@@ -4948,6 +4991,14 @@
         }
       }
     },
+    "SuperplaneDescribeComponentResponse": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "$ref": "#/definitions/SuperplaneComponent"
+        }
+      }
+    },
     "SuperplaneDescribeConnectionGroupResponse": {
       "type": "object",
       "properties": {
@@ -4961,14 +5012,6 @@
       "properties": {
         "eventSource": {
           "$ref": "#/definitions/SuperplaneEventSource"
-        }
-      }
-    },
-    "SuperplaneDescribePrimitiveResponse": {
-      "type": "object",
-      "properties": {
-        "primitive": {
-          "$ref": "#/definitions/SuperplanePrimitive"
         }
       }
     },
@@ -5448,6 +5491,30 @@
         }
       }
     },
+    "SuperplaneListComponentActionsResponse": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneComponentAction"
+          }
+        }
+      }
+    },
+    "SuperplaneListComponentsResponse": {
+      "type": "object",
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneComponent"
+          }
+        }
+      }
+    },
     "SuperplaneListConnectionGroupFieldSetsResponse": {
       "type": "object",
       "properties": {
@@ -5576,30 +5643,6 @@
         }
       }
     },
-    "SuperplaneListPrimitiveActionsResponse": {
-      "type": "object",
-      "properties": {
-        "actions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplanePrimitiveAction"
-          }
-        }
-      }
-    },
-    "SuperplaneListPrimitivesResponse": {
-      "type": "object",
-      "properties": {
-        "primitives": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplanePrimitive"
-          }
-        }
-      }
-    },
     "SuperplaneListStageEventsResponse": {
       "type": "object",
       "properties": {
@@ -5724,49 +5767,6 @@
         },
         "value": {
           "type": "string"
-        }
-      }
-    },
-    "SuperplanePrimitive": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneConfigurationField"
-          }
-        },
-        "branches": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneOutputBranch"
-          }
-        }
-      }
-    },
-    "SuperplanePrimitiveAction": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "parameters": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneConfigurationField"
-          }
         }
       }
     },
@@ -6204,14 +6204,22 @@
         "refType": {
           "$ref": "#/definitions/SuperplaneWorkflowNodeRefType"
         },
-        "primitive": {
-          "$ref": "#/definitions/SuperplaneWorkflowNodePrimitiveRef"
+        "component": {
+          "$ref": "#/definitions/SuperplaneWorkflowNodeComponentRef"
         },
         "blueprint": {
           "$ref": "#/definitions/WorkflowNodeBlueprintRef"
         },
         "configuration": {
           "type": "object"
+        }
+      }
+    },
+    "SuperplaneWorkflowNodeComponentRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
         }
       }
     },
@@ -6293,21 +6301,13 @@
       ],
       "default": "STATE_UNKNOWN"
     },
-    "SuperplaneWorkflowNodePrimitiveRef": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      }
-    },
     "SuperplaneWorkflowNodeRefType": {
       "type": "string",
       "enum": [
-        "REF_TYPE_PRIMITIVE",
+        "REF_TYPE_COMPONENT",
         "REF_TYPE_BLUEPRINT"
       ],
-      "default": "REF_TYPE_PRIMITIVE"
+      "default": "REF_TYPE_COMPONENT"
     },
     "SuperplaneWorkflowQueueItem": {
       "type": "object",

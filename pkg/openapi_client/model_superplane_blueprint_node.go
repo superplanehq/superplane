@@ -23,7 +23,7 @@ type SuperplaneBlueprintNode struct {
 	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
 	RefType *SuperplaneBlueprintNodeRefType `json:"refType,omitempty"`
-	Primitive *SuperplaneBlueprintNodePrimitiveRef `json:"primitive,omitempty"`
+	Component *SuperplaneBlueprintNodeComponentRef `json:"component,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 }
 
@@ -33,7 +33,7 @@ type SuperplaneBlueprintNode struct {
 // will change when the set of required properties is changed
 func NewSuperplaneBlueprintNode() *SuperplaneBlueprintNode {
 	this := SuperplaneBlueprintNode{}
-	var refType SuperplaneBlueprintNodeRefType = SUPERPLANEBLUEPRINTNODEREFTYPE_REF_TYPE_PRIMITIVE
+	var refType SuperplaneBlueprintNodeRefType = SUPERPLANEBLUEPRINTNODEREFTYPE_REF_TYPE_COMPONENT
 	this.RefType = &refType
 	return &this
 }
@@ -43,7 +43,7 @@ func NewSuperplaneBlueprintNode() *SuperplaneBlueprintNode {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneBlueprintNodeWithDefaults() *SuperplaneBlueprintNode {
 	this := SuperplaneBlueprintNode{}
-	var refType SuperplaneBlueprintNodeRefType = SUPERPLANEBLUEPRINTNODEREFTYPE_REF_TYPE_PRIMITIVE
+	var refType SuperplaneBlueprintNodeRefType = SUPERPLANEBLUEPRINTNODEREFTYPE_REF_TYPE_COMPONENT
 	this.RefType = &refType
 	return &this
 }
@@ -144,36 +144,36 @@ func (o *SuperplaneBlueprintNode) SetRefType(v SuperplaneBlueprintNodeRefType) {
 	o.RefType = &v
 }
 
-// GetPrimitive returns the Primitive field value if set, zero value otherwise.
-func (o *SuperplaneBlueprintNode) GetPrimitive() SuperplaneBlueprintNodePrimitiveRef {
-	if o == nil || IsNil(o.Primitive) {
-		var ret SuperplaneBlueprintNodePrimitiveRef
+// GetComponent returns the Component field value if set, zero value otherwise.
+func (o *SuperplaneBlueprintNode) GetComponent() SuperplaneBlueprintNodeComponentRef {
+	if o == nil || IsNil(o.Component) {
+		var ret SuperplaneBlueprintNodeComponentRef
 		return ret
 	}
-	return *o.Primitive
+	return *o.Component
 }
 
-// GetPrimitiveOk returns a tuple with the Primitive field value if set, nil otherwise
+// GetComponentOk returns a tuple with the Component field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneBlueprintNode) GetPrimitiveOk() (*SuperplaneBlueprintNodePrimitiveRef, bool) {
-	if o == nil || IsNil(o.Primitive) {
+func (o *SuperplaneBlueprintNode) GetComponentOk() (*SuperplaneBlueprintNodeComponentRef, bool) {
+	if o == nil || IsNil(o.Component) {
 		return nil, false
 	}
-	return o.Primitive, true
+	return o.Component, true
 }
 
-// HasPrimitive returns a boolean if a field has been set.
-func (o *SuperplaneBlueprintNode) HasPrimitive() bool {
-	if o != nil && !IsNil(o.Primitive) {
+// HasComponent returns a boolean if a field has been set.
+func (o *SuperplaneBlueprintNode) HasComponent() bool {
+	if o != nil && !IsNil(o.Component) {
 		return true
 	}
 
 	return false
 }
 
-// SetPrimitive gets a reference to the given SuperplaneBlueprintNodePrimitiveRef and assigns it to the Primitive field.
-func (o *SuperplaneBlueprintNode) SetPrimitive(v SuperplaneBlueprintNodePrimitiveRef) {
-	o.Primitive = &v
+// SetComponent gets a reference to the given SuperplaneBlueprintNodeComponentRef and assigns it to the Component field.
+func (o *SuperplaneBlueprintNode) SetComponent(v SuperplaneBlueprintNodeComponentRef) {
+	o.Component = &v
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
@@ -227,8 +227,8 @@ func (o SuperplaneBlueprintNode) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.RefType) {
 		toSerialize["refType"] = o.RefType
 	}
-	if !IsNil(o.Primitive) {
-		toSerialize["primitive"] = o.Primitive
+	if !IsNil(o.Component) {
+		toSerialize["component"] = o.Component
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration

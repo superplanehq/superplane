@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package Superplane;
+
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/components";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Components API";
+    version: "1.0";
+    description: "API for Superplane Components";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Components {
+  rpc ListComponents(ListComponentsRequest) returns (ListComponentsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/components"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List components";
+      description: "Returns a list of all components";
+      tags: "Component";
+    };
+  }
+
+  rpc DescribeComponent(DescribeComponentRequest) returns (DescribeComponentResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/components/{name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe component";
+      description: "Returns a component by its name";
+      tags: "Component";
+    };
+  }
+
+  rpc ListComponentActions(ListComponentActionsRequest) returns (ListComponentActionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/components/{name}/actions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List component actions";
+      description: "Returns available actions for a component";
+      tags: "Component";
+    };
+  }
+}
+
+message ListComponentsRequest {}
+
+message ListComponentsResponse {
+  repeated Component components = 1;
+}
+
+message DescribeComponentRequest {
+  string name = 1;
+}
+
+message DescribeComponentResponse {
+  Component component = 1;
+}
+
+message Component {
+  string name = 1;
+  string description = 2;
+  repeated ConfigurationField configuration = 3;
+  repeated OutputBranch branches = 4;
+}
+
+message ConfigurationField {
+  string name = 1;
+  string type = 2;
+  string description = 3;
+  bool required = 4;
+}
+
+message OutputBranch {
+  string name = 1;
+}
+
+message ListComponentActionsRequest {
+  string name = 1;
+}
+
+message ComponentAction {
+  string name = 1;
+  string description = 2;
+  repeated ConfigurationField parameters = 3;
+}
+
+message ListComponentActionsResponse {
+  repeated ComponentAction actions = 1;
+}

@@ -80,7 +80,7 @@ export function CreateBlueprintModal({
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
       <DialogTitle>Create New Blueprint</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a new blueprint to define reusable workflow patterns using primitives.
+        Create a new blueprint to define reusable workflow patterns using components.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <MaterialSymbol name="close" size="sm" />

@@ -1,13 +1,17 @@
 package contexts
 
 import (
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/primitives"
 )
 
 type ExecutionStateContext struct {
 	execution *models.WorkflowNodeExecution
 	event     *models.WorkflowEvent
+}
+
+func NewExecutionStateContext(execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) components.ExecutionStateContext {
+	return &ExecutionStateContext{execution: execution, event: event}
 }
 
 func (s *ExecutionStateContext) Wait() error {
@@ -23,9 +27,4 @@ func (s *ExecutionStateContext) Finish(outputs map[string][]any) error {
 
 func (s *ExecutionStateContext) Fail(reason string) error {
 	return s.execution.Fail(reason)
-}
-
-// NewExecutionStateContext creates an ExecutionStateContext for a workflow node execution
-func NewExecutionStateContext(execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) primitives.ExecutionStateContext {
-	return &ExecutionStateContext{execution: execution, event: event}
 }

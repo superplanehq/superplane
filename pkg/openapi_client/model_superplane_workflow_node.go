@@ -23,7 +23,7 @@ type SuperplaneWorkflowNode struct {
 	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
 	RefType *SuperplaneWorkflowNodeRefType `json:"refType,omitempty"`
-	Primitive *SuperplaneWorkflowNodePrimitiveRef `json:"primitive,omitempty"`
+	Component *SuperplaneWorkflowNodeComponentRef `json:"component,omitempty"`
 	Blueprint *WorkflowNodeBlueprintRef `json:"blueprint,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 }
@@ -34,7 +34,7 @@ type SuperplaneWorkflowNode struct {
 // will change when the set of required properties is changed
 func NewSuperplaneWorkflowNode() *SuperplaneWorkflowNode {
 	this := SuperplaneWorkflowNode{}
-	var refType SuperplaneWorkflowNodeRefType = SUPERPLANEWORKFLOWNODEREFTYPE_REF_TYPE_PRIMITIVE
+	var refType SuperplaneWorkflowNodeRefType = SUPERPLANEWORKFLOWNODEREFTYPE_REF_TYPE_COMPONENT
 	this.RefType = &refType
 	return &this
 }
@@ -44,7 +44,7 @@ func NewSuperplaneWorkflowNode() *SuperplaneWorkflowNode {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneWorkflowNodeWithDefaults() *SuperplaneWorkflowNode {
 	this := SuperplaneWorkflowNode{}
-	var refType SuperplaneWorkflowNodeRefType = SUPERPLANEWORKFLOWNODEREFTYPE_REF_TYPE_PRIMITIVE
+	var refType SuperplaneWorkflowNodeRefType = SUPERPLANEWORKFLOWNODEREFTYPE_REF_TYPE_COMPONENT
 	this.RefType = &refType
 	return &this
 }
@@ -145,36 +145,36 @@ func (o *SuperplaneWorkflowNode) SetRefType(v SuperplaneWorkflowNodeRefType) {
 	o.RefType = &v
 }
 
-// GetPrimitive returns the Primitive field value if set, zero value otherwise.
-func (o *SuperplaneWorkflowNode) GetPrimitive() SuperplaneWorkflowNodePrimitiveRef {
-	if o == nil || IsNil(o.Primitive) {
-		var ret SuperplaneWorkflowNodePrimitiveRef
+// GetComponent returns the Component field value if set, zero value otherwise.
+func (o *SuperplaneWorkflowNode) GetComponent() SuperplaneWorkflowNodeComponentRef {
+	if o == nil || IsNil(o.Component) {
+		var ret SuperplaneWorkflowNodeComponentRef
 		return ret
 	}
-	return *o.Primitive
+	return *o.Component
 }
 
-// GetPrimitiveOk returns a tuple with the Primitive field value if set, nil otherwise
+// GetComponentOk returns a tuple with the Component field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneWorkflowNode) GetPrimitiveOk() (*SuperplaneWorkflowNodePrimitiveRef, bool) {
-	if o == nil || IsNil(o.Primitive) {
+func (o *SuperplaneWorkflowNode) GetComponentOk() (*SuperplaneWorkflowNodeComponentRef, bool) {
+	if o == nil || IsNil(o.Component) {
 		return nil, false
 	}
-	return o.Primitive, true
+	return o.Component, true
 }
 
-// HasPrimitive returns a boolean if a field has been set.
-func (o *SuperplaneWorkflowNode) HasPrimitive() bool {
-	if o != nil && !IsNil(o.Primitive) {
+// HasComponent returns a boolean if a field has been set.
+func (o *SuperplaneWorkflowNode) HasComponent() bool {
+	if o != nil && !IsNil(o.Component) {
 		return true
 	}
 
 	return false
 }
 
-// SetPrimitive gets a reference to the given SuperplaneWorkflowNodePrimitiveRef and assigns it to the Primitive field.
-func (o *SuperplaneWorkflowNode) SetPrimitive(v SuperplaneWorkflowNodePrimitiveRef) {
-	o.Primitive = &v
+// SetComponent gets a reference to the given SuperplaneWorkflowNodeComponentRef and assigns it to the Component field.
+func (o *SuperplaneWorkflowNode) SetComponent(v SuperplaneWorkflowNodeComponentRef) {
+	o.Component = &v
 }
 
 // GetBlueprint returns the Blueprint field value if set, zero value otherwise.
@@ -260,8 +260,8 @@ func (o SuperplaneWorkflowNode) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.RefType) {
 		toSerialize["refType"] = o.RefType
 	}
-	if !IsNil(o.Primitive) {
-		toSerialize["primitive"] = o.Primitive
+	if !IsNil(o.Component) {
+		toSerialize["component"] = o.Component
 	}
 	if !IsNil(o.Blueprint) {
 		toSerialize["blueprint"] = o.Blueprint

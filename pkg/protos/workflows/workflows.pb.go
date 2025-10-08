@@ -28,18 +28,18 @@ const (
 type WorkflowNode_RefType int32
 
 const (
-	WorkflowNode_REF_TYPE_PRIMITIVE WorkflowNode_RefType = 0
+	WorkflowNode_REF_TYPE_COMPONENT WorkflowNode_RefType = 0
 	WorkflowNode_REF_TYPE_BLUEPRINT WorkflowNode_RefType = 1
 )
 
 // Enum value maps for WorkflowNode_RefType.
 var (
 	WorkflowNode_RefType_name = map[int32]string{
-		0: "REF_TYPE_PRIMITIVE",
+		0: "REF_TYPE_COMPONENT",
 		1: "REF_TYPE_BLUEPRINT",
 	}
 	WorkflowNode_RefType_value = map[string]int32{
-		"REF_TYPE_PRIMITIVE": 0,
+		"REF_TYPE_COMPONENT": 0,
 		"REF_TYPE_BLUEPRINT": 1,
 	}
 )
@@ -761,7 +761,7 @@ type WorkflowNode struct {
 	Id            string                     `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                     `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	RefType       WorkflowNode_RefType       `protobuf:"varint,3,opt,name=ref_type,json=refType,proto3,enum=Superplane.WorkflowNode_RefType" json:"ref_type,omitempty"`
-	Primitive     *WorkflowNode_PrimitiveRef `protobuf:"bytes,4,opt,name=primitive,proto3" json:"primitive,omitempty"`
+	Component     *WorkflowNode_ComponentRef `protobuf:"bytes,4,opt,name=component,proto3" json:"component,omitempty"`
 	Blueprint     *WorkflowNode_BlueprintRef `protobuf:"bytes,5,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
 	Configuration *_struct.Struct            `protobuf:"bytes,6,opt,name=configuration,proto3" json:"configuration,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -816,12 +816,12 @@ func (x *WorkflowNode) GetRefType() WorkflowNode_RefType {
 	if x != nil {
 		return x.RefType
 	}
-	return WorkflowNode_REF_TYPE_PRIMITIVE
+	return WorkflowNode_REF_TYPE_COMPONENT
 }
 
-func (x *WorkflowNode) GetPrimitive() *WorkflowNode_PrimitiveRef {
+func (x *WorkflowNode) GetComponent() *WorkflowNode_ComponentRef {
 	if x != nil {
-		return x.Primitive
+		return x.Component
 	}
 	return nil
 }
@@ -1592,27 +1592,27 @@ func (*InvokeNodeExecutionActionResponse) Descriptor() ([]byte, []int) {
 	return file_workflows_proto_rawDescGZIP(), []int{21}
 }
 
-type WorkflowNode_PrimitiveRef struct {
+type WorkflowNode_ComponentRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *WorkflowNode_PrimitiveRef) Reset() {
-	*x = WorkflowNode_PrimitiveRef{}
+func (x *WorkflowNode_ComponentRef) Reset() {
+	*x = WorkflowNode_ComponentRef{}
 	mi := &file_workflows_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WorkflowNode_PrimitiveRef) String() string {
+func (x *WorkflowNode_ComponentRef) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WorkflowNode_PrimitiveRef) ProtoMessage() {}
+func (*WorkflowNode_ComponentRef) ProtoMessage() {}
 
-func (x *WorkflowNode_PrimitiveRef) ProtoReflect() protoreflect.Message {
+func (x *WorkflowNode_ComponentRef) ProtoReflect() protoreflect.Message {
 	mi := &file_workflows_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1624,12 +1624,12 @@ func (x *WorkflowNode_PrimitiveRef) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WorkflowNode_PrimitiveRef.ProtoReflect.Descriptor instead.
-func (*WorkflowNode_PrimitiveRef) Descriptor() ([]byte, []int) {
+// Deprecated: Use WorkflowNode_ComponentRef.ProtoReflect.Descriptor instead.
+func (*WorkflowNode_ComponentRef) Descriptor() ([]byte, []int) {
 	return file_workflows_proto_rawDescGZIP(), []int{11, 0}
 }
 
-func (x *WorkflowNode_PrimitiveRef) GetName() string {
+func (x *WorkflowNode_ComponentRef) GetName() string {
 	if x != nil {
 		return x.Name
 	}
@@ -1720,15 +1720,15 @@ const file_workflows_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12;\n" +
 	"\bref_type\x18\x03 \x01(\x0e2 .Superplane.WorkflowNode.RefTypeR\arefType\x12C\n" +
-	"\tprimitive\x18\x04 \x01(\v2%.Superplane.WorkflowNode.PrimitiveRefR\tprimitive\x12C\n" +
+	"\tcomponent\x18\x04 \x01(\v2%.Superplane.WorkflowNode.ComponentRefR\tcomponent\x12C\n" +
 	"\tblueprint\x18\x05 \x01(\v2%.Superplane.WorkflowNode.BlueprintRefR\tblueprint\x12=\n" +
 	"\rconfiguration\x18\x06 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x1a\"\n" +
-	"\fPrimitiveRef\x12\x12\n" +
+	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a\"\n" +
 	"\fBlueprintRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"9\n" +
 	"\aRefType\x12\x16\n" +
-	"\x12REF_TYPE_PRIMITIVE\x10\x00\x12\x16\n" +
+	"\x12REF_TYPE_COMPONENT\x10\x00\x12\x16\n" +
 	"\x12REF_TYPE_BLUEPRINT\x10\x01\"`\n" +
 	"\fWorkflowEdge\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12\x1b\n" +
@@ -1882,7 +1882,7 @@ var file_workflows_proto_goTypes = []any{
 	(*WorkflowEvent)(nil),                     // 23: Superplane.WorkflowEvent
 	(*InvokeNodeExecutionActionRequest)(nil),  // 24: Superplane.InvokeNodeExecutionActionRequest
 	(*InvokeNodeExecutionActionResponse)(nil), // 25: Superplane.InvokeNodeExecutionActionResponse
-	(*WorkflowNode_PrimitiveRef)(nil),         // 26: Superplane.WorkflowNode.PrimitiveRef
+	(*WorkflowNode_ComponentRef)(nil),         // 26: Superplane.WorkflowNode.ComponentRef
 	(*WorkflowNode_BlueprintRef)(nil),         // 27: Superplane.WorkflowNode.BlueprintRef
 	(*timestamp.Timestamp)(nil),               // 28: google.protobuf.Timestamp
 	(*_struct.Struct)(nil),                    // 29: google.protobuf.Struct
@@ -1899,7 +1899,7 @@ var file_workflows_proto_depIdxs = []int32{
 	15, // 8: Superplane.Workflow.nodes:type_name -> Superplane.WorkflowNode
 	16, // 9: Superplane.Workflow.edges:type_name -> Superplane.WorkflowEdge
 	0,  // 10: Superplane.WorkflowNode.ref_type:type_name -> Superplane.WorkflowNode.RefType
-	26, // 11: Superplane.WorkflowNode.primitive:type_name -> Superplane.WorkflowNode.PrimitiveRef
+	26, // 11: Superplane.WorkflowNode.component:type_name -> Superplane.WorkflowNode.ComponentRef
 	27, // 12: Superplane.WorkflowNode.blueprint:type_name -> Superplane.WorkflowNode.BlueprintRef
 	29, // 13: Superplane.WorkflowNode.configuration:type_name -> google.protobuf.Struct
 	28, // 14: Superplane.ListNodeQueueItemsRequest.before:type_name -> google.protobuf.Timestamp

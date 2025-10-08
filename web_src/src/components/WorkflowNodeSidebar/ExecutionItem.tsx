@@ -4,7 +4,7 @@ import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
 import { getExecutionRenderer } from './executionRenderers'
-import { PrimitiveActions } from './PrimitiveActions'
+import { ComponentActions } from './ComponentActions'
 
 interface ExecutionItemProps {
   execution: any
@@ -193,11 +193,11 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
               </div>
             </div>
 
-            {/* Primitive Actions Section */}
+            {/* Actions Section */}
             {!isBlueprintNode && nodeType && (
-              <PrimitiveActions
+              <ComponentActions
                 executionId={execution.id}
-                primitiveName={nodeType}
+                componentName={nodeType}
                 executionState={execution.state}
               />
             )}

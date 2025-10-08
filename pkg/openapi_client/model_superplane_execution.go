@@ -23,8 +23,8 @@ var _ MappedNullable = &SuperplaneExecution{}
 type SuperplaneExecution struct {
 	Id *string `json:"id,omitempty"`
 	State *SuperplaneExecutionState `json:"state,omitempty"`
-	Result *ExecutionResult `json:"result,omitempty"`
-	ResultReason *ExecutionResultReason `json:"resultReason,omitempty"`
+	Result *SuperplaneExecutionResult `json:"result,omitempty"`
+	ResultReason *SuperplaneExecutionResultReason `json:"resultReason,omitempty"`
 	ResultMessage *string `json:"resultMessage,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
@@ -43,9 +43,9 @@ func NewSuperplaneExecution() *SuperplaneExecution {
 	this := SuperplaneExecution{}
 	var state SuperplaneExecutionState = SUPERPLANEEXECUTIONSTATE_STATE_UNKNOWN
 	this.State = &state
-	var result ExecutionResult = EXECUTIONRESULT_RESULT_UNKNOWN
+	var result SuperplaneExecutionResult = SUPERPLANEEXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
-	var resultReason ExecutionResultReason = EXECUTIONRESULTREASON_RESULT_REASON_OK
+	var resultReason SuperplaneExecutionResultReason = SUPERPLANEEXECUTIONRESULTREASON_RESULT_REASON_OK
 	this.ResultReason = &resultReason
 	return &this
 }
@@ -57,9 +57,9 @@ func NewSuperplaneExecutionWithDefaults() *SuperplaneExecution {
 	this := SuperplaneExecution{}
 	var state SuperplaneExecutionState = SUPERPLANEEXECUTIONSTATE_STATE_UNKNOWN
 	this.State = &state
-	var result ExecutionResult = EXECUTIONRESULT_RESULT_UNKNOWN
+	var result SuperplaneExecutionResult = SUPERPLANEEXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
-	var resultReason ExecutionResultReason = EXECUTIONRESULTREASON_RESULT_REASON_OK
+	var resultReason SuperplaneExecutionResultReason = SUPERPLANEEXECUTIONRESULTREASON_RESULT_REASON_OK
 	this.ResultReason = &resultReason
 	return &this
 }
@@ -129,9 +129,9 @@ func (o *SuperplaneExecution) SetState(v SuperplaneExecutionState) {
 }
 
 // GetResult returns the Result field value if set, zero value otherwise.
-func (o *SuperplaneExecution) GetResult() ExecutionResult {
+func (o *SuperplaneExecution) GetResult() SuperplaneExecutionResult {
 	if o == nil || IsNil(o.Result) {
-		var ret ExecutionResult
+		var ret SuperplaneExecutionResult
 		return ret
 	}
 	return *o.Result
@@ -139,7 +139,7 @@ func (o *SuperplaneExecution) GetResult() ExecutionResult {
 
 // GetResultOk returns a tuple with the Result field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneExecution) GetResultOk() (*ExecutionResult, bool) {
+func (o *SuperplaneExecution) GetResultOk() (*SuperplaneExecutionResult, bool) {
 	if o == nil || IsNil(o.Result) {
 		return nil, false
 	}
@@ -155,15 +155,15 @@ func (o *SuperplaneExecution) HasResult() bool {
 	return false
 }
 
-// SetResult gets a reference to the given ExecutionResult and assigns it to the Result field.
-func (o *SuperplaneExecution) SetResult(v ExecutionResult) {
+// SetResult gets a reference to the given SuperplaneExecutionResult and assigns it to the Result field.
+func (o *SuperplaneExecution) SetResult(v SuperplaneExecutionResult) {
 	o.Result = &v
 }
 
 // GetResultReason returns the ResultReason field value if set, zero value otherwise.
-func (o *SuperplaneExecution) GetResultReason() ExecutionResultReason {
+func (o *SuperplaneExecution) GetResultReason() SuperplaneExecutionResultReason {
 	if o == nil || IsNil(o.ResultReason) {
-		var ret ExecutionResultReason
+		var ret SuperplaneExecutionResultReason
 		return ret
 	}
 	return *o.ResultReason
@@ -171,7 +171,7 @@ func (o *SuperplaneExecution) GetResultReason() ExecutionResultReason {
 
 // GetResultReasonOk returns a tuple with the ResultReason field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneExecution) GetResultReasonOk() (*ExecutionResultReason, bool) {
+func (o *SuperplaneExecution) GetResultReasonOk() (*SuperplaneExecutionResultReason, bool) {
 	if o == nil || IsNil(o.ResultReason) {
 		return nil, false
 	}
@@ -187,8 +187,8 @@ func (o *SuperplaneExecution) HasResultReason() bool {
 	return false
 }
 
-// SetResultReason gets a reference to the given ExecutionResultReason and assigns it to the ResultReason field.
-func (o *SuperplaneExecution) SetResultReason(v ExecutionResultReason) {
+// SetResultReason gets a reference to the given SuperplaneExecutionResultReason and assigns it to the ResultReason field.
+func (o *SuperplaneExecution) SetResultReason(v SuperplaneExecutionResultReason) {
 	o.ResultReason = &v
 }
 

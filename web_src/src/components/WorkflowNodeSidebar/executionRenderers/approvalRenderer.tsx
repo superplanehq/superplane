@@ -192,7 +192,7 @@ const ApprovalActions = ({ execution }: { execution: any }) => {
   )
 }
 
-// Custom renderer for Approval primitive executions
+// Custom renderer for Approval component executions
 registerExecutionRenderer('approval', {
   renderCollapsed: ({ execution, onClick }: CollapsedViewProps) => {
     const metadata = execution.metadata || {}
@@ -258,7 +258,7 @@ registerExecutionRenderer('approval', {
     )
   },
 
-  renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
+  renderExpanded: ({ execution }: ExpandedViewProps) => {
     const metadata = execution.metadata || {}
     const approvals = metadata.approvals || []
 

@@ -21,13 +21,13 @@ type SuperplaneWorkflowNodeRefType string
 
 // List of SuperplaneWorkflowNodeRefType
 const (
-	SUPERPLANEWORKFLOWNODEREFTYPE_REF_TYPE_PRIMITIVE SuperplaneWorkflowNodeRefType = "REF_TYPE_PRIMITIVE"
+	SUPERPLANEWORKFLOWNODEREFTYPE_REF_TYPE_COMPONENT SuperplaneWorkflowNodeRefType = "REF_TYPE_COMPONENT"
 	SUPERPLANEWORKFLOWNODEREFTYPE_REF_TYPE_BLUEPRINT SuperplaneWorkflowNodeRefType = "REF_TYPE_BLUEPRINT"
 )
 
 // All allowed values of SuperplaneWorkflowNodeRefType enum
 var AllowedSuperplaneWorkflowNodeRefTypeEnumValues = []SuperplaneWorkflowNodeRefType{
-	"REF_TYPE_PRIMITIVE",
+	"REF_TYPE_COMPONENT",
 	"REF_TYPE_BLUEPRINT",
 }
 

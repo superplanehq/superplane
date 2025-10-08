@@ -56,9 +56,9 @@ func NodesToProto(nodes []models.Node) []*pb.WorkflowNode {
 		}
 
 		ref := node.Ref
-		if ref.Primitive != nil {
-			result[i].Primitive = &pb.WorkflowNode_PrimitiveRef{
-				Name: ref.Primitive.Name,
+		if ref.Component != nil {
+			result[i].Component = &pb.WorkflowNode_ComponentRef{
+				Name: ref.Component.Name,
 			}
 		}
 		if ref.Blueprint != nil {
@@ -96,10 +96,10 @@ func EdgesToProto(edges []models.Edge) []*pb.WorkflowEdge {
 
 func ProtoToRefType(refType pb.WorkflowNode_RefType) string {
 	switch refType {
-	case pb.WorkflowNode_REF_TYPE_PRIMITIVE:
-		return "primitive"
+	case pb.WorkflowNode_REF_TYPE_COMPONENT:
+		return models.NodeRefTypeComponent
 	case pb.WorkflowNode_REF_TYPE_BLUEPRINT:
-		return "blueprint"
+		return models.NodeRefTypeBlueprint
 	default:
 		return ""
 	}
@@ -107,12 +107,12 @@ func ProtoToRefType(refType pb.WorkflowNode_RefType) string {
 
 func RefTypeToProto(refType string) pb.WorkflowNode_RefType {
 	switch refType {
-	case "primitive":
-		return pb.WorkflowNode_REF_TYPE_PRIMITIVE
-	case "blueprint":
+	case models.NodeRefTypeComponent:
+		return pb.WorkflowNode_REF_TYPE_COMPONENT
+	case models.NodeRefTypeBlueprint:
 		return pb.WorkflowNode_REF_TYPE_BLUEPRINT
 	default:
-		return pb.WorkflowNode_REF_TYPE_PRIMITIVE
+		return pb.WorkflowNode_REF_TYPE_COMPONENT
 	}
 }
 
@@ -120,10 +120,10 @@ func ProtoToNodeRef(node *pb.WorkflowNode) models.NodeRef {
 	ref := models.NodeRef{}
 
 	switch node.RefType {
-	case pb.WorkflowNode_REF_TYPE_PRIMITIVE:
-		if node.Primitive != nil {
-			ref.Primitive = &models.PrimitiveRef{
-				Name: node.Primitive.Name,
+	case pb.WorkflowNode_REF_TYPE_COMPONENT:
+		if node.Component != nil {
+			ref.Component = &models.ComponentRef{
+				Name: node.Component.Name,
 			}
 		}
 	case pb.WorkflowNode_REF_TYPE_BLUEPRINT:
@@ -191,18 +191,18 @@ func ParseWorkflow(registry *registry.Registry, workflow *pb.Workflow) ([]models
 
 func validateNodeRef(registry *registry.Registry, node *pb.WorkflowNode) error {
 	switch node.RefType {
-	case pb.WorkflowNode_REF_TYPE_PRIMITIVE:
-		if node.Primitive == nil {
-			return fmt.Errorf("primitive reference is required for primitive ref type")
+	case pb.WorkflowNode_REF_TYPE_COMPONENT:
+		if node.Component == nil {
+			return fmt.Errorf("component reference is required for component ref type")
 		}
 
-		if node.Primitive.Name == "" {
-			return fmt.Errorf("primitive name is required")
+		if node.Component.Name == "" {
+			return fmt.Errorf("component name is required")
 		}
 
-		_, err := registry.GetPrimitive(node.Primitive.Name)
+		_, err := registry.GetComponent(node.Component.Name)
 		if err != nil {
-			return fmt.Errorf("primitive %s not found", node.Primitive.Name)
+			return fmt.Errorf("component %s not found", node.Component.Name)
 		}
 
 		return nil

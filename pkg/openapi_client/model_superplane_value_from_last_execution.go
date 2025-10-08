@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneValueFromLastExecution{}
 
 // SuperplaneValueFromLastExecution struct for SuperplaneValueFromLastExecution
 type SuperplaneValueFromLastExecution struct {
-	Results []ExecutionResult `json:"results,omitempty"`
+	Results []SuperplaneExecutionResult `json:"results,omitempty"`
 }
 
 // NewSuperplaneValueFromLastExecution instantiates a new SuperplaneValueFromLastExecution object
@@ -41,9 +41,9 @@ func NewSuperplaneValueFromLastExecutionWithDefaults() *SuperplaneValueFromLastE
 }
 
 // GetResults returns the Results field value if set, zero value otherwise.
-func (o *SuperplaneValueFromLastExecution) GetResults() []ExecutionResult {
+func (o *SuperplaneValueFromLastExecution) GetResults() []SuperplaneExecutionResult {
 	if o == nil || IsNil(o.Results) {
-		var ret []ExecutionResult
+		var ret []SuperplaneExecutionResult
 		return ret
 	}
 	return o.Results
@@ -51,7 +51,7 @@ func (o *SuperplaneValueFromLastExecution) GetResults() []ExecutionResult {
 
 // GetResultsOk returns a tuple with the Results field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneValueFromLastExecution) GetResultsOk() ([]ExecutionResult, bool) {
+func (o *SuperplaneValueFromLastExecution) GetResultsOk() ([]SuperplaneExecutionResult, bool) {
 	if o == nil || IsNil(o.Results) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *SuperplaneValueFromLastExecution) HasResults() bool {
 	return false
 }
 
-// SetResults gets a reference to the given []ExecutionResult and assigns it to the Results field.
-func (o *SuperplaneValueFromLastExecution) SetResults(v []ExecutionResult) {
+// SetResults gets a reference to the given []SuperplaneExecutionResult and assigns it to the Results field.
+func (o *SuperplaneValueFromLastExecution) SetResults(v []SuperplaneExecutionResult) {
 	o.Results = v
 }
 

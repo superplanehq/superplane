@@ -29,11 +29,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbSup "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
-	pbPrimitives "github.com/superplanehq/superplane/pkg/protos/primitives"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
@@ -186,7 +186,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbPrimitives.RegisterPrimitivesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbComponents.RegisterComponentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/primitives").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 

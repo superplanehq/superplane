@@ -4,12 +4,12 @@ import { MaterialSymbol } from '../../../../components/MaterialSymbol/material-s
 
 interface ApprovalNodeData {
   label: string
-  primitive: string
+  component: string
   branches?: string[]
   onAddNode?: (sourceId: string, branch: string) => void
 }
 
-export const ApprovalNode = memo(({ data, id }: NodeProps<ApprovalNodeData>) => {
+export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
   const branches = data.branches || ['default']
   const branch = branches[0]
 
