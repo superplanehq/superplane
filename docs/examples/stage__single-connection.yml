@@ -46,7 +46,7 @@ spec:
 
               # Use first 7 chars of commit SHA
               # This expression uses https://expr-lang.org/docs/language-definition.
-              expression: "commit_sha[0:7]"
+              expression: "$.commits[0].id[0:7]"
 
         - name: ENVIRONMENT
           value: "production"  # Static value
