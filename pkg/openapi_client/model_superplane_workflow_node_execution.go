@@ -35,6 +35,7 @@ type SuperplaneWorkflowNodeExecution struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Event *SuperplaneWorkflowEvent `json:"event,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Configuration map[string]interface{} `json:"configuration,omitempty"`
 }
 
 // NewSuperplaneWorkflowNodeExecution instantiates a new SuperplaneWorkflowNodeExecution object
@@ -514,6 +515,38 @@ func (o *SuperplaneWorkflowNodeExecution) SetMetadata(v map[string]interface{}) 
 	o.Metadata = v
 }
 
+// GetConfiguration returns the Configuration field value if set, zero value otherwise.
+func (o *SuperplaneWorkflowNodeExecution) GetConfiguration() map[string]interface{} {
+	if o == nil || IsNil(o.Configuration) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.Configuration
+}
+
+// GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneWorkflowNodeExecution) GetConfigurationOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Configuration) {
+		return map[string]interface{}{}, false
+	}
+	return o.Configuration, true
+}
+
+// HasConfiguration returns a boolean if a field has been set.
+func (o *SuperplaneWorkflowNodeExecution) HasConfiguration() bool {
+	if o != nil && !IsNil(o.Configuration) {
+		return true
+	}
+
+	return false
+}
+
+// SetConfiguration gets a reference to the given map[string]interface{} and assigns it to the Configuration field.
+func (o *SuperplaneWorkflowNodeExecution) SetConfiguration(v map[string]interface{}) {
+	o.Configuration = v
+}
+
 func (o SuperplaneWorkflowNodeExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -565,6 +598,9 @@ func (o SuperplaneWorkflowNodeExecution) ToMap() (map[string]interface{}, error)
 	}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
+	}
+	if !IsNil(o.Configuration) {
+		toSerialize["configuration"] = o.Configuration
 	}
 	return toSerialize, nil
 }

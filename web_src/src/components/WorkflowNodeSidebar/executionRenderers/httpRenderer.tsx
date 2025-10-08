@@ -34,22 +34,18 @@ registerExecutionRenderer('http', {
   renderCollapsed: ({ execution, onClick }: CollapsedViewProps) => {
     // Extract response status from outputs
     const response = execution.outputs?.default?.[0]
+    const method = execution.configuration?.method
+    const url = execution.configuration?.url
     const statusCode = response?.status
 
     // Determine status badge styling
     let statusBadgeClasses = 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-    let iconName = 'check_circle'
-    let iconColorClasses = 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
 
     if (statusCode) {
       if (statusCode >= 400) {
         statusBadgeClasses = 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-        iconName = 'error'
-        iconColorClasses = 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30'
       } else if (statusCode >= 300) {
         statusBadgeClasses = 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-        iconName = 'warning'
-        iconColorClasses = 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30'
       }
     }
 
@@ -58,15 +54,22 @@ registerExecutionRenderer('http', {
         className="flex items-start gap-3 cursor-pointer"
         onClick={onClick}
       >
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconColorClasses}`}>
-          <MaterialSymbol name={iconName} size="sm" />
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium font-mono ${statusBadgeClasses}`}>
+            {statusCode}
+          </span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            {statusCode ? (
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium font-mono ${statusBadgeClasses}`}>
-                {statusCode}
-              </span>
+            {statusCode && method && url ? (
+              <>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-gray-300 dark:text-zinc-400`}>
+                  {method}
+                </span>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-gray-300 dark:text-zinc-400`}>
+                  {url}
+                </span>
+              </>
             ) : (
               <>
                 {getResultBadge(execution.result)}
@@ -83,16 +86,11 @@ registerExecutionRenderer('http', {
               </>
             )}
           </div>
-
-          <p className="text-xs font-mono text-gray-600 dark:text-zinc-400 truncate mb-1">
-            {execution.id}
-          </p>
-
+        </div>
+        <div className="flex-shrink-0">
           <p className="text-xs text-gray-400 dark:text-zinc-500">
             {formatTimeAgo(new Date(execution.createdAt))}
           </p>
-        </div>
-        <div className="flex-shrink-0">
           <MaterialSymbol
             name="expand_more"
             size="xl"
@@ -104,14 +102,11 @@ registerExecutionRenderer('http', {
   },
 
   renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
-    const inputs = execution.inputs
     const outputs = execution.outputs
 
     // Extract HTTP-specific information
-    const method = inputs?.method || 'GET'
-    const url = inputs?.url || ''
-    const headers = inputs?.headers || {}
-    const body = inputs?.body
+    const method = execution.configuration?.method
+    const url = execution.configuration?.url || ''
 
     // Extract response information from outputs
     const response = outputs?.default?.[0]
@@ -129,30 +124,14 @@ registerExecutionRenderer('http', {
           <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <MaterialSymbol name="http" size="md" className="text-gray-600 dark:text-zinc-400" />
-                <span className="font-medium text-blue-600 dark:text-blue-400">{method}</span>
+                <span className="text-gray-800 dark:text-gray-200 font-mono break-all">{method}</span>
                 <span className="text-gray-800 dark:text-gray-200 font-mono break-all">{url}</span>
               </div>
 
-              {Object.keys(headers).length > 0 && (
+              {execution.inputs && (
                 <div>
-                  <div className="text-gray-500 dark:text-zinc-400 mb-1">Headers:</div>
-                  <div className="pl-4 space-y-1">
-                    {Object.entries(headers).map(([key, value]) => (
-                      <div key={key} className="font-mono">
-                        <span className="text-gray-600 dark:text-zinc-400">{key}:</span>{' '}
-                        <span className="text-gray-800 dark:text-gray-200">{String(value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {body && (
-                <div>
-                  <div className="text-gray-500 dark:text-zinc-400 mb-1">Body:</div>
                   <pre className="pl-4 text-gray-800 dark:text-gray-200 font-mono text-xs overflow-x-auto bg-white dark:bg-zinc-900 p-2 rounded border border-gray-200 dark:border-zinc-600">
-                    {typeof body === 'string' ? body : JSON.stringify(body, null, 2)}
+                    {JSON.stringify(execution.inputs, null, 2)}
                   </pre>
                 </div>
               )}

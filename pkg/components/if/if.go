@@ -27,7 +27,7 @@ func (f *If) Description() string {
 	return "Evaluate input data against condition and route to true or false branches"
 }
 
-func (f *If) Outputs(configuration any) []string {
+func (f *If) OutputBranches(configuration any) []string {
 	return []string{BranchNameTrue, BranchNameFalse}
 }
 
@@ -85,7 +85,7 @@ func (f *If) Execute(ctx components.ExecutionContext) error {
 		}
 	}
 
-	return ctx.State.Finish(outputs)
+	return ctx.ExecutionStateContext.Finish(outputs)
 }
 
 func (f *If) Actions() []components.Action {

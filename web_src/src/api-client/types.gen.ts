@@ -1151,6 +1151,9 @@ export type SuperplaneWorkflowNodeExecution = {
     metadata?: {
         [key: string]: unknown;
     };
+    configuration?: {
+        [key: string]: unknown;
+    };
 };
 
 export type SuperplaneWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';

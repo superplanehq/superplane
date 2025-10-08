@@ -17,7 +17,7 @@ func ListComponents(ctx context.Context, registry *registry.Registry) (*pb.ListC
 func serializeComponents(in []components.Component) []*pb.Component {
 	out := make([]*pb.Component, len(in))
 	for i, component := range in {
-		outputs := component.Outputs(nil)
+		outputs := component.OutputBranches(nil)
 		branches := make([]*pb.OutputBranch, len(outputs))
 		for j, output := range outputs {
 			branches[j] = &pb.OutputBranch{

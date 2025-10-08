@@ -10,18 +10,53 @@ import (
 
 const ComponentName = "approval"
 
+/*
+ * Configuration for the component.
+ * Filled when the component is added to a blueprint/workflow.
+ */
 type Config struct {
 	Count int `json:"count"`
 }
 
-type ApprovalMetadata struct {
-	RequiredCount int              `mapstructure:"required_count"`
-	Approvals     []ApprovalRecord `mapstructure:"approvals"`
+/*
+ * Metadata for the component.
+ */
+type Metadata struct {
+	RequiredCount int              `mapstructure:"required_count" json:"required_count"`
+	Approvals     []ApprovalRecord `mapstructure:"approvals" json:"approvals"`
+}
+
+func NewMetadata(count int) Metadata {
+	return Metadata{
+		RequiredCount: count,
+		Approvals:     []ApprovalRecord{},
+	}
+}
+
+func (m *Metadata) addApproval(parameters map[string]any) {
+	record := ApprovalRecord{
+		ApprovedAt: time.Now().Format(time.RFC3339),
+	}
+
+	c, ok := parameters["comment"]
+	if !ok || c == nil {
+		m.Approvals = append(m.Approvals, record)
+		return
+	}
+
+	comment, ok := c.(string)
+	if !ok {
+		m.Approvals = append(m.Approvals, record)
+		return
+	}
+
+	record.Comment = comment
+	m.Approvals = append(m.Approvals, record)
 }
 
 type ApprovalRecord struct {
-	ApprovedAt string `mapstructure:"approved_at"`
-	Comment    string `mapstructure:"comment"`
+	ApprovedAt string `mapstructure:"approved_at" json:"approved_at"`
+	Comment    string `mapstructure:"comment" json:"comment"`
 }
 
 type Approval struct{}
@@ -34,7 +69,7 @@ func (a *Approval) Description() string {
 	return "Wait for approvals before continuing execution. Execution moves to waiting state until required approvals are received."
 }
 
-func (a *Approval) Outputs(configuration any) []string {
+func (a *Approval) OutputBranches(configuration any) []string {
 	return []string{components.DefaultBranchName}
 }
 
@@ -56,21 +91,19 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
+	//
+	// TODO: this should be validated before it even gets here.
+	//
 	if config.Count < 1 {
 		return fmt.Errorf("count must be at least 1")
 	}
 
-	// Initialize approval state
-	metadata := ApprovalMetadata{
-		RequiredCount: config.Count,
-		Approvals:     []ApprovalRecord{},
-	}
-
-	ctx.Metadata.Set("required_count", metadata.RequiredCount)
-	ctx.Metadata.Set("approvals", metadata.Approvals)
-
-	// Move to waiting state
-	return ctx.State.Wait()
+	//
+	// Initialize metadata for the execution,
+	// and move it to the waiting state.
+	//
+	ctx.MetadataContext.Set(NewMetadata(config.Count))
+	return ctx.ExecutionStateContext.Wait()
 }
 
 func (a *Approval) Actions() []components.Action {
@@ -114,37 +147,32 @@ func (a *Approval) HandleAction(ctx components.ActionContext) error {
 }
 
 func (a *Approval) handleApprove(ctx components.ActionContext) error {
-	// Parse metadata into structured format
-	var metadata ApprovalMetadata
-	err := mapstructure.Decode(ctx.Metadata.GetAll(), &metadata)
+	//
+	// Add new approval to metadata
+	//
+	var metadata Metadata
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	// Add new approval
-	approval := ApprovalRecord{
-		ApprovedAt: time.Now().Format(time.RFC3339),
+	metadata.addApproval(ctx.Parameters)
+	ctx.MetadataContext.Set(metadata)
+
+	//
+	// If the number of approvals is still below the required amount,
+	// do not finish the execution yet.
+	//
+	if len(metadata.Approvals) < metadata.RequiredCount {
+		return nil
 	}
 
-	if comment, ok := ctx.Parameters["comment"]; ok && comment != nil {
-		if commentStr, ok := comment.(string); ok {
-			approval.Comment = commentStr
-		}
-	}
-
-	metadata.Approvals = append(metadata.Approvals, approval)
-	ctx.Metadata.Set("approvals", metadata.Approvals)
-
-	// Check if we have enough approvals
-	if len(metadata.Approvals) >= metadata.RequiredCount {
-		// Complete the execution - pass input data through
-		return ctx.State.Finish(map[string][]any{
-			components.DefaultBranchName: {ctx.Metadata.GetAll()},
-		})
-	}
-
-	// Still waiting for more approvals
-	return nil
+	//
+	// Required amount of approvals reached - finish the execution.
+	//
+	return ctx.ExecutionStateContext.Finish(map[string][]any{
+		components.DefaultBranchName: {metadata},
+	})
 }
 
 func (a *Approval) handleReject(ctx components.ActionContext) error {
@@ -158,5 +186,5 @@ func (a *Approval) handleReject(ctx components.ActionContext) error {
 		return fmt.Errorf("reason must be a string")
 	}
 
-	return ctx.State.Fail(fmt.Sprintf("Rejected: %s", reasonStr))
+	return ctx.ExecutionStateContext.Fail(fmt.Sprintf("Rejected: %s", reasonStr))
 }

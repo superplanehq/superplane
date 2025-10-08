@@ -27,7 +27,7 @@ func (e *HTTP) Description() string {
 	return "Send HTTP request. The HTTP response is sent to the default output branch"
 }
 
-func (e *HTTP) Outputs(configuration any) []string {
+func (e *HTTP) OutputBranches(configuration any) []string {
 	return []string{components.DefaultBranchName}
 }
 
@@ -115,7 +115,7 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 		"body":    bodyData,
 	}
 
-	return ctx.State.Finish(map[string][]any{
+	return ctx.ExecutionStateContext.Finish(map[string][]any{
 		components.DefaultBranchName: {response},
 	})
 }

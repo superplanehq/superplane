@@ -25,7 +25,7 @@ func (f *Filter) Description() string {
 	return "Evaluate input data against condition. If true, input data is sent to default output branch"
 }
 
-func (f *Filter) Outputs(configuration any) []string {
+func (f *Filter) OutputBranches(configuration any) []string {
 	return []string{components.DefaultBranchName}
 }
 
@@ -44,7 +44,7 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	env := map[string]any{
@@ -59,7 +59,7 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 	}...)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("expression compilation failed: %w", err)
 	}
 
 	output, err := expr.Run(vm, env)
@@ -77,7 +77,7 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 		outputs[components.DefaultBranchName] = []any{ctx.Data}
 	}
 
-	return ctx.State.Finish(outputs)
+	return ctx.ExecutionStateContext.Finish(outputs)
 }
 
 func (f *Filter) Actions() []components.Action {

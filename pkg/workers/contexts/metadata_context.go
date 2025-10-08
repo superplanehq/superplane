@@ -1,6 +1,8 @@
 package contexts
 
 import (
+	"encoding/json"
+
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
@@ -14,24 +16,21 @@ func NewMetadataContext(execution *models.WorkflowNodeExecution) components.Meta
 	return &MetadataContext{execution: execution}
 }
 
-func (m *MetadataContext) Get(key string) (any, bool) {
-	data := m.execution.Metadata.Data()
-	if data == nil {
-		return nil, false
-	}
-	val, ok := data[key]
-	return val, ok
-}
-
-func (m *MetadataContext) Set(key string, value any) {
-	data := m.execution.Metadata.Data()
-	if data == nil {
-		data = make(map[string]any)
-	}
-	data[key] = value
-	m.execution.Metadata = datatypes.NewJSONType(data)
-}
-
-func (m *MetadataContext) GetAll() map[string]any {
+func (m *MetadataContext) Get() any {
 	return m.execution.Metadata.Data()
+}
+
+func (m *MetadataContext) Set(value any) {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return
+	}
+
+	var v map[string]any
+	err = json.Unmarshal(b, &v)
+	if err != nil {
+		return
+	}
+
+	m.execution.Metadata = datatypes.NewJSONType(v)
 }

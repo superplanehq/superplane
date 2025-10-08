@@ -10,6 +10,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -29,22 +30,21 @@ func (w *WorkflowQueueWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := w.processQueue(); err != nil {
-				log.Printf("Error processing workflow queue: %v", err)
+				w.log("Error processing workflow queue: %v", err)
 			}
 		}
 	}
 }
 
 func (w *WorkflowQueueWorker) processQueue() error {
-	db := database.Conn()
-	var queueItems []models.WorkflowQueueItem
-	if err := db.Find(&queueItems).Error; err != nil {
+	queueItems, err := models.FindOldestQueueItems()
+	if err != nil {
 		return err
 	}
 
 	for _, item := range queueItems {
 		if err := w.processQueueItem(&item); err != nil {
-			log.Printf("Error processing queue entry for node %s: %v", item.NodeID, err)
+			w.log("Error processing queue entry for node %s: %v", item.NodeID, err)
 		}
 	}
 
@@ -52,8 +52,6 @@ func (w *WorkflowQueueWorker) processQueue() error {
 }
 
 func (w *WorkflowQueueWorker) processQueueItem(entry *models.WorkflowQueueItem) error {
-	log.Printf("[WorkflowQueueWorker] Processing queue item: workflow=%s, node=%s, event=%s", entry.WorkflowID, entry.NodeID, entry.EventID)
-
 	_, err := models.FindLastNodeExecutionForNode(
 		entry.WorkflowID,
 		entry.NodeID,
@@ -65,11 +63,10 @@ func (w *WorkflowQueueWorker) processQueueItem(entry *models.WorkflowQueueItem) 
 	// Do not process this queue entry yet.
 	//
 	if err == nil {
-		log.Printf("[WorkflowQueueWorker] Execution pending/waiting/started already exists for workflow=%s, node=%s", entry.WorkflowID, entry.NodeID)
 		return nil
 	}
 
-	log.Printf("[WorkflowQueueWorker] Creating new execution for workflow=%s, node=%s", entry.WorkflowID, entry.NodeID)
+	w.log("Creating new execution for workflow=%s, node=%s", entry.WorkflowID, entry.NodeID)
 
 	//
 	// Create new execution for workflow/node,
@@ -80,16 +77,27 @@ func (w *WorkflowQueueWorker) processQueueItem(entry *models.WorkflowQueueItem) 
 		return fmt.Errorf("failed to find workflow event: %w", err)
 	}
 
+	workflow, err := models.FindWorkflow(entry.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("failed to find workflow: %w", err)
+	}
+
+	node, err := workflow.FindNode(entry.NodeID)
+	if err != nil {
+		return fmt.Errorf("failed to find node %s: %w", entry.NodeID, err)
+	}
+
 	now := time.Now()
 	execution := models.WorkflowNodeExecution{
-		ID:         uuid.New(),
-		WorkflowID: entry.WorkflowID,
-		NodeID:     entry.NodeID,
-		State:      models.WorkflowNodeExecutionStatePending,
-		Inputs:     event.Data,
-		EventID:    event.ID,
-		CreatedAt:  &now,
-		UpdatedAt:  &now,
+		ID:            uuid.New(),
+		WorkflowID:    entry.WorkflowID,
+		NodeID:        entry.NodeID,
+		State:         models.WorkflowNodeExecutionStatePending,
+		Inputs:        event.Data,
+		Configuration: datatypes.NewJSONType(node.Configuration),
+		EventID:       event.ID,
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -105,4 +113,8 @@ func (w *WorkflowQueueWorker) processQueueItem(entry *models.WorkflowQueueItem) 
 			Delete(&models.WorkflowQueueItem{}).
 			Error
 	})
+}
+
+func (w *WorkflowQueueWorker) log(format string, v ...any) {
+	log.Printf("[WorkflowQueueWorker] "+format, v...)
 }

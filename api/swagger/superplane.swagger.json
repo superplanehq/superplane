@@ -6269,6 +6269,9 @@
         },
         "metadata": {
           "type": "object"
+        },
+        "configuration": {
+          "type": "object"
         }
       }
     },

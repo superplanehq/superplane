@@ -60,10 +60,10 @@ func InvokeNodeExecutionAction(ctx context.Context, registry *registry.Registry,
 
 	// TODO: Get user ID from context
 	actionCtx := components.ActionContext{
-		Name:       actionName,
-		Parameters: parameters,
-		Metadata:   contexts.NewMetadataContext(&execution),
-		State:      contexts.NewExecutionStateContext(&execution, event),
+		Name:                  actionName,
+		Parameters:            parameters,
+		MetadataContext:       contexts.NewMetadataContext(&execution),
+		ExecutionStateContext: contexts.NewExecutionStateContext(&execution, event),
 	}
 
 	err = component.HandleAction(actionCtx)

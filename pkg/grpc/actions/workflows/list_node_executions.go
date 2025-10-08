@@ -116,6 +116,11 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 			return nil, err
 		}
 
+		configuration, err := structpb.NewStruct(execution.Configuration.Data())
+		if err != nil {
+			return nil, err
+		}
+
 		result = append(result, &pb.WorkflowNodeExecution{
 			Id:            execution.ID.String(),
 			EventId:       execution.EventID.String(),
@@ -131,6 +136,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 			UpdatedAt:     timestamppb.New(*execution.UpdatedAt),
 			Event:         SerializeWorkflowEvent(&event),
 			Metadata:      metadata,
+			Configuration: configuration,
 		})
 	}
 
@@ -233,7 +239,6 @@ func NodeExecutionResultReasonToProto(reason string) pb.WorkflowNodeExecution_Re
 		return pb.WorkflowNodeExecution_RESULT_REASON_OK
 	}
 }
-
 
 func getLastExecutionTimestamp(executions []models.WorkflowNodeExecution) *timestamppb.Timestamp {
 	if len(executions) > 0 {

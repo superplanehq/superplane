@@ -265,6 +265,7 @@ message WorkflowNodeExecution {
   google.protobuf.Timestamp updated_at = 12;
   WorkflowEvent event = 13;
   google.protobuf.Struct metadata = 14;
+  google.protobuf.Struct configuration = 15;
 }
 
 message WorkflowEvent {

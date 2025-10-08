@@ -76,6 +76,7 @@ CREATE TABLE workflow_node_executions (
   inputs          JSONB,
   outputs         JSONB,
   metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,
+  configuration   JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at      TIMESTAMP NOT NULL,
   updated_at      TIMESTAMP NOT NULL,
 

@@ -27,7 +27,7 @@ func (s *Switch) Description() string {
 	return "Evaluate input data against conditions and route to the first branch where expression evaluates to true"
 }
 
-func (s *Switch) Outputs(configuration any) []string {
+func (s *Switch) OutputBranches(configuration any) []string {
 	spec := Spec{}
 	err := mapstructure.Decode(configuration, &spec)
 	if err != nil || len(spec.Branches) == 0 {
@@ -86,7 +86,7 @@ func (s *Switch) Execute(ctx components.ExecutionContext) error {
 		}
 	}
 
-	return ctx.State.Finish(outputs)
+	return ctx.ExecutionStateContext.Finish(outputs)
 }
 
 func (s *Switch) Actions() []components.Action {
