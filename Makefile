@@ -115,6 +115,14 @@ openapi.web.client.gen:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
 
 #
+# WebAssembly build
+#
+
+wasm.build:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps -e GOOS=js -e GOARCH=wasm app bash -c 'go build -o web_src/public/expr-validator.wasm cmd/wasm/main.go'
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c 'cp /usr/local/go/lib/wasm/wasm_exec.js web_src/public/'
+
+#
 # Image and CLI build
 #
 
