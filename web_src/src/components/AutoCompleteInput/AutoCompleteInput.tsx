@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef } from 'react';
 import { twMerge } from 'tailwind-merge';
-import { flattenForAutocomplete, getAutocompleteSuggestions } from './core';
+import { flattenForAutocomplete, getAutocompleteSuggestions, getAutocompleteSuggestionsWithTypes } from './core';
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<'input'>, 'onChange' | 'size'> {
   exampleObj: Record<string, unknown> | null;
@@ -21,7 +21,7 @@ let blurTimeout: NodeJS.Timeout;
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
   ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noSuggestionsText = 'No suggestions found', ...props }) => {
     const [inputValue, setInputValue] = useState(value);
-    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [suggestions, setSuggestions] = useState<Array<{ suggestion: string; type: string }>>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -94,11 +94,18 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
 
       const lastKey = word.split('.').slice(-1)[0];
       const parsedInput = word.split('.').slice(0, -1).join('.');
+      const basePath = parsedInput || '';
 
-      const newSuggestions = getAutocompleteSuggestions(flattenedData, parsedInput || 'root');
-      const arraySuggestions = getAutocompleteSuggestions(flattenedData, parsedInput ? `${parsedInput}.${lastKey}` : lastKey).filter((suggestion: string) => suggestion.match(/\[\d+\]$/));
-      const similarSuggestions = newSuggestions.filter((suggestion: string) => suggestion.startsWith(lastKey) && suggestion !== lastKey);
-      const allSuggestions = [...new Set([...arraySuggestions, ...similarSuggestions])];
+      const newSuggestions = getAutocompleteSuggestionsWithTypes(flattenedData, parsedInput || 'root', basePath, exampleObj);
+      const arraySuggestions = getAutocompleteSuggestionsWithTypes(flattenedData, parsedInput ? `${parsedInput}.${lastKey}` : lastKey, basePath, exampleObj).filter(({ suggestion }) => suggestion.match(/\[\d+\]$/));
+      const similarSuggestions = newSuggestions.filter(({ suggestion }) => suggestion.startsWith(lastKey) && suggestion !== lastKey);
+
+      // Merge suggestions and remove duplicates based on suggestion text
+      const allSuggestionsMap = new Map();
+      [...arraySuggestions, ...similarSuggestions].forEach(item => {
+        allSuggestionsMap.set(item.suggestion, item);
+      });
+      const allSuggestions = Array.from(allSuggestionsMap.values());
 
       setSuggestions(allSuggestions);
       setIsOpen(allSuggestions.length > 0 || (allSuggestions.length === 0 && word.endsWith('.')) || (!exampleObj && word.endsWith('.')));
@@ -127,13 +134,13 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       onChange?.(newValue);
     };
 
-    const handleSuggestionClick = (suggestion: string) => {
+    const handleSuggestionClick = (suggestionItem: { suggestion: string; type: string }) => {
       const cursorPosition = inputRef.current?.selectionStart || 0;
       const { word } = getWordAtCursor(inputValue, cursorPosition);
 
       const allPreviousKeys = word.split('.');
       const withoutLastKey = allPreviousKeys.slice(0, -1).join('.');
-      let newValue = suggestion.startsWith(withoutLastKey) ? suggestion : `${withoutLastKey}.${suggestion}`;
+      let newValue = suggestionItem.suggestion.startsWith(withoutLastKey) ? suggestionItem.suggestion : `${withoutLastKey}.${suggestionItem.suggestion}`;
       const nextSuggestions = getAutocompleteSuggestions(flattenedData, newValue);
       const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) => suggestion.match(/\[\d+\]$/));
       const isFinalKey = (nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions);
@@ -264,19 +271,22 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
               'dark:bg-zinc-800 dark:border-zinc-700'
             ])}
           >
-            {suggestions.map((suggestion, index) => (
+            {suggestions.map((suggestionItem, index) => (
               <div
-                key={suggestion}
+                key={suggestionItem.suggestion}
                 className={twMerge([
-                  'px-3 py-2 cursor-pointer text-sm',
+                  'px-3 py-2 cursor-pointer text-sm flex justify-between items-center',
                   'hover:bg-zinc-100 dark:hover:bg-zinc-700',
                   'text-zinc-950 dark:text-white',
                   highlightedIndex === index && 'bg-zinc-100 dark:bg-zinc-700'
                 ])}
-                onClick={() => handleSuggestionClick(suggestion)}
+                onClick={() => handleSuggestionClick(suggestionItem)}
                 onMouseEnter={() => setHighlightedIndex(index)}
               >
-                {suggestion}
+                <span>{suggestionItem.suggestion}</span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-2">
+                  {suggestionItem.type}
+                </span>
               </div>
             ))}
           </div>

@@ -1,6 +1,56 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
+ * Get the value at a specific path in an object
+ * @param {Object} obj - The object to traverse
+ * @param {string} path - The path to the value (e.g., "test.my_name" or "items[0].name")
+ * @returns {any} The value at the path, or undefined if not found
+ */
+export function getValueAtPath(obj: any, path: string): any {
+  if (!obj || !path) return undefined;
+
+  try {
+    const parts = path.split('.').flatMap(part => {
+      const arrayMatch = part.match(/^(.+?)\[(\d+)\]$/);
+      if (arrayMatch) {
+        return [arrayMatch[1], parseInt(arrayMatch[2])];
+      }
+      return [part];
+    });
+
+    let current = obj;
+    for (const part of parts) {
+      if (current === null || current === undefined) {
+        return undefined;
+      }
+      current = current[part];
+    }
+
+    return current;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Get the type of a value as a user-friendly string
+ * @param {any} value - The value to get the type of
+ * @returns {string} The type as a string
+ */
+export function getTypeString(value: any): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (Array.isArray(value)) return 'array';
+
+  const type = typeof value;
+  if (type === 'object') {
+    return 'object';
+  }
+
+  return type;
+}
+
+/**
  * Flattens a JSON object by parent field and depth layer for autocomplete
  * @param {Object} obj - The JSON object to flatten
  * @returns {Object} Flattened structure with parent-depth as keys and field arrays as values
@@ -93,10 +143,50 @@ export function flattenForAutocomplete(obj: any) {
 
       return [];
     }
-    
-    const depth = (currentPath.match(/\./g) || []).length + 
+
+    const depth = (currentPath.match(/\./g) || []).length +
                   (currentPath.match(/\[/g) || []).length;
-    
+
     const lookupKey = `${currentPath}-${depth}`;
     return flattenedData[lookupKey] || [];
+  }
+
+  /**
+   * Get autocomplete suggestions with type information
+   * @param {Object} flattenedData - The flattened data structure
+   * @param {string} currentPath - The current input path
+   * @param {string} basePath - The base path to build full paths from
+   * @param {Object} exampleObj - The original object to get types from
+   * @returns {Array} Array of objects with suggestion and type
+   */
+  export function getAutocompleteSuggestionsWithTypes(
+    flattenedData: any,
+    currentPath: string,
+    basePath: string,
+    exampleObj: any
+  ): Array<{ suggestion: string; type: string }> {
+    const suggestions = getAutocompleteSuggestions(flattenedData, currentPath);
+
+    return suggestions.map((suggestion: string) => {
+      // Build the full path for type checking
+      let fullPath: string;
+      if (currentPath === 'root') {
+        fullPath = suggestion;
+      } else {
+        // Check if suggestion is an array index or regular property
+        if (suggestion.match(/\[/)) {
+          fullPath = suggestion.startsWith(currentPath) ? suggestion : `${currentPath}.${suggestion}`;
+        } else {
+          fullPath = basePath ? `${basePath}.${suggestion}` : suggestion;
+        }
+      }
+
+      const value = getValueAtPath(exampleObj, fullPath);
+      const type = getTypeString(value);
+
+      return {
+        suggestion,
+        type
+      };
+    });
   }
