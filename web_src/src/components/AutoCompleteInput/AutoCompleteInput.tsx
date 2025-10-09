@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef } from 'react';
 import { twMerge } from 'tailwind-merge';
-import { flattenForAutocomplete, getAutocompleteSuggestions, getAutocompleteSuggestionsWithTypes } from './core';
+import { flattenForAutocomplete, getAutocompleteSuggestions, getAutocompleteSuggestionsWithTypes, getValueAtPath } from './core';
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<'input'>, 'onChange' | 'size'> {
   exampleObj: Record<string, unknown> | null;
@@ -14,18 +14,20 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   startWord?: string;
   inputSize?: 'xs' | 'sm' | 'md' | 'lg';
   noSuggestionsText?: string;
+  showValuePreview?: boolean;
 }
 
 let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noSuggestionsText = 'No suggestions found', ...props }) => {
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noSuggestionsText = 'No suggestions found', showValuePreview = false, ...props }) => {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<Array<{ suggestion: string; type: string }>>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [flattenedData, setFlattenedData] = useState<Record<string, string[]>>({});
+    const [highlightedValue, setHighlightedValue] = useState<unknown>(undefined);
     const previousWordLength = useRef<number>(0);
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +54,17 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const replaceWordAtCursor = (text: string, position: number, newWord: string) => {
       const { start, end } = getWordAtCursor(text, position);
       return text.substring(0, start) + newWord + text.substring(end);
+    };
+
+    // Helper function to build full path for a suggestion
+    const buildFullPath = (suggestion: string) => {
+      const cursorPosition = inputRef.current?.selectionStart || 0;
+      const { word } = getWordAtCursor(inputValue, cursorPosition);
+      const allPreviousKeys = word.split('.');
+      const withoutLastKey = allPreviousKeys.slice(0, -1).join('.');
+
+      return suggestion.startsWith(withoutLastKey) ? suggestion :
+        withoutLastKey ? `${withoutLastKey}.${suggestion}` : suggestion;
     };
 
     // Flatten the example object when it changes
@@ -121,6 +134,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           setIsOpen(false);
           setIsFocused(false);
           setHighlightedIndex(-1);
+          setHighlightedValue(undefined);
         }
       };
 
@@ -174,15 +188,27 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setHighlightedIndex(prev =>
-            prev < suggestions.length - 1 ? prev + 1 : 0
-          );
+          setHighlightedIndex(prev => {
+            const newIndex = prev < suggestions.length - 1 ? prev + 1 : 0;
+            if (exampleObj && suggestions[newIndex]) {
+              const fullPath = buildFullPath(suggestions[newIndex].suggestion);
+              const value = getValueAtPath(exampleObj, fullPath);
+              setHighlightedValue(value);
+            }
+            return newIndex;
+          });
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setHighlightedIndex(prev =>
-            prev > 0 ? prev - 1 : suggestions.length - 1
-          );
+          setHighlightedIndex(prev => {
+            const newIndex = prev > 0 ? prev - 1 : suggestions.length - 1;
+            if (exampleObj && suggestions[newIndex]) {
+              const fullPath = buildFullPath(suggestions[newIndex].suggestion);
+              const value = getValueAtPath(exampleObj, fullPath);
+              setHighlightedValue(value);
+            }
+            return newIndex;
+          });
           break;
         case 'Enter':
           e.preventDefault();
@@ -193,6 +219,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
         case 'Escape':
           setIsOpen(false);
           setHighlightedIndex(-1);
+          setHighlightedValue(undefined);
           break;
       }
     };
@@ -241,6 +268,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
               blurTimeout = setTimeout(() => {
                 setIsFocused(false);
                 setIsOpen(false);
+                setHighlightedValue(undefined);
               }, 150);
             }}
             placeholder={placeholder}
@@ -262,6 +290,26 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
           />
         </span>
 
+        {/* Value Preview Box */}
+        {showValuePreview && highlightedIndex >= 0 && highlightedValue !== undefined && isOpen &&
+          (highlightedValue === null || (typeof highlightedValue !== 'object' && !Array.isArray(highlightedValue))) && (
+            <div className={twMerge([
+              'absolute z-50 w-full bottom-full mb-1 bg-white border border-zinc-200 rounded-lg shadow-lg p-3',
+              'dark:bg-zinc-800 dark:border-zinc-700'
+            ])}>
+              <div className="text-xs text-zinc-600 dark:text-zinc-300 mb-1">
+                Value Preview:
+              </div>
+              <div className="text-sm text-zinc-950 dark:text-white font-mono break-all">
+                {highlightedValue === null
+                  ? 'null'
+                  : typeof highlightedValue === 'string'
+                    ? `"${highlightedValue}"`
+                    : String(highlightedValue)}
+              </div>
+            </div>
+          )}
+
         {/* Suggestions Dropdown */}
         {isOpen && suggestions.length > 0 && (
           <div
@@ -281,7 +329,14 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
                   highlightedIndex === index && 'bg-zinc-100 dark:bg-zinc-700'
                 ])}
                 onClick={() => handleSuggestionClick(suggestionItem)}
-                onMouseEnter={() => setHighlightedIndex(index)}
+                onMouseEnter={() => {
+                  setHighlightedIndex(index);
+                  if (exampleObj) {
+                    const fullPath = buildFullPath(suggestionItem.suggestion);
+                    const value = getValueAtPath(exampleObj, fullPath);
+                    setHighlightedValue(value);
+                  }
+                }}
               >
                 <span>{suggestionItem.suggestion}</span>
                 <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-2">

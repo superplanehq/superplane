@@ -1552,6 +1552,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     exampleObj={getEventTemplate(inputValue?.valueFrom?.eventData?.connection || '')}
                                                     startWord="$"
                                                     prefix='$.'
+                                                    showValuePreview
                                                     noSuggestionsText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
                                                   />
                                                   <div className="mt-2">

@@ -136,6 +136,7 @@ export function ConnectionSelector({
                       exampleObj={getEventTemplate ? getEventTemplate(connection.name || '') : {}}
                       startWord='$'
                       prefix='$.'
+                      showValuePreview
                       noSuggestionsText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
                     />
                     <button
