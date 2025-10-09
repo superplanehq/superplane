@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 import { StageNodeType } from '@/canvas/types/flow';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping, SuperplaneStageEvent } from '@/api-client/types.gen';
 import { useSecrets } from '../hooks/useSecrets';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
@@ -35,9 +35,10 @@ import { StaticValueTooltip } from '@/components/Tooltip/static-value-tooltip';
 import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
 import { DryRunTooltip } from '@/components/Tooltip/dry-run-tooltip';
 import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
-import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
 import { Switch } from '@/components/Switch/switch';
+import { AutoCompleteInput } from '@/components/AutoCompleteInput/AutoCompleteInput';
+import { useEventRejections, useStageEvents } from '@/hooks/useCanvasData';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -98,6 +99,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const [semaphoreExecutionType, setSemaphoreExecutionType] = useState<'workflow' | 'task'>(
     (executor.spec?.task as string) ? 'task' : 'workflow'
   );
+
+  const { data: lastReceivedEvents } = useStageEvents(canvasId, currentStageId || '', []);
+  const { data: rejectedEventsData } = useEventRejections(canvasId, 'TYPE_STAGE', currentStageId || '');
+
+  const allEvents = useMemo(() => {
+    const rejectedEvents = rejectedEventsData?.pages.flatMap(page => page.rejections.flatMap(rejection => rejection.event)).filter(Boolean) || [];
+    const receivedEvents = lastReceivedEvents?.pages.flatMap(page => page.events.map((event: SuperplaneStageEvent) => event.triggerEvent).filter(Boolean)) || [];
+    return [...rejectedEvents, ...receivedEvents].sort((a, b) => new Date(b?.receivedAt || '').getTime() - new Date(a?.receivedAt || '').getTime());
+  }, [rejectedEventsData?.pages, lastReceivedEvents?.pages]);
 
   const [semaphoreParameters, setSemaphoreParameters] = useState<ParameterWithId[]>(() => {
     const params = executor.spec?.parameters as Record<string, string>;
@@ -204,14 +214,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   const getAllIntegrations = () => [...canvasIntegrations, ...orgIntegrations];
 
-  // Helper function to generate input options for TaggedInput
-  const getInputOptions = (): TaggedInputOption[] => {
-    return inputs.map(input => ({
-      id: input.name || '',
-      label: input.name || '',
-      value: `\${{ inputs.${input.name} }}`,
-      description: input.description || 'Stage input'
-    })).filter(option => option.id); // Only include inputs with names
+  // Helper function to generate input object for AutoCompleteInput
+  const getInputsObject = (): Record<string, string> | null => {
+    if (!inputs || Object.keys(inputs).length === 0) return null;
+
+    return inputs.reduce((acc, input) => {
+      if (input.name) {
+        acc[input.name] = input.description || 'Stage input';
+      }
+      return acc;
+    }, {} as Record<string, string>);
   };
 
   const getSecretKeys = (secretName: string) => {
@@ -224,6 +236,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     if (!resourceName || !resourceType) return '';
     return `Run: ${resourceName}`;
   };
+
+  const getEventTemplate = useCallback((connectionName: string) => {
+    const lastReceivedEvent = allEvents.find(event => event?.sourceName === connectionName);
+
+    if (lastReceivedEvent?.raw) {
+      return { $: lastReceivedEvent.raw };
+    }
+
+    return null;
+  }, [allEvents]);
 
   // Debounced auto-generation to prevent input interference
   const debouncedAutoGeneration = useCallback(
@@ -1225,7 +1247,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                 checked={dryRun}
                 onChange={checked => {
                   setDryRun(checked);
-                  setFieldErrors(() => { return {}});
+                  setFieldErrors(() => { return {} });
                 }}
                 color="indigo"
                 aria-label="Toggle dry run mode"
@@ -1315,6 +1337,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         filterErrors={connectionFilterErrors[index] || []}
                         showFilters={true}
                         existingConnections={connections}
+                        getEventTemplate={getEventTemplate}
                       />
                     }
                   />
@@ -1521,12 +1544,20 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                 /* Event Data Mode */
                                                 <div>
                                                   <label className="block text-xs font-medium mb-1">Expression</label>
-                                                  <input
+                                                  <AutoCompleteInput
                                                     value={inputValue.valueFrom.eventData.expression || ''}
-                                                    onChange={(e) => inputMappingHandlers.handleEventDataExpressionChange(e.target.value, actualMappingIndex, input.name)}
-                                                    placeholder="eg. $.commit[0].message"
-                                                    className="w-full px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
+                                                    onChange={(value) => inputMappingHandlers.handleEventDataExpressionChange(value, actualMappingIndex, input.name)}
+                                                    placeholder="eg. $.commits[0].message"
+                                                    inputSize="xs"
+                                                    exampleObj={getEventTemplate(inputValue?.valueFrom?.eventData?.connection || '')}
+                                                    startWord="$"
+                                                    prefix='$.'
+                                                    showValuePreview
+                                                    noSuggestionsText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
                                                   />
+                                                  <div className="mt-2">
+                                                    <ProTip show message="Pro tip: Type $ to select data from event payload" />
+                                                  </div>
                                                 </div>
                                               ) : inputValue?.valueFrom?.lastExecution ? (
                                                 /* Last Execution Mode */
@@ -2188,12 +2219,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
                             />
                             <div className="w-2/3">
-                              <TaggedInput
+                              <AutoCompleteInput
                                 value={param.value}
                                 onChange={(value) => updateExecutorParameter(param.id, param.key, value)}
-                                options={getInputOptions()}
+                                exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Parameter value"
-                                className="text-sm"
+                                inputSize="sm"
+                                startWord="$"
+                                prefix="${{ inputs."
+                                suffix=" }}"
                               />
                             </div>
                             <button
@@ -2335,12 +2369,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
                             />
                             <div className="w-2/3">
-                              <TaggedInput
+                              <AutoCompleteInput
                                 value={input.value}
                                 onChange={(value) => updateExecutorInput(input.id, input.key, value)}
-                                options={getInputOptions()}
+                                exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Input value"
-                                className="text-sm"
+                                inputSize="sm"
+                                startWord="$"
+                                prefix="${{ inputs."
+                                suffix=" }}"
                               />
                             </div>
                             <button
@@ -2417,12 +2454,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                             />
                             <div className="w-2/3">
-                              <TaggedInput
+                              <AutoCompleteInput
                                 value={header.value}
                                 onChange={(value) => updateExecutorHeader(header.id, header.key, value)}
-                                options={getInputOptions()}
+                                exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Header value"
-                                className="text-sm"
+                                inputSize="sm"
+                                startWord="$"
+                                prefix="${{ inputs."
+                                suffix=" }}"
                               />
                             </div>
                             <button
@@ -2467,12 +2507,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   <ValidationField
                     label="Execution name (optional)"
                   >
-                    <TaggedInput
+                    <AutoCompleteInput
                       value={executor.name || ''}
                       onChange={(value) => setExecutor(prev => ({ ...prev, name: value }))}
-                      options={getInputOptions()}
+                      exampleObj={{ inputs: getInputsObject() }}
                       placeholder={'${{ inputs.VERSION }} deployment'}
-                      className="text-sm"
+                      inputSize="sm"
+                      startWord="$"
+                      prefix="${{ inputs."
+                      suffix=" }}"
                     />
                     <ProTip show />
                   </ValidationField>

@@ -4,6 +4,7 @@ import { useConnectionOptions } from '../../hooks/useConnectionOptions';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { StageFilterTooltip } from '@/components/Tooltip/StageFilterTooltip';
 import { AutoCompleteSelect, type AutoCompleteOption } from '@/components/AutoCompleteSelect';
+import { AutoCompleteInput } from '@/components/AutoCompleteInput/AutoCompleteInput';
 
 interface ConnectionSelectorProps {
   connection: SuperplaneConnection;
@@ -18,6 +19,7 @@ interface ConnectionSelectorProps {
   filterErrors?: number[]; // Array of filter indices that have validation errors
   showFilters?: boolean;
   existingConnections?: SuperplaneConnection[];
+  getEventTemplate?: (connectionName: string) => Record<string, unknown> | null;
 }
 
 export function ConnectionSelector({
@@ -32,7 +34,8 @@ export function ConnectionSelector({
   validationError,
   filterErrors = [],
   showFilters = true,
-  existingConnections
+  existingConnections,
+  getEventTemplate
 }: ConnectionSelectorProps) {
   const { getConnectionOptions } = useConnectionOptions(currentEntityId, existingConnections);
 
@@ -75,7 +78,7 @@ export function ConnectionSelector({
             </div>
           </div>
           <div className="mb-3 text-xs text-zinc-600 dark:text-zinc-400">
-            Pro tip: Expressions are parsed using the <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> language.
+            Pro tip: Expressions are parsed using the <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> language. You can type $ to select data from event payload.
           </div>
           <div className="space-y-2">
             {(connection.filters || []).map((filter, filterIndex) => {
@@ -109,15 +112,13 @@ export function ConnectionSelector({
                       <option value="FILTER_TYPE_DATA">Data</option>
                       <option value="FILTER_TYPE_HEADER">Header</option>
                     </select>
-                    <input
-                      type="text"
+                    <AutoCompleteInput
                       value={
                         filter.type === 'FILTER_TYPE_HEADER'
                           ? filter.header?.expression || ''
                           : filter.data?.expression || ''
                       }
-                      onChange={(e) => {
-                        const expression = e.target.value;
+                      onChange={(expression) => {
                         const updates: Partial<SuperplaneFilter> = {};
                         if (filter.type === 'FILTER_TYPE_HEADER') {
                           updates.header = { expression };
@@ -127,10 +128,16 @@ export function ConnectionSelector({
                         onFilterUpdate(index, filterIndex, updates);
                       }}
                       placeholder={filter.type === 'FILTER_TYPE_DATA' ? 'eg. $.execution.result=="passed"' : 'eg. headers["name"]=="value"'}
-                      className={`flex-1 px-2 py-1 border rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 ${hasError
+                      className={`flex-1 ${hasError
                         ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                         : 'border-zinc-300 dark:border-zinc-600'
                         }`}
+                      inputSize="sm"
+                      exampleObj={getEventTemplate ? getEventTemplate(connection.name || '') : {}}
+                      startWord='$'
+                      prefix='$.'
+                      showValuePreview
+                      noSuggestionsText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
                     />
                     <button
                       onClick={() => onFilterRemove(index, filterIndex)}
