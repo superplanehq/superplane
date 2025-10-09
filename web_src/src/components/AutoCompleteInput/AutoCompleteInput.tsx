@@ -9,12 +9,14 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   className?: string;
   placeholder?: string;
   disabled?: boolean;
+  prefix?: string;
+  suffix?: string;
 }
 
 let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, ...props }) => {
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', ...props }) => {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -111,7 +113,12 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       let newValue = suggestion.startsWith(withoutLastKey) ? suggestion : `${withoutLastKey}.${suggestion}`;
       const nextSuggestions = getAutocompleteSuggestions(flattenedData, newValue);
       const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) => suggestion.match(/\[\d+\]$/));
-      newValue += (nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions) ? '.' : '';
+      const isFinalKey = (nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions);
+      if (isFinalKey) {
+        newValue += '.';
+      } else {
+        newValue = `${prefix}${newValue}${suffix}`;
+      }
       newValue = replaceWordAtCursor(inputValue, cursorPosition, newValue);
       setInputValue(newValue);
       onChange?.(newValue);

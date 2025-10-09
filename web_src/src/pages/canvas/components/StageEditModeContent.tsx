@@ -35,12 +35,13 @@ import { StaticValueTooltip } from '@/components/Tooltip/static-value-tooltip';
 import { ExpressionTooltip } from '@/components/Tooltip/expression-tooltip';
 import { DryRunTooltip } from '@/components/Tooltip/dry-run-tooltip';
 import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-execution-results-tooltip';
-import { TaggedInput, type TaggedInputOption } from '@/components/TaggedInput';
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
 import { Switch } from '@/components/Switch/switch';
 import { AutoCompleteInput } from '@/components/AutoCompleteInput/AutoCompleteInput';
 import { EVENT_TEMPLATES } from '@/constants/eventTemplates';
 import { useEventRejections, useStageEvents } from '@/hooks/useCanvasData';
+
+const inputFormattingMessage = 'Pro tip: Select inputs for automatic input formatting';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -216,14 +217,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
 
   const getAllIntegrations = () => [...canvasIntegrations, ...orgIntegrations];
 
-  // Helper function to generate input options for TaggedInput
-  const getInputOptions = (): TaggedInputOption[] => {
-    return inputs.map(input => ({
-      id: input.name || '',
-      label: input.name || '',
-      value: `\${{ inputs.${input.name} }}`,
-      description: input.description || 'Stage input'
-    })).filter(option => option.id); // Only include inputs with names
+  // Helper function to generate input object for AutoCompleteInput
+  const getInputsObject = (): Record<string, string> => {
+    return inputs.reduce((acc, input) => {
+      if (input.name) {
+        acc[input.name] = input.description || 'Stage input';
+      }
+      return acc;
+    }, {} as Record<string, string>);
   };
 
   const getSecretKeys = (secretName: string) => {
@@ -2200,7 +2201,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <ParametersTooltip executorType="semaphore" />
                       </div>
                     }>
-                      <ProTip show={semaphoreParameters.length > 0} />
+                      <ProTip show={semaphoreParameters.length > 0} message={inputFormattingMessage} />
                       <div className="space-y-2">
                         {semaphoreParameters.map((param) => (
                           <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2212,12 +2213,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
                             />
                             <div className="w-2/3">
-                              <TaggedInput
+                              <AutoCompleteInput
                                 value={param.value}
                                 onChange={(value) => updateExecutorParameter(param.id, param.key, value)}
-                                options={getInputOptions()}
+                                exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Parameter value"
                                 className="text-sm"
+                                prefix="${{ "
+                                suffix=" }}"
                               />
                             </div>
                             <button
@@ -2347,7 +2350,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <ParametersTooltip executorType="github" />
                       </div>
                     }>
-                      <ProTip show={githubInputs.length > 0} />
+                      <ProTip show={githubInputs.length > 0} message={inputFormattingMessage} />
                       <div className="space-y-2">
                         {githubInputs.map((input) => (
                           <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2359,12 +2362,14 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md text-xs bg-white dark:bg-zinc-700"
                             />
                             <div className="w-2/3">
-                              <TaggedInput
+                              <AutoCompleteInput
                                 value={input.value}
                                 onChange={(value) => updateExecutorInput(input.id, input.key, value)}
-                                options={getInputOptions()}
+                                exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Input value"
                                 className="text-sm"
+                                prefix="${{ "
+                                suffix=" }}"
                               />
                             </div>
                             <button
@@ -2429,7 +2434,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <ParametersTooltip executorType="http" />
                       </div>
                     }>
-                      <ProTip show={httpHeaders.length > 0} />
+                      <ProTip show={httpHeaders.length > 0} message={inputFormattingMessage} />
                       <div className="space-y-2">
                         {httpHeaders.map((header) => (
                           <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2441,12 +2446,15 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                               className="w-1/3 px-2 py-2 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                             />
                             <div className="w-2/3">
-                              <TaggedInput
+                              <AutoCompleteInput
                                 value={header.value}
                                 onChange={(value) => updateExecutorHeader(header.id, header.key, value)}
-                                options={getInputOptions()}
+                                exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Header value"
                                 className="text-sm"
+                                prefix="${{ "
+                                suffix=" }}"
+
                               />
                             </div>
                             <button
@@ -2491,14 +2499,16 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                   <ValidationField
                     label="Execution name (optional)"
                   >
-                    <TaggedInput
+                    <AutoCompleteInput
                       value={executor.name || ''}
                       onChange={(value) => setExecutor(prev => ({ ...prev, name: value }))}
-                      options={getInputOptions()}
+                      exampleObj={{ inputs: getInputsObject() }}
                       placeholder={'${{ inputs.VERSION }} deployment'}
                       className="text-sm"
+                      prefix="${{ "
+                      suffix=" }}"
                     />
-                    <ProTip show />
+                    <ProTip show message={inputFormattingMessage} />
                   </ValidationField>
                 )}
               </div>
