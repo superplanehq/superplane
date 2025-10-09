@@ -38,7 +38,6 @@ import { RequiredExecutionResultsTooltip } from '@/components/Tooltip/required-e
 import { NodeContentWrapper } from './shared/NodeContentWrapper';
 import { Switch } from '@/components/Switch/switch';
 import { AutoCompleteInput } from '@/components/AutoCompleteInput/AutoCompleteInput';
-import { EVENT_TEMPLATES } from '@/constants/eventTemplates';
 import { useEventRejections, useStageEvents } from '@/hooks/useCanvasData';
 
 interface StageEditModeContentProps {
@@ -216,7 +215,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const getAllIntegrations = () => [...canvasIntegrations, ...orgIntegrations];
 
   // Helper function to generate input object for AutoCompleteInput
-  const getInputsObject = (): Record<string, string> => {
+  const getInputsObject = (): Record<string, string> | null => {
+    if (!inputs || Object.keys(inputs).length === 0) return null;
+
     return inputs.reduce((acc, input) => {
       if (input.name) {
         acc[input.name] = input.description || 'Stage input';
@@ -243,8 +244,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       return { $: lastReceivedEvent.raw };
     }
 
-    const customTemplate = EVENT_TEMPLATES.find(template => template.eventType === 'execution_finished');
-    return customTemplate ? { $: customTemplate.getEventData() } : {};
+    return null;
   }, [allEvents]);
 
   // Debounced auto-generation to prevent input interference
@@ -1552,6 +1552,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     exampleObj={getEventTemplate(inputValue?.valueFrom?.eventData?.connection || '')}
                                                     startWord="$"
                                                     prefix='$.'
+                                                    noSuggestionsText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
                                                   />
                                                   <div className="mt-2">
                                                     <ProTip show message="Pro tip: Type $ to select data from event payload" />

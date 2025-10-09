@@ -3,7 +3,7 @@ import { twMerge } from 'tailwind-merge';
 import { flattenForAutocomplete, getAutocompleteSuggestions } from './core';
 
 export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<'input'>, 'onChange' | 'size'> {
-  exampleObj: Record<string, unknown>;
+  exampleObj: Record<string, unknown> | null;
   value?: string;
   onChange?: (value: string) => void;
   className?: string;
@@ -13,12 +13,13 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   suffix?: string;
   startWord?: string;
   inputSize?: 'xs' | 'sm' | 'md' | 'lg';
+  noSuggestionsText?: string;
 }
 
 let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', ...props }) => {
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noSuggestionsText = 'No suggestions found', ...props }) => {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -100,7 +101,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       const allSuggestions = [...new Set([...arraySuggestions, ...similarSuggestions])];
 
       setSuggestions(allSuggestions);
-      setIsOpen(allSuggestions.length > 0);
+      setIsOpen(allSuggestions.length > 0 || (allSuggestions.length === 0 && word.endsWith('.')) || (!exampleObj && word.endsWith('.')));
       setHighlightedIndex(-1);
       previousWordLength.current = word.length;
 
@@ -288,7 +289,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             'dark:bg-zinc-800 dark:border-zinc-700'
           ])}>
             <div className="px-3 py-2 text-sm text-zinc-500 dark:text-zinc-400">
-              No results found.
+              {noSuggestionsText}
             </div>
           </div>
         )}

@@ -19,7 +19,7 @@ interface ConnectionSelectorProps {
   filterErrors?: number[]; // Array of filter indices that have validation errors
   showFilters?: boolean;
   existingConnections?: SuperplaneConnection[];
-  getEventTemplate?: (connectionName: string) => Record<string, unknown>;
+  getEventTemplate?: (connectionName: string) => Record<string, unknown> | null;
 }
 
 export function ConnectionSelector({
@@ -136,6 +136,7 @@ export function ConnectionSelector({
                       exampleObj={getEventTemplate ? getEventTemplate(connection.name || '') : {}}
                       startWord='$'
                       prefix='$.'
+                      noSuggestionsText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
                     />
                     <button
                       onClick={() => onFilterRemove(index, filterIndex)}
