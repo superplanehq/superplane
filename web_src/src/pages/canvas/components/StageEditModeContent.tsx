@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 import { StageNodeType } from '@/canvas/types/flow';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping, SuperplaneStageEvent } from '@/api-client/types.gen';
@@ -139,6 +139,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const [nextIdCounter, setNextIdCounter] = useState(1);
   const resourceInputRef = useRef<HTMLInputElement>(null);
   const hasAutoFocused = useRef(false);
+  const connectionSelectorRefs = useRef<(React.RefObject<{ validateFilters: () => Promise<boolean> }>)[]>([]);
 
   const generateId = useCallback(() => {
     const id = `param_${nextIdCounter}`;
@@ -259,6 +260,13 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     }, 300),
     [isNewStage, dirtyByUser, onStageNameChange]
   );
+
+  // Initialize connection selector refs
+  useEffect(() => {
+    connectionSelectorRefs.current = connections.map((_, index) =>
+      connectionSelectorRefs.current[index] || React.createRef()
+    );
+  }, [connections.length]);
 
   // Auto focus on resource input for new stages (only once)
   useEffect(() => {
@@ -1111,14 +1119,28 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
     setInputMappings(newMappings);
   };
 
-  const handleConnectionSave = useCallback(() => {
+  const handleConnectionSave = useCallback(async () => {
     const savedConnectionIndex = connectionsEditor.editingIndex;
     const savedConnection = savedConnectionIndex !== null ?
       connections[savedConnectionIndex] : null;
 
     if (savedConnection && savedConnectionIndex !== null) {
+      // Validate connection fields first
       const connectionErrors = connectionManager.validateConnection(savedConnection);
-      if (connectionErrors.length > 0) {
+
+      // Validate filters using WebAssembly
+      const connectionRef = connectionSelectorRefs.current[savedConnectionIndex];
+      let filterValidationPassed = true;
+      if (connectionRef && connectionRef.current) {
+        try {
+          filterValidationPassed = await connectionRef.current.validateFilters();
+        } catch (error) {
+          console.error('Filter validation failed:', error);
+          filterValidationPassed = false;
+        }
+      }
+
+      if (connectionErrors.length > 0 || !filterValidationPassed) {
         setValidationErrors(prev => ({
           ...prev,
           [`connection_${savedConnectionIndex}`]: connectionErrors.join(', ')
@@ -1304,6 +1326,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                     )}
                     editForm={
                       <ConnectionSelector
+                        ref={connectionSelectorRefs.current[index]}
                         connection={connection}
                         index={index}
                         onConnectionUpdate={(index, type, name) => {
