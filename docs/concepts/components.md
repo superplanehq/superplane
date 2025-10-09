@@ -60,7 +60,7 @@ spec:
       filters:
         - type: FILTER_TYPE_DATA
           data:
-            expression: $.ref=="refs/heads/main"
+            expression: $.ref=="$.refs/heads/main"
       filterOperator: FILTER_OPERATOR_AND
 ```
 
@@ -117,7 +117,7 @@ spec:
   filters:
     - type: FILTER_TYPE_DATA
       data:
-        expression: "ref == 'refs/heads/main'"
+        expression: "$.ref == 'refs/heads/main'"
 
   # Define stage inputs
   inputs:
@@ -134,7 +134,7 @@ spec:
           valueFrom:
             eventData:
               connection: github-repo
-              expression: "commit_sha[0:7]"
+              expression: "$.commits[0].id"
 
   # Define expected outputs
   outputs:
@@ -420,7 +420,7 @@ Filter based on event payload content:
 filters:
   - type: FILTER_TYPE_DATA
     data:
-      expression: "ref == 'refs/heads/main'"
+      expression: "$.ref == 'refs/heads/main'"
 ```
 
 ### Header Filters  
@@ -439,7 +439,7 @@ filterOperator: FILTER_OPERATOR_AND  # or FILTER_OPERATOR_OR
 filters:
   - type: FILTER_TYPE_DATA
     data:
-      expression: "ref == 'refs/heads/main'"
+      expression: "$.ref == 'refs/heads/main'"
   - type: FILTER_TYPE_HEADER
     header:
       expression: "headers['X-GitHub-Event'] == 'push'"
