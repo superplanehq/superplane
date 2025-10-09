@@ -41,8 +41,6 @@ import { AutoCompleteInput } from '@/components/AutoCompleteInput/AutoCompleteIn
 import { EVENT_TEMPLATES } from '@/constants/eventTemplates';
 import { useEventRejections, useStageEvents } from '@/hooks/useCanvasData';
 
-const inputFormattingMessage = 'Pro tip: Select inputs for automatic formatting';
-
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
   currentStageId?: string;
@@ -1552,7 +1550,12 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     placeholder="eg. $.commits[0].message"
                                                     inputSize="xs"
                                                     exampleObj={getEventTemplate(inputValue?.valueFrom?.eventData?.connection || '')}
+                                                    startWord="$"
+                                                    prefix='$.'
                                                   />
+                                                  <div className="mt-2">
+                                                    <ProTip show message="Pro tip: Type $ to select data from event payload" />
+                                                  </div>
                                                 </div>
                                               ) : inputValue?.valueFrom?.lastExecution ? (
                                                 /* Last Execution Mode */
@@ -2202,7 +2205,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <ParametersTooltip executorType="semaphore" />
                       </div>
                     }>
-                      <ProTip show={semaphoreParameters.length > 0} message={inputFormattingMessage} />
+                      <ProTip show={semaphoreParameters.length > 0} />
                       <div className="space-y-2">
                         {semaphoreParameters.map((param) => (
                           <div key={param.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2220,7 +2223,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Parameter value"
                                 inputSize="sm"
-                                prefix="${{ "
+                                startWord="$"
+                                prefix="${{ inputs."
                                 suffix=" }}"
                               />
                             </div>
@@ -2351,7 +2355,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <ParametersTooltip executorType="github" />
                       </div>
                     }>
-                      <ProTip show={githubInputs.length > 0} message={inputFormattingMessage} />
+                      <ProTip show={githubInputs.length > 0} />
                       <div className="space-y-2">
                         {githubInputs.map((input) => (
                           <div key={input.id} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2369,7 +2373,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Input value"
                                 inputSize="sm"
-                                prefix="${{ "
+                                startWord="$"
+                                prefix="${{ inputs."
                                 suffix=" }}"
                               />
                             </div>
@@ -2435,7 +2440,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         <ParametersTooltip executorType="http" />
                       </div>
                     }>
-                      <ProTip show={httpHeaders.length > 0} message={inputFormattingMessage} />
+                      <ProTip show={httpHeaders.length > 0} />
                       <div className="space-y-2">
                         {httpHeaders.map((header) => (
                           <div key={header.id} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
@@ -2453,7 +2458,8 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Header value"
                                 inputSize="sm"
-                                prefix="${{ "
+                                startWord="$"
+                                prefix="${{ inputs."
                                 suffix=" }}"
                               />
                             </div>
@@ -2505,10 +2511,11 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       exampleObj={{ inputs: getInputsObject() }}
                       placeholder={'${{ inputs.VERSION }} deployment'}
                       inputSize="sm"
-                      prefix="${{ "
+                      startWord="$"
+                      prefix="${{ inputs."
                       suffix=" }}"
                     />
-                    <ProTip show message={inputFormattingMessage} />
+                    <ProTip show />
                   </ValidationField>
                 )}
               </div>

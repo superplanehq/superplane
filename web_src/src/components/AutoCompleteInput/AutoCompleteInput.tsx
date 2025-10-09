@@ -11,19 +11,21 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   disabled?: boolean;
   prefix?: string;
   suffix?: string;
+  startWord?: string;
   inputSize?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', inputSize = 'md', ...props }) => {
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', ...props }) => {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [flattenedData, setFlattenedData] = useState<Record<string, string[]>>({});
+    const previousWordLength = useRef<number>(0);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -72,6 +74,23 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
 
       const cursorPosition = inputRef.current?.selectionStart || 0;
       const { word } = getWordAtCursor(inputValue, cursorPosition);
+
+      if (word === '') {
+        previousWordLength.current = 0;
+        setSuggestions([]);
+        setIsOpen(false);
+        return;
+      }
+
+      if (startWord && word === startWord && previousWordLength.current < word.length) {
+        const newValue = replaceWordAtCursor(inputValue, cursorPosition, prefix || '');
+        setInputValue(newValue);
+        onChange?.(newValue);
+        setSuggestions([]);
+        setIsOpen(false);
+        return;
+      }
+
       const lastKey = word.split('.').slice(-1)[0];
       const parsedInput = word.split('.').slice(0, -1).join('.');
 
@@ -83,7 +102,9 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       setSuggestions(allSuggestions);
       setIsOpen(allSuggestions.length > 0);
       setHighlightedIndex(-1);
-    }, [inputValue, flattenedData, isFocused]);
+      previousWordLength.current = word.length;
+
+    }, [inputValue, flattenedData, isFocused, startWord, prefix, onChange]);
 
     // Handle clicking outside to close suggestions
     useEffect(() => {
@@ -118,8 +139,9 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
       if (isFinalKey) {
         newValue += '.';
       } else {
-        newValue = `${prefix}${newValue}${suffix}`;
+        newValue = `${newValue}${suffix}`;
       }
+
       newValue = replaceWordAtCursor(inputValue, cursorPosition, newValue);
       setInputValue(newValue);
       onChange?.(newValue);

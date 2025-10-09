@@ -134,6 +134,8 @@ export function ConnectionSelector({
                         }`}
                       inputSize="sm"
                       exampleObj={getEventTemplate ? getEventTemplate(connection.name || '') : {}}
+                      startWord='$'
+                      prefix='$.'
                     />
                     <button
                       onClick={() => onFilterRemove(index, filterIndex)}
