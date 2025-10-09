@@ -139,9 +139,14 @@ export const Workflow = () => {
       const isComponent = node.refType === 'REF_TYPE_COMPONENT'
       const blockName = isComponent ? node.component?.name : node.blueprint?.name
       const blockId = isComponent ? node.component?.name : node.blueprint?.id
-      const block = buildingBlocks.find((b: BuildingBlock) =>
-        b.name === blockName && b.type === (isComponent ? 'component' : 'blueprint')
-      )
+      const block = buildingBlocks.find((b: BuildingBlock) => {
+        if (isComponent) {
+          return b.name === blockName && b.type === 'component'
+        } else {
+          // For blueprints, match by ID since blueprint nodes reference by ID, not name
+          return (b as any).id === blockId && b.type === 'blueprint'
+        }
+      })
 
       const branches = block?.branches?.map((branch: any) => branch.name) || ['default']
 
@@ -204,9 +209,14 @@ export const Workflow = () => {
   }
 
   const handleNodeClick = useCallback((_: any, node: Node) => {
-    const block = buildingBlocks.find((b: BuildingBlock) =>
-      b.name === node.data.blockName && b.type === node.data.blockType
-    )
+    const block = buildingBlocks.find((b: BuildingBlock) => {
+      if (node.data.blockType === 'component') {
+        return b.name === node.data.blockName && b.type === 'component'
+      } else {
+        // For blueprints, match by ID
+        return (b as any).id === node.data.blockId && b.type === 'blueprint'
+      }
+    })
     setSelectedNode({
       id: node.id,
       name: node.data.label,
@@ -217,9 +227,14 @@ export const Workflow = () => {
   }, [buildingBlocks])
 
   const handleNodeDoubleClick = useCallback((_: any, node: Node) => {
-    const block = buildingBlocks.find((b: BuildingBlock) =>
-      b.name === node.data.blockName && b.type === node.data.blockType
-    )
+    const block = buildingBlocks.find((b: BuildingBlock) => {
+      if (node.data.blockType === 'component') {
+        return b.name === node.data.blockName && b.type === 'component'
+      } else {
+        // For blueprints, match by ID
+        return (b as any).id === node.data.blockId && b.type === 'blueprint'
+      }
+    })
     if (!block) return
 
     setEditingNodeId(node.id)

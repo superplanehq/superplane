@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -70,7 +71,7 @@ func (w *ExecutionRouter) routeExecution(exec *models.WorkflowNodeExecution) err
 	// Route to next nodes if they exist
 	if len(nextNodes) > 0 {
 		w.log("Execution %s: routing to %d next nodes", exec.ID, len(nextNodes))
-		return w.createChildExecutions(exec, nextNodes, nodes)
+		return w.createNextExecutions(exec, nextNodes, nodes)
 	}
 
 	// No more nodes - handle completion
@@ -155,7 +156,7 @@ func (w *ExecutionRouter) findNextNodes(exec *models.WorkflowNodeExecution, edge
 	return nextNodes, nil
 }
 
-func (w *ExecutionRouter) createChildExecutions(
+func (w *ExecutionRouter) createNextExecutions(
 	parent *models.WorkflowNodeExecution,
 	nextNodes []nextNodeInfo,
 	nodes []models.Node,
@@ -164,7 +165,7 @@ func (w *ExecutionRouter) createChildExecutions(
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		for _, next := range nextNodes {
-			if err := w.createChildExecution(tx, parent, next, nodes, now); err != nil {
+			if err := w.createNextExecution(tx, parent, next, nodes, now); err != nil {
 				return err
 			}
 		}
@@ -173,9 +174,9 @@ func (w *ExecutionRouter) createChildExecutions(
 	})
 }
 
-func (w *ExecutionRouter) createChildExecution(
+func (w *ExecutionRouter) createNextExecution(
 	tx *gorm.DB,
-	parent *models.WorkflowNodeExecution,
+	previous *models.WorkflowNodeExecution,
 	next nextNodeInfo,
 	nodes []models.Node,
 	now time.Time,
@@ -185,18 +186,24 @@ func (w *ExecutionRouter) createChildExecution(
 		return fmt.Errorf("node %s not found", next.NodeID)
 	}
 
+	// Resolve configuration using ConfigurationBuilder if inside a blueprint
+	config, err := w.resolveNodeConfiguration(tx, previous, node)
+	if err != nil {
+		return fmt.Errorf("failed to resolve node configuration: %w", err)
+	}
+
 	childExec := models.WorkflowNodeExecution{
 		ID:                   uuid.New(),
-		WorkflowID:           parent.WorkflowID,
+		WorkflowID:           previous.WorkflowID,
 		NodeID:               next.NodeID,
-		RootEventID:          parent.RootEventID,
-		PreviousExecutionID:  &parent.ID,
+		RootEventID:          previous.RootEventID,
+		PreviousExecutionID:  &previous.ID,
 		PreviousOutputBranch: &next.OutputBranch,
 		PreviousOutputIndex:  &next.OutputIndex,
-		ParentExecutionID:    parent.ParentExecutionID,
-		BlueprintID:          parent.BlueprintID,
+		ParentExecutionID:    previous.ParentExecutionID,
+		BlueprintID:          previous.BlueprintID,
 		State:                models.WorkflowNodeExecutionStatePending,
-		Configuration:        datatypes.NewJSONType(node.Configuration),
+		Configuration:        datatypes.NewJSONType(config),
 		CreatedAt:            &now,
 		UpdatedAt:            &now,
 	}
@@ -207,6 +214,36 @@ func (w *ExecutionRouter) createChildExecution(
 
 	w.log("Created child execution %s for node %s", childExec.ID, next.NodeID)
 	return nil
+}
+
+func (w *ExecutionRouter) resolveNodeConfiguration(
+	tx *gorm.DB,
+	previous *models.WorkflowNodeExecution,
+	node *models.Node,
+) (map[string]any, error) {
+	// If not inside a blueprint, use the node configuration as-is
+	if previous.BlueprintID == nil {
+		return node.Configuration, nil
+	}
+
+	// Inside a blueprint: resolve using the parent blueprint node's configuration
+	if previous.ParentExecutionID == nil {
+		return nil, fmt.Errorf("execution inside blueprint but has no parent execution")
+	}
+
+	var parentExec models.WorkflowNodeExecution
+	if err := tx.First(&parentExec, "id = ?", previous.ParentExecutionID).Error; err != nil {
+		return nil, fmt.Errorf("failed to find parent blueprint execution: %w", err)
+	}
+
+	// Use ConfigurationBuilder to resolve expressions
+	configBuilder := components.ConfigurationBuilder{}
+	resolvedConfig, err := configBuilder.Build(node.Configuration, parentExec.Configuration.Data())
+	if err != nil {
+		return nil, fmt.Errorf("failed to build configuration: %w", err)
+	}
+
+	return resolvedConfig, nil
 }
 
 func (w *ExecutionRouter) findNodeByID(nodes []models.Node, nodeID string) *models.Node {

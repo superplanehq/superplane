@@ -757,6 +757,12 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			}
 		}
 
+		if node.Ref.Blueprint != nil {
+			result[i].Blueprint = &componentpb.Node_BlueprintRef{
+				Id: node.Ref.Blueprint.ID,
+			}
+		}
+
 		if node.Configuration != nil {
 			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
 		}

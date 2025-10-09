@@ -11,10 +11,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/components"
 )
 
+type Header struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type Spec struct {
-	URL     string            `json:"url"`
-	Method  string            `json:"method"`
-	Headers map[string]string `json:"headers"`
+	URL     string   `json:"url"`
+	Method  string   `json:"method"`
+	Headers []Header `json:"headers"`
 }
 
 type HTTP struct{}
@@ -109,8 +114,8 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	for key, value := range spec.Headers {
-		req.Header.Set(key, value)
+	for _, header := range spec.Headers {
+		req.Header.Set(header.Name, header.Value)
 	}
 
 	resp, err := http.DefaultClient.Do(req)

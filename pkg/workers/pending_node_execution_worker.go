@@ -136,6 +136,12 @@ func (w *PendingNodeExecutionWorker) executeBlueprintNode(execution *models.Work
 		return fmt.Errorf("invalid blueprint ID: %w", err)
 	}
 
+	configBuilder := components.ConfigurationBuilder{}
+	config, err := configBuilder.Build(firstNode.Configuration, node.Configuration)
+	if err != nil {
+		return fmt.Errorf("error building configuration: %v", err)
+	}
+
 	now := time.Now()
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		// Create first execution inside blueprint
@@ -151,7 +157,7 @@ func (w *PendingNodeExecutionWorker) executeBlueprintNode(execution *models.Work
 			ParentExecutionID:    &execution.ID,
 			BlueprintID:          &blueprintID,
 			State:                models.WorkflowNodeExecutionStatePending,
-			Configuration:        datatypes.NewJSONType(firstNode.Configuration),
+			Configuration:        datatypes.NewJSONType(config),
 			CreatedAt:            &now,
 			UpdatedAt:            &now,
 		}
