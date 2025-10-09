@@ -22,11 +22,15 @@ import { Heading } from '../../components/Heading/heading'
 import { Text } from '../../components/Text/text'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import {
   Dialog,
   DialogContent,
   DialogFooter,
+  DialogTitle,
+  DialogDescription,
 } from '../../components/ui/dialog'
+import { VisuallyHidden } from '../../components/ui/visually-hidden'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 import { IfNode } from './components/nodes/IfNode'
 import { HttpNode } from './components/nodes/HttpNode'
@@ -96,6 +100,11 @@ export const Blueprint = () => {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; branch: string } | null>(null)
+  const [activeTab, setActiveTab] = useState<'components' | 'configuration'>('components')
+  const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([])
+  const [isEditConfigFieldModalOpen, setIsEditConfigFieldModalOpen] = useState(false)
+  const [editingConfigFieldIndex, setEditingConfigFieldIndex] = useState<number | null>(null)
+  const [configFieldForm, setConfigFieldForm] = useState<any>({})
 
   // Fetch blueprint and components
   const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId!, blueprintId!)
@@ -108,6 +117,13 @@ export const Blueprint = () => {
 
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
+
+  // Update blueprint configuration when blueprint loads
+  useEffect(() => {
+    if (blueprint?.configuration) {
+      setBlueprintConfiguration(blueprint.configuration)
+    }
+  }, [blueprint])
 
   // Update nodes and edges when blueprint or components data changes
   useEffect(() => {
@@ -256,6 +272,64 @@ export const Blueprint = () => {
     setEditingNodeId(null)
   }
 
+  const handleOpenConfigFieldModal = (index?: number) => {
+    if (index !== undefined) {
+      setEditingConfigFieldIndex(index)
+      setConfigFieldForm(blueprintConfiguration[index])
+    } else {
+      setEditingConfigFieldIndex(null)
+      setConfigFieldForm({
+        name: '',
+        label: '',
+        type: 'string',
+        description: '',
+        required: false,
+        options: [],
+      })
+    }
+    setIsEditConfigFieldModalOpen(true)
+  }
+
+  const handleCloseConfigFieldModal = () => {
+    setIsEditConfigFieldModalOpen(false)
+    setEditingConfigFieldIndex(null)
+    setConfigFieldForm({})
+  }
+
+  const handleSaveConfigField = () => {
+    if (!configFieldForm.name.trim()) {
+      showErrorToast('Field name is required')
+      return
+    }
+
+    // Validate options for select/multi_select types
+    if (configFieldForm.type === 'select' || configFieldForm.type === 'multi_select') {
+      if (!configFieldForm.options || configFieldForm.options.length === 0) {
+        showErrorToast('At least one option is required for select/multi-select fields')
+        return
+      }
+
+      // Validate that all options have both label and value
+      const hasInvalidOption = configFieldForm.options.some((opt: any) => !opt.label.trim() || !opt.value.trim())
+      if (hasInvalidOption) {
+        showErrorToast('All options must have both label and value')
+        return
+      }
+    }
+
+    if (editingConfigFieldIndex !== null) {
+      // Update existing field
+      const newConfig = [...blueprintConfiguration]
+      newConfig[editingConfigFieldIndex] = configFieldForm
+      setBlueprintConfiguration(newConfig)
+    } else {
+      // Add new field
+      setBlueprintConfiguration([...blueprintConfiguration, configFieldForm])
+    }
+
+    handleCloseConfigFieldModal()
+  }
+
   const handleSave = async () => {
     try {
       const blueprintNodes = nodes.map((node) => ({
@@ -279,6 +353,7 @@ export const Blueprint = () => {
         description: blueprint?.description,
         nodes: blueprintNodes,
         edges: blueprintEdges,
+        configuration: blueprintConfiguration,
       })
 
       showSuccessToast('Blueprint saved successfully')
@@ -352,47 +427,121 @@ export const Blueprint = () => {
                   <MaterialSymbol name="menu_open" size="lg" />
                 </Button>
                 <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">
-                  Components
+                  Blueprint Builder
                 </h2>
               </div>
             </div>
 
-            {/* Sidebar Content */}
-            <div className="flex-1 overflow-y-auto text-left p-4">
-              <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                Click on a component to add it to your blueprint
-              </div>
-              <ItemGroup>
-                {components.map((component: any) => {
-                  const iconMap: Record<string, string> = {
-                    if: 'alt_route',
-                    http: 'http',
-                    filter: 'filter_alt',
-                    switch: 'settings_input_component',
-                  }
-                  const icon = iconMap[component.name] || 'widgets'
+            {/* Tabs */}
+            <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)} className="flex-1 flex flex-col">
+              <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
+                <TabsTrigger value="components">Components</TabsTrigger>
+                <TabsTrigger value="configuration">Configuration</TabsTrigger>
+              </TabsList>
 
-                  return (
-                    <Item
-                      key={component.name}
-                      onClick={() => handleComponentClick(component)}
-                      className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                      size="sm"
-                    >
-                      <ItemMedia>
-                        <MaterialSymbol name={icon} size="lg" className="text-blue-600 dark:text-blue-400" />
-                      </ItemMedia>
-                      <ItemContent>
-                        <ItemTitle>{component.label || component.name}</ItemTitle>
-                        {component.description && (
-                          <ItemDescription>{component.description}</ItemDescription>
-                        )}
-                      </ItemContent>
-                    </Item>
-                  )
-                })}
-              </ItemGroup>
-            </div>
+              {/* Components Tab */}
+              <TabsContent value="components" className="flex-1 overflow-y-auto mt-0">
+                <div className="text-left p-4">
+                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+                    Click on a component to add it to your blueprint
+                  </div>
+                  <ItemGroup>
+                    {components.map((component: any) => {
+                      const iconMap: Record<string, string> = {
+                        if: 'alt_route',
+                        http: 'http',
+                        filter: 'filter_alt',
+                        switch: 'settings_input_component',
+                      }
+                      const icon = iconMap[component.name] || 'widgets'
+
+                      return (
+                        <Item
+                          key={component.name}
+                          onClick={() => handleComponentClick(component)}
+                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                          size="sm"
+                        >
+                          <ItemMedia>
+                            <MaterialSymbol name={icon} size="lg" className="text-blue-600 dark:text-blue-400" />
+                          </ItemMedia>
+                          <ItemContent>
+                            <ItemTitle>{component.label || component.name}</ItemTitle>
+                            {component.description && (
+                              <ItemDescription>{component.description}</ItemDescription>
+                            )}
+                          </ItemContent>
+                        </Item>
+                      )
+                    })}
+                  </ItemGroup>
+                </div>
+              </TabsContent>
+
+              {/* Configuration Tab */}
+              <TabsContent value="configuration" className="flex-1 overflow-y-auto mt-0">
+                <div className="text-left p-4 space-y-6">
+                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+                    Add configuration fields that can be used in your blueprint nodes
+                  </div>
+
+                  {/* Configuration Fields List */}
+                  {blueprintConfiguration.length > 0 && (
+                    <div className="space-y-4">
+                      {blueprintConfiguration.map((field: any, index: number) => (
+                        <div
+                          key={index}
+                          className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3 cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
+                          onClick={() => handleOpenConfigFieldModal(index)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">
+                                {field.label || field.name}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                                Type: {field.type} {field.required && '(required)'}
+                              </p>
+                              {field.description && (
+                                <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+                                  {field.description}
+                                </p>
+                              )}
+                              {(field.type === 'select' || field.type === 'multi_select') && field.options && field.options.length > 0 && (
+                                <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+                                  Options: {field.options.map((opt: any) => opt.label).join(', ')}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const newConfig = blueprintConfiguration.filter((_, i) => i !== index)
+                                setBlueprintConfiguration(newConfig)
+                              }}
+                            >
+                              <MaterialSymbol name="delete" className="text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add New Configuration Field Button */}
+                  <Button
+                    variant="outline"
+                    onClick={() => handleOpenConfigFieldModal()}
+                    className="w-full"
+                  >
+                    <MaterialSymbol name="add" />
+                    Add Configuration Field
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         )}
 
@@ -433,6 +582,10 @@ export const Blueprint = () => {
       {/* Add/Edit Node Modal */}
       <Dialog open={isAddNodeModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
         <DialogContent className="max-w-2xl p-0" showCloseButton={false}>
+          <VisuallyHidden>
+            <DialogTitle>{editingNodeId ? 'Edit Node' : 'Add Node'}</DialogTitle>
+            <DialogDescription>Configure the node settings and parameters</DialogDescription>
+          </VisuallyHidden>
           <ScrollArea className="max-h-[80vh]">
             <div className="p-6">
               <div className="space-y-6">
@@ -478,6 +631,182 @@ export const Blueprint = () => {
               </DialogFooter>
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Configuration Field Editor Modal */}
+      <Dialog open={isEditConfigFieldModalOpen} onOpenChange={(open) => !open && handleCloseConfigFieldModal()}>
+        <DialogContent className="max-w-2xl" showCloseButton={false}>
+          <VisuallyHidden>
+            <DialogTitle>
+              {editingConfigFieldIndex !== null ? 'Edit Configuration Field' : 'Add Configuration Field'}
+            </DialogTitle>
+            <DialogDescription>Configure the blueprint configuration field</DialogDescription>
+          </VisuallyHidden>
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
+              {editingConfigFieldIndex !== null ? 'Edit Configuration Field' : 'Add Configuration Field'}
+            </h3>
+
+            <div className="space-y-4">
+              {/* Field Name */}
+              <div>
+                <Label className="block text-sm font-medium mb-2">Field Name *</Label>
+                <Input
+                  type="text"
+                  value={configFieldForm.name || ''}
+                  onChange={(e) => setConfigFieldForm({ ...configFieldForm, name: e.target.value })}
+                  placeholder="e.g., threshold_expression"
+                  autoFocus
+                />
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                  This is the internal name used in templates (e.g., $config.threshold_expression)
+                </p>
+              </div>
+
+              {/* Field Label */}
+              <div>
+                <Label className="block text-sm font-medium mb-2">Label *</Label>
+                <Input
+                  type="text"
+                  value={configFieldForm.label || ''}
+                  onChange={(e) => setConfigFieldForm({ ...configFieldForm, label: e.target.value })}
+                  placeholder="e.g., Threshold Expression"
+                />
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                  Display name shown in the UI
+                </p>
+              </div>
+
+              {/* Field Type */}
+              <div>
+                <Label className="block text-sm font-medium mb-2">Type *</Label>
+                <Select
+                  value={configFieldForm.type || 'string'}
+                  onValueChange={(val) => setConfigFieldForm({ ...configFieldForm, type: val })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="string">String</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="boolean">Boolean</SelectItem>
+                    <SelectItem value="select">Select</SelectItem>
+                    <SelectItem value="multi_select">Multi-Select</SelectItem>
+                    <SelectItem value="date">Date</SelectItem>
+                    <SelectItem value="url">URL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Options Section (for select and multi_select types) */}
+              {(configFieldForm.type === 'select' || configFieldForm.type === 'multi_select') && (
+                <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="block text-sm font-medium">Options *</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const currentOptions = configFieldForm.options || []
+                        setConfigFieldForm({
+                          ...configFieldForm,
+                          options: [...currentOptions, { label: '', value: '' }]
+                        })
+                      }}
+                    >
+                      <MaterialSymbol name="add" />
+                      Add Option
+                    </Button>
+                  </div>
+
+                  {configFieldForm.options && configFieldForm.options.length > 0 ? (
+                    <div className="space-y-2">
+                      {configFieldForm.options.map((option: any, index: number) => (
+                        <div key={index} className="flex gap-2 items-start">
+                          <div className="flex-1 grid grid-cols-2 gap-2">
+                            <Input
+                              type="text"
+                              value={option.label || ''}
+                              onChange={(e) => {
+                                const newOptions = [...configFieldForm.options]
+                                newOptions[index] = { ...option, label: e.target.value }
+                                setConfigFieldForm({ ...configFieldForm, options: newOptions })
+                              }}
+                              placeholder="Label (e.g., Low)"
+                            />
+                            <Input
+                              type="text"
+                              value={option.value || ''}
+                              onChange={(e) => {
+                                const newOptions = [...configFieldForm.options]
+                                newOptions[index] = { ...option, value: e.target.value }
+                                setConfigFieldForm({ ...configFieldForm, options: newOptions })
+                              }}
+                              placeholder="Value (e.g., low)"
+                            />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => {
+                              const newOptions = configFieldForm.options.filter((_: any, i: number) => i !== index)
+                              setConfigFieldForm({ ...configFieldForm, options: newOptions })
+                            }}
+                          >
+                            <MaterialSymbol name="delete" className="text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-zinc-400">
+                      No options added yet. Click "Add Option" to add options.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Field Description */}
+              <div>
+                <Label className="block text-sm font-medium mb-2">Description</Label>
+                <Input
+                  type="text"
+                  value={configFieldForm.description || ''}
+                  onChange={(e) => setConfigFieldForm({ ...configFieldForm, description: e.target.value })}
+                  placeholder="Describe the purpose of this field"
+                />
+              </div>
+
+              {/* Required Checkbox */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={configFieldForm.required || false}
+                  onChange={(e) => setConfigFieldForm({ ...configFieldForm, required: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300 dark:border-zinc-700"
+                  id="required-checkbox"
+                />
+                <Label htmlFor="required-checkbox" className="cursor-pointer">
+                  Required field
+                </Label>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-6">
+              <Button variant="outline" onClick={handleCloseConfigFieldModal}>
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                onClick={handleSaveConfigField}
+                disabled={!configFieldForm.name?.trim() || !configFieldForm.label?.trim()}
+              >
+                {editingConfigFieldIndex !== null ? 'Save Changes' : 'Add Field'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -140,7 +140,7 @@ func RegisterComponentsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Components/ListComponents", runtime.WithHTTPPathPattern("/api/v1/components"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Components.Components/ListComponents", runtime.WithHTTPPathPattern("/api/v1/components"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -160,7 +160,7 @@ func RegisterComponentsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Components/DescribeComponent", runtime.WithHTTPPathPattern("/api/v1/components/{name}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Components.Components/DescribeComponent", runtime.WithHTTPPathPattern("/api/v1/components/{name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -180,7 +180,7 @@ func RegisterComponentsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Components/ListComponentActions", runtime.WithHTTPPathPattern("/api/v1/components/{name}/actions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Components.Components/ListComponentActions", runtime.WithHTTPPathPattern("/api/v1/components/{name}/actions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -238,7 +238,7 @@ func RegisterComponentsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Components/ListComponents", runtime.WithHTTPPathPattern("/api/v1/components"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Components.Components/ListComponents", runtime.WithHTTPPathPattern("/api/v1/components"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -255,7 +255,7 @@ func RegisterComponentsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Components/DescribeComponent", runtime.WithHTTPPathPattern("/api/v1/components/{name}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Components.Components/DescribeComponent", runtime.WithHTTPPathPattern("/api/v1/components/{name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -272,7 +272,7 @@ func RegisterComponentsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Components/ListComponentActions", runtime.WithHTTPPathPattern("/api/v1/components/{name}/actions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Components.Components/ListComponentActions", runtime.WithHTTPPathPattern("/api/v1/components/{name}/actions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return

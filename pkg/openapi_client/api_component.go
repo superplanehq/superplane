@@ -30,7 +30,7 @@ type ApiComponentsDescribeComponentRequest struct {
 	name string
 }
 
-func (r ApiComponentsDescribeComponentRequest) Execute() (*SuperplaneDescribeComponentResponse, *http.Response, error) {
+func (r ApiComponentsDescribeComponentRequest) Execute() (*ComponentsDescribeComponentResponse, *http.Response, error) {
 	return r.ApiService.ComponentsDescribeComponentExecute(r)
 }
 
@@ -52,13 +52,13 @@ func (a *ComponentAPIService) ComponentsDescribeComponent(ctx context.Context, n
 }
 
 // Execute executes the request
-//  @return SuperplaneDescribeComponentResponse
-func (a *ComponentAPIService) ComponentsDescribeComponentExecute(r ApiComponentsDescribeComponentRequest) (*SuperplaneDescribeComponentResponse, *http.Response, error) {
+//  @return ComponentsDescribeComponentResponse
+func (a *ComponentAPIService) ComponentsDescribeComponentExecute(r ApiComponentsDescribeComponentRequest) (*ComponentsDescribeComponentResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneDescribeComponentResponse
+		localVarReturnValue  *ComponentsDescribeComponentResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ComponentAPIService.ComponentsDescribeComponent")
@@ -141,7 +141,7 @@ type ApiComponentsListComponentActionsRequest struct {
 	name string
 }
 
-func (r ApiComponentsListComponentActionsRequest) Execute() (*SuperplaneListComponentActionsResponse, *http.Response, error) {
+func (r ApiComponentsListComponentActionsRequest) Execute() (*ComponentsListComponentActionsResponse, *http.Response, error) {
 	return r.ApiService.ComponentsListComponentActionsExecute(r)
 }
 
@@ -163,13 +163,13 @@ func (a *ComponentAPIService) ComponentsListComponentActions(ctx context.Context
 }
 
 // Execute executes the request
-//  @return SuperplaneListComponentActionsResponse
-func (a *ComponentAPIService) ComponentsListComponentActionsExecute(r ApiComponentsListComponentActionsRequest) (*SuperplaneListComponentActionsResponse, *http.Response, error) {
+//  @return ComponentsListComponentActionsResponse
+func (a *ComponentAPIService) ComponentsListComponentActionsExecute(r ApiComponentsListComponentActionsRequest) (*ComponentsListComponentActionsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListComponentActionsResponse
+		localVarReturnValue  *ComponentsListComponentActionsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ComponentAPIService.ComponentsListComponentActions")
@@ -251,7 +251,7 @@ type ApiComponentsListComponentsRequest struct {
 	ApiService *ComponentAPIService
 }
 
-func (r ApiComponentsListComponentsRequest) Execute() (*SuperplaneListComponentsResponse, *http.Response, error) {
+func (r ApiComponentsListComponentsRequest) Execute() (*ComponentsListComponentsResponse, *http.Response, error) {
 	return r.ApiService.ComponentsListComponentsExecute(r)
 }
 
@@ -271,13 +271,13 @@ func (a *ComponentAPIService) ComponentsListComponents(ctx context.Context) ApiC
 }
 
 // Execute executes the request
-//  @return SuperplaneListComponentsResponse
-func (a *ComponentAPIService) ComponentsListComponentsExecute(r ApiComponentsListComponentsRequest) (*SuperplaneListComponentsResponse, *http.Response, error) {
+//  @return ComponentsListComponentsResponse
+func (a *ComponentAPIService) ComponentsListComponentsExecute(r ApiComponentsListComponentsRequest) (*ComponentsListComponentsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListComponentsResponse
+		localVarReturnValue  *ComponentsListComponentsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ComponentAPIService.ComponentsListComponents")

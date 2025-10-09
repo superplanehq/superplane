@@ -27,13 +27,6 @@ func ValidateConfiguration(fields []ConfigurationField, config map[string]any) e
 		if err := validateFieldValue(field, value); err != nil {
 			return fmt.Errorf("field '%s': %w", field.Name, err)
 		}
-
-		// Run custom validation if provided
-		if field.Validate != nil {
-			if err := field.Validate(value); err != nil {
-				return fmt.Errorf("field '%s': %w", field.Name, err)
-			}
-		}
 	}
 
 	return nil

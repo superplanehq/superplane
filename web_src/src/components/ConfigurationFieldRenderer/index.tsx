@@ -1,4 +1,4 @@
-import { SuperplaneConfigurationField } from '../../api-client'
+import { ComponentsConfigurationField } from '../../api-client'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -7,7 +7,7 @@ import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip'
 
 interface ConfigurationFieldRendererProps {
-  field: SuperplaneConfigurationField
+  field: ComponentsConfigurationField
   value: any
   onChange: (value: any) => void
 }
@@ -168,7 +168,7 @@ const ListFieldRenderer = ({
   value,
   onChange
 }: {
-  field: SuperplaneConfigurationField
+  field: ComponentsConfigurationField
   value: any
   onChange: (value: any) => void
 }) => {
@@ -254,7 +254,7 @@ const ObjectFieldRenderer = ({
   value,
   onChange
 }: {
-  field: SuperplaneConfigurationField
+  field: ComponentsConfigurationField
   value: Record<string, any>
   onChange: (value: Record<string, any>) => void
 }) => {

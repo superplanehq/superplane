@@ -2,6 +2,7 @@ package blueprints
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/datatypes"
 )
 
 func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizationID string, blueprint *pb.Blueprint) (*pb.CreateBlueprintResponse, error) {
@@ -22,6 +24,13 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, err
 	}
 
+	configuration, err := ProtoToConfiguration(blueprint.Configuration)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("Configuration: %v", configuration)
+
 	orgID, _ := uuid.Parse(organizationID)
 	now := time.Now()
 	model := &models.Blueprint{
@@ -33,6 +42,7 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		UpdatedAt:      &now,
 		Nodes:          nodes,
 		Edges:          edges,
+		Configuration:  datatypes.NewJSONSlice(configuration),
 	}
 
 	if err := database.Conn().Create(model).Error; err != nil {

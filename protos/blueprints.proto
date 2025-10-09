@@ -1,7 +1,8 @@
 syntax = "proto3";
 
-package Superplane;
+package Superplane.Blueprints;
 
+import "components.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
@@ -113,6 +114,7 @@ message Blueprint {
   google.protobuf.Timestamp updated_at = 6;
   repeated BlueprintNode nodes = 7;
   repeated BlueprintEdge edges = 8;
+  repeated Components.ConfigurationField configuration = 9;
 }
 
 message BlueprintNode {

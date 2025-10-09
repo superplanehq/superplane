@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Components_ListComponents_FullMethodName       = "/Superplane.Components/ListComponents"
-	Components_DescribeComponent_FullMethodName    = "/Superplane.Components/DescribeComponent"
-	Components_ListComponentActions_FullMethodName = "/Superplane.Components/ListComponentActions"
+	Components_ListComponents_FullMethodName       = "/Superplane.Components.Components/ListComponents"
+	Components_DescribeComponent_FullMethodName    = "/Superplane.Components.Components/DescribeComponent"
+	Components_ListComponentActions_FullMethodName = "/Superplane.Components.Components/ListComponentActions"
 )
 
 // ComponentsClient is the client API for Components service.
@@ -174,7 +174,7 @@ func _Components_ListComponentActions_Handler(srv interface{}, ctx context.Conte
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Components_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Superplane.Components",
+	ServiceName: "Superplane.Components.Components",
 	HandlerType: (*ComponentsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

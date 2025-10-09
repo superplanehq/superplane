@@ -14,8 +14,116 @@ export type AuthorizationPermission = {
     domainType?: AuthorizationDomainType;
 };
 
+export type BlueprintsBlueprint = {
+    id?: string;
+    organizationId?: string;
+    name?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    nodes?: Array<BlueprintsBlueprintNode>;
+    edges?: Array<BlueprintsBlueprintEdge>;
+    configuration?: Array<ComponentsConfigurationField>;
+};
+
+export type BlueprintsBlueprintEdge = {
+    sourceId?: string;
+    targetId?: string;
+    branch?: string;
+};
+
+export type BlueprintsBlueprintNode = {
+    id?: string;
+    name?: string;
+    refType?: BlueprintsBlueprintNodeRefType;
+    component?: BlueprintsBlueprintNodeComponentRef;
+    configuration?: {
+        [key: string]: unknown;
+    };
+};
+
+export type BlueprintsBlueprintNodeComponentRef = {
+    name?: string;
+};
+
+export type BlueprintsBlueprintNodeRefType = 'REF_TYPE_COMPONENT';
+
+export type BlueprintsCreateBlueprintRequest = {
+    blueprint?: BlueprintsBlueprint;
+};
+
+export type BlueprintsCreateBlueprintResponse = {
+    blueprint?: BlueprintsBlueprint;
+};
+
+export type BlueprintsDescribeBlueprintResponse = {
+    blueprint?: BlueprintsBlueprint;
+};
+
+export type BlueprintsListBlueprintsResponse = {
+    blueprints?: Array<BlueprintsBlueprint>;
+};
+
 export type BlueprintsUpdateBlueprintBody = {
-    blueprint?: SuperplaneBlueprint;
+    blueprint?: BlueprintsBlueprint;
+};
+
+export type BlueprintsUpdateBlueprintResponse = {
+    blueprint?: BlueprintsBlueprint;
+};
+
+export type ComponentsComponent = {
+    name?: string;
+    label?: string;
+    description?: string;
+    configuration?: Array<ComponentsConfigurationField>;
+    branches?: Array<ComponentsOutputBranch>;
+};
+
+export type ComponentsComponentAction = {
+    name?: string;
+    description?: string;
+    parameters?: Array<ComponentsConfigurationField>;
+};
+
+export type ComponentsConfigurationField = {
+    name?: string;
+    type?: string;
+    description?: string;
+    required?: boolean;
+    defaultValue?: string;
+    options?: Array<ComponentsFieldOption>;
+    min?: number;
+    max?: number;
+    listItem?: ComponentsListItemDefinition;
+    schema?: Array<ComponentsConfigurationField>;
+    label?: string;
+};
+
+export type ComponentsDescribeComponentResponse = {
+    component?: ComponentsComponent;
+};
+
+export type ComponentsFieldOption = {
+    label?: string;
+    value?: string;
+};
+
+export type ComponentsListComponentActionsResponse = {
+    actions?: Array<ComponentsComponentAction>;
+};
+
+export type ComponentsListComponentsResponse = {
+    components?: Array<ComponentsComponent>;
+};
+
+export type ComponentsListItemDefinition = {
+    type?: string;
+    schema?: Array<ComponentsConfigurationField>;
+};
+
+export type ComponentsOutputBranch = {
+    name?: string;
 };
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
@@ -427,39 +535,6 @@ export type SuperplaneApproveStageEventResponse = {
     event?: SuperplaneStageEvent;
 };
 
-export type SuperplaneBlueprint = {
-    id?: string;
-    organizationId?: string;
-    name?: string;
-    description?: string;
-    createdAt?: string;
-    updatedAt?: string;
-    nodes?: Array<SuperplaneBlueprintNode>;
-    edges?: Array<SuperplaneBlueprintEdge>;
-};
-
-export type SuperplaneBlueprintEdge = {
-    sourceId?: string;
-    targetId?: string;
-    branch?: string;
-};
-
-export type SuperplaneBlueprintNode = {
-    id?: string;
-    name?: string;
-    refType?: SuperplaneBlueprintNodeRefType;
-    component?: SuperplaneBlueprintNodeComponentRef;
-    configuration?: {
-        [key: string]: unknown;
-    };
-};
-
-export type SuperplaneBlueprintNodeComponentRef = {
-    name?: string;
-};
-
-export type SuperplaneBlueprintNodeRefType = 'REF_TYPE_COMPONENT';
-
 export type SuperplaneCancelStageExecutionBody = {
     [key: string]: unknown;
 };
@@ -480,20 +555,6 @@ export type SuperplaneCanvasMetadata = {
     createdAt?: string;
 };
 
-export type SuperplaneComponent = {
-    name?: string;
-    label?: string;
-    description?: string;
-    configuration?: Array<SuperplaneConfigurationField>;
-    branches?: Array<SuperplaneOutputBranch>;
-};
-
-export type SuperplaneComponentAction = {
-    name?: string;
-    description?: string;
-    parameters?: Array<SuperplaneConfigurationField>;
-};
-
 export type SuperplaneCondition = {
     type?: SuperplaneConditionType;
     approval?: SuperplaneConditionApproval;
@@ -511,20 +572,6 @@ export type SuperplaneConditionTimeWindow = {
 };
 
 export type SuperplaneConditionType = 'CONDITION_TYPE_UNKNOWN' | 'CONDITION_TYPE_APPROVAL' | 'CONDITION_TYPE_TIME_WINDOW';
-
-export type SuperplaneConfigurationField = {
-    name?: string;
-    type?: string;
-    description?: string;
-    required?: boolean;
-    defaultValue?: string;
-    options?: Array<SuperplaneFieldOption>;
-    min?: number;
-    max?: number;
-    listItem?: SuperplaneListItemDefinition;
-    schema?: Array<SuperplaneConfigurationField>;
-    label?: string;
-};
 
 export type SuperplaneConnection = {
     type?: SuperplaneConnectionType;
@@ -580,14 +627,6 @@ export type SuperplaneConnectionGroupSpec = {
 
 export type SuperplaneConnectionType = 'TYPE_UNKNOWN' | 'TYPE_EVENT_SOURCE' | 'TYPE_STAGE' | 'TYPE_CONNECTION_GROUP';
 
-export type SuperplaneCreateBlueprintRequest = {
-    blueprint?: SuperplaneBlueprint;
-};
-
-export type SuperplaneCreateBlueprintResponse = {
-    blueprint?: SuperplaneBlueprint;
-};
-
 export type SuperplaneCreateCanvasRequest = {
     canvas?: SuperplaneCanvas;
 };
@@ -634,14 +673,6 @@ export type SuperplaneCreateStageResponse = {
     stage?: SuperplaneStage;
 };
 
-export type SuperplaneCreateWorkflowRequest = {
-    workflow?: SuperplaneWorkflow;
-};
-
-export type SuperplaneCreateWorkflowResponse = {
-    workflow?: SuperplaneWorkflow;
-};
-
 export type SuperplaneDataFilter = {
     expression?: string;
 };
@@ -662,20 +693,8 @@ export type SuperplaneDeleteStageResponse = {
     [key: string]: unknown;
 };
 
-export type SuperplaneDeleteWorkflowResponse = {
-    [key: string]: unknown;
-};
-
-export type SuperplaneDescribeBlueprintResponse = {
-    blueprint?: SuperplaneBlueprint;
-};
-
 export type SuperplaneDescribeCanvasResponse = {
     canvas?: SuperplaneCanvas;
-};
-
-export type SuperplaneDescribeComponentResponse = {
-    component?: SuperplaneComponent;
 };
 
 export type SuperplaneDescribeConnectionGroupResponse = {
@@ -688,10 +707,6 @@ export type SuperplaneDescribeEventSourceResponse = {
 
 export type SuperplaneDescribeStageResponse = {
     stage?: SuperplaneStage;
-};
-
-export type SuperplaneDescribeWorkflowResponse = {
-    workflow?: SuperplaneWorkflow;
 };
 
 export type SuperplaneDiscardStageEventBody = {
@@ -810,11 +825,6 @@ export type SuperplaneExecutor = {
     name?: string;
 };
 
-export type SuperplaneFieldOption = {
-    label?: string;
-    value?: string;
-};
-
 export type SuperplaneFilter = {
     type?: SuperplaneFilterType;
     data?: SuperplaneDataFilter;
@@ -849,10 +859,6 @@ export type SuperplaneIntegrationsValueFromSecret = {
     key?: string;
 };
 
-export type SuperplaneInvokeNodeExecutionActionResponse = {
-    [key: string]: unknown;
-};
-
 export type SuperplaneKeyValuePair = {
     name?: string;
     value?: string;
@@ -862,20 +868,8 @@ export type SuperplaneListAlertsResponse = {
     alerts?: Array<SuperplaneAlert>;
 };
 
-export type SuperplaneListBlueprintsResponse = {
-    blueprints?: Array<SuperplaneBlueprint>;
-};
-
 export type SuperplaneListCanvasesResponse = {
     canvases?: Array<SuperplaneCanvas>;
-};
-
-export type SuperplaneListComponentActionsResponse = {
-    actions?: Array<SuperplaneComponentAction>;
-};
-
-export type SuperplaneListComponentsResponse = {
-    components?: Array<SuperplaneComponent>;
 };
 
 export type SuperplaneListConnectionGroupFieldSetsResponse = {
@@ -904,25 +898,6 @@ export type SuperplaneListEventsResponse = {
     lastTimestamp?: string;
 };
 
-export type SuperplaneListItemDefinition = {
-    type?: string;
-    schema?: Array<SuperplaneConfigurationField>;
-};
-
-export type SuperplaneListNodeExecutionsResponse = {
-    executions?: Array<SuperplaneWorkflowNodeExecution>;
-    totalCount?: number;
-    hasNextPage?: boolean;
-    lastTimestamp?: string;
-};
-
-export type SuperplaneListNodeQueueItemsResponse = {
-    queueItems?: Array<SuperplaneWorkflowQueueItem>;
-    totalCount?: number;
-    hasNextPage?: boolean;
-    lastTimestamp?: string;
-};
-
 export type SuperplaneListStageEventsResponse = {
     events?: Array<SuperplaneStageEvent>;
     totalCount?: number;
@@ -941,10 +916,6 @@ export type SuperplaneListStagesResponse = {
     stages?: Array<SuperplaneStage>;
 };
 
-export type SuperplaneListWorkflowsResponse = {
-    workflows?: Array<SuperplaneWorkflow>;
-};
-
 export type SuperplaneMeUser = {
     id?: string;
     email?: string;
@@ -955,10 +926,6 @@ export type SuperplaneMeUser = {
 
 export type SuperplaneOrganizationsRemoveUserResponse = {
     [key: string]: unknown;
-};
-
-export type SuperplaneOutputBranch = {
-    name?: string;
 };
 
 export type SuperplaneOutputDefinition = {
@@ -1037,10 +1004,6 @@ export type SuperplaneStageStatus = {
     queue?: StatusQueue;
 };
 
-export type SuperplaneUpdateBlueprintResponse = {
-    blueprint?: SuperplaneBlueprint;
-};
-
 export type SuperplaneUpdateConnectionGroupBody = {
     connectionGroup?: SuperplaneConnectionGroup;
 };
@@ -1064,10 +1027,6 @@ export type SuperplaneUpdateStageBody = {
 
 export type SuperplaneUpdateStageResponse = {
     stage?: SuperplaneStage;
-};
-
-export type SuperplaneUpdateWorkflowResponse = {
-    workflow?: SuperplaneWorkflow;
 };
 
 export type SuperplaneUsersUser = {
@@ -1101,91 +1060,6 @@ export type SuperplaneValueFromSecret = {
     domainType?: AuthorizationDomainType;
     name?: string;
     key?: string;
-};
-
-export type SuperplaneWorkflow = {
-    id?: string;
-    organizationId?: string;
-    name?: string;
-    description?: string;
-    createdAt?: string;
-    updatedAt?: string;
-    nodes?: Array<SuperplaneWorkflowNode>;
-    edges?: Array<SuperplaneWorkflowEdge>;
-};
-
-export type SuperplaneWorkflowEdge = {
-    sourceId?: string;
-    targetId?: string;
-    branch?: string;
-};
-
-export type SuperplaneWorkflowEvent = {
-    id?: string;
-    workflowId?: string;
-    parentEventId?: string;
-    blueprintName?: string;
-    data?: {
-        [key: string]: unknown;
-    };
-    state?: string;
-    createdAt?: string;
-    updatedAt?: string;
-};
-
-export type SuperplaneWorkflowNode = {
-    id?: string;
-    name?: string;
-    refType?: SuperplaneWorkflowNodeRefType;
-    component?: SuperplaneWorkflowNodeComponentRef;
-    blueprint?: WorkflowNodeBlueprintRef;
-    configuration?: {
-        [key: string]: unknown;
-    };
-};
-
-export type SuperplaneWorkflowNodeComponentRef = {
-    name?: string;
-};
-
-export type SuperplaneWorkflowNodeExecution = {
-    id?: string;
-    eventId?: string;
-    workflowId?: string;
-    nodeId?: string;
-    state?: SuperplaneWorkflowNodeExecutionState;
-    result?: SuperplaneWorkflowNodeExecutionResult;
-    resultReason?: SuperplaneWorkflowNodeExecutionResultReason;
-    resultMessage?: string;
-    inputs?: {
-        [key: string]: unknown;
-    };
-    outputs?: {
-        [key: string]: unknown;
-    };
-    createdAt?: string;
-    updatedAt?: string;
-    event?: SuperplaneWorkflowEvent;
-    metadata?: {
-        [key: string]: unknown;
-    };
-    configuration?: {
-        [key: string]: unknown;
-    };
-};
-
-export type SuperplaneWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
-
-export type SuperplaneWorkflowNodeExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR';
-
-export type SuperplaneWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_FINISHED';
-
-export type SuperplaneWorkflowNodeRefType = 'REF_TYPE_COMPONENT' | 'REF_TYPE_BLUEPRINT';
-
-export type SuperplaneWorkflowQueueItem = {
-    eventId?: string;
-    createdAt?: string;
-    event?: SuperplaneWorkflowEvent;
 };
 
 export type UsersAccountProvider = {
@@ -1245,14 +1119,141 @@ export type WorkflowNodeBlueprintRef = {
     name?: string;
 };
 
+export type WorkflowsCreateWorkflowRequest = {
+    workflow?: WorkflowsWorkflow;
+};
+
+export type WorkflowsCreateWorkflowResponse = {
+    workflow?: WorkflowsWorkflow;
+};
+
+export type WorkflowsDeleteWorkflowResponse = {
+    [key: string]: unknown;
+};
+
+export type WorkflowsDescribeWorkflowResponse = {
+    workflow?: WorkflowsWorkflow;
+};
+
 export type WorkflowsInvokeNodeExecutionActionBody = {
     parameters?: {
         [key: string]: unknown;
     };
 };
 
+export type WorkflowsInvokeNodeExecutionActionResponse = {
+    [key: string]: unknown;
+};
+
+export type WorkflowsListNodeExecutionsResponse = {
+    executions?: Array<WorkflowsWorkflowNodeExecution>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
+};
+
+export type WorkflowsListNodeQueueItemsResponse = {
+    queueItems?: Array<WorkflowsWorkflowQueueItem>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
+};
+
+export type WorkflowsListWorkflowsResponse = {
+    workflows?: Array<WorkflowsWorkflow>;
+};
+
 export type WorkflowsUpdateWorkflowBody = {
-    workflow?: SuperplaneWorkflow;
+    workflow?: WorkflowsWorkflow;
+};
+
+export type WorkflowsUpdateWorkflowResponse = {
+    workflow?: WorkflowsWorkflow;
+};
+
+export type WorkflowsWorkflow = {
+    id?: string;
+    organizationId?: string;
+    name?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    nodes?: Array<WorkflowsWorkflowNode>;
+    edges?: Array<WorkflowsWorkflowEdge>;
+};
+
+export type WorkflowsWorkflowEdge = {
+    sourceId?: string;
+    targetId?: string;
+    branch?: string;
+};
+
+export type WorkflowsWorkflowEvent = {
+    id?: string;
+    workflowId?: string;
+    parentEventId?: string;
+    blueprintName?: string;
+    data?: {
+        [key: string]: unknown;
+    };
+    state?: string;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type WorkflowsWorkflowNode = {
+    id?: string;
+    name?: string;
+    refType?: WorkflowsWorkflowNodeRefType;
+    component?: WorkflowsWorkflowNodeComponentRef;
+    blueprint?: WorkflowNodeBlueprintRef;
+    configuration?: {
+        [key: string]: unknown;
+    };
+};
+
+export type WorkflowsWorkflowNodeComponentRef = {
+    name?: string;
+};
+
+export type WorkflowsWorkflowNodeExecution = {
+    id?: string;
+    eventId?: string;
+    workflowId?: string;
+    nodeId?: string;
+    state?: WorkflowsWorkflowNodeExecutionState;
+    result?: WorkflowsWorkflowNodeExecutionResult;
+    resultReason?: WorkflowsWorkflowNodeExecutionResultReason;
+    resultMessage?: string;
+    inputs?: {
+        [key: string]: unknown;
+    };
+    outputs?: {
+        [key: string]: unknown;
+    };
+    createdAt?: string;
+    updatedAt?: string;
+    event?: WorkflowsWorkflowEvent;
+    metadata?: {
+        [key: string]: unknown;
+    };
+    configuration?: {
+        [key: string]: unknown;
+    };
+};
+
+export type WorkflowsWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
+
+export type WorkflowsWorkflowNodeExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR';
+
+export type WorkflowsWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_FINISHED';
+
+export type WorkflowsWorkflowNodeRefType = 'REF_TYPE_COMPONENT' | 'REF_TYPE_BLUEPRINT';
+
+export type WorkflowsWorkflowQueueItem = {
+    eventId?: string;
+    createdAt?: string;
+    event?: WorkflowsWorkflowEvent;
 };
 
 export type GooglerpcStatus = {
@@ -1296,13 +1297,13 @@ export type BlueprintsListBlueprintsResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneListBlueprintsResponse;
+    200: BlueprintsListBlueprintsResponse;
 };
 
-export type BlueprintsListBlueprintsResponse = BlueprintsListBlueprintsResponses[keyof BlueprintsListBlueprintsResponses];
+export type BlueprintsListBlueprintsResponse2 = BlueprintsListBlueprintsResponses[keyof BlueprintsListBlueprintsResponses];
 
 export type BlueprintsCreateBlueprintData = {
-    body: SuperplaneCreateBlueprintRequest;
+    body: BlueprintsCreateBlueprintRequest;
     path?: never;
     query?: never;
     url: '/api/v1/blueprints';
@@ -1321,10 +1322,10 @@ export type BlueprintsCreateBlueprintResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneCreateBlueprintResponse;
+    200: BlueprintsCreateBlueprintResponse;
 };
 
-export type BlueprintsCreateBlueprintResponse = BlueprintsCreateBlueprintResponses[keyof BlueprintsCreateBlueprintResponses];
+export type BlueprintsCreateBlueprintResponse2 = BlueprintsCreateBlueprintResponses[keyof BlueprintsCreateBlueprintResponses];
 
 export type BlueprintsDescribeBlueprintData = {
     body?: never;
@@ -1348,10 +1349,10 @@ export type BlueprintsDescribeBlueprintResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneDescribeBlueprintResponse;
+    200: BlueprintsDescribeBlueprintResponse;
 };
 
-export type BlueprintsDescribeBlueprintResponse = BlueprintsDescribeBlueprintResponses[keyof BlueprintsDescribeBlueprintResponses];
+export type BlueprintsDescribeBlueprintResponse2 = BlueprintsDescribeBlueprintResponses[keyof BlueprintsDescribeBlueprintResponses];
 
 export type BlueprintsUpdateBlueprintData = {
     body: BlueprintsUpdateBlueprintBody;
@@ -1375,10 +1376,10 @@ export type BlueprintsUpdateBlueprintResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneUpdateBlueprintResponse;
+    200: BlueprintsUpdateBlueprintResponse;
 };
 
-export type BlueprintsUpdateBlueprintResponse = BlueprintsUpdateBlueprintResponses[keyof BlueprintsUpdateBlueprintResponses];
+export type BlueprintsUpdateBlueprintResponse2 = BlueprintsUpdateBlueprintResponses[keyof BlueprintsUpdateBlueprintResponses];
 
 export type SuperplaneListCanvasesData = {
     body?: never;
@@ -2335,10 +2336,10 @@ export type ComponentsListComponentsResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneListComponentsResponse;
+    200: ComponentsListComponentsResponse;
 };
 
-export type ComponentsListComponentsResponse = ComponentsListComponentsResponses[keyof ComponentsListComponentsResponses];
+export type ComponentsListComponentsResponse2 = ComponentsListComponentsResponses[keyof ComponentsListComponentsResponses];
 
 export type ComponentsDescribeComponentData = {
     body?: never;
@@ -2362,10 +2363,10 @@ export type ComponentsDescribeComponentResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneDescribeComponentResponse;
+    200: ComponentsDescribeComponentResponse;
 };
 
-export type ComponentsDescribeComponentResponse = ComponentsDescribeComponentResponses[keyof ComponentsDescribeComponentResponses];
+export type ComponentsDescribeComponentResponse2 = ComponentsDescribeComponentResponses[keyof ComponentsDescribeComponentResponses];
 
 export type ComponentsListComponentActionsData = {
     body?: never;
@@ -2389,10 +2390,10 @@ export type ComponentsListComponentActionsResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneListComponentActionsResponse;
+    200: ComponentsListComponentActionsResponse;
 };
 
-export type ComponentsListComponentActionsResponse = ComponentsListComponentActionsResponses[keyof ComponentsListComponentActionsResponses];
+export type ComponentsListComponentActionsResponse2 = ComponentsListComponentActionsResponses[keyof ComponentsListComponentActionsResponses];
 
 export type GroupsListGroupsData = {
     body?: never;
@@ -3356,13 +3357,13 @@ export type WorkflowsListWorkflowsResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneListWorkflowsResponse;
+    200: WorkflowsListWorkflowsResponse;
 };
 
-export type WorkflowsListWorkflowsResponse = WorkflowsListWorkflowsResponses[keyof WorkflowsListWorkflowsResponses];
+export type WorkflowsListWorkflowsResponse2 = WorkflowsListWorkflowsResponses[keyof WorkflowsListWorkflowsResponses];
 
 export type WorkflowsCreateWorkflowData = {
-    body: SuperplaneCreateWorkflowRequest;
+    body: WorkflowsCreateWorkflowRequest;
     path?: never;
     query?: never;
     url: '/api/v1/workflows';
@@ -3381,10 +3382,10 @@ export type WorkflowsCreateWorkflowResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneCreateWorkflowResponse;
+    200: WorkflowsCreateWorkflowResponse;
 };
 
-export type WorkflowsCreateWorkflowResponse = WorkflowsCreateWorkflowResponses[keyof WorkflowsCreateWorkflowResponses];
+export type WorkflowsCreateWorkflowResponse2 = WorkflowsCreateWorkflowResponses[keyof WorkflowsCreateWorkflowResponses];
 
 export type WorkflowsInvokeNodeExecutionActionData = {
     body: WorkflowsInvokeNodeExecutionActionBody;
@@ -3409,10 +3410,10 @@ export type WorkflowsInvokeNodeExecutionActionResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneInvokeNodeExecutionActionResponse;
+    200: WorkflowsInvokeNodeExecutionActionResponse;
 };
 
-export type WorkflowsInvokeNodeExecutionActionResponse = WorkflowsInvokeNodeExecutionActionResponses[keyof WorkflowsInvokeNodeExecutionActionResponses];
+export type WorkflowsInvokeNodeExecutionActionResponse2 = WorkflowsInvokeNodeExecutionActionResponses[keyof WorkflowsInvokeNodeExecutionActionResponses];
 
 export type WorkflowsDeleteWorkflowData = {
     body?: never;
@@ -3436,10 +3437,10 @@ export type WorkflowsDeleteWorkflowResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneDeleteWorkflowResponse;
+    200: WorkflowsDeleteWorkflowResponse;
 };
 
-export type WorkflowsDeleteWorkflowResponse = WorkflowsDeleteWorkflowResponses[keyof WorkflowsDeleteWorkflowResponses];
+export type WorkflowsDeleteWorkflowResponse2 = WorkflowsDeleteWorkflowResponses[keyof WorkflowsDeleteWorkflowResponses];
 
 export type WorkflowsDescribeWorkflowData = {
     body?: never;
@@ -3463,10 +3464,10 @@ export type WorkflowsDescribeWorkflowResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneDescribeWorkflowResponse;
+    200: WorkflowsDescribeWorkflowResponse;
 };
 
-export type WorkflowsDescribeWorkflowResponse = WorkflowsDescribeWorkflowResponses[keyof WorkflowsDescribeWorkflowResponses];
+export type WorkflowsDescribeWorkflowResponse2 = WorkflowsDescribeWorkflowResponses[keyof WorkflowsDescribeWorkflowResponses];
 
 export type WorkflowsUpdateWorkflowData = {
     body: WorkflowsUpdateWorkflowBody;
@@ -3490,10 +3491,10 @@ export type WorkflowsUpdateWorkflowResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneUpdateWorkflowResponse;
+    200: WorkflowsUpdateWorkflowResponse;
 };
 
-export type WorkflowsUpdateWorkflowResponse = WorkflowsUpdateWorkflowResponses[keyof WorkflowsUpdateWorkflowResponses];
+export type WorkflowsUpdateWorkflowResponse2 = WorkflowsUpdateWorkflowResponses[keyof WorkflowsUpdateWorkflowResponses];
 
 export type WorkflowsListNodeExecutionsData = {
     body?: never;
@@ -3523,10 +3524,10 @@ export type WorkflowsListNodeExecutionsResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneListNodeExecutionsResponse;
+    200: WorkflowsListNodeExecutionsResponse;
 };
 
-export type WorkflowsListNodeExecutionsResponse = WorkflowsListNodeExecutionsResponses[keyof WorkflowsListNodeExecutionsResponses];
+export type WorkflowsListNodeExecutionsResponse2 = WorkflowsListNodeExecutionsResponses[keyof WorkflowsListNodeExecutionsResponses];
 
 export type WorkflowsListNodeQueueItemsData = {
     body?: never;
@@ -3554,10 +3555,10 @@ export type WorkflowsListNodeQueueItemsResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneListNodeQueueItemsResponse;
+    200: WorkflowsListNodeQueueItemsResponse;
 };
 
-export type WorkflowsListNodeQueueItemsResponse = WorkflowsListNodeQueueItemsResponses[keyof WorkflowsListNodeQueueItemsResponses];
+export type WorkflowsListNodeQueueItemsResponse2 = WorkflowsListNodeQueueItemsResponses[keyof WorkflowsListNodeQueueItemsResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

@@ -691,35 +691,34 @@ var File_components_proto protoreflect.FileDescriptor
 
 const file_components_proto_rawDesc = "" +
 	"\n" +
-	"\x10components.proto\x12\n" +
-	"Superplane\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x17\n" +
-	"\x15ListComponentsRequest\"O\n" +
-	"\x16ListComponentsResponse\x125\n" +
+	"\x10components.proto\x12\x15Superplane.Components\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x17\n" +
+	"\x15ListComponentsRequest\"Z\n" +
+	"\x16ListComponentsResponse\x12@\n" +
 	"\n" +
-	"components\x18\x01 \x03(\v2\x15.Superplane.ComponentR\n" +
+	"components\x18\x01 \x03(\v2 .Superplane.Components.ComponentR\n" +
 	"components\".\n" +
 	"\x18DescribeComponentRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"P\n" +
-	"\x19DescribeComponentResponse\x123\n" +
-	"\tcomponent\x18\x01 \x01(\v2\x15.Superplane.ComponentR\tcomponent\"\xd3\x01\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"[\n" +
+	"\x19DescribeComponentResponse\x12>\n" +
+	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xe9\x01\n" +
 	"\tComponent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12D\n" +
-	"\rconfiguration\x18\x04 \x03(\v2\x1e.Superplane.ConfigurationFieldR\rconfiguration\x124\n" +
-	"\bbranches\x18\x05 \x03(\v2\x18.Superplane.OutputBranchR\bbranches\"\xc5\x03\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12O\n" +
+	"\rconfiguration\x18\x04 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12?\n" +
+	"\bbranches\x18\x05 \x03(\v2#.Superplane.Components.OutputBranchR\bbranches\"\xe6\x03\n" +
 	"\x12ConfigurationField\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1a\n" +
 	"\brequired\x18\x04 \x01(\bR\brequired\x12(\n" +
-	"\rdefault_value\x18\x05 \x01(\tH\x00R\fdefaultValue\x88\x01\x01\x121\n" +
-	"\aoptions\x18\x06 \x03(\v2\x17.Superplane.FieldOptionR\aoptions\x12\x15\n" +
+	"\rdefault_value\x18\x05 \x01(\tH\x00R\fdefaultValue\x88\x01\x01\x12<\n" +
+	"\aoptions\x18\x06 \x03(\v2\".Superplane.Components.FieldOptionR\aoptions\x12\x15\n" +
 	"\x03min\x18\a \x01(\x05H\x01R\x03min\x88\x01\x01\x12\x15\n" +
-	"\x03max\x18\b \x01(\x05H\x02R\x03max\x88\x01\x01\x12@\n" +
-	"\tlist_item\x18\t \x01(\v2\x1e.Superplane.ListItemDefinitionH\x03R\blistItem\x88\x01\x01\x126\n" +
+	"\x03max\x18\b \x01(\x05H\x02R\x03max\x88\x01\x01\x12K\n" +
+	"\tlist_item\x18\t \x01(\v2).Superplane.Components.ListItemDefinitionH\x03R\blistItem\x88\x01\x01\x12A\n" +
 	"\x06schema\x18\n" +
-	" \x03(\v2\x1e.Superplane.ConfigurationFieldR\x06schema\x12\x14\n" +
+	" \x03(\v2).Superplane.Components.ConfigurationFieldR\x06schema\x12\x14\n" +
 	"\x05label\x18\v \x01(\tR\x05labelB\x10\n" +
 	"\x0e_default_valueB\x06\n" +
 	"\x04_minB\x06\n" +
@@ -728,29 +727,29 @@ const file_components_proto_rawDesc = "" +
 	"_list_item\"9\n" +
 	"\vFieldOption\x12\x14\n" +
 	"\x05label\x18\x01 \x01(\tR\x05label\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"`\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"k\n" +
 	"\x12ListItemDefinition\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x126\n" +
-	"\x06schema\x18\x02 \x03(\v2\x1e.Superplane.ConfigurationFieldR\x06schema\"\"\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12A\n" +
+	"\x06schema\x18\x02 \x03(\v2).Superplane.Components.ConfigurationFieldR\x06schema\"\"\n" +
 	"\fOutputBranch\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"1\n" +
 	"\x1bListComponentActionsRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"\x87\x01\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x92\x01\n" +
 	"\x0fComponentAction\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x02 \x01(\tR\vdescription\x12>\n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12I\n" +
 	"\n" +
-	"parameters\x18\x03 \x03(\v2\x1e.Superplane.ConfigurationFieldR\n" +
-	"parameters\"U\n" +
-	"\x1cListComponentActionsResponse\x125\n" +
-	"\aactions\x18\x01 \x03(\v2\x1b.Superplane.ComponentActionR\aactions2\xf4\x04\n" +
+	"parameters\x18\x03 \x03(\v2).Superplane.Components.ConfigurationFieldR\n" +
+	"parameters\"`\n" +
+	"\x1cListComponentActionsResponse\x12@\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions2\xb6\x05\n" +
 	"\n" +
-	"Components\x12\xb4\x01\n" +
-	"\x0eListComponents\x12!.Superplane.ListComponentsRequest\x1a\".Superplane.ListComponentsResponse\"[\x92A>\n" +
-	"\tComponent\x12\x0fList components\x1a Returns a list of all components\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/components\x12\xc6\x01\n" +
-	"\x11DescribeComponent\x12$.Superplane.DescribeComponentRequest\x1a%.Superplane.DescribeComponentResponse\"d\x92A@\n" +
-	"\tComponent\x12\x12Describe component\x1a\x1fReturns a component by its name\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/components/{name}\x12\xe5\x01\n" +
-	"\x14ListComponentActions\x12'.Superplane.ListComponentActionsRequest\x1a(.Superplane.ListComponentActionsResponse\"z\x92AN\n" +
+	"Components\x12\xca\x01\n" +
+	"\x0eListComponents\x12,.Superplane.Components.ListComponentsRequest\x1a-.Superplane.Components.ListComponentsResponse\"[\x92A>\n" +
+	"\tComponent\x12\x0fList components\x1a Returns a list of all components\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/components\x12\xdc\x01\n" +
+	"\x11DescribeComponent\x12/.Superplane.Components.DescribeComponentRequest\x1a0.Superplane.Components.DescribeComponentResponse\"d\x92A@\n" +
+	"\tComponent\x12\x12Describe component\x1a\x1fReturns a component by its name\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/components/{name}\x12\xfb\x01\n" +
+	"\x14ListComponentActions\x122.Superplane.Components.ListComponentActionsRequest\x1a3.Superplane.Components.ListComponentActionsResponse\"z\x92AN\n" +
 	"\tComponent\x12\x16List component actions\x1a)Returns available actions for a component\x82\xd3\xe4\x93\x02#\x12!/api/v1/components/{name}/actionsB\xce\x01\x92A\x90\x01\x12f\n" +
 	"\x19Superplane Components API\x12\x1dAPI for Superplane Components\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/componentsb\x06proto3"
@@ -769,36 +768,36 @@ func file_components_proto_rawDescGZIP() []byte {
 
 var file_components_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_components_proto_goTypes = []any{
-	(*ListComponentsRequest)(nil),        // 0: Superplane.ListComponentsRequest
-	(*ListComponentsResponse)(nil),       // 1: Superplane.ListComponentsResponse
-	(*DescribeComponentRequest)(nil),     // 2: Superplane.DescribeComponentRequest
-	(*DescribeComponentResponse)(nil),    // 3: Superplane.DescribeComponentResponse
-	(*Component)(nil),                    // 4: Superplane.Component
-	(*ConfigurationField)(nil),           // 5: Superplane.ConfigurationField
-	(*FieldOption)(nil),                  // 6: Superplane.FieldOption
-	(*ListItemDefinition)(nil),           // 7: Superplane.ListItemDefinition
-	(*OutputBranch)(nil),                 // 8: Superplane.OutputBranch
-	(*ListComponentActionsRequest)(nil),  // 9: Superplane.ListComponentActionsRequest
-	(*ComponentAction)(nil),              // 10: Superplane.ComponentAction
-	(*ListComponentActionsResponse)(nil), // 11: Superplane.ListComponentActionsResponse
+	(*ListComponentsRequest)(nil),        // 0: Superplane.Components.ListComponentsRequest
+	(*ListComponentsResponse)(nil),       // 1: Superplane.Components.ListComponentsResponse
+	(*DescribeComponentRequest)(nil),     // 2: Superplane.Components.DescribeComponentRequest
+	(*DescribeComponentResponse)(nil),    // 3: Superplane.Components.DescribeComponentResponse
+	(*Component)(nil),                    // 4: Superplane.Components.Component
+	(*ConfigurationField)(nil),           // 5: Superplane.Components.ConfigurationField
+	(*FieldOption)(nil),                  // 6: Superplane.Components.FieldOption
+	(*ListItemDefinition)(nil),           // 7: Superplane.Components.ListItemDefinition
+	(*OutputBranch)(nil),                 // 8: Superplane.Components.OutputBranch
+	(*ListComponentActionsRequest)(nil),  // 9: Superplane.Components.ListComponentActionsRequest
+	(*ComponentAction)(nil),              // 10: Superplane.Components.ComponentAction
+	(*ListComponentActionsResponse)(nil), // 11: Superplane.Components.ListComponentActionsResponse
 }
 var file_components_proto_depIdxs = []int32{
-	4,  // 0: Superplane.ListComponentsResponse.components:type_name -> Superplane.Component
-	4,  // 1: Superplane.DescribeComponentResponse.component:type_name -> Superplane.Component
-	5,  // 2: Superplane.Component.configuration:type_name -> Superplane.ConfigurationField
-	8,  // 3: Superplane.Component.branches:type_name -> Superplane.OutputBranch
-	6,  // 4: Superplane.ConfigurationField.options:type_name -> Superplane.FieldOption
-	7,  // 5: Superplane.ConfigurationField.list_item:type_name -> Superplane.ListItemDefinition
-	5,  // 6: Superplane.ConfigurationField.schema:type_name -> Superplane.ConfigurationField
-	5,  // 7: Superplane.ListItemDefinition.schema:type_name -> Superplane.ConfigurationField
-	5,  // 8: Superplane.ComponentAction.parameters:type_name -> Superplane.ConfigurationField
-	10, // 9: Superplane.ListComponentActionsResponse.actions:type_name -> Superplane.ComponentAction
-	0,  // 10: Superplane.Components.ListComponents:input_type -> Superplane.ListComponentsRequest
-	2,  // 11: Superplane.Components.DescribeComponent:input_type -> Superplane.DescribeComponentRequest
-	9,  // 12: Superplane.Components.ListComponentActions:input_type -> Superplane.ListComponentActionsRequest
-	1,  // 13: Superplane.Components.ListComponents:output_type -> Superplane.ListComponentsResponse
-	3,  // 14: Superplane.Components.DescribeComponent:output_type -> Superplane.DescribeComponentResponse
-	11, // 15: Superplane.Components.ListComponentActions:output_type -> Superplane.ListComponentActionsResponse
+	4,  // 0: Superplane.Components.ListComponentsResponse.components:type_name -> Superplane.Components.Component
+	4,  // 1: Superplane.Components.DescribeComponentResponse.component:type_name -> Superplane.Components.Component
+	5,  // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Components.ConfigurationField
+	8,  // 3: Superplane.Components.Component.branches:type_name -> Superplane.Components.OutputBranch
+	6,  // 4: Superplane.Components.ConfigurationField.options:type_name -> Superplane.Components.FieldOption
+	7,  // 5: Superplane.Components.ConfigurationField.list_item:type_name -> Superplane.Components.ListItemDefinition
+	5,  // 6: Superplane.Components.ConfigurationField.schema:type_name -> Superplane.Components.ConfigurationField
+	5,  // 7: Superplane.Components.ListItemDefinition.schema:type_name -> Superplane.Components.ConfigurationField
+	5,  // 8: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Components.ConfigurationField
+	10, // 9: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
+	0,  // 10: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
+	2,  // 11: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
+	9,  // 12: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
+	1,  // 13: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
+	3,  // 14: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
+	11, // 15: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
 	13, // [13:16] is the sub-list for method output_type
 	10, // [10:13] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name

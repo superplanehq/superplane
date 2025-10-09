@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package Superplane;
+package Superplane.Components;
 
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";

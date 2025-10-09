@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package Superplane;
+package Superplane.Workflows;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";

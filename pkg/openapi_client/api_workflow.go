@@ -27,15 +27,15 @@ type WorkflowAPIService service
 type ApiWorkflowsCreateWorkflowRequest struct {
 	ctx context.Context
 	ApiService *WorkflowAPIService
-	body *SuperplaneCreateWorkflowRequest
+	body *WorkflowsCreateWorkflowRequest
 }
 
-func (r ApiWorkflowsCreateWorkflowRequest) Body(body SuperplaneCreateWorkflowRequest) ApiWorkflowsCreateWorkflowRequest {
+func (r ApiWorkflowsCreateWorkflowRequest) Body(body WorkflowsCreateWorkflowRequest) ApiWorkflowsCreateWorkflowRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiWorkflowsCreateWorkflowRequest) Execute() (*SuperplaneCreateWorkflowResponse, *http.Response, error) {
+func (r ApiWorkflowsCreateWorkflowRequest) Execute() (*WorkflowsCreateWorkflowResponse, *http.Response, error) {
 	return r.ApiService.WorkflowsCreateWorkflowExecute(r)
 }
 
@@ -55,13 +55,13 @@ func (a *WorkflowAPIService) WorkflowsCreateWorkflow(ctx context.Context) ApiWor
 }
 
 // Execute executes the request
-//  @return SuperplaneCreateWorkflowResponse
-func (a *WorkflowAPIService) WorkflowsCreateWorkflowExecute(r ApiWorkflowsCreateWorkflowRequest) (*SuperplaneCreateWorkflowResponse, *http.Response, error) {
+//  @return WorkflowsCreateWorkflowResponse
+func (a *WorkflowAPIService) WorkflowsCreateWorkflowExecute(r ApiWorkflowsCreateWorkflowRequest) (*WorkflowsCreateWorkflowResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneCreateWorkflowResponse
+		localVarReturnValue  *WorkflowsCreateWorkflowResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsCreateWorkflow")
@@ -259,7 +259,7 @@ type ApiWorkflowsDescribeWorkflowRequest struct {
 	id string
 }
 
-func (r ApiWorkflowsDescribeWorkflowRequest) Execute() (*SuperplaneDescribeWorkflowResponse, *http.Response, error) {
+func (r ApiWorkflowsDescribeWorkflowRequest) Execute() (*WorkflowsDescribeWorkflowResponse, *http.Response, error) {
 	return r.ApiService.WorkflowsDescribeWorkflowExecute(r)
 }
 
@@ -281,13 +281,13 @@ func (a *WorkflowAPIService) WorkflowsDescribeWorkflow(ctx context.Context, id s
 }
 
 // Execute executes the request
-//  @return SuperplaneDescribeWorkflowResponse
-func (a *WorkflowAPIService) WorkflowsDescribeWorkflowExecute(r ApiWorkflowsDescribeWorkflowRequest) (*SuperplaneDescribeWorkflowResponse, *http.Response, error) {
+//  @return WorkflowsDescribeWorkflowResponse
+func (a *WorkflowAPIService) WorkflowsDescribeWorkflowExecute(r ApiWorkflowsDescribeWorkflowRequest) (*WorkflowsDescribeWorkflowResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneDescribeWorkflowResponse
+		localVarReturnValue  *WorkflowsDescribeWorkflowResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsDescribeWorkflow")
@@ -369,7 +369,7 @@ type ApiWorkflowsListWorkflowsRequest struct {
 	ApiService *WorkflowAPIService
 }
 
-func (r ApiWorkflowsListWorkflowsRequest) Execute() (*SuperplaneListWorkflowsResponse, *http.Response, error) {
+func (r ApiWorkflowsListWorkflowsRequest) Execute() (*WorkflowsListWorkflowsResponse, *http.Response, error) {
 	return r.ApiService.WorkflowsListWorkflowsExecute(r)
 }
 
@@ -389,13 +389,13 @@ func (a *WorkflowAPIService) WorkflowsListWorkflows(ctx context.Context) ApiWork
 }
 
 // Execute executes the request
-//  @return SuperplaneListWorkflowsResponse
-func (a *WorkflowAPIService) WorkflowsListWorkflowsExecute(r ApiWorkflowsListWorkflowsRequest) (*SuperplaneListWorkflowsResponse, *http.Response, error) {
+//  @return WorkflowsListWorkflowsResponse
+func (a *WorkflowAPIService) WorkflowsListWorkflowsExecute(r ApiWorkflowsListWorkflowsRequest) (*WorkflowsListWorkflowsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListWorkflowsResponse
+		localVarReturnValue  *WorkflowsListWorkflowsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsListWorkflows")
@@ -483,7 +483,7 @@ func (r ApiWorkflowsUpdateWorkflowRequest) Body(body WorkflowsUpdateWorkflowBody
 	return r
 }
 
-func (r ApiWorkflowsUpdateWorkflowRequest) Execute() (*SuperplaneUpdateWorkflowResponse, *http.Response, error) {
+func (r ApiWorkflowsUpdateWorkflowRequest) Execute() (*WorkflowsUpdateWorkflowResponse, *http.Response, error) {
 	return r.ApiService.WorkflowsUpdateWorkflowExecute(r)
 }
 
@@ -505,13 +505,13 @@ func (a *WorkflowAPIService) WorkflowsUpdateWorkflow(ctx context.Context, id str
 }
 
 // Execute executes the request
-//  @return SuperplaneUpdateWorkflowResponse
-func (a *WorkflowAPIService) WorkflowsUpdateWorkflowExecute(r ApiWorkflowsUpdateWorkflowRequest) (*SuperplaneUpdateWorkflowResponse, *http.Response, error) {
+//  @return WorkflowsUpdateWorkflowResponse
+func (a *WorkflowAPIService) WorkflowsUpdateWorkflowExecute(r ApiWorkflowsUpdateWorkflowRequest) (*WorkflowsUpdateWorkflowResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPut
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneUpdateWorkflowResponse
+		localVarReturnValue  *WorkflowsUpdateWorkflowResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowAPIService.WorkflowsUpdateWorkflow")

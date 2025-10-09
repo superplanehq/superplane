@@ -10,6 +10,7 @@ import (
 	_struct "github.com/golang/protobuf/ptypes/struct"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
+	components "github.com/superplanehq/superplane/pkg/protos/components"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -421,15 +422,16 @@ func (x *UpdateBlueprintResponse) GetBlueprint() *Blueprint {
 }
 
 type Blueprint struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Name           string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Description    string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt      *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	Nodes          []*BlueprintNode       `protobuf:"bytes,7,rep,name=nodes,proto3" json:"nodes,omitempty"`
-	Edges          []*BlueprintEdge       `protobuf:"bytes,8,rep,name=edges,proto3" json:"edges,omitempty"`
+	state          protoimpl.MessageState           `protogen:"open.v1"`
+	Id             string                           `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrganizationId string                           `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Name           string                           `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Description    string                           `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedAt      *timestamp.Timestamp             `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      *timestamp.Timestamp             `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Nodes          []*BlueprintNode                 `protobuf:"bytes,7,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	Edges          []*BlueprintEdge                 `protobuf:"bytes,8,rep,name=edges,proto3" json:"edges,omitempty"`
+	Configuration  []*components.ConfigurationField `protobuf:"bytes,9,rep,name=configuration,proto3" json:"configuration,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -520,11 +522,18 @@ func (x *Blueprint) GetEdges() []*BlueprintEdge {
 	return nil
 }
 
+func (x *Blueprint) GetConfiguration() []*components.ConfigurationField {
+	if x != nil {
+		return x.Configuration
+	}
+	return nil
+}
+
 type BlueprintNode struct {
 	state         protoimpl.MessageState      `protogen:"open.v1"`
 	Id            string                      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                      `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	RefType       BlueprintNode_RefType       `protobuf:"varint,3,opt,name=ref_type,json=refType,proto3,enum=Superplane.BlueprintNode_RefType" json:"ref_type,omitempty"`
+	RefType       BlueprintNode_RefType       `protobuf:"varint,3,opt,name=ref_type,json=refType,proto3,enum=Superplane.Blueprints.BlueprintNode_RefType" json:"ref_type,omitempty"`
 	Component     *BlueprintNode_ComponentRef `protobuf:"bytes,4,opt,name=component,proto3" json:"component,omitempty"`
 	Configuration *_struct.Struct             `protobuf:"bytes,5,opt,name=configuration,proto3" json:"configuration,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -704,26 +713,25 @@ var File_blueprints_proto protoreflect.FileDescriptor
 
 const file_blueprints_proto_rawDesc = "" +
 	"\n" +
-	"\x10blueprints.proto\x12\n" +
-	"Superplane\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x17\n" +
-	"\x15ListBlueprintsRequest\"O\n" +
-	"\x16ListBlueprintsResponse\x125\n" +
+	"\x10blueprints.proto\x12\x15Superplane.Blueprints\x1a\x10components.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x17\n" +
+	"\x15ListBlueprintsRequest\"Z\n" +
+	"\x16ListBlueprintsResponse\x12@\n" +
 	"\n" +
-	"blueprints\x18\x01 \x03(\v2\x15.Superplane.BlueprintR\n" +
+	"blueprints\x18\x01 \x03(\v2 .Superplane.Blueprints.BlueprintR\n" +
 	"blueprints\"*\n" +
 	"\x18DescribeBlueprintRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"P\n" +
-	"\x19DescribeBlueprintResponse\x123\n" +
-	"\tblueprint\x18\x01 \x01(\v2\x15.Superplane.BlueprintR\tblueprint\"M\n" +
-	"\x16CreateBlueprintRequest\x123\n" +
-	"\tblueprint\x18\x01 \x01(\v2\x15.Superplane.BlueprintR\tblueprint\"N\n" +
-	"\x17CreateBlueprintResponse\x123\n" +
-	"\tblueprint\x18\x01 \x01(\v2\x15.Superplane.BlueprintR\tblueprint\"]\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"[\n" +
+	"\x19DescribeBlueprintResponse\x12>\n" +
+	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"X\n" +
+	"\x16CreateBlueprintRequest\x12>\n" +
+	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"Y\n" +
+	"\x17CreateBlueprintResponse\x12>\n" +
+	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"h\n" +
 	"\x16UpdateBlueprintRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x123\n" +
-	"\tblueprint\x18\x02 \x01(\v2\x15.Superplane.BlueprintR\tblueprint\"N\n" +
-	"\x17UpdateBlueprintResponse\x123\n" +
-	"\tblueprint\x18\x01 \x01(\v2\x15.Superplane.BlueprintR\tblueprint\"\xd2\x02\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12>\n" +
+	"\tblueprint\x18\x02 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"Y\n" +
+	"\x17UpdateBlueprintResponse\x12>\n" +
+	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"\xb9\x03\n" +
 	"\tBlueprint\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x12\n" +
@@ -732,14 +740,15 @@ const file_blueprints_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12/\n" +
-	"\x05nodes\x18\a \x03(\v2\x19.Superplane.BlueprintNodeR\x05nodes\x12/\n" +
-	"\x05edges\x18\b \x03(\v2\x19.Superplane.BlueprintEdgeR\x05edges\"\xbd\x02\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12:\n" +
+	"\x05nodes\x18\a \x03(\v2$.Superplane.Blueprints.BlueprintNodeR\x05nodes\x12:\n" +
+	"\x05edges\x18\b \x03(\v2$.Superplane.Blueprints.BlueprintEdgeR\x05edges\x12O\n" +
+	"\rconfiguration\x18\t \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\"\xd3\x02\n" +
 	"\rBlueprintNode\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12<\n" +
-	"\bref_type\x18\x03 \x01(\x0e2!.Superplane.BlueprintNode.RefTypeR\arefType\x12D\n" +
-	"\tcomponent\x18\x04 \x01(\v2&.Superplane.BlueprintNode.ComponentRefR\tcomponent\x12=\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12G\n" +
+	"\bref_type\x18\x03 \x01(\x0e2,.Superplane.Blueprints.BlueprintNode.RefTypeR\arefType\x12O\n" +
+	"\tcomponent\x18\x04 \x01(\v21.Superplane.Blueprints.BlueprintNode.ComponentRefR\tcomponent\x12=\n" +
 	"\rconfiguration\x18\x05 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x1a\"\n" +
 	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"!\n" +
@@ -748,16 +757,16 @@ const file_blueprints_proto_rawDesc = "" +
 	"\rBlueprintEdge\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x16\n" +
-	"\x06branch\x18\x03 \x01(\tR\x06branch2\xf3\x05\n" +
+	"\x06branch\x18\x03 \x01(\tR\x06branch2\xcb\x06\n" +
 	"\n" +
-	"Blueprints\x12\xb4\x01\n" +
-	"\x0eListBlueprints\x12!.Superplane.ListBlueprintsRequest\x1a\".Superplane.ListBlueprintsResponse\"[\x92A>\n" +
-	"\tBlueprint\x12\x0fList blueprints\x1a Returns a list of all blueprints\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/blueprints\x12\xb8\x01\n" +
-	"\x11DescribeBlueprint\x12$.Superplane.DescribeBlueprintRequest\x1a%.Superplane.DescribeBlueprintResponse\"V\x92A4\n" +
-	"\tBlueprint\x12\x12Describe blueprint\x1a\x13Returns a blueprint\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1/blueprints/{id}\x12\xb2\x01\n" +
-	"\x0fCreateBlueprint\x12\".Superplane.CreateBlueprintRequest\x1a#.Superplane.CreateBlueprintResponse\"V\x92A6\n" +
-	"\tBlueprint\x12\x10Create blueprint\x1a\x17Creates a new blueprint\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/blueprints\x12\xbd\x01\n" +
-	"\x0fUpdateBlueprint\x12\".Superplane.UpdateBlueprintRequest\x1a#.Superplane.UpdateBlueprintResponse\"a\x92A<\n" +
+	"Blueprints\x12\xca\x01\n" +
+	"\x0eListBlueprints\x12,.Superplane.Blueprints.ListBlueprintsRequest\x1a-.Superplane.Blueprints.ListBlueprintsResponse\"[\x92A>\n" +
+	"\tBlueprint\x12\x0fList blueprints\x1a Returns a list of all blueprints\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/blueprints\x12\xce\x01\n" +
+	"\x11DescribeBlueprint\x12/.Superplane.Blueprints.DescribeBlueprintRequest\x1a0.Superplane.Blueprints.DescribeBlueprintResponse\"V\x92A4\n" +
+	"\tBlueprint\x12\x12Describe blueprint\x1a\x13Returns a blueprint\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1/blueprints/{id}\x12\xc8\x01\n" +
+	"\x0fCreateBlueprint\x12-.Superplane.Blueprints.CreateBlueprintRequest\x1a..Superplane.Blueprints.CreateBlueprintResponse\"V\x92A6\n" +
+	"\tBlueprint\x12\x10Create blueprint\x1a\x17Creates a new blueprint\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/blueprints\x12\xd3\x01\n" +
+	"\x0fUpdateBlueprint\x12-.Superplane.Blueprints.UpdateBlueprintRequest\x1a..Superplane.Blueprints.UpdateBlueprintResponse\"a\x92A<\n" +
 	"\tBlueprint\x12\x10Update blueprint\x1a\x1dUpdates an existing blueprint\x82\xd3\xe4\x93\x02\x1c:\x01*2\x17/api/v1/blueprints/{id}B\xce\x01\x92A\x90\x01\x12f\n" +
 	"\x19Superplane Blueprints API\x12\x1dAPI for Superplane blueprints\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/blueprintsb\x06proto3"
@@ -777,49 +786,51 @@ func file_blueprints_proto_rawDescGZIP() []byte {
 var file_blueprints_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_blueprints_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_blueprints_proto_goTypes = []any{
-	(BlueprintNode_RefType)(0),         // 0: Superplane.BlueprintNode.RefType
-	(*ListBlueprintsRequest)(nil),      // 1: Superplane.ListBlueprintsRequest
-	(*ListBlueprintsResponse)(nil),     // 2: Superplane.ListBlueprintsResponse
-	(*DescribeBlueprintRequest)(nil),   // 3: Superplane.DescribeBlueprintRequest
-	(*DescribeBlueprintResponse)(nil),  // 4: Superplane.DescribeBlueprintResponse
-	(*CreateBlueprintRequest)(nil),     // 5: Superplane.CreateBlueprintRequest
-	(*CreateBlueprintResponse)(nil),    // 6: Superplane.CreateBlueprintResponse
-	(*UpdateBlueprintRequest)(nil),     // 7: Superplane.UpdateBlueprintRequest
-	(*UpdateBlueprintResponse)(nil),    // 8: Superplane.UpdateBlueprintResponse
-	(*Blueprint)(nil),                  // 9: Superplane.Blueprint
-	(*BlueprintNode)(nil),              // 10: Superplane.BlueprintNode
-	(*BlueprintEdge)(nil),              // 11: Superplane.BlueprintEdge
-	(*BlueprintNode_ComponentRef)(nil), // 12: Superplane.BlueprintNode.ComponentRef
-	(*timestamp.Timestamp)(nil),        // 13: google.protobuf.Timestamp
-	(*_struct.Struct)(nil),             // 14: google.protobuf.Struct
+	(BlueprintNode_RefType)(0),            // 0: Superplane.Blueprints.BlueprintNode.RefType
+	(*ListBlueprintsRequest)(nil),         // 1: Superplane.Blueprints.ListBlueprintsRequest
+	(*ListBlueprintsResponse)(nil),        // 2: Superplane.Blueprints.ListBlueprintsResponse
+	(*DescribeBlueprintRequest)(nil),      // 3: Superplane.Blueprints.DescribeBlueprintRequest
+	(*DescribeBlueprintResponse)(nil),     // 4: Superplane.Blueprints.DescribeBlueprintResponse
+	(*CreateBlueprintRequest)(nil),        // 5: Superplane.Blueprints.CreateBlueprintRequest
+	(*CreateBlueprintResponse)(nil),       // 6: Superplane.Blueprints.CreateBlueprintResponse
+	(*UpdateBlueprintRequest)(nil),        // 7: Superplane.Blueprints.UpdateBlueprintRequest
+	(*UpdateBlueprintResponse)(nil),       // 8: Superplane.Blueprints.UpdateBlueprintResponse
+	(*Blueprint)(nil),                     // 9: Superplane.Blueprints.Blueprint
+	(*BlueprintNode)(nil),                 // 10: Superplane.Blueprints.BlueprintNode
+	(*BlueprintEdge)(nil),                 // 11: Superplane.Blueprints.BlueprintEdge
+	(*BlueprintNode_ComponentRef)(nil),    // 12: Superplane.Blueprints.BlueprintNode.ComponentRef
+	(*timestamp.Timestamp)(nil),           // 13: google.protobuf.Timestamp
+	(*components.ConfigurationField)(nil), // 14: Superplane.Components.ConfigurationField
+	(*_struct.Struct)(nil),                // 15: google.protobuf.Struct
 }
 var file_blueprints_proto_depIdxs = []int32{
-	9,  // 0: Superplane.ListBlueprintsResponse.blueprints:type_name -> Superplane.Blueprint
-	9,  // 1: Superplane.DescribeBlueprintResponse.blueprint:type_name -> Superplane.Blueprint
-	9,  // 2: Superplane.CreateBlueprintRequest.blueprint:type_name -> Superplane.Blueprint
-	9,  // 3: Superplane.CreateBlueprintResponse.blueprint:type_name -> Superplane.Blueprint
-	9,  // 4: Superplane.UpdateBlueprintRequest.blueprint:type_name -> Superplane.Blueprint
-	9,  // 5: Superplane.UpdateBlueprintResponse.blueprint:type_name -> Superplane.Blueprint
-	13, // 6: Superplane.Blueprint.created_at:type_name -> google.protobuf.Timestamp
-	13, // 7: Superplane.Blueprint.updated_at:type_name -> google.protobuf.Timestamp
-	10, // 8: Superplane.Blueprint.nodes:type_name -> Superplane.BlueprintNode
-	11, // 9: Superplane.Blueprint.edges:type_name -> Superplane.BlueprintEdge
-	0,  // 10: Superplane.BlueprintNode.ref_type:type_name -> Superplane.BlueprintNode.RefType
-	12, // 11: Superplane.BlueprintNode.component:type_name -> Superplane.BlueprintNode.ComponentRef
-	14, // 12: Superplane.BlueprintNode.configuration:type_name -> google.protobuf.Struct
-	1,  // 13: Superplane.Blueprints.ListBlueprints:input_type -> Superplane.ListBlueprintsRequest
-	3,  // 14: Superplane.Blueprints.DescribeBlueprint:input_type -> Superplane.DescribeBlueprintRequest
-	5,  // 15: Superplane.Blueprints.CreateBlueprint:input_type -> Superplane.CreateBlueprintRequest
-	7,  // 16: Superplane.Blueprints.UpdateBlueprint:input_type -> Superplane.UpdateBlueprintRequest
-	2,  // 17: Superplane.Blueprints.ListBlueprints:output_type -> Superplane.ListBlueprintsResponse
-	4,  // 18: Superplane.Blueprints.DescribeBlueprint:output_type -> Superplane.DescribeBlueprintResponse
-	6,  // 19: Superplane.Blueprints.CreateBlueprint:output_type -> Superplane.CreateBlueprintResponse
-	8,  // 20: Superplane.Blueprints.UpdateBlueprint:output_type -> Superplane.UpdateBlueprintResponse
-	17, // [17:21] is the sub-list for method output_type
-	13, // [13:17] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	9,  // 0: Superplane.Blueprints.ListBlueprintsResponse.blueprints:type_name -> Superplane.Blueprints.Blueprint
+	9,  // 1: Superplane.Blueprints.DescribeBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	9,  // 2: Superplane.Blueprints.CreateBlueprintRequest.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	9,  // 3: Superplane.Blueprints.CreateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	9,  // 4: Superplane.Blueprints.UpdateBlueprintRequest.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	9,  // 5: Superplane.Blueprints.UpdateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	13, // 6: Superplane.Blueprints.Blueprint.created_at:type_name -> google.protobuf.Timestamp
+	13, // 7: Superplane.Blueprints.Blueprint.updated_at:type_name -> google.protobuf.Timestamp
+	10, // 8: Superplane.Blueprints.Blueprint.nodes:type_name -> Superplane.Blueprints.BlueprintNode
+	11, // 9: Superplane.Blueprints.Blueprint.edges:type_name -> Superplane.Blueprints.BlueprintEdge
+	14, // 10: Superplane.Blueprints.Blueprint.configuration:type_name -> Superplane.Components.ConfigurationField
+	0,  // 11: Superplane.Blueprints.BlueprintNode.ref_type:type_name -> Superplane.Blueprints.BlueprintNode.RefType
+	12, // 12: Superplane.Blueprints.BlueprintNode.component:type_name -> Superplane.Blueprints.BlueprintNode.ComponentRef
+	15, // 13: Superplane.Blueprints.BlueprintNode.configuration:type_name -> google.protobuf.Struct
+	1,  // 14: Superplane.Blueprints.Blueprints.ListBlueprints:input_type -> Superplane.Blueprints.ListBlueprintsRequest
+	3,  // 15: Superplane.Blueprints.Blueprints.DescribeBlueprint:input_type -> Superplane.Blueprints.DescribeBlueprintRequest
+	5,  // 16: Superplane.Blueprints.Blueprints.CreateBlueprint:input_type -> Superplane.Blueprints.CreateBlueprintRequest
+	7,  // 17: Superplane.Blueprints.Blueprints.UpdateBlueprint:input_type -> Superplane.Blueprints.UpdateBlueprintRequest
+	2,  // 18: Superplane.Blueprints.Blueprints.ListBlueprints:output_type -> Superplane.Blueprints.ListBlueprintsResponse
+	4,  // 19: Superplane.Blueprints.Blueprints.DescribeBlueprint:output_type -> Superplane.Blueprints.DescribeBlueprintResponse
+	6,  // 20: Superplane.Blueprints.Blueprints.CreateBlueprint:output_type -> Superplane.Blueprints.CreateBlueprintResponse
+	8,  // 21: Superplane.Blueprints.Blueprints.UpdateBlueprint:output_type -> Superplane.Blueprints.UpdateBlueprintResponse
+	18, // [18:22] is the sub-list for method output_type
+	14, // [14:18] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_blueprints_proto_init() }

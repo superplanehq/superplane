@@ -20,7 +20,7 @@ var _ MappedNullable = &BlueprintsUpdateBlueprintBody{}
 
 // BlueprintsUpdateBlueprintBody struct for BlueprintsUpdateBlueprintBody
 type BlueprintsUpdateBlueprintBody struct {
-	Blueprint *SuperplaneBlueprint `json:"blueprint,omitempty"`
+	Blueprint *BlueprintsBlueprint `json:"blueprint,omitempty"`
 }
 
 // NewBlueprintsUpdateBlueprintBody instantiates a new BlueprintsUpdateBlueprintBody object
@@ -41,9 +41,9 @@ func NewBlueprintsUpdateBlueprintBodyWithDefaults() *BlueprintsUpdateBlueprintBo
 }
 
 // GetBlueprint returns the Blueprint field value if set, zero value otherwise.
-func (o *BlueprintsUpdateBlueprintBody) GetBlueprint() SuperplaneBlueprint {
+func (o *BlueprintsUpdateBlueprintBody) GetBlueprint() BlueprintsBlueprint {
 	if o == nil || IsNil(o.Blueprint) {
-		var ret SuperplaneBlueprint
+		var ret BlueprintsBlueprint
 		return ret
 	}
 	return *o.Blueprint
@@ -51,7 +51,7 @@ func (o *BlueprintsUpdateBlueprintBody) GetBlueprint() SuperplaneBlueprint {
 
 // GetBlueprintOk returns a tuple with the Blueprint field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsUpdateBlueprintBody) GetBlueprintOk() (*SuperplaneBlueprint, bool) {
+func (o *BlueprintsUpdateBlueprintBody) GetBlueprintOk() (*BlueprintsBlueprint, bool) {
 	if o == nil || IsNil(o.Blueprint) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *BlueprintsUpdateBlueprintBody) HasBlueprint() bool {
 	return false
 }
 
-// SetBlueprint gets a reference to the given SuperplaneBlueprint and assigns it to the Blueprint field.
-func (o *BlueprintsUpdateBlueprintBody) SetBlueprint(v SuperplaneBlueprint) {
+// SetBlueprint gets a reference to the given BlueprintsBlueprint and assigns it to the Blueprint field.
+func (o *BlueprintsUpdateBlueprintBody) SetBlueprint(v BlueprintsBlueprint) {
 	o.Blueprint = &v
 }
 

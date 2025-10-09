@@ -19,10 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Blueprints_ListBlueprints_FullMethodName    = "/Superplane.Blueprints/ListBlueprints"
-	Blueprints_DescribeBlueprint_FullMethodName = "/Superplane.Blueprints/DescribeBlueprint"
-	Blueprints_CreateBlueprint_FullMethodName   = "/Superplane.Blueprints/CreateBlueprint"
-	Blueprints_UpdateBlueprint_FullMethodName   = "/Superplane.Blueprints/UpdateBlueprint"
+	Blueprints_ListBlueprints_FullMethodName    = "/Superplane.Blueprints.Blueprints/ListBlueprints"
+	Blueprints_DescribeBlueprint_FullMethodName = "/Superplane.Blueprints.Blueprints/DescribeBlueprint"
+	Blueprints_CreateBlueprint_FullMethodName   = "/Superplane.Blueprints.Blueprints/CreateBlueprint"
+	Blueprints_UpdateBlueprint_FullMethodName   = "/Superplane.Blueprints.Blueprints/UpdateBlueprint"
 )
 
 // BlueprintsClient is the client API for Blueprints service.
@@ -208,7 +208,7 @@ func _Blueprints_UpdateBlueprint_Handler(srv interface{}, ctx context.Context, d
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Blueprints_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Superplane.Blueprints",
+	ServiceName: "Superplane.Blueprints.Blueprints",
 	HandlerType: (*BlueprintsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

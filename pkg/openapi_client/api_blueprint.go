@@ -27,15 +27,15 @@ type BlueprintAPIService service
 type ApiBlueprintsCreateBlueprintRequest struct {
 	ctx context.Context
 	ApiService *BlueprintAPIService
-	body *SuperplaneCreateBlueprintRequest
+	body *BlueprintsCreateBlueprintRequest
 }
 
-func (r ApiBlueprintsCreateBlueprintRequest) Body(body SuperplaneCreateBlueprintRequest) ApiBlueprintsCreateBlueprintRequest {
+func (r ApiBlueprintsCreateBlueprintRequest) Body(body BlueprintsCreateBlueprintRequest) ApiBlueprintsCreateBlueprintRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiBlueprintsCreateBlueprintRequest) Execute() (*SuperplaneCreateBlueprintResponse, *http.Response, error) {
+func (r ApiBlueprintsCreateBlueprintRequest) Execute() (*BlueprintsCreateBlueprintResponse, *http.Response, error) {
 	return r.ApiService.BlueprintsCreateBlueprintExecute(r)
 }
 
@@ -55,13 +55,13 @@ func (a *BlueprintAPIService) BlueprintsCreateBlueprint(ctx context.Context) Api
 }
 
 // Execute executes the request
-//  @return SuperplaneCreateBlueprintResponse
-func (a *BlueprintAPIService) BlueprintsCreateBlueprintExecute(r ApiBlueprintsCreateBlueprintRequest) (*SuperplaneCreateBlueprintResponse, *http.Response, error) {
+//  @return BlueprintsCreateBlueprintResponse
+func (a *BlueprintAPIService) BlueprintsCreateBlueprintExecute(r ApiBlueprintsCreateBlueprintRequest) (*BlueprintsCreateBlueprintResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneCreateBlueprintResponse
+		localVarReturnValue  *BlueprintsCreateBlueprintResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsCreateBlueprint")
@@ -148,7 +148,7 @@ type ApiBlueprintsDescribeBlueprintRequest struct {
 	id string
 }
 
-func (r ApiBlueprintsDescribeBlueprintRequest) Execute() (*SuperplaneDescribeBlueprintResponse, *http.Response, error) {
+func (r ApiBlueprintsDescribeBlueprintRequest) Execute() (*BlueprintsDescribeBlueprintResponse, *http.Response, error) {
 	return r.ApiService.BlueprintsDescribeBlueprintExecute(r)
 }
 
@@ -170,13 +170,13 @@ func (a *BlueprintAPIService) BlueprintsDescribeBlueprint(ctx context.Context, i
 }
 
 // Execute executes the request
-//  @return SuperplaneDescribeBlueprintResponse
-func (a *BlueprintAPIService) BlueprintsDescribeBlueprintExecute(r ApiBlueprintsDescribeBlueprintRequest) (*SuperplaneDescribeBlueprintResponse, *http.Response, error) {
+//  @return BlueprintsDescribeBlueprintResponse
+func (a *BlueprintAPIService) BlueprintsDescribeBlueprintExecute(r ApiBlueprintsDescribeBlueprintRequest) (*BlueprintsDescribeBlueprintResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneDescribeBlueprintResponse
+		localVarReturnValue  *BlueprintsDescribeBlueprintResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsDescribeBlueprint")
@@ -258,7 +258,7 @@ type ApiBlueprintsListBlueprintsRequest struct {
 	ApiService *BlueprintAPIService
 }
 
-func (r ApiBlueprintsListBlueprintsRequest) Execute() (*SuperplaneListBlueprintsResponse, *http.Response, error) {
+func (r ApiBlueprintsListBlueprintsRequest) Execute() (*BlueprintsListBlueprintsResponse, *http.Response, error) {
 	return r.ApiService.BlueprintsListBlueprintsExecute(r)
 }
 
@@ -278,13 +278,13 @@ func (a *BlueprintAPIService) BlueprintsListBlueprints(ctx context.Context) ApiB
 }
 
 // Execute executes the request
-//  @return SuperplaneListBlueprintsResponse
-func (a *BlueprintAPIService) BlueprintsListBlueprintsExecute(r ApiBlueprintsListBlueprintsRequest) (*SuperplaneListBlueprintsResponse, *http.Response, error) {
+//  @return BlueprintsListBlueprintsResponse
+func (a *BlueprintAPIService) BlueprintsListBlueprintsExecute(r ApiBlueprintsListBlueprintsRequest) (*BlueprintsListBlueprintsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListBlueprintsResponse
+		localVarReturnValue  *BlueprintsListBlueprintsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsListBlueprints")
@@ -372,7 +372,7 @@ func (r ApiBlueprintsUpdateBlueprintRequest) Body(body BlueprintsUpdateBlueprint
 	return r
 }
 
-func (r ApiBlueprintsUpdateBlueprintRequest) Execute() (*SuperplaneUpdateBlueprintResponse, *http.Response, error) {
+func (r ApiBlueprintsUpdateBlueprintRequest) Execute() (*BlueprintsUpdateBlueprintResponse, *http.Response, error) {
 	return r.ApiService.BlueprintsUpdateBlueprintExecute(r)
 }
 
@@ -394,13 +394,13 @@ func (a *BlueprintAPIService) BlueprintsUpdateBlueprint(ctx context.Context, id 
 }
 
 // Execute executes the request
-//  @return SuperplaneUpdateBlueprintResponse
-func (a *BlueprintAPIService) BlueprintsUpdateBlueprintExecute(r ApiBlueprintsUpdateBlueprintRequest) (*SuperplaneUpdateBlueprintResponse, *http.Response, error) {
+//  @return BlueprintsUpdateBlueprintResponse
+func (a *BlueprintAPIService) BlueprintsUpdateBlueprintExecute(r ApiBlueprintsUpdateBlueprintRequest) (*BlueprintsUpdateBlueprintResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPatch
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneUpdateBlueprintResponse
+		localVarReturnValue  *BlueprintsUpdateBlueprintResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "BlueprintAPIService.BlueprintsUpdateBlueprint")

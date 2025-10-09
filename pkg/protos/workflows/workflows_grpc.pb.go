@@ -19,14 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Workflows_ListWorkflows_FullMethodName             = "/Superplane.Workflows/ListWorkflows"
-	Workflows_CreateWorkflow_FullMethodName            = "/Superplane.Workflows/CreateWorkflow"
-	Workflows_DescribeWorkflow_FullMethodName          = "/Superplane.Workflows/DescribeWorkflow"
-	Workflows_UpdateWorkflow_FullMethodName            = "/Superplane.Workflows/UpdateWorkflow"
-	Workflows_DeleteWorkflow_FullMethodName            = "/Superplane.Workflows/DeleteWorkflow"
-	Workflows_ListNodeQueueItems_FullMethodName        = "/Superplane.Workflows/ListNodeQueueItems"
-	Workflows_ListNodeExecutions_FullMethodName        = "/Superplane.Workflows/ListNodeExecutions"
-	Workflows_InvokeNodeExecutionAction_FullMethodName = "/Superplane.Workflows/InvokeNodeExecutionAction"
+	Workflows_ListWorkflows_FullMethodName             = "/Superplane.Workflows.Workflows/ListWorkflows"
+	Workflows_CreateWorkflow_FullMethodName            = "/Superplane.Workflows.Workflows/CreateWorkflow"
+	Workflows_DescribeWorkflow_FullMethodName          = "/Superplane.Workflows.Workflows/DescribeWorkflow"
+	Workflows_UpdateWorkflow_FullMethodName            = "/Superplane.Workflows.Workflows/UpdateWorkflow"
+	Workflows_DeleteWorkflow_FullMethodName            = "/Superplane.Workflows.Workflows/DeleteWorkflow"
+	Workflows_ListNodeQueueItems_FullMethodName        = "/Superplane.Workflows.Workflows/ListNodeQueueItems"
+	Workflows_ListNodeExecutions_FullMethodName        = "/Superplane.Workflows.Workflows/ListNodeExecutions"
+	Workflows_InvokeNodeExecutionAction_FullMethodName = "/Superplane.Workflows.Workflows/InvokeNodeExecutionAction"
 )
 
 // WorkflowsClient is the client API for Workflows service.
@@ -344,7 +344,7 @@ func _Workflows_InvokeNodeExecutionAction_Handler(srv interface{}, ctx context.C
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Workflows_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Superplane.Workflows",
+	ServiceName: "Superplane.Workflows.Workflows",
 	HandlerType: (*WorkflowsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

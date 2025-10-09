@@ -9,6 +9,7 @@ CREATE TABLE blueprints (
   updated_at      TIMESTAMP NOT NULL,
   nodes           JSONB NOT NULL DEFAULT '[]'::jsonb,
   edges           JSONB NOT NULL DEFAULT '[]'::jsonb,
+  configuration   JSONB NOT NULL DEFAULT '[]'::jsonb,
 
   PRIMARY KEY (id),
   UNIQUE (organization_id, name)

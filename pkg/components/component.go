@@ -122,12 +122,12 @@ type ConfigurationField struct {
 	/*
 	 * Unique name identifier for the field
 	 */
-	Name string
+	Name string `json:"name"`
 
 	/*
 	 * Human-readable label for the field (displayed in forms)
 	 */
-	Label string
+	Label string `json:"label"`
 
 	/*
 	 * Type of the field. Supported types are:
@@ -141,41 +141,35 @@ type ConfigurationField struct {
 	 * - list
 	 * - object
 	 */
-	Type        string
-	Description string
-	Required    bool
-	Default     any
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Default     any    `json:"default"`
 
 	/*
 	 * Used for select / multi_select types
 	 */
-	Options []FieldOption
+	Options []FieldOption `json:"options,omitempty"`
 
 	/*
 	 * Used for number type to specify minimum value
 	 */
-	Min *int
+	Min *int `json:"min,omitempty"`
 
 	/*
 	 * Used for number type to specify maximum value
 	 */
-	Max *int
+	Max *int `json:"max,omitempty"`
 
 	/*
-	 *
+	 * Defines structures of items on a 'list' type.
 	 */
-	ListItem *ListItemDefinition
+	ListItem *ListItemDefinition `json:"list_item,omitempty"`
 
 	/*
 	 * Schema allows us to define nested object structures for 'object' type.
 	 */
-	Schema []ConfigurationField
-
-	/*
-	 * Optional custom validation function.
-	 * Returns an error if validation fails, nil if valid.
-	 */
-	Validate func(value any) error
+	Schema []ConfigurationField `json:"schema,omitempty"`
 }
 
 /*

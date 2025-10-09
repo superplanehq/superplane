@@ -57,7 +57,7 @@ func (r ApiWorkflowsListNodeExecutionsRequest) Before(before time.Time) ApiWorkf
 	return r
 }
 
-func (r ApiWorkflowsListNodeExecutionsRequest) Execute() (*SuperplaneListNodeExecutionsResponse, *http.Response, error) {
+func (r ApiWorkflowsListNodeExecutionsRequest) Execute() (*WorkflowsListNodeExecutionsResponse, *http.Response, error) {
 	return r.ApiService.WorkflowsListNodeExecutionsExecute(r)
 }
 
@@ -81,13 +81,13 @@ func (a *WorkflowNodeAPIService) WorkflowsListNodeExecutions(ctx context.Context
 }
 
 // Execute executes the request
-//  @return SuperplaneListNodeExecutionsResponse
-func (a *WorkflowNodeAPIService) WorkflowsListNodeExecutionsExecute(r ApiWorkflowsListNodeExecutionsRequest) (*SuperplaneListNodeExecutionsResponse, *http.Response, error) {
+//  @return WorkflowsListNodeExecutionsResponse
+func (a *WorkflowNodeAPIService) WorkflowsListNodeExecutionsExecute(r ApiWorkflowsListNodeExecutionsRequest) (*WorkflowsListNodeExecutionsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListNodeExecutionsResponse
+		localVarReturnValue  *WorkflowsListNodeExecutionsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowNodeAPIService.WorkflowsListNodeExecutions")
@@ -212,7 +212,7 @@ func (r ApiWorkflowsListNodeQueueItemsRequest) Before(before time.Time) ApiWorkf
 	return r
 }
 
-func (r ApiWorkflowsListNodeQueueItemsRequest) Execute() (*SuperplaneListNodeQueueItemsResponse, *http.Response, error) {
+func (r ApiWorkflowsListNodeQueueItemsRequest) Execute() (*WorkflowsListNodeQueueItemsResponse, *http.Response, error) {
 	return r.ApiService.WorkflowsListNodeQueueItemsExecute(r)
 }
 
@@ -236,13 +236,13 @@ func (a *WorkflowNodeAPIService) WorkflowsListNodeQueueItems(ctx context.Context
 }
 
 // Execute executes the request
-//  @return SuperplaneListNodeQueueItemsResponse
-func (a *WorkflowNodeAPIService) WorkflowsListNodeQueueItemsExecute(r ApiWorkflowsListNodeQueueItemsRequest) (*SuperplaneListNodeQueueItemsResponse, *http.Response, error) {
+//  @return WorkflowsListNodeQueueItemsResponse
+func (a *WorkflowNodeAPIService) WorkflowsListNodeQueueItemsExecute(r ApiWorkflowsListNodeQueueItemsRequest) (*WorkflowsListNodeQueueItemsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListNodeQueueItemsResponse
+		localVarReturnValue  *WorkflowsListNodeQueueItemsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowNodeAPIService.WorkflowsListNodeQueueItems")

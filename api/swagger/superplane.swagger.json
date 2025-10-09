@@ -64,7 +64,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneListBlueprintsResponse"
+              "$ref": "#/definitions/BlueprintsListBlueprintsResponse"
             }
           },
           "default": {
@@ -86,7 +86,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneCreateBlueprintResponse"
+              "$ref": "#/definitions/BlueprintsCreateBlueprintResponse"
             }
           },
           "default": {
@@ -102,7 +102,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/SuperplaneCreateBlueprintRequest"
+              "$ref": "#/definitions/BlueprintsCreateBlueprintRequest"
             }
           }
         ],
@@ -120,7 +120,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneDescribeBlueprintResponse"
+              "$ref": "#/definitions/BlueprintsDescribeBlueprintResponse"
             }
           },
           "default": {
@@ -150,7 +150,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateBlueprintResponse"
+              "$ref": "#/definitions/BlueprintsUpdateBlueprintResponse"
             }
           },
           "default": {
@@ -1640,7 +1640,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneListComponentsResponse"
+              "$ref": "#/definitions/ComponentsListComponentsResponse"
             }
           },
           "default": {
@@ -1664,7 +1664,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneDescribeComponentResponse"
+              "$ref": "#/definitions/ComponentsDescribeComponentResponse"
             }
           },
           "default": {
@@ -1696,7 +1696,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneListComponentActionsResponse"
+              "$ref": "#/definitions/ComponentsListComponentActionsResponse"
             }
           },
           "default": {
@@ -3096,7 +3096,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneListWorkflowsResponse"
+              "$ref": "#/definitions/WorkflowsListWorkflowsResponse"
             }
           },
           "default": {
@@ -3118,7 +3118,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneCreateWorkflowResponse"
+              "$ref": "#/definitions/WorkflowsCreateWorkflowResponse"
             }
           },
           "default": {
@@ -3134,7 +3134,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/SuperplaneCreateWorkflowRequest"
+              "$ref": "#/definitions/WorkflowsCreateWorkflowRequest"
             }
           }
         ],
@@ -3152,7 +3152,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneInvokeNodeExecutionActionResponse"
+              "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionResponse"
             }
           },
           "default": {
@@ -3198,7 +3198,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneDescribeWorkflowResponse"
+              "$ref": "#/definitions/WorkflowsDescribeWorkflowResponse"
             }
           },
           "default": {
@@ -3228,7 +3228,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneDeleteWorkflowResponse"
+              "$ref": "#/definitions/WorkflowsDeleteWorkflowResponse"
             }
           },
           "default": {
@@ -3258,7 +3258,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateWorkflowResponse"
+              "$ref": "#/definitions/WorkflowsUpdateWorkflowResponse"
             }
           },
           "default": {
@@ -3298,7 +3298,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneListNodeExecutionsResponse"
+              "$ref": "#/definitions/WorkflowsListNodeExecutionsResponse"
             }
           },
           "default": {
@@ -3383,7 +3383,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneListNodeQueueItemsResponse"
+              "$ref": "#/definitions/WorkflowsListNodeQueueItemsResponse"
             }
           },
           "default": {
@@ -3471,11 +3471,310 @@
       },
       "title": "Common data structures"
     },
+    "BlueprintsBlueprint": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/BlueprintsBlueprintNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/BlueprintsBlueprintEdge"
+          }
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsConfigurationField"
+          }
+        }
+      }
+    },
+    "BlueprintsBlueprintEdge": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
+      }
+    },
+    "BlueprintsBlueprintNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "refType": {
+          "$ref": "#/definitions/BlueprintsBlueprintNodeRefType"
+        },
+        "component": {
+          "$ref": "#/definitions/BlueprintsBlueprintNodeComponentRef"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "BlueprintsBlueprintNodeComponentRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "BlueprintsBlueprintNodeRefType": {
+      "type": "string",
+      "enum": [
+        "REF_TYPE_COMPONENT"
+      ],
+      "default": "REF_TYPE_COMPONENT"
+    },
+    "BlueprintsCreateBlueprintRequest": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/BlueprintsBlueprint"
+        }
+      }
+    },
+    "BlueprintsCreateBlueprintResponse": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/BlueprintsBlueprint"
+        }
+      }
+    },
+    "BlueprintsDescribeBlueprintResponse": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/BlueprintsBlueprint"
+        }
+      }
+    },
+    "BlueprintsListBlueprintsResponse": {
+      "type": "object",
+      "properties": {
+        "blueprints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/BlueprintsBlueprint"
+          }
+        }
+      }
+    },
     "BlueprintsUpdateBlueprintBody": {
       "type": "object",
       "properties": {
         "blueprint": {
-          "$ref": "#/definitions/SuperplaneBlueprint"
+          "$ref": "#/definitions/BlueprintsBlueprint"
+        }
+      }
+    },
+    "BlueprintsUpdateBlueprintResponse": {
+      "type": "object",
+      "properties": {
+        "blueprint": {
+          "$ref": "#/definitions/BlueprintsBlueprint"
+        }
+      }
+    },
+    "ComponentsComponent": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsConfigurationField"
+          }
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsOutputBranch"
+          }
+        }
+      }
+    },
+    "ComponentsComponentAction": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsConfigurationField"
+          }
+        }
+      }
+    },
+    "ComponentsConfigurationField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "defaultValue": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsFieldOption"
+          }
+        },
+        "min": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "max": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "listItem": {
+          "$ref": "#/definitions/ComponentsListItemDefinition"
+        },
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsConfigurationField"
+          }
+        },
+        "label": {
+          "type": "string"
+        }
+      }
+    },
+    "ComponentsDescribeComponentResponse": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "$ref": "#/definitions/ComponentsComponent"
+        }
+      }
+    },
+    "ComponentsFieldOption": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "ComponentsListComponentActionsResponse": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsComponentAction"
+          }
+        }
+      }
+    },
+    "ComponentsListComponentsResponse": {
+      "type": "object",
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsComponent"
+          }
+        }
+      }
+    },
+    "ComponentsListItemDefinition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsConfigurationField"
+          }
+        }
+      }
+    },
+    "ComponentsOutputBranch": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
         }
       }
     },
@@ -4420,94 +4719,6 @@
         }
       }
     },
-    "SuperplaneBlueprint": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "organizationId": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "nodes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneBlueprintNode"
-          }
-        },
-        "edges": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneBlueprintEdge"
-          }
-        }
-      }
-    },
-    "SuperplaneBlueprintEdge": {
-      "type": "object",
-      "properties": {
-        "sourceId": {
-          "type": "string"
-        },
-        "targetId": {
-          "type": "string"
-        },
-        "branch": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneBlueprintNode": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "refType": {
-          "$ref": "#/definitions/SuperplaneBlueprintNodeRefType"
-        },
-        "component": {
-          "$ref": "#/definitions/SuperplaneBlueprintNodeComponentRef"
-        },
-        "configuration": {
-          "type": "object"
-        }
-      }
-    },
-    "SuperplaneBlueprintNodeComponentRef": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneBlueprintNodeRefType": {
-      "type": "string",
-      "enum": [
-        "REF_TYPE_COMPONENT"
-      ],
-      "default": "REF_TYPE_COMPONENT"
-    },
     "SuperplaneCancelStageExecutionBody": {
       "type": "object"
     },
@@ -4546,52 +4757,6 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
-        }
-      }
-    },
-    "SuperplaneComponent": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneConfigurationField"
-          }
-        },
-        "branches": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneOutputBranch"
-          }
-        }
-      }
-    },
-    "SuperplaneComponentAction": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "parameters": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneConfigurationField"
-          }
         }
       }
     },
@@ -4643,54 +4808,6 @@
         "CONDITION_TYPE_TIME_WINDOW"
       ],
       "default": "CONDITION_TYPE_UNKNOWN"
-    },
-    "SuperplaneConfigurationField": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "type": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "required": {
-          "type": "boolean"
-        },
-        "defaultValue": {
-          "type": "string"
-        },
-        "options": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneFieldOption"
-          }
-        },
-        "min": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "max": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "listItem": {
-          "$ref": "#/definitions/SuperplaneListItemDefinition"
-        },
-        "schema": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneConfigurationField"
-          }
-        },
-        "label": {
-          "type": "string"
-        }
-      }
     },
     "SuperplaneConnection": {
       "type": "object",
@@ -4862,22 +4979,6 @@
       ],
       "default": "TYPE_UNKNOWN"
     },
-    "SuperplaneCreateBlueprintRequest": {
-      "type": "object",
-      "properties": {
-        "blueprint": {
-          "$ref": "#/definitions/SuperplaneBlueprint"
-        }
-      }
-    },
-    "SuperplaneCreateBlueprintResponse": {
-      "type": "object",
-      "properties": {
-        "blueprint": {
-          "$ref": "#/definitions/SuperplaneBlueprint"
-        }
-      }
-    },
     "SuperplaneCreateCanvasRequest": {
       "type": "object",
       "properties": {
@@ -4970,22 +5071,6 @@
         }
       }
     },
-    "SuperplaneCreateWorkflowRequest": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/SuperplaneWorkflow"
-        }
-      }
-    },
-    "SuperplaneCreateWorkflowResponse": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/SuperplaneWorkflow"
-        }
-      }
-    },
     "SuperplaneDataFilter": {
       "type": "object",
       "properties": {
@@ -5006,30 +5091,11 @@
     "SuperplaneDeleteStageResponse": {
       "type": "object"
     },
-    "SuperplaneDeleteWorkflowResponse": {
-      "type": "object"
-    },
-    "SuperplaneDescribeBlueprintResponse": {
-      "type": "object",
-      "properties": {
-        "blueprint": {
-          "$ref": "#/definitions/SuperplaneBlueprint"
-        }
-      }
-    },
     "SuperplaneDescribeCanvasResponse": {
       "type": "object",
       "properties": {
         "canvas": {
           "$ref": "#/definitions/SuperplaneCanvas"
-        }
-      }
-    },
-    "SuperplaneDescribeComponentResponse": {
-      "type": "object",
-      "properties": {
-        "component": {
-          "$ref": "#/definitions/SuperplaneComponent"
         }
       }
     },
@@ -5054,14 +5120,6 @@
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
-        }
-      }
-    },
-    "SuperplaneDescribeWorkflowResponse": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/SuperplaneWorkflow"
         }
       }
     },
@@ -5387,17 +5445,6 @@
         }
       }
     },
-    "SuperplaneFieldOption": {
-      "type": "object",
-      "properties": {
-        "label": {
-          "type": "string"
-        },
-        "value": {
-          "type": "string"
-        }
-      }
-    },
     "SuperplaneFilter": {
       "type": "object",
       "properties": {
@@ -5486,9 +5533,6 @@
         }
       }
     },
-    "SuperplaneInvokeNodeExecutionActionResponse": {
-      "type": "object"
-    },
     "SuperplaneKeyValuePair": {
       "type": "object",
       "properties": {
@@ -5512,18 +5556,6 @@
         }
       }
     },
-    "SuperplaneListBlueprintsResponse": {
-      "type": "object",
-      "properties": {
-        "blueprints": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneBlueprint"
-          }
-        }
-      }
-    },
     "SuperplaneListCanvasesResponse": {
       "type": "object",
       "properties": {
@@ -5532,30 +5564,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneCanvas"
-          }
-        }
-      }
-    },
-    "SuperplaneListComponentActionsResponse": {
-      "type": "object",
-      "properties": {
-        "actions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneComponentAction"
-          }
-        }
-      }
-    },
-    "SuperplaneListComponentsResponse": {
-      "type": "object",
-      "properties": {
-        "components": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneComponent"
           }
         }
       }
@@ -5642,67 +5650,6 @@
         }
       }
     },
-    "SuperplaneListItemDefinition": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "schema": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneConfigurationField"
-          }
-        }
-      }
-    },
-    "SuperplaneListNodeExecutionsResponse": {
-      "type": "object",
-      "properties": {
-        "executions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneWorkflowNodeExecution"
-          }
-        },
-        "totalCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "hasNextPage": {
-          "type": "boolean"
-        },
-        "lastTimestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "SuperplaneListNodeQueueItemsResponse": {
-      "type": "object",
-      "properties": {
-        "queueItems": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneWorkflowQueueItem"
-          }
-        },
-        "totalCount": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "hasNextPage": {
-          "type": "boolean"
-        },
-        "lastTimestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
     "SuperplaneListStageEventsResponse": {
       "type": "object",
       "properties": {
@@ -5761,18 +5708,6 @@
         }
       }
     },
-    "SuperplaneListWorkflowsResponse": {
-      "type": "object",
-      "properties": {
-        "workflows": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneWorkflow"
-          }
-        }
-      }
-    },
     "SuperplaneMeUser": {
       "type": "object",
       "properties": {
@@ -5796,14 +5731,6 @@
     },
     "SuperplaneOrganizationsRemoveUserResponse": {
       "type": "object"
-    },
-    "SuperplaneOutputBranch": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      }
     },
     "SuperplaneOutputDefinition": {
       "type": "object",
@@ -6023,14 +5950,6 @@
         }
       }
     },
-    "SuperplaneUpdateBlueprintResponse": {
-      "type": "object",
-      "properties": {
-        "blueprint": {
-          "$ref": "#/definitions/SuperplaneBlueprint"
-        }
-      }
-    },
     "SuperplaneUpdateConnectionGroupBody": {
       "type": "object",
       "properties": {
@@ -6079,14 +5998,6 @@
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
-        }
-      }
-    },
-    "SuperplaneUpdateWorkflowResponse": {
-      "type": "object",
-      "properties": {
-        "workflow": {
-          "$ref": "#/definitions/SuperplaneWorkflow"
         }
       }
     },
@@ -6165,225 +6076,6 @@
         },
         "key": {
           "type": "string"
-        }
-      }
-    },
-    "SuperplaneWorkflow": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "organizationId": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "nodes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneWorkflowNode"
-          }
-        },
-        "edges": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneWorkflowEdge"
-          }
-        }
-      }
-    },
-    "SuperplaneWorkflowEdge": {
-      "type": "object",
-      "properties": {
-        "sourceId": {
-          "type": "string"
-        },
-        "targetId": {
-          "type": "string"
-        },
-        "branch": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneWorkflowEvent": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "workflowId": {
-          "type": "string"
-        },
-        "parentEventId": {
-          "type": "string"
-        },
-        "blueprintName": {
-          "type": "string"
-        },
-        "data": {
-          "type": "object"
-        },
-        "state": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "SuperplaneWorkflowNode": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "refType": {
-          "$ref": "#/definitions/SuperplaneWorkflowNodeRefType"
-        },
-        "component": {
-          "$ref": "#/definitions/SuperplaneWorkflowNodeComponentRef"
-        },
-        "blueprint": {
-          "$ref": "#/definitions/WorkflowNodeBlueprintRef"
-        },
-        "configuration": {
-          "type": "object"
-        }
-      }
-    },
-    "SuperplaneWorkflowNodeComponentRef": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneWorkflowNodeExecution": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "eventId": {
-          "type": "string"
-        },
-        "workflowId": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "state": {
-          "$ref": "#/definitions/SuperplaneWorkflowNodeExecutionState"
-        },
-        "result": {
-          "$ref": "#/definitions/SuperplaneWorkflowNodeExecutionResult"
-        },
-        "resultReason": {
-          "$ref": "#/definitions/SuperplaneWorkflowNodeExecutionResultReason"
-        },
-        "resultMessage": {
-          "type": "string"
-        },
-        "inputs": {
-          "type": "object"
-        },
-        "outputs": {
-          "type": "object"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "event": {
-          "$ref": "#/definitions/SuperplaneWorkflowEvent"
-        },
-        "metadata": {
-          "type": "object"
-        },
-        "configuration": {
-          "type": "object"
-        }
-      }
-    },
-    "SuperplaneWorkflowNodeExecutionResult": {
-      "type": "string",
-      "enum": [
-        "RESULT_UNKNOWN",
-        "RESULT_PASSED",
-        "RESULT_FAILED",
-        "RESULT_CANCELLED"
-      ],
-      "default": "RESULT_UNKNOWN"
-    },
-    "SuperplaneWorkflowNodeExecutionResultReason": {
-      "type": "string",
-      "enum": [
-        "RESULT_REASON_OK",
-        "RESULT_REASON_ERROR"
-      ],
-      "default": "RESULT_REASON_OK"
-    },
-    "SuperplaneWorkflowNodeExecutionState": {
-      "type": "string",
-      "enum": [
-        "STATE_UNKNOWN",
-        "STATE_PENDING",
-        "STATE_WAITING",
-        "STATE_STARTED",
-        "STATE_FINISHED"
-      ],
-      "default": "STATE_UNKNOWN"
-    },
-    "SuperplaneWorkflowNodeRefType": {
-      "type": "string",
-      "enum": [
-        "REF_TYPE_COMPONENT",
-        "REF_TYPE_BLUEPRINT"
-      ],
-      "default": "REF_TYPE_COMPONENT"
-    },
-    "SuperplaneWorkflowQueueItem": {
-      "type": "object",
-      "properties": {
-        "eventId": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "event": {
-          "$ref": "#/definitions/SuperplaneWorkflowEvent"
         }
       }
     },
@@ -6547,6 +6239,33 @@
         }
       }
     },
+    "WorkflowsCreateWorkflowRequest": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/WorkflowsWorkflow"
+        }
+      }
+    },
+    "WorkflowsCreateWorkflowResponse": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/WorkflowsWorkflow"
+        }
+      }
+    },
+    "WorkflowsDeleteWorkflowResponse": {
+      "type": "object"
+    },
+    "WorkflowsDescribeWorkflowResponse": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/WorkflowsWorkflow"
+        }
+      }
+    },
     "WorkflowsInvokeNodeExecutionActionBody": {
       "type": "object",
       "properties": {
@@ -6555,11 +6274,299 @@
         }
       }
     },
+    "WorkflowsInvokeNodeExecutionActionResponse": {
+      "type": "object"
+    },
+    "WorkflowsListNodeExecutionsResponse": {
+      "type": "object",
+      "properties": {
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsListNodeQueueItemsResponse": {
+      "type": "object",
+      "properties": {
+        "queueItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowQueueItem"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsListWorkflowsResponse": {
+      "type": "object",
+      "properties": {
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflow"
+          }
+        }
+      }
+    },
     "WorkflowsUpdateWorkflowBody": {
       "type": "object",
       "properties": {
         "workflow": {
-          "$ref": "#/definitions/SuperplaneWorkflow"
+          "$ref": "#/definitions/WorkflowsWorkflow"
+        }
+      }
+    },
+    "WorkflowsUpdateWorkflowResponse": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "$ref": "#/definitions/WorkflowsWorkflow"
+        }
+      }
+    },
+    "WorkflowsWorkflow": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowEdge"
+          }
+        }
+      }
+    },
+    "WorkflowsWorkflowEdge": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
+      }
+    },
+    "WorkflowsWorkflowEvent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "workflowId": {
+          "type": "string"
+        },
+        "parentEventId": {
+          "type": "string"
+        },
+        "blueprintName": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        },
+        "state": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsWorkflowNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "refType": {
+          "$ref": "#/definitions/WorkflowsWorkflowNodeRefType"
+        },
+        "component": {
+          "$ref": "#/definitions/WorkflowsWorkflowNodeComponentRef"
+        },
+        "blueprint": {
+          "$ref": "#/definitions/WorkflowNodeBlueprintRef"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "WorkflowsWorkflowNodeComponentRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "WorkflowsWorkflowNodeExecution": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "eventId": {
+          "type": "string"
+        },
+        "workflowId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/WorkflowsWorkflowNodeExecutionState"
+        },
+        "result": {
+          "$ref": "#/definitions/WorkflowsWorkflowNodeExecutionResult"
+        },
+        "resultReason": {
+          "$ref": "#/definitions/WorkflowsWorkflowNodeExecutionResultReason"
+        },
+        "resultMessage": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "object"
+        },
+        "outputs": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "event": {
+          "$ref": "#/definitions/WorkflowsWorkflowEvent"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      }
+    },
+    "WorkflowsWorkflowNodeExecutionResult": {
+      "type": "string",
+      "enum": [
+        "RESULT_UNKNOWN",
+        "RESULT_PASSED",
+        "RESULT_FAILED",
+        "RESULT_CANCELLED"
+      ],
+      "default": "RESULT_UNKNOWN"
+    },
+    "WorkflowsWorkflowNodeExecutionResultReason": {
+      "type": "string",
+      "enum": [
+        "RESULT_REASON_OK",
+        "RESULT_REASON_ERROR"
+      ],
+      "default": "RESULT_REASON_OK"
+    },
+    "WorkflowsWorkflowNodeExecutionState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_WAITING",
+        "STATE_STARTED",
+        "STATE_FINISHED"
+      ],
+      "default": "STATE_UNKNOWN"
+    },
+    "WorkflowsWorkflowNodeRefType": {
+      "type": "string",
+      "enum": [
+        "REF_TYPE_COMPONENT",
+        "REF_TYPE_BLUEPRINT"
+      ],
+      "default": "REF_TYPE_COMPONENT"
+    },
+    "WorkflowsWorkflowQueueItem": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "event": {
+          "$ref": "#/definitions/WorkflowsWorkflowEvent"
         }
       }
     },

@@ -2,16 +2,19 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
@@ -659,5 +662,69 @@ func StageEventStateReasonToProto(stateReason string) pb.StageEvent_StateReason 
 	default:
 		return pb.StageEvent_STATE_REASON_UNKNOWN
 	}
+}
+
+func ConfigurationFieldToProto(field components.ConfigurationField) *pbComponents.ConfigurationField {
+	pbField := &pbComponents.ConfigurationField{
+		Name:        field.Name,
+		Label:       field.Label,
+		Type:        field.Type,
+		Description: field.Description,
+		Required:    field.Required,
+	}
+
+	// Handle default value
+	if field.Default != nil {
+		// Convert default value to JSON string for proto
+		defaultBytes, err := json.Marshal(field.Default)
+		if err == nil {
+			defaultStr := string(defaultBytes)
+			pbField.DefaultValue = &defaultStr
+		}
+	}
+
+	// Handle options (for select/multi_select)
+	if len(field.Options) > 0 {
+		pbField.Options = make([]*pbComponents.FieldOption, len(field.Options))
+		for i, opt := range field.Options {
+			pbField.Options[i] = &pbComponents.FieldOption{
+				Label: opt.Label,
+				Value: opt.Value,
+			}
+		}
+	}
+
+	// Handle min/max (for number type)
+	if field.Min != nil {
+		min := int32(*field.Min)
+		pbField.Min = &min
+	}
+	if field.Max != nil {
+		max := int32(*field.Max)
+		pbField.Max = &max
+	}
+
+	// Handle list item definition (for list type)
+	if field.ListItem != nil {
+		pbField.ListItem = &pbComponents.ListItemDefinition{
+			Type: field.ListItem.Type,
+		}
+		if len(field.ListItem.Schema) > 0 {
+			pbField.ListItem.Schema = make([]*pbComponents.ConfigurationField, len(field.ListItem.Schema))
+			for i, schemaField := range field.ListItem.Schema {
+				pbField.ListItem.Schema[i] = ConfigurationFieldToProto(schemaField)
+			}
+		}
+	}
+
+	// Handle object schema (for object type)
+	if len(field.Schema) > 0 {
+		pbField.Schema = make([]*pbComponents.ConfigurationField, len(field.Schema))
+		for i, schemaField := range field.Schema {
+			pbField.Schema[i] = ConfigurationFieldToProto(schemaField)
+		}
+	}
+
+	return pbField
 }
 

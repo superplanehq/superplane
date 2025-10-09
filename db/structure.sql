@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vmrlWhwTM0qGMpktkZwajMG6dMuRyiktRGO7qguIvitvwjxxAhW77cyMvsHJkCl
+\restrict b68QhI6BainKjSehgjoxiewb6EagcafM3UjavocOeinlDoleK63IAyOZj5R1K5b
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -100,7 +100,8 @@ CREATE TABLE public.blueprints (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
-    edges jsonb DEFAULT '[]'::jsonb NOT NULL
+    edges jsonb DEFAULT '[]'::jsonb NOT NULL,
+    configuration jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1469,13 +1470,13 @@ ALTER TABLE ONLY public.workflow_queue_items
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vmrlWhwTM0qGMpktkZwajMG6dMuRyiktRGO7qguIvitvwjxxAhW77cyMvsHJkCl
+\unrestrict b68QhI6BainKjSehgjoxiewb6EagcafM3UjavocOeinlDoleK63IAyOZj5R1K5b
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict pgJx63UWyFqv1f4p8BfrGlwcyTNQM6h6r2jGHlPvuozL9y0wk5ZdW7cVJw7QY2D
+\restrict xckg4pgTksoqTeLGWhunKCy2hDlbrH8dRSYo13q0btkoYuDXcHMroZLaGtchExq
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1505,5 +1506,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pgJx63UWyFqv1f4p8BfrGlwcyTNQM6h6r2jGHlPvuozL9y0wk5ZdW7cVJw7QY2D
+\unrestrict xckg4pgTksoqTeLGWhunKCy2hDlbrH8dRSYo13q0btkoYuDXcHMroZLaGtchExq
 

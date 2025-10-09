@@ -20,7 +20,7 @@ var _ MappedNullable = &WorkflowsUpdateWorkflowBody{}
 
 // WorkflowsUpdateWorkflowBody struct for WorkflowsUpdateWorkflowBody
 type WorkflowsUpdateWorkflowBody struct {
-	Workflow *SuperplaneWorkflow `json:"workflow,omitempty"`
+	Workflow *WorkflowsWorkflow `json:"workflow,omitempty"`
 }
 
 // NewWorkflowsUpdateWorkflowBody instantiates a new WorkflowsUpdateWorkflowBody object
@@ -41,9 +41,9 @@ func NewWorkflowsUpdateWorkflowBodyWithDefaults() *WorkflowsUpdateWorkflowBody {
 }
 
 // GetWorkflow returns the Workflow field value if set, zero value otherwise.
-func (o *WorkflowsUpdateWorkflowBody) GetWorkflow() SuperplaneWorkflow {
+func (o *WorkflowsUpdateWorkflowBody) GetWorkflow() WorkflowsWorkflow {
 	if o == nil || IsNil(o.Workflow) {
-		var ret SuperplaneWorkflow
+		var ret WorkflowsWorkflow
 		return ret
 	}
 	return *o.Workflow
@@ -51,7 +51,7 @@ func (o *WorkflowsUpdateWorkflowBody) GetWorkflow() SuperplaneWorkflow {
 
 // GetWorkflowOk returns a tuple with the Workflow field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsUpdateWorkflowBody) GetWorkflowOk() (*SuperplaneWorkflow, bool) {
+func (o *WorkflowsUpdateWorkflowBody) GetWorkflowOk() (*WorkflowsWorkflow, bool) {
 	if o == nil || IsNil(o.Workflow) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *WorkflowsUpdateWorkflowBody) HasWorkflow() bool {
 	return false
 }
 
-// SetWorkflow gets a reference to the given SuperplaneWorkflow and assigns it to the Workflow field.
-func (o *WorkflowsUpdateWorkflowBody) SetWorkflow(v SuperplaneWorkflow) {
+// SetWorkflow gets a reference to the given WorkflowsWorkflow and assigns it to the Workflow field.
+func (o *WorkflowsUpdateWorkflowBody) SetWorkflow(v WorkflowsWorkflow) {
 	o.Workflow = &v
 }
 

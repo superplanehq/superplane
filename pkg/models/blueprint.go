@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 )
@@ -23,6 +24,7 @@ type Blueprint struct {
 	UpdatedAt      *time.Time
 	Nodes          datatypes.JSONSlice[Node]
 	Edges          datatypes.JSONSlice[Edge]
+	Configuration  datatypes.JSONSlice[components.ConfigurationField]
 }
 
 func (b *Blueprint) FindNode(id string) (*Node, error) {

@@ -398,7 +398,7 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows/ListWorkflows", runtime.WithHTTPPathPattern("/api/v1/workflows"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/ListWorkflows", runtime.WithHTTPPathPattern("/api/v1/workflows"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -418,7 +418,7 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows/CreateWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/CreateWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -438,7 +438,7 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows/DescribeWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/DescribeWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -458,7 +458,7 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows/UpdateWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/UpdateWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -478,7 +478,7 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows/DeleteWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/DeleteWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -498,7 +498,7 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows/ListNodeQueueItems", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/nodes/{node_id}/queue"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/ListNodeQueueItems", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/nodes/{node_id}/queue"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -518,7 +518,7 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows/ListNodeExecutions", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/ListNodeExecutions", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -538,7 +538,7 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows/InvokeNodeExecutionAction", runtime.WithHTTPPathPattern("/api/v1/workflows/executions/{execution_id}/actions/{action_name}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/InvokeNodeExecutionAction", runtime.WithHTTPPathPattern("/api/v1/workflows/executions/{execution_id}/actions/{action_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -596,7 +596,7 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows/ListWorkflows", runtime.WithHTTPPathPattern("/api/v1/workflows"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/ListWorkflows", runtime.WithHTTPPathPattern("/api/v1/workflows"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -613,7 +613,7 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows/CreateWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/CreateWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -630,7 +630,7 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows/DescribeWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/DescribeWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -647,7 +647,7 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows/UpdateWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/UpdateWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -664,7 +664,7 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows/DeleteWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/DeleteWorkflow", runtime.WithHTTPPathPattern("/api/v1/workflows/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -681,7 +681,7 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows/ListNodeQueueItems", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/nodes/{node_id}/queue"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/ListNodeQueueItems", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/nodes/{node_id}/queue"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -698,7 +698,7 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows/ListNodeExecutions", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/ListNodeExecutions", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -715,7 +715,7 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows/InvokeNodeExecutionAction", runtime.WithHTTPPathPattern("/api/v1/workflows/executions/{execution_id}/actions/{action_name}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/InvokeNodeExecutionAction", runtime.WithHTTPPathPattern("/api/v1/workflows/executions/{execution_id}/actions/{action_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
