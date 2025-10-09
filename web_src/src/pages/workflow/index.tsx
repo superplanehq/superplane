@@ -138,6 +138,7 @@ export const Workflow = () => {
     const loadedNodes: Node[] = (workflow.nodes || []).map((node: any) => {
       const isComponent = node.refType === 'REF_TYPE_COMPONENT'
       const blockName = isComponent ? node.component?.name : node.blueprint?.name
+      const blockId = isComponent ? node.component?.name : node.blueprint?.id
       const block = buildingBlocks.find((b: BuildingBlock) =>
         b.name === blockName && b.type === (isComponent ? 'component' : 'blueprint')
       )
@@ -155,6 +156,7 @@ export const Workflow = () => {
         data: {
           label: node.name,
           blockName,
+          blockId,
           blockType: isComponent ? 'component' : 'blueprint',
           branches,
           configuration: node.configuration || {},
@@ -265,6 +267,7 @@ export const Workflow = () => {
         data: {
           label: nodeName.trim(),
           blockName: selectedBlock.name,
+          blockId: selectedBlock.type === 'blueprint' ? (selectedBlock as any).id : selectedBlock.name,
           blockType: selectedBlock.type,
           branches,
           configuration: nodeConfiguration,
@@ -317,7 +320,7 @@ export const Workflow = () => {
         if (node.data.blockType === 'component') {
           baseNode.component = { name: node.data.blockName }
         } else {
-          baseNode.blueprint = { name: node.data.blockName }
+          baseNode.blueprint = { id: node.data.blockId }
         }
 
         return baseNode
@@ -325,6 +328,7 @@ export const Workflow = () => {
 
       const workflowEdges = edges.map((edge) => ({
         sourceId: edge.source!,
+        targetType: 'REF_TYPE_NODE',
         targetId: edge.target!,
         branch: edge.sourceHandle || edge.label as string || 'default',
       }))
@@ -384,6 +388,13 @@ export const Workflow = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/${organizationId}/workflows/${workflowId}/events`)}
+          >
+            <MaterialSymbol name="timeline" />
+            Event Execution Chains
+          </Button>
           <Button
             onClick={handleSave}
             disabled={updateWorkflowMutation.isPending}

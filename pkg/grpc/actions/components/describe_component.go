@@ -17,7 +17,7 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 	branches := make([]*pb.OutputBranch, len(outputs))
 	for i, output := range outputs {
 		branches[i] = &pb.OutputBranch{
-			Name: output,
+			Name: output.Name,
 		}
 	}
 

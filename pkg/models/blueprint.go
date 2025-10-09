@@ -13,6 +13,9 @@ import (
 const (
 	NodeRefTypeComponent = "component"
 	NodeRefTypeBlueprint = "blueprint"
+
+	EdgeTargetTypeNode         = "node"
+	EdgeTargetTypeOutputBranch = "output_branch"
 )
 
 type Blueprint struct {
@@ -25,6 +28,7 @@ type Blueprint struct {
 	Nodes          datatypes.JSONSlice[Node]
 	Edges          datatypes.JSONSlice[Edge]
 	Configuration  datatypes.JSONSlice[components.ConfigurationField]
+	OutputBranches datatypes.JSONSlice[components.OutputBranch]
 }
 
 func (b *Blueprint) FindNode(id string) (*Node, error) {
@@ -37,10 +41,10 @@ func (b *Blueprint) FindNode(id string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", id)
 }
 
-func FindBlueprintByName(name string) (*Blueprint, error) {
+func FindBlueprintByID(id string) (*Blueprint, error) {
 	var blueprint Blueprint
 	err := database.Conn().
-		Where("name = ?", name).
+		Where("id = ?", id).
 		First(&blueprint).
 		Error
 
@@ -69,11 +73,12 @@ type ComponentRef struct {
 }
 
 type BlueprintRef struct {
-	Name string `json:"name"`
+	ID string `json:"id"`
 }
 
 type Edge struct {
-	SourceID string `json:"source_id"`
-	TargetID string `json:"target_id"`
-	Branch   string `json:"branch"`
+	SourceID   string `json:"source_id"`
+	TargetType string `json:"target_type"`
+	TargetID   string `json:"target_id"`
+	Branch     string `json:"branch"`
 }

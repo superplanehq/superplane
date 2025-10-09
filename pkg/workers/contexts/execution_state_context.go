@@ -7,11 +7,10 @@ import (
 
 type ExecutionStateContext struct {
 	execution *models.WorkflowNodeExecution
-	event     *models.WorkflowEvent
 }
 
-func NewExecutionStateContext(execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) components.ExecutionStateContext {
-	return &ExecutionStateContext{execution: execution, event: event}
+func NewExecutionStateContext(execution *models.WorkflowNodeExecution) components.ExecutionStateContext {
+	return &ExecutionStateContext{execution: execution}
 }
 
 func (s *ExecutionStateContext) Wait() error {
@@ -22,9 +21,11 @@ func (s *ExecutionStateContext) Finish(outputs map[string][]any) error {
 	if err := s.execution.Pass(outputs); err != nil {
 		return err
 	}
-	return s.event.Route()
+
+	// Move execution to routing state so router picks it up
+	return s.execution.Route()
 }
 
-func (s *ExecutionStateContext) Fail(reason string) error {
-	return s.execution.Fail(reason)
+func (s *ExecutionStateContext) Fail(reason, message string) error {
+	return s.execution.Fail(reason, message)
 }

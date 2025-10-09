@@ -10,18 +10,7 @@ import { Textarea } from '../../Textarea/textarea'
 import { workflowsInvokeNodeExecutionAction } from '../../../api-client/sdk.gen'
 import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import { showSuccessToast, showErrorToast } from '../../../utils/toast'
-
-const formatTimeAgo = (date: Date): string => {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
-
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
+import { formatTimeAgo } from '../../../utils/date'
 
 const ApprovalActions = ({ execution }: { execution: any }) => {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
@@ -198,7 +187,7 @@ const ApprovalActions = ({ execution }: { execution: any }) => {
 
 // Custom renderer for Approval component executions
 registerExecutionRenderer('approval', {
-  renderCollapsed: ({ execution, onClick }: CollapsedViewProps) => {
+  renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
     const metadata = execution.metadata || {}
     const requiredCount = metadata.required_count || 0
     const approvals = metadata.approvals || []
@@ -221,7 +210,7 @@ registerExecutionRenderer('approval', {
       iconName = 'check_circle'
       badgeClassName = 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800'
     } else {
-      label = `${approvals.length}/${requiredCount} Approvals`
+      label = 'Pending'
       iconName = 'pending'
       badgeClassName = 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800'
     }
@@ -232,19 +221,22 @@ registerExecutionRenderer('approval', {
         onClick={onClick}
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-sm">
             <Badge variant={badgeVariant} className={badgeClassName}>
               <MaterialSymbol name={iconName} size="sm" />
               {label}
             </Badge>
+            <span className="font-semibold text-gray-700 dark:text-gray-300">
+              {approvals.length}/{requiredCount}
+            </span>
           </div>
         </div>
         <div className="flex-shrink-0 flex items-center gap-2">
           <p className="text-xs text-gray-400 dark:text-zinc-500">
-            {formatTimeAgo(new Date(execution.createdAt))}
+            {formatTimeAgo(new Date(execution.createdAt!))}
           </p>
           <MaterialSymbol
-            name="expand_more"
+            name={isExpanded ? 'expand_less' : 'expand_more'}
             size="xl"
             className="text-gray-600 dark:text-zinc-400"
           />
@@ -260,14 +252,14 @@ registerExecutionRenderer('approval', {
     return (
       <div className="space-y-4 text-left">
         {/* Inputs Section */}
-        {execution.inputs && Object.keys(execution.inputs).length > 0 && (
+        {execution.input && Object.keys(execution.input).length > 0 && (
           <>
             <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
               Inputs
             </div>
             <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs text-left">
               <pre className="text-gray-800 dark:text-gray-200 font-mono text-xs overflow-x-auto">
-                {JSON.stringify(execution.inputs, null, 2)}
+                {JSON.stringify(execution.input, null, 2)}
               </pre>
             </div>
           </>

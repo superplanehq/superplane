@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane.Workflows;
 
+import "components.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
@@ -83,17 +84,6 @@ service Workflows {
     };
   }
 
-  rpc ListNodeQueueItems(ListNodeQueueItemsRequest) returns (ListNodeQueueItemsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/queue"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List node queue items";
-      description: "Returns a list of queued events for a specific workflow node";
-      tags: "WorkflowNode";
-    };
-  }
-
   rpc ListNodeExecutions(ListNodeExecutionsRequest) returns (ListNodeExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"
@@ -114,6 +104,28 @@ service Workflows {
       summary: "Invoke execution action";
       description: "Invokes a custom action on a workflow node execution";
       tags: "WorkflowNodeExecution";
+    };
+  }
+
+  rpc ListWorkflowEvents(ListWorkflowEventsRequest) returns (ListWorkflowEventsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/workflows/{workflow_id}/events"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List workflow events";
+      description: "Returns a list of initial events that triggered executions in a workflow";
+      tags: "WorkflowEvent";
+    };
+  }
+
+  rpc ListEventExecutions(ListEventExecutionsRequest) returns (ListEventExecutionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/workflows/{workflow_id}/events/{event_id}/executions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List event executions";
+      description: "Returns a list of all node executions triggered by a specific initial event";
+      tags: "WorkflowEvent";
     };
   }
 }
@@ -162,56 +174,8 @@ message Workflow {
   string description = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
-  repeated WorkflowNode nodes = 7;
-  repeated WorkflowEdge edges = 8;
-}
-
-message WorkflowNode {
-  enum RefType {
-    REF_TYPE_COMPONENT = 0;
-    REF_TYPE_BLUEPRINT = 1;
-  }
-
-  message ComponentRef {
-    string name = 1;
-  }
-
-  message BlueprintRef {
-    string name = 1;
-  }
-
-  string id = 1;
-  string name = 2;
-  RefType ref_type = 3;
-  ComponentRef component = 4;
-  BlueprintRef blueprint = 5;
-  google.protobuf.Struct configuration = 6;
-}
-
-message WorkflowEdge {
-  string source_id = 1;
-  string target_id = 2;
-  string branch = 3;
-}
-
-message ListNodeQueueItemsRequest {
-  string workflow_id = 1;
-  string node_id = 2;
-  uint32 limit = 3;
-  google.protobuf.Timestamp before = 4;
-}
-
-message ListNodeQueueItemsResponse {
-  repeated WorkflowQueueItem queue_items = 1;
-  uint32 total_count = 2;
-  bool has_next_page = 3;
-  google.protobuf.Timestamp last_timestamp = 4;
-}
-
-message WorkflowQueueItem {
-  string event_id = 1;
-  google.protobuf.Timestamp created_at = 2;
-  WorkflowEvent event = 3;
+  repeated Components.Node nodes = 7;
+  repeated Components.Edge edges = 8;
 }
 
 message ListNodeExecutionsRequest {
@@ -236,7 +200,8 @@ message WorkflowNodeExecution {
     STATE_PENDING = 1;
     STATE_WAITING = 2;
     STATE_STARTED = 3;
-    STATE_FINISHED = 4;
+    STATE_ROUTING = 4;
+    STATE_FINISHED = 5;
   }
 
   enum Result {
@@ -252,31 +217,23 @@ message WorkflowNodeExecution {
   }
 
   string id = 1;
-  string event_id = 2;
-  string workflow_id = 3;
-  string node_id = 4;
-  State state = 5;
-  Result result = 6;
-  ResultReason result_reason = 7;
-  string result_message = 8;
-  google.protobuf.Struct inputs = 9;
-  google.protobuf.Struct outputs = 10;
-  google.protobuf.Timestamp created_at = 11;
-  google.protobuf.Timestamp updated_at = 12;
-  WorkflowEvent event = 13;
+  string workflow_id = 2;
+  string node_id = 3;
+  string parent_execution_id = 4;
+  string blueprint_id = 5;
+  State state = 6;
+  Result result = 7;
+  ResultReason result_reason = 8;
+  string result_message = 9;
+  google.protobuf.Struct input = 10;
+  google.protobuf.Struct outputs = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
   google.protobuf.Struct metadata = 14;
   google.protobuf.Struct configuration = 15;
-}
-
-message WorkflowEvent {
-  string id = 1;
-  string workflow_id = 2;
-  string parent_event_id = 3;
-  string blueprint_name = 4;
-  google.protobuf.Struct data = 5;
-  string state = 6;
-  google.protobuf.Timestamp created_at = 7;
-  google.protobuf.Timestamp updated_at = 8;
+  string previous_execution_id = 16;
+  string previous_output_branch = 17;
+  int32 previous_output_index = 18;
 }
 
 message InvokeNodeExecutionActionRequest {
@@ -286,3 +243,32 @@ message InvokeNodeExecutionActionRequest {
 }
 
 message InvokeNodeExecutionActionResponse {}
+
+message ListWorkflowEventsRequest {
+  string workflow_id = 1;
+  uint32 limit = 2;
+  google.protobuf.Timestamp before = 3;
+}
+
+message ListWorkflowEventsResponse {
+  repeated WorkflowInitialEvent events = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
+message WorkflowInitialEvent {
+  string id = 1;
+  string workflow_id = 2;
+  google.protobuf.Struct data = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message ListEventExecutionsRequest {
+  string workflow_id = 1;
+  string event_id = 2;
+}
+
+message ListEventExecutionsResponse {
+  repeated WorkflowNodeExecution executions = 1;
+}

@@ -344,6 +344,7 @@ export const Blueprint = () => {
 
       const blueprintEdges = edges.map((edge) => ({
         sourceId: edge.source!,
+        targetType: 'REF_TYPE_NODE',
         targetId: edge.target!,
         branch: edge.sourceHandle || edge.label as string || 'default',
       }))

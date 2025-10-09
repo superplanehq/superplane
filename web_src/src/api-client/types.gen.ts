@@ -21,32 +21,11 @@ export type BlueprintsBlueprint = {
     description?: string;
     createdAt?: string;
     updatedAt?: string;
-    nodes?: Array<BlueprintsBlueprintNode>;
-    edges?: Array<BlueprintsBlueprintEdge>;
+    nodes?: Array<ComponentsNode>;
+    edges?: Array<ComponentsEdge>;
     configuration?: Array<ComponentsConfigurationField>;
+    outputBranches?: Array<ComponentsOutputBranch>;
 };
-
-export type BlueprintsBlueprintEdge = {
-    sourceId?: string;
-    targetId?: string;
-    branch?: string;
-};
-
-export type BlueprintsBlueprintNode = {
-    id?: string;
-    name?: string;
-    refType?: BlueprintsBlueprintNodeRefType;
-    component?: BlueprintsBlueprintNodeComponentRef;
-    configuration?: {
-        [key: string]: unknown;
-    };
-};
-
-export type BlueprintsBlueprintNodeComponentRef = {
-    name?: string;
-};
-
-export type BlueprintsBlueprintNodeRefType = 'REF_TYPE_COMPONENT';
 
 export type BlueprintsCreateBlueprintRequest = {
     blueprint?: BlueprintsBlueprint;
@@ -104,6 +83,13 @@ export type ComponentsDescribeComponentResponse = {
     component?: ComponentsComponent;
 };
 
+export type ComponentsEdge = {
+    sourceId?: string;
+    targetType?: EdgeTargetType;
+    targetId?: string;
+    branch?: string;
+};
+
 export type ComponentsFieldOption = {
     label?: string;
     value?: string;
@@ -122,9 +108,24 @@ export type ComponentsListItemDefinition = {
     schema?: Array<ComponentsConfigurationField>;
 };
 
+export type ComponentsNode = {
+    id?: string;
+    name?: string;
+    refType?: NodeRefType;
+    component?: NodeComponentRef;
+    blueprint?: NodeBlueprintRef;
+    configuration?: {
+        [key: string]: unknown;
+    };
+};
+
 export type ComponentsOutputBranch = {
     name?: string;
+    label?: string;
+    description?: string;
 };
+
+export type EdgeTargetType = 'REF_TYPE_NODE' | 'REF_TYPE_OUTPUT_BRANCH';
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
@@ -318,6 +319,16 @@ export type IntegrationsUpdateIntegrationResponse = {
 export type MeRegenerateTokenResponse = {
     token?: string;
 };
+
+export type NodeBlueprintRef = {
+    id?: string;
+};
+
+export type NodeComponentRef = {
+    name?: string;
+};
+
+export type NodeRefType = 'REF_TYPE_COMPONENT' | 'REF_TYPE_BLUEPRINT';
 
 export type OrganizationsCreateInvitationBody = {
     email?: string;
@@ -1115,10 +1126,6 @@ export type UsersUserStatus = {
     roleAssignments?: Array<UsersUserRoleAssignment>;
 };
 
-export type WorkflowNodeBlueprintRef = {
-    name?: string;
-};
-
 export type WorkflowsCreateWorkflowRequest = {
     workflow?: WorkflowsWorkflow;
 };
@@ -1145,6 +1152,10 @@ export type WorkflowsInvokeNodeExecutionActionResponse = {
     [key: string]: unknown;
 };
 
+export type WorkflowsListEventExecutionsResponse = {
+    executions?: Array<WorkflowsWorkflowNodeExecution>;
+};
+
 export type WorkflowsListNodeExecutionsResponse = {
     executions?: Array<WorkflowsWorkflowNodeExecution>;
     totalCount?: number;
@@ -1152,8 +1163,8 @@ export type WorkflowsListNodeExecutionsResponse = {
     lastTimestamp?: string;
 };
 
-export type WorkflowsListNodeQueueItemsResponse = {
-    queueItems?: Array<WorkflowsWorkflowQueueItem>;
+export type WorkflowsListWorkflowEventsResponse = {
+    events?: Array<WorkflowsWorkflowInitialEvent>;
     totalCount?: number;
     hasNextPage?: boolean;
     lastTimestamp?: string;
@@ -1178,54 +1189,30 @@ export type WorkflowsWorkflow = {
     description?: string;
     createdAt?: string;
     updatedAt?: string;
-    nodes?: Array<WorkflowsWorkflowNode>;
-    edges?: Array<WorkflowsWorkflowEdge>;
+    nodes?: Array<ComponentsNode>;
+    edges?: Array<ComponentsEdge>;
 };
 
-export type WorkflowsWorkflowEdge = {
-    sourceId?: string;
-    targetId?: string;
-    branch?: string;
-};
-
-export type WorkflowsWorkflowEvent = {
+export type WorkflowsWorkflowInitialEvent = {
     id?: string;
     workflowId?: string;
-    parentEventId?: string;
-    blueprintName?: string;
     data?: {
         [key: string]: unknown;
     };
-    state?: string;
     createdAt?: string;
-    updatedAt?: string;
-};
-
-export type WorkflowsWorkflowNode = {
-    id?: string;
-    name?: string;
-    refType?: WorkflowsWorkflowNodeRefType;
-    component?: WorkflowsWorkflowNodeComponentRef;
-    blueprint?: WorkflowNodeBlueprintRef;
-    configuration?: {
-        [key: string]: unknown;
-    };
-};
-
-export type WorkflowsWorkflowNodeComponentRef = {
-    name?: string;
 };
 
 export type WorkflowsWorkflowNodeExecution = {
     id?: string;
-    eventId?: string;
     workflowId?: string;
     nodeId?: string;
+    parentExecutionId?: string;
+    blueprintId?: string;
     state?: WorkflowsWorkflowNodeExecutionState;
     result?: WorkflowsWorkflowNodeExecutionResult;
     resultReason?: WorkflowsWorkflowNodeExecutionResultReason;
     resultMessage?: string;
-    inputs?: {
+    input?: {
         [key: string]: unknown;
     };
     outputs?: {
@@ -1233,28 +1220,22 @@ export type WorkflowsWorkflowNodeExecution = {
     };
     createdAt?: string;
     updatedAt?: string;
-    event?: WorkflowsWorkflowEvent;
     metadata?: {
         [key: string]: unknown;
     };
     configuration?: {
         [key: string]: unknown;
     };
+    previousExecutionId?: string;
+    previousOutputBranch?: string;
+    previousOutputIndex?: number;
 };
 
 export type WorkflowsWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
 
 export type WorkflowsWorkflowNodeExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR';
 
-export type WorkflowsWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_FINISHED';
-
-export type WorkflowsWorkflowNodeRefType = 'REF_TYPE_COMPONENT' | 'REF_TYPE_BLUEPRINT';
-
-export type WorkflowsWorkflowQueueItem = {
-    eventId?: string;
-    createdAt?: string;
-    event?: WorkflowsWorkflowEvent;
-};
+export type WorkflowsWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_ROUTING' | 'STATE_FINISHED';
 
 export type GooglerpcStatus = {
     code?: number;
@@ -3496,6 +3477,64 @@ export type WorkflowsUpdateWorkflowResponses = {
 
 export type WorkflowsUpdateWorkflowResponse2 = WorkflowsUpdateWorkflowResponses[keyof WorkflowsUpdateWorkflowResponses];
 
+export type WorkflowsListWorkflowEventsData = {
+    body?: never;
+    path: {
+        workflowId: string;
+    };
+    query?: {
+        limit?: number;
+        before?: string;
+    };
+    url: '/api/v1/workflows/{workflowId}/events';
+};
+
+export type WorkflowsListWorkflowEventsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsListWorkflowEventsError = WorkflowsListWorkflowEventsErrors[keyof WorkflowsListWorkflowEventsErrors];
+
+export type WorkflowsListWorkflowEventsResponses = {
+    /**
+     * A successful response.
+     */
+    200: WorkflowsListWorkflowEventsResponse;
+};
+
+export type WorkflowsListWorkflowEventsResponse2 = WorkflowsListWorkflowEventsResponses[keyof WorkflowsListWorkflowEventsResponses];
+
+export type WorkflowsListEventExecutionsData = {
+    body?: never;
+    path: {
+        workflowId: string;
+        eventId: string;
+    };
+    query?: never;
+    url: '/api/v1/workflows/{workflowId}/events/{eventId}/executions';
+};
+
+export type WorkflowsListEventExecutionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsListEventExecutionsError = WorkflowsListEventExecutionsErrors[keyof WorkflowsListEventExecutionsErrors];
+
+export type WorkflowsListEventExecutionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: WorkflowsListEventExecutionsResponse;
+};
+
+export type WorkflowsListEventExecutionsResponse2 = WorkflowsListEventExecutionsResponses[keyof WorkflowsListEventExecutionsResponses];
+
 export type WorkflowsListNodeExecutionsData = {
     body?: never;
     path: {
@@ -3503,7 +3542,7 @@ export type WorkflowsListNodeExecutionsData = {
         nodeId: string;
     };
     query?: {
-        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_FINISHED'>;
+        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_ROUTING' | 'STATE_FINISHED'>;
         results?: Array<'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED'>;
         limit?: number;
         before?: string;
@@ -3528,37 +3567,6 @@ export type WorkflowsListNodeExecutionsResponses = {
 };
 
 export type WorkflowsListNodeExecutionsResponse2 = WorkflowsListNodeExecutionsResponses[keyof WorkflowsListNodeExecutionsResponses];
-
-export type WorkflowsListNodeQueueItemsData = {
-    body?: never;
-    path: {
-        workflowId: string;
-        nodeId: string;
-    };
-    query?: {
-        limit?: number;
-        before?: string;
-    };
-    url: '/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue';
-};
-
-export type WorkflowsListNodeQueueItemsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type WorkflowsListNodeQueueItemsError = WorkflowsListNodeQueueItemsErrors[keyof WorkflowsListNodeQueueItemsErrors];
-
-export type WorkflowsListNodeQueueItemsResponses = {
-    /**
-     * A successful response.
-     */
-    200: WorkflowsListNodeQueueItemsResponse;
-};
-
-export type WorkflowsListNodeQueueItemsResponse2 = WorkflowsListNodeQueueItemsResponses[keyof WorkflowsListNodeQueueItemsResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

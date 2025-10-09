@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/components"
@@ -49,9 +50,26 @@ func (w *PendingNodeExecutionWorker) processExecutions() error {
 	}
 
 	for _, execution := range executions {
+		// Check if there's already an execution running for this node
+		// Only process if no other execution is in started/waiting state
+		_, err := models.FindLastNodeExecutionForNode(
+			execution.WorkflowID,
+			execution.NodeID,
+			[]string{
+				models.WorkflowNodeExecutionStateWaiting,
+				models.WorkflowNodeExecutionStateStarted,
+			},
+		)
+
+		if err == nil {
+			// An execution is already running for this node, skip
+			w.log("Node %s already has a running execution, skipping", execution.NodeID)
+			continue
+		}
+
 		if err := w.executeNode(&execution); err != nil {
 			w.log("Error executing node %s: %v", execution.NodeID, err)
-			if err := execution.Fail(err.Error()); err != nil {
+			if err := execution.Fail(models.WorkflowNodeExecutionResultReasonError, err.Error()); err != nil {
 				w.log("Error marking execution as failed: %v", err)
 			}
 		}
@@ -61,7 +79,7 @@ func (w *PendingNodeExecutionWorker) processExecutions() error {
 }
 
 func (w *PendingNodeExecutionWorker) executeNode(execution *models.WorkflowNodeExecution) error {
-	w.log("Executing node: workflow=%s, node=%s, event=%s", execution.WorkflowID, execution.NodeID, execution.EventID)
+	w.log("Executing node: workflow=%s, node=%s, execution=%s", execution.WorkflowID, execution.NodeID, execution.ID)
 
 	node, err := w.findNode(execution)
 	if err != nil {
@@ -69,7 +87,7 @@ func (w *PendingNodeExecutionWorker) executeNode(execution *models.WorkflowNodeE
 	}
 
 	if node.Ref.Blueprint != nil {
-		w.log("Node %s is a blueprint node (%s)", execution.NodeID, node.Ref.Blueprint.Name)
+		w.log("Node %s is a blueprint node (%s)", execution.NodeID, node.Ref.Blueprint.ID)
 		return w.executeBlueprintNode(execution, node)
 	}
 
@@ -78,27 +96,18 @@ func (w *PendingNodeExecutionWorker) executeNode(execution *models.WorkflowNodeE
 }
 
 func (w *PendingNodeExecutionWorker) findNode(execution *models.WorkflowNodeExecution) (*models.Node, error) {
-	event, err := models.FindWorkflowEvent(execution.EventID.String())
-	if err != nil {
-		return nil, fmt.Errorf("workflow event %s not found: %w", execution.EventID, err)
-	}
-
-	//
-	// If this event is for a blueprint, find the node in the blueprint
-	//
-	if event.BlueprintName != nil {
-		w.log("Looking for node %s in blueprint '%s'", execution.NodeID, *event.BlueprintName)
-		blueprint, err := models.FindBlueprintByName(*event.BlueprintName)
+	// If this execution is inside a blueprint, find the node in the blueprint
+	if execution.BlueprintID != nil {
+		w.log("Looking for node %s in blueprint '%s'", execution.NodeID, *execution.BlueprintID)
+		blueprint, err := models.FindBlueprintByID(execution.BlueprintID.String())
 		if err != nil {
-			return nil, fmt.Errorf("blueprint %s not found: %w", *event.BlueprintName, err)
+			return nil, fmt.Errorf("blueprint %s not found: %w", *execution.BlueprintID, err)
 		}
 
 		return blueprint.FindNode(execution.NodeID)
 	}
 
-	//
-	// Otherwise, find it in the workflow itself.
-	//
+	// Otherwise, find it in the workflow itself
 	w.log("Looking for node %s in workflow %s", execution.NodeID, execution.WorkflowID)
 	workflow, err := models.FindWorkflow(execution.WorkflowID)
 	if err != nil {
@@ -109,48 +118,74 @@ func (w *PendingNodeExecutionWorker) findNode(execution *models.WorkflowNodeExec
 }
 
 func (w *PendingNodeExecutionWorker) executeBlueprintNode(execution *models.WorkflowNodeExecution, node *models.Node) error {
-	_, err := models.FindBlueprintByName(node.Ref.Blueprint.Name)
+	blueprint, err := models.FindBlueprintByID(node.Ref.Blueprint.ID)
 	if err != nil {
-		return fmt.Errorf("blueprint %s not found: %w", node.Ref.Blueprint.Name, err)
+		return fmt.Errorf("blueprint %s not found: %w", node.Ref.Blueprint.ID, err)
 	}
 
-	event, err := models.FindWorkflowEvent(execution.EventID.String())
-	if err != nil {
-		return fmt.Errorf("workflow event %s not found: %w", execution.EventID, err)
+	w.log("Executing blueprint node %s (blueprint: %s)", execution.NodeID, node.Ref.Blueprint.ID)
+
+	// Find first node in blueprint (node with no incoming edges)
+	firstNode := w.findFirstNodeInBlueprint(blueprint)
+	if firstNode == nil {
+		return fmt.Errorf("blueprint %s has no start node", blueprint.ID)
 	}
 
-	//
-	// For blueprint executions,
-	// we create a child workflow_events record with the blueprint name.
-	//
-	w.log("Creating child event for blueprint %s", node.Ref.Blueprint.Name)
+	blueprintID, err := uuid.Parse(node.Ref.Blueprint.ID)
+	if err != nil {
+		return fmt.Errorf("invalid blueprint ID: %w", err)
+	}
 
 	now := time.Now()
-	blueprintName := node.Ref.Blueprint.Name
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		childEvent := models.WorkflowEvent{
-			ID:            uuid.New(),
-			WorkflowID:    execution.WorkflowID,
-			ParentEventID: &event.ID,
-			BlueprintName: &blueprintName,
-			Data:          event.Data,
-			State:         models.WorkflowEventStateRouting,
-			CreatedAt:     &now,
-			UpdatedAt:     &now,
+		// Create first execution inside blueprint
+		// This execution inherits from the blueprint node execution
+		firstExec := models.WorkflowNodeExecution{
+			ID:                   uuid.New(),
+			WorkflowID:           execution.WorkflowID,
+			NodeID:               firstNode.ID,
+			RootEventID:          execution.RootEventID,
+			PreviousExecutionID:  &execution.ID,
+			PreviousOutputBranch: nil, // Special: entering blueprint, will use blueprint node's inputs
+			PreviousOutputIndex:  nil,
+			ParentExecutionID:    &execution.ID,
+			BlueprintID:          &blueprintID,
+			State:                models.WorkflowNodeExecutionStatePending,
+			Configuration:        datatypes.NewJSONType(firstNode.Configuration),
+			CreatedAt:            &now,
+			UpdatedAt:            &now,
 		}
 
-		if err := tx.Create(&childEvent).Error; err != nil {
-			return err
+		if err := tx.Create(&firstExec).Error; err != nil {
+			return fmt.Errorf("failed to create first blueprint execution: %w", err)
 		}
 
-		w.log("Created child event %s for blueprint %s", childEvent.ID, blueprintName)
+		w.log("Created first execution %s in blueprint for node %s", firstExec.ID, firstNode.ID)
+
+		// Move blueprint node to started state (waiting for children)
 		return execution.StartInTransaction(tx)
 	})
 }
 
+func (w *PendingNodeExecutionWorker) findFirstNodeInBlueprint(blueprint *models.Blueprint) *models.Node {
+	hasIncoming := make(map[string]bool)
+	for _, edge := range blueprint.Edges {
+		if edge.TargetType == "node" {
+			hasIncoming[edge.TargetID] = true
+		}
+	}
+
+	for _, node := range blueprint.Nodes {
+		if !hasIncoming[node.ID] {
+			return &node
+		}
+	}
+
+	return nil
+}
+
 func (w *PendingNodeExecutionWorker) executeComponentNode(execution *models.WorkflowNodeExecution, node *models.Node) error {
-	err := execution.Start()
-	if err != nil {
+	if err := execution.Start(); err != nil {
 		return fmt.Errorf("failed to start execution: %w", err)
 	}
 
@@ -159,27 +194,24 @@ func (w *PendingNodeExecutionWorker) executeComponentNode(execution *models.Work
 		return fmt.Errorf("component %s not found: %w", node.Ref.Component.Name, err)
 	}
 
-	event, err := models.FindWorkflowEvent(execution.EventID.String())
+	inputs, err := execution.GetInputs()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get execution inputs: %w", err)
 	}
 
 	ctx := components.ExecutionContext{
 		Configuration:         execution.Configuration.Data(),
-		Data:                  execution.Inputs.Data(),
+		Data:                  inputs,
 		MetadataContext:       contexts.NewMetadataContext(execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(execution, event),
+		ExecutionStateContext: contexts.NewExecutionStateContext(execution),
 	}
 
-	//
-	// Execute component - it handles its own lifecycle
-	//
-	err = component.Execute(ctx)
-	if err != nil {
-		return execution.Fail(err.Error())
+	if err := component.Execute(ctx); err != nil {
+		w.log("Component execution failed for %s (execution=%s): %v", node.Ref.Component.Name, execution.ID, err)
+		return execution.Fail(models.WorkflowNodeExecutionResultReasonError, err.Error())
 	}
 
-	// Save any metadata changes
+	w.log("Component execution completed successfully for %s (execution=%s)", node.Ref.Component.Name, execution.ID)
 	return database.Conn().Save(execution).Error
 }
 

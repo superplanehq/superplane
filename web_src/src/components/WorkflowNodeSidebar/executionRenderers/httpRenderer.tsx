@@ -4,6 +4,7 @@ import { Badge } from '../../ui/badge'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
+import { formatTimeAgo } from '../../../utils/date'
 
 const getResultBadge = (result: string) => {
   switch (result) {
@@ -33,21 +34,9 @@ const getResultBadge = (result: string) => {
   }
 }
 
-const formatTimeAgo = (date: Date): string => {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
-
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
 // Custom renderer for HTTP component executions
 registerExecutionRenderer('http', {
-  renderCollapsed: ({ execution, onClick }: CollapsedViewProps) => {
+  renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
     // Extract response status from outputs
     const response = execution.outputs?.default?.[0]
     const method = execution.configuration?.method
@@ -105,10 +94,10 @@ registerExecutionRenderer('http', {
         </div>
         <div className="flex-shrink-0 flex items-center gap-2">
           <p className="text-xs text-gray-400 dark:text-zinc-500">
-            {formatTimeAgo(new Date(execution.createdAt))}
+            {formatTimeAgo(new Date(execution.createdAt!))}
           </p>
           <MaterialSymbol
-            name="expand_more"
+            name={isExpanded ? 'expand_less' : 'expand_more'}
             size="xl"
             className="text-gray-600 dark:text-zinc-400"
           />
@@ -144,10 +133,10 @@ registerExecutionRenderer('http', {
                 <span className="text-gray-800 dark:text-gray-200 font-mono break-all">{url}</span>
               </div>
 
-              {execution.inputs && (
+              {execution.input && (
                 <div>
                   <pre className="pl-4 text-gray-800 dark:text-gray-200 font-mono text-xs overflow-x-auto bg-white dark:bg-zinc-900 p-2 rounded border border-gray-200 dark:border-zinc-600">
-                    {JSON.stringify(execution.inputs, null, 2)}
+                    {JSON.stringify(execution.input, null, 2)}
                   </pre>
                 </div>
               )}

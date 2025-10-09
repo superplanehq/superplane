@@ -70,17 +70,12 @@ func InvokeNodeExecutionAction(ctx context.Context, registry *registry.Registry,
 		return nil, fmt.Errorf("action parameter validation failed: %w", err)
 	}
 
-	event, err := models.FindWorkflowEvent(execution.EventID.String())
-	if err != nil {
-		return nil, fmt.Errorf("workflow event not found: %w", err)
-	}
-
 	// TODO: Get user ID from context
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
 		Parameters:            parameters,
 		MetadataContext:       contexts.NewMetadataContext(&execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(&execution, event),
+		ExecutionStateContext: contexts.NewExecutionStateContext(&execution),
 	}
 
 	err = component.HandleAction(actionCtx)

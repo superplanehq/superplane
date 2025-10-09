@@ -15,33 +15,33 @@ import (
 	"encoding/json"
 )
 
-// checks if the WorkflowNodeBlueprintRef type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &WorkflowNodeBlueprintRef{}
+// checks if the NodeComponentRef type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &NodeComponentRef{}
 
-// WorkflowNodeBlueprintRef struct for WorkflowNodeBlueprintRef
-type WorkflowNodeBlueprintRef struct {
+// NodeComponentRef struct for NodeComponentRef
+type NodeComponentRef struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// NewWorkflowNodeBlueprintRef instantiates a new WorkflowNodeBlueprintRef object
+// NewNodeComponentRef instantiates a new NodeComponentRef object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewWorkflowNodeBlueprintRef() *WorkflowNodeBlueprintRef {
-	this := WorkflowNodeBlueprintRef{}
+func NewNodeComponentRef() *NodeComponentRef {
+	this := NodeComponentRef{}
 	return &this
 }
 
-// NewWorkflowNodeBlueprintRefWithDefaults instantiates a new WorkflowNodeBlueprintRef object
+// NewNodeComponentRefWithDefaults instantiates a new NodeComponentRef object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewWorkflowNodeBlueprintRefWithDefaults() *WorkflowNodeBlueprintRef {
-	this := WorkflowNodeBlueprintRef{}
+func NewNodeComponentRefWithDefaults() *NodeComponentRef {
+	this := NodeComponentRef{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *WorkflowNodeBlueprintRef) GetName() string {
+func (o *NodeComponentRef) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -51,7 +51,7 @@ func (o *WorkflowNodeBlueprintRef) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowNodeBlueprintRef) GetNameOk() (*string, bool) {
+func (o *NodeComponentRef) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -59,7 +59,7 @@ func (o *WorkflowNodeBlueprintRef) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *WorkflowNodeBlueprintRef) HasName() bool {
+func (o *NodeComponentRef) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -68,11 +68,11 @@ func (o *WorkflowNodeBlueprintRef) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *WorkflowNodeBlueprintRef) SetName(v string) {
+func (o *NodeComponentRef) SetName(v string) {
 	o.Name = &v
 }
 
-func (o WorkflowNodeBlueprintRef) MarshalJSON() ([]byte, error) {
+func (o NodeComponentRef) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -80,7 +80,7 @@ func (o WorkflowNodeBlueprintRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o WorkflowNodeBlueprintRef) ToMap() (map[string]interface{}, error) {
+func (o NodeComponentRef) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -88,38 +88,38 @@ func (o WorkflowNodeBlueprintRef) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableWorkflowNodeBlueprintRef struct {
-	value *WorkflowNodeBlueprintRef
+type NullableNodeComponentRef struct {
+	value *NodeComponentRef
 	isSet bool
 }
 
-func (v NullableWorkflowNodeBlueprintRef) Get() *WorkflowNodeBlueprintRef {
+func (v NullableNodeComponentRef) Get() *NodeComponentRef {
 	return v.value
 }
 
-func (v *NullableWorkflowNodeBlueprintRef) Set(val *WorkflowNodeBlueprintRef) {
+func (v *NullableNodeComponentRef) Set(val *NodeComponentRef) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableWorkflowNodeBlueprintRef) IsSet() bool {
+func (v NullableNodeComponentRef) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableWorkflowNodeBlueprintRef) Unset() {
+func (v *NullableNodeComponentRef) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableWorkflowNodeBlueprintRef(val *WorkflowNodeBlueprintRef) *NullableWorkflowNodeBlueprintRef {
-	return &NullableWorkflowNodeBlueprintRef{value: val, isSet: true}
+func NewNullableNodeComponentRef(val *NodeComponentRef) *NullableNodeComponentRef {
+	return &NullableNodeComponentRef{value: val, isSet: true}
 }
 
-func (v NullableWorkflowNodeBlueprintRef) MarshalJSON() ([]byte, error) {
+func (v NullableNodeComponentRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableWorkflowNodeBlueprintRef) UnmarshalJSON(src []byte) error {
+func (v *NullableNodeComponentRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

@@ -15,42 +15,42 @@ import (
 	"encoding/json"
 )
 
-// checks if the WorkflowsWorkflowNode type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &WorkflowsWorkflowNode{}
+// checks if the ComponentsNode type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ComponentsNode{}
 
-// WorkflowsWorkflowNode struct for WorkflowsWorkflowNode
-type WorkflowsWorkflowNode struct {
+// ComponentsNode struct for ComponentsNode
+type ComponentsNode struct {
 	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
-	RefType *WorkflowsWorkflowNodeRefType `json:"refType,omitempty"`
-	Component *WorkflowsWorkflowNodeComponentRef `json:"component,omitempty"`
-	Blueprint *WorkflowNodeBlueprintRef `json:"blueprint,omitempty"`
+	RefType *NodeRefType `json:"refType,omitempty"`
+	Component *NodeComponentRef `json:"component,omitempty"`
+	Blueprint *NodeBlueprintRef `json:"blueprint,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 }
 
-// NewWorkflowsWorkflowNode instantiates a new WorkflowsWorkflowNode object
+// NewComponentsNode instantiates a new ComponentsNode object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewWorkflowsWorkflowNode() *WorkflowsWorkflowNode {
-	this := WorkflowsWorkflowNode{}
-	var refType WorkflowsWorkflowNodeRefType = WORKFLOWSWORKFLOWNODEREFTYPE_REF_TYPE_COMPONENT
+func NewComponentsNode() *ComponentsNode {
+	this := ComponentsNode{}
+	var refType NodeRefType = NODEREFTYPE_REF_TYPE_COMPONENT
 	this.RefType = &refType
 	return &this
 }
 
-// NewWorkflowsWorkflowNodeWithDefaults instantiates a new WorkflowsWorkflowNode object
+// NewComponentsNodeWithDefaults instantiates a new ComponentsNode object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewWorkflowsWorkflowNodeWithDefaults() *WorkflowsWorkflowNode {
-	this := WorkflowsWorkflowNode{}
-	var refType WorkflowsWorkflowNodeRefType = WORKFLOWSWORKFLOWNODEREFTYPE_REF_TYPE_COMPONENT
+func NewComponentsNodeWithDefaults() *ComponentsNode {
+	this := ComponentsNode{}
+	var refType NodeRefType = NODEREFTYPE_REF_TYPE_COMPONENT
 	this.RefType = &refType
 	return &this
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNode) GetId() string {
+func (o *ComponentsNode) GetId() string {
 	if o == nil || IsNil(o.Id) {
 		var ret string
 		return ret
@@ -60,7 +60,7 @@ func (o *WorkflowsWorkflowNode) GetId() string {
 
 // GetIdOk returns a tuple with the Id field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNode) GetIdOk() (*string, bool) {
+func (o *ComponentsNode) GetIdOk() (*string, bool) {
 	if o == nil || IsNil(o.Id) {
 		return nil, false
 	}
@@ -68,7 +68,7 @@ func (o *WorkflowsWorkflowNode) GetIdOk() (*string, bool) {
 }
 
 // HasId returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNode) HasId() bool {
+func (o *ComponentsNode) HasId() bool {
 	if o != nil && !IsNil(o.Id) {
 		return true
 	}
@@ -77,12 +77,12 @@ func (o *WorkflowsWorkflowNode) HasId() bool {
 }
 
 // SetId gets a reference to the given string and assigns it to the Id field.
-func (o *WorkflowsWorkflowNode) SetId(v string) {
+func (o *ComponentsNode) SetId(v string) {
 	o.Id = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNode) GetName() string {
+func (o *ComponentsNode) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -92,7 +92,7 @@ func (o *WorkflowsWorkflowNode) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNode) GetNameOk() (*string, bool) {
+func (o *ComponentsNode) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -100,7 +100,7 @@ func (o *WorkflowsWorkflowNode) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNode) HasName() bool {
+func (o *ComponentsNode) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -109,14 +109,14 @@ func (o *WorkflowsWorkflowNode) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *WorkflowsWorkflowNode) SetName(v string) {
+func (o *ComponentsNode) SetName(v string) {
 	o.Name = &v
 }
 
 // GetRefType returns the RefType field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNode) GetRefType() WorkflowsWorkflowNodeRefType {
+func (o *ComponentsNode) GetRefType() NodeRefType {
 	if o == nil || IsNil(o.RefType) {
-		var ret WorkflowsWorkflowNodeRefType
+		var ret NodeRefType
 		return ret
 	}
 	return *o.RefType
@@ -124,7 +124,7 @@ func (o *WorkflowsWorkflowNode) GetRefType() WorkflowsWorkflowNodeRefType {
 
 // GetRefTypeOk returns a tuple with the RefType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNode) GetRefTypeOk() (*WorkflowsWorkflowNodeRefType, bool) {
+func (o *ComponentsNode) GetRefTypeOk() (*NodeRefType, bool) {
 	if o == nil || IsNil(o.RefType) {
 		return nil, false
 	}
@@ -132,7 +132,7 @@ func (o *WorkflowsWorkflowNode) GetRefTypeOk() (*WorkflowsWorkflowNodeRefType, b
 }
 
 // HasRefType returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNode) HasRefType() bool {
+func (o *ComponentsNode) HasRefType() bool {
 	if o != nil && !IsNil(o.RefType) {
 		return true
 	}
@@ -140,15 +140,15 @@ func (o *WorkflowsWorkflowNode) HasRefType() bool {
 	return false
 }
 
-// SetRefType gets a reference to the given WorkflowsWorkflowNodeRefType and assigns it to the RefType field.
-func (o *WorkflowsWorkflowNode) SetRefType(v WorkflowsWorkflowNodeRefType) {
+// SetRefType gets a reference to the given NodeRefType and assigns it to the RefType field.
+func (o *ComponentsNode) SetRefType(v NodeRefType) {
 	o.RefType = &v
 }
 
 // GetComponent returns the Component field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNode) GetComponent() WorkflowsWorkflowNodeComponentRef {
+func (o *ComponentsNode) GetComponent() NodeComponentRef {
 	if o == nil || IsNil(o.Component) {
-		var ret WorkflowsWorkflowNodeComponentRef
+		var ret NodeComponentRef
 		return ret
 	}
 	return *o.Component
@@ -156,7 +156,7 @@ func (o *WorkflowsWorkflowNode) GetComponent() WorkflowsWorkflowNodeComponentRef
 
 // GetComponentOk returns a tuple with the Component field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNode) GetComponentOk() (*WorkflowsWorkflowNodeComponentRef, bool) {
+func (o *ComponentsNode) GetComponentOk() (*NodeComponentRef, bool) {
 	if o == nil || IsNil(o.Component) {
 		return nil, false
 	}
@@ -164,7 +164,7 @@ func (o *WorkflowsWorkflowNode) GetComponentOk() (*WorkflowsWorkflowNodeComponen
 }
 
 // HasComponent returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNode) HasComponent() bool {
+func (o *ComponentsNode) HasComponent() bool {
 	if o != nil && !IsNil(o.Component) {
 		return true
 	}
@@ -172,15 +172,15 @@ func (o *WorkflowsWorkflowNode) HasComponent() bool {
 	return false
 }
 
-// SetComponent gets a reference to the given WorkflowsWorkflowNodeComponentRef and assigns it to the Component field.
-func (o *WorkflowsWorkflowNode) SetComponent(v WorkflowsWorkflowNodeComponentRef) {
+// SetComponent gets a reference to the given NodeComponentRef and assigns it to the Component field.
+func (o *ComponentsNode) SetComponent(v NodeComponentRef) {
 	o.Component = &v
 }
 
 // GetBlueprint returns the Blueprint field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNode) GetBlueprint() WorkflowNodeBlueprintRef {
+func (o *ComponentsNode) GetBlueprint() NodeBlueprintRef {
 	if o == nil || IsNil(o.Blueprint) {
-		var ret WorkflowNodeBlueprintRef
+		var ret NodeBlueprintRef
 		return ret
 	}
 	return *o.Blueprint
@@ -188,7 +188,7 @@ func (o *WorkflowsWorkflowNode) GetBlueprint() WorkflowNodeBlueprintRef {
 
 // GetBlueprintOk returns a tuple with the Blueprint field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNode) GetBlueprintOk() (*WorkflowNodeBlueprintRef, bool) {
+func (o *ComponentsNode) GetBlueprintOk() (*NodeBlueprintRef, bool) {
 	if o == nil || IsNil(o.Blueprint) {
 		return nil, false
 	}
@@ -196,7 +196,7 @@ func (o *WorkflowsWorkflowNode) GetBlueprintOk() (*WorkflowNodeBlueprintRef, boo
 }
 
 // HasBlueprint returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNode) HasBlueprint() bool {
+func (o *ComponentsNode) HasBlueprint() bool {
 	if o != nil && !IsNil(o.Blueprint) {
 		return true
 	}
@@ -204,13 +204,13 @@ func (o *WorkflowsWorkflowNode) HasBlueprint() bool {
 	return false
 }
 
-// SetBlueprint gets a reference to the given WorkflowNodeBlueprintRef and assigns it to the Blueprint field.
-func (o *WorkflowsWorkflowNode) SetBlueprint(v WorkflowNodeBlueprintRef) {
+// SetBlueprint gets a reference to the given NodeBlueprintRef and assigns it to the Blueprint field.
+func (o *ComponentsNode) SetBlueprint(v NodeBlueprintRef) {
 	o.Blueprint = &v
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNode) GetConfiguration() map[string]interface{} {
+func (o *ComponentsNode) GetConfiguration() map[string]interface{} {
 	if o == nil || IsNil(o.Configuration) {
 		var ret map[string]interface{}
 		return ret
@@ -220,7 +220,7 @@ func (o *WorkflowsWorkflowNode) GetConfiguration() map[string]interface{} {
 
 // GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNode) GetConfigurationOk() (map[string]interface{}, bool) {
+func (o *ComponentsNode) GetConfigurationOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Configuration) {
 		return map[string]interface{}{}, false
 	}
@@ -228,7 +228,7 @@ func (o *WorkflowsWorkflowNode) GetConfigurationOk() (map[string]interface{}, bo
 }
 
 // HasConfiguration returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNode) HasConfiguration() bool {
+func (o *ComponentsNode) HasConfiguration() bool {
 	if o != nil && !IsNil(o.Configuration) {
 		return true
 	}
@@ -237,11 +237,11 @@ func (o *WorkflowsWorkflowNode) HasConfiguration() bool {
 }
 
 // SetConfiguration gets a reference to the given map[string]interface{} and assigns it to the Configuration field.
-func (o *WorkflowsWorkflowNode) SetConfiguration(v map[string]interface{}) {
+func (o *ComponentsNode) SetConfiguration(v map[string]interface{}) {
 	o.Configuration = v
 }
 
-func (o WorkflowsWorkflowNode) MarshalJSON() ([]byte, error) {
+func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -249,7 +249,7 @@ func (o WorkflowsWorkflowNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o WorkflowsWorkflowNode) ToMap() (map[string]interface{}, error) {
+func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
@@ -272,38 +272,38 @@ func (o WorkflowsWorkflowNode) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableWorkflowsWorkflowNode struct {
-	value *WorkflowsWorkflowNode
+type NullableComponentsNode struct {
+	value *ComponentsNode
 	isSet bool
 }
 
-func (v NullableWorkflowsWorkflowNode) Get() *WorkflowsWorkflowNode {
+func (v NullableComponentsNode) Get() *ComponentsNode {
 	return v.value
 }
 
-func (v *NullableWorkflowsWorkflowNode) Set(val *WorkflowsWorkflowNode) {
+func (v *NullableComponentsNode) Set(val *ComponentsNode) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableWorkflowsWorkflowNode) IsSet() bool {
+func (v NullableComponentsNode) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableWorkflowsWorkflowNode) Unset() {
+func (v *NullableComponentsNode) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableWorkflowsWorkflowNode(val *WorkflowsWorkflowNode) *NullableWorkflowsWorkflowNode {
-	return &NullableWorkflowsWorkflowNode{value: val, isSet: true}
+func NewNullableComponentsNode(val *ComponentsNode) *NullableComponentsNode {
+	return &NullableComponentsNode{value: val, isSet: true}
 }
 
-func (v NullableWorkflowsWorkflowNode) MarshalJSON() ([]byte, error) {
+func (v NullableComponentsNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableWorkflowsWorkflowNode) UnmarshalJSON(src []byte) error {
+func (v *NullableComponentsNode) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

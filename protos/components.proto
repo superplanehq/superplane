@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane.Components;
 
+import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -106,6 +107,8 @@ message ListItemDefinition {
 
 message OutputBranch {
   string name = 1;
+  string label = 2;
+  string description = 3;
 }
 
 message ListComponentActionsRequest {
@@ -120,4 +123,38 @@ message ComponentAction {
 
 message ListComponentActionsResponse {
   repeated ComponentAction actions = 1;
+}
+
+message Node {
+  enum RefType {
+    REF_TYPE_COMPONENT = 0;
+    REF_TYPE_BLUEPRINT = 1;
+  }
+
+  message ComponentRef {
+    string name = 1;
+  }
+
+  message BlueprintRef {
+    string id = 1;
+  }
+
+  string id = 1;
+  string name = 2;
+  RefType ref_type = 3;
+  ComponentRef component = 4;
+  BlueprintRef blueprint = 5;
+  google.protobuf.Struct configuration = 6;
+}
+
+message Edge {
+  enum TargetType {
+    REF_TYPE_NODE = 0;
+    REF_TYPE_OUTPUT_BRANCH = 1;
+  }
+
+  string source_id = 1;
+  TargetType target_type = 2;
+  string target_id = 3;
+  string branch = 4;
 }

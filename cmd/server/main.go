@@ -134,17 +134,10 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start()
 	}
 
-	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" {
-		log.Println("Starting Workflow Event Router")
+	if os.Getenv("START_EXECUTION_ROUTER") == "yes" {
+		log.Println("Starting Execution Router")
 
-		w := workers.NewWorkflowEventRouter()
-		go w.Start(context.Background())
-	}
-
-	if os.Getenv("START_WORKFLOW_QUEUE_WORKER") == "yes" {
-		log.Println("Starting Workflow Queue Worker")
-
-		w := workers.NewWorkflowQueueWorker()
+		w := workers.NewExecutionRouter()
 		go w.Start(context.Background())
 	}
 

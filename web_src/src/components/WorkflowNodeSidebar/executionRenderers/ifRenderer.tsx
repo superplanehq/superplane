@@ -1,201 +1,100 @@
-import { registerExecutionRenderer, ExecutionRendererProps } from './registry'
+import { registerExecutionRenderer, CollapsedViewProps, ExpandedViewProps } from './registry'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
+import { Badge } from '../../ui/badge'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
+import { formatTimeAgo } from '../../../utils/date'
 
 // Custom renderer for IF component executions
 registerExecutionRenderer('if', {
-  renderCustomSections: ({ execution, isDarkMode }: ExecutionRendererProps) => {
-    const inputs = execution.inputs
+  renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
     const outputs = execution.outputs
+    const isFailed = execution.result === 'RESULT_FAILED'
 
     // Extract condition expression from configuration
-    const conditionExpression = execution.configuration?.expression
-    const condition = inputs?.condition
+    const conditionExpression = execution.configuration?.expression || 'No expression'
 
     // Determine which branch was taken
     const trueBranch = outputs?.true
     const falseBranch = outputs?.false
-    const branchTaken = trueBranch && trueBranch.length > 0 ? 'true' :
-                        falseBranch && falseBranch.length > 0 ? 'false' :
-                        'none'
+    const branchTaken = trueBranch && trueBranch.length > 0 ? 'TRUE' :
+                        falseBranch && falseBranch.length > 0 ? 'FALSE' :
+                        'NONE'
 
     return (
-      <div className="space-y-3">
-        {/* Condition Section */}
-        <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-          Condition
-        </div>
-        <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs">
-          <div className="space-y-2">
-            <div className="flex items-start gap-2">
-              <MaterialSymbol
-                name={branchTaken === 'true' ? 'check_circle' : branchTaken === 'false' ? 'cancel' : 'help'}
-                size="md"
-                className={
-                  branchTaken === 'true' ? 'text-green-600 dark:text-green-400' :
-                  branchTaken === 'false' ? 'text-red-600 dark:text-red-400' :
-                  'text-gray-600 dark:text-gray-400'
-                }
-              />
-              <div className="flex-1">
-                <div className="font-medium mb-1">
-                  Evaluated to: <span className={`font-bold ${
-                    branchTaken === 'true' ? 'text-green-600 dark:text-green-400' :
-                    branchTaken === 'false' ? 'text-red-600 dark:text-red-400' :
-                    'text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {branchTaken.toUpperCase()}
-                  </span>
-                </div>
-                {conditionExpression && (
-                  <div className="mt-2">
-                    <div className="text-gray-500 dark:text-zinc-400 mb-1">Expression:</div>
-                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-2 rounded">
-                      <code className="text-gray-800 dark:text-gray-200 font-mono text-xs break-all">
-                        {conditionExpression}
-                      </code>
-                    </div>
-                  </div>
-                )}
-                {condition !== undefined && (
-                  <div className="mt-2">
-                    <div className="text-gray-500 dark:text-zinc-400 mb-1">Evaluated Result:</div>
-                    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-2 rounded font-mono text-xs">
-                      <JsonView
-                        value={condition}
-                        style={{
-                          fontSize: '12px',
-                          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                          backgroundColor: 'transparent',
-                          textAlign: 'left',
-                          ...(isDarkMode ? darkTheme : lightTheme)
-                        }}
-                        displayDataTypes={false}
-                        displayObjectSize={false}
-                        enableClipboard={false}
-                        collapsed={1}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+      <div
+        className="flex items-center gap-3 cursor-pointer"
+        onClick={onClick}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded truncate">{conditionExpression}</span>
+            <MaterialSymbol name="arrow_forward" size="sm" className="text-gray-400 dark:text-gray-500" />
+            <span className="font-semibold text-blue-600 dark:text-blue-400">{isFailed ? 'FAILED' : branchTaken}</span>
           </div>
         </div>
-
-        {/* Branches Section */}
-        <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-          Branches
+        <div className="flex-shrink-0 flex items-center gap-2">
+          <p className="text-xs text-gray-400 dark:text-zinc-500">
+            {formatTimeAgo(new Date(execution.createdAt!))}
+          </p>
+          <MaterialSymbol
+            name={isExpanded ? 'expand_less' : 'expand_more'}
+            size="xl"
+            className="text-gray-600 dark:text-zinc-400"
+          />
         </div>
-        <div className="space-y-2">
-          {/* True Branch */}
-          <div className={`bg-zinc-50 dark:bg-zinc-800 border p-3 text-xs ${
-            branchTaken === 'true'
-              ? 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-900/20'
-              : 'border-gray-200 dark:border-zinc-700'
-          }`}>
-            <div className="flex items-center gap-2 mb-2">
-              <MaterialSymbol
-                name="arrow_forward"
-                size="md"
-                className={branchTaken === 'true' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-zinc-500'}
-              />
-              <span className={`font-semibold uppercase tracking-wide ${
-                branchTaken === 'true' ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-zinc-400'
-              }`}>
-                TRUE Branch
-              </span>
-              {branchTaken === 'true' && (
-                <span className="ml-auto px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                  Taken
-                </span>
-              )}
-            </div>
-            {trueBranch && trueBranch.length > 0 ? (
-              <div className="pl-6 text-left">
-                <div className="text-gray-500 dark:text-zinc-400 mb-1">
-                  Output ({trueBranch.length} {trueBranch.length === 1 ? 'item' : 'items'}):
-                </div>
-                <JsonView
-                  value={trueBranch}
-                  style={{
-                    fontSize: '12px',
-                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                    backgroundColor: 'transparent',
-                    textAlign: 'left',
-                    ...(isDarkMode ? darkTheme : lightTheme)
-                  }}
-                  displayDataTypes={false}
-                  displayObjectSize={false}
-                  enableClipboard={false}
-                  collapsed={1}
-                />
-              </div>
-            ) : (
-              <div className="pl-6 text-gray-400 dark:text-zinc-500 italic">No output</div>
-            )}
-          </div>
+      </div>
+    )
+  },
 
-          {/* False Branch */}
-          <div className={`bg-zinc-50 dark:bg-zinc-800 border p-3 text-xs ${
-            branchTaken === 'false'
-              ? 'border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-900/20'
-              : 'border-gray-200 dark:border-zinc-700'
-          }`}>
-            <div className="flex items-center gap-2 mb-2">
-              <MaterialSymbol
-                name="arrow_forward"
-                size="md"
-                className={branchTaken === 'false' ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-zinc-500'}
-              />
-              <span className={`font-semibold uppercase tracking-wide ${
-                branchTaken === 'false' ? 'text-red-700 dark:text-red-300' : 'text-gray-600 dark:text-zinc-400'
-              }`}>
-                FALSE Branch
-              </span>
-              {branchTaken === 'false' && (
-                <span className="ml-auto px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
-                  Taken
-                </span>
-              )}
-            </div>
-            {falseBranch && falseBranch.length > 0 ? (
-              <div className="pl-6 text-left">
-                <div className="text-gray-500 dark:text-zinc-400 mb-1">
-                  Output ({falseBranch.length} {falseBranch.length === 1 ? 'item' : 'items'}):
-                </div>
-                <JsonView
-                  value={falseBranch}
-                  style={{
-                    fontSize: '12px',
-                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                    backgroundColor: 'transparent',
-                    textAlign: 'left',
-                    ...(isDarkMode ? darkTheme : lightTheme)
-                  }}
-                  displayDataTypes={false}
-                  displayObjectSize={false}
-                  enableClipboard={false}
-                  collapsed={1}
-                />
-              </div>
-            ) : (
-              <div className="pl-6 text-gray-400 dark:text-zinc-500 italic">No output</div>
-            )}
-          </div>
-        </div>
+  renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
+    const input = execution.input
+    const isFailed = execution.result === 'RESULT_FAILED'
 
-        {/* Input Data Section (if there's more than just condition) */}
-        {inputs && Object.keys(inputs).filter(k => k !== 'condition').length > 0 && (
-          <>
+    return (
+      <div className="mt-4 space-y-4 text-left">
+        {/* Error Section - Show when execution failed */}
+        {isFailed && (
+          <div className="space-y-3">
             <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-              Additional Input Data
+              Error
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-xs">
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <MaterialSymbol
+                    name="error"
+                    size="md"
+                    className="text-red-600 dark:text-red-400"
+                  />
+                  <div className="flex-1">
+                    {execution.resultReason && (
+                      <div className="font-medium text-red-700 dark:text-red-300 mb-1">
+                        {execution.resultReason.replace('RESULT_REASON_', '')}
+                      </div>
+                    )}
+                    {execution.resultMessage && (
+                      <div className="text-red-600 dark:text-red-400 break-words">
+                        {execution.resultMessage}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Input Data Section */}
+        {input && Object.keys(input).length > 0 && (
+          <div className="space-y-3">
+            <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
+              Input Data
             </div>
             <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs text-left">
               <JsonView
-                value={Object.fromEntries(Object.entries(inputs).filter(([k]) => k !== 'condition'))}
+                value={input}
                 style={{
                   fontSize: '12px',
                   fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
@@ -209,7 +108,7 @@ registerExecutionRenderer('if', {
                 collapsed={1}
               />
             </div>
-          </>
+          </div>
         )}
       </div>
     )

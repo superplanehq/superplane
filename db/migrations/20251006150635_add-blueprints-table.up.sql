@@ -10,6 +10,7 @@ CREATE TABLE blueprints (
   nodes           JSONB NOT NULL DEFAULT '[]'::jsonb,
   edges           JSONB NOT NULL DEFAULT '[]'::jsonb,
   configuration   JSONB NOT NULL DEFAULT '[]'::jsonb,
+  output_branches JSONB NOT NULL DEFAULT '[]'::jsonb,
 
   PRIMARY KEY (id),
   UNIQUE (organization_id, name)

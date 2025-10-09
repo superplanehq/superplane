@@ -4,22 +4,11 @@ import { Badge } from '../../ui/badge'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
-
-const formatTimeAgo = (date: Date): string => {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
-
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
+import { formatTimeAgo } from '../../../utils/date'
 
 // Custom renderer for Filter component executions
 registerExecutionRenderer('filter', {
-  renderCollapsed: ({ execution, onClick }: CollapsedViewProps) => {
+  renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
     const outputs = execution.outputs
 
     // Check if the filter matched (outputs will have data if it matched)
@@ -48,10 +37,10 @@ registerExecutionRenderer('filter', {
         </div>
         <div className="flex-shrink-0 flex items-center gap-2">
           <p className="text-xs text-gray-400 dark:text-zinc-500">
-            {formatTimeAgo(new Date(execution.createdAt))}
+            {formatTimeAgo(new Date(execution.createdAt!))}
           </p>
           <MaterialSymbol
-            name="expand_more"
+            name={isExpanded ? 'expand_less' : 'expand_more'}
             size="xl"
             className="text-gray-600 dark:text-zinc-400"
           />
@@ -61,7 +50,6 @@ registerExecutionRenderer('filter', {
   },
 
   renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
-    const inputs = execution.inputs
     const filterExpression = execution.configuration?.expression
 
     return (
@@ -81,14 +69,14 @@ registerExecutionRenderer('filter', {
         )}
 
         {/* Inputs Section */}
-        {inputs && Object.keys(inputs).length > 0 && (
+        {execution.input && Object.keys(execution.input).length > 0 && (
           <div className="space-y-3">
             <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
               Inputs
             </div>
             <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs text-left">
               <JsonView
-                value={inputs}
+                value={execution.input}
                 style={{
                   fontSize: '12px',
                   fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',

@@ -31,8 +31,8 @@ func (e *HTTP) Description() string {
 	return "Make HTTP requests"
 }
 
-func (e *HTTP) OutputBranches(configuration any) []string {
-	return []string{components.DefaultBranchName}
+func (e *HTTP) OutputBranches(configuration any) []components.OutputBranch {
+	return []components.OutputBranch{components.DefaultOutputBranch}
 }
 
 func (e *HTTP) Configuration() []components.ConfigurationField {
@@ -145,7 +145,7 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 	}
 
 	return ctx.ExecutionStateContext.Finish(map[string][]any{
-		components.DefaultBranchName: {response},
+		components.DefaultOutputBranch.Name: {response},
 	})
 }
 

@@ -1,18 +1,20 @@
 import { ReactNode } from 'react'
+import { WorkflowsWorkflowNodeExecution } from '@/api-client'
 
 export interface ExecutionRendererProps {
-  execution: any
+  execution: WorkflowsWorkflowNodeExecution
   isDarkMode: boolean
   workflowId: string
 }
 
 export interface CollapsedViewProps {
-  execution: any
+  execution: WorkflowsWorkflowNodeExecution
   onClick: () => void
+  isExpanded?: boolean
 }
 
 export interface ExpandedViewProps {
-  execution: any
+  execution: WorkflowsWorkflowNodeExecution
   isDarkMode: boolean
   workflowId: string
 }

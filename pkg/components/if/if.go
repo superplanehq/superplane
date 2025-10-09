@@ -31,8 +31,11 @@ func (f *If) Description() string {
 	return "Route events based on expression"
 }
 
-func (f *If) OutputBranches(configuration any) []string {
-	return []string{BranchNameTrue, BranchNameFalse}
+func (f *If) OutputBranches(configuration any) []components.OutputBranch {
+	return []components.OutputBranch{
+		{Name: "true", Label: "True"},
+		{Name: "false", Label: "False"},
+	}
 }
 
 func (f *If) Configuration() []components.ConfigurationField {

@@ -4,7 +4,6 @@ package Superplane.Blueprints;
 
 import "components.proto";
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -112,29 +111,8 @@ message Blueprint {
   string description = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
-  repeated BlueprintNode nodes = 7;
-  repeated BlueprintEdge edges = 8;
+  repeated Components.Node nodes = 7;
+  repeated Components.Edge edges = 8;
   repeated Components.ConfigurationField configuration = 9;
-}
-
-message BlueprintNode {
-  enum RefType {
-    REF_TYPE_COMPONENT = 0;
-  }
-
-  message ComponentRef {
-    string name = 1;
-  }
-
-  string id = 1;
-  string name = 2;
-  RefType ref_type = 3;
-  ComponentRef component = 4;
-  google.protobuf.Struct configuration = 5;
-}
-
-message BlueprintEdge {
-  string source_id = 1;
-  string target_id = 2;
-  string branch = 3;
+  repeated Components.OutputBranch output_branches = 10;
 }

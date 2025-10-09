@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -91,14 +92,14 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 	result := make([]*pb.WorkflowNodeExecution, 0, len(executions))
 
 	for _, execution := range executions {
-		var event models.WorkflowEvent
-		if err := database.Conn().First(&event, "id = ?", execution.EventID).Error; err != nil {
-			return nil, err
-		}
-
-		inputs, err := structpb.NewStruct(execution.Inputs.Data())
-		if err != nil {
-			return nil, err
+		// Get inputs from parent execution (computed field for API)
+		var input *structpb.Struct
+		inputData, err := execution.GetInputs()
+		if err == nil {
+			input, err = structpb.NewStruct(inputData)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		outputsData := execution.Outputs.Data()
@@ -121,22 +122,50 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 			return nil, err
 		}
 
+		parentExecID := ""
+		if execution.ParentExecutionID != nil {
+			parentExecID = execution.ParentExecutionID.String()
+		}
+
+		blueprintID := ""
+		if execution.BlueprintID != nil {
+			blueprintID = execution.BlueprintID.String()
+		}
+
+		previousExecID := ""
+		if execution.PreviousExecutionID != nil {
+			previousExecID = execution.PreviousExecutionID.String()
+		}
+
+		previousOutputBranch := ""
+		if execution.PreviousOutputBranch != nil {
+			previousOutputBranch = *execution.PreviousOutputBranch
+		}
+
+		previousOutputIndex := int32(0)
+		if execution.PreviousOutputIndex != nil {
+			previousOutputIndex = int32(*execution.PreviousOutputIndex)
+		}
+
 		result = append(result, &pb.WorkflowNodeExecution{
-			Id:            execution.ID.String(),
-			EventId:       execution.EventID.String(),
-			WorkflowId:    execution.WorkflowID.String(),
-			NodeId:        execution.NodeID,
-			State:         NodeExecutionStateToProto(execution.State),
-			Result:        NodeExecutionResultToProto(execution.Result),
-			ResultReason:  NodeExecutionResultReasonToProto(execution.ResultReason),
-			ResultMessage: execution.ResultMessage,
-			Inputs:        inputs,
-			Outputs:       outputs,
-			CreatedAt:     timestamppb.New(*execution.CreatedAt),
-			UpdatedAt:     timestamppb.New(*execution.UpdatedAt),
-			Event:         SerializeWorkflowEvent(&event),
-			Metadata:      metadata,
-			Configuration: configuration,
+			Id:                    execution.ID.String(),
+			WorkflowId:            execution.WorkflowID.String(),
+			NodeId:                execution.NodeID,
+			ParentExecutionId:     parentExecID,
+			BlueprintId:           blueprintID,
+			State:                 NodeExecutionStateToProto(execution.State),
+			Result:                NodeExecutionResultToProto(execution.Result),
+			ResultReason:          NodeExecutionResultReasonToProto(execution.ResultReason),
+			ResultMessage:         execution.ResultMessage,
+			Input:                 input,
+			Outputs:               outputs,
+			CreatedAt:             timestamppb.New(*execution.CreatedAt),
+			UpdatedAt:             timestamppb.New(*execution.UpdatedAt),
+			Metadata:              metadata,
+			Configuration:         configuration,
+			PreviousExecutionId:   previousExecID,
+			PreviousOutputBranch:  previousOutputBranch,
+			PreviousOutputIndex:   previousOutputIndex,
 		})
 	}
 
@@ -185,6 +214,8 @@ func ProtoToNodeExecutionState(state pb.WorkflowNodeExecution_State) (string, er
 		return models.WorkflowNodeExecutionStateWaiting, nil
 	case pb.WorkflowNodeExecution_STATE_STARTED:
 		return models.WorkflowNodeExecutionStateStarted, nil
+	case pb.WorkflowNodeExecution_STATE_ROUTING:
+		return models.WorkflowNodeExecutionStateRouting, nil
 	case pb.WorkflowNodeExecution_STATE_FINISHED:
 		return models.WorkflowNodeExecutionStateFinished, nil
 	default:
@@ -211,6 +242,8 @@ func NodeExecutionStateToProto(state string) pb.WorkflowNodeExecution_State {
 		return pb.WorkflowNodeExecution_STATE_WAITING
 	case models.WorkflowNodeExecutionStateStarted:
 		return pb.WorkflowNodeExecution_STATE_STARTED
+	case models.WorkflowNodeExecutionStateRouting:
+		return pb.WorkflowNodeExecution_STATE_ROUTING
 	case models.WorkflowNodeExecutionStateFinished:
 		return pb.WorkflowNodeExecution_STATE_FINISHED
 	default:
@@ -245,4 +278,23 @@ func getLastExecutionTimestamp(executions []models.WorkflowNodeExecution) *times
 		return timestamppb.New(*executions[len(executions)-1].CreatedAt)
 	}
 	return nil
+}
+
+func getLimit(limit uint32) uint32 {
+	if limit == 0 || limit > 100 {
+		return 100
+	}
+	return limit
+}
+
+func getBefore(before *timestamppb.Timestamp) *time.Time {
+	if before == nil {
+		return nil
+	}
+	t := before.AsTime()
+	return &t
+}
+
+func hasNextPage(numResults, limit int, totalCount int64) bool {
+	return int64(numResults) >= int64(limit) && int64(numResults) < totalCount
 }

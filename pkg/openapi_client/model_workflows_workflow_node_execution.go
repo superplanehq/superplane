@@ -22,20 +22,23 @@ var _ MappedNullable = &WorkflowsWorkflowNodeExecution{}
 // WorkflowsWorkflowNodeExecution struct for WorkflowsWorkflowNodeExecution
 type WorkflowsWorkflowNodeExecution struct {
 	Id *string `json:"id,omitempty"`
-	EventId *string `json:"eventId,omitempty"`
 	WorkflowId *string `json:"workflowId,omitempty"`
 	NodeId *string `json:"nodeId,omitempty"`
+	ParentExecutionId *string `json:"parentExecutionId,omitempty"`
+	BlueprintId *string `json:"blueprintId,omitempty"`
 	State *WorkflowsWorkflowNodeExecutionState `json:"state,omitempty"`
 	Result *WorkflowsWorkflowNodeExecutionResult `json:"result,omitempty"`
 	ResultReason *WorkflowsWorkflowNodeExecutionResultReason `json:"resultReason,omitempty"`
 	ResultMessage *string `json:"resultMessage,omitempty"`
-	Inputs map[string]interface{} `json:"inputs,omitempty"`
+	Input map[string]interface{} `json:"input,omitempty"`
 	Outputs map[string]interface{} `json:"outputs,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	Event *WorkflowsWorkflowEvent `json:"event,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	PreviousExecutionId *string `json:"previousExecutionId,omitempty"`
+	PreviousOutputBranch *string `json:"previousOutputBranch,omitempty"`
+	PreviousOutputIndex *int32 `json:"previousOutputIndex,omitempty"`
 }
 
 // NewWorkflowsWorkflowNodeExecution instantiates a new WorkflowsWorkflowNodeExecution object
@@ -97,38 +100,6 @@ func (o *WorkflowsWorkflowNodeExecution) HasId() bool {
 // SetId gets a reference to the given string and assigns it to the Id field.
 func (o *WorkflowsWorkflowNodeExecution) SetId(v string) {
 	o.Id = &v
-}
-
-// GetEventId returns the EventId field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetEventId() string {
-	if o == nil || IsNil(o.EventId) {
-		var ret string
-		return ret
-	}
-	return *o.EventId
-}
-
-// GetEventIdOk returns a tuple with the EventId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetEventIdOk() (*string, bool) {
-	if o == nil || IsNil(o.EventId) {
-		return nil, false
-	}
-	return o.EventId, true
-}
-
-// HasEventId returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNodeExecution) HasEventId() bool {
-	if o != nil && !IsNil(o.EventId) {
-		return true
-	}
-
-	return false
-}
-
-// SetEventId gets a reference to the given string and assigns it to the EventId field.
-func (o *WorkflowsWorkflowNodeExecution) SetEventId(v string) {
-	o.EventId = &v
 }
 
 // GetWorkflowId returns the WorkflowId field value if set, zero value otherwise.
@@ -193,6 +164,70 @@ func (o *WorkflowsWorkflowNodeExecution) HasNodeId() bool {
 // SetNodeId gets a reference to the given string and assigns it to the NodeId field.
 func (o *WorkflowsWorkflowNodeExecution) SetNodeId(v string) {
 	o.NodeId = &v
+}
+
+// GetParentExecutionId returns the ParentExecutionId field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetParentExecutionId() string {
+	if o == nil || IsNil(o.ParentExecutionId) {
+		var ret string
+		return ret
+	}
+	return *o.ParentExecutionId
+}
+
+// GetParentExecutionIdOk returns a tuple with the ParentExecutionId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetParentExecutionIdOk() (*string, bool) {
+	if o == nil || IsNil(o.ParentExecutionId) {
+		return nil, false
+	}
+	return o.ParentExecutionId, true
+}
+
+// HasParentExecutionId returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasParentExecutionId() bool {
+	if o != nil && !IsNil(o.ParentExecutionId) {
+		return true
+	}
+
+	return false
+}
+
+// SetParentExecutionId gets a reference to the given string and assigns it to the ParentExecutionId field.
+func (o *WorkflowsWorkflowNodeExecution) SetParentExecutionId(v string) {
+	o.ParentExecutionId = &v
+}
+
+// GetBlueprintId returns the BlueprintId field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetBlueprintId() string {
+	if o == nil || IsNil(o.BlueprintId) {
+		var ret string
+		return ret
+	}
+	return *o.BlueprintId
+}
+
+// GetBlueprintIdOk returns a tuple with the BlueprintId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetBlueprintIdOk() (*string, bool) {
+	if o == nil || IsNil(o.BlueprintId) {
+		return nil, false
+	}
+	return o.BlueprintId, true
+}
+
+// HasBlueprintId returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasBlueprintId() bool {
+	if o != nil && !IsNil(o.BlueprintId) {
+		return true
+	}
+
+	return false
+}
+
+// SetBlueprintId gets a reference to the given string and assigns it to the BlueprintId field.
+func (o *WorkflowsWorkflowNodeExecution) SetBlueprintId(v string) {
+	o.BlueprintId = &v
 }
 
 // GetState returns the State field value if set, zero value otherwise.
@@ -323,36 +358,36 @@ func (o *WorkflowsWorkflowNodeExecution) SetResultMessage(v string) {
 	o.ResultMessage = &v
 }
 
-// GetInputs returns the Inputs field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetInputs() map[string]interface{} {
-	if o == nil || IsNil(o.Inputs) {
+// GetInput returns the Input field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetInput() map[string]interface{} {
+	if o == nil || IsNil(o.Input) {
 		var ret map[string]interface{}
 		return ret
 	}
-	return o.Inputs
+	return o.Input
 }
 
-// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
+// GetInputOk returns a tuple with the Input field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetInputsOk() (map[string]interface{}, bool) {
-	if o == nil || IsNil(o.Inputs) {
+func (o *WorkflowsWorkflowNodeExecution) GetInputOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Input) {
 		return map[string]interface{}{}, false
 	}
-	return o.Inputs, true
+	return o.Input, true
 }
 
-// HasInputs returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNodeExecution) HasInputs() bool {
-	if o != nil && !IsNil(o.Inputs) {
+// HasInput returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasInput() bool {
+	if o != nil && !IsNil(o.Input) {
 		return true
 	}
 
 	return false
 }
 
-// SetInputs gets a reference to the given map[string]interface{} and assigns it to the Inputs field.
-func (o *WorkflowsWorkflowNodeExecution) SetInputs(v map[string]interface{}) {
-	o.Inputs = v
+// SetInput gets a reference to the given map[string]interface{} and assigns it to the Input field.
+func (o *WorkflowsWorkflowNodeExecution) SetInput(v map[string]interface{}) {
+	o.Input = v
 }
 
 // GetOutputs returns the Outputs field value if set, zero value otherwise.
@@ -451,38 +486,6 @@ func (o *WorkflowsWorkflowNodeExecution) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
-// GetEvent returns the Event field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetEvent() WorkflowsWorkflowEvent {
-	if o == nil || IsNil(o.Event) {
-		var ret WorkflowsWorkflowEvent
-		return ret
-	}
-	return *o.Event
-}
-
-// GetEventOk returns a tuple with the Event field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetEventOk() (*WorkflowsWorkflowEvent, bool) {
-	if o == nil || IsNil(o.Event) {
-		return nil, false
-	}
-	return o.Event, true
-}
-
-// HasEvent returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNodeExecution) HasEvent() bool {
-	if o != nil && !IsNil(o.Event) {
-		return true
-	}
-
-	return false
-}
-
-// SetEvent gets a reference to the given WorkflowsWorkflowEvent and assigns it to the Event field.
-func (o *WorkflowsWorkflowNodeExecution) SetEvent(v WorkflowsWorkflowEvent) {
-	o.Event = &v
-}
-
 // GetMetadata returns the Metadata field value if set, zero value otherwise.
 func (o *WorkflowsWorkflowNodeExecution) GetMetadata() map[string]interface{} {
 	if o == nil || IsNil(o.Metadata) {
@@ -547,6 +550,102 @@ func (o *WorkflowsWorkflowNodeExecution) SetConfiguration(v map[string]interface
 	o.Configuration = v
 }
 
+// GetPreviousExecutionId returns the PreviousExecutionId field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousExecutionId() string {
+	if o == nil || IsNil(o.PreviousExecutionId) {
+		var ret string
+		return ret
+	}
+	return *o.PreviousExecutionId
+}
+
+// GetPreviousExecutionIdOk returns a tuple with the PreviousExecutionId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousExecutionIdOk() (*string, bool) {
+	if o == nil || IsNil(o.PreviousExecutionId) {
+		return nil, false
+	}
+	return o.PreviousExecutionId, true
+}
+
+// HasPreviousExecutionId returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasPreviousExecutionId() bool {
+	if o != nil && !IsNil(o.PreviousExecutionId) {
+		return true
+	}
+
+	return false
+}
+
+// SetPreviousExecutionId gets a reference to the given string and assigns it to the PreviousExecutionId field.
+func (o *WorkflowsWorkflowNodeExecution) SetPreviousExecutionId(v string) {
+	o.PreviousExecutionId = &v
+}
+
+// GetPreviousOutputBranch returns the PreviousOutputBranch field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputBranch() string {
+	if o == nil || IsNil(o.PreviousOutputBranch) {
+		var ret string
+		return ret
+	}
+	return *o.PreviousOutputBranch
+}
+
+// GetPreviousOutputBranchOk returns a tuple with the PreviousOutputBranch field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputBranchOk() (*string, bool) {
+	if o == nil || IsNil(o.PreviousOutputBranch) {
+		return nil, false
+	}
+	return o.PreviousOutputBranch, true
+}
+
+// HasPreviousOutputBranch returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasPreviousOutputBranch() bool {
+	if o != nil && !IsNil(o.PreviousOutputBranch) {
+		return true
+	}
+
+	return false
+}
+
+// SetPreviousOutputBranch gets a reference to the given string and assigns it to the PreviousOutputBranch field.
+func (o *WorkflowsWorkflowNodeExecution) SetPreviousOutputBranch(v string) {
+	o.PreviousOutputBranch = &v
+}
+
+// GetPreviousOutputIndex returns the PreviousOutputIndex field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputIndex() int32 {
+	if o == nil || IsNil(o.PreviousOutputIndex) {
+		var ret int32
+		return ret
+	}
+	return *o.PreviousOutputIndex
+}
+
+// GetPreviousOutputIndexOk returns a tuple with the PreviousOutputIndex field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputIndexOk() (*int32, bool) {
+	if o == nil || IsNil(o.PreviousOutputIndex) {
+		return nil, false
+	}
+	return o.PreviousOutputIndex, true
+}
+
+// HasPreviousOutputIndex returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasPreviousOutputIndex() bool {
+	if o != nil && !IsNil(o.PreviousOutputIndex) {
+		return true
+	}
+
+	return false
+}
+
+// SetPreviousOutputIndex gets a reference to the given int32 and assigns it to the PreviousOutputIndex field.
+func (o *WorkflowsWorkflowNodeExecution) SetPreviousOutputIndex(v int32) {
+	o.PreviousOutputIndex = &v
+}
+
 func (o WorkflowsWorkflowNodeExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -560,14 +659,17 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
 	}
-	if !IsNil(o.EventId) {
-		toSerialize["eventId"] = o.EventId
-	}
 	if !IsNil(o.WorkflowId) {
 		toSerialize["workflowId"] = o.WorkflowId
 	}
 	if !IsNil(o.NodeId) {
 		toSerialize["nodeId"] = o.NodeId
+	}
+	if !IsNil(o.ParentExecutionId) {
+		toSerialize["parentExecutionId"] = o.ParentExecutionId
+	}
+	if !IsNil(o.BlueprintId) {
+		toSerialize["blueprintId"] = o.BlueprintId
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
@@ -581,8 +683,8 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.ResultMessage) {
 		toSerialize["resultMessage"] = o.ResultMessage
 	}
-	if !IsNil(o.Inputs) {
-		toSerialize["inputs"] = o.Inputs
+	if !IsNil(o.Input) {
+		toSerialize["input"] = o.Input
 	}
 	if !IsNil(o.Outputs) {
 		toSerialize["outputs"] = o.Outputs
@@ -593,14 +695,20 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updatedAt"] = o.UpdatedAt
 	}
-	if !IsNil(o.Event) {
-		toSerialize["event"] = o.Event
-	}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
+	}
+	if !IsNil(o.PreviousExecutionId) {
+		toSerialize["previousExecutionId"] = o.PreviousExecutionId
+	}
+	if !IsNil(o.PreviousOutputBranch) {
+		toSerialize["previousOutputBranch"] = o.PreviousOutputBranch
+	}
+	if !IsNil(o.PreviousOutputIndex) {
+		toSerialize["previousOutputIndex"] = o.PreviousOutputIndex
 	}
 	return toSerialize, nil
 }

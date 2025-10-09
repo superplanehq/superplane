@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,21 +10,43 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	WorkflowNodeExecutionStatePending  = "pending"
+	WorkflowNodeExecutionStateWaiting  = "waiting"
+	WorkflowNodeExecutionStateStarted  = "started"
+	WorkflowNodeExecutionStateRouting  = "routing"
+	WorkflowNodeExecutionStateFinished = "finished"
+
+	WorkflowNodeExecutionResultPassed = "passed"
+	WorkflowNodeExecutionResultFailed = "failed"
+
+	WorkflowNodeExecutionResultReasonError = "error"
+)
+
 type WorkflowNodeExecution struct {
-	ID            uuid.UUID
-	WorkflowID    uuid.UUID
-	NodeID        string
-	EventID       uuid.UUID
+	ID         uuid.UUID
+	WorkflowID uuid.UUID
+	NodeID     string
+
+	// Root event ID - shared by all executions triggered by the same initial event
+	RootEventID uuid.UUID
+
+	// Sequential flow - references to previous execution that provides inputs
+	PreviousExecutionID  *uuid.UUID
+	PreviousOutputBranch *string
+	PreviousOutputIndex  *int
+
+	// Blueprint hierarchy - reference to the blueprint node execution that spawned this
+	ParentExecutionID *uuid.UUID
+
+	// Blueprint context (if this execution is running inside a blueprint)
+	BlueprintID *uuid.UUID
+
+	// State machine
 	State         string
 	Result        string
 	ResultReason  string
 	ResultMessage string
-
-	//
-	// The event data (if first node in the flow),
-	// or the output of the previous execution.
-	//
-	Inputs datatypes.JSONType[map[string]any]
 
 	//
 	// The outputs of the node execution.
@@ -31,7 +54,9 @@ type WorkflowNodeExecution struct {
 	// The key in the map is the output branch name.
 	// A node can emit multiple events as part of the same output.
 	// The subsequent node in the flow will unpack that and create
-	// multiple queue items - and subsequent node executions.
+	// multiple child executions.
+	//
+	// Inputs are NOT stored here - they are derived from the parent execution.
 	//
 	Outputs datatypes.JSONType[map[string][]any]
 
@@ -55,8 +80,30 @@ type WorkflowNodeExecution struct {
 
 func FindPendingNodeExecutions() ([]WorkflowNodeExecution, error) {
 	var executions []WorkflowNodeExecution
+
+	// Get the oldest pending execution for each (workflow_id, node_id) pair
+	// This prevents processing multiple pending executions for the same node concurrently
 	err := database.Conn().
-		Where("state = ?", WorkflowNodeExecutionStatePending).
+		Raw(`
+			SELECT DISTINCT ON (workflow_id, node_id) *
+			FROM workflow_node_executions
+			WHERE state = ?
+			ORDER BY workflow_id, node_id, created_at ASC
+		`, WorkflowNodeExecutionStatePending).
+		Find(&executions).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func FindRoutingNodeExecutions() ([]WorkflowNodeExecution, error) {
+	var executions []WorkflowNodeExecution
+	err := database.Conn().
+		Where("state = ?", WorkflowNodeExecutionStateRouting).
 		Find(&executions).
 		Error
 
@@ -83,12 +130,10 @@ func FindLastNodeExecution(workflowID uuid.UUID, states []string) (*WorkflowNode
 	return &execution, nil
 }
 
-func FindLastNodeExecutionForEvent(eventID uuid.UUID, states []string) (*WorkflowNodeExecution, error) {
+func FindNodeExecution(id uuid.UUID) (*WorkflowNodeExecution, error) {
 	var execution WorkflowNodeExecution
 	err := database.Conn().
-		Where("event_id = ?", eventID).
-		Where("state IN ?", states).
-		Order("updated_at DESC").
+		Where("id = ?", id).
 		First(&execution).
 		Error
 
@@ -97,6 +142,21 @@ func FindLastNodeExecutionForEvent(eventID uuid.UUID, states []string) (*Workflo
 	}
 
 	return &execution, nil
+}
+
+func FindExecutionsByWorkflowAndState(workflowID uuid.UUID, states []string) ([]WorkflowNodeExecution, error) {
+	var executions []WorkflowNodeExecution
+	err := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("state IN ?", states).
+		Find(&executions).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
 }
 
 func FindLastNodeExecutionForNode(workflowID uuid.UUID, nodeID string, states []string) (*WorkflowNodeExecution, error) {
@@ -155,17 +215,88 @@ func (e *WorkflowNodeExecution) PassInTransaction(tx *gorm.DB, outputs map[strin
 		}).Error
 }
 
-func (e *WorkflowNodeExecution) Fail(reason string) error {
-	return e.FailInTransaction(database.Conn(), reason)
+func (e *WorkflowNodeExecution) Fail(reason, message string) error {
+	return e.FailInTransaction(database.Conn(), reason, message)
 }
 
-func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason string) error {
+func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) error {
 	now := time.Now()
 	return tx.Model(e).
 		Updates(map[string]interface{}{
-			"state":         WorkflowNodeExecutionStateFinished,
-			"result":        WorkflowNodeExecutionResultFailed,
-			"result_reason": reason,
-			"updated_at":    &now,
+			"state":          WorkflowNodeExecutionStateFinished,
+			"result":         WorkflowNodeExecutionResultFailed,
+			"result_reason":  reason,
+			"result_message": message,
+			"updated_at":     &now,
 		}).Error
+}
+
+func (e *WorkflowNodeExecution) Route() error {
+	return e.RouteInTransaction(database.Conn())
+}
+
+func (e *WorkflowNodeExecution) RouteInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+	e.State = WorkflowNodeExecutionStateRouting
+	e.UpdatedAt = &now
+	return tx.Save(e).Error
+}
+
+func (e *WorkflowNodeExecution) Complete() error {
+	return e.CompleteInTransaction(database.Conn())
+}
+
+func (e *WorkflowNodeExecution) CompleteInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+	return tx.Model(e).
+		Updates(map[string]interface{}{
+			"state":      WorkflowNodeExecutionStateFinished,
+			"result":     WorkflowNodeExecutionResultPassed,
+			"updated_at": &now,
+		}).Error
+}
+
+// GetInputs resolves the inputs for this execution from previous execution or from the root event
+func (e *WorkflowNodeExecution) GetInputs() (map[string]any, error) {
+	// First node in the flow - fetch from root event
+	if e.PreviousExecutionID == nil {
+		initialEvent, err := FindWorkflowInitialEvent(e.RootEventID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find initial event %s: %w", e.RootEventID, err)
+		}
+		return initialEvent.Data.Data(), nil
+	}
+
+	previous, err := FindNodeExecution(*e.PreviousExecutionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find previous execution %s: %w", *e.PreviousExecutionID, err)
+	}
+
+	// Special case: Entering a blueprint
+	// The previous execution is the blueprint node, but we need to get ITS inputs
+	if e.ParentExecutionID != nil && previous.ParentExecutionID == nil {
+		return previous.GetInputs()
+	}
+
+	// Normal case: Read from previous execution's outputs
+	if e.PreviousOutputBranch == nil || e.PreviousOutputIndex == nil {
+		return nil, fmt.Errorf("execution %s has invalid previous reference", e.ID)
+	}
+
+	previousOutputs := previous.Outputs.Data()
+	branchData, exists := previousOutputs[*e.PreviousOutputBranch]
+	if !exists {
+		return nil, fmt.Errorf("previous execution %s has no output branch '%s'", previous.ID, *e.PreviousOutputBranch)
+	}
+
+	if *e.PreviousOutputIndex >= len(branchData) {
+		return nil, fmt.Errorf("previous output index %d out of range for branch '%s'", *e.PreviousOutputIndex, *e.PreviousOutputBranch)
+	}
+
+	inputData, ok := branchData[*e.PreviousOutputIndex].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("previous output data is not a map")
+	}
+
+	return inputData, nil
 }

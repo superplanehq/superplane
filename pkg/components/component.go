@@ -1,6 +1,6 @@
 package components
 
-const DefaultBranchName = "default"
+var DefaultOutputBranch = OutputBranch{Name: "default", Label: "Default"}
 
 type Component interface {
 
@@ -26,7 +26,7 @@ type Component interface {
 	 * The output branches used by the component.
 	 * If none is returned, the 'default' one is used.
 	 */
-	OutputBranches(configuration any) []string
+	OutputBranches(configuration any) []OutputBranch
 
 	/*
 	 * The configuration fields exposed by the component.
@@ -57,6 +57,12 @@ type Component interface {
 	HandleAction(ctx ActionContext) error
 }
 
+type OutputBranch struct {
+	Name        string
+	Label       string
+	Description string
+}
+
 /*
  * ExecutionContext allows the component
  * to control the state and metadata of each execution of it.
@@ -83,7 +89,7 @@ type MetadataContext interface {
 type ExecutionStateContext interface {
 	Wait() error
 	Finish(outputs map[string][]any) error
-	Fail(reason string) error
+	Fail(reason, message string) error
 }
 
 /*

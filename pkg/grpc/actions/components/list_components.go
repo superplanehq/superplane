@@ -21,7 +21,7 @@ func serializeComponents(in []components.Component) []*pb.Component {
 		branches := make([]*pb.OutputBranch, len(outputs))
 		for j, output := range outputs {
 			branches[j] = &pb.OutputBranch{
-				Name: output,
+				Name: output.Name,
 			}
 		}
 

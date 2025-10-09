@@ -31,18 +31,18 @@ func (s *Switch) Description() string {
 	return "Evaluate input data against expressions and route to the first branch where expression evaluates to true"
 }
 
-func (s *Switch) OutputBranches(configuration any) []string {
+func (s *Switch) OutputBranches(configuration any) []components.OutputBranch {
 	spec := Spec{}
 	err := mapstructure.Decode(configuration, &spec)
 	if err != nil || len(spec.Branches) == 0 {
-		return []string{components.DefaultBranchName}
+		return []components.OutputBranch{components.DefaultOutputBranch}
 	}
 
-	outputs := make([]string, len(spec.Branches))
+	outputBranches := make([]components.OutputBranch, len(spec.Branches))
 	for i, branch := range spec.Branches {
-		outputs[i] = branch.Name
+		outputBranches[i] = components.OutputBranch{Name: branch.Name}
 	}
-	return outputs
+	return outputBranches
 }
 
 func (s *Switch) Configuration() []components.ConfigurationField {

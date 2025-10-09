@@ -7,11 +7,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
-	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -23,103 +22,10 @@ func SerializeBlueprint(in *models.Blueprint) *pb.Blueprint {
 		Description:    in.Description,
 		CreatedAt:      timestamppb.New(*in.CreatedAt),
 		UpdatedAt:      timestamppb.New(*in.UpdatedAt),
-		Nodes:          NodesToProto(in.Nodes),
-		Edges:          EdgesToProto(in.Edges),
+		Nodes:          actions.NodesToProto(in.Nodes),
+		Edges:          actions.EdgesToProto(in.Edges),
 		Configuration:  ConfigurationToProto(in.Configuration),
 	}
-}
-
-func ProtoToNodes(nodes []*pb.BlueprintNode) []models.Node {
-	result := make([]models.Node, len(nodes))
-	for i, node := range nodes {
-		result[i] = models.Node{
-			ID:            node.Id,
-			Name:          node.Name,
-			RefType:       ProtoToRefType(node.RefType),
-			Ref:           ProtoToNodeRef(node),
-			Configuration: node.Configuration.AsMap(),
-		}
-	}
-	return result
-}
-
-func NodesToProto(nodes []models.Node) []*pb.BlueprintNode {
-	result := make([]*pb.BlueprintNode, len(nodes))
-	for i, node := range nodes {
-		result[i] = &pb.BlueprintNode{
-			Id:      node.ID,
-			Name:    node.Name,
-			RefType: RefTypeToProto(node.RefType),
-		}
-
-		if node.Ref.Component != nil {
-			result[i].Component = &pb.BlueprintNode_ComponentRef{
-				Name: node.Ref.Component.Name,
-			}
-		}
-
-		if node.Configuration != nil {
-			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
-		}
-	}
-	return result
-}
-
-func ProtoToEdges(edges []*pb.BlueprintEdge) []models.Edge {
-	result := make([]models.Edge, len(edges))
-	for i, edge := range edges {
-		result[i] = models.Edge{
-			SourceID: edge.SourceId,
-			TargetID: edge.TargetId,
-			Branch:   edge.Branch,
-		}
-	}
-	return result
-}
-
-func EdgesToProto(edges []models.Edge) []*pb.BlueprintEdge {
-	result := make([]*pb.BlueprintEdge, len(edges))
-	for i, edge := range edges {
-		result[i] = &pb.BlueprintEdge{
-			SourceId: edge.SourceID,
-			TargetId: edge.TargetID,
-			Branch:   edge.Branch,
-		}
-	}
-	return result
-}
-
-func ProtoToRefType(refType pb.BlueprintNode_RefType) string {
-	switch refType {
-	case pb.BlueprintNode_REF_TYPE_COMPONENT:
-		return "component"
-	default:
-		return ""
-	}
-}
-
-func RefTypeToProto(refType string) pb.BlueprintNode_RefType {
-	switch refType {
-	case "component":
-		return pb.BlueprintNode_REF_TYPE_COMPONENT
-	default:
-		return pb.BlueprintNode_REF_TYPE_COMPONENT
-	}
-}
-
-func ProtoToNodeRef(node *pb.BlueprintNode) models.NodeRef {
-	ref := models.NodeRef{}
-
-	switch node.RefType {
-	case pb.BlueprintNode_REF_TYPE_COMPONENT:
-		if node.Component != nil {
-			ref.Component = &models.ComponentRef{
-				Name: node.Component.Name,
-			}
-		}
-	}
-
-	return ref
 }
 
 func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]models.Node, []models.Edge, error) {
@@ -152,12 +58,20 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
 		}
 
+		if edge.TargetType != componentpb.Edge_REF_TYPE_NODE && edge.TargetType != componentpb.Edge_REF_TYPE_OUTPUT_BRANCH {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target_type must be set to either NODE or OUTPUT_BRANCH", i)
+		}
+
 		if !nodeIDs[edge.SourceId] {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
 		}
 
-		if !nodeIDs[edge.TargetId] {
+		if edge.TargetType == componentpb.Edge_REF_TYPE_NODE && !nodeIDs[edge.TargetId] {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
+		}
+
+		if edge.TargetType == componentpb.Edge_REF_TYPE_OUTPUT_BRANCH && !hasOutputBranch(blueprint.OutputBranches, edge.TargetId) {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target output branch %s not found", i, edge.TargetId)
 		}
 	}
 
@@ -165,15 +79,21 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 		return nil, nil, err
 	}
 
-	nodes := ProtoToNodes(blueprint.Nodes)
-	edges := ProtoToEdges(blueprint.Edges)
-
-	return nodes, edges, nil
+	return actions.ProtoToNodes(blueprint.Nodes), actions.ProtoToEdges(blueprint.Edges), nil
 }
 
-func validateNodeRef(registry *registry.Registry, node *pb.BlueprintNode) error {
+func hasOutputBranch(outputBranches []*componentpb.OutputBranch, name string) bool {
+	for _, outputBranch := range outputBranches {
+		if outputBranch.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func validateNodeRef(registry *registry.Registry, node *componentpb.Node) error {
 	switch node.RefType {
-	case pb.BlueprintNode_REF_TYPE_COMPONENT:
+	case componentpb.Node_REF_TYPE_COMPONENT:
 		if node.Component == nil {
 			return fmt.Errorf("component reference is required for component ref type")
 		}
@@ -193,7 +113,7 @@ func validateNodeRef(registry *registry.Registry, node *pb.BlueprintNode) error 
 	}
 }
 
-func validateAcyclic(nodes []*pb.BlueprintNode, edges []*pb.BlueprintEdge) error {
+func validateAcyclic(nodes []*componentpb.Node, edges []*componentpb.Edge) error {
 	// Build adjacency list
 	graph := make(map[string][]string)
 	inDegree := make(map[string]int)
@@ -240,19 +160,19 @@ func validateAcyclic(nodes []*pb.BlueprintNode, edges []*pb.BlueprintEdge) error
 	return nil
 }
 
-func ConfigurationToProto(config []components.ConfigurationField) []*pbComponents.ConfigurationField {
+func ConfigurationToProto(config []components.ConfigurationField) []*componentpb.ConfigurationField {
 	if config == nil {
-		return []*pbComponents.ConfigurationField{}
+		return []*componentpb.ConfigurationField{}
 	}
 
-	result := make([]*pbComponents.ConfigurationField, len(config))
+	result := make([]*componentpb.ConfigurationField, len(config))
 	for i, field := range config {
 		result[i] = actions.ConfigurationFieldToProto(field)
 	}
 	return result
 }
 
-func ProtoToConfiguration(config []*pbComponents.ConfigurationField) ([]components.ConfigurationField, error) {
+func ProtoToConfiguration(config []*componentpb.ConfigurationField) ([]components.ConfigurationField, error) {
 	if len(config) == 0 {
 		return []components.ConfigurationField{}, nil
 	}

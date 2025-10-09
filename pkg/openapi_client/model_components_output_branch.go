@@ -21,6 +21,8 @@ var _ MappedNullable = &ComponentsOutputBranch{}
 // ComponentsOutputBranch struct for ComponentsOutputBranch
 type ComponentsOutputBranch struct {
 	Name *string `json:"name,omitempty"`
+	Label *string `json:"label,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // NewComponentsOutputBranch instantiates a new ComponentsOutputBranch object
@@ -72,6 +74,70 @@ func (o *ComponentsOutputBranch) SetName(v string) {
 	o.Name = &v
 }
 
+// GetLabel returns the Label field value if set, zero value otherwise.
+func (o *ComponentsOutputBranch) GetLabel() string {
+	if o == nil || IsNil(o.Label) {
+		var ret string
+		return ret
+	}
+	return *o.Label
+}
+
+// GetLabelOk returns a tuple with the Label field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsOutputBranch) GetLabelOk() (*string, bool) {
+	if o == nil || IsNil(o.Label) {
+		return nil, false
+	}
+	return o.Label, true
+}
+
+// HasLabel returns a boolean if a field has been set.
+func (o *ComponentsOutputBranch) HasLabel() bool {
+	if o != nil && !IsNil(o.Label) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabel gets a reference to the given string and assigns it to the Label field.
+func (o *ComponentsOutputBranch) SetLabel(v string) {
+	o.Label = &v
+}
+
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *ComponentsOutputBranch) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsOutputBranch) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *ComponentsOutputBranch) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *ComponentsOutputBranch) SetDescription(v string) {
+	o.Description = &v
+}
+
 func (o ComponentsOutputBranch) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -84,6 +150,12 @@ func (o ComponentsOutputBranch) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
+	}
+	if !IsNil(o.Label) {
+		toSerialize["label"] = o.Label
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	return toSerialize, nil
 }

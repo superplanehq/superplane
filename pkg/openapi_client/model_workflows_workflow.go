@@ -27,8 +27,8 @@ type WorkflowsWorkflow struct {
 	Description *string `json:"description,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	Nodes []WorkflowsWorkflowNode `json:"nodes,omitempty"`
-	Edges []WorkflowsWorkflowEdge `json:"edges,omitempty"`
+	Nodes []ComponentsNode `json:"nodes,omitempty"`
+	Edges []ComponentsEdge `json:"edges,omitempty"`
 }
 
 // NewWorkflowsWorkflow instantiates a new WorkflowsWorkflow object
@@ -241,9 +241,9 @@ func (o *WorkflowsWorkflow) SetUpdatedAt(v time.Time) {
 }
 
 // GetNodes returns the Nodes field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetNodes() []WorkflowsWorkflowNode {
+func (o *WorkflowsWorkflow) GetNodes() []ComponentsNode {
 	if o == nil || IsNil(o.Nodes) {
-		var ret []WorkflowsWorkflowNode
+		var ret []ComponentsNode
 		return ret
 	}
 	return o.Nodes
@@ -251,7 +251,7 @@ func (o *WorkflowsWorkflow) GetNodes() []WorkflowsWorkflowNode {
 
 // GetNodesOk returns a tuple with the Nodes field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetNodesOk() ([]WorkflowsWorkflowNode, bool) {
+func (o *WorkflowsWorkflow) GetNodesOk() ([]ComponentsNode, bool) {
 	if o == nil || IsNil(o.Nodes) {
 		return nil, false
 	}
@@ -267,15 +267,15 @@ func (o *WorkflowsWorkflow) HasNodes() bool {
 	return false
 }
 
-// SetNodes gets a reference to the given []WorkflowsWorkflowNode and assigns it to the Nodes field.
-func (o *WorkflowsWorkflow) SetNodes(v []WorkflowsWorkflowNode) {
+// SetNodes gets a reference to the given []ComponentsNode and assigns it to the Nodes field.
+func (o *WorkflowsWorkflow) SetNodes(v []ComponentsNode) {
 	o.Nodes = v
 }
 
 // GetEdges returns the Edges field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetEdges() []WorkflowsWorkflowEdge {
+func (o *WorkflowsWorkflow) GetEdges() []ComponentsEdge {
 	if o == nil || IsNil(o.Edges) {
-		var ret []WorkflowsWorkflowEdge
+		var ret []ComponentsEdge
 		return ret
 	}
 	return o.Edges
@@ -283,7 +283,7 @@ func (o *WorkflowsWorkflow) GetEdges() []WorkflowsWorkflowEdge {
 
 // GetEdgesOk returns a tuple with the Edges field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetEdgesOk() ([]WorkflowsWorkflowEdge, bool) {
+func (o *WorkflowsWorkflow) GetEdgesOk() ([]ComponentsEdge, bool) {
 	if o == nil || IsNil(o.Edges) {
 		return nil, false
 	}
@@ -299,8 +299,8 @@ func (o *WorkflowsWorkflow) HasEdges() bool {
 	return false
 }
 
-// SetEdges gets a reference to the given []WorkflowsWorkflowEdge and assigns it to the Edges field.
-func (o *WorkflowsWorkflow) SetEdges(v []WorkflowsWorkflowEdge) {
+// SetEdges gets a reference to the given []ComponentsEdge and assigns it to the Edges field.
+func (o *WorkflowsWorkflow) SetEdges(v []ComponentsEdge) {
 	o.Edges = v
 }
 

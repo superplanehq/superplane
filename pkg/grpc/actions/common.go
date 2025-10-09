@@ -14,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
@@ -664,8 +664,8 @@ func StageEventStateReasonToProto(stateReason string) pb.StageEvent_StateReason 
 	}
 }
 
-func ConfigurationFieldToProto(field components.ConfigurationField) *pbComponents.ConfigurationField {
-	pbField := &pbComponents.ConfigurationField{
+func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb.ConfigurationField {
+	pbField := &componentpb.ConfigurationField{
 		Name:        field.Name,
 		Label:       field.Label,
 		Type:        field.Type,
@@ -685,9 +685,9 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *pbComponent
 
 	// Handle options (for select/multi_select)
 	if len(field.Options) > 0 {
-		pbField.Options = make([]*pbComponents.FieldOption, len(field.Options))
+		pbField.Options = make([]*componentpb.FieldOption, len(field.Options))
 		for i, opt := range field.Options {
-			pbField.Options[i] = &pbComponents.FieldOption{
+			pbField.Options[i] = &componentpb.FieldOption{
 				Label: opt.Label,
 				Value: opt.Value,
 			}
@@ -706,11 +706,11 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *pbComponent
 
 	// Handle list item definition (for list type)
 	if field.ListItem != nil {
-		pbField.ListItem = &pbComponents.ListItemDefinition{
+		pbField.ListItem = &componentpb.ListItemDefinition{
 			Type: field.ListItem.Type,
 		}
 		if len(field.ListItem.Schema) > 0 {
-			pbField.ListItem.Schema = make([]*pbComponents.ConfigurationField, len(field.ListItem.Schema))
+			pbField.ListItem.Schema = make([]*componentpb.ConfigurationField, len(field.ListItem.Schema))
 			for i, schemaField := range field.ListItem.Schema {
 				pbField.ListItem.Schema[i] = ConfigurationFieldToProto(schemaField)
 			}
@@ -719,7 +719,7 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *pbComponent
 
 	// Handle object schema (for object type)
 	if len(field.Schema) > 0 {
-		pbField.Schema = make([]*pbComponents.ConfigurationField, len(field.Schema))
+		pbField.Schema = make([]*componentpb.ConfigurationField, len(field.Schema))
 		for i, schemaField := range field.Schema {
 			pbField.Schema[i] = ConfigurationFieldToProto(schemaField)
 		}
@@ -728,3 +728,180 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *pbComponent
 	return pbField
 }
 
+func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
+	result := make([]models.Node, len(nodes))
+	for i, node := range nodes {
+		result[i] = models.Node{
+			ID:            node.Id,
+			Name:          node.Name,
+			RefType:       ProtoToRefType(node.RefType),
+			Ref:           ProtoToNodeRef(node),
+			Configuration: node.Configuration.AsMap(),
+		}
+	}
+	return result
+}
+
+func NodesToProto(nodes []models.Node) []*componentpb.Node {
+	result := make([]*componentpb.Node, len(nodes))
+	for i, node := range nodes {
+		result[i] = &componentpb.Node{
+			Id:      node.ID,
+			Name:    node.Name,
+			RefType: RefTypeToProto(node.RefType),
+		}
+
+		if node.Ref.Component != nil {
+			result[i].Component = &componentpb.Node_ComponentRef{
+				Name: node.Ref.Component.Name,
+			}
+		}
+
+		if node.Configuration != nil {
+			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
+		}
+	}
+	return result
+}
+
+func ProtoToEdges(edges []*componentpb.Edge) []models.Edge {
+	result := make([]models.Edge, len(edges))
+	for i, edge := range edges {
+		result[i] = models.Edge{
+			SourceID:   edge.SourceId,
+			TargetID:   edge.TargetId,
+			TargetType: ProtoToTargetType(edge.TargetType),
+			Branch:     edge.Branch,
+		}
+	}
+	return result
+}
+
+func EdgesToProto(edges []models.Edge) []*componentpb.Edge {
+	result := make([]*componentpb.Edge, len(edges))
+	for i, edge := range edges {
+		result[i] = &componentpb.Edge{
+			SourceId:   edge.SourceID,
+			TargetId:   edge.TargetID,
+			TargetType: TargetTypeToProto(edge.TargetType),
+			Branch:     edge.Branch,
+		}
+	}
+	return result
+}
+
+func ProtoToRefType(refType componentpb.Node_RefType) string {
+	switch refType {
+	case componentpb.Node_REF_TYPE_COMPONENT:
+		return models.NodeRefTypeComponent
+	case componentpb.Node_REF_TYPE_BLUEPRINT:
+		return models.NodeRefTypeBlueprint
+	default:
+		return ""
+	}
+}
+
+func RefTypeToProto(refType string) componentpb.Node_RefType {
+	switch refType {
+	case models.NodeRefTypeBlueprint:
+		return componentpb.Node_REF_TYPE_BLUEPRINT
+	default:
+		return componentpb.Node_REF_TYPE_COMPONENT
+	}
+}
+
+func ProtoToTargetType(targetType componentpb.Edge_TargetType) string {
+	switch targetType {
+	case componentpb.Edge_REF_TYPE_NODE:
+		return models.EdgeTargetTypeNode
+	case componentpb.Edge_REF_TYPE_OUTPUT_BRANCH:
+		return models.EdgeTargetTypeOutputBranch
+	default:
+		return ""
+	}
+}
+
+func TargetTypeToProto(targetType string) componentpb.Edge_TargetType {
+	switch targetType {
+	case models.EdgeTargetTypeOutputBranch:
+		return componentpb.Edge_REF_TYPE_OUTPUT_BRANCH
+	case models.EdgeTargetTypeNode:
+		return componentpb.Edge_REF_TYPE_NODE
+	default:
+		return componentpb.Edge_REF_TYPE_NODE
+	}
+}
+
+func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
+	ref := models.NodeRef{}
+
+	switch node.RefType {
+	case componentpb.Node_REF_TYPE_COMPONENT:
+		if node.Component != nil {
+			ref.Component = &models.ComponentRef{
+				Name: node.Component.Name,
+			}
+		}
+	case componentpb.Node_REF_TYPE_BLUEPRINT:
+		if node.Blueprint != nil {
+			ref.Blueprint = &models.BlueprintRef{
+				ID: node.Blueprint.Id,
+			}
+		}
+	}
+
+	return ref
+}
+
+// Verify if the workflow is acyclic using
+// topological sort algorithm - kahn's - to detect cycles
+func CheckForCycles(nodes []*componentpb.Node, edges []*componentpb.Edge) error {
+
+	//
+	// Build adjacency list
+	//
+	graph := make(map[string][]string)
+	inDegree := make(map[string]int)
+
+	//
+	// Initialize all nodesm and build the graph
+	//
+	for _, node := range nodes {
+		graph[node.Id] = []string{}
+		inDegree[node.Id] = 0
+	}
+
+	for _, edge := range edges {
+		graph[edge.SourceId] = append(graph[edge.SourceId], edge.TargetId)
+		inDegree[edge.TargetId]++
+	}
+
+	// Kahn's algorithm for topological sort
+	queue := []string{}
+	for nodeID, degree := range inDegree {
+		if degree == 0 {
+			queue = append(queue, nodeID)
+		}
+	}
+
+	visited := 0
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		visited++
+
+		for _, neighbor := range graph[current] {
+			inDegree[neighbor]--
+			if inDegree[neighbor] == 0 {
+				queue = append(queue, neighbor)
+			}
+		}
+	}
+
+	// If we visited all nodes, the graph is acyclic
+	if visited != len(nodes) {
+		return status.Error(codes.InvalidArgument, "graph contains a cycle")
+	}
+
+	return nil
+}

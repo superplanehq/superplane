@@ -15,35 +15,40 @@ import (
 	"encoding/json"
 )
 
-// checks if the BlueprintsBlueprintEdge type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &BlueprintsBlueprintEdge{}
+// checks if the ComponentsEdge type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ComponentsEdge{}
 
-// BlueprintsBlueprintEdge struct for BlueprintsBlueprintEdge
-type BlueprintsBlueprintEdge struct {
+// ComponentsEdge struct for ComponentsEdge
+type ComponentsEdge struct {
 	SourceId *string `json:"sourceId,omitempty"`
+	TargetType *EdgeTargetType `json:"targetType,omitempty"`
 	TargetId *string `json:"targetId,omitempty"`
 	Branch *string `json:"branch,omitempty"`
 }
 
-// NewBlueprintsBlueprintEdge instantiates a new BlueprintsBlueprintEdge object
+// NewComponentsEdge instantiates a new ComponentsEdge object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewBlueprintsBlueprintEdge() *BlueprintsBlueprintEdge {
-	this := BlueprintsBlueprintEdge{}
+func NewComponentsEdge() *ComponentsEdge {
+	this := ComponentsEdge{}
+	var targetType EdgeTargetType = EDGETARGETTYPE_REF_TYPE_NODE
+	this.TargetType = &targetType
 	return &this
 }
 
-// NewBlueprintsBlueprintEdgeWithDefaults instantiates a new BlueprintsBlueprintEdge object
+// NewComponentsEdgeWithDefaults instantiates a new ComponentsEdge object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewBlueprintsBlueprintEdgeWithDefaults() *BlueprintsBlueprintEdge {
-	this := BlueprintsBlueprintEdge{}
+func NewComponentsEdgeWithDefaults() *ComponentsEdge {
+	this := ComponentsEdge{}
+	var targetType EdgeTargetType = EDGETARGETTYPE_REF_TYPE_NODE
+	this.TargetType = &targetType
 	return &this
 }
 
 // GetSourceId returns the SourceId field value if set, zero value otherwise.
-func (o *BlueprintsBlueprintEdge) GetSourceId() string {
+func (o *ComponentsEdge) GetSourceId() string {
 	if o == nil || IsNil(o.SourceId) {
 		var ret string
 		return ret
@@ -53,7 +58,7 @@ func (o *BlueprintsBlueprintEdge) GetSourceId() string {
 
 // GetSourceIdOk returns a tuple with the SourceId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprintEdge) GetSourceIdOk() (*string, bool) {
+func (o *ComponentsEdge) GetSourceIdOk() (*string, bool) {
 	if o == nil || IsNil(o.SourceId) {
 		return nil, false
 	}
@@ -61,7 +66,7 @@ func (o *BlueprintsBlueprintEdge) GetSourceIdOk() (*string, bool) {
 }
 
 // HasSourceId returns a boolean if a field has been set.
-func (o *BlueprintsBlueprintEdge) HasSourceId() bool {
+func (o *ComponentsEdge) HasSourceId() bool {
 	if o != nil && !IsNil(o.SourceId) {
 		return true
 	}
@@ -70,12 +75,44 @@ func (o *BlueprintsBlueprintEdge) HasSourceId() bool {
 }
 
 // SetSourceId gets a reference to the given string and assigns it to the SourceId field.
-func (o *BlueprintsBlueprintEdge) SetSourceId(v string) {
+func (o *ComponentsEdge) SetSourceId(v string) {
 	o.SourceId = &v
 }
 
+// GetTargetType returns the TargetType field value if set, zero value otherwise.
+func (o *ComponentsEdge) GetTargetType() EdgeTargetType {
+	if o == nil || IsNil(o.TargetType) {
+		var ret EdgeTargetType
+		return ret
+	}
+	return *o.TargetType
+}
+
+// GetTargetTypeOk returns a tuple with the TargetType field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsEdge) GetTargetTypeOk() (*EdgeTargetType, bool) {
+	if o == nil || IsNil(o.TargetType) {
+		return nil, false
+	}
+	return o.TargetType, true
+}
+
+// HasTargetType returns a boolean if a field has been set.
+func (o *ComponentsEdge) HasTargetType() bool {
+	if o != nil && !IsNil(o.TargetType) {
+		return true
+	}
+
+	return false
+}
+
+// SetTargetType gets a reference to the given EdgeTargetType and assigns it to the TargetType field.
+func (o *ComponentsEdge) SetTargetType(v EdgeTargetType) {
+	o.TargetType = &v
+}
+
 // GetTargetId returns the TargetId field value if set, zero value otherwise.
-func (o *BlueprintsBlueprintEdge) GetTargetId() string {
+func (o *ComponentsEdge) GetTargetId() string {
 	if o == nil || IsNil(o.TargetId) {
 		var ret string
 		return ret
@@ -85,7 +122,7 @@ func (o *BlueprintsBlueprintEdge) GetTargetId() string {
 
 // GetTargetIdOk returns a tuple with the TargetId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprintEdge) GetTargetIdOk() (*string, bool) {
+func (o *ComponentsEdge) GetTargetIdOk() (*string, bool) {
 	if o == nil || IsNil(o.TargetId) {
 		return nil, false
 	}
@@ -93,7 +130,7 @@ func (o *BlueprintsBlueprintEdge) GetTargetIdOk() (*string, bool) {
 }
 
 // HasTargetId returns a boolean if a field has been set.
-func (o *BlueprintsBlueprintEdge) HasTargetId() bool {
+func (o *ComponentsEdge) HasTargetId() bool {
 	if o != nil && !IsNil(o.TargetId) {
 		return true
 	}
@@ -102,12 +139,12 @@ func (o *BlueprintsBlueprintEdge) HasTargetId() bool {
 }
 
 // SetTargetId gets a reference to the given string and assigns it to the TargetId field.
-func (o *BlueprintsBlueprintEdge) SetTargetId(v string) {
+func (o *ComponentsEdge) SetTargetId(v string) {
 	o.TargetId = &v
 }
 
 // GetBranch returns the Branch field value if set, zero value otherwise.
-func (o *BlueprintsBlueprintEdge) GetBranch() string {
+func (o *ComponentsEdge) GetBranch() string {
 	if o == nil || IsNil(o.Branch) {
 		var ret string
 		return ret
@@ -117,7 +154,7 @@ func (o *BlueprintsBlueprintEdge) GetBranch() string {
 
 // GetBranchOk returns a tuple with the Branch field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprintEdge) GetBranchOk() (*string, bool) {
+func (o *ComponentsEdge) GetBranchOk() (*string, bool) {
 	if o == nil || IsNil(o.Branch) {
 		return nil, false
 	}
@@ -125,7 +162,7 @@ func (o *BlueprintsBlueprintEdge) GetBranchOk() (*string, bool) {
 }
 
 // HasBranch returns a boolean if a field has been set.
-func (o *BlueprintsBlueprintEdge) HasBranch() bool {
+func (o *ComponentsEdge) HasBranch() bool {
 	if o != nil && !IsNil(o.Branch) {
 		return true
 	}
@@ -134,11 +171,11 @@ func (o *BlueprintsBlueprintEdge) HasBranch() bool {
 }
 
 // SetBranch gets a reference to the given string and assigns it to the Branch field.
-func (o *BlueprintsBlueprintEdge) SetBranch(v string) {
+func (o *ComponentsEdge) SetBranch(v string) {
 	o.Branch = &v
 }
 
-func (o BlueprintsBlueprintEdge) MarshalJSON() ([]byte, error) {
+func (o ComponentsEdge) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -146,10 +183,13 @@ func (o BlueprintsBlueprintEdge) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o BlueprintsBlueprintEdge) ToMap() (map[string]interface{}, error) {
+func (o ComponentsEdge) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.SourceId) {
 		toSerialize["sourceId"] = o.SourceId
+	}
+	if !IsNil(o.TargetType) {
+		toSerialize["targetType"] = o.TargetType
 	}
 	if !IsNil(o.TargetId) {
 		toSerialize["targetId"] = o.TargetId
@@ -160,38 +200,38 @@ func (o BlueprintsBlueprintEdge) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableBlueprintsBlueprintEdge struct {
-	value *BlueprintsBlueprintEdge
+type NullableComponentsEdge struct {
+	value *ComponentsEdge
 	isSet bool
 }
 
-func (v NullableBlueprintsBlueprintEdge) Get() *BlueprintsBlueprintEdge {
+func (v NullableComponentsEdge) Get() *ComponentsEdge {
 	return v.value
 }
 
-func (v *NullableBlueprintsBlueprintEdge) Set(val *BlueprintsBlueprintEdge) {
+func (v *NullableComponentsEdge) Set(val *ComponentsEdge) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableBlueprintsBlueprintEdge) IsSet() bool {
+func (v NullableComponentsEdge) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableBlueprintsBlueprintEdge) Unset() {
+func (v *NullableComponentsEdge) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableBlueprintsBlueprintEdge(val *BlueprintsBlueprintEdge) *NullableBlueprintsBlueprintEdge {
-	return &NullableBlueprintsBlueprintEdge{value: val, isSet: true}
+func NewNullableComponentsEdge(val *ComponentsEdge) *NullableComponentsEdge {
+	return &NullableComponentsEdge{value: val, isSet: true}
 }
 
-func (v NullableBlueprintsBlueprintEdge) MarshalJSON() ([]byte, error) {
+func (v NullableComponentsEdge) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableBlueprintsBlueprintEdge) UnmarshalJSON(src []byte) error {
+func (v *NullableComponentsEdge) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

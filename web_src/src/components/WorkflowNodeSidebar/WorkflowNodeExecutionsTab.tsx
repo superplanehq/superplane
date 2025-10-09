@@ -1,9 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
-import { workflowsListNodeExecutions } from '../../api-client/sdk.gen'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
-import { withOrganizationHeader } from '../../utils/withOrganizationHeader'
 import { useState, useEffect } from 'react'
 import { ExecutionItem } from './ExecutionItem'
+import { useNodeExecutions } from '../../hooks/useWorkflowData'
+import { WorkflowsWorkflowNodeExecution } from '@/api-client'
 
 interface WorkflowNodeExecutionsTabProps {
   workflowId: string
@@ -32,20 +31,8 @@ export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode,
     return () => observer.disconnect()
   }, [])
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['workflow-node-executions', workflowId, nodeId],
-    queryFn: async () => {
-      const response = await workflowsListNodeExecutions(
-        withOrganizationHeader({
-          path: {
-            workflowId: workflowId,
-            nodeId: nodeId,
-          },
-        })
-      )
-      return response.data
-    },
-    refetchInterval: 5000, // Refresh every 5 seconds
+  const { data, isLoading, error } = useNodeExecutions(workflowId, nodeId, {
+    states: ['STATE_WAITING', 'STATE_STARTED', 'STATE_FINISHED']
   })
 
   if (isLoading) {
@@ -89,7 +76,7 @@ export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode,
         </p>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {executions.map((execution: any) => (
+        {executions.map((execution: WorkflowsWorkflowNodeExecution) => (
           <ExecutionItem
             key={execution.id}
             execution={execution}

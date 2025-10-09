@@ -71,8 +71,8 @@ func (a *Approval) Description() string {
 	return "Collect approvals on events"
 }
 
-func (a *Approval) OutputBranches(configuration any) []string {
-	return []string{components.DefaultBranchName}
+func (a *Approval) OutputBranches(configuration any) []components.OutputBranch {
+	return []components.OutputBranch{components.DefaultOutputBranch}
 }
 
 func (a *Approval) Configuration() []components.ConfigurationField {
@@ -171,7 +171,7 @@ func (a *Approval) handleApprove(ctx components.ActionContext) error {
 	// Required amount of approvals reached - finish the execution.
 	//
 	return ctx.ExecutionStateContext.Finish(map[string][]any{
-		components.DefaultBranchName: {metadata},
+		components.DefaultOutputBranch.Name: {metadata},
 	})
 }
 
@@ -186,5 +186,5 @@ func (a *Approval) handleReject(ctx components.ActionContext) error {
 		return fmt.Errorf("reason must be a string")
 	}
 
-	return ctx.ExecutionStateContext.Fail(fmt.Sprintf("Rejected: %s", reasonStr))
+	return ctx.ExecutionStateContext.Fail(reasonStr, "")
 }
