@@ -41,7 +41,7 @@ import { AutoCompleteInput } from '@/components/AutoCompleteInput/AutoCompleteIn
 import { EVENT_TEMPLATES } from '@/constants/eventTemplates';
 import { useEventRejections, useStageEvents } from '@/hooks/useCanvasData';
 
-const inputFormattingMessage = 'Pro tip: Select inputs for automatic input formatting';
+const inputFormattingMessage = 'Pro tip: Select inputs for automatic formatting';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -1339,6 +1339,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                         filterErrors={connectionFilterErrors[index] || []}
                         showFilters={true}
                         existingConnections={connections}
+                        getEventTemplate={getEventTemplate}
                       />
                     }
                   />
@@ -1549,7 +1550,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     value={inputValue.valueFrom.eventData.expression || ''}
                                                     onChange={(value) => inputMappingHandlers.handleEventDataExpressionChange(value, actualMappingIndex, input.name)}
                                                     placeholder="eg. $.commits[0].message"
-                                                    className="text-xs"
+                                                    inputSize="xs"
                                                     exampleObj={getEventTemplate(inputValue?.valueFrom?.eventData?.connection || '')}
                                                   />
                                                 </div>
@@ -2218,7 +2219,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 onChange={(value) => updateExecutorParameter(param.id, param.key, value)}
                                 exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Parameter value"
-                                className="text-sm"
+                                inputSize="sm"
                                 prefix="${{ "
                                 suffix=" }}"
                               />
@@ -2367,7 +2368,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 onChange={(value) => updateExecutorInput(input.id, input.key, value)}
                                 exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Input value"
-                                className="text-sm"
+                                inputSize="sm"
                                 prefix="${{ "
                                 suffix=" }}"
                               />
@@ -2451,10 +2452,9 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                 onChange={(value) => updateExecutorHeader(header.id, header.key, value)}
                                 exampleObj={{ inputs: getInputsObject() }}
                                 placeholder="Header value"
-                                className="text-sm"
+                                inputSize="sm"
                                 prefix="${{ "
                                 suffix=" }}"
-
                               />
                             </div>
                             <button
@@ -2504,7 +2504,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                       onChange={(value) => setExecutor(prev => ({ ...prev, name: value }))}
                       exampleObj={{ inputs: getInputsObject() }}
                       placeholder={'${{ inputs.VERSION }} deployment'}
-                      className="text-sm"
+                      inputSize="sm"
                       prefix="${{ "
                       suffix=" }}"
                     />

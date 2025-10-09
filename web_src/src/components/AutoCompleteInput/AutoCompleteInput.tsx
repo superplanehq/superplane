@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, forwardRef } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { flattenForAutocomplete, getAutocompleteSuggestions } from './core';
 
-export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<'input'>, 'onChange'> {
+export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<'input'>, 'onChange' | 'size'> {
   exampleObj: Record<string, unknown>;
   value?: string;
   onChange?: (value: string) => void;
@@ -11,12 +11,13 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   disabled?: boolean;
   prefix?: string;
   suffix?: string;
+  inputSize?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', ...props }) => {
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', inputSize = 'md', ...props }) => {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -215,13 +216,17 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             placeholder={placeholder}
             disabled={disabled}
             className={twMerge([
-              'relative block w-full appearance-none rounded-lg px-3 py-2 sm:px-3 sm:py-1.5',
-              'text-base/6 text-zinc-950 placeholder:text-zinc-500 sm:text-sm/6 dark:text-white',
-              'border border-zinc-950/10 hover:border-zinc-950/20 dark:border-white/10 dark:hover:border-white/20',
+              'relative block w-full appearance-none rounded-lg border border-zinc-950/10 hover:border-zinc-950/20 dark:border-white/10 dark:hover:border-white/20',
               'bg-transparent dark:bg-white/5',
+              'text-zinc-950 placeholder:text-zinc-500 dark:text-white',
               'focus:outline-none',
               'invalid:border-red-500 dark:invalid:border-red-500',
               'disabled:border-zinc-950/20 dark:disabled:border-white/15 dark:disabled:bg-white/2.5',
+              // Size variants
+              inputSize === 'xs' && 'px-2 py-1 text-xs',
+              inputSize === 'sm' && 'px-2 py-1.5 text-sm',
+              inputSize === 'md' && 'px-3 py-2 text-base sm:px-3 sm:py-1.5 sm:text-sm',
+              inputSize === 'lg' && 'px-4 py-3 text-lg',
             ])}
             {...props}
           />
