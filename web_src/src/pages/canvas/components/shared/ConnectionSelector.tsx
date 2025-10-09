@@ -78,7 +78,7 @@ export function ConnectionSelector({
             </div>
           </div>
           <div className="mb-3 text-xs text-zinc-600 dark:text-zinc-400">
-            Pro tip: Expressions are parsed using the <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> language.
+            Pro tip: Expressions are parsed using the <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> language. You can type $ to select data from event payload.
           </div>
           <div className="space-y-2">
             {(connection.filters || []).map((filter, filterIndex) => {
