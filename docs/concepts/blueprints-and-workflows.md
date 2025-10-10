@@ -624,12 +624,12 @@ Scenario: A blueprint that makes two HTTP calls in sequence.
 
 The blueprints-and-workflows architecture provides:
 
-✅ **Composability**: Blueprints are reusable subgraphs
-✅ **Flexibility**: Components have full lifecycle control
-✅ **Interactivity**: Actions enable async workflows
-✅ **State Management**: Metadata storage per execution
-✅ **Complex Routing**: Dynamic branches and fan-out support
-✅ **Hierarchy**: Nested blueprints with configuration resolution
-✅ **Traceability**: Complete execution history in database
+- ✅ **Composability**: Blueprints are reusable subgraphs
+- ✅ **Flexibility**: Components have full lifecycle control
+- ✅ **Interactivity**: Actions enable async workflows
+- ✅ **State Management**: Metadata storage per execution
+- ✅ **Complex Routing**: Dynamic branches and fan-out support
+- ✅ **Hierarchy**: Nested blueprints with configuration resolution
+- ✅ **Traceability**: Complete execution history in database
 
 This architecture replaces the previous canvas-based system with a more powerful, flexible model suitable for complex orchestration scenarios.
