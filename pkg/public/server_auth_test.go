@@ -20,6 +20,8 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 	// Set test environment variables
 	os.Setenv("GITHUB_CLIENT_ID", "test-client-id")
 	os.Setenv("GITHUB_CLIENT_SECRET", "test-client-secret")
+	os.Setenv("GOOGLE_CLIENT_ID", "test-google-client-id")
+	os.Setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	signer := jwt.NewSigner("test-client-secret")
@@ -46,6 +48,7 @@ func Test__Login(t *testing.T) {
 	assert.Equal(t, http.StatusOK, response.Code)
 	assert.Contains(t, response.Body.String(), "Superplane")
 	assert.Contains(t, response.Body.String(), "Continue with GitHub")
+	assert.Contains(t, response.Body.String(), "Continue with Google")
 }
 
 func Test__Logout(t *testing.T) {
@@ -184,6 +187,8 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	// Test with no providers configured
 	os.Unsetenv("GITHUB_CLIENT_ID")
 	os.Unsetenv("GITHUB_CLIENT_SECRET")
+	os.Unsetenv("GOOGLE_CLIENT_ID")
+	os.Unsetenv("GOOGLE_CLIENT_SECRET")
 
 	providers := getOAuthProviders()
 	assert.Empty(t, providers)
@@ -198,4 +203,19 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	assert.Equal(t, "test-client-id", providers["github"].Key)
 	assert.Equal(t, "test-client-secret", providers["github"].Secret)
 	assert.Equal(t, "http://localhost:8000/auth/github/callback", providers["github"].CallbackURL)
+
+	// Test with Google configured
+	os.Setenv("GOOGLE_CLIENT_ID", "test-google-client-id")
+	os.Setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
+
+	providers = getOAuthProviders()
+	assert.Contains(t, providers, "google")
+	assert.Equal(t, "test-google-client-id", providers["google"].Key)
+	assert.Equal(t, "test-google-client-secret", providers["google"].Secret)
+	assert.Equal(t, "http://localhost:8000/auth/google/callback", providers["google"].CallbackURL)
+
+	// Test with both providers configured
+	assert.Contains(t, providers, "github")
+	assert.Contains(t, providers, "google")
+	assert.Len(t, providers, 2)
 }
