@@ -171,7 +171,7 @@ export const ConnectionSelector = forwardRef<ConnectionSelectorRef, ConnectionSe
             </div>
           </div>
           <div className="mb-3 text-xs text-zinc-600 dark:text-zinc-400">
-            Pro tip: Expressions are parsed using the <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> language. You can type $ to select data from event payload. Expressions will be validated when you save the connection.
+            Pro tip: Expressions are parsed using the <a className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300" href="https://expr-lang.org/docs/language-definition" target="_blank" rel="noopener noreferrer">Expr</a> language. You can type $ to select data from event payload.
           </div>
           <div className="space-y-2">
             {(connection.filters || []).map((filter, filterIndex) => {
@@ -182,12 +182,11 @@ export const ConnectionSelector = forwardRef<ConnectionSelectorRef, ConnectionSe
 
               return (
                 <div key={filterIndex}>
-                  <div className={`flex gap-2 items-center p-2 rounded ${
-                    hasError || hasValidationError
-                      ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'
-                      : validation && validation.isValid
-                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'
-                        : 'bg-zinc-50 dark:bg-zinc-800'
+                  <div className={`flex gap-2 items-center p-2 rounded ${hasError || hasValidationError
+                    ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700'
+                    : validation && validation.isValid
+                      ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'
+                      : 'bg-zinc-50 dark:bg-zinc-800'
                     }`}>
                     <select
                       value={filter.type || 'FILTER_TYPE_DATA'}
@@ -203,10 +202,9 @@ export const ConnectionSelector = forwardRef<ConnectionSelectorRef, ConnectionSe
                         }
                         onFilterUpdate(index, filterIndex, updates);
                       }}
-                      className={`px-2 py-1 border rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 ${
-                        hasError || hasValidationError
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600'
+                      className={`px-2 py-1 border rounded text-sm bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 ${hasError || hasValidationError
+                        ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                        : 'border-zinc-300 dark:border-zinc-600'
                         }`}
                     >
                       <option value="FILTER_TYPE_DATA">Data</option>
@@ -228,12 +226,11 @@ export const ConnectionSelector = forwardRef<ConnectionSelectorRef, ConnectionSe
                         onFilterUpdate(index, filterIndex, updates);
                       }}
                       placeholder={filter.type === 'FILTER_TYPE_DATA' ? 'eg. $.execution.result=="passed"' : 'eg. headers["name"]=="value"'}
-                      className={`flex-1 ${
-                        hasError || hasValidationError
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : validation && validation.isValid
-                            ? 'border-green-300 dark:border-green-600 focus:ring-green-500'
-                            : 'border-zinc-300 dark:border-zinc-600'
+                      className={`flex-1 ${hasError || hasValidationError
+                        ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                        : validation && validation.isValid
+                          ? 'border-green-300 dark:border-green-600 focus:ring-green-500'
+                          : 'border-zinc-300 dark:border-zinc-600'
                         }`}
                       inputSize="sm"
                       exampleObj={getEventTemplate ? getEventTemplate(connection.name || '') : {}}
