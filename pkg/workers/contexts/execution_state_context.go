@@ -13,17 +13,8 @@ func NewExecutionStateContext(execution *models.WorkflowNodeExecution) component
 	return &ExecutionStateContext{execution: execution}
 }
 
-func (s *ExecutionStateContext) Wait() error {
-	return s.execution.Wait()
-}
-
-func (s *ExecutionStateContext) Finish(outputs map[string][]any) error {
-	if err := s.execution.Pass(outputs); err != nil {
-		return err
-	}
-
-	// Move execution to routing state so router picks it up
-	return s.execution.Route()
+func (s *ExecutionStateContext) Pass(outputs map[string][]any) error {
+	return s.execution.Pass(outputs)
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {

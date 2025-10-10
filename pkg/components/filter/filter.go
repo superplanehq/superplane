@@ -82,7 +82,7 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 		outputs[components.DefaultOutputBranch.Name] = []any{ctx.Data}
 	}
 
-	return ctx.ExecutionStateContext.Finish(outputs)
+	return ctx.ExecutionStateContext.Pass(outputs)
 }
 
 func (f *Filter) Actions() []components.Action {

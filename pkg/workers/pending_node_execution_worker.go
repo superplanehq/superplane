@@ -51,14 +51,11 @@ func (w *PendingNodeExecutionWorker) processExecutions() error {
 
 	for _, execution := range executions {
 		// Check if there's already an execution running for this node
-		// Only process if no other execution is in started/waiting state
+		// Only process if no other execution is in started state
 		_, err := models.FindLastNodeExecutionForNode(
 			execution.WorkflowID,
 			execution.NodeID,
-			[]string{
-				models.WorkflowNodeExecutionStateWaiting,
-				models.WorkflowNodeExecutionStateStarted,
-			},
+			[]string{models.WorkflowNodeExecutionStateStarted},
 		)
 
 		if err == nil {

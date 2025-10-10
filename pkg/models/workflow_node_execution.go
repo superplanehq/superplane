@@ -12,7 +12,6 @@ import (
 
 const (
 	WorkflowNodeExecutionStatePending  = "pending"
-	WorkflowNodeExecutionStateWaiting  = "waiting"
 	WorkflowNodeExecutionStateStarted  = "started"
 	WorkflowNodeExecutionStateRouting  = "routing"
 	WorkflowNodeExecutionStateFinished = "finished"
@@ -114,22 +113,6 @@ func FindRoutingNodeExecutions() ([]WorkflowNodeExecution, error) {
 	return executions, nil
 }
 
-func FindLastNodeExecution(workflowID uuid.UUID, states []string) (*WorkflowNodeExecution, error) {
-	var execution WorkflowNodeExecution
-	err := database.Conn().
-		Where("workflow_id = ?", workflowID).
-		Where("state IN ?", states).
-		Order("updated_at DESC").
-		First(&execution).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &execution, nil
-}
-
 func FindNodeExecution(id uuid.UUID) (*WorkflowNodeExecution, error) {
 	var execution WorkflowNodeExecution
 	err := database.Conn().
@@ -142,21 +125,6 @@ func FindNodeExecution(id uuid.UUID) (*WorkflowNodeExecution, error) {
 	}
 
 	return &execution, nil
-}
-
-func FindExecutionsByWorkflowAndState(workflowID uuid.UUID, states []string) ([]WorkflowNodeExecution, error) {
-	var executions []WorkflowNodeExecution
-	err := database.Conn().
-		Where("workflow_id = ?", workflowID).
-		Where("state IN ?", states).
-		Find(&executions).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return executions, nil
 }
 
 func FindLastNodeExecutionForNode(workflowID uuid.UUID, nodeID string, states []string) (*WorkflowNodeExecution, error) {
@@ -189,30 +157,30 @@ func (e *WorkflowNodeExecution) StartInTransaction(tx *gorm.DB) error {
 		}).Error
 }
 
+//
+// Passing and failing an execution just updates its result,
+// and moves its state to routing, so the execution router can take it,
+// and route it to the next nodes, if needed.
+//
+
 func (e *WorkflowNodeExecution) Pass(outputs map[string][]any) error {
 	return e.PassInTransaction(database.Conn(), outputs)
 }
 
-func (e *WorkflowNodeExecution) Wait() error {
-	return e.WaitInTransaction(database.Conn())
-}
-
-func (e *WorkflowNodeExecution) WaitInTransaction(tx *gorm.DB) error {
-	now := time.Now()
-	e.State = WorkflowNodeExecutionStateWaiting
-	e.UpdatedAt = &now
-	return tx.Save(e).Error
-}
-
 func (e *WorkflowNodeExecution) PassInTransaction(tx *gorm.DB, outputs map[string][]any) error {
 	now := time.Now()
-	return tx.Model(e).
+	err := tx.Model(e).
 		Updates(map[string]interface{}{
-			"state":      WorkflowNodeExecutionStateFinished,
 			"result":     WorkflowNodeExecutionResultPassed,
 			"outputs":    datatypes.NewJSONType(outputs),
 			"updated_at": &now,
 		}).Error
+
+	if err != nil {
+		return err
+	}
+
+	return e.RouteInTransaction(tx)
 }
 
 func (e *WorkflowNodeExecution) Fail(reason, message string) error {
@@ -221,14 +189,19 @@ func (e *WorkflowNodeExecution) Fail(reason, message string) error {
 
 func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) error {
 	now := time.Now()
-	return tx.Model(e).
+	err := tx.Model(e).
 		Updates(map[string]interface{}{
-			"state":          WorkflowNodeExecutionStateFinished,
 			"result":         WorkflowNodeExecutionResultFailed,
 			"result_reason":  reason,
 			"result_message": message,
 			"updated_at":     &now,
 		}).Error
+
+	if err != nil {
+		return err
+	}
+
+	return e.RouteInTransaction(tx)
 }
 
 func (e *WorkflowNodeExecution) Route() error {
@@ -242,23 +215,23 @@ func (e *WorkflowNodeExecution) RouteInTransaction(tx *gorm.DB) error {
 	return tx.Save(e).Error
 }
 
-func (e *WorkflowNodeExecution) Complete() error {
-	return e.CompleteInTransaction(database.Conn())
+func (e *WorkflowNodeExecution) Finish() error {
+	return e.FinishInTransaction(database.Conn())
 }
 
-func (e *WorkflowNodeExecution) CompleteInTransaction(tx *gorm.DB) error {
+func (e *WorkflowNodeExecution) FinishInTransaction(tx *gorm.DB) error {
 	now := time.Now()
 	return tx.Model(e).
 		Updates(map[string]interface{}{
 			"state":      WorkflowNodeExecutionStateFinished,
-			"result":     WorkflowNodeExecutionResultPassed,
 			"updated_at": &now,
 		}).Error
 }
 
-// GetInputs resolves the inputs for this execution from previous execution or from the root event
 func (e *WorkflowNodeExecution) GetInputs() (map[string]any, error) {
+	//
 	// First node in the flow - fetch from root event
+	//
 	if e.PreviousExecutionID == nil {
 		initialEvent, err := FindWorkflowInitialEvent(e.RootEventID)
 		if err != nil {
@@ -272,17 +245,23 @@ func (e *WorkflowNodeExecution) GetInputs() (map[string]any, error) {
 		return nil, fmt.Errorf("failed to find previous execution %s: %w", *e.PreviousExecutionID, err)
 	}
 
+	//
 	// Special case: Entering a blueprint
-	// The previous execution is the blueprint node, but we need to get ITS inputs
+	// The previous execution is the top-level blueprint node execution,
+	// so we need to get its inputs.
+	//
 	if e.ParentExecutionID != nil && previous.ParentExecutionID == nil {
 		return previous.GetInputs()
 	}
 
-	// Normal case: Read from previous execution's outputs
 	if e.PreviousOutputBranch == nil || e.PreviousOutputIndex == nil {
 		return nil, fmt.Errorf("execution %s has invalid previous reference", e.ID)
 	}
 
+	//
+	// Normal case: read from previous execution's outputs,
+	// using the output branch and index references.
+	//
 	previousOutputs := previous.Outputs.Data()
 	branchData, exists := previousOutputs[*e.PreviousOutputBranch]
 	if !exists {

@@ -78,11 +78,6 @@ registerExecutionRenderer('http', {
             ) : (
               <>
                 {getResultBadge(execution.result)}
-                {execution.state === 'STATE_WAITING' && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">
-                    Waiting
-                  </span>
-                )}
                 {execution.state === 'STATE_STARTED' && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                     Running

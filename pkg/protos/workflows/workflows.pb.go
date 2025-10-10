@@ -31,10 +31,9 @@ type WorkflowNodeExecution_State int32
 const (
 	WorkflowNodeExecution_STATE_UNKNOWN  WorkflowNodeExecution_State = 0
 	WorkflowNodeExecution_STATE_PENDING  WorkflowNodeExecution_State = 1
-	WorkflowNodeExecution_STATE_WAITING  WorkflowNodeExecution_State = 2
-	WorkflowNodeExecution_STATE_STARTED  WorkflowNodeExecution_State = 3
-	WorkflowNodeExecution_STATE_ROUTING  WorkflowNodeExecution_State = 4
-	WorkflowNodeExecution_STATE_FINISHED WorkflowNodeExecution_State = 5
+	WorkflowNodeExecution_STATE_STARTED  WorkflowNodeExecution_State = 2
+	WorkflowNodeExecution_STATE_ROUTING  WorkflowNodeExecution_State = 3
+	WorkflowNodeExecution_STATE_FINISHED WorkflowNodeExecution_State = 4
 )
 
 // Enum value maps for WorkflowNodeExecution_State.
@@ -42,18 +41,16 @@ var (
 	WorkflowNodeExecution_State_name = map[int32]string{
 		0: "STATE_UNKNOWN",
 		1: "STATE_PENDING",
-		2: "STATE_WAITING",
-		3: "STATE_STARTED",
-		4: "STATE_ROUTING",
-		5: "STATE_FINISHED",
+		2: "STATE_STARTED",
+		3: "STATE_ROUTING",
+		4: "STATE_FINISHED",
 	}
 	WorkflowNodeExecution_State_value = map[string]int32{
 		"STATE_UNKNOWN":  0,
 		"STATE_PENDING":  1,
-		"STATE_WAITING":  2,
-		"STATE_STARTED":  3,
-		"STATE_ROUTING":  4,
-		"STATE_FINISHED": 5,
+		"STATE_STARTED":  2,
+		"STATE_ROUTING":  3,
+		"STATE_FINISHED": 4,
 	}
 )
 
@@ -1484,7 +1481,7 @@ const file_workflows_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xce\t\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xbb\t\n" +
 	"\x15WorkflowNodeExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vworkflow_id\x18\x02 \x01(\tR\n" +
@@ -1507,14 +1504,13 @@ const file_workflows_proto_rawDesc = "" +
 	"\rconfiguration\x18\x0f \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x122\n" +
 	"\x15previous_execution_id\x18\x10 \x01(\tR\x13previousExecutionId\x124\n" +
 	"\x16previous_output_branch\x18\x11 \x01(\tR\x14previousOutputBranch\x122\n" +
-	"\x15previous_output_index\x18\x12 \x01(\x05R\x13previousOutputIndex\"z\n" +
+	"\x15previous_output_index\x18\x12 \x01(\x05R\x13previousOutputIndex\"g\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
-	"\rSTATE_WAITING\x10\x02\x12\x11\n" +
-	"\rSTATE_STARTED\x10\x03\x12\x11\n" +
-	"\rSTATE_ROUTING\x10\x04\x12\x12\n" +
-	"\x0eSTATE_FINISHED\x10\x05\"X\n" +
+	"\rSTATE_STARTED\x10\x02\x12\x11\n" +
+	"\rSTATE_ROUTING\x10\x03\x12\x12\n" +
+	"\x0eSTATE_FINISHED\x10\x04\"X\n" +
 	"\x06Result\x12\x12\n" +
 	"\x0eRESULT_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rRESULT_PASSED\x10\x01\x12\x11\n" +

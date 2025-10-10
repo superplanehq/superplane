@@ -94,8 +94,8 @@ export const ComponentActions = ({ executionId, componentName, executionState }:
     return null
   }
 
-  // Only show actions for waiting or started executions
-  if (executionState !== 'STATE_WAITING' && executionState !== 'STATE_STARTED') {
+  // Only show actions for started executions
+  if (executionState !== 'STATE_STARTED') {
     return null
   }
 

@@ -87,8 +87,7 @@ type MetadataContext interface {
  * ExecutionStateContext allows components to control execution lifecycle.
  */
 type ExecutionStateContext interface {
-	Wait() error
-	Finish(outputs map[string][]any) error
+	Pass(outputs map[string][]any) error
 	Fail(reason, message string) error
 }
 

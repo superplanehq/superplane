@@ -3415,7 +3415,6 @@
               "enum": [
                 "STATE_UNKNOWN",
                 "STATE_PENDING",
-                "STATE_WAITING",
                 "STATE_STARTED",
                 "STATE_ROUTING",
                 "STATE_FINISHED"
@@ -6566,7 +6565,6 @@
       "enum": [
         "STATE_UNKNOWN",
         "STATE_PENDING",
-        "STATE_WAITING",
         "STATE_STARTED",
         "STATE_ROUTING",
         "STATE_FINISHED"

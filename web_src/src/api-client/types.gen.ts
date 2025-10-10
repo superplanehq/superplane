@@ -1235,7 +1235,7 @@ export type WorkflowsWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PA
 
 export type WorkflowsWorkflowNodeExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR';
 
-export type WorkflowsWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_ROUTING' | 'STATE_FINISHED';
+export type WorkflowsWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_ROUTING' | 'STATE_FINISHED';
 
 export type GooglerpcStatus = {
     code?: number;
@@ -3542,7 +3542,7 @@ export type WorkflowsListNodeExecutionsData = {
         nodeId: string;
     };
     query?: {
-        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_STARTED' | 'STATE_ROUTING' | 'STATE_FINISHED'>;
+        states?: Array<'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_ROUTING' | 'STATE_FINISHED'>;
         results?: Array<'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED'>;
         limit?: number;
         before?: string;

@@ -32,7 +32,7 @@ export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode,
   }, [])
 
   const { data, isLoading, error } = useNodeExecutions(workflowId, nodeId, {
-    states: ['STATE_WAITING', 'STATE_STARTED', 'STATE_FINISHED']
+    states: ['STATE_STARTED', 'STATE_FINISHED']
   })
 
   if (isLoading) {

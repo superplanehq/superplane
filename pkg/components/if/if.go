@@ -92,7 +92,7 @@ func (f *If) Execute(ctx components.ExecutionContext) error {
 		}
 	}
 
-	return ctx.ExecutionStateContext.Finish(outputs)
+	return ctx.ExecutionStateContext.Pass(outputs)
 }
 
 func (f *If) Actions() []components.Action {

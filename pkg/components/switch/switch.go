@@ -108,7 +108,7 @@ func (s *Switch) Execute(ctx components.ExecutionContext) error {
 		}
 	}
 
-	return ctx.ExecutionStateContext.Finish(outputs)
+	return ctx.ExecutionStateContext.Pass(outputs)
 }
 
 func (s *Switch) Actions() []components.Action {

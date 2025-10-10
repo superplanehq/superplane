@@ -148,24 +148,24 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 		}
 
 		result = append(result, &pb.WorkflowNodeExecution{
-			Id:                    execution.ID.String(),
-			WorkflowId:            execution.WorkflowID.String(),
-			NodeId:                execution.NodeID,
-			ParentExecutionId:     parentExecID,
-			BlueprintId:           blueprintID,
-			State:                 NodeExecutionStateToProto(execution.State),
-			Result:                NodeExecutionResultToProto(execution.Result),
-			ResultReason:          NodeExecutionResultReasonToProto(execution.ResultReason),
-			ResultMessage:         execution.ResultMessage,
-			Input:                 input,
-			Outputs:               outputs,
-			CreatedAt:             timestamppb.New(*execution.CreatedAt),
-			UpdatedAt:             timestamppb.New(*execution.UpdatedAt),
-			Metadata:              metadata,
-			Configuration:         configuration,
-			PreviousExecutionId:   previousExecID,
-			PreviousOutputBranch:  previousOutputBranch,
-			PreviousOutputIndex:   previousOutputIndex,
+			Id:                   execution.ID.String(),
+			WorkflowId:           execution.WorkflowID.String(),
+			NodeId:               execution.NodeID,
+			ParentExecutionId:    parentExecID,
+			BlueprintId:          blueprintID,
+			State:                NodeExecutionStateToProto(execution.State),
+			Result:               NodeExecutionResultToProto(execution.Result),
+			ResultReason:         NodeExecutionResultReasonToProto(execution.ResultReason),
+			ResultMessage:        execution.ResultMessage,
+			Input:                input,
+			Outputs:              outputs,
+			CreatedAt:            timestamppb.New(*execution.CreatedAt),
+			UpdatedAt:            timestamppb.New(*execution.UpdatedAt),
+			Metadata:             metadata,
+			Configuration:        configuration,
+			PreviousExecutionId:  previousExecID,
+			PreviousOutputBranch: previousOutputBranch,
+			PreviousOutputIndex:  previousOutputIndex,
 		})
 	}
 
@@ -210,8 +210,6 @@ func ProtoToNodeExecutionState(state pb.WorkflowNodeExecution_State) (string, er
 	switch state {
 	case pb.WorkflowNodeExecution_STATE_PENDING:
 		return models.WorkflowNodeExecutionStatePending, nil
-	case pb.WorkflowNodeExecution_STATE_WAITING:
-		return models.WorkflowNodeExecutionStateWaiting, nil
 	case pb.WorkflowNodeExecution_STATE_STARTED:
 		return models.WorkflowNodeExecutionStateStarted, nil
 	case pb.WorkflowNodeExecution_STATE_ROUTING:
@@ -238,8 +236,6 @@ func NodeExecutionStateToProto(state string) pb.WorkflowNodeExecution_State {
 	switch state {
 	case models.WorkflowNodeExecutionStatePending:
 		return pb.WorkflowNodeExecution_STATE_PENDING
-	case models.WorkflowNodeExecutionStateWaiting:
-		return pb.WorkflowNodeExecution_STATE_WAITING
 	case models.WorkflowNodeExecutionStateStarted:
 		return pb.WorkflowNodeExecution_STATE_STARTED
 	case models.WorkflowNodeExecutionStateRouting:

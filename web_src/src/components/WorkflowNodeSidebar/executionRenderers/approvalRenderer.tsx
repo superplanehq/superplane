@@ -64,8 +64,8 @@ const ApprovalActions = ({ execution }: { execution: any }) => {
     })
   }
 
-  // Only show actions for waiting or started executions
-  if (execution.state !== 'STATE_WAITING' && execution.state !== 'STATE_STARTED') {
+  // Only show actions for started executions
+  if (execution.state !== 'STATE_STARTED') {
     return null
   }
 

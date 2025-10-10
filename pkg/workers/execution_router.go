@@ -15,8 +15,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-// ExecutionRouter replaces WorkflowEventRouter
-// It routes completed executions to next nodes or completes the workflow
+/*
+ * ExecutionRouter is responsible for routing
+ * executions with a result to the next nodes
+ * in the workflow.
+ *
+ * It creates new WorkflowNodeExecution records
+ * for each next node, and updates the previous
+ * execution to mark it as completed.
+ */
 type ExecutionRouter struct{}
 
 func NewExecutionRouter() *ExecutionRouter {
@@ -33,7 +40,7 @@ func (w *ExecutionRouter) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := w.processExecutions(); err != nil {
-				log.Printf("[ExecutionRouter] Error processing executions: %v", err)
+				w.log("Error processing executions: %v", err)
 			}
 		}
 	}
@@ -57,31 +64,66 @@ func (w *ExecutionRouter) processExecutions() error {
 	return nil
 }
 
-func (w *ExecutionRouter) routeExecution(exec *models.WorkflowNodeExecution) error {
-	nodes, edges, err := w.findNodesAndEdges(exec)
+func (w *ExecutionRouter) routeExecution(execution *models.WorkflowNodeExecution) error {
+	//
+	// If an execution passed, we continue the chain of executions.
+	//
+	if execution.Result == models.WorkflowNodeExecutionResultPassed {
+		return w.continueChain(execution)
+	}
+
+	//
+	// If an execution failed, we stop the chain of executions.
+	//
+	return w.abortChain(execution)
+}
+
+func (w *ExecutionRouter) abortChain(execution *models.WorkflowNodeExecution) error {
+	if execution.BlueprintID == nil {
+		return execution.Finish()
+	}
+
+	parentExecution, err := w.findBlueprintNodeExecution(execution)
+	if err != nil {
+		return err
+	}
+
+	//
+	// We finish the child execution, and fail the parent execution.
+	//
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		err := execution.Finish()
+		if err != nil {
+			return err
+		}
+
+		return parentExecution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, "")
+	})
+}
+
+func (w *ExecutionRouter) continueChain(execution *models.WorkflowNodeExecution) error {
+	nodes, edges, err := w.findNodesAndEdges(execution)
 	if err != nil {
 		return fmt.Errorf("failed to determine nodes and edges for execution: %v", err)
 	}
 
-	nextNodes, err := w.findNextNodes(exec, edges)
+	nextNodes, err := w.findNextNodes(execution, edges)
 	if err != nil {
 		return fmt.Errorf("failed to find next nodes: %w", err)
 	}
 
-	// Route to next nodes if they exist
 	if len(nextNodes) > 0 {
-		w.log("Execution %s: routing to %d next nodes", exec.ID, len(nextNodes))
-		return w.createNextExecutions(exec, nextNodes, nodes)
+		w.log("Execution %s: routing to %d next nodes", execution.ID, len(nextNodes))
+		return w.createNextExecutions(execution, nextNodes, nodes)
 	}
 
-	// No more nodes - handle completion
-	w.log("Execution %s: no more nodes", exec.ID)
+	w.log("Execution %s: no more nodes", execution.ID)
 
-	if exec.BlueprintID != nil {
-		return w.checkBlueprintCompletion(exec, edges)
+	if execution.BlueprintID != nil {
+		return w.checkBlueprintCompletion(execution, edges)
 	}
 
-	return exec.Complete()
+	return execution.Finish()
 }
 
 func (w *ExecutionRouter) findNodesAndEdges(exec *models.WorkflowNodeExecution) ([]models.Node, []models.Edge, error) {
@@ -143,7 +185,7 @@ func (w *ExecutionRouter) findNextNodes(exec *models.WorkflowNodeExecution, edge
 			continue
 		}
 
-		// Create child executions for each item in branch (fan-out)
+		// Create child executions for each item in branch
 		for idx := range branchData {
 			nextNodes = append(nextNodes, nextNodeInfo{
 				NodeID:       edge.TargetID,
@@ -170,7 +212,7 @@ func (w *ExecutionRouter) createNextExecutions(
 			}
 		}
 
-		return parent.CompleteInTransaction(tx)
+		return parent.FinishInTransaction(tx)
 	})
 }
 
@@ -258,11 +300,11 @@ func (w *ExecutionRouter) findNodeByID(nodes []models.Node, nodeID string) *mode
 func (w *ExecutionRouter) checkBlueprintCompletion(exec *models.WorkflowNodeExecution, edges []models.Edge) error {
 	w.log("Checking blueprint completion for execution %s", exec.ID)
 
-	if err := exec.Complete(); err != nil {
+	if err := exec.Finish(); err != nil {
 		return fmt.Errorf("failed to complete terminal execution: %w", err)
 	}
 
-	activeCount, err := w.countActiveExecutionsInBlueprint(exec.BlueprintID)
+	activeCount, err := w.countActiveExecutionsInBlueprint(exec.RootEventID, exec.BlueprintID)
 	if err != nil {
 		return err
 	}
@@ -272,13 +314,14 @@ func (w *ExecutionRouter) checkBlueprintCompletion(exec *models.WorkflowNodeExec
 		return nil
 	}
 
-	return w.completeBlueprintWithAllOutputs(exec, edges)
+	return w.finishBlueprintWithAllOutputs(exec, edges)
 }
 
-func (w *ExecutionRouter) countActiveExecutionsInBlueprint(blueprintID *uuid.UUID) (int64, error) {
+func (w *ExecutionRouter) countActiveExecutionsInBlueprint(rootEventID uuid.UUID, blueprintID *uuid.UUID) (int64, error) {
 	var count int64
 	err := database.Conn().Model(&models.WorkflowNodeExecution{}).
 		Where("blueprint_id = ?", blueprintID).
+		Where("root_event_id = ?", rootEventID).
 		Where("state IN ?", []string{
 			models.WorkflowNodeExecutionStatePending,
 			models.WorkflowNodeExecutionStateStarted,
@@ -294,7 +337,7 @@ func (w *ExecutionRouter) countActiveExecutionsInBlueprint(blueprintID *uuid.UUI
 	return count, nil
 }
 
-func (w *ExecutionRouter) completeBlueprintWithAllOutputs(
+func (w *ExecutionRouter) finishBlueprintWithAllOutputs(
 	terminalExec *models.WorkflowNodeExecution,
 	edges []models.Edge,
 ) error {

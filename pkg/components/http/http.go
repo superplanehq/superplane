@@ -149,7 +149,7 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 		"body":    bodyData,
 	}
 
-	return ctx.ExecutionStateContext.Finish(map[string][]any{
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
 		components.DefaultOutputBranch.Name: {response},
 	})
 }

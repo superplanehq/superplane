@@ -58,7 +58,6 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
   const getStateIcon = (state: string) => {
     switch (state) {
       case 'STATE_PENDING': return 'schedule'
-      case 'STATE_WAITING': return 'pending'
       case 'STATE_STARTED': return 'play_arrow'
       case 'STATE_FINISHED': return 'check_circle'
       default: return 'help'
@@ -68,7 +67,6 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
   const getStateColor = (state: string) => {
     switch (state) {
       case 'STATE_PENDING': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30'
-      case 'STATE_WAITING': return 'text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30'
       case 'STATE_STARTED': return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30'
       case 'STATE_FINISHED': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
       default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900/30'
@@ -110,13 +108,6 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
           <Badge className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">
             <MaterialSymbol name="schedule" size="sm" />
             Pending
-          </Badge>
-        )
-      case 'STATE_WAITING':
-        return (
-          <Badge className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800">
-            <MaterialSymbol name="pending" size="sm" />
-            Waiting
           </Badge>
         )
       case 'STATE_STARTED':

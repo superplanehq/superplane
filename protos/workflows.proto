@@ -198,10 +198,9 @@ message WorkflowNodeExecution {
   enum State {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
-    STATE_WAITING = 2;
-    STATE_STARTED = 3;
-    STATE_ROUTING = 4;
-    STATE_FINISHED = 5;
+    STATE_STARTED = 2;
+    STATE_ROUTING = 3;
+    STATE_FINISHED = 4;
   }
 
   enum Result {

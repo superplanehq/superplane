@@ -97,11 +97,10 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 	}
 
 	//
-	// Initialize metadata for the execution,
-	// and move it to the waiting state.
+	// Initialize metadata for the execution.
 	//
 	ctx.MetadataContext.Set(NewMetadata(config.Count))
-	return ctx.ExecutionStateContext.Wait()
+	return nil
 }
 
 func (a *Approval) Actions() []components.Action {
@@ -170,7 +169,7 @@ func (a *Approval) handleApprove(ctx components.ActionContext) error {
 	//
 	// Required amount of approvals reached - finish the execution.
 	//
-	return ctx.ExecutionStateContext.Finish(map[string][]any{
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
 		components.DefaultOutputBranch.Name: {metadata},
 	})
 }
