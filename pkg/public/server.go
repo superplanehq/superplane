@@ -130,7 +130,16 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 		}
 	}
 
-	// ...Other providers must be added here
+	// Google
+	if googleKey := os.Getenv("GOOGLE_CLIENT_ID"); googleKey != "" {
+		if googleSecret := os.Getenv("GOOGLE_CLIENT_SECRET"); googleSecret != "" {
+			providers["google"] = authentication.ProviderConfig{
+				Key:         googleKey,
+				Secret:      googleSecret,
+				CallbackURL: fmt.Sprintf("%s/auth/google/callback", baseURL),
+			}
+		}
+	}
 	return providers
 }
 

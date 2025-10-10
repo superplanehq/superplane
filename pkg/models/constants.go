@@ -4,6 +4,7 @@ import "fmt"
 
 const (
 	ProviderGitHub = "github"
+	ProviderGoogle = "google"
 
 	DomainTypeOrganization = "org"
 	DomainTypeCanvas       = "canvas"

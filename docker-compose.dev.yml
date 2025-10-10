@@ -49,6 +49,8 @@ services:
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
+      GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
 
     ports:
