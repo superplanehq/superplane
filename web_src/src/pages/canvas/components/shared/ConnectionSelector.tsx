@@ -137,7 +137,7 @@ export function ConnectionSelector({
                       startWord='$'
                       prefix='$.'
                       showValuePreview
-                      noSuggestionsText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
+                      noExampleObjectText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
                     />
                     <button
                       onClick={() => onFilterRemove(index, filterIndex)}
