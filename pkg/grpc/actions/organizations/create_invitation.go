@@ -4,9 +4,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
@@ -87,6 +89,11 @@ func handleNewUser(authService authorization.Authorization, orgID, userID uuid.U
 		invitation, err := models.CreateInvitation(orgID, userID, email, models.InvitationStatePending)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
+		}
+
+		message := messages.NewInvitationCreatedMessage(invitation)
+		if err := message.Publish(); err != nil {
+			log.Errorf("Failed to publish invitation created message for invitation %s: %v", invitation.ID, err)
 		}
 
 		return &pb.CreateInvitationResponse{

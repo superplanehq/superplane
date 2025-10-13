@@ -41,6 +41,17 @@ func FindPendingInvitationInTransaction(tx *gorm.DB, email, organizationID strin
 	return &invitation, err
 }
 
+func FindInvitationByID(invitationID string) (*OrganizationInvitation, error) {
+	var invitation OrganizationInvitation
+
+	err := database.Conn().
+		Where("id = ?", invitationID).
+		First(&invitation).
+		Error
+
+	return &invitation, err
+}
+
 func ListInvitationsInState(organizationID string, state string) ([]OrganizationInvitation, error) {
 	var invitations []OrganizationInvitation
 

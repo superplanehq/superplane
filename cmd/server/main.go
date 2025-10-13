@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/workers"
 )
 
@@ -62,6 +63,20 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		log.Println("Starting Stage Updated Consumer")
 		stageUpdatedConsumer := workers.NewStageUpdatedConsumer(registry, rabbitMQURL, cleanupService)
 		go stageUpdatedConsumer.Start()
+
+		log.Println("Starting Invitation Email Consumer")
+		sendGridAPIKey := os.Getenv("SENDGRID_API_KEY")
+		fromName := os.Getenv("EMAIL_FROM_NAME")
+		fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
+		templateDir := os.Getenv("TEMPLATE_DIR")
+
+		if sendGridAPIKey != "" && fromName != "" && fromEmail != "" && templateDir != "" {
+			emailService := services.NewSendGridEmailService(sendGridAPIKey, fromName, fromEmail, templateDir)
+			invitationEmailConsumer := workers.NewInvitationEmailConsumer(rabbitMQURL, emailService, baseURL)
+			go invitationEmailConsumer.Start()
+		} else {
+			log.Warn("Invitation Email Consumer not started - missing required environment variables (SENDGRID_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS, TEMPLATE_DIR)")
+		}
 	}
 
 	if os.Getenv("START_EXECUTIONS_POLLER") == "yes" {
