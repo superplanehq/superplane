@@ -1553,7 +1553,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
                                                     startWord="$"
                                                     prefix='$.'
                                                     showValuePreview
-                                                    noSuggestionsText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
+                                                    noExampleObjectText="This component hasn't received any events from this connection. Send events to this connection to enable autocomplete suggestions."
                                                   />
                                                   <div className="mt-2">
                                                     <ProTip show message="Pro tip: Type $ to select data from event payload" />

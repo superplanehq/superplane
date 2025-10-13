@@ -13,14 +13,14 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   suffix?: string;
   startWord?: string;
   inputSize?: 'xs' | 'sm' | 'md' | 'lg';
-  noSuggestionsText?: string;
+  noExampleObjectText?: string;
   showValuePreview?: boolean;
 }
 
 let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noSuggestionsText = 'No suggestions found', showValuePreview = false, ...props }) => {
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noExampleObjectText = 'No suggestions found', showValuePreview = false, ...props }) => {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<Array<{ suggestion: string; type: string }>>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -354,7 +354,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
             'dark:bg-zinc-800 dark:border-zinc-700'
           ])}>
             <div className="px-3 py-2 text-sm text-zinc-500 dark:text-zinc-400">
-              {noSuggestionsText}
+              {!exampleObj ? noExampleObjectText : 'No suggestions found'}
             </div>
           </div>
         )}
