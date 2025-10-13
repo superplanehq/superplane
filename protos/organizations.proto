@@ -176,3 +176,8 @@ message OrganizationDeleted {
   string organization_id = 1;
   google.protobuf.Timestamp timestamp = 2;
 }
+
+message InvitationCreated {
+  string invitation_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
