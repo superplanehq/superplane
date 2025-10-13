@@ -11,7 +11,7 @@ import {
   Connection,
   useNodesState,
   useEdgesState,
-  MarkerType,
+  NodeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useWorkflow, useUpdateWorkflow } from '../../hooks/useWorkflowData'
@@ -42,7 +42,7 @@ import { ScrollArea } from '../../components/ui/scroll-area'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../../components/ui/resizable'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
-const nodeTypes = {
+const nodeTypes: NodeTypes = {
   if: IfNode,
   http: HttpNode,
   filter: FilterNode,
@@ -95,7 +95,7 @@ type BuildingBlock = {
   label?: string
   description?: string
   type: 'component' | 'blueprint'
-  branches?: { name: string }[]
+  channels?: { name: string }[]
   configuration?: any[]
 }
 
@@ -108,7 +108,6 @@ export const Workflow = () => {
   const [nodeName, setNodeName] = useState('')
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
-  const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; branch: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'components' | 'blueprints'>('components')
   const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string; componentLabel?: string } | null>(null)
 
@@ -118,12 +117,8 @@ export const Workflow = () => {
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!)
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!)
 
-  const handleAddNodeFromBranch = useCallback((sourceNodeId: string, branch: string) => {
-    setConnectingFrom({ nodeId: sourceNodeId, branch })
-  }, [])
-
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   // Combine components and blueprints into building blocks
   const buildingBlocks: BuildingBlock[] = [
@@ -148,7 +143,7 @@ export const Workflow = () => {
         }
       })
 
-      const branches = block?.branches?.map((branch: any) => branch.name) || ['default']
+      const channels = block?.channels?.map((channel: any) => channel.name) || ['default']
 
       // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
       const nodeType = isComponent && blockName && nodeTypes[blockName as keyof typeof nodeTypes]
@@ -163,9 +158,8 @@ export const Workflow = () => {
           blockName,
           blockId,
           blockType: isComponent ? 'component' : 'blueprint',
-          branches,
+          channels,
           configuration: node.configuration || {},
-          onAddNode: handleAddNodeFromBranch,
         },
         position: { x: 0, y: 0 }, // Will be set by elk
       }
@@ -174,9 +168,9 @@ export const Workflow = () => {
     const loadedEdges: Edge[] = (workflow.edges || []).map((edge: any, index: number) => ({
       id: `e${index}`,
       source: edge.sourceId,
-      sourceHandle: edge.branch || 'default',
+      sourceHandle: edge.channel || 'default',
       target: edge.targetId,
-      label: edge.branch,
+      label: edge.channel,
       style: { strokeWidth: 2, stroke: '#64748b' },
     }))
 
@@ -185,7 +179,7 @@ export const Workflow = () => {
       setNodes(layoutedNodes)
       setEdges(layoutedEdges)
     })
-  }, [workflow, buildingBlocks.length, setNodes, setEdges, handleAddNodeFromBranch])
+  }, [workflow, buildingBlocks.length, setNodes, setEdges])
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -196,7 +190,7 @@ export const Workflow = () => {
 
   const handleBlockClick = (block: BuildingBlock) => {
     setSelectedBlock(block)
-    setNodeName(block.name)
+    setNodeName(block.name || '')
     setNodeConfiguration({})
     setIsAddNodeModalOpen(true)
   }
@@ -219,9 +213,9 @@ export const Workflow = () => {
     })
     setSelectedNode({
       id: node.id,
-      name: node.data.label,
+      name: node.data.label as string,
       isBlueprintNode: node.data.blockType === 'blueprint',
-      nodeType: node.data.blockName,
+      nodeType: node.data.blockName as string,
       componentLabel: block?.label
     })
   }, [buildingBlocks])
@@ -239,8 +233,8 @@ export const Workflow = () => {
 
     setEditingNodeId(node.id)
     setSelectedBlock(block)
-    setNodeName(node.data.label)
-    setNodeConfiguration(node.data.configuration || {})
+    setNodeName(node.data.label as string)
+    setNodeConfiguration((node.data.configuration as Record<string, any>) || {})
     setIsAddNodeModalOpen(true)
   }, [buildingBlocks])
 
@@ -265,8 +259,8 @@ export const Workflow = () => {
       )
     } else {
       // Add new node
-      const branches = selectedBlock?.branches?.map((branch: any) => branch.name) || ['default']
-      const newNodeId = generateNodeId(selectedBlock.name, nodeName.trim())
+      const channels = selectedBlock?.channels?.map((channel: any) => channel.name) || ['default']
+      const newNodeId = generateNodeId(selectedBlock.name || 'node', nodeName.trim())
 
       // Use block name as node type if it exists in nodeTypes and is a component
       const nodeType = selectedBlock.type === 'component' &&
@@ -281,29 +275,14 @@ export const Workflow = () => {
         position: { x: nodes.length * 250, y: 100 },
         data: {
           label: nodeName.trim(),
-          blockName: selectedBlock.name,
+          blockName: selectedBlock.name || '',
           blockId: selectedBlock.type === 'blueprint' ? (selectedBlock as any).id : selectedBlock.name,
           blockType: selectedBlock.type,
-          branches,
+          channels,
           configuration: nodeConfiguration,
-          onAddNode: handleAddNodeFromBranch,
-        },
+        } as Record<string, unknown>,
       }
       setNodes((nds) => [...nds, newNode])
-
-      // If connecting from a branch button, create the edge
-      if (connectingFrom) {
-        const newEdge: Edge = {
-          id: `e-${connectingFrom.nodeId}-${newNodeId}-${Date.now()}`,
-          source: connectingFrom.nodeId,
-          sourceHandle: connectingFrom.branch,
-          target: newNodeId,
-          label: connectingFrom.branch,
-          style: { strokeWidth: 2, stroke: '#64748b' },
-        }
-        setEdges((eds) => [...eds, newEdge])
-        setConnectingFrom(null)
-      }
     }
 
     setIsAddNodeModalOpen(false)
@@ -345,7 +324,7 @@ export const Workflow = () => {
         sourceId: edge.source!,
         targetType: 'REF_TYPE_NODE',
         targetId: edge.target!,
-        branch: edge.sourceHandle || edge.label as string || 'default',
+        channel: edge.sourceHandle || edge.label as string || 'default',
       }))
 
       await updateWorkflowMutation.mutateAsync({
@@ -382,10 +361,6 @@ export const Workflow = () => {
       </div>
     )
   }
-
-  const displayedBlocks = activeTab === 'components'
-    ? buildingBlocks.filter(b => b.type === 'component')
-    : buildingBlocks.filter(b => b.type === 'blueprint')
 
   return (
     <div className="h-screen flex flex-col">

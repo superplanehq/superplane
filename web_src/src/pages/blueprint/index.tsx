@@ -11,7 +11,7 @@ import {
   Connection,
   useNodesState,
   useEdgesState,
-  MarkerType,
+  NodeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useBlueprint, useUpdateBlueprint } from '../../hooks/useBlueprintData'
@@ -37,17 +37,19 @@ import { HttpNode } from './components/nodes/HttpNode'
 import { FilterNode } from './components/nodes/FilterNode'
 import { SwitchNode } from './components/nodes/SwitchNode'
 import { DefaultNode } from './components/nodes/DefaultNode'
+import { ApprovalNode } from './components/nodes/ApprovalNode'
 import { ConfigurationFieldRenderer } from '../../components/ConfigurationFieldRenderer'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs'
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from '../../components/ui/item'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
-const nodeTypes = {
+const nodeTypes: NodeTypes = {
   if: IfNode,
   http: HttpNode,
   filter: FilterNode,
   switch: SwitchNode,
+  approval: ApprovalNode,
   default: DefaultNode,
 }
 
@@ -99,7 +101,6 @@ export const Blueprint = () => {
   const [nodeName, setNodeName] = useState('')
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
-  const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; branch: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'components' | 'configuration'>('components')
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([])
   const [isEditConfigFieldModalOpen, setIsEditConfigFieldModalOpen] = useState(false)
@@ -111,12 +112,8 @@ export const Blueprint = () => {
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!)
   const updateBlueprintMutation = useUpdateBlueprint(organizationId!, blueprintId!)
 
-  const handleAddNodeFromBranch = useCallback((sourceNodeId: string, branch: string) => {
-    setConnectingFrom({ nodeId: sourceNodeId, branch })
-  }, [])
-
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   // Update blueprint configuration when blueprint loads
   useEffect(() => {
@@ -131,7 +128,7 @@ export const Blueprint = () => {
 
     const loadedNodes: Node[] = (blueprint.nodes || []).map((node: any) => {
       const component = components.find((p: any) => p.name === node.component?.name)
-      const branches = component?.branches?.map((branch: any) => branch.name) || ['default']
+      const channels = component?.channels?.map((channel: any) => channel.name) || ['default']
       const componentName = node.component?.name
 
       // Use the component name as node type if it exists in nodeTypes, otherwise use 'default'
@@ -143,9 +140,8 @@ export const Blueprint = () => {
         data: {
           label: node.name,
           component: componentName,
-          branches,
+          channels,
           configuration: node.configuration || {},
-          onAddNode: handleAddNodeFromBranch,
         },
         position: { x: 0, y: 0 }, // Will be set by elk
       }
@@ -154,9 +150,9 @@ export const Blueprint = () => {
     const loadedEdges: Edge[] = (blueprint.edges || []).map((edge: any, index: number) => ({
       id: `e${index}`,
       source: edge.sourceId,
-      sourceHandle: edge.branch || 'default',
+      sourceHandle: edge.channel || 'default',
       target: edge.targetId,
-      label: edge.branch,
+      label: edge.channel,
       style: { strokeWidth: 2, stroke: '#64748b' },
     }))
 
@@ -165,7 +161,7 @@ export const Blueprint = () => {
       setNodes(layoutedNodes)
       setEdges(layoutedEdges)
     })
-  }, [blueprint, components, setNodes, setEdges, handleAddNodeFromBranch])
+  }, [blueprint, components, setNodes, setEdges])
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -189,13 +185,13 @@ export const Blueprint = () => {
   }
 
   const handleNodeDoubleClick = useCallback((_: any, node: Node) => {
-    const component = components.find((p: any) => p.name === node.data.component)
+    const component = components.find((p: any) => p.name === (node.data as any).component)
     if (!component) return
 
     setEditingNodeId(node.id)
     setSelectedComponent(component)
-    setNodeName(node.data.label)
-    setNodeConfiguration(node.data.configuration || {})
+    setNodeName((node.data as any).label as string)
+    setNodeConfiguration((node.data as any).configuration || {})
     setIsAddNodeModalOpen(true)
   }, [components])
 
@@ -220,7 +216,7 @@ export const Blueprint = () => {
       )
     } else {
       // Add new node with left-to-right positioning
-      const branches = selectedComponent?.branches?.map((branch: any) => branch.name) || ['default']
+      const channels = selectedComponent?.channels?.map((channel: any) => channel.name) || ['default']
       const newNodeId = generateNodeId(selectedComponent.name, nodeName.trim())
 
       // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
@@ -235,26 +231,11 @@ export const Blueprint = () => {
         data: {
           label: nodeName.trim(),
           component: selectedComponent.name,
-          branches,
+          channels,
           configuration: nodeConfiguration,
-          onAddNode: handleAddNodeFromBranch,
         },
       }
       setNodes((nds) => [...nds, newNode])
-
-      // If connecting from a branch button, create the edge
-      if (connectingFrom) {
-        const newEdge: Edge = {
-          id: `e-${connectingFrom.nodeId}-${newNodeId}-${Date.now()}`,
-          source: connectingFrom.nodeId,
-          sourceHandle: connectingFrom.branch,
-          target: newNodeId,
-          label: connectingFrom.branch,
-          style: { strokeWidth: 2, stroke: '#64748b' },
-        }
-        setEdges((eds) => [...eds, newEdge])
-        setConnectingFrom(null)
-      }
     }
 
     setIsAddNodeModalOpen(false)
@@ -334,19 +315,19 @@ export const Blueprint = () => {
     try {
       const blueprintNodes = nodes.map((node) => ({
         id: node.id,
-        name: node.data.label,
+        name: (node.data as any).label as string,
         refType: 'REF_TYPE_COMPONENT',
         component: {
-          name: node.data.component,
+          name: (node.data as any).component as string,
         },
-        configuration: node.data.configuration || {},
+        configuration: (node.data as any).configuration || {},
       }))
 
       const blueprintEdges = edges.map((edge) => ({
         sourceId: edge.source!,
         targetType: 'REF_TYPE_NODE',
         targetId: edge.target!,
-        branch: edge.sourceHandle || edge.label as string || 'default',
+        channel: edge.sourceHandle || edge.label as string || 'default',
       }))
 
       await updateBlueprintMutation.mutateAsync({

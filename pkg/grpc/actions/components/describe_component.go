@@ -13,11 +13,11 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 		return nil, err
 	}
 
-	outputs := component.OutputBranches(nil)
-	branches := make([]*pb.OutputBranch, len(outputs))
-	for i, output := range outputs {
-		branches[i] = &pb.OutputBranch{
-			Name: output.Name,
+	outputChannels := component.OutputChannels(nil)
+	channels := make([]*pb.OutputChannel, len(outputChannels))
+	for i, channel := range outputChannels {
+		channels[i] = &pb.OutputChannel{
+			Name: channel.Name,
 		}
 	}
 
@@ -30,7 +30,7 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 	return &pb.DescribeComponentResponse{
 		Component: &pb.Component{
 			Name:          component.Name(),
-			Branches:      branches,
+			Channels:      channels,
 			Configuration: configuration,
 		},
 	}, nil

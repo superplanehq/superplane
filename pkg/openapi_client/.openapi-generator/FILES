@@ -50,7 +50,7 @@ docs/ComponentsListComponentActionsResponse.md
 docs/ComponentsListComponentsResponse.md
 docs/ComponentsListItemDefinition.md
 docs/ComponentsNode.md
-docs/ComponentsOutputBranch.md
+docs/ComponentsOutputChannel.md
 docs/ConnectionGroupAPI.md
 docs/EdgeTargetType.md
 docs/EventAPI.md
@@ -286,7 +286,7 @@ model_components_list_component_actions_response.go
 model_components_list_components_response.go
 model_components_list_item_definition.go
 model_components_node.go
-model_components_output_branch.go
+model_components_output_channel.go
 model_edge_target_type.go
 model_event_rejection_rejection_reason.go
 model_event_source_daily_schedule.go

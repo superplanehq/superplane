@@ -244,12 +244,12 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
                       Outputs
                     </div>
                     <div className="space-y-2">
-                      {Object.entries(execution.outputs).map(([branch, outputs]: [string, any]) => (
-                        <div key={branch} className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs">
+                      {Object.entries(execution.outputs).map(([channel, outputs]: [string, any]) => (
+                        <div key={channel} className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 text-xs">
                           <div className="flex items-center gap-2 mb-2">
                             <MaterialSymbol name="alt_route" size="md" className="text-gray-600 dark:text-zinc-400" />
                             <span className="text-xs font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
-                              {branch}
+                              {channel}
                             </span>
                             {Array.isArray(outputs) && (
                               <span className="text-xs text-gray-500 dark:text-zinc-400">

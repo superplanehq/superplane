@@ -1,20 +1,13 @@
 import { memo } from 'react'
-import { Handle, Position, NodeProps } from '@xyflow/react'
+import { Handle, Position, NodeProps, Node } from '@xyflow/react'
 import { MaterialSymbol } from '../../../../components/MaterialSymbol/material-symbol'
 
-interface ApprovalNodeData {
+type ApprovalNodeData = Node<{
   label: string
-  component: string
-  branches?: string[]
-  configuration?: Record<string, any>
-  onAddNode?: (sourceId: string, branch: string) => void
-}
+  configuration: Record<string, any>
+}>
 
 export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
-  const branches = data.branches || ['default']
-  const branch = branches[0]
-  const requiredCount = data.configuration?.count
-
   return (
     <div className="bg-white dark:bg-zinc-800 border-2 border-zinc-400 dark:border-zinc-500 rounded-lg shadow-md min-w-[180px]">
       {/* Input handle */}
@@ -35,24 +28,22 @@ export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
       </div>
 
       {/* Configuration */}
-      {requiredCount && (
+      {data.configuration.count && (
         <div className="px-4 py-2 border-t border-zinc-200 dark:border-zinc-700 text-xs text-slate-600 dark:text-slate-400 text-left">
-          Requires {requiredCount} approval{requiredCount !== 1 ? 's' : ''}
+          Requires {data.configuration.count} approval{data.configuration.count !== 1 ? 's' : ''}
         </div>
       )}
 
-      {/* Output branch */}
+      {/* Output channel */}
       <div className="border-t border-zinc-200 dark:border-zinc-700">
         <div className="relative flex items-center justify-between px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors">
-          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-            {branch}
-          </span>
+          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">default</span>
 
           {/* Output handle */}
           <Handle
             type="source"
             position={Position.Right}
-            id={branch}
+            id="default"
             className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white dark:!border-zinc-800 !right-[-6px]"
             style={{
               top: '50%',

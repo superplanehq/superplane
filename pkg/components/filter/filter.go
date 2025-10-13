@@ -29,8 +29,8 @@ func (f *Filter) Description() string {
 	return "Filter events based on their content"
 }
 
-func (f *Filter) OutputBranches(configuration any) []components.OutputBranch {
-	return []components.OutputBranch{components.DefaultOutputBranch}
+func (f *Filter) OutputChannels(configuration any) []components.OutputChannel {
+	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
 func (f *Filter) Configuration() []components.ConfigurationField {
@@ -79,7 +79,7 @@ func (f *Filter) Execute(ctx components.ExecutionContext) error {
 
 	outputs := map[string][]any{}
 	if matches {
-		outputs[components.DefaultOutputBranch.Name] = []any{ctx.Data}
+		outputs[components.DefaultOutputChannel.Name] = []any{ctx.Data}
 	}
 
 	return ctx.ExecutionStateContext.Pass(outputs)

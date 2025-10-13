@@ -23,7 +23,7 @@ type ComponentsEdge struct {
 	SourceId *string `json:"sourceId,omitempty"`
 	TargetType *EdgeTargetType `json:"targetType,omitempty"`
 	TargetId *string `json:"targetId,omitempty"`
-	Branch *string `json:"branch,omitempty"`
+	Channel *string `json:"channel,omitempty"`
 }
 
 // NewComponentsEdge instantiates a new ComponentsEdge object
@@ -143,36 +143,36 @@ func (o *ComponentsEdge) SetTargetId(v string) {
 	o.TargetId = &v
 }
 
-// GetBranch returns the Branch field value if set, zero value otherwise.
-func (o *ComponentsEdge) GetBranch() string {
-	if o == nil || IsNil(o.Branch) {
+// GetChannel returns the Channel field value if set, zero value otherwise.
+func (o *ComponentsEdge) GetChannel() string {
+	if o == nil || IsNil(o.Channel) {
 		var ret string
 		return ret
 	}
-	return *o.Branch
+	return *o.Channel
 }
 
-// GetBranchOk returns a tuple with the Branch field value if set, nil otherwise
+// GetChannelOk returns a tuple with the Channel field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsEdge) GetBranchOk() (*string, bool) {
-	if o == nil || IsNil(o.Branch) {
+func (o *ComponentsEdge) GetChannelOk() (*string, bool) {
+	if o == nil || IsNil(o.Channel) {
 		return nil, false
 	}
-	return o.Branch, true
+	return o.Channel, true
 }
 
-// HasBranch returns a boolean if a field has been set.
-func (o *ComponentsEdge) HasBranch() bool {
-	if o != nil && !IsNil(o.Branch) {
+// HasChannel returns a boolean if a field has been set.
+func (o *ComponentsEdge) HasChannel() bool {
+	if o != nil && !IsNil(o.Channel) {
 		return true
 	}
 
 	return false
 }
 
-// SetBranch gets a reference to the given string and assigns it to the Branch field.
-func (o *ComponentsEdge) SetBranch(v string) {
-	o.Branch = &v
+// SetChannel gets a reference to the given string and assigns it to the Channel field.
+func (o *ComponentsEdge) SetChannel(v string) {
+	o.Channel = &v
 }
 
 func (o ComponentsEdge) MarshalJSON() ([]byte, error) {
@@ -194,8 +194,8 @@ func (o ComponentsEdge) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.TargetId) {
 		toSerialize["targetId"] = o.TargetId
 	}
-	if !IsNil(o.Branch) {
-		toSerialize["branch"] = o.Branch
+	if !IsNil(o.Channel) {
+		toSerialize["channel"] = o.Channel
 	}
 	return toSerialize, nil
 }

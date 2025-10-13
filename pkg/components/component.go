@@ -1,6 +1,6 @@
 package components
 
-var DefaultOutputBranch = OutputBranch{Name: "default", Label: "Default"}
+var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
 
 type Component interface {
 
@@ -23,10 +23,10 @@ type Component interface {
 	Description() string
 
 	/*
-	 * The output branches used by the component.
+	 * The output channels used by the component.
 	 * If none is returned, the 'default' one is used.
 	 */
-	OutputBranches(configuration any) []OutputBranch
+	OutputChannels(configuration any) []OutputChannel
 
 	/*
 	 * The configuration fields exposed by the component.
@@ -57,7 +57,7 @@ type Component interface {
 	HandleAction(ctx ActionContext) error
 }
 
-type OutputBranch struct {
+type OutputChannel struct {
 	Name        string
 	Label       string
 	Description string

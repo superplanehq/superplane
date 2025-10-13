@@ -92,7 +92,6 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 	result := make([]*pb.WorkflowNodeExecution, 0, len(executions))
 
 	for _, execution := range executions {
-		// Get inputs from parent execution (computed field for API)
 		var input *structpb.Struct
 		inputData, err := execution.GetInputs()
 		if err == nil {
@@ -122,50 +121,25 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 			return nil, err
 		}
 
-		parentExecID := ""
-		if execution.ParentExecutionID != nil {
-			parentExecID = execution.ParentExecutionID.String()
-		}
-
-		blueprintID := ""
-		if execution.BlueprintID != nil {
-			blueprintID = execution.BlueprintID.String()
-		}
-
-		previousExecID := ""
-		if execution.PreviousExecutionID != nil {
-			previousExecID = execution.PreviousExecutionID.String()
-		}
-
-		previousOutputBranch := ""
-		if execution.PreviousOutputBranch != nil {
-			previousOutputBranch = *execution.PreviousOutputBranch
-		}
-
-		previousOutputIndex := int32(0)
-		if execution.PreviousOutputIndex != nil {
-			previousOutputIndex = int32(*execution.PreviousOutputIndex)
-		}
-
 		result = append(result, &pb.WorkflowNodeExecution{
-			Id:                   execution.ID.String(),
-			WorkflowId:           execution.WorkflowID.String(),
-			NodeId:               execution.NodeID,
-			ParentExecutionId:    parentExecID,
-			BlueprintId:          blueprintID,
-			State:                NodeExecutionStateToProto(execution.State),
-			Result:               NodeExecutionResultToProto(execution.Result),
-			ResultReason:         NodeExecutionResultReasonToProto(execution.ResultReason),
-			ResultMessage:        execution.ResultMessage,
-			Input:                input,
-			Outputs:              outputs,
-			CreatedAt:            timestamppb.New(*execution.CreatedAt),
-			UpdatedAt:            timestamppb.New(*execution.UpdatedAt),
-			Metadata:             metadata,
-			Configuration:        configuration,
-			PreviousExecutionId:  previousExecID,
-			PreviousOutputBranch: previousOutputBranch,
-			PreviousOutputIndex:  previousOutputIndex,
+			Id:                    execution.ID.String(),
+			WorkflowId:            execution.WorkflowID.String(),
+			NodeId:                execution.NodeID,
+			ParentExecutionId:     execution.GetParentExecutionID(),
+			BlueprintId:           execution.GetBlueprintID(),
+			State:                 NodeExecutionStateToProto(execution.State),
+			Result:                NodeExecutionResultToProto(execution.Result),
+			ResultReason:          NodeExecutionResultReasonToProto(execution.ResultReason),
+			ResultMessage:         execution.ResultMessage,
+			Input:                 input,
+			Outputs:               outputs,
+			CreatedAt:             timestamppb.New(*execution.CreatedAt),
+			UpdatedAt:             timestamppb.New(*execution.UpdatedAt),
+			Metadata:              metadata,
+			Configuration:         configuration,
+			PreviousExecutionId:   execution.GetPreviousExecutionID(),
+			PreviousOutputChannel: execution.GetPreviousOutputChannel(),
+			PreviousOutputIndex:   execution.GetPreviousOutputIndex(),
 		})
 	}
 

@@ -388,7 +388,7 @@ type Blueprint struct {
 	Nodes          []*components.Node               `protobuf:"bytes,7,rep,name=nodes,proto3" json:"nodes,omitempty"`
 	Edges          []*components.Edge               `protobuf:"bytes,8,rep,name=edges,proto3" json:"edges,omitempty"`
 	Configuration  []*components.ConfigurationField `protobuf:"bytes,9,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	OutputBranches []*components.OutputBranch       `protobuf:"bytes,10,rep,name=output_branches,json=outputBranches,proto3" json:"output_branches,omitempty"`
+	OutputChannels []*components.OutputChannel      `protobuf:"bytes,10,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -486,9 +486,9 @@ func (x *Blueprint) GetConfiguration() []*components.ConfigurationField {
 	return nil
 }
 
-func (x *Blueprint) GetOutputBranches() []*components.OutputBranch {
+func (x *Blueprint) GetOutputChannels() []*components.OutputChannel {
 	if x != nil {
-		return x.OutputBranches
+		return x.OutputChannels
 	}
 	return nil
 }
@@ -515,7 +515,7 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12>\n" +
 	"\tblueprint\x18\x02 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"Y\n" +
 	"\x17UpdateBlueprintResponse\x12>\n" +
-	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"\xf5\x03\n" +
+	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"\xf6\x03\n" +
 	"\tBlueprint\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x12\n" +
@@ -527,9 +527,9 @@ const file_blueprints_proto_rawDesc = "" +
 	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x121\n" +
 	"\x05nodes\x18\a \x03(\v2\x1b.Superplane.Components.NodeR\x05nodes\x121\n" +
 	"\x05edges\x18\b \x03(\v2\x1b.Superplane.Components.EdgeR\x05edges\x12O\n" +
-	"\rconfiguration\x18\t \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12L\n" +
-	"\x0foutput_branches\x18\n" +
-	" \x03(\v2#.Superplane.Components.OutputBranchR\x0eoutputBranches2\xcb\x06\n" +
+	"\rconfiguration\x18\t \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12M\n" +
+	"\x0foutput_channels\x18\n" +
+	" \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels2\xcb\x06\n" +
 	"\n" +
 	"Blueprints\x12\xca\x01\n" +
 	"\x0eListBlueprints\x12,.Superplane.Blueprints.ListBlueprintsRequest\x1a-.Superplane.Blueprints.ListBlueprintsResponse\"[\x92A>\n" +
@@ -570,7 +570,7 @@ var file_blueprints_proto_goTypes = []any{
 	(*components.Node)(nil),               // 10: Superplane.Components.Node
 	(*components.Edge)(nil),               // 11: Superplane.Components.Edge
 	(*components.ConfigurationField)(nil), // 12: Superplane.Components.ConfigurationField
-	(*components.OutputBranch)(nil),       // 13: Superplane.Components.OutputBranch
+	(*components.OutputChannel)(nil),      // 13: Superplane.Components.OutputChannel
 }
 var file_blueprints_proto_depIdxs = []int32{
 	8,  // 0: Superplane.Blueprints.ListBlueprintsResponse.blueprints:type_name -> Superplane.Blueprints.Blueprint
@@ -584,7 +584,7 @@ var file_blueprints_proto_depIdxs = []int32{
 	10, // 8: Superplane.Blueprints.Blueprint.nodes:type_name -> Superplane.Components.Node
 	11, // 9: Superplane.Blueprints.Blueprint.edges:type_name -> Superplane.Components.Edge
 	12, // 10: Superplane.Blueprints.Blueprint.configuration:type_name -> Superplane.Components.ConfigurationField
-	13, // 11: Superplane.Blueprints.Blueprint.output_branches:type_name -> Superplane.Components.OutputBranch
+	13, // 11: Superplane.Blueprints.Blueprint.output_channels:type_name -> Superplane.Components.OutputChannel
 	0,  // 12: Superplane.Blueprints.Blueprints.ListBlueprints:input_type -> Superplane.Blueprints.ListBlueprintsRequest
 	2,  // 13: Superplane.Blueprints.Blueprints.DescribeBlueprint:input_type -> Superplane.Blueprints.DescribeBlueprintRequest
 	4,  // 14: Superplane.Blueprints.Blueprints.CreateBlueprint:input_type -> Superplane.Blueprints.CreateBlueprintRequest

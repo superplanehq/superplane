@@ -1,18 +1,17 @@
 import { memo } from 'react'
-import { Handle, Position, NodeProps } from '@xyflow/react'
+import { Handle, Position, NodeProps, Node } from '@xyflow/react'
 import { MaterialSymbol } from '../../../../components/MaterialSymbol/material-symbol'
 
-interface IfNodeData {
-  label: string
-  component: string
-  branches?: string[]
+type IfNodeData = Node<{
+  label?: string
+  component?: string
+  channels?: string[]
   configuration?: Record<string, any>
-  onAddNode?: (sourceId: string, branch: string) => void
-}
+}>
 
-export const IfNode = memo(({ data, id }: NodeProps<IfNodeData>) => {
-  const branches = data.branches || ['true', 'false']
-  const expression = data.configuration?.expression
+export const IfNode = memo(({ data }: NodeProps<IfNodeData>) => {
+  const channels = (data.channels as string[]) || ['true', 'false']
+  const expression = (data.configuration as Record<string, any>)?.expression
 
   return (
     <div className="bg-white dark:bg-zinc-800 border-2 border-zinc-400 dark:border-zinc-500 rounded-lg shadow-md min-w-[180px]">
@@ -28,7 +27,7 @@ export const IfNode = memo(({ data, id }: NodeProps<IfNodeData>) => {
         <div className="flex items-center gap-2">
           <MaterialSymbol name="alt_route" size="sm" className="text-blue-600 dark:text-blue-400" />
           <div className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-            {data.label}
+            {data.label as string}
           </div>
         </div>
       </div>
@@ -40,11 +39,11 @@ export const IfNode = memo(({ data, id }: NodeProps<IfNodeData>) => {
         </div>
       )}
 
-      {/* Output branches */}
+      {/* Output channels */}
       <div className="border-t border-zinc-200 dark:border-zinc-700">
-        {branches.map((branch, index) => (
+        {channels.map((channel, index) => (
           <div
-            key={branch}
+            key={channel}
             className="relative flex items-center justify-between px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors"
             style={{
               borderTop: index > 0 ? '1px solid' : 'none',
@@ -52,14 +51,14 @@ export const IfNode = memo(({ data, id }: NodeProps<IfNodeData>) => {
             }}
           >
             <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              {branch}
+              {channel}
             </span>
 
             {/* Output handle */}
             <Handle
               type="source"
               position={Position.Right}
-              id={branch}
+              id={channel}
               className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white dark:!border-zinc-800 !right-[-6px]"
               style={{
                 top: '50%',

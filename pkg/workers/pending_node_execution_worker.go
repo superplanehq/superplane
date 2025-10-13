@@ -144,19 +144,19 @@ func (w *PendingNodeExecutionWorker) executeBlueprintNode(execution *models.Work
 		// Create first execution inside blueprint
 		// This execution inherits from the blueprint node execution
 		firstExec := models.WorkflowNodeExecution{
-			ID:                   uuid.New(),
-			WorkflowID:           execution.WorkflowID,
-			NodeID:               firstNode.ID,
-			RootEventID:          execution.RootEventID,
-			PreviousExecutionID:  &execution.ID,
-			PreviousOutputBranch: nil, // Special: entering blueprint, will use blueprint node's inputs
-			PreviousOutputIndex:  nil,
-			ParentExecutionID:    &execution.ID,
-			BlueprintID:          &blueprintID,
-			State:                models.WorkflowNodeExecutionStatePending,
-			Configuration:        datatypes.NewJSONType(config),
-			CreatedAt:            &now,
-			UpdatedAt:            &now,
+			ID:                    uuid.New(),
+			WorkflowID:            execution.WorkflowID,
+			NodeID:                firstNode.ID,
+			RootEventID:           execution.RootEventID,
+			PreviousExecutionID:   &execution.ID,
+			PreviousOutputChannel: nil, // Special: entering blueprint, will use blueprint node's inputs
+			PreviousOutputIndex:   nil,
+			ParentExecutionID:     &execution.ID,
+			BlueprintID:           &blueprintID,
+			State:                 models.WorkflowNodeExecutionStatePending,
+			Configuration:         datatypes.NewJSONType(config),
+			CreatedAt:             &now,
+			UpdatedAt:             &now,
 		}
 
 		if err := tx.Create(&firstExec).Error; err != nil {

@@ -3547,11 +3547,11 @@
             "$ref": "#/definitions/ComponentsConfigurationField"
           }
         },
-        "outputBranches": {
+        "outputChannels": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsOutputBranch"
+            "$ref": "#/definitions/ComponentsOutputChannel"
           }
         }
       }
@@ -3627,11 +3627,11 @@
             "$ref": "#/definitions/ComponentsConfigurationField"
           }
         },
-        "branches": {
+        "channels": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsOutputBranch"
+            "$ref": "#/definitions/ComponentsOutputChannel"
           }
         }
       }
@@ -3722,7 +3722,7 @@
         "targetId": {
           "type": "string"
         },
-        "branch": {
+        "channel": {
           "type": "string"
         }
       }
@@ -3800,7 +3800,7 @@
         }
       }
     },
-    "ComponentsOutputBranch": {
+    "ComponentsOutputChannel": {
       "type": "object",
       "properties": {
         "name": {
@@ -3818,7 +3818,7 @@
       "type": "string",
       "enum": [
         "REF_TYPE_NODE",
-        "REF_TYPE_OUTPUT_BRANCH"
+        "REF_TYPE_OUTPUT_CHANNEL"
       ],
       "default": "REF_TYPE_NODE"
     },
@@ -6533,7 +6533,7 @@
         "previousExecutionId": {
           "type": "string"
         },
-        "previousOutputBranch": {
+        "previousOutputChannel": {
           "type": "string"
         },
         "previousOutputIndex": {

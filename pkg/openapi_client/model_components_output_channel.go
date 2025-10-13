@@ -15,35 +15,35 @@ import (
 	"encoding/json"
 )
 
-// checks if the ComponentsOutputBranch type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ComponentsOutputBranch{}
+// checks if the ComponentsOutputChannel type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ComponentsOutputChannel{}
 
-// ComponentsOutputBranch struct for ComponentsOutputBranch
-type ComponentsOutputBranch struct {
+// ComponentsOutputChannel struct for ComponentsOutputChannel
+type ComponentsOutputChannel struct {
 	Name *string `json:"name,omitempty"`
 	Label *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
 }
 
-// NewComponentsOutputBranch instantiates a new ComponentsOutputBranch object
+// NewComponentsOutputChannel instantiates a new ComponentsOutputChannel object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewComponentsOutputBranch() *ComponentsOutputBranch {
-	this := ComponentsOutputBranch{}
+func NewComponentsOutputChannel() *ComponentsOutputChannel {
+	this := ComponentsOutputChannel{}
 	return &this
 }
 
-// NewComponentsOutputBranchWithDefaults instantiates a new ComponentsOutputBranch object
+// NewComponentsOutputChannelWithDefaults instantiates a new ComponentsOutputChannel object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewComponentsOutputBranchWithDefaults() *ComponentsOutputBranch {
-	this := ComponentsOutputBranch{}
+func NewComponentsOutputChannelWithDefaults() *ComponentsOutputChannel {
+	this := ComponentsOutputChannel{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *ComponentsOutputBranch) GetName() string {
+func (o *ComponentsOutputChannel) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -53,7 +53,7 @@ func (o *ComponentsOutputBranch) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsOutputBranch) GetNameOk() (*string, bool) {
+func (o *ComponentsOutputChannel) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -61,7 +61,7 @@ func (o *ComponentsOutputBranch) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *ComponentsOutputBranch) HasName() bool {
+func (o *ComponentsOutputChannel) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -70,12 +70,12 @@ func (o *ComponentsOutputBranch) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *ComponentsOutputBranch) SetName(v string) {
+func (o *ComponentsOutputChannel) SetName(v string) {
 	o.Name = &v
 }
 
 // GetLabel returns the Label field value if set, zero value otherwise.
-func (o *ComponentsOutputBranch) GetLabel() string {
+func (o *ComponentsOutputChannel) GetLabel() string {
 	if o == nil || IsNil(o.Label) {
 		var ret string
 		return ret
@@ -85,7 +85,7 @@ func (o *ComponentsOutputBranch) GetLabel() string {
 
 // GetLabelOk returns a tuple with the Label field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsOutputBranch) GetLabelOk() (*string, bool) {
+func (o *ComponentsOutputChannel) GetLabelOk() (*string, bool) {
 	if o == nil || IsNil(o.Label) {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (o *ComponentsOutputBranch) GetLabelOk() (*string, bool) {
 }
 
 // HasLabel returns a boolean if a field has been set.
-func (o *ComponentsOutputBranch) HasLabel() bool {
+func (o *ComponentsOutputChannel) HasLabel() bool {
 	if o != nil && !IsNil(o.Label) {
 		return true
 	}
@@ -102,12 +102,12 @@ func (o *ComponentsOutputBranch) HasLabel() bool {
 }
 
 // SetLabel gets a reference to the given string and assigns it to the Label field.
-func (o *ComponentsOutputBranch) SetLabel(v string) {
+func (o *ComponentsOutputChannel) SetLabel(v string) {
 	o.Label = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
-func (o *ComponentsOutputBranch) GetDescription() string {
+func (o *ComponentsOutputChannel) GetDescription() string {
 	if o == nil || IsNil(o.Description) {
 		var ret string
 		return ret
@@ -117,7 +117,7 @@ func (o *ComponentsOutputBranch) GetDescription() string {
 
 // GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsOutputBranch) GetDescriptionOk() (*string, bool) {
+func (o *ComponentsOutputChannel) GetDescriptionOk() (*string, bool) {
 	if o == nil || IsNil(o.Description) {
 		return nil, false
 	}
@@ -125,7 +125,7 @@ func (o *ComponentsOutputBranch) GetDescriptionOk() (*string, bool) {
 }
 
 // HasDescription returns a boolean if a field has been set.
-func (o *ComponentsOutputBranch) HasDescription() bool {
+func (o *ComponentsOutputChannel) HasDescription() bool {
 	if o != nil && !IsNil(o.Description) {
 		return true
 	}
@@ -134,11 +134,11 @@ func (o *ComponentsOutputBranch) HasDescription() bool {
 }
 
 // SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *ComponentsOutputBranch) SetDescription(v string) {
+func (o *ComponentsOutputChannel) SetDescription(v string) {
 	o.Description = &v
 }
 
-func (o ComponentsOutputBranch) MarshalJSON() ([]byte, error) {
+func (o ComponentsOutputChannel) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -146,7 +146,7 @@ func (o ComponentsOutputBranch) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ComponentsOutputBranch) ToMap() (map[string]interface{}, error) {
+func (o ComponentsOutputChannel) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -160,38 +160,38 @@ func (o ComponentsOutputBranch) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableComponentsOutputBranch struct {
-	value *ComponentsOutputBranch
+type NullableComponentsOutputChannel struct {
+	value *ComponentsOutputChannel
 	isSet bool
 }
 
-func (v NullableComponentsOutputBranch) Get() *ComponentsOutputBranch {
+func (v NullableComponentsOutputChannel) Get() *ComponentsOutputChannel {
 	return v.value
 }
 
-func (v *NullableComponentsOutputBranch) Set(val *ComponentsOutputBranch) {
+func (v *NullableComponentsOutputChannel) Set(val *ComponentsOutputChannel) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableComponentsOutputBranch) IsSet() bool {
+func (v NullableComponentsOutputChannel) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableComponentsOutputBranch) Unset() {
+func (v *NullableComponentsOutputChannel) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableComponentsOutputBranch(val *ComponentsOutputBranch) *NullableComponentsOutputBranch {
-	return &NullableComponentsOutputBranch{value: val, isSet: true}
+func NewNullableComponentsOutputChannel(val *ComponentsOutputChannel) *NullableComponentsOutputChannel {
+	return &NullableComponentsOutputChannel{value: val, isSet: true}
 }
 
-func (v NullableComponentsOutputBranch) MarshalJSON() ([]byte, error) {
+func (v NullableComponentsOutputChannel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableComponentsOutputBranch) UnmarshalJSON(src []byte) error {
+func (v *NullableComponentsOutputChannel) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

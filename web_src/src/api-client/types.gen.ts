@@ -24,7 +24,7 @@ export type BlueprintsBlueprint = {
     nodes?: Array<ComponentsNode>;
     edges?: Array<ComponentsEdge>;
     configuration?: Array<ComponentsConfigurationField>;
-    outputBranches?: Array<ComponentsOutputBranch>;
+    outputChannels?: Array<ComponentsOutputChannel>;
 };
 
 export type BlueprintsCreateBlueprintRequest = {
@@ -56,7 +56,7 @@ export type ComponentsComponent = {
     label?: string;
     description?: string;
     configuration?: Array<ComponentsConfigurationField>;
-    branches?: Array<ComponentsOutputBranch>;
+    channels?: Array<ComponentsOutputChannel>;
 };
 
 export type ComponentsComponentAction = {
@@ -87,7 +87,7 @@ export type ComponentsEdge = {
     sourceId?: string;
     targetType?: EdgeTargetType;
     targetId?: string;
-    branch?: string;
+    channel?: string;
 };
 
 export type ComponentsFieldOption = {
@@ -119,13 +119,13 @@ export type ComponentsNode = {
     };
 };
 
-export type ComponentsOutputBranch = {
+export type ComponentsOutputChannel = {
     name?: string;
     label?: string;
     description?: string;
 };
 
-export type EdgeTargetType = 'REF_TYPE_NODE' | 'REF_TYPE_OUTPUT_BRANCH';
+export type EdgeTargetType = 'REF_TYPE_NODE' | 'REF_TYPE_OUTPUT_CHANNEL';
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
@@ -1227,7 +1227,7 @@ export type WorkflowsWorkflowNodeExecution = {
         [key: string]: unknown;
     };
     previousExecutionId?: string;
-    previousOutputBranch?: string;
+    previousOutputChannel?: string;
     previousOutputIndex?: number;
 };
 

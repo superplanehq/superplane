@@ -864,27 +864,27 @@ func (x *ListNodeExecutionsResponse) GetLastTimestamp() *timestamp.Timestamp {
 }
 
 type WorkflowNodeExecution struct {
-	state                protoimpl.MessageState             `protogen:"open.v1"`
-	Id                   string                             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	WorkflowId           string                             `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
-	NodeId               string                             `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	ParentExecutionId    string                             `protobuf:"bytes,4,opt,name=parent_execution_id,json=parentExecutionId,proto3" json:"parent_execution_id,omitempty"`
-	BlueprintId          string                             `protobuf:"bytes,5,opt,name=blueprint_id,json=blueprintId,proto3" json:"blueprint_id,omitempty"`
-	State                WorkflowNodeExecution_State        `protobuf:"varint,6,opt,name=state,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_State" json:"state,omitempty"`
-	Result               WorkflowNodeExecution_Result       `protobuf:"varint,7,opt,name=result,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_Result" json:"result,omitempty"`
-	ResultReason         WorkflowNodeExecution_ResultReason `protobuf:"varint,8,opt,name=result_reason,json=resultReason,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_ResultReason" json:"result_reason,omitempty"`
-	ResultMessage        string                             `protobuf:"bytes,9,opt,name=result_message,json=resultMessage,proto3" json:"result_message,omitempty"`
-	Input                *_struct.Struct                    `protobuf:"bytes,10,opt,name=input,proto3" json:"input,omitempty"`
-	Outputs              *_struct.Struct                    `protobuf:"bytes,11,opt,name=outputs,proto3" json:"outputs,omitempty"`
-	CreatedAt            *timestamp.Timestamp               `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt            *timestamp.Timestamp               `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	Metadata             *_struct.Struct                    `protobuf:"bytes,14,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Configuration        *_struct.Struct                    `protobuf:"bytes,15,opt,name=configuration,proto3" json:"configuration,omitempty"`
-	PreviousExecutionId  string                             `protobuf:"bytes,16,opt,name=previous_execution_id,json=previousExecutionId,proto3" json:"previous_execution_id,omitempty"`
-	PreviousOutputBranch string                             `protobuf:"bytes,17,opt,name=previous_output_branch,json=previousOutputBranch,proto3" json:"previous_output_branch,omitempty"`
-	PreviousOutputIndex  int32                              `protobuf:"varint,18,opt,name=previous_output_index,json=previousOutputIndex,proto3" json:"previous_output_index,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                 protoimpl.MessageState             `protogen:"open.v1"`
+	Id                    string                             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkflowId            string                             `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
+	NodeId                string                             `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ParentExecutionId     string                             `protobuf:"bytes,4,opt,name=parent_execution_id,json=parentExecutionId,proto3" json:"parent_execution_id,omitempty"`
+	BlueprintId           string                             `protobuf:"bytes,5,opt,name=blueprint_id,json=blueprintId,proto3" json:"blueprint_id,omitempty"`
+	State                 WorkflowNodeExecution_State        `protobuf:"varint,6,opt,name=state,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_State" json:"state,omitempty"`
+	Result                WorkflowNodeExecution_Result       `protobuf:"varint,7,opt,name=result,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_Result" json:"result,omitempty"`
+	ResultReason          WorkflowNodeExecution_ResultReason `protobuf:"varint,8,opt,name=result_reason,json=resultReason,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_ResultReason" json:"result_reason,omitempty"`
+	ResultMessage         string                             `protobuf:"bytes,9,opt,name=result_message,json=resultMessage,proto3" json:"result_message,omitempty"`
+	Input                 *_struct.Struct                    `protobuf:"bytes,10,opt,name=input,proto3" json:"input,omitempty"`
+	Outputs               *_struct.Struct                    `protobuf:"bytes,11,opt,name=outputs,proto3" json:"outputs,omitempty"`
+	CreatedAt             *timestamp.Timestamp               `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt             *timestamp.Timestamp               `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Metadata              *_struct.Struct                    `protobuf:"bytes,14,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Configuration         *_struct.Struct                    `protobuf:"bytes,15,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	PreviousExecutionId   string                             `protobuf:"bytes,16,opt,name=previous_execution_id,json=previousExecutionId,proto3" json:"previous_execution_id,omitempty"`
+	PreviousOutputChannel string                             `protobuf:"bytes,17,opt,name=previous_output_channel,json=previousOutputChannel,proto3" json:"previous_output_channel,omitempty"`
+	PreviousOutputIndex   int32                              `protobuf:"varint,18,opt,name=previous_output_index,json=previousOutputIndex,proto3" json:"previous_output_index,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *WorkflowNodeExecution) Reset() {
@@ -1029,9 +1029,9 @@ func (x *WorkflowNodeExecution) GetPreviousExecutionId() string {
 	return ""
 }
 
-func (x *WorkflowNodeExecution) GetPreviousOutputBranch() string {
+func (x *WorkflowNodeExecution) GetPreviousOutputChannel() string {
 	if x != nil {
-		return x.PreviousOutputBranch
+		return x.PreviousOutputChannel
 	}
 	return ""
 }
@@ -1481,7 +1481,7 @@ const file_workflows_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xbb\t\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xbd\t\n" +
 	"\x15WorkflowNodeExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vworkflow_id\x18\x02 \x01(\tR\n" +
@@ -1502,8 +1502,8 @@ const file_workflows_proto_rawDesc = "" +
 	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x123\n" +
 	"\bmetadata\x18\x0e \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12=\n" +
 	"\rconfiguration\x18\x0f \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x122\n" +
-	"\x15previous_execution_id\x18\x10 \x01(\tR\x13previousExecutionId\x124\n" +
-	"\x16previous_output_branch\x18\x11 \x01(\tR\x14previousOutputBranch\x122\n" +
+	"\x15previous_execution_id\x18\x10 \x01(\tR\x13previousExecutionId\x126\n" +
+	"\x17previous_output_channel\x18\x11 \x01(\tR\x15previousOutputChannel\x122\n" +
 	"\x15previous_output_index\x18\x12 \x01(\x05R\x13previousOutputIndex\"g\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +

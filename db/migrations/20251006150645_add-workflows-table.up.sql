@@ -42,39 +42,24 @@ CREATE INDEX idx_workflow_initial_events_workflow_id ON workflow_initial_events(
 --
 
 CREATE TABLE workflow_node_executions (
-  id                     uuid NOT NULL DEFAULT uuid_generate_v4(),
-  workflow_id            uuid NOT NULL,
-  node_id                CHARACTER VARYING(128) NOT NULL,
-
-  -- Root event (shared by all executions in this workflow run)
-  root_event_id          uuid NOT NULL,
-
-  -- Sequential flow (previous node that provides inputs)
-  previous_execution_id  uuid,
-  previous_output_branch CHARACTER VARYING(64),
-  previous_output_index  INTEGER,
-
-  -- Blueprint hierarchy (blueprint node execution that spawned this, if any)
-  parent_execution_id    uuid,
-
-  -- Blueprint context (no FK - we want to preserve execution history even after blueprint deletion)
-  blueprint_id           uuid,
-
-  -- State machine
-  state                  CHARACTER VARYING(32) NOT NULL,
-  result                 CHARACTER VARYING(32),
-  result_reason          CHARACTER VARYING(128),
-  result_message         TEXT,
-
-  -- Data (only outputs stored, inputs derived from previous)
-  outputs                JSONB,
-
-  -- Node snapshot
-  metadata               JSONB NOT NULL DEFAULT '{}'::jsonb,
-  configuration          JSONB NOT NULL DEFAULT '{}'::jsonb,
-
-  created_at             TIMESTAMP NOT NULL,
-  updated_at             TIMESTAMP NOT NULL,
+  id                      uuid NOT NULL DEFAULT uuid_generate_v4(),
+  workflow_id             uuid NOT NULL,
+  node_id                 CHARACTER VARYING(128) NOT NULL,
+  root_event_id           uuid NOT NULL,
+  previous_execution_id   uuid,
+  previous_output_channel CHARACTER VARYING(64),
+  previous_output_index   INTEGER,
+  parent_execution_id     uuid,
+  blueprint_id            uuid,
+  state                   CHARACTER VARYING(32) NOT NULL,
+  result                  CHARACTER VARYING(32),
+  result_reason           CHARACTER VARYING(128),
+  result_message          TEXT,
+  outputs                 JSONB,
+  metadata                JSONB NOT NULL DEFAULT '{}'::jsonb,
+  configuration           JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at              TIMESTAMP NOT NULL,
+  updated_at              TIMESTAMP NOT NULL,
 
   PRIMARY KEY (id),
   FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,

@@ -114,5 +114,5 @@ message Blueprint {
   repeated Components.Node nodes = 7;
   repeated Components.Edge edges = 8;
   repeated Components.ConfigurationField configuration = 9;
-  repeated Components.OutputBranch output_branches = 10;
+  repeated Components.OutputChannel output_channels = 10;
 }

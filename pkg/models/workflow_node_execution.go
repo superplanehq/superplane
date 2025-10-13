@@ -31,9 +31,9 @@ type WorkflowNodeExecution struct {
 	RootEventID uuid.UUID
 
 	// Sequential flow - references to previous execution that provides inputs
-	PreviousExecutionID  *uuid.UUID
-	PreviousOutputBranch *string
-	PreviousOutputIndex  *int
+	PreviousExecutionID   *uuid.UUID
+	PreviousOutputChannel *string
+	PreviousOutputIndex   *int
 
 	// Blueprint hierarchy - reference to the blueprint node execution that spawned this
 	ParentExecutionID *uuid.UUID
@@ -50,7 +50,7 @@ type WorkflowNodeExecution struct {
 	//
 	// The outputs of the node execution.
 	// Note that this is a map[string][]any type.
-	// The key in the map is the output branch name.
+	// The key in the map is the output channel name.
 	// A node can emit multiple events as part of the same output.
 	// The subsequent node in the flow will unpack that and create
 	// multiple child executions.
@@ -142,6 +142,46 @@ func FindLastNodeExecutionForNode(workflowID uuid.UUID, nodeID string, states []
 	}
 
 	return &execution, nil
+}
+
+func (e *WorkflowNodeExecution) GetParentExecutionID() string {
+	if e.ParentExecutionID == nil {
+		return ""
+	}
+
+	return e.ParentExecutionID.String()
+}
+
+func (e *WorkflowNodeExecution) GetBlueprintID() string {
+	if e.BlueprintID == nil {
+		return ""
+	}
+
+	return e.BlueprintID.String()
+}
+
+func (e *WorkflowNodeExecution) GetPreviousExecutionID() string {
+	if e.PreviousExecutionID == nil {
+		return ""
+	}
+
+	return e.PreviousExecutionID.String()
+}
+
+func (e *WorkflowNodeExecution) GetPreviousOutputChannel() string {
+	if e.PreviousOutputChannel == nil {
+		return ""
+	}
+
+	return *e.PreviousOutputChannel
+}
+
+func (e *WorkflowNodeExecution) GetPreviousOutputIndex() int32 {
+	if e.PreviousOutputIndex == nil {
+		return 0
+	}
+
+	return int32(*e.PreviousOutputIndex)
 }
 
 func (e *WorkflowNodeExecution) Start() error {
@@ -254,25 +294,25 @@ func (e *WorkflowNodeExecution) GetInputs() (map[string]any, error) {
 		return previous.GetInputs()
 	}
 
-	if e.PreviousOutputBranch == nil || e.PreviousOutputIndex == nil {
+	if e.PreviousOutputChannel == nil || e.PreviousOutputIndex == nil {
 		return nil, fmt.Errorf("execution %s has invalid previous reference", e.ID)
 	}
 
 	//
 	// Normal case: read from previous execution's outputs,
-	// using the output branch and index references.
+	// using the output channel and index references.
 	//
 	previousOutputs := previous.Outputs.Data()
-	branchData, exists := previousOutputs[*e.PreviousOutputBranch]
+	channelData, exists := previousOutputs[*e.PreviousOutputChannel]
 	if !exists {
-		return nil, fmt.Errorf("previous execution %s has no output branch '%s'", previous.ID, *e.PreviousOutputBranch)
+		return nil, fmt.Errorf("previous execution %s has no output channel '%s'", previous.ID, *e.PreviousOutputChannel)
 	}
 
-	if *e.PreviousOutputIndex >= len(branchData) {
-		return nil, fmt.Errorf("previous output index %d out of range for branch '%s'", *e.PreviousOutputIndex, *e.PreviousOutputBranch)
+	if *e.PreviousOutputIndex >= len(channelData) {
+		return nil, fmt.Errorf("previous output index %d out of range for channel '%s'", *e.PreviousOutputIndex, *e.PreviousOutputChannel)
 	}
 
-	inputData, ok := branchData[*e.PreviousOutputIndex].(map[string]any)
+	inputData, ok := channelData[*e.PreviousOutputIndex].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("previous output data is not a map")
 	}

@@ -30,7 +30,7 @@ type BlueprintsBlueprint struct {
 	Nodes []ComponentsNode `json:"nodes,omitempty"`
 	Edges []ComponentsEdge `json:"edges,omitempty"`
 	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
-	OutputBranches []ComponentsOutputBranch `json:"outputBranches,omitempty"`
+	OutputChannels []ComponentsOutputChannel `json:"outputChannels,omitempty"`
 }
 
 // NewBlueprintsBlueprint instantiates a new BlueprintsBlueprint object
@@ -338,36 +338,36 @@ func (o *BlueprintsBlueprint) SetConfiguration(v []ComponentsConfigurationField)
 	o.Configuration = v
 }
 
-// GetOutputBranches returns the OutputBranches field value if set, zero value otherwise.
-func (o *BlueprintsBlueprint) GetOutputBranches() []ComponentsOutputBranch {
-	if o == nil || IsNil(o.OutputBranches) {
-		var ret []ComponentsOutputBranch
+// GetOutputChannels returns the OutputChannels field value if set, zero value otherwise.
+func (o *BlueprintsBlueprint) GetOutputChannels() []ComponentsOutputChannel {
+	if o == nil || IsNil(o.OutputChannels) {
+		var ret []ComponentsOutputChannel
 		return ret
 	}
-	return o.OutputBranches
+	return o.OutputChannels
 }
 
-// GetOutputBranchesOk returns a tuple with the OutputBranches field value if set, nil otherwise
+// GetOutputChannelsOk returns a tuple with the OutputChannels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprint) GetOutputBranchesOk() ([]ComponentsOutputBranch, bool) {
-	if o == nil || IsNil(o.OutputBranches) {
+func (o *BlueprintsBlueprint) GetOutputChannelsOk() ([]ComponentsOutputChannel, bool) {
+	if o == nil || IsNil(o.OutputChannels) {
 		return nil, false
 	}
-	return o.OutputBranches, true
+	return o.OutputChannels, true
 }
 
-// HasOutputBranches returns a boolean if a field has been set.
-func (o *BlueprintsBlueprint) HasOutputBranches() bool {
-	if o != nil && !IsNil(o.OutputBranches) {
+// HasOutputChannels returns a boolean if a field has been set.
+func (o *BlueprintsBlueprint) HasOutputChannels() bool {
+	if o != nil && !IsNil(o.OutputChannels) {
 		return true
 	}
 
 	return false
 }
 
-// SetOutputBranches gets a reference to the given []ComponentsOutputBranch and assigns it to the OutputBranches field.
-func (o *BlueprintsBlueprint) SetOutputBranches(v []ComponentsOutputBranch) {
-	o.OutputBranches = v
+// SetOutputChannels gets a reference to the given []ComponentsOutputChannel and assigns it to the OutputChannels field.
+func (o *BlueprintsBlueprint) SetOutputChannels(v []ComponentsOutputChannel) {
+	o.OutputChannels = v
 }
 
 func (o BlueprintsBlueprint) MarshalJSON() ([]byte, error) {
@@ -407,8 +407,8 @@ func (o BlueprintsBlueprint) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
 	}
-	if !IsNil(o.OutputBranches) {
-		toSerialize["outputBranches"] = o.OutputBranches
+	if !IsNil(o.OutputChannels) {
+		toSerialize["outputChannels"] = o.OutputChannels
 	}
 	return toSerialize, nil
 }

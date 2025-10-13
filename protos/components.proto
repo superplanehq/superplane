@@ -78,7 +78,7 @@ message Component {
   string label = 2;
   string description = 3;
   repeated ConfigurationField configuration = 4;
-  repeated OutputBranch branches = 5;
+  repeated OutputChannel channels = 5;
 }
 
 message ConfigurationField {
@@ -105,7 +105,7 @@ message ListItemDefinition {
   repeated ConfigurationField schema = 2;
 }
 
-message OutputBranch {
+message OutputChannel {
   string name = 1;
   string label = 2;
   string description = 3;
@@ -150,11 +150,11 @@ message Node {
 message Edge {
   enum TargetType {
     REF_TYPE_NODE = 0;
-    REF_TYPE_OUTPUT_BRANCH = 1;
+    REF_TYPE_OUTPUT_CHANNEL = 1;
   }
 
   string source_id = 1;
   TargetType target_type = 2;
   string target_id = 3;
-  string branch = 4;
+  string channel = 4;
 }

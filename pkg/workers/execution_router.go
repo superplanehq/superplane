@@ -157,9 +157,9 @@ func (w *ExecutionRouter) findWorkflowNodesAndEdges(exec *models.WorkflowNodeExe
 }
 
 type nextNodeInfo struct {
-	NodeID       string
-	OutputBranch string
-	OutputIndex  int
+	NodeID        string
+	OutputChannel string
+	OutputIndex   int
 }
 
 func (w *ExecutionRouter) findNextNodes(exec *models.WorkflowNodeExecution, edges []models.Edge) ([]nextNodeInfo, error) {
@@ -171,12 +171,12 @@ func (w *ExecutionRouter) findNextNodes(exec *models.WorkflowNodeExecution, edge
 			continue
 		}
 
-		branchData, exists := outputs[edge.Branch]
-		if !exists || len(branchData) == 0 {
+		channelData, exists := outputs[edge.Channel]
+		if !exists || len(channelData) == 0 {
 			continue
 		}
 
-		if edge.TargetType == models.EdgeTargetTypeOutputBranch {
+		if edge.TargetType == models.EdgeTargetTypeOutputChannel {
 			// Blueprint exit - handled in checkBlueprintCompletion
 			continue
 		}
@@ -185,12 +185,12 @@ func (w *ExecutionRouter) findNextNodes(exec *models.WorkflowNodeExecution, edge
 			continue
 		}
 
-		// Create child executions for each item in branch
-		for idx := range branchData {
+		// Create child executions for each item in channel
+		for idx := range channelData {
 			nextNodes = append(nextNodes, nextNodeInfo{
-				NodeID:       edge.TargetID,
-				OutputBranch: edge.Branch,
-				OutputIndex:  idx,
+				NodeID:        edge.TargetID,
+				OutputChannel: edge.Channel,
+				OutputIndex:   idx,
 			})
 		}
 	}
@@ -235,19 +235,19 @@ func (w *ExecutionRouter) createNextExecution(
 	}
 
 	childExec := models.WorkflowNodeExecution{
-		ID:                   uuid.New(),
-		WorkflowID:           previous.WorkflowID,
-		NodeID:               next.NodeID,
-		RootEventID:          previous.RootEventID,
-		PreviousExecutionID:  &previous.ID,
-		PreviousOutputBranch: &next.OutputBranch,
-		PreviousOutputIndex:  &next.OutputIndex,
-		ParentExecutionID:    previous.ParentExecutionID,
-		BlueprintID:          previous.BlueprintID,
-		State:                models.WorkflowNodeExecutionStatePending,
-		Configuration:        datatypes.NewJSONType(config),
-		CreatedAt:            &now,
-		UpdatedAt:            &now,
+		ID:                    uuid.New(),
+		WorkflowID:            previous.WorkflowID,
+		NodeID:                next.NodeID,
+		RootEventID:           previous.RootEventID,
+		PreviousExecutionID:   &previous.ID,
+		PreviousOutputChannel: &next.OutputChannel,
+		PreviousOutputIndex:   &next.OutputIndex,
+		ParentExecutionID:     previous.ParentExecutionID,
+		BlueprintID:           previous.BlueprintID,
+		State:                 models.WorkflowNodeExecutionStatePending,
+		Configuration:         datatypes.NewJSONType(config),
+		CreatedAt:             &now,
+		UpdatedAt:             &now,
 	}
 
 	if err := tx.Create(&childExec).Error; err != nil {
@@ -413,20 +413,20 @@ func (w *ExecutionRouter) collectOutputsFromExecution(
 			continue
 		}
 
-		if edge.TargetType != models.EdgeTargetTypeOutputBranch {
+		if edge.TargetType != models.EdgeTargetTypeOutputChannel {
 			continue
 		}
 
 		outputs := exec.Outputs.Data()
-		branchData, exists := outputs[edge.Branch]
+		channelData, exists := outputs[edge.Channel]
 		if !exists {
 			continue
 		}
 
-		exitBranchName := edge.TargetID
-		blueprintOutputs[exitBranchName] = append(blueprintOutputs[exitBranchName], branchData...)
+		exitChannelName := edge.TargetID
+		blueprintOutputs[exitChannelName] = append(blueprintOutputs[exitChannelName], channelData...)
 
-		w.log("Collected outputs from node %s to branch %s", exec.NodeID, exitBranchName)
+		w.log("Collected outputs from node %s to channel %s", exec.NodeID, exitChannelName)
 	}
 }
 

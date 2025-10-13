@@ -777,7 +777,7 @@ func ProtoToEdges(edges []*componentpb.Edge) []models.Edge {
 			SourceID:   edge.SourceId,
 			TargetID:   edge.TargetId,
 			TargetType: ProtoToTargetType(edge.TargetType),
-			Branch:     edge.Branch,
+			Channel:    edge.Channel,
 		}
 	}
 	return result
@@ -790,7 +790,7 @@ func EdgesToProto(edges []models.Edge) []*componentpb.Edge {
 			SourceId:   edge.SourceID,
 			TargetId:   edge.TargetID,
 			TargetType: TargetTypeToProto(edge.TargetType),
-			Branch:     edge.Branch,
+			Channel:    edge.Channel,
 		}
 	}
 	return result
@@ -820,8 +820,8 @@ func ProtoToTargetType(targetType componentpb.Edge_TargetType) string {
 	switch targetType {
 	case componentpb.Edge_REF_TYPE_NODE:
 		return models.EdgeTargetTypeNode
-	case componentpb.Edge_REF_TYPE_OUTPUT_BRANCH:
-		return models.EdgeTargetTypeOutputBranch
+	case componentpb.Edge_REF_TYPE_OUTPUT_CHANNEL:
+		return models.EdgeTargetTypeOutputChannel
 	default:
 		return ""
 	}
@@ -829,8 +829,8 @@ func ProtoToTargetType(targetType componentpb.Edge_TargetType) string {
 
 func TargetTypeToProto(targetType string) componentpb.Edge_TargetType {
 	switch targetType {
-	case models.EdgeTargetTypeOutputBranch:
-		return componentpb.Edge_REF_TYPE_OUTPUT_BRANCH
+	case models.EdgeTargetTypeOutputChannel:
+		return componentpb.Edge_REF_TYPE_OUTPUT_CHANNEL
 	case models.EdgeTargetTypeNode:
 		return componentpb.Edge_REF_TYPE_NODE
 	default:

@@ -27,7 +27,7 @@ type Component interface {
     Label() string             // Display name
     Description() string       // Documentation
 
-    OutputBranches(configuration any) []OutputBranch
+    OutputChannels(configuration any) []OutputChannel
     Configuration() []ConfigurationField
 
     Execute(ctx ExecutionContext) error
@@ -64,8 +64,8 @@ type Executor interface {
    - Support for async operations
    - Parameters defined via ConfigurationField schema
 
-4. **Dynamic Output Branches**: Components can define multiple output paths:
-   - Configuration-dependent branches (e.g., switch/if components)
+4. **Dynamic Output Channels**: Components can define multiple output paths:
+   - Configuration-dependent channels (e.g., switch/if components)
    - Enables complex routing logic
 
 5. **Rich Configuration Schema**: Components define their configuration declaratively:
@@ -112,13 +112,13 @@ Several components are implemented in `pkg/components/`:
 
 3. **If Component** (`pkg/components/if/if.go:16`): Conditional routing
    - Evaluates boolean expressions
-   - Two output branches: `true` and `false`
+   - Two output channels: `true` and `false`
    - Uses expr-lang for expression evaluation
 
 4. **Switch Component** (`pkg/components/switch/switch.go:20`): Multi-way routing
-   - Multiple configurable branches with expressions
-   - Dynamic output branches based on configuration
-   - Can route to multiple branches simultaneously
+   - Multiple configurable channels with expressions
+   - Dynamic output channels based on configuration
+   - Can route to multiple channels simultaneously
 
 5. **Filter Component** (`pkg/components/filter/filter.go`): Filters events based on expressions
 
@@ -141,14 +141,14 @@ type Blueprint struct {
     Nodes          datatypes.JSONSlice[Node]
     Edges          datatypes.JSONSlice[Edge]
     Configuration  datatypes.JSONSlice[components.ConfigurationField]  // Exposed parameters
-    OutputBranches datatypes.JSONSlice[components.OutputBranch]         // Exit points
+    OutputChannels datatypes.JSONSlice[components.OutputChannel]        // Exit points
 }
 ```
 
 #### Blueprint Characteristics
 
 - **Parameterized**: Blueprints expose configuration fields that can be bound when used in workflows
-- **Multiple Outputs**: Can define multiple output branches for different exit paths
+- **Multiple Outputs**: Can define multiple output channels for different exit paths
 - **Nested**: Blueprints can contain other blueprint nodes
 - **Isolated**: Each blueprint execution maintains its own scope
 
@@ -204,16 +204,16 @@ Edges connect nodes and define data flow:
 
 ```go
 type Edge struct {
-    SourceID   string  // Source node ID
-    TargetType string  // "node" or "output_branch"
-    TargetID   string  // Target node ID or output branch name
-    Branch     string  // Output branch name from source
+   SourceID   string  // Source node ID
+   TargetType string  // "node" or "output_channel"
+   TargetID   string  // Target node ID or output channel name
+   Channel    string  // Output channel name from source
 }
 ```
 
 **Edge Types:**
 - **Node-to-Node**: `TargetType = "node"` - connects to next node in flow
-- **Node-to-OutputBranch**: `TargetType = "output_branch"` - exits blueprint via named output
+- **Node-to-OutputChannel**: `TargetType = "output-channel"` - exits blueprint via named output
 
 ## Execution Model
 
@@ -231,9 +231,9 @@ type WorkflowNodeExecution struct {
     RootEventID uuid.UUID
 
     // Sequential flow - references to previous execution
-    PreviousExecutionID  *uuid.UUID
-    PreviousOutputBranch *string
-    PreviousOutputIndex  *int
+    PreviousExecutionID   *uuid.UUID
+    PreviousOutputChannel *string
+    PreviousOutputIndex   *int
 
     // Blueprint hierarchy - parent blueprint node execution
     ParentExecutionID *uuid.UUID
@@ -309,9 +309,9 @@ Located in `pkg/workers/execution_router.go:27`, this worker:
 
 1. **Passed Execution:**
    - Finds all outgoing edges from the completed node
-   - For each edge matching an output branch with data:
-     - If `TargetType = "node"`: Creates child execution for each item in branch
-     - If `TargetType = "output_branch"`: Marks as blueprint exit (handled in completion)
+   - For each edge matching an output channel with data:
+     - If `TargetType = "node"`: Creates child execution for each item in channel
+     - If `TargetType = "output_channel"`: Marks as blueprint exit (handled in completion)
    - Marks execution as `finished`
 
 2. **Failed Execution:**
@@ -323,7 +323,7 @@ Located in `pkg/workers/execution_router.go:27`, this worker:
    - Checks if any active executions remain in the blueprint
    - If none remain:
      - Collects outputs from all blueprint exit edges
-     - Aggregates them by output branch name
+     - Aggregates them by output channel name
      - Marks parent blueprint node execution as passed with collected outputs
      - Moves parent to `routing` state to continue workflow
 
@@ -333,17 +333,17 @@ The `GetInputs()` method (in `pkg/models/workflow_node_execution.go:231`) determ
 
 1. **First Node in Flow**: Reads from `workflow_initial_events` table using `RootEventID`
 2. **Entering a Blueprint**: Reads from parent blueprint node execution's inputs
-3. **Normal Flow**: Reads from `PreviousExecutionID.Outputs[PreviousOutputBranch][PreviousOutputIndex]`
+3. **Normal Flow**: Reads from `PreviousExecutionID.Outputs[PreviousOutputChannel][PreviousOutputIndex]`
 
 ### Output Structure
 
 Outputs are structured as `map[string][]any`:
-- **Key**: Output branch name (e.g., "default", "true", "false")
+- **Key**: Output channel name (e.g., "default", "true", "false")
 - **Value**: Array of output items
 
 This structure supports:
-- Multiple output branches per node
-- Multiple items per branch (for fan-out scenarios)
+- Multiple output channels per node
+- Multiple items per channel (for fan-out scenarios)
 - Automatic creation of child executions for each item
 
 ## Database Schema
@@ -361,7 +361,7 @@ CREATE TABLE blueprints (
   nodes           JSONB NOT NULL DEFAULT '[]',
   edges           JSONB NOT NULL DEFAULT '[]',
   configuration   JSONB NOT NULL DEFAULT '[]',  -- Exposed parameters
-  output_branches JSONB NOT NULL DEFAULT '[]',  -- Exit points
+  output_channels JSONB NOT NULL DEFAULT '[]',  -- Exit points
   UNIQUE (organization_id, name)
 );
 ```
@@ -407,9 +407,9 @@ CREATE TABLE workflow_node_executions (
   root_event_id          uuid NOT NULL REFERENCES workflow_initial_events(id),
 
   -- Sequential flow
-  previous_execution_id  uuid REFERENCES workflow_node_executions(id),
-  previous_output_branch VARCHAR(64),
-  previous_output_index  INTEGER,
+  previous_execution_id   uuid REFERENCES workflow_node_executions(id),
+  previous_output_channel VARCHAR(64),
+  previous_output_index   INTEGER,
 
   -- Blueprint hierarchy
   parent_execution_id    uuid REFERENCES workflow_node_executions(id),
@@ -495,7 +495,7 @@ The old Executor interface remains for backward compatibility with existing inte
 | No state management | Metadata storage per execution |
 | Binary success/failure | Rich result handling with reasons |
 | No dynamic behavior | Actions for interactive flows |
-| Fixed outputs | Dynamic output branches |
+| Fixed outputs | Dynamic output channels |
 | Synchronous only | Support for async patterns |
 
 ## Example: Approval Component Flow
@@ -529,7 +529,7 @@ Scenario: A blueprint that makes two HTTP calls in sequence.
   "configuration": [
     {"name": "base_url", "type": "string", "required": true}
   ],
-  "output_branches": [
+  "output_channels": [
     {"name": "success", "label": "Success"}
   ],
   "nodes": [
@@ -553,8 +553,8 @@ Scenario: A blueprint that makes two HTTP calls in sequence.
     }
   ],
   "edges": [
-    {"source_id": "http-1", "target_type": "node", "target_id": "http-2", "branch": "default"},
-    {"source_id": "http-2", "target_type": "output_branch", "target_id": "success", "branch": "default"}
+    {"source_id": "http-1", "target_type": "node", "target_id": "http-2", "channel": "default"},
+    {"source_id": "http-2", "target_type": "output_channel", "target_id": "success", "channel": "default"}
   ]
 }
 ```
@@ -580,7 +580,7 @@ Scenario: A blueprint that makes two HTTP calls in sequence.
     }
   ],
   "edges": [
-    {"source_id": "blueprint-node", "target_type": "node", "target_id": "next-step", "branch": "success"}
+    {"source_id": "blueprint-node", "target_type": "node", "target_id": "next-step", "channel": "success"}
   ]
 }
 ```
@@ -607,10 +607,10 @@ Scenario: A blueprint that makes two HTTP calls in sequence.
    - Calls `Pass()` with response
    - Moves to `routing` state
 7. ExecutionRouter routes `http-2`:
-   - Finds exit edge to `success` output branch
+   - Finds exit edge to `success` output channel
    - No more nodes in blueprint
    - Checks for active executions in blueprint (none found)
-   - Collects outputs from `http-2` to `success` branch
+   - Collects outputs from `http-2` to `success` channel
    - Marks `http-2` as `finished`
    - Marks blueprint-node as passed with collected outputs
    - Moves blueprint-node to `routing` state
@@ -628,7 +628,7 @@ The blueprints-and-workflows architecture provides:
 - ✅ **Flexibility**: Components have full lifecycle control
 - ✅ **Interactivity**: Actions enable async workflows
 - ✅ **State Management**: Metadata storage per execution
-- ✅ **Complex Routing**: Dynamic branches and fan-out support
+- ✅ **Complex Routing**: Dynamic channels and fan-out support
 - ✅ **Hierarchy**: Nested blueprints with configuration resolution
 - ✅ **Traceability**: Complete execution history in database
 

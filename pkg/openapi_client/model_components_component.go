@@ -24,7 +24,7 @@ type ComponentsComponent struct {
 	Label *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
-	Branches []ComponentsOutputBranch `json:"branches,omitempty"`
+	Channels []ComponentsOutputChannel `json:"channels,omitempty"`
 }
 
 // NewComponentsComponent instantiates a new ComponentsComponent object
@@ -172,36 +172,36 @@ func (o *ComponentsComponent) SetConfiguration(v []ComponentsConfigurationField)
 	o.Configuration = v
 }
 
-// GetBranches returns the Branches field value if set, zero value otherwise.
-func (o *ComponentsComponent) GetBranches() []ComponentsOutputBranch {
-	if o == nil || IsNil(o.Branches) {
-		var ret []ComponentsOutputBranch
+// GetChannels returns the Channels field value if set, zero value otherwise.
+func (o *ComponentsComponent) GetChannels() []ComponentsOutputChannel {
+	if o == nil || IsNil(o.Channels) {
+		var ret []ComponentsOutputChannel
 		return ret
 	}
-	return o.Branches
+	return o.Channels
 }
 
-// GetBranchesOk returns a tuple with the Branches field value if set, nil otherwise
+// GetChannelsOk returns a tuple with the Channels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsComponent) GetBranchesOk() ([]ComponentsOutputBranch, bool) {
-	if o == nil || IsNil(o.Branches) {
+func (o *ComponentsComponent) GetChannelsOk() ([]ComponentsOutputChannel, bool) {
+	if o == nil || IsNil(o.Channels) {
 		return nil, false
 	}
-	return o.Branches, true
+	return o.Channels, true
 }
 
-// HasBranches returns a boolean if a field has been set.
-func (o *ComponentsComponent) HasBranches() bool {
-	if o != nil && !IsNil(o.Branches) {
+// HasChannels returns a boolean if a field has been set.
+func (o *ComponentsComponent) HasChannels() bool {
+	if o != nil && !IsNil(o.Channels) {
 		return true
 	}
 
 	return false
 }
 
-// SetBranches gets a reference to the given []ComponentsOutputBranch and assigns it to the Branches field.
-func (o *ComponentsComponent) SetBranches(v []ComponentsOutputBranch) {
-	o.Branches = v
+// SetChannels gets a reference to the given []ComponentsOutputChannel and assigns it to the Channels field.
+func (o *ComponentsComponent) SetChannels(v []ComponentsOutputChannel) {
+	o.Channels = v
 }
 
 func (o ComponentsComponent) MarshalJSON() ([]byte, error) {
@@ -226,8 +226,8 @@ func (o ComponentsComponent) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
 	}
-	if !IsNil(o.Branches) {
-		toSerialize["branches"] = o.Branches
+	if !IsNil(o.Channels) {
+		toSerialize["channels"] = o.Channels
 	}
 	return toSerialize, nil
 }

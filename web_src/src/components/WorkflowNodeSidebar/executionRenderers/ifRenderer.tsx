@@ -1,6 +1,5 @@
 import { registerExecutionRenderer, CollapsedViewProps, ExpandedViewProps } from './registry'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
-import { Badge } from '../../ui/badge'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
@@ -15,11 +14,11 @@ registerExecutionRenderer('if', {
     // Extract condition expression from configuration
     const conditionExpression = execution.configuration?.expression || 'No expression'
 
-    // Determine which branch was taken
-    const trueBranch = outputs?.true
-    const falseBranch = outputs?.false
-    const branchTaken = trueBranch && trueBranch.length > 0 ? 'TRUE' :
-                        falseBranch && falseBranch.length > 0 ? 'FALSE' :
+    // Determine which channel was taken
+    const trueChannel = outputs?.true
+    const falseChannel = outputs?.false
+    const channelTaken = trueChannel && trueChannel.length > 0 ? 'TRUE' :
+                        falseChannel && falseChannel.length > 0 ? 'FALSE' :
                         'NONE'
 
     return (
@@ -31,7 +30,7 @@ registerExecutionRenderer('if', {
           <div className="flex items-center gap-2 text-sm">
             <span className="font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded truncate">{conditionExpression}</span>
             <MaterialSymbol name="arrow_forward" size="sm" className="text-gray-400 dark:text-gray-500" />
-            <span className="font-semibold text-blue-600 dark:text-blue-400">{isFailed ? 'FAILED' : branchTaken}</span>
+            <span className="font-semibold text-blue-600 dark:text-blue-400">{isFailed ? 'FAILED' : channelTaken}</span>
           </div>
         </div>
         <div className="flex-shrink-0 flex items-center gap-2">

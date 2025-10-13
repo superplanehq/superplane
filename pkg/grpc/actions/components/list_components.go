@@ -17,11 +17,11 @@ func ListComponents(ctx context.Context, registry *registry.Registry) (*pb.ListC
 func serializeComponents(in []components.Component) []*pb.Component {
 	out := make([]*pb.Component, len(in))
 	for i, component := range in {
-		outputs := component.OutputBranches(nil)
-		branches := make([]*pb.OutputBranch, len(outputs))
-		for j, output := range outputs {
-			branches[j] = &pb.OutputBranch{
-				Name: output.Name,
+		outputChannels := component.OutputChannels(nil)
+		channels := make([]*pb.OutputChannel, len(outputChannels))
+		for j, channel := range outputChannels {
+			channels[j] = &pb.OutputChannel{
+				Name: channel.Name,
 			}
 		}
 
@@ -35,7 +35,7 @@ func serializeComponents(in []components.Component) []*pb.Component {
 			Name:          component.Name(),
 			Label:         component.Label(),
 			Description:   component.Description(),
-			Branches:      branches,
+			Channels:      channels,
 			Configuration: configuration,
 		}
 	}

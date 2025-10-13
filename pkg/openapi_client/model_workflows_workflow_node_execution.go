@@ -37,7 +37,7 @@ type WorkflowsWorkflowNodeExecution struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 	PreviousExecutionId *string `json:"previousExecutionId,omitempty"`
-	PreviousOutputBranch *string `json:"previousOutputBranch,omitempty"`
+	PreviousOutputChannel *string `json:"previousOutputChannel,omitempty"`
 	PreviousOutputIndex *int32 `json:"previousOutputIndex,omitempty"`
 }
 
@@ -582,36 +582,36 @@ func (o *WorkflowsWorkflowNodeExecution) SetPreviousExecutionId(v string) {
 	o.PreviousExecutionId = &v
 }
 
-// GetPreviousOutputBranch returns the PreviousOutputBranch field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputBranch() string {
-	if o == nil || IsNil(o.PreviousOutputBranch) {
+// GetPreviousOutputChannel returns the PreviousOutputChannel field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputChannel() string {
+	if o == nil || IsNil(o.PreviousOutputChannel) {
 		var ret string
 		return ret
 	}
-	return *o.PreviousOutputBranch
+	return *o.PreviousOutputChannel
 }
 
-// GetPreviousOutputBranchOk returns a tuple with the PreviousOutputBranch field value if set, nil otherwise
+// GetPreviousOutputChannelOk returns a tuple with the PreviousOutputChannel field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputBranchOk() (*string, bool) {
-	if o == nil || IsNil(o.PreviousOutputBranch) {
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputChannelOk() (*string, bool) {
+	if o == nil || IsNil(o.PreviousOutputChannel) {
 		return nil, false
 	}
-	return o.PreviousOutputBranch, true
+	return o.PreviousOutputChannel, true
 }
 
-// HasPreviousOutputBranch returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNodeExecution) HasPreviousOutputBranch() bool {
-	if o != nil && !IsNil(o.PreviousOutputBranch) {
+// HasPreviousOutputChannel returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasPreviousOutputChannel() bool {
+	if o != nil && !IsNil(o.PreviousOutputChannel) {
 		return true
 	}
 
 	return false
 }
 
-// SetPreviousOutputBranch gets a reference to the given string and assigns it to the PreviousOutputBranch field.
-func (o *WorkflowsWorkflowNodeExecution) SetPreviousOutputBranch(v string) {
-	o.PreviousOutputBranch = &v
+// SetPreviousOutputChannel gets a reference to the given string and assigns it to the PreviousOutputChannel field.
+func (o *WorkflowsWorkflowNodeExecution) SetPreviousOutputChannel(v string) {
+	o.PreviousOutputChannel = &v
 }
 
 // GetPreviousOutputIndex returns the PreviousOutputIndex field value if set, zero value otherwise.
@@ -704,8 +704,8 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	if !IsNil(o.PreviousExecutionId) {
 		toSerialize["previousExecutionId"] = o.PreviousExecutionId
 	}
-	if !IsNil(o.PreviousOutputBranch) {
-		toSerialize["previousOutputBranch"] = o.PreviousOutputBranch
+	if !IsNil(o.PreviousOutputChannel) {
+		toSerialize["previousOutputChannel"] = o.PreviousOutputChannel
 	}
 	if !IsNil(o.PreviousOutputIndex) {
 		toSerialize["previousOutputIndex"] = o.PreviousOutputIndex

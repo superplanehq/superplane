@@ -22,13 +22,13 @@ type EdgeTargetType string
 // List of EdgeTargetType
 const (
 	EDGETARGETTYPE_REF_TYPE_NODE EdgeTargetType = "REF_TYPE_NODE"
-	EDGETARGETTYPE_REF_TYPE_OUTPUT_BRANCH EdgeTargetType = "REF_TYPE_OUTPUT_BRANCH"
+	EDGETARGETTYPE_REF_TYPE_OUTPUT_CHANNEL EdgeTargetType = "REF_TYPE_OUTPUT_CHANNEL"
 )
 
 // All allowed values of EdgeTargetType enum
 var AllowedEdgeTargetTypeEnumValues = []EdgeTargetType{
 	"REF_TYPE_NODE",
-	"REF_TYPE_OUTPUT_BRANCH",
+	"REF_TYPE_OUTPUT_CHANNEL",
 }
 
 func (v *EdgeTargetType) UnmarshalJSON(src []byte) error {

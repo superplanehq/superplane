@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KmaAirIUUrmwCuoPKnptUFqKESXCza9xWV5Eldt8xfY3xUhgXo44jb2coLQf58N
+\restrict QEwDEbYufDy4Hv2QFu78VGQJyu23l3uhb85fkEhsunYBBE6AWa8VGJLxRJ9SOrN
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -102,7 +102,7 @@ CREATE TABLE public.blueprints (
     nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     configuration jsonb DEFAULT '[]'::jsonb NOT NULL,
-    output_branches jsonb DEFAULT '[]'::jsonb NOT NULL
+    output_channels jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -550,7 +550,7 @@ CREATE TABLE public.workflow_node_executions (
     node_id character varying(128) NOT NULL,
     root_event_id uuid NOT NULL,
     previous_execution_id uuid,
-    previous_output_branch character varying(64),
+    previous_output_channel character varying(64),
     previous_output_index integer,
     parent_execution_id uuid,
     blueprint_id uuid,
@@ -1464,13 +1464,13 @@ ALTER TABLE ONLY public.workflow_node_executions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KmaAirIUUrmwCuoPKnptUFqKESXCza9xWV5Eldt8xfY3xUhgXo44jb2coLQf58N
+\unrestrict QEwDEbYufDy4Hv2QFu78VGQJyu23l3uhb85fkEhsunYBBE6AWa8VGJLxRJ9SOrN
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict tCo5KaLinN5twW7zouU0pcxAPP5lTo2hUaokSjhp7BnPHfygEYTr3Xb6axCS0Xp
+\restrict UgxnleTETyfYhRWUPIHYuXtSxUiWWhmdj8HqZtUV4Tcp7mIcNkv2fKb2ySun1Y7
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1500,5 +1500,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict tCo5KaLinN5twW7zouU0pcxAPP5lTo2hUaokSjhp7BnPHfygEYTr3Xb6axCS0Xp
+\unrestrict UgxnleTETyfYhRWUPIHYuXtSxUiWWhmdj8HqZtUV4Tcp7mIcNkv2fKb2ySun1Y7
 

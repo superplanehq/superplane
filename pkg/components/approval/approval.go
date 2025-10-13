@@ -71,8 +71,8 @@ func (a *Approval) Description() string {
 	return "Collect approvals on events"
 }
 
-func (a *Approval) OutputBranches(configuration any) []components.OutputBranch {
-	return []components.OutputBranch{components.DefaultOutputBranch}
+func (a *Approval) OutputChannels(configuration any) []components.OutputChannel {
+	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
 func (a *Approval) Configuration() []components.ConfigurationField {
@@ -170,7 +170,7 @@ func (a *Approval) handleApprove(ctx components.ActionContext) error {
 	// Required amount of approvals reached - finish the execution.
 	//
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputBranch.Name: {metadata},
+		components.DefaultOutputChannel.Name: {metadata},
 	})
 }
 

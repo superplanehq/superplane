@@ -73,19 +73,19 @@ func (Node_RefType) EnumDescriptor() ([]byte, []int) {
 type Edge_TargetType int32
 
 const (
-	Edge_REF_TYPE_NODE          Edge_TargetType = 0
-	Edge_REF_TYPE_OUTPUT_BRANCH Edge_TargetType = 1
+	Edge_REF_TYPE_NODE           Edge_TargetType = 0
+	Edge_REF_TYPE_OUTPUT_CHANNEL Edge_TargetType = 1
 )
 
 // Enum value maps for Edge_TargetType.
 var (
 	Edge_TargetType_name = map[int32]string{
 		0: "REF_TYPE_NODE",
-		1: "REF_TYPE_OUTPUT_BRANCH",
+		1: "REF_TYPE_OUTPUT_CHANNEL",
 	}
 	Edge_TargetType_value = map[string]int32{
-		"REF_TYPE_NODE":          0,
-		"REF_TYPE_OUTPUT_BRANCH": 1,
+		"REF_TYPE_NODE":           0,
+		"REF_TYPE_OUTPUT_CHANNEL": 1,
 	}
 )
 
@@ -290,7 +290,7 @@ type Component struct {
 	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
 	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	Configuration []*ConfigurationField  `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	Branches      []*OutputBranch        `protobuf:"bytes,5,rep,name=branches,proto3" json:"branches,omitempty"`
+	Channels      []*OutputChannel       `protobuf:"bytes,5,rep,name=channels,proto3" json:"channels,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -353,9 +353,9 @@ func (x *Component) GetConfiguration() []*ConfigurationField {
 	return nil
 }
 
-func (x *Component) GetBranches() []*OutputBranch {
+func (x *Component) GetChannels() []*OutputChannel {
 	if x != nil {
-		return x.Branches
+		return x.Channels
 	}
 	return nil
 }
@@ -588,7 +588,7 @@ func (x *ListItemDefinition) GetSchema() []*ConfigurationField {
 	return nil
 }
 
-type OutputBranch struct {
+type OutputChannel struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
@@ -597,20 +597,20 @@ type OutputBranch struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *OutputBranch) Reset() {
-	*x = OutputBranch{}
+func (x *OutputChannel) Reset() {
+	*x = OutputChannel{}
 	mi := &file_components_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *OutputBranch) String() string {
+func (x *OutputChannel) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*OutputBranch) ProtoMessage() {}
+func (*OutputChannel) ProtoMessage() {}
 
-func (x *OutputBranch) ProtoReflect() protoreflect.Message {
+func (x *OutputChannel) ProtoReflect() protoreflect.Message {
 	mi := &file_components_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -622,26 +622,26 @@ func (x *OutputBranch) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use OutputBranch.ProtoReflect.Descriptor instead.
-func (*OutputBranch) Descriptor() ([]byte, []int) {
+// Deprecated: Use OutputChannel.ProtoReflect.Descriptor instead.
+func (*OutputChannel) Descriptor() ([]byte, []int) {
 	return file_components_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *OutputBranch) GetName() string {
+func (x *OutputChannel) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *OutputBranch) GetLabel() string {
+func (x *OutputChannel) GetLabel() string {
 	if x != nil {
 		return x.Label
 	}
 	return ""
 }
 
-func (x *OutputBranch) GetDescription() string {
+func (x *OutputChannel) GetDescription() string {
 	if x != nil {
 		return x.Description
 	}
@@ -885,7 +885,7 @@ type Edge struct {
 	SourceId      string                 `protobuf:"bytes,1,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
 	TargetType    Edge_TargetType        `protobuf:"varint,2,opt,name=target_type,json=targetType,proto3,enum=Superplane.Components.Edge_TargetType" json:"target_type,omitempty"`
 	TargetId      string                 `protobuf:"bytes,3,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
-	Branch        string                 `protobuf:"bytes,4,opt,name=branch,proto3" json:"branch,omitempty"`
+	Channel       string                 `protobuf:"bytes,4,opt,name=channel,proto3" json:"channel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -941,9 +941,9 @@ func (x *Edge) GetTargetId() string {
 	return ""
 }
 
-func (x *Edge) GetBranch() string {
+func (x *Edge) GetChannel() string {
 	if x != nil {
-		return x.Branch
+		return x.Channel
 	}
 	return ""
 }
@@ -1049,13 +1049,13 @@ const file_components_proto_rawDesc = "" +
 	"\x18DescribeComponentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"[\n" +
 	"\x19DescribeComponentResponse\x12>\n" +
-	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xe9\x01\n" +
+	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xea\x01\n" +
 	"\tComponent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12O\n" +
-	"\rconfiguration\x18\x04 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12?\n" +
-	"\bbranches\x18\x05 \x03(\v2#.Superplane.Components.OutputBranchR\bbranches\"\xe6\x03\n" +
+	"\rconfiguration\x18\x04 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12@\n" +
+	"\bchannels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\bchannels\"\xe6\x03\n" +
 	"\x12ConfigurationField\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
@@ -1079,8 +1079,8 @@ const file_components_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"k\n" +
 	"\x12ListItemDefinition\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12A\n" +
-	"\x06schema\x18\x02 \x03(\v2).Superplane.Components.ConfigurationFieldR\x06schema\"Z\n" +
-	"\fOutputBranch\x12\x12\n" +
+	"\x06schema\x18\x02 \x03(\v2).Superplane.Components.ConfigurationFieldR\x06schema\"[\n" +
+	"\rOutputChannel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\"1\n" +
@@ -1107,17 +1107,17 @@ const file_components_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"9\n" +
 	"\aRefType\x12\x16\n" +
 	"\x12REF_TYPE_COMPONENT\x10\x00\x12\x16\n" +
-	"\x12REF_TYPE_BLUEPRINT\x10\x01\"\xde\x01\n" +
+	"\x12REF_TYPE_BLUEPRINT\x10\x01\"\xe1\x01\n" +
 	"\x04Edge\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12G\n" +
 	"\vtarget_type\x18\x02 \x01(\x0e2&.Superplane.Components.Edge.TargetTypeR\n" +
 	"targetType\x12\x1b\n" +
-	"\ttarget_id\x18\x03 \x01(\tR\btargetId\x12\x16\n" +
-	"\x06branch\x18\x04 \x01(\tR\x06branch\";\n" +
+	"\ttarget_id\x18\x03 \x01(\tR\btargetId\x12\x18\n" +
+	"\achannel\x18\x04 \x01(\tR\achannel\"<\n" +
 	"\n" +
 	"TargetType\x12\x11\n" +
-	"\rREF_TYPE_NODE\x10\x00\x12\x1a\n" +
-	"\x16REF_TYPE_OUTPUT_BRANCH\x10\x012\xb6\x05\n" +
+	"\rREF_TYPE_NODE\x10\x00\x12\x1b\n" +
+	"\x17REF_TYPE_OUTPUT_CHANNEL\x10\x012\xb6\x05\n" +
 	"\n" +
 	"Components\x12\xca\x01\n" +
 	"\x0eListComponents\x12,.Superplane.Components.ListComponentsRequest\x1a-.Superplane.Components.ListComponentsResponse\"[\x92A>\n" +
@@ -1154,7 +1154,7 @@ var file_components_proto_goTypes = []any{
 	(*ConfigurationField)(nil),           // 7: Superplane.Components.ConfigurationField
 	(*FieldOption)(nil),                  // 8: Superplane.Components.FieldOption
 	(*ListItemDefinition)(nil),           // 9: Superplane.Components.ListItemDefinition
-	(*OutputBranch)(nil),                 // 10: Superplane.Components.OutputBranch
+	(*OutputChannel)(nil),                // 10: Superplane.Components.OutputChannel
 	(*ListComponentActionsRequest)(nil),  // 11: Superplane.Components.ListComponentActionsRequest
 	(*ComponentAction)(nil),              // 12: Superplane.Components.ComponentAction
 	(*ListComponentActionsResponse)(nil), // 13: Superplane.Components.ListComponentActionsResponse
@@ -1168,7 +1168,7 @@ var file_components_proto_depIdxs = []int32{
 	6,  // 0: Superplane.Components.ListComponentsResponse.components:type_name -> Superplane.Components.Component
 	6,  // 1: Superplane.Components.DescribeComponentResponse.component:type_name -> Superplane.Components.Component
 	7,  // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Components.ConfigurationField
-	10, // 3: Superplane.Components.Component.branches:type_name -> Superplane.Components.OutputBranch
+	10, // 3: Superplane.Components.Component.channels:type_name -> Superplane.Components.OutputChannel
 	8,  // 4: Superplane.Components.ConfigurationField.options:type_name -> Superplane.Components.FieldOption
 	9,  // 5: Superplane.Components.ConfigurationField.list_item:type_name -> Superplane.Components.ListItemDefinition
 	7,  // 6: Superplane.Components.ConfigurationField.schema:type_name -> Superplane.Components.ConfigurationField

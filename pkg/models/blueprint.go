@@ -13,9 +13,13 @@ import (
 const (
 	NodeRefTypeComponent = "component"
 	NodeRefTypeBlueprint = "blueprint"
+	NodeRefTypeTrigger   = "trigger"
 
-	EdgeTargetTypeNode         = "node"
-	EdgeTargetTypeOutputBranch = "output_branch"
+	EdgeSourceTypeNode    = "node"
+	EdgeSourceTypeTrigger = "trigger"
+
+	EdgeTargetTypeNode          = "node"
+	EdgeTargetTypeOutputChannel = "output-channel"
 )
 
 type Blueprint struct {
@@ -28,7 +32,7 @@ type Blueprint struct {
 	Nodes          datatypes.JSONSlice[Node]
 	Edges          datatypes.JSONSlice[Edge]
 	Configuration  datatypes.JSONSlice[components.ConfigurationField]
-	OutputBranches datatypes.JSONSlice[components.OutputBranch]
+	OutputChannels datatypes.JSONSlice[components.OutputChannel]
 }
 
 func (b *Blueprint) FindNode(id string) (*Node, error) {
@@ -64,8 +68,9 @@ type Node struct {
 }
 
 type NodeRef struct {
-	Component *ComponentRef `json:"component"`
-	Blueprint *BlueprintRef `json:"blueprint"`
+	Component *ComponentRef `json:"component,omitempty"`
+	Blueprint *BlueprintRef `json:"blueprint,omitempty"`
+	Trigger   *TriggerRef   `json:"trigger,omitempty"`
 }
 
 type ComponentRef struct {
@@ -76,9 +81,14 @@ type BlueprintRef struct {
 	ID string `json:"id"`
 }
 
+type TriggerRef struct {
+	Name string `json:"name"`
+}
+
 type Edge struct {
+	SourceType string `json:"source_type"`
 	SourceID   string `json:"source_id"`
 	TargetType string `json:"target_type"`
 	TargetID   string `json:"target_id"`
-	Branch     string `json:"branch"`
+	Channel    string `json:"channel"`
 }

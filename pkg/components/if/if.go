@@ -10,8 +10,8 @@ import (
 )
 
 const ComponentName = "if"
-const BranchNameTrue = "true"
-const BranchNameFalse = "false"
+const ChannelNameTrue = "true"
+const ChannelNameFalse = "false"
 
 type If struct{}
 
@@ -31,8 +31,8 @@ func (f *If) Description() string {
 	return "Route events based on expression"
 }
 
-func (f *If) OutputBranches(configuration any) []components.OutputBranch {
-	return []components.OutputBranch{
+func (f *If) OutputChannels(configuration any) []components.OutputChannel {
+	return []components.OutputChannel{
 		{Name: "true", Label: "True"},
 		{Name: "false", Label: "False"},
 	}
@@ -84,11 +84,11 @@ func (f *If) Execute(ctx components.ExecutionContext) error {
 	var outputs map[string][]any
 	if matches {
 		outputs = map[string][]any{
-			BranchNameTrue: {ctx.Data},
+			ChannelNameTrue: {ctx.Data},
 		}
 	} else {
 		outputs = map[string][]any{
-			BranchNameFalse: {ctx.Data},
+			ChannelNameFalse: {ctx.Data},
 		}
 	}
 

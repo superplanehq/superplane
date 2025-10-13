@@ -231,7 +231,7 @@ message WorkflowNodeExecution {
   google.protobuf.Struct metadata = 14;
   google.protobuf.Struct configuration = 15;
   string previous_execution_id = 16;
-  string previous_output_branch = 17;
+  string previous_output_channel = 17;
   int32 previous_output_index = 18;
 }
 

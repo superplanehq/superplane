@@ -266,7 +266,7 @@ export const WorkflowEvents = () => {
                 const isExpanded = expandedEventId === event.id
                 const executionChain = isExpanded ? buildExecutionChain(executions) : []
 
-                const renderExecutionNode = (node: ExecutionNode, index: number, isLast: boolean, depth: number = 0) => {
+                const renderExecutionNode = (node: ExecutionNode, isLast: boolean, depth: number = 0) => {
                   const nodeInfo = nodeMap.get(node.execution.nodeId!)
                   const isBlueprint = nodeInfo?.isBlueprint || false
 
@@ -300,7 +300,7 @@ export const WorkflowEvents = () => {
                           <div className="space-y-6">
                             {node.children.map((childNode, childIndex) => (
                               <div key={childNode.execution.id}>
-                                {renderExecutionNode(childNode, childIndex, childIndex === node.children.length - 1, depth + 1)}
+                                {renderExecutionNode(childNode, childIndex === node.children.length - 1, depth + 1)}
                               </div>
                             ))}
                           </div>
@@ -318,12 +318,12 @@ export const WorkflowEvents = () => {
                           {/* Outputs preview */}
                           <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg p-4">
                             <div className="space-y-3">
-                              {Object.entries(node.execution.outputs).map(([branch, outputs]: [string, any]) => (
-                                <div key={branch}>
+                              {Object.entries(node.execution.outputs).map(([channel, outputs]: [string, any]) => (
+                                <div key={channel}>
                                   <div className="flex items-center gap-2 mb-2">
                                     <MaterialSymbol name="alt_route" size="sm" className="text-zinc-500 dark:text-zinc-400" />
                                     <span className="font-medium text-zinc-700 dark:text-zinc-300 text-xs uppercase">
-                                      {branch}
+                                      {channel}
                                     </span>
                                     {Array.isArray(outputs) && (
                                       <span className="text-zinc-500 dark:text-zinc-400 text-xs">
@@ -432,7 +432,7 @@ export const WorkflowEvents = () => {
                         ) : (
                           <div className="space-y-0">
                             {executionChain.map((node, index) =>
-                              renderExecutionNode(node, index, index === executionChain.length - 1)
+                              renderExecutionNode(node, index === executionChain.length - 1)
                             )}
                           </div>
                         )}

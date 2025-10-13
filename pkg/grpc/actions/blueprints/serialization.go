@@ -58,8 +58,8 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
 		}
 
-		if edge.TargetType != componentpb.Edge_REF_TYPE_NODE && edge.TargetType != componentpb.Edge_REF_TYPE_OUTPUT_BRANCH {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target_type must be set to either NODE or OUTPUT_BRANCH", i)
+		if edge.TargetType != componentpb.Edge_REF_TYPE_NODE && edge.TargetType != componentpb.Edge_REF_TYPE_OUTPUT_CHANNEL {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target_type must be set to either NODE or OUTPUT_CHANNEL", i)
 		}
 
 		if !nodeIDs[edge.SourceId] {
@@ -70,8 +70,8 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 
-		if edge.TargetType == componentpb.Edge_REF_TYPE_OUTPUT_BRANCH && !hasOutputBranch(blueprint.OutputBranches, edge.TargetId) {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target output branch %s not found", i, edge.TargetId)
+		if edge.TargetType == componentpb.Edge_REF_TYPE_OUTPUT_CHANNEL && !hasOutputChannel(blueprint.OutputChannels, edge.TargetId) {
+			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target output channel %s not found", i, edge.TargetId)
 		}
 	}
 
@@ -82,9 +82,9 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 	return actions.ProtoToNodes(blueprint.Nodes), actions.ProtoToEdges(blueprint.Edges), nil
 }
 
-func hasOutputBranch(outputBranches []*componentpb.OutputBranch, name string) bool {
-	for _, outputBranch := range outputBranches {
-		if outputBranch.Name == name {
+func hasOutputChannel(channels []*componentpb.OutputChannel, name string) bool {
+	for _, channel := range channels {
+		if channel.Name == name {
 			return true
 		}
 	}
