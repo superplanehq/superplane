@@ -28,16 +28,15 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName strin
 }
 
 func assignRoleToUser(authService authorization.Authorization, subjectIdentifierType pbAuth.SubjectIdentifierType, subjectIdentifier, orgID, roleName, domainID, domainType string) (*pb.AssignRoleResponse, error) {
-	userID := ""
-	email := ""
+	var user *models.User
+	var err error
 
 	if subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_ID {
-		userID = subjectIdentifier
+		user, err = models.FindActiveUserByID(orgID, subjectIdentifier)
 	} else if subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_EMAIL {
-		email = subjectIdentifier
+		user, err = models.FindActiveUserByEmail(orgID, subjectIdentifier)
 	}
 
-	user, err := FindUser(orgID, userID, email)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "user not found")
 	}

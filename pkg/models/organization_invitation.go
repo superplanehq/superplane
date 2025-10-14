@@ -17,7 +17,7 @@ const (
 type OrganizationInvitation struct {
 	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	OrganizationID uuid.UUID
-	CanvasIDs      []uuid.UUID `gorm:"type:uuid;array"`
+	CanvasIDs      UUIDArray `gorm:"type:text[]"`
 	Email          string
 	InvitedBy      uuid.UUID
 	State          string
