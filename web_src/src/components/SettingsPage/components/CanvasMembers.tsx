@@ -24,7 +24,7 @@ import {
   useCanvasRoles,
   useCanvasUsers,
   useAssignCanvasRole,
-  useRemoveCanvasUser
+  useRemoveCanvasSubject
 } from '../../../hooks/useCanvasData'
 
 interface CanvasMembersProps {
@@ -55,7 +55,7 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
 
   // Mutations
   const assignRoleMutation = useAssignCanvasRole(canvasId)
-  const removeUserMutation = useRemoveCanvasUser(canvasId)
+  const removeUserMutation = useRemoveCanvasSubject(canvasId)
 
   const error = usersError || rolesError
 
@@ -145,7 +145,8 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
   const handleRemoveMember = async (userId: string) => {
     try {
       await removeUserMutation.mutateAsync({
-        userId,
+        subjectId: userId,
+        subjectType: 'USER_ID',
       })
     } catch (err) {
       console.error('Error removing member:', err)

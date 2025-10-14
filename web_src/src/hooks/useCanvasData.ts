@@ -20,7 +20,7 @@ import {
   superplaneDescribeConnectionGroup,
   integrationsListIntegrations,
   superplaneAddUser,
-  superplaneRemoveUser,
+  superplaneRemoveSubject,
   superplaneListEvents,
   superplaneListStageEvents,
   superplaneListStageExecutions,
@@ -140,20 +140,27 @@ export const useAddCanvasUser = (canvasId: string) => {
   })
 }
 
-export const useRemoveCanvasUser = (canvasId: string) => {
+export const useRemoveCanvasSubject = (canvasId: string) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: async (params: { 
-      userId: string,
+    mutationFn: async (params: {
+      subjectId: string,
+      subjectType: 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID'
     }) => {
-      return await superplaneRemoveUser(withOrganizationHeader({
-        path: { canvasIdOrName: canvasId, userId: params.userId }
+      return await superplaneRemoveSubject(withOrganizationHeader({
+        path: {
+          canvasIdOrName: canvasId,
+          subjectIdentifier: params.subjectId
+        },
+        query: {
+          subjectIdentifierType: params.subjectType,
+        }
       }))
     },
     onSuccess: () => {
-      // Invalidate and refetch canvas users
       queryClient.invalidateQueries({ queryKey: canvasKeys.users(canvasId) })
+      queryClient.invalidateQueries({ queryKey: ['invitations'] })
     }
   })
 }

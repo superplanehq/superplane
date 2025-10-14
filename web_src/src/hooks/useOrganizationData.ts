@@ -6,7 +6,6 @@ import {
   groupsDescribeGroup,
   groupsListGroupUsers,
   rolesAssignRole,
-  organizationsRemoveUser,
   groupsCreateGroup,
   groupsUpdateGroup,
   groupsDeleteGroup,
@@ -20,9 +19,12 @@ import {
   organizationsUpdateOrganization,
   superplaneListCanvases,
   superplaneCreateCanvas,
-  superplaneDeleteCanvas
+  superplaneDeleteCanvas,
+  organizationsRemoveSubject,
+  organizationsListInvitations,
+  organizationsCreateInvitation
 } from '../api-client/sdk.gen'
-import { RolesCreateRoleRequest, AuthorizationDomainType } from '@/api-client'
+import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveSubjectData } from '@/api-client'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 
 // Query Keys
@@ -36,6 +38,7 @@ export const organizationKeys = {
   groupUsers: (orgId: string, groupName: string) => [...organizationKeys.all, 'groupUsers', orgId, groupName] as const,
   role: (orgId: string, roleName: string) => [...organizationKeys.all, 'role', orgId, roleName] as const,
   canvases: (orgId: string) => [...organizationKeys.all, 'canvases', orgId] as const,
+  invitations: (orgId: string) => [...organizationKeys.all, 'invitations', orgId] as const,
 }
 
 // Hooks for fetching data
@@ -161,6 +164,23 @@ export const useRole = (organizationId: string, roleName: string) => {
   })
 }
 
+export const useOrganizationInvitations = (organizationId: string) => {
+  return useQuery({
+    queryKey: organizationKeys.invitations(organizationId),
+    queryFn: async () => {
+      const response = await organizationsListInvitations(
+        withOrganizationHeader({
+          path: { id: organizationId }
+        })
+      )
+      return response.data?.invitations || []
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!organizationId,
+  })
+}
+
 // Mutations with cache invalidation
 export const useAssignRole = (organizationId: string) => {
   const queryClient = useQueryClient()
@@ -191,25 +211,58 @@ export const useAssignRole = (organizationId: string) => {
   })
 }
 
-export const useRemoveOrganizationUser = (organizationId: string) => {
+export const useRemoveOrganizationSubject = (organizationId: string) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: async (params: { 
-      userId: string,
+    mutationFn: async (params: {
+      subjectId: string,
+      subjectType: 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID'
     }) => {
-      return await organizationsRemoveUser(
+      return await organizationsRemoveSubject(
         withOrganizationHeader({
           path: {
             id: organizationId,
-            userId: params.userId
+            subjectIdentifier: params.subjectId,
+          },
+          query: {
+            subjectIdentifierType: params.subjectType,
           }
-        })
+        } as OrganizationsRemoveSubjectData) 
       )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
+      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) })
     }
+  })
+}
+
+export const useCreateInvitation = (organizationId: string, options?: {
+  onError?: (error: Error) => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (email: string) => {
+      const response = await organizationsCreateInvitation(
+        withOrganizationHeader({
+          path: { id: organizationId },
+          body: {
+            email: email,
+          }
+        })
+      )
+      return response.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) })
+
+      if (data.invitation?.state === 'accepted') {
+        queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
+      }
+    },
+    onError: options?.onError
   })
 }
 
