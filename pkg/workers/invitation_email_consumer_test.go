@@ -87,7 +87,7 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 		assert.Equal(t, "test@example.com", sentEmail.ToEmail)
 		assert.Equal(t, "test", sentEmail.ToName)
 		assert.Equal(t, r.Organization.Name, sentEmail.OrganizationName)
-		assert.Equal(t, baseURL+"/invitations/"+invitation.ID.String()+"/accept", sentEmail.InvitationLink)
+		assert.Equal(t, baseURL+"/login", sentEmail.InvitationLink)
 	})
 
 	t.Run("should not send email for accepted invitation", func(t *testing.T) {
@@ -121,7 +121,7 @@ func TestGenerateInvitationLink(t *testing.T) {
 		ID: invitationID,
 	}
 
-	expectedLink := "https://test.superplane.com/invitations/" + invitationID.String() + "/accept"
+	expectedLink := "https://app.superplane.com/login"
 	actualLink := consumer.generateInvitationLink(invitation)
 
 	assert.Equal(t, expectedLink, actualLink)
