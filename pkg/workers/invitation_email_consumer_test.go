@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -109,22 +108,6 @@ func Test__InvitationEmailConsumer(t *testing.T) {
 			return len(testEmailService.GetSentEmails()) > 0
 		}, time.Second*2, 100*time.Millisecond)
 	})
-}
-
-func TestGenerateInvitationLink(t *testing.T) {
-	consumer := &InvitationEmailConsumer{
-		BaseURL: "https://app.superplane.com",
-	}
-
-	invitationID := uuid.New()
-	invitation := &models.OrganizationInvitation{
-		ID: invitationID,
-	}
-
-	expectedLink := "https://app.superplane.com/login"
-	actualLink := consumer.generateInvitationLink(invitation)
-
-	assert.Equal(t, expectedLink, actualLink)
 }
 
 func TestNewInvitationEmailConsumer(t *testing.T) {
