@@ -25,6 +25,7 @@ docs/AlertAlertType.md
 docs/AuthToken.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
+docs/AuthorizationSubjectIdentifierType.md
 docs/CanvasAPI.md
 docs/ConnectionGroupAPI.md
 docs/EventAPI.md
@@ -221,6 +222,7 @@ model_alert_alert_type.go
 model_auth_token.go
 model_authorization_domain_type.go
 model_authorization_permission.go
+model_authorization_subject_identifier_type.go
 model_event_rejection_rejection_reason.go
 model_event_source_daily_schedule.go
 model_event_source_event_type.go

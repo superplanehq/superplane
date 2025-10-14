@@ -2218,16 +2218,16 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/users/{userId}": {
+    "/api/v1/organizations/{id}/subjects/{subjectIdentifier}": {
       "delete": {
-        "summary": "Remove a user from an organization",
-        "description": "Removes a user from an organization (can be referenced by ID or name)",
-        "operationId": "Organizations_RemoveUser",
+        "summary": "Remove a subject from an organization",
+        "description": "Removes a subject (user or invitation) from an organization (can be referenced by ID or name)",
+        "operationId": "Organizations_RemoveSubject",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneOrganizationsRemoveUserResponse"
+              "$ref": "#/definitions/OrganizationsRemoveSubjectResponse"
             }
           },
           "default": {
@@ -2245,10 +2245,22 @@
             "type": "string"
           },
           {
-            "name": "userId",
+            "name": "subjectIdentifier",
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "subjectIdentifierType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "USER_ID",
+              "USER_EMAIL",
+              "INVITATION_ID"
+            ],
+            "default": "USER_ID"
           }
         ],
         "tags": [
@@ -2468,10 +2480,10 @@
         ]
       }
     },
-    "/api/v1/roles/{roleName}/users": {
+    "/api/v1/roles/{roleName}/subjects": {
       "post": {
         "summary": "Assign role",
-        "description": "Assigns a role to a user within a domain",
+        "description": "Assigns a role to a subject (user or invitation) within a domain",
         "operationId": "Roles_AssignRole",
         "responses": {
           "200": {
@@ -2916,6 +2928,15 @@
         }
       },
       "title": "Common data structures"
+    },
+    "AuthorizationSubjectIdentifierType": {
+      "type": "string",
+      "enum": [
+        "USER_ID",
+        "USER_EMAIL",
+        "INVITATION_ID"
+      ],
+      "default": "USER_ID"
     },
     "EventRejectionRejectionReason": {
       "type": "string",
@@ -3480,6 +3501,9 @@
         }
       }
     },
+    "OrganizationsRemoveSubjectResponse": {
+      "type": "object"
+    },
     "OrganizationsUpdateOrganizationBody": {
       "type": "object",
       "properties": {
@@ -3505,10 +3529,10 @@
         "domainId": {
           "type": "string"
         },
-        "userId": {
-          "type": "string"
+        "subjectIdentifierType": {
+          "$ref": "#/definitions/AuthorizationSubjectIdentifierType"
         },
-        "userEmail": {
+        "subjectIdentifier": {
           "type": "string"
         }
       }
@@ -4870,9 +4894,6 @@
           "type": "boolean"
         }
       }
-    },
-    "SuperplaneOrganizationsRemoveUserResponse": {
-      "type": "object"
     },
     "SuperplaneOutputDefinition": {
       "type": "object",

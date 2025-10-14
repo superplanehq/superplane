@@ -71,6 +71,55 @@ func (DomainType) EnumDescriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{0}
 }
 
+type SubjectIdentifierType int32
+
+const (
+	SubjectIdentifierType_USER_ID       SubjectIdentifierType = 0
+	SubjectIdentifierType_USER_EMAIL    SubjectIdentifierType = 1
+	SubjectIdentifierType_INVITATION_ID SubjectIdentifierType = 2
+)
+
+// Enum value maps for SubjectIdentifierType.
+var (
+	SubjectIdentifierType_name = map[int32]string{
+		0: "USER_ID",
+		1: "USER_EMAIL",
+		2: "INVITATION_ID",
+	}
+	SubjectIdentifierType_value = map[string]int32{
+		"USER_ID":       0,
+		"USER_EMAIL":    1,
+		"INVITATION_ID": 2,
+	}
+)
+
+func (x SubjectIdentifierType) Enum() *SubjectIdentifierType {
+	p := new(SubjectIdentifierType)
+	*p = x
+	return p
+}
+
+func (x SubjectIdentifierType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SubjectIdentifierType) Descriptor() protoreflect.EnumDescriptor {
+	return file_authorization_proto_enumTypes[1].Descriptor()
+}
+
+func (SubjectIdentifierType) Type() protoreflect.EnumType {
+	return &file_authorization_proto_enumTypes[1]
+}
+
+func (x SubjectIdentifierType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SubjectIdentifierType.Descriptor instead.
+func (SubjectIdentifierType) EnumDescriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{1}
+}
+
 // Common data structures
 type Permission struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -147,7 +196,12 @@ const file_authorization_proto_rawDesc = "" +
 	"DomainType\x12\x1b\n" +
 	"\x17DOMAIN_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DOMAIN_TYPE_ORGANIZATION\x10\x01\x12\x16\n" +
-	"\x12DOMAIN_TYPE_CANVAS\x10\x02B=Z;github.com/superplanehq/superplane/pkg/protos/authorizationb\x06proto3"
+	"\x12DOMAIN_TYPE_CANVAS\x10\x02*G\n" +
+	"\x15SubjectIdentifierType\x12\v\n" +
+	"\aUSER_ID\x10\x00\x12\x0e\n" +
+	"\n" +
+	"USER_EMAIL\x10\x01\x12\x11\n" +
+	"\rINVITATION_ID\x10\x02B=Z;github.com/superplanehq/superplane/pkg/protos/authorizationb\x06proto3"
 
 var (
 	file_authorization_proto_rawDescOnce sync.Once
@@ -161,11 +215,12 @@ func file_authorization_proto_rawDescGZIP() []byte {
 	return file_authorization_proto_rawDescData
 }
 
-var file_authorization_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_authorization_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_authorization_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_authorization_proto_goTypes = []any{
-	(DomainType)(0),    // 0: Superplane.Authorization.DomainType
-	(*Permission)(nil), // 1: Superplane.Authorization.Permission
+	(DomainType)(0),            // 0: Superplane.Authorization.DomainType
+	(SubjectIdentifierType)(0), // 1: Superplane.Authorization.SubjectIdentifierType
+	(*Permission)(nil),         // 2: Superplane.Authorization.Permission
 }
 var file_authorization_proto_depIdxs = []int32{
 	0, // 0: Superplane.Authorization.Permission.domain_type:type_name -> Superplane.Authorization.DomainType
@@ -186,7 +241,7 @@ func file_authorization_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_authorization_proto_rawDesc), len(file_authorization_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   1,
 			NumExtensions: 0,
 			NumServices:   0,

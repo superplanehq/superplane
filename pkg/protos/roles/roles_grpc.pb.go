@@ -46,7 +46,7 @@ type RolesClient interface {
 	// Endpoint for deleting a custom role
 	// Operation is synchronous and idempotent.
 	DeleteRole(ctx context.Context, in *DeleteRoleRequest, opts ...grpc.CallOption) (*DeleteRoleResponse, error)
-	// Endpoint for assigning a role to a user in a domain
+	// Endpoint for assigning a role to a subject (user or invitation) in a domain
 	// Operation is synchronous and idempotent.
 	AssignRole(ctx context.Context, in *AssignRoleRequest, opts ...grpc.CallOption) (*AssignRoleResponse, error)
 }
@@ -138,7 +138,7 @@ type RolesServer interface {
 	// Endpoint for deleting a custom role
 	// Operation is synchronous and idempotent.
 	DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error)
-	// Endpoint for assigning a role to a user in a domain
+	// Endpoint for assigning a role to a subject (user or invitation) in a domain
 	// Operation is synchronous and idempotent.
 	AssignRole(context.Context, *AssignRoleRequest) (*AssignRoleResponse, error)
 }

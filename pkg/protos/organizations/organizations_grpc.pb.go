@@ -22,7 +22,7 @@ const (
 	Organizations_DescribeOrganization_FullMethodName = "/Superplane.Organizations.Organizations/DescribeOrganization"
 	Organizations_UpdateOrganization_FullMethodName   = "/Superplane.Organizations.Organizations/UpdateOrganization"
 	Organizations_DeleteOrganization_FullMethodName   = "/Superplane.Organizations.Organizations/DeleteOrganization"
-	Organizations_RemoveUser_FullMethodName           = "/Superplane.Organizations.Organizations/RemoveUser"
+	Organizations_RemoveSubject_FullMethodName        = "/Superplane.Organizations.Organizations/RemoveSubject"
 	Organizations_CreateInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/CreateInvitation"
 	Organizations_ListInvitations_FullMethodName      = "/Superplane.Organizations.Organizations/ListInvitations"
 )
@@ -34,7 +34,7 @@ type OrganizationsClient interface {
 	DescribeOrganization(ctx context.Context, in *DescribeOrganizationRequest, opts ...grpc.CallOption) (*DescribeOrganizationResponse, error)
 	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*UpdateOrganizationResponse, error)
 	DeleteOrganization(ctx context.Context, in *DeleteOrganizationRequest, opts ...grpc.CallOption) (*DeleteOrganizationResponse, error)
-	RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error)
+	RemoveSubject(ctx context.Context, in *RemoveSubjectRequest, opts ...grpc.CallOption) (*RemoveSubjectResponse, error)
 	CreateInvitation(ctx context.Context, in *CreateInvitationRequest, opts ...grpc.CallOption) (*CreateInvitationResponse, error)
 	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
 }
@@ -77,10 +77,10 @@ func (c *organizationsClient) DeleteOrganization(ctx context.Context, in *Delete
 	return out, nil
 }
 
-func (c *organizationsClient) RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error) {
+func (c *organizationsClient) RemoveSubject(ctx context.Context, in *RemoveSubjectRequest, opts ...grpc.CallOption) (*RemoveSubjectResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RemoveUserResponse)
-	err := c.cc.Invoke(ctx, Organizations_RemoveUser_FullMethodName, in, out, cOpts...)
+	out := new(RemoveSubjectResponse)
+	err := c.cc.Invoke(ctx, Organizations_RemoveSubject_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ type OrganizationsServer interface {
 	DescribeOrganization(context.Context, *DescribeOrganizationRequest) (*DescribeOrganizationResponse, error)
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*UpdateOrganizationResponse, error)
 	DeleteOrganization(context.Context, *DeleteOrganizationRequest) (*DeleteOrganizationResponse, error)
-	RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error)
+	RemoveSubject(context.Context, *RemoveSubjectRequest) (*RemoveSubjectResponse, error)
 	CreateInvitation(context.Context, *CreateInvitationRequest) (*CreateInvitationResponse, error)
 	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 }
@@ -135,8 +135,8 @@ func (UnimplementedOrganizationsServer) UpdateOrganization(context.Context, *Upd
 func (UnimplementedOrganizationsServer) DeleteOrganization(context.Context, *DeleteOrganizationRequest) (*DeleteOrganizationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteOrganization not implemented")
 }
-func (UnimplementedOrganizationsServer) RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveUser not implemented")
+func (UnimplementedOrganizationsServer) RemoveSubject(context.Context, *RemoveSubjectRequest) (*RemoveSubjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveSubject not implemented")
 }
 func (UnimplementedOrganizationsServer) CreateInvitation(context.Context, *CreateInvitationRequest) (*CreateInvitationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateInvitation not implemented")
@@ -218,20 +218,20 @@ func _Organizations_DeleteOrganization_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Organizations_RemoveUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveUserRequest)
+func _Organizations_RemoveSubject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveSubjectRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(OrganizationsServer).RemoveUser(ctx, in)
+		return srv.(OrganizationsServer).RemoveSubject(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Organizations_RemoveUser_FullMethodName,
+		FullMethod: Organizations_RemoveSubject_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).RemoveUser(ctx, req.(*RemoveUserRequest))
+		return srv.(OrganizationsServer).RemoveSubject(ctx, req.(*RemoveSubjectRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -292,8 +292,8 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Organizations_DeleteOrganization_Handler,
 		},
 		{
-			MethodName: "RemoveUser",
-			Handler:    _Organizations_RemoveUser_Handler,
+			MethodName: "RemoveSubject",
+			Handler:    _Organizations_RemoveSubject_Handler,
 		},
 		{
 			MethodName: "CreateInvitation",

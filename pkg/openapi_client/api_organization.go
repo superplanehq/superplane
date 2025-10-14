@@ -479,39 +479,45 @@ func (a *OrganizationAPIService) OrganizationsListInvitationsExecute(r ApiOrgani
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiOrganizationsRemoveUserRequest struct {
+type ApiOrganizationsRemoveSubjectRequest struct {
 	ctx context.Context
 	ApiService *OrganizationAPIService
 	id string
-	userId string
+	subjectIdentifier string
+	subjectIdentifierType *string
 }
 
-func (r ApiOrganizationsRemoveUserRequest) Execute() (map[string]interface{}, *http.Response, error) {
-	return r.ApiService.OrganizationsRemoveUserExecute(r)
+func (r ApiOrganizationsRemoveSubjectRequest) SubjectIdentifierType(subjectIdentifierType string) ApiOrganizationsRemoveSubjectRequest {
+	r.subjectIdentifierType = &subjectIdentifierType
+	return r
+}
+
+func (r ApiOrganizationsRemoveSubjectRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.OrganizationsRemoveSubjectExecute(r)
 }
 
 /*
-OrganizationsRemoveUser Remove a user from an organization
+OrganizationsRemoveSubject Remove a subject from an organization
 
-Removes a user from an organization (can be referenced by ID or name)
+Removes a subject (user or invitation) from an organization (can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param id
- @param userId
- @return ApiOrganizationsRemoveUserRequest
+ @param subjectIdentifier
+ @return ApiOrganizationsRemoveSubjectRequest
 */
-func (a *OrganizationAPIService) OrganizationsRemoveUser(ctx context.Context, id string, userId string) ApiOrganizationsRemoveUserRequest {
-	return ApiOrganizationsRemoveUserRequest{
+func (a *OrganizationAPIService) OrganizationsRemoveSubject(ctx context.Context, id string, subjectIdentifier string) ApiOrganizationsRemoveSubjectRequest {
+	return ApiOrganizationsRemoveSubjectRequest{
 		ApiService: a,
 		ctx: ctx,
 		id: id,
-		userId: userId,
+		subjectIdentifier: subjectIdentifier,
 	}
 }
 
 // Execute executes the request
 //  @return map[string]interface{}
-func (a *OrganizationAPIService) OrganizationsRemoveUserExecute(r ApiOrganizationsRemoveUserRequest) (map[string]interface{}, *http.Response, error) {
+func (a *OrganizationAPIService) OrganizationsRemoveSubjectExecute(r ApiOrganizationsRemoveSubjectRequest) (map[string]interface{}, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodDelete
 		localVarPostBody     interface{}
@@ -519,19 +525,25 @@ func (a *OrganizationAPIService) OrganizationsRemoveUserExecute(r ApiOrganizatio
 		localVarReturnValue  map[string]interface{}
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsRemoveUser")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsRemoveSubject")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{id}/users/{userId}"
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/subjects/{subjectIdentifier}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"subjectIdentifier"+"}", url.PathEscape(parameterValueToString(r.subjectIdentifier, "subjectIdentifier")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.subjectIdentifierType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "subjectIdentifierType", r.subjectIdentifierType, "", "")
+	} else {
+		var defaultValue string = "USER_ID"
+		r.subjectIdentifierType = &defaultValue
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

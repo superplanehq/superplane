@@ -22,8 +22,8 @@ var _ MappedNullable = &RolesAssignRoleBody{}
 type RolesAssignRoleBody struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
-	UserId *string `json:"userId,omitempty"`
-	UserEmail *string `json:"userEmail,omitempty"`
+	SubjectIdentifierType *AuthorizationSubjectIdentifierType `json:"subjectIdentifierType,omitempty"`
+	SubjectIdentifier *string `json:"subjectIdentifier,omitempty"`
 }
 
 // NewRolesAssignRoleBody instantiates a new RolesAssignRoleBody object
@@ -34,6 +34,8 @@ func NewRolesAssignRoleBody() *RolesAssignRoleBody {
 	this := RolesAssignRoleBody{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
+	var subjectIdentifierType AuthorizationSubjectIdentifierType = AUTHORIZATIONSUBJECTIDENTIFIERTYPE_USER_ID
+	this.SubjectIdentifierType = &subjectIdentifierType
 	return &this
 }
 
@@ -44,6 +46,8 @@ func NewRolesAssignRoleBodyWithDefaults() *RolesAssignRoleBody {
 	this := RolesAssignRoleBody{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
+	var subjectIdentifierType AuthorizationSubjectIdentifierType = AUTHORIZATIONSUBJECTIDENTIFIERTYPE_USER_ID
+	this.SubjectIdentifierType = &subjectIdentifierType
 	return &this
 }
 
@@ -111,68 +115,68 @@ func (o *RolesAssignRoleBody) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
-// GetUserId returns the UserId field value if set, zero value otherwise.
-func (o *RolesAssignRoleBody) GetUserId() string {
-	if o == nil || IsNil(o.UserId) {
-		var ret string
+// GetSubjectIdentifierType returns the SubjectIdentifierType field value if set, zero value otherwise.
+func (o *RolesAssignRoleBody) GetSubjectIdentifierType() AuthorizationSubjectIdentifierType {
+	if o == nil || IsNil(o.SubjectIdentifierType) {
+		var ret AuthorizationSubjectIdentifierType
 		return ret
 	}
-	return *o.UserId
+	return *o.SubjectIdentifierType
 }
 
-// GetUserIdOk returns a tuple with the UserId field value if set, nil otherwise
+// GetSubjectIdentifierTypeOk returns a tuple with the SubjectIdentifierType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesAssignRoleBody) GetUserIdOk() (*string, bool) {
-	if o == nil || IsNil(o.UserId) {
+func (o *RolesAssignRoleBody) GetSubjectIdentifierTypeOk() (*AuthorizationSubjectIdentifierType, bool) {
+	if o == nil || IsNil(o.SubjectIdentifierType) {
 		return nil, false
 	}
-	return o.UserId, true
+	return o.SubjectIdentifierType, true
 }
 
-// HasUserId returns a boolean if a field has been set.
-func (o *RolesAssignRoleBody) HasUserId() bool {
-	if o != nil && !IsNil(o.UserId) {
+// HasSubjectIdentifierType returns a boolean if a field has been set.
+func (o *RolesAssignRoleBody) HasSubjectIdentifierType() bool {
+	if o != nil && !IsNil(o.SubjectIdentifierType) {
 		return true
 	}
 
 	return false
 }
 
-// SetUserId gets a reference to the given string and assigns it to the UserId field.
-func (o *RolesAssignRoleBody) SetUserId(v string) {
-	o.UserId = &v
+// SetSubjectIdentifierType gets a reference to the given AuthorizationSubjectIdentifierType and assigns it to the SubjectIdentifierType field.
+func (o *RolesAssignRoleBody) SetSubjectIdentifierType(v AuthorizationSubjectIdentifierType) {
+	o.SubjectIdentifierType = &v
 }
 
-// GetUserEmail returns the UserEmail field value if set, zero value otherwise.
-func (o *RolesAssignRoleBody) GetUserEmail() string {
-	if o == nil || IsNil(o.UserEmail) {
+// GetSubjectIdentifier returns the SubjectIdentifier field value if set, zero value otherwise.
+func (o *RolesAssignRoleBody) GetSubjectIdentifier() string {
+	if o == nil || IsNil(o.SubjectIdentifier) {
 		var ret string
 		return ret
 	}
-	return *o.UserEmail
+	return *o.SubjectIdentifier
 }
 
-// GetUserEmailOk returns a tuple with the UserEmail field value if set, nil otherwise
+// GetSubjectIdentifierOk returns a tuple with the SubjectIdentifier field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesAssignRoleBody) GetUserEmailOk() (*string, bool) {
-	if o == nil || IsNil(o.UserEmail) {
+func (o *RolesAssignRoleBody) GetSubjectIdentifierOk() (*string, bool) {
+	if o == nil || IsNil(o.SubjectIdentifier) {
 		return nil, false
 	}
-	return o.UserEmail, true
+	return o.SubjectIdentifier, true
 }
 
-// HasUserEmail returns a boolean if a field has been set.
-func (o *RolesAssignRoleBody) HasUserEmail() bool {
-	if o != nil && !IsNil(o.UserEmail) {
+// HasSubjectIdentifier returns a boolean if a field has been set.
+func (o *RolesAssignRoleBody) HasSubjectIdentifier() bool {
+	if o != nil && !IsNil(o.SubjectIdentifier) {
 		return true
 	}
 
 	return false
 }
 
-// SetUserEmail gets a reference to the given string and assigns it to the UserEmail field.
-func (o *RolesAssignRoleBody) SetUserEmail(v string) {
-	o.UserEmail = &v
+// SetSubjectIdentifier gets a reference to the given string and assigns it to the SubjectIdentifier field.
+func (o *RolesAssignRoleBody) SetSubjectIdentifier(v string) {
+	o.SubjectIdentifier = &v
 }
 
 func (o RolesAssignRoleBody) MarshalJSON() ([]byte, error) {
@@ -191,11 +195,11 @@ func (o RolesAssignRoleBody) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.DomainId) {
 		toSerialize["domainId"] = o.DomainId
 	}
-	if !IsNil(o.UserId) {
-		toSerialize["userId"] = o.UserId
+	if !IsNil(o.SubjectIdentifierType) {
+		toSerialize["subjectIdentifierType"] = o.SubjectIdentifierType
 	}
-	if !IsNil(o.UserEmail) {
-		toSerialize["userEmail"] = o.UserEmail
+	if !IsNil(o.SubjectIdentifier) {
+		toSerialize["subjectIdentifier"] = o.SubjectIdentifier
 	}
 	return toSerialize, nil
 }

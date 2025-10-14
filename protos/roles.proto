@@ -104,17 +104,17 @@ service Roles {
   }
 
   //
-  // Endpoint for assigning a role to a user in a domain
+  // Endpoint for assigning a role to a subject (user or invitation) in a domain
   // Operation is synchronous and idempotent.
   //
   rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse) {
     option (google.api.http) = {
-      post: "/api/v1/roles/{role_name}/users"
+      post: "/api/v1/roles/{role_name}/subjects"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Assign role";
-      description: "Assigns a role to a user within a domain";
+      description: "Assigns a role to a subject (user or invitation) within a domain";
       tags: "Roles";
     };
   }
@@ -124,21 +124,11 @@ message AssignRoleRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
   string role_name = 3;
-  string user_id = 4;
-  string user_email = 5;
+  Authorization.SubjectIdentifierType subject_identifier_type = 4;
+  string subject_identifier = 5;
 }
 
 message AssignRoleResponse {}
-
-message RemoveRoleRequest {
-  Authorization.DomainType domain_type = 1;
-  string domain_id = 2;
-  string role_name = 3;
-  string user_id = 4;
-  string user_email = 5;
-}
-
-message RemoveRoleResponse {}
 
 message ListRolesRequest {
   Authorization.DomainType domain_type = 1;

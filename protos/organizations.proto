@@ -5,6 +5,7 @@ package Superplane.Organizations;
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
+import "authorization.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/organizations";
 
@@ -59,13 +60,13 @@ service Organizations {
     };
   }
 
-  rpc RemoveUser(RemoveUserRequest) returns (RemoveUserResponse) {
+  rpc RemoveSubject(RemoveSubjectRequest) returns (RemoveSubjectResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/users/{user_id}"
+      delete: "/api/v1/organizations/{id}/subjects/{subject_identifier}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Remove a user from an organization";
-      description: "Removes a user from an organization (can be referenced by ID or name)";
+      summary: "Remove a subject from an organization";
+      description: "Removes a subject (user or invitation) from an organization (can be referenced by ID or name)";
       tags: "Organization";
     };
   }
@@ -154,12 +155,13 @@ message ListInvitationsResponse {
   repeated Invitation invitations = 1;
 }
 
-message RemoveUserRequest {
+message RemoveSubjectRequest {
   string id = 1;
-  string user_id = 2;
+  Authorization.SubjectIdentifierType subject_identifier_type = 2;
+  string subject_identifier = 3;
 }
 
-message RemoveUserResponse {}
+message RemoveSubjectResponse {}
 
 // Event messages for organization lifecycle events
 message OrganizationCreated {
