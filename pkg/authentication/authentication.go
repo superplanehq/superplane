@@ -203,7 +203,17 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 		//
 		// TODO: this is not using the transaction properly
 		//
-		return a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
+		err = a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
+		if err != nil {
+			return err
+		}
+		for _, canvasID := range invitation.CanvasIDs {
+			err = a.authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID.String(), models.DomainTypeCanvas)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
