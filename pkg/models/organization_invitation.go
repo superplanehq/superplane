@@ -53,6 +53,18 @@ func FindInvitationByID(invitationID string) (*OrganizationInvitation, error) {
 	return &invitation, err
 }
 
+func FindInvitationByIDWithState(invitationID string, state string) (*OrganizationInvitation, error) {
+	var invitation OrganizationInvitation
+
+	err := database.Conn().
+		Where("id = ?", invitationID).
+		Where("state = ?", state).
+		First(&invitation).
+		Error
+
+	return &invitation, err
+}
+
 func ListInvitationsInState(organizationID string, state string) ([]OrganizationInvitation, error) {
 	var invitations []OrganizationInvitation
 
@@ -89,4 +101,12 @@ func CreateInvitationInTransaction(tx *gorm.DB, organizationID, invitedBy uuid.U
 	}
 
 	return invitation, err
+}
+
+func SaveInvitation(invitation *OrganizationInvitation) error {
+	return database.Conn().Save(invitation).Error
+}
+
+func (i *OrganizationInvitation) Delete() error {
+	return database.Conn().Delete(i).Error
 }

@@ -28,9 +28,9 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.Up
 	return organizations.UpdateOrganization(ctx, orgID, req.Organization)
 }
 
-func (s *OrganizationService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {
+func (s *OrganizationService) RemoveSubject(ctx context.Context, req *pb.RemoveSubjectRequest) (*pb.RemoveSubjectResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.RemoveUser(ctx, s.authorizationService, orgID, req.UserId)
+	return organizations.RemoveSubject(ctx, s.authorizationService, orgID, req.SubjectIdentifierType, req.SubjectIdentifier)
 }
 
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {

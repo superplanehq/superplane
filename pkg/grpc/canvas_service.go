@@ -62,10 +62,10 @@ func (s *CanvasService) AddUser(ctx context.Context, req *pb.AddUserRequest) (*p
 	return canvases.AddUser(ctx, s.authorizationService, orgID, canvasID, req.UserId)
 }
 
-func (s *CanvasService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {
+func (s *CanvasService) RemoveSubject(ctx context.Context, req *pb.RemoveSubjectRequest) (*pb.RemoveSubjectResponse, error) {
 	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return canvases.RemoveUser(ctx, s.authorizationService, orgID, canvasID, req.UserId)
+	return canvases.RemoveSubject(ctx, s.authorizationService, orgID, canvasID, req.SubjectIdentifierType, req.SubjectIdentifier)
 }
 
 //

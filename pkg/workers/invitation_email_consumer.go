@@ -112,15 +112,13 @@ func (c *InvitationEmailConsumer) Consume(delivery tackle.Delivery) error {
 		return nil
 	}
 
-	invitationLink := c.generateInvitationLink(invitation)
-
 	toName := strings.Split(invitation.Email, "@")[0]
 
 	err = c.EmailService.SendInvitationEmail(
 		invitation.Email,
 		toName,
 		org.Name,
-		invitationLink,
+		c.BaseURL+"/login",
 	)
 
 	if err != nil {
@@ -130,8 +128,4 @@ func (c *InvitationEmailConsumer) Consume(delivery tackle.Delivery) error {
 
 	log.Infof("Successfully sent invitation email for %s to %s", invitationID, invitation.Email)
 	return nil
-}
-
-func (c *InvitationEmailConsumer) generateInvitationLink(invitation *models.OrganizationInvitation) string {
-	return c.BaseURL + "/login"
 }
