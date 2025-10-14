@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BEh7gGlIzFZRKG7JPMjib0hku4XDgPe5DesZ6CRxq7wl6GUn1JyQ6Sab50mRgin
+\restrict 8VwTA2olRP2FMclD4wi1Ri8X713MTdR9ZWssHwmsRpRXxPdl9JXigIfe1dLM5SK
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -333,7 +333,8 @@ CREATE TABLE public.organization_invitations (
     invited_by uuid NOT NULL,
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    canvas_ids uuid[]
 );
 
 
@@ -889,6 +890,13 @@ CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at)
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1235,13 +1243,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BEh7gGlIzFZRKG7JPMjib0hku4XDgPe5DesZ6CRxq7wl6GUn1JyQ6Sab50mRgin
+\unrestrict 8VwTA2olRP2FMclD4wi1Ri8X713MTdR9ZWssHwmsRpRXxPdl9JXigIfe1dLM5SK
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict OzyenkWxv3X5PKoo1N1BtWASfd2oNHlfn5AguF5vXwnp6vHLEt2MDbSGfb0HIeM
+\restrict edanSt0Yd1E7q43aOnkuRmlgKnloIZb7sLO6rGESwBdNzDukndTOzzg7S86T8AF
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1263,7 +1271,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251006144130	f
+20251014143835	f
 \.
 
 
@@ -1271,5 +1279,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OzyenkWxv3X5PKoo1N1BtWASfd2oNHlfn5AguF5vXwnp6vHLEt2MDbSGfb0HIeM
+\unrestrict edanSt0Yd1E7q43aOnkuRmlgKnloIZb7sLO6rGESwBdNzDukndTOzzg7S86T8AF
 
