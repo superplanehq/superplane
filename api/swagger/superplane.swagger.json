@@ -1348,6 +1348,56 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/subjects/{subjectIdentifier}": {
+      "delete": {
+        "summary": "Remove a subject (user or invitation) from a canvas",
+        "description": "Remove a subject (user or invitation) from a canvas",
+        "operationId": "Superplane_RemoveSubject",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneRemoveSubjectResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "subjectIdentifier",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "subjectIdentifierType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "USER_ID",
+              "USER_EMAIL",
+              "INVITATION_ID"
+            ],
+            "default": "USER_ID"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/users": {
       "post": {
         "summary": "Add a user to a canvas",
@@ -1381,44 +1431,6 @@
             "schema": {
               "$ref": "#/definitions/SuperplaneAddUserBody"
             }
-          }
-        ],
-        "tags": [
-          "Canvas"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/users/{userId}": {
-      "delete": {
-        "summary": "Remove a user from a canvas",
-        "description": "Remove a user from a canvas",
-        "operationId": "Superplane_RemoveUser",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneRemoveUserResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
           }
         ],
         "tags": [
@@ -2227,7 +2239,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/OrganizationsRemoveSubjectResponse"
+              "$ref": "#/definitions/SuperplaneOrganizationsRemoveSubjectResponse"
             }
           },
           "default": {
@@ -3500,9 +3512,6 @@
           "format": "date-time"
         }
       }
-    },
-    "OrganizationsRemoveSubjectResponse": {
-      "type": "object"
     },
     "OrganizationsUpdateOrganizationBody": {
       "type": "object",
@@ -4895,6 +4904,9 @@
         }
       }
     },
+    "SuperplaneOrganizationsRemoveSubjectResponse": {
+      "type": "object"
+    },
     "SuperplaneOutputDefinition": {
       "type": "object",
       "properties": {
@@ -4920,7 +4932,7 @@
         }
       }
     },
-    "SuperplaneRemoveUserResponse": {
+    "SuperplaneRemoveSubjectResponse": {
       "type": "object"
     },
     "SuperplaneResetEventSourceKeyBody": {

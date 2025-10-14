@@ -49,7 +49,7 @@ const (
 	Superplane_CancelStageExecution_FullMethodName         = "/Superplane.Superplane/CancelStageExecution"
 	Superplane_ListEventRejections_FullMethodName          = "/Superplane.Superplane/ListEventRejections"
 	Superplane_AddUser_FullMethodName                      = "/Superplane.Superplane/AddUser"
-	Superplane_RemoveUser_FullMethodName                   = "/Superplane.Superplane/RemoveUser"
+	Superplane_RemoveSubject_FullMethodName                = "/Superplane.Superplane/RemoveSubject"
 	Superplane_ListAlerts_FullMethodName                   = "/Superplane.Superplane/ListAlerts"
 	Superplane_AcknowledgeAlert_FullMethodName             = "/Superplane.Superplane/AcknowledgeAlert"
 )
@@ -88,7 +88,7 @@ type SuperplaneClient interface {
 	CancelStageExecution(ctx context.Context, in *CancelStageExecutionRequest, opts ...grpc.CallOption) (*CancelStageExecutionResponse, error)
 	ListEventRejections(ctx context.Context, in *ListEventRejectionsRequest, opts ...grpc.CallOption) (*ListEventRejectionsResponse, error)
 	AddUser(ctx context.Context, in *AddUserRequest, opts ...grpc.CallOption) (*AddUserResponse, error)
-	RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error)
+	RemoveSubject(ctx context.Context, in *RemoveSubjectRequest, opts ...grpc.CallOption) (*RemoveSubjectResponse, error)
 	ListAlerts(ctx context.Context, in *ListAlertsRequest, opts ...grpc.CallOption) (*ListAlertsResponse, error)
 	AcknowledgeAlert(ctx context.Context, in *AcknowledgeAlertRequest, opts ...grpc.CallOption) (*AcknowledgeAlertResponse, error)
 }
@@ -401,10 +401,10 @@ func (c *superplaneClient) AddUser(ctx context.Context, in *AddUserRequest, opts
 	return out, nil
 }
 
-func (c *superplaneClient) RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error) {
+func (c *superplaneClient) RemoveSubject(ctx context.Context, in *RemoveSubjectRequest, opts ...grpc.CallOption) (*RemoveSubjectResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RemoveUserResponse)
-	err := c.cc.Invoke(ctx, Superplane_RemoveUser_FullMethodName, in, out, cOpts...)
+	out := new(RemoveSubjectResponse)
+	err := c.cc.Invoke(ctx, Superplane_RemoveSubject_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -465,7 +465,7 @@ type SuperplaneServer interface {
 	CancelStageExecution(context.Context, *CancelStageExecutionRequest) (*CancelStageExecutionResponse, error)
 	ListEventRejections(context.Context, *ListEventRejectionsRequest) (*ListEventRejectionsResponse, error)
 	AddUser(context.Context, *AddUserRequest) (*AddUserResponse, error)
-	RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error)
+	RemoveSubject(context.Context, *RemoveSubjectRequest) (*RemoveSubjectResponse, error)
 	ListAlerts(context.Context, *ListAlertsRequest) (*ListAlertsResponse, error)
 	AcknowledgeAlert(context.Context, *AcknowledgeAlertRequest) (*AcknowledgeAlertResponse, error)
 }
@@ -567,8 +567,8 @@ func (UnimplementedSuperplaneServer) ListEventRejections(context.Context, *ListE
 func (UnimplementedSuperplaneServer) AddUser(context.Context, *AddUserRequest) (*AddUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddUser not implemented")
 }
-func (UnimplementedSuperplaneServer) RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveUser not implemented")
+func (UnimplementedSuperplaneServer) RemoveSubject(context.Context, *RemoveSubjectRequest) (*RemoveSubjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveSubject not implemented")
 }
 func (UnimplementedSuperplaneServer) ListAlerts(context.Context, *ListAlertsRequest) (*ListAlertsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListAlerts not implemented")
@@ -1136,20 +1136,20 @@ func _Superplane_AddUser_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Superplane_RemoveUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveUserRequest)
+func _Superplane_RemoveSubject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveSubjectRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SuperplaneServer).RemoveUser(ctx, in)
+		return srv.(SuperplaneServer).RemoveSubject(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Superplane_RemoveUser_FullMethodName,
+		FullMethod: Superplane_RemoveSubject_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SuperplaneServer).RemoveUser(ctx, req.(*RemoveUserRequest))
+		return srv.(SuperplaneServer).RemoveSubject(ctx, req.(*RemoveSubjectRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1318,8 +1318,8 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Superplane_AddUser_Handler,
 		},
 		{
-			MethodName: "RemoveUser",
-			Handler:    _Superplane_RemoveUser_Handler,
+			MethodName: "RemoveSubject",
+			Handler:    _Superplane_RemoveSubject_Handler,
 		},
 		{
 			MethodName: "ListAlerts",

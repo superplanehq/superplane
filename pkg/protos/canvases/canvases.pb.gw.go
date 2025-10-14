@@ -1548,9 +1548,11 @@ func local_request_Superplane_AddUser_0(ctx context.Context, marshaler runtime.M
 	return msg, metadata, err
 }
 
-func request_Superplane_RemoveUser_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+var filter_Superplane_RemoveSubject_0 = &utilities.DoubleArray{Encoding: map[string]int{"canvas_id_or_name": 0, "subject_identifier": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
+
+func request_Superplane_RemoveSubject_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq RemoveUserRequest
+		protoReq RemoveSubjectRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -1563,21 +1565,27 @@ func request_Superplane_RemoveUser_0(ctx context.Context, marshaler runtime.Mars
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
 	}
-	val, ok = pathParams["user_id"]
+	val, ok = pathParams["subject_identifier"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "user_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "subject_identifier")
 	}
-	protoReq.UserId, err = runtime.String(val)
+	protoReq.SubjectIdentifier, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "subject_identifier", err)
 	}
-	msg, err := client.RemoveUser(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Superplane_RemoveSubject_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.RemoveSubject(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_Superplane_RemoveUser_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_Superplane_RemoveSubject_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq RemoveUserRequest
+		protoReq RemoveSubjectRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -1589,15 +1597,21 @@ func local_request_Superplane_RemoveUser_0(ctx context.Context, marshaler runtim
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "canvas_id_or_name", err)
 	}
-	val, ok = pathParams["user_id"]
+	val, ok = pathParams["subject_identifier"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "user_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "subject_identifier")
 	}
-	protoReq.UserId, err = runtime.String(val)
+	protoReq.SubjectIdentifier, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "subject_identifier", err)
 	}
-	msg, err := server.RemoveUser(ctx, &protoReq)
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Superplane_RemoveSubject_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.RemoveSubject(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -2311,25 +2325,25 @@ func RegisterSuperplaneHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_AddUser_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_Superplane_RemoveUser_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodDelete, pattern_Superplane_RemoveSubject_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/RemoveUser", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/RemoveSubject", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/subjects/{subject_identifier}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_Superplane_RemoveUser_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_Superplane_RemoveSubject_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Superplane_RemoveUser_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Superplane_RemoveSubject_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodGet, pattern_Superplane_ListAlerts_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -2921,22 +2935,22 @@ func RegisterSuperplaneHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_AddUser_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_Superplane_RemoveUser_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodDelete, pattern_Superplane_RemoveSubject_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/RemoveUser", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/RemoveSubject", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/subjects/{subject_identifier}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_Superplane_RemoveUser_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_Superplane_RemoveSubject_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Superplane_RemoveUser_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Superplane_RemoveSubject_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodGet, pattern_Superplane_ListAlerts_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -3006,7 +3020,7 @@ var (
 	pattern_Superplane_CancelStageExecution_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7, 2, 8}, []string{"api", "v1", "canvases", "canvas_id_or_name", "stages", "stage_id_or_name", "executions", "execution_id", "cancel"}, ""))
 	pattern_Superplane_ListEventRejections_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "rejections"}, ""))
 	pattern_Superplane_AddUser_0                      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "users"}, ""))
-	pattern_Superplane_RemoveUser_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "users", "user_id"}, ""))
+	pattern_Superplane_RemoveSubject_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "subjects", "subject_identifier"}, ""))
 	pattern_Superplane_ListAlerts_0                   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "alerts"}, ""))
 	pattern_Superplane_AcknowledgeAlert_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id_or_name", "alerts", "alert_id", "acknowledge"}, ""))
 )
@@ -3042,7 +3056,7 @@ var (
 	forward_Superplane_CancelStageExecution_0         = runtime.ForwardResponseMessage
 	forward_Superplane_ListEventRejections_0          = runtime.ForwardResponseMessage
 	forward_Superplane_AddUser_0                      = runtime.ForwardResponseMessage
-	forward_Superplane_RemoveUser_0                   = runtime.ForwardResponseMessage
+	forward_Superplane_RemoveSubject_0                = runtime.ForwardResponseMessage
 	forward_Superplane_ListAlerts_0                   = runtime.ForwardResponseMessage
 	forward_Superplane_AcknowledgeAlert_0             = runtime.ForwardResponseMessage
 )

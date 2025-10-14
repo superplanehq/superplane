@@ -371,13 +371,13 @@ service Superplane {
     };
   }
 
-  rpc RemoveUser(RemoveUserRequest) returns (RemoveUserResponse) {
+  rpc RemoveSubject(RemoveSubjectRequest) returns (RemoveSubjectResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/canvases/{canvas_id_or_name}/users/{user_id}"
+      delete: "/api/v1/canvases/{canvas_id_or_name}/subjects/{subject_identifier}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Remove a user from a canvas";
-      description: "Remove a user from a canvas";
+      summary: "Remove a subject (user or invitation) from a canvas";
+      description: "Remove a subject (user or invitation) from a canvas";
       tags: "Canvas";
     };
   }
@@ -1038,12 +1038,13 @@ message AddUserRequest {
 
 message AddUserResponse {}
 
-message RemoveUserRequest {
+message RemoveSubjectRequest {
   string canvas_id_or_name = 1;
-  string user_id = 2;
+  Authorization.SubjectIdentifierType subject_identifier_type = 2;
+  string subject_identifier = 3;
 }
 
-message RemoveUserResponse {}
+message RemoveSubjectResponse {}
 
 message DeleteEventSourceRequest {
   string canvas_id_or_name = 1;

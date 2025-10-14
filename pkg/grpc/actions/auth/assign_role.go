@@ -3,27 +3,85 @@ package auth
 import (
 	"context"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.AssignRoleResponse, error) {
+func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName string, subjectIdentifierType pbAuth.SubjectIdentifierType, subjectIdentifier string, authService authorization.Authorization) (*pb.AssignRoleResponse, error) {
 	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}
 
-	user, err := FindUser(orgID, userID, userEmail)
+	if subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_ID || subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_EMAIL {
+		return assignRoleToUser(authService, subjectIdentifierType, subjectIdentifier, orgID, roleName, domainID, domainType)
+	} else if subjectIdentifierType == pbAuth.SubjectIdentifierType_INVITATION_ID {
+		return assignRoleToInvitation(subjectIdentifier, roleName, domainID, domainType)
+	}
+
+	return nil, status.Error(codes.InvalidArgument, "invalid subject identifier type")
+}
+
+func assignRoleToUser(authService authorization.Authorization, subjectIdentifierType pbAuth.SubjectIdentifierType, subjectIdentifier, orgID, roleName, domainID, domainType string) (*pb.AssignRoleResponse, error) {
+	userID := ""
+	email := ""
+
+	if subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_ID {
+		userID = subjectIdentifier
+	} else if subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_EMAIL {
+		email = subjectIdentifier
+	}
+
+	user, err := FindUser(orgID, userID, email)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "user not found")
 	}
-
 	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)
 	if err != nil {
-		log.Errorf("Error assigning role %s to %s: %v", roleName, user.ID.String(), err)
+		log.Errorf("Error assigning role %s to user %s: %v", roleName, user.ID.String(), err)
 		return nil, status.Error(codes.Internal, "failed to assign role")
+	}
+
+	return &pb.AssignRoleResponse{}, nil
+}
+
+func assignRoleToInvitation(invitationID, roleName, domainID, domainType string) (*pb.AssignRoleResponse, error) {
+	invitation, err := models.FindInvitationByIDWithState(invitationID, models.InvitationStatePending)
+	if err != nil {
+		log.Errorf("Invitation not found: %s", invitationID)
+		return nil, status.Error(codes.NotFound, "invitation not found")
+	}
+
+	if domainType != models.DomainTypeCanvas {
+		return nil, status.Error(codes.InvalidArgument, "only canvas roles can be assigned to invitations")
+	}
+
+	if roleName != models.RoleCanvasViewer {
+		return nil, status.Error(codes.InvalidArgument, "only canvas viewer role can be assigned to invitations")
+	}
+
+	canvasID, err := uuid.Parse(domainID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
+	}
+
+	for _, existingCanvasID := range invitation.CanvasIDs {
+		if existingCanvasID == canvasID {
+			return &pb.AssignRoleResponse{}, nil
+		}
+	}
+
+	invitation.CanvasIDs = append(invitation.CanvasIDs, canvasID)
+
+	err = models.SaveInvitation(invitation)
+	if err != nil {
+		log.Errorf("Error updating invitation %s with canvas ID %s: %v", invitationID, canvasID, err)
+		return nil, status.Error(codes.Internal, "failed to assign canvas role to invitation")
 	}
 
 	return &pb.AssignRoleResponse{}, nil

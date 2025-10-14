@@ -255,10 +255,6 @@ export type OrganizationsOrganizationMetadata = {
     updatedAt?: string;
 };
 
-export type OrganizationsRemoveSubjectResponse = {
-    [key: string]: unknown;
-};
-
 export type OrganizationsUpdateOrganizationBody = {
     organization?: OrganizationsOrganization;
 };
@@ -821,6 +817,10 @@ export type SuperplaneMeUser = {
     hasToken?: boolean;
 };
 
+export type SuperplaneOrganizationsRemoveSubjectResponse = {
+    [key: string]: unknown;
+};
+
 export type SuperplaneOutputDefinition = {
     name?: string;
     description?: string;
@@ -832,7 +832,7 @@ export type SuperplaneOutputValue = {
     value?: string;
 };
 
-export type SuperplaneRemoveUserResponse = {
+export type SuperplaneRemoveSubjectResponse = {
     [key: string]: unknown;
 };
 
@@ -1853,6 +1853,36 @@ export type SuperplaneCancelStageExecutionResponses = {
 
 export type SuperplaneCancelStageExecutionResponse2 = SuperplaneCancelStageExecutionResponses[keyof SuperplaneCancelStageExecutionResponses];
 
+export type SuperplaneRemoveSubjectData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        subjectIdentifier: string;
+    };
+    query?: {
+        subjectIdentifierType?: 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID';
+    };
+    url: '/api/v1/canvases/{canvasIdOrName}/subjects/{subjectIdentifier}';
+};
+
+export type SuperplaneRemoveSubjectErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneRemoveSubjectError = SuperplaneRemoveSubjectErrors[keyof SuperplaneRemoveSubjectErrors];
+
+export type SuperplaneRemoveSubjectResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneRemoveSubjectResponse;
+};
+
+export type SuperplaneRemoveSubjectResponse2 = SuperplaneRemoveSubjectResponses[keyof SuperplaneRemoveSubjectResponses];
+
 export type SuperplaneAddUserData = {
     body: SuperplaneAddUserBody;
     path: {
@@ -1879,34 +1909,6 @@ export type SuperplaneAddUserResponses = {
 };
 
 export type SuperplaneAddUserResponse2 = SuperplaneAddUserResponses[keyof SuperplaneAddUserResponses];
-
-export type SuperplaneRemoveUserData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        userId: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/users/{userId}';
-};
-
-export type SuperplaneRemoveUserErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type SuperplaneRemoveUserError = SuperplaneRemoveUserErrors[keyof SuperplaneRemoveUserErrors];
-
-export type SuperplaneRemoveUserResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneRemoveUserResponse;
-};
-
-export type SuperplaneRemoveUserResponse2 = SuperplaneRemoveUserResponses[keyof SuperplaneRemoveUserResponses];
 
 export type SuperplaneDeleteCanvasData = {
     body?: never;
@@ -2508,10 +2510,10 @@ export type OrganizationsRemoveSubjectResponses = {
     /**
      * A successful response.
      */
-    200: OrganizationsRemoveSubjectResponse;
+    200: SuperplaneOrganizationsRemoveSubjectResponse;
 };
 
-export type OrganizationsRemoveSubjectResponse2 = OrganizationsRemoveSubjectResponses[keyof OrganizationsRemoveSubjectResponses];
+export type OrganizationsRemoveSubjectResponse = OrganizationsRemoveSubjectResponses[keyof OrganizationsRemoveSubjectResponses];
 
 export type RolesListRolesData = {
     body?: never;
