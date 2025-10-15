@@ -135,7 +135,8 @@ message Invitation {
   string organization_id = 2;
   string email = 3;
   string state = 4;
-  google.protobuf.Timestamp created_at = 5;
+  repeated string canvas_ids = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message CreateInvitationRequest {

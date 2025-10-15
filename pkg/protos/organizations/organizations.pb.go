@@ -339,7 +339,8 @@ type Invitation struct {
 	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	Email          string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
 	State          string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`
-	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	CanvasIds      []string               `protobuf:"bytes,5,rep,name=canvas_ids,json=canvasIds,proto3" json:"canvas_ids,omitempty"`
+	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -400,6 +401,13 @@ func (x *Invitation) GetState() string {
 		return x.State
 	}
 	return ""
+}
+
+func (x *Invitation) GetCanvasIds() []string {
+	if x != nil {
+		return x.CanvasIds
+	}
+	return nil
 }
 
 func (x *Invitation) GetCreatedAt() *timestamp.Timestamp {
@@ -1000,15 +1008,17 @@ const file_organizations_proto_rawDesc = "" +
 	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"+\n" +
 	"\x19DeleteOrganizationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x1c\n" +
-	"\x1aDeleteOrganizationResponse\"\xac\x01\n" +
+	"\x1aDeleteOrganizationResponse\"\xcb\x01\n" +
 	"\n" +
 	"Invitation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
-	"\x05state\x18\x04 \x01(\tR\x05state\x129\n" +
+	"\x05state\x18\x04 \x01(\tR\x05state\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"?\n" +
+	"canvas_ids\x18\x05 \x03(\tR\tcanvasIds\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"?\n" +
 	"\x17CreateInvitationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\"`\n" +

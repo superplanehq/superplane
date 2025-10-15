@@ -236,6 +236,7 @@ export type OrganizationsInvitation = {
     organizationId?: string;
     email?: string;
     state?: string;
+    canvasIds?: Array<string>;
     createdAt?: string;
 };
 
