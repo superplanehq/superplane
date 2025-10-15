@@ -315,7 +315,7 @@ export function Members({ organizationId }: MembersProps) {
       <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <Text className="font-semibold text-zinc-900 dark:text-white mb-1">
+            <Text className="text-left font-semibold text-zinc-900 dark:text-white mb-1">
               Invite new members
             </Text>
             <Text className="text-sm text-zinc-500 dark:text-zinc-400">
