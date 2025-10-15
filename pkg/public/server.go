@@ -79,12 +79,13 @@ func NewServer(
 	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
 	appEnv string,
+	templateDir string,
 	authorizationService authorization.Authorization,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
