@@ -2,7 +2,7 @@ Hi {{.ToName}},
 
 You've been invited to join the organization "{{.OrganizationName}}" on Superplane.
 
-To accept this invitation, please click the link below:
+To sign in, please click the link below:
 {{.InvitationLink}}
 
 Best regards,
