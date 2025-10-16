@@ -146,10 +146,12 @@ export const useRole = (organizationId: string, roleName: string) => {
     queryFn: async () => {
       const response = await rolesDescribeRole(
         withOrganizationHeader({
+          path: {
+            roleName,
+          },
           query: {
             domainType: 'DOMAIN_TYPE_ORGANIZATION',
             domainId: organizationId,
-            role: roleName
           }
         })
       )

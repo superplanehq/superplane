@@ -3,6 +3,10 @@ import {
   rolesListRoles,
   usersListUsers,
   rolesAssignRole,
+  rolesCreateRole,
+  rolesUpdateRole,
+  rolesDeleteRole,
+  rolesDescribeRole,
   superplaneListStages,
   superplaneCreateStage,
   superplaneUpdateStage,
@@ -28,6 +32,7 @@ import {
   superplaneListAlerts,
   superplaneAcknowledgeAlert,
 } from '../api-client/sdk.gen'
+import { RolesCreateRoleRequest, AuthorizationDomainType } from '@/api-client'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState, SuperplaneAlert } from '../api-client/types.gen'
 
@@ -48,6 +53,7 @@ export const canvasKeys = {
   connectionGroup: (canvasId: string, connectionGroupId: string) => [...canvasKeys.all, 'connectionGroup', canvasId, connectionGroupId] as const,
   integrations: (canvasId?: string) => canvasId ? [...canvasKeys.all, 'integrations', canvasId] as const : ['integrations'] as const,
   eventRejections: (canvasId: string, targetType: string, targetId: string) => [...canvasKeys.all, 'eventRejections', canvasId, targetType, targetId] as const,
+  role: (canvasId: string, roleName: string) => [...canvasKeys.all, 'role', canvasId, roleName] as const,
 }
 
 export const useCanvasRoles = (canvasId: string) => {
@@ -854,6 +860,112 @@ export const useAddAlert = (canvasId: string) => {
       if (context?.previousAlerts) {
         queryClient.setQueryData(canvasKeys.alerts(canvasId), context.previousAlerts)
       }
+    }
+  })
+}
+
+// Canvas Role Management Hooks
+export const useCanvasRole = (canvasId: string, roleName: string) => {
+  return useQuery({
+    queryKey: canvasKeys.role(canvasId, roleName),
+    queryFn: async () => {
+      const response = await rolesDescribeRole(
+        withOrganizationHeader({
+          path: {
+            roleName,
+          },
+          query: {
+            domainType: 'DOMAIN_TYPE_CANVAS',
+            domainId: canvasId,
+          }
+        })
+      )
+      return response.data?.role || null
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!canvasId && !!roleName,
+  })
+}
+
+export const useCreateCanvasRole = (canvasId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: RolesCreateRoleRequest) => {
+      return await rolesCreateRole(
+        withOrganizationHeader({
+          body: params
+        })
+      )
+    },
+    onSuccess: () => {
+      // Invalidate and refetch canvas roles
+      queryClient.invalidateQueries({ queryKey: canvasKeys.roles(canvasId) })
+    }
+  })
+}
+
+export const useUpdateCanvasRole = (canvasId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      roleName: string,
+      domainType: AuthorizationDomainType | undefined,
+      domainId: string,
+      permissions: Array<{ resource: string, action: string, domainType: AuthorizationDomainType | undefined }>,
+      displayName?: string,
+      description?: string
+    }) => {
+      return await rolesUpdateRole(
+        withOrganizationHeader({
+          path: { roleName: params.roleName },
+          body: {
+            domainType: params.domainType,
+            domainId: params.domainId,
+            role: {
+              metadata: {
+                name: params.roleName,
+              },
+              spec: {
+                permissions: params.permissions,
+                displayName: params.displayName,
+                description: params.description
+              }
+            }
+          }
+        })
+      )
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.roles(canvasId) })
+      queryClient.invalidateQueries({ queryKey: canvasKeys.role(canvasId, variables.roleName) })
+    }
+  })
+}
+
+export const useDeleteCanvasRole = (canvasId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      roleName: string,
+      domainType: AuthorizationDomainType,
+      domainId: string
+    }) => {
+      return await rolesDeleteRole(
+        withOrganizationHeader({
+          path: { roleName: params.roleName },
+          query: {
+            domainType: params.domainType,
+            domainId: params.domainId
+          }
+        })
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.roles(canvasId) })
     }
   })
 }
