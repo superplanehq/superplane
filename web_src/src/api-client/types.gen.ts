@@ -16,8 +16,6 @@ export type AuthorizationPermission = {
     domainType?: AuthorizationDomainType;
 };
 
-export type AuthorizationSubjectIdentifierType = 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID';
-
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
 export type EventSourceDailySchedule = {
@@ -256,6 +254,18 @@ export type OrganizationsOrganizationMetadata = {
     updatedAt?: string;
 };
 
+export type OrganizationsRemoveInvitationResponse = {
+    [key: string]: unknown;
+};
+
+export type OrganizationsUpdateInvitationBody = {
+    canvasIds?: Array<string>;
+};
+
+export type OrganizationsUpdateInvitationResponse = {
+    invitation?: OrganizationsInvitation;
+};
+
 export type OrganizationsUpdateOrganizationBody = {
     organization?: OrganizationsOrganization;
 };
@@ -267,8 +277,8 @@ export type OrganizationsUpdateOrganizationResponse = {
 export type RolesAssignRoleBody = {
     domainType?: AuthorizationDomainType;
     domainId?: string;
-    subjectIdentifierType?: AuthorizationSubjectIdentifierType;
-    subjectIdentifier?: string;
+    userId?: string;
+    userEmail?: string;
 };
 
 export type RolesAssignRoleResponse = {
@@ -818,7 +828,7 @@ export type SuperplaneMeUser = {
     hasToken?: boolean;
 };
 
-export type SuperplaneOrganizationsRemoveSubjectResponse = {
+export type SuperplaneOrganizationsRemoveUserResponse = {
     [key: string]: unknown;
 };
 
@@ -833,7 +843,7 @@ export type SuperplaneOutputValue = {
     value?: string;
 };
 
-export type SuperplaneRemoveSubjectResponse = {
+export type SuperplaneRemoveUserResponse = {
     [key: string]: unknown;
 };
 
@@ -1854,36 +1864,6 @@ export type SuperplaneCancelStageExecutionResponses = {
 
 export type SuperplaneCancelStageExecutionResponse2 = SuperplaneCancelStageExecutionResponses[keyof SuperplaneCancelStageExecutionResponses];
 
-export type SuperplaneRemoveSubjectData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        subjectIdentifier: string;
-    };
-    query?: {
-        subjectIdentifierType?: 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID';
-    };
-    url: '/api/v1/canvases/{canvasIdOrName}/subjects/{subjectIdentifier}';
-};
-
-export type SuperplaneRemoveSubjectErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type SuperplaneRemoveSubjectError = SuperplaneRemoveSubjectErrors[keyof SuperplaneRemoveSubjectErrors];
-
-export type SuperplaneRemoveSubjectResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneRemoveSubjectResponse;
-};
-
-export type SuperplaneRemoveSubjectResponse2 = SuperplaneRemoveSubjectResponses[keyof SuperplaneRemoveSubjectResponses];
-
 export type SuperplaneAddUserData = {
     body: SuperplaneAddUserBody;
     path: {
@@ -1910,6 +1890,34 @@ export type SuperplaneAddUserResponses = {
 };
 
 export type SuperplaneAddUserResponse2 = SuperplaneAddUserResponses[keyof SuperplaneAddUserResponses];
+
+export type SuperplaneRemoveUserData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/users/{userId}';
+};
+
+export type SuperplaneRemoveUserErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneRemoveUserError = SuperplaneRemoveUserErrors[keyof SuperplaneRemoveUserErrors];
+
+export type SuperplaneRemoveUserResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneRemoveUserResponse;
+};
+
+export type SuperplaneRemoveUserResponse2 = SuperplaneRemoveUserResponses[keyof SuperplaneRemoveUserResponses];
 
 export type SuperplaneDeleteCanvasData = {
     body?: never;
@@ -2486,35 +2494,89 @@ export type OrganizationsCreateInvitationResponses = {
 
 export type OrganizationsCreateInvitationResponse2 = OrganizationsCreateInvitationResponses[keyof OrganizationsCreateInvitationResponses];
 
-export type OrganizationsRemoveSubjectData = {
+export type OrganizationsRemoveInvitationData = {
     body?: never;
     path: {
         id: string;
-        subjectIdentifier: string;
+        invitationId: string;
     };
-    query?: {
-        subjectIdentifierType?: 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID';
-    };
-    url: '/api/v1/organizations/{id}/subjects/{subjectIdentifier}';
+    query?: never;
+    url: '/api/v1/organizations/{id}/invitations/{invitationId}';
 };
 
-export type OrganizationsRemoveSubjectErrors = {
+export type OrganizationsRemoveInvitationErrors = {
     /**
      * An unexpected error response.
      */
     default: GooglerpcStatus;
 };
 
-export type OrganizationsRemoveSubjectError = OrganizationsRemoveSubjectErrors[keyof OrganizationsRemoveSubjectErrors];
+export type OrganizationsRemoveInvitationError = OrganizationsRemoveInvitationErrors[keyof OrganizationsRemoveInvitationErrors];
 
-export type OrganizationsRemoveSubjectResponses = {
+export type OrganizationsRemoveInvitationResponses = {
     /**
      * A successful response.
      */
-    200: SuperplaneOrganizationsRemoveSubjectResponse;
+    200: OrganizationsRemoveInvitationResponse;
 };
 
-export type OrganizationsRemoveSubjectResponse = OrganizationsRemoveSubjectResponses[keyof OrganizationsRemoveSubjectResponses];
+export type OrganizationsRemoveInvitationResponse2 = OrganizationsRemoveInvitationResponses[keyof OrganizationsRemoveInvitationResponses];
+
+export type OrganizationsUpdateInvitationData = {
+    body: OrganizationsUpdateInvitationBody;
+    path: {
+        id: string;
+        invitationId: string;
+    };
+    query?: never;
+    url: '/api/v1/organizations/{id}/invitations/{invitationId}';
+};
+
+export type OrganizationsUpdateInvitationErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type OrganizationsUpdateInvitationError = OrganizationsUpdateInvitationErrors[keyof OrganizationsUpdateInvitationErrors];
+
+export type OrganizationsUpdateInvitationResponses = {
+    /**
+     * A successful response.
+     */
+    200: OrganizationsUpdateInvitationResponse;
+};
+
+export type OrganizationsUpdateInvitationResponse2 = OrganizationsUpdateInvitationResponses[keyof OrganizationsUpdateInvitationResponses];
+
+export type OrganizationsRemoveUserData = {
+    body?: never;
+    path: {
+        id: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/organizations/{id}/users/{userId}';
+};
+
+export type OrganizationsRemoveUserErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type OrganizationsRemoveUserError = OrganizationsRemoveUserErrors[keyof OrganizationsRemoveUserErrors];
+
+export type OrganizationsRemoveUserResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneOrganizationsRemoveUserResponse;
+};
+
+export type OrganizationsRemoveUserResponse = OrganizationsRemoveUserResponses[keyof OrganizationsRemoveUserResponses];
 
 export type RolesListRolesData = {
     body?: never;
@@ -2662,7 +2724,7 @@ export type RolesAssignRoleData = {
         roleName: string;
     };
     query?: never;
-    url: '/api/v1/roles/{roleName}/subjects';
+    url: '/api/v1/roles/{roleName}/users';
 };
 
 export type RolesAssignRoleErrors = {

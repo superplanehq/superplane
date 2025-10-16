@@ -1348,56 +1348,6 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/subjects/{subjectIdentifier}": {
-      "delete": {
-        "summary": "Remove a subject (user or invitation) from a canvas",
-        "description": "Remove a subject (user or invitation) from a canvas",
-        "operationId": "Superplane_RemoveSubject",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneRemoveSubjectResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "subjectIdentifier",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "subjectIdentifierType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "USER_ID",
-              "USER_EMAIL",
-              "INVITATION_ID"
-            ],
-            "default": "USER_ID"
-          }
-        ],
-        "tags": [
-          "Canvas"
-        ]
-      }
-    },
     "/api/v1/canvases/{canvasIdOrName}/users": {
       "post": {
         "summary": "Add a user to a canvas",
@@ -1431,6 +1381,44 @@
             "schema": {
               "$ref": "#/definitions/SuperplaneAddUserBody"
             }
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/users/{userId}": {
+      "delete": {
+        "summary": "Remove a user from a canvas",
+        "description": "Remove a user from a canvas",
+        "operationId": "Superplane_RemoveUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneRemoveUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
@@ -2230,16 +2218,16 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/subjects/{subjectIdentifier}": {
+    "/api/v1/organizations/{id}/invitations/{invitationId}": {
       "delete": {
-        "summary": "Remove a subject from an organization",
-        "description": "Removes a subject (user or invitation) from an organization (can be referenced by ID or name)",
-        "operationId": "Organizations_RemoveSubject",
+        "summary": "Remove an organization invitation",
+        "description": "Removes an organization invitation",
+        "operationId": "Organizations_RemoveInvitation",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneOrganizationsRemoveSubjectResponse"
+              "$ref": "#/definitions/OrganizationsRemoveInvitationResponse"
             }
           },
           "default": {
@@ -2257,22 +2245,92 @@
             "type": "string"
           },
           {
-            "name": "subjectIdentifier",
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "put": {
+        "summary": "Update an organization invitation",
+        "description": "Updates an organization invitation",
+        "operationId": "Organizations_UpdateInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateInvitationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
           },
           {
-            "name": "subjectIdentifierType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "USER_ID",
-              "USER_EMAIL",
-              "INVITATION_ID"
-            ],
-            "default": "USER_ID"
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateInvitationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/users/{userId}": {
+      "delete": {
+        "summary": "Remove a user from an organization",
+        "description": "Removes a user from an organization (can be referenced by ID or name)",
+        "operationId": "Organizations_RemoveUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneOrganizationsRemoveUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
@@ -2492,10 +2550,10 @@
         ]
       }
     },
-    "/api/v1/roles/{roleName}/subjects": {
+    "/api/v1/roles/{roleName}/users": {
       "post": {
         "summary": "Assign role",
-        "description": "Assigns a role to a subject (user or invitation) within a domain",
+        "description": "Assigns a role to a user within a domain",
         "operationId": "Roles_AssignRole",
         "responses": {
           "200": {
@@ -2940,15 +2998,6 @@
         }
       },
       "title": "Common data structures"
-    },
-    "AuthorizationSubjectIdentifierType": {
-      "type": "string",
-      "enum": [
-        "USER_ID",
-        "USER_EMAIL",
-        "INVITATION_ID"
-      ],
-      "default": "USER_ID"
     },
     "EventRejectionRejectionReason": {
       "type": "string",
@@ -3519,6 +3568,28 @@
         }
       }
     },
+    "OrganizationsRemoveInvitationResponse": {
+      "type": "object"
+    },
+    "OrganizationsUpdateInvitationBody": {
+      "type": "object",
+      "properties": {
+        "canvasIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "OrganizationsUpdateInvitationResponse": {
+      "type": "object",
+      "properties": {
+        "invitation": {
+          "$ref": "#/definitions/OrganizationsInvitation"
+        }
+      }
+    },
     "OrganizationsUpdateOrganizationBody": {
       "type": "object",
       "properties": {
@@ -3544,10 +3615,10 @@
         "domainId": {
           "type": "string"
         },
-        "subjectIdentifierType": {
-          "$ref": "#/definitions/AuthorizationSubjectIdentifierType"
+        "userId": {
+          "type": "string"
         },
-        "subjectIdentifier": {
+        "userEmail": {
           "type": "string"
         }
       }
@@ -4910,7 +4981,7 @@
         }
       }
     },
-    "SuperplaneOrganizationsRemoveSubjectResponse": {
+    "SuperplaneOrganizationsRemoveUserResponse": {
       "type": "object"
     },
     "SuperplaneOutputDefinition": {
@@ -4938,7 +5009,7 @@
         }
       }
     },
-    "SuperplaneRemoveSubjectResponse": {
+    "SuperplaneRemoveUserResponse": {
       "type": "object"
     },
     "SuperplaneResetEventSourceKeyBody": {

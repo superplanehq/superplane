@@ -11,12 +11,6 @@ enum DomainType {
   DOMAIN_TYPE_CANVAS = 2;
 }
 
-enum SubjectIdentifierType {
-  USER_ID = 0;
-  USER_EMAIL = 1;
-  INVITATION_ID = 2;
-}
-
 // Common data structures
 message Permission {
   string resource = 1;

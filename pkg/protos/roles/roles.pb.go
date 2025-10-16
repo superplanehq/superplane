@@ -26,14 +26,14 @@ const (
 )
 
 type AssignRoleRequest struct {
-	state                 protoimpl.MessageState              `protogen:"open.v1"`
-	DomainType            authorization.DomainType            `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	DomainId              string                              `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	RoleName              string                              `protobuf:"bytes,3,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
-	SubjectIdentifierType authorization.SubjectIdentifierType `protobuf:"varint,4,opt,name=subject_identifier_type,json=subjectIdentifierType,proto3,enum=Superplane.Authorization.SubjectIdentifierType" json:"subject_identifier_type,omitempty"`
-	SubjectIdentifier     string                              `protobuf:"bytes,5,opt,name=subject_identifier,json=subjectIdentifier,proto3" json:"subject_identifier,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	RoleName      string                   `protobuf:"bytes,3,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
+	UserId        string                   `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserEmail     string                   `protobuf:"bytes,5,opt,name=user_email,json=userEmail,proto3" json:"user_email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AssignRoleRequest) Reset() {
@@ -87,16 +87,16 @@ func (x *AssignRoleRequest) GetRoleName() string {
 	return ""
 }
 
-func (x *AssignRoleRequest) GetSubjectIdentifierType() authorization.SubjectIdentifierType {
+func (x *AssignRoleRequest) GetUserId() string {
 	if x != nil {
-		return x.SubjectIdentifierType
+		return x.UserId
 	}
-	return authorization.SubjectIdentifierType(0)
+	return ""
 }
 
-func (x *AssignRoleRequest) GetSubjectIdentifier() string {
+func (x *AssignRoleRequest) GetUserEmail() string {
 	if x != nil {
-		return x.SubjectIdentifier
+		return x.UserEmail
 	}
 	return ""
 }
@@ -849,14 +849,15 @@ var File_roles_proto protoreflect.FileDescriptor
 
 const file_roles_proto_rawDesc = "" +
 	"\n" +
-	"\vroles.proto\x12\x10Superplane.Roles\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x13authorization.proto\"\xac\x02\n" +
+	"\vroles.proto\x12\x10Superplane.Roles\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x13authorization.proto\"\xcc\x01\n" +
 	"\x11AssignRoleRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1b\n" +
-	"\trole_name\x18\x03 \x01(\tR\broleName\x12g\n" +
-	"\x17subject_identifier_type\x18\x04 \x01(\x0e2/.Superplane.Authorization.SubjectIdentifierTypeR\x15subjectIdentifierType\x12-\n" +
-	"\x12subject_identifier\x18\x05 \x01(\tR\x11subjectIdentifier\"\x14\n" +
+	"\trole_name\x18\x03 \x01(\tR\broleName\x12\x17\n" +
+	"\auser_id\x18\x04 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"user_email\x18\x05 \x01(\tR\tuserEmail\"\x14\n" +
 	"\x12AssignRoleResponse\"v\n" +
 	"\x10ListRolesRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
@@ -908,8 +909,7 @@ const file_roles_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12F\n" +
 	"\vpermissions\x18\x03 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12=\n" +
-	"\x0einherited_role\x18\x04 \x01(\v2\x16.Superplane.Roles.RoleR\rinheritedRole2\x84\n" +
-	"\n" +
+	"\x0einherited_role\x18\x04 \x01(\v2\x16.Superplane.Roles.RoleR\rinheritedRole2\xe8\t\n" +
 	"\x05Roles\x12\xdd\x01\n" +
 	"\tListRoles\x12\".Superplane.Roles.ListRolesRequest\x1a#.Superplane.Roles.ListRolesResponse\"\x86\x01\x92An\n" +
 	"\x05Roles\x12\n" +
@@ -924,10 +924,10 @@ const file_roles_proto_rawDesc = "" +
 	"\x05Roles\x12\vUpdate role\x1a4Updates an existing custom role with new permissions\x82\xd3\xe4\x93\x02\x1e:\x01*\x1a\x19/api/v1/roles/{role_name}\x12\xb2\x01\n" +
 	"\n" +
 	"DeleteRole\x12#.Superplane.Roles.DeleteRoleRequest\x1a$.Superplane.Roles.DeleteRoleResponse\"Y\x92A5\n" +
-	"\x05Roles\x12\vDelete role\x1a\x1fDeletes an existing custom role\x82\xd3\xe4\x93\x02\x1b*\x19/api/v1/roles/{role_name}\x12\xe0\x01\n" +
+	"\x05Roles\x12\vDelete role\x1a\x1fDeletes an existing custom role\x82\xd3\xe4\x93\x02\x1b*\x19/api/v1/roles/{role_name}\x12\xc4\x01\n" +
 	"\n" +
-	"AssignRole\x12#.Superplane.Roles.AssignRoleRequest\x1a$.Superplane.Roles.AssignRoleResponse\"\x86\x01\x92AV\n" +
-	"\x05Roles\x12\vAssign role\x1a@Assigns a role to a subject (user or invitation) within a domain\x82\xd3\xe4\x93\x02':\x01*\"\"/api/v1/roles/{role_name}/subjectsB\xbf\x01\x92A\x86\x01\x12\\\n" +
+	"AssignRole\x12#.Superplane.Roles.AssignRoleRequest\x1a$.Superplane.Roles.AssignRoleResponse\"k\x92A>\n" +
+	"\x05Roles\x12\vAssign role\x1a(Assigns a role to a user within a domain\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/roles/{role_name}/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
 	"\x14Superplane Roles API\x12\x18API for Superplane Roles\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ3github.com/superplanehq/superplane/pkg/protos/rolesb\x06proto3"
 
@@ -945,64 +945,62 @@ func file_roles_proto_rawDescGZIP() []byte {
 
 var file_roles_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_roles_proto_goTypes = []any{
-	(*AssignRoleRequest)(nil),                // 0: Superplane.Roles.AssignRoleRequest
-	(*AssignRoleResponse)(nil),               // 1: Superplane.Roles.AssignRoleResponse
-	(*ListRolesRequest)(nil),                 // 2: Superplane.Roles.ListRolesRequest
-	(*ListRolesResponse)(nil),                // 3: Superplane.Roles.ListRolesResponse
-	(*DescribeRoleRequest)(nil),              // 4: Superplane.Roles.DescribeRoleRequest
-	(*DescribeRoleResponse)(nil),             // 5: Superplane.Roles.DescribeRoleResponse
-	(*CreateRoleRequest)(nil),                // 6: Superplane.Roles.CreateRoleRequest
-	(*CreateRoleResponse)(nil),               // 7: Superplane.Roles.CreateRoleResponse
-	(*UpdateRoleRequest)(nil),                // 8: Superplane.Roles.UpdateRoleRequest
-	(*UpdateRoleResponse)(nil),               // 9: Superplane.Roles.UpdateRoleResponse
-	(*DeleteRoleRequest)(nil),                // 10: Superplane.Roles.DeleteRoleRequest
-	(*DeleteRoleResponse)(nil),               // 11: Superplane.Roles.DeleteRoleResponse
-	(*Role)(nil),                             // 12: Superplane.Roles.Role
-	(*Role_Metadata)(nil),                    // 13: Superplane.Roles.Role.Metadata
-	(*Role_Spec)(nil),                        // 14: Superplane.Roles.Role.Spec
-	(authorization.DomainType)(0),            // 15: Superplane.Authorization.DomainType
-	(authorization.SubjectIdentifierType)(0), // 16: Superplane.Authorization.SubjectIdentifierType
-	(*timestamp.Timestamp)(nil),              // 17: google.protobuf.Timestamp
-	(*authorization.Permission)(nil),         // 18: Superplane.Authorization.Permission
+	(*AssignRoleRequest)(nil),        // 0: Superplane.Roles.AssignRoleRequest
+	(*AssignRoleResponse)(nil),       // 1: Superplane.Roles.AssignRoleResponse
+	(*ListRolesRequest)(nil),         // 2: Superplane.Roles.ListRolesRequest
+	(*ListRolesResponse)(nil),        // 3: Superplane.Roles.ListRolesResponse
+	(*DescribeRoleRequest)(nil),      // 4: Superplane.Roles.DescribeRoleRequest
+	(*DescribeRoleResponse)(nil),     // 5: Superplane.Roles.DescribeRoleResponse
+	(*CreateRoleRequest)(nil),        // 6: Superplane.Roles.CreateRoleRequest
+	(*CreateRoleResponse)(nil),       // 7: Superplane.Roles.CreateRoleResponse
+	(*UpdateRoleRequest)(nil),        // 8: Superplane.Roles.UpdateRoleRequest
+	(*UpdateRoleResponse)(nil),       // 9: Superplane.Roles.UpdateRoleResponse
+	(*DeleteRoleRequest)(nil),        // 10: Superplane.Roles.DeleteRoleRequest
+	(*DeleteRoleResponse)(nil),       // 11: Superplane.Roles.DeleteRoleResponse
+	(*Role)(nil),                     // 12: Superplane.Roles.Role
+	(*Role_Metadata)(nil),            // 13: Superplane.Roles.Role.Metadata
+	(*Role_Spec)(nil),                // 14: Superplane.Roles.Role.Spec
+	(authorization.DomainType)(0),    // 15: Superplane.Authorization.DomainType
+	(*timestamp.Timestamp)(nil),      // 16: google.protobuf.Timestamp
+	(*authorization.Permission)(nil), // 17: Superplane.Authorization.Permission
 }
 var file_roles_proto_depIdxs = []int32{
 	15, // 0: Superplane.Roles.AssignRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	16, // 1: Superplane.Roles.AssignRoleRequest.subject_identifier_type:type_name -> Superplane.Authorization.SubjectIdentifierType
-	15, // 2: Superplane.Roles.ListRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	12, // 3: Superplane.Roles.ListRolesResponse.roles:type_name -> Superplane.Roles.Role
-	15, // 4: Superplane.Roles.DescribeRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	12, // 5: Superplane.Roles.DescribeRoleResponse.role:type_name -> Superplane.Roles.Role
-	15, // 6: Superplane.Roles.CreateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	12, // 7: Superplane.Roles.CreateRoleRequest.role:type_name -> Superplane.Roles.Role
-	12, // 8: Superplane.Roles.CreateRoleResponse.role:type_name -> Superplane.Roles.Role
-	15, // 9: Superplane.Roles.UpdateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	12, // 10: Superplane.Roles.UpdateRoleRequest.role:type_name -> Superplane.Roles.Role
-	12, // 11: Superplane.Roles.UpdateRoleResponse.role:type_name -> Superplane.Roles.Role
-	15, // 12: Superplane.Roles.DeleteRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	13, // 13: Superplane.Roles.Role.metadata:type_name -> Superplane.Roles.Role.Metadata
-	14, // 14: Superplane.Roles.Role.spec:type_name -> Superplane.Roles.Role.Spec
-	15, // 15: Superplane.Roles.Role.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
-	17, // 16: Superplane.Roles.Role.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	17, // 17: Superplane.Roles.Role.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	18, // 18: Superplane.Roles.Role.Spec.permissions:type_name -> Superplane.Authorization.Permission
-	12, // 19: Superplane.Roles.Role.Spec.inherited_role:type_name -> Superplane.Roles.Role
-	2,  // 20: Superplane.Roles.Roles.ListRoles:input_type -> Superplane.Roles.ListRolesRequest
-	6,  // 21: Superplane.Roles.Roles.CreateRole:input_type -> Superplane.Roles.CreateRoleRequest
-	4,  // 22: Superplane.Roles.Roles.DescribeRole:input_type -> Superplane.Roles.DescribeRoleRequest
-	8,  // 23: Superplane.Roles.Roles.UpdateRole:input_type -> Superplane.Roles.UpdateRoleRequest
-	10, // 24: Superplane.Roles.Roles.DeleteRole:input_type -> Superplane.Roles.DeleteRoleRequest
-	0,  // 25: Superplane.Roles.Roles.AssignRole:input_type -> Superplane.Roles.AssignRoleRequest
-	3,  // 26: Superplane.Roles.Roles.ListRoles:output_type -> Superplane.Roles.ListRolesResponse
-	7,  // 27: Superplane.Roles.Roles.CreateRole:output_type -> Superplane.Roles.CreateRoleResponse
-	5,  // 28: Superplane.Roles.Roles.DescribeRole:output_type -> Superplane.Roles.DescribeRoleResponse
-	9,  // 29: Superplane.Roles.Roles.UpdateRole:output_type -> Superplane.Roles.UpdateRoleResponse
-	11, // 30: Superplane.Roles.Roles.DeleteRole:output_type -> Superplane.Roles.DeleteRoleResponse
-	1,  // 31: Superplane.Roles.Roles.AssignRole:output_type -> Superplane.Roles.AssignRoleResponse
-	26, // [26:32] is the sub-list for method output_type
-	20, // [20:26] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	15, // 1: Superplane.Roles.ListRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	12, // 2: Superplane.Roles.ListRolesResponse.roles:type_name -> Superplane.Roles.Role
+	15, // 3: Superplane.Roles.DescribeRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	12, // 4: Superplane.Roles.DescribeRoleResponse.role:type_name -> Superplane.Roles.Role
+	15, // 5: Superplane.Roles.CreateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	12, // 6: Superplane.Roles.CreateRoleRequest.role:type_name -> Superplane.Roles.Role
+	12, // 7: Superplane.Roles.CreateRoleResponse.role:type_name -> Superplane.Roles.Role
+	15, // 8: Superplane.Roles.UpdateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	12, // 9: Superplane.Roles.UpdateRoleRequest.role:type_name -> Superplane.Roles.Role
+	12, // 10: Superplane.Roles.UpdateRoleResponse.role:type_name -> Superplane.Roles.Role
+	15, // 11: Superplane.Roles.DeleteRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	13, // 12: Superplane.Roles.Role.metadata:type_name -> Superplane.Roles.Role.Metadata
+	14, // 13: Superplane.Roles.Role.spec:type_name -> Superplane.Roles.Role.Spec
+	15, // 14: Superplane.Roles.Role.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
+	16, // 15: Superplane.Roles.Role.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	16, // 16: Superplane.Roles.Role.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 17: Superplane.Roles.Role.Spec.permissions:type_name -> Superplane.Authorization.Permission
+	12, // 18: Superplane.Roles.Role.Spec.inherited_role:type_name -> Superplane.Roles.Role
+	2,  // 19: Superplane.Roles.Roles.ListRoles:input_type -> Superplane.Roles.ListRolesRequest
+	6,  // 20: Superplane.Roles.Roles.CreateRole:input_type -> Superplane.Roles.CreateRoleRequest
+	4,  // 21: Superplane.Roles.Roles.DescribeRole:input_type -> Superplane.Roles.DescribeRoleRequest
+	8,  // 22: Superplane.Roles.Roles.UpdateRole:input_type -> Superplane.Roles.UpdateRoleRequest
+	10, // 23: Superplane.Roles.Roles.DeleteRole:input_type -> Superplane.Roles.DeleteRoleRequest
+	0,  // 24: Superplane.Roles.Roles.AssignRole:input_type -> Superplane.Roles.AssignRoleRequest
+	3,  // 25: Superplane.Roles.Roles.ListRoles:output_type -> Superplane.Roles.ListRolesResponse
+	7,  // 26: Superplane.Roles.Roles.CreateRole:output_type -> Superplane.Roles.CreateRoleResponse
+	5,  // 27: Superplane.Roles.Roles.DescribeRole:output_type -> Superplane.Roles.DescribeRoleResponse
+	9,  // 28: Superplane.Roles.Roles.UpdateRole:output_type -> Superplane.Roles.UpdateRoleResponse
+	11, // 29: Superplane.Roles.Roles.DeleteRole:output_type -> Superplane.Roles.DeleteRoleResponse
+	1,  // 30: Superplane.Roles.Roles.AssignRole:output_type -> Superplane.Roles.AssignRoleResponse
+	25, // [25:31] is the sub-list for method output_type
+	19, // [19:25] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_roles_proto_init() }

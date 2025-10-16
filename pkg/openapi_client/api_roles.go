@@ -43,7 +43,7 @@ func (r ApiRolesAssignRoleRequest) Execute() (map[string]interface{}, *http.Resp
 /*
 RolesAssignRole Assign role
 
-Assigns a role to a subject (user or invitation) within a domain
+Assigns a role to a user within a domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param roleName
@@ -72,7 +72,7 @@ func (a *RolesAPIService) RolesAssignRoleExecute(r ApiRolesAssignRoleRequest) (m
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles/{roleName}/subjects"
+	localVarPath := localBasePath + "/api/v1/roles/{roleName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
 
 	localVarHeaderParams := make(map[string]string)

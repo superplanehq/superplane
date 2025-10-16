@@ -390,7 +390,7 @@ func RegisterRolesHandlerServer(ctx context.Context, mux *runtime.ServeMux, serv
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Roles.Roles/AssignRole", runtime.WithHTTPPathPattern("/api/v1/roles/{role_name}/subjects"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Roles.Roles/AssignRole", runtime.WithHTTPPathPattern("/api/v1/roles/{role_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -533,7 +533,7 @@ func RegisterRolesHandlerClient(ctx context.Context, mux *runtime.ServeMux, clie
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Roles.Roles/AssignRole", runtime.WithHTTPPathPattern("/api/v1/roles/{role_name}/subjects"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Roles.Roles/AssignRole", runtime.WithHTTPPathPattern("/api/v1/roles/{role_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -555,7 +555,7 @@ var (
 	pattern_Roles_DescribeRole_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "roles", "role_name"}, ""))
 	pattern_Roles_UpdateRole_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "roles", "role_name"}, ""))
 	pattern_Roles_DeleteRole_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "roles", "role_name"}, ""))
-	pattern_Roles_AssignRole_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "roles", "role_name", "subjects"}, ""))
+	pattern_Roles_AssignRole_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "roles", "role_name", "users"}, ""))
 )
 
 var (

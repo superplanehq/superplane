@@ -479,45 +479,39 @@ func (a *OrganizationAPIService) OrganizationsListInvitationsExecute(r ApiOrgani
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiOrganizationsRemoveSubjectRequest struct {
+type ApiOrganizationsRemoveInvitationRequest struct {
 	ctx context.Context
 	ApiService *OrganizationAPIService
 	id string
-	subjectIdentifier string
-	subjectIdentifierType *string
+	invitationId string
 }
 
-func (r ApiOrganizationsRemoveSubjectRequest) SubjectIdentifierType(subjectIdentifierType string) ApiOrganizationsRemoveSubjectRequest {
-	r.subjectIdentifierType = &subjectIdentifierType
-	return r
-}
-
-func (r ApiOrganizationsRemoveSubjectRequest) Execute() (map[string]interface{}, *http.Response, error) {
-	return r.ApiService.OrganizationsRemoveSubjectExecute(r)
+func (r ApiOrganizationsRemoveInvitationRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.OrganizationsRemoveInvitationExecute(r)
 }
 
 /*
-OrganizationsRemoveSubject Remove a subject from an organization
+OrganizationsRemoveInvitation Remove an organization invitation
 
-Removes a subject (user or invitation) from an organization (can be referenced by ID or name)
+Removes an organization invitation
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param id
- @param subjectIdentifier
- @return ApiOrganizationsRemoveSubjectRequest
+ @param invitationId
+ @return ApiOrganizationsRemoveInvitationRequest
 */
-func (a *OrganizationAPIService) OrganizationsRemoveSubject(ctx context.Context, id string, subjectIdentifier string) ApiOrganizationsRemoveSubjectRequest {
-	return ApiOrganizationsRemoveSubjectRequest{
+func (a *OrganizationAPIService) OrganizationsRemoveInvitation(ctx context.Context, id string, invitationId string) ApiOrganizationsRemoveInvitationRequest {
+	return ApiOrganizationsRemoveInvitationRequest{
 		ApiService: a,
 		ctx: ctx,
 		id: id,
-		subjectIdentifier: subjectIdentifier,
+		invitationId: invitationId,
 	}
 }
 
 // Execute executes the request
 //  @return map[string]interface{}
-func (a *OrganizationAPIService) OrganizationsRemoveSubjectExecute(r ApiOrganizationsRemoveSubjectRequest) (map[string]interface{}, *http.Response, error) {
+func (a *OrganizationAPIService) OrganizationsRemoveInvitationExecute(r ApiOrganizationsRemoveInvitationRequest) (map[string]interface{}, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodDelete
 		localVarPostBody     interface{}
@@ -525,25 +519,19 @@ func (a *OrganizationAPIService) OrganizationsRemoveSubjectExecute(r ApiOrganiza
 		localVarReturnValue  map[string]interface{}
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsRemoveSubject")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsRemoveInvitation")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{id}/subjects/{subjectIdentifier}"
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/invitations/{invitationId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"subjectIdentifier"+"}", url.PathEscape(parameterValueToString(r.subjectIdentifier, "subjectIdentifier")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"invitationId"+"}", url.PathEscape(parameterValueToString(r.invitationId, "invitationId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.subjectIdentifierType != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "subjectIdentifierType", r.subjectIdentifierType, "", "")
-	} else {
-		var defaultValue string = "USER_ID"
-		r.subjectIdentifierType = &defaultValue
-	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -561,6 +549,247 @@ func (a *OrganizationAPIService) OrganizationsRemoveSubjectExecute(r ApiOrganiza
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiOrganizationsRemoveUserRequest struct {
+	ctx context.Context
+	ApiService *OrganizationAPIService
+	id string
+	userId string
+}
+
+func (r ApiOrganizationsRemoveUserRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.OrganizationsRemoveUserExecute(r)
+}
+
+/*
+OrganizationsRemoveUser Remove a user from an organization
+
+Removes a user from an organization (can be referenced by ID or name)
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @param userId
+ @return ApiOrganizationsRemoveUserRequest
+*/
+func (a *OrganizationAPIService) OrganizationsRemoveUser(ctx context.Context, id string, userId string) ApiOrganizationsRemoveUserRequest {
+	return ApiOrganizationsRemoveUserRequest{
+		ApiService: a,
+		ctx: ctx,
+		id: id,
+		userId: userId,
+	}
+}
+
+// Execute executes the request
+//  @return map[string]interface{}
+func (a *OrganizationAPIService) OrganizationsRemoveUserExecute(r ApiOrganizationsRemoveUserRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodDelete
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsRemoveUser")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/users/{userId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiOrganizationsUpdateInvitationRequest struct {
+	ctx context.Context
+	ApiService *OrganizationAPIService
+	id string
+	invitationId string
+	body *OrganizationsUpdateInvitationBody
+}
+
+func (r ApiOrganizationsUpdateInvitationRequest) Body(body OrganizationsUpdateInvitationBody) ApiOrganizationsUpdateInvitationRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiOrganizationsUpdateInvitationRequest) Execute() (*OrganizationsUpdateInvitationResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsUpdateInvitationExecute(r)
+}
+
+/*
+OrganizationsUpdateInvitation Update an organization invitation
+
+Updates an organization invitation
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param id
+ @param invitationId
+ @return ApiOrganizationsUpdateInvitationRequest
+*/
+func (a *OrganizationAPIService) OrganizationsUpdateInvitation(ctx context.Context, id string, invitationId string) ApiOrganizationsUpdateInvitationRequest {
+	return ApiOrganizationsUpdateInvitationRequest{
+		ApiService: a,
+		ctx: ctx,
+		id: id,
+		invitationId: invitationId,
+	}
+}
+
+// Execute executes the request
+//  @return OrganizationsUpdateInvitationResponse
+func (a *OrganizationAPIService) OrganizationsUpdateInvitationExecute(r ApiOrganizationsUpdateInvitationRequest) (*OrganizationsUpdateInvitationResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPut
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *OrganizationsUpdateInvitationResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsUpdateInvitation")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/invitations/{invitationId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"invitationId"+"}", url.PathEscape(parameterValueToString(r.invitationId, "invitationId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err

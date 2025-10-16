@@ -151,11 +151,9 @@ func local_request_Organizations_DeleteOrganization_0(ctx context.Context, marsh
 	return msg, metadata, err
 }
 
-var filter_Organizations_RemoveSubject_0 = &utilities.DoubleArray{Encoding: map[string]int{"id": 0, "subject_identifier": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
-
-func request_Organizations_RemoveSubject_0(ctx context.Context, marshaler runtime.Marshaler, client OrganizationsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_Organizations_RemoveUser_0(ctx context.Context, marshaler runtime.Marshaler, client OrganizationsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq RemoveSubjectRequest
+		protoReq RemoveUserRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -168,27 +166,21 @@ func request_Organizations_RemoveSubject_0(ctx context.Context, marshaler runtim
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id", err)
 	}
-	val, ok = pathParams["subject_identifier"]
+	val, ok = pathParams["user_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "subject_identifier")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "user_id")
 	}
-	protoReq.SubjectIdentifier, err = runtime.String(val)
+	protoReq.UserId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "subject_identifier", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
 	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Organizations_RemoveSubject_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	msg, err := client.RemoveSubject(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.RemoveUser(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_Organizations_RemoveSubject_0(ctx context.Context, marshaler runtime.Marshaler, server OrganizationsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_Organizations_RemoveUser_0(ctx context.Context, marshaler runtime.Marshaler, server OrganizationsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq RemoveSubjectRequest
+		protoReq RemoveUserRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -200,21 +192,15 @@ func local_request_Organizations_RemoveSubject_0(ctx context.Context, marshaler 
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id", err)
 	}
-	val, ok = pathParams["subject_identifier"]
+	val, ok = pathParams["user_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "subject_identifier")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "user_id")
 	}
-	protoReq.SubjectIdentifier, err = runtime.String(val)
+	protoReq.UserId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "subject_identifier", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
 	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Organizations_RemoveSubject_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	msg, err := server.RemoveSubject(ctx, &protoReq)
+	msg, err := server.RemoveUser(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -297,6 +283,117 @@ func local_request_Organizations_ListInvitations_0(ctx context.Context, marshale
 	return msg, metadata, err
 }
 
+func request_Organizations_RemoveInvitation_0(ctx context.Context, marshaler runtime.Marshaler, client OrganizationsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq RemoveInvitationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	io.Copy(io.Discard, req.Body)
+	val, ok := pathParams["id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id")
+	}
+	protoReq.Id, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id", err)
+	}
+	val, ok = pathParams["invitation_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "invitation_id")
+	}
+	protoReq.InvitationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "invitation_id", err)
+	}
+	msg, err := client.RemoveInvitation(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Organizations_RemoveInvitation_0(ctx context.Context, marshaler runtime.Marshaler, server OrganizationsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq RemoveInvitationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id")
+	}
+	protoReq.Id, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id", err)
+	}
+	val, ok = pathParams["invitation_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "invitation_id")
+	}
+	protoReq.InvitationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "invitation_id", err)
+	}
+	msg, err := server.RemoveInvitation(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+func request_Organizations_UpdateInvitation_0(ctx context.Context, marshaler runtime.Marshaler, client OrganizationsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq UpdateInvitationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id")
+	}
+	protoReq.Id, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id", err)
+	}
+	val, ok = pathParams["invitation_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "invitation_id")
+	}
+	protoReq.InvitationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "invitation_id", err)
+	}
+	msg, err := client.UpdateInvitation(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Organizations_UpdateInvitation_0(ctx context.Context, marshaler runtime.Marshaler, server OrganizationsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq UpdateInvitationRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id")
+	}
+	protoReq.Id, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id", err)
+	}
+	val, ok = pathParams["invitation_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "invitation_id")
+	}
+	protoReq.InvitationId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "invitation_id", err)
+	}
+	msg, err := server.UpdateInvitation(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 // RegisterOrganizationsHandlerServer registers the http handlers for service Organizations to "mux".
 // UnaryRPC     :call OrganizationsServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -363,25 +460,25 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Organizations_DeleteOrganization_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_Organizations_RemoveSubject_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodDelete, pattern_Organizations_RemoveUser_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveSubject", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/subjects/{subject_identifier}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveUser", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_Organizations_RemoveSubject_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_Organizations_RemoveUser_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Organizations_RemoveSubject_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Organizations_RemoveUser_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_Organizations_CreateInvitation_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -422,6 +519,46 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 			return
 		}
 		forward_Organizations_ListInvitations_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodDelete, pattern_Organizations_RemoveInvitation_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveInvitation", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations/{invitation_id}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Organizations_RemoveInvitation_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Organizations_RemoveInvitation_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPut, pattern_Organizations_UpdateInvitation_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateInvitation", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations/{invitation_id}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Organizations_UpdateInvitation_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Organizations_UpdateInvitation_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -514,22 +651,22 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Organizations_DeleteOrganization_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_Organizations_RemoveSubject_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodDelete, pattern_Organizations_RemoveUser_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveSubject", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/subjects/{subject_identifier}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveUser", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_Organizations_RemoveSubject_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_Organizations_RemoveUser_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Organizations_RemoveSubject_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Organizations_RemoveUser_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPost, pattern_Organizations_CreateInvitation_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -565,6 +702,40 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Organizations_ListInvitations_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodDelete, pattern_Organizations_RemoveInvitation_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveInvitation", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations/{invitation_id}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Organizations_RemoveInvitation_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Organizations_RemoveInvitation_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPut, pattern_Organizations_UpdateInvitation_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateInvitation", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations/{invitation_id}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Organizations_UpdateInvitation_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Organizations_UpdateInvitation_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
@@ -572,16 +743,20 @@ var (
 	pattern_Organizations_DescribeOrganization_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "organizations", "id"}, ""))
 	pattern_Organizations_UpdateOrganization_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "organizations", "id"}, ""))
 	pattern_Organizations_DeleteOrganization_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "organizations", "id"}, ""))
-	pattern_Organizations_RemoveSubject_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "subjects", "subject_identifier"}, ""))
+	pattern_Organizations_RemoveUser_0           = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "users", "user_id"}, ""))
 	pattern_Organizations_CreateInvitation_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "invitations"}, ""))
 	pattern_Organizations_ListInvitations_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "invitations"}, ""))
+	pattern_Organizations_RemoveInvitation_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "invitations", "invitation_id"}, ""))
+	pattern_Organizations_UpdateInvitation_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "invitations", "invitation_id"}, ""))
 )
 
 var (
 	forward_Organizations_DescribeOrganization_0 = runtime.ForwardResponseMessage
 	forward_Organizations_UpdateOrganization_0   = runtime.ForwardResponseMessage
 	forward_Organizations_DeleteOrganization_0   = runtime.ForwardResponseMessage
-	forward_Organizations_RemoveSubject_0        = runtime.ForwardResponseMessage
+	forward_Organizations_RemoveUser_0           = runtime.ForwardResponseMessage
 	forward_Organizations_CreateInvitation_0     = runtime.ForwardResponseMessage
 	forward_Organizations_ListInvitations_0      = runtime.ForwardResponseMessage
+	forward_Organizations_RemoveInvitation_0     = runtime.ForwardResponseMessage
+	forward_Organizations_UpdateInvitation_0     = runtime.ForwardResponseMessage
 )

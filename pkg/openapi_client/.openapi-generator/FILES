@@ -25,7 +25,6 @@ docs/AlertAlertType.md
 docs/AuthToken.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
-docs/AuthorizationSubjectIdentifierType.md
 docs/CanvasAPI.md
 docs/ConnectionGroupAPI.md
 docs/EventAPI.md
@@ -82,6 +81,8 @@ docs/OrganizationsInvitation.md
 docs/OrganizationsListInvitationsResponse.md
 docs/OrganizationsOrganization.md
 docs/OrganizationsOrganizationMetadata.md
+docs/OrganizationsUpdateInvitationBody.md
+docs/OrganizationsUpdateInvitationResponse.md
 docs/OrganizationsUpdateOrganizationBody.md
 docs/OrganizationsUpdateOrganizationResponse.md
 docs/ProtobufAny.md
@@ -222,7 +223,6 @@ model_alert_alert_type.go
 model_auth_token.go
 model_authorization_domain_type.go
 model_authorization_permission.go
-model_authorization_subject_identifier_type.go
 model_event_rejection_rejection_reason.go
 model_event_source_daily_schedule.go
 model_event_source_event_type.go
@@ -270,6 +270,8 @@ model_organizations_invitation.go
 model_organizations_list_invitations_response.go
 model_organizations_organization.go
 model_organizations_organization_metadata.go
+model_organizations_update_invitation_body.go
+model_organizations_update_invitation_response.go
 model_organizations_update_organization_body.go
 model_organizations_update_organization_response.go
 model_protobuf_any.go
