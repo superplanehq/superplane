@@ -251,6 +251,8 @@ docs/WorkflowNodeExecutionAPI.md
 docs/WorkflowsCreateWorkflowRequest.md
 docs/WorkflowsCreateWorkflowResponse.md
 docs/WorkflowsDescribeWorkflowResponse.md
+docs/WorkflowsEmitNodeEventBody.md
+docs/WorkflowsEmitNodeEventResponse.md
 docs/WorkflowsInvokeNodeExecutionActionBody.md
 docs/WorkflowsListChildExecutionsResponse.md
 docs/WorkflowsListEventExecutionsResponse.md
@@ -472,6 +474,8 @@ model_users_user_status.go
 model_workflows_create_workflow_request.go
 model_workflows_create_workflow_response.go
 model_workflows_describe_workflow_response.go
+model_workflows_emit_node_event_body.go
+model_workflows_emit_node_event_response.go
 model_workflows_invoke_node_execution_action_body.go
 model_workflows_list_child_executions_response.go
 model_workflows_list_event_executions_response.go

@@ -3425,6 +3425,52 @@
         ]
       }
     },
+    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/events": {
+      "post": {
+        "summary": "Emit output event for workflow node",
+        "description": "Emit output event for workflow node",
+        "operationId": "Workflows_EmitNodeEvent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsEmitNodeEventResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsEmitNodeEventBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      }
+    },
     "/api/v1/workflows/{workflowId}/nodes/{nodeId}/executions": {
       "get": {
         "summary": "List node executions",
@@ -6377,6 +6423,25 @@
       "properties": {
         "workflow": {
           "$ref": "#/definitions/WorkflowsWorkflow"
+        }
+      }
+    },
+    "WorkflowsEmitNodeEventBody": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "WorkflowsEmitNodeEventResponse": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
         }
       }
     },

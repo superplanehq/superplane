@@ -342,20 +342,13 @@ GET    /workflows/{id}
 PUT    /workflows/{id}
 DELETE /workflows/{id}
 
-List all executions for a node
-  GET /workflows/{workflow_id}/nodes/{node_id}/executions
 
-List all child executions for a parent execution
-  GET /workflows/{workflow_id}/executions/{execution_id}/children
-
-Invoke action on an execution
-  POST /workflows/{workflow_id}/executions/{execution_id}/actions/{action_name}
-
-List all root events for a workflow - workflow_events records with execution_id set
-  GET /workflows/{workflow_id}/events
-
-List all executions for a root event
-  GET /workflows/{workflow_id}/events/{event_id}/executions
+GET   /workflows/{workflow_id}/nodes/{node_id}/executions                      - List all executions for a node
+POST  /workflows/{workflow_id}/nodes/{node_id}/events                          - Manually generate an output event for a node
+GET   /workflows/{workflow_id}/executions/{execution_id}/children              - List all child executions for a parent execution
+POST  /workflows/{workflow_id}/executions/{execution_id}/actions/{action_name} - Invoke action on an execution
+GET   /workflows/{workflow_id}/events                                          - List all root events for a workflow
+GET   /workflows/{workflow_id}/events/{event_id}/executions                    - List all executions for a root event
 
 ## Output channels
 

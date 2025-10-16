@@ -1145,6 +1145,17 @@ export type WorkflowsDescribeWorkflowResponse = {
     workflow?: WorkflowsWorkflow;
 };
 
+export type WorkflowsEmitNodeEventBody = {
+    channel?: string;
+    data?: {
+        [key: string]: unknown;
+    };
+};
+
+export type WorkflowsEmitNodeEventResponse = {
+    eventId?: string;
+};
+
 export type WorkflowsInvokeNodeExecutionActionBody = {
     parameters?: {
         [key: string]: unknown;
@@ -3573,6 +3584,34 @@ export type WorkflowsListChildExecutionsResponses = {
 };
 
 export type WorkflowsListChildExecutionsResponse2 = WorkflowsListChildExecutionsResponses[keyof WorkflowsListChildExecutionsResponses];
+
+export type WorkflowsEmitNodeEventData = {
+    body: WorkflowsEmitNodeEventBody;
+    path: {
+        workflowId: string;
+        nodeId: string;
+    };
+    query?: never;
+    url: '/api/v1/workflows/{workflowId}/nodes/{nodeId}/events';
+};
+
+export type WorkflowsEmitNodeEventErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsEmitNodeEventError = WorkflowsEmitNodeEventErrors[keyof WorkflowsEmitNodeEventErrors];
+
+export type WorkflowsEmitNodeEventResponses = {
+    /**
+     * A successful response.
+     */
+    200: WorkflowsEmitNodeEventResponse;
+};
+
+export type WorkflowsEmitNodeEventResponse2 = WorkflowsEmitNodeEventResponses[keyof WorkflowsEmitNodeEventResponses];
 
 export type WorkflowsListNodeExecutionsData = {
     body?: never;

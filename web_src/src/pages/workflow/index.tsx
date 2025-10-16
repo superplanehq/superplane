@@ -30,25 +30,30 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs'
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from '../../components/ui/item'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
-import { IfNode } from '../blueprint/components/nodes/IfNode'
-import { HttpNode } from '../blueprint/components/nodes/HttpNode'
-import { FilterNode } from '../blueprint/components/nodes/FilterNode'
-import { SwitchNode } from '../blueprint/components/nodes/SwitchNode'
-import { ApprovalNode } from '../blueprint/components/nodes/ApprovalNode'
-import { DefaultNode } from '../blueprint/components/nodes/DefaultNode'
 import { WorkflowNodeSidebar } from '../../components/WorkflowNodeSidebar'
 import { ConfigurationFieldRenderer } from '../../components/ConfigurationFieldRenderer'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../../components/ui/resizable'
+import { EmitEventModal } from './components/EmitEventModal'
+import { workflowsEmitNodeEvent } from '../../api-client/sdk.gen'
+import { withOrganizationHeader } from '../../utils/withOrganizationHeader'
+import {
+  WorkflowIfNode,
+  WorkflowHttpNode,
+  WorkflowFilterNode,
+  WorkflowSwitchNode,
+  WorkflowApprovalNode,
+  WorkflowDefaultNode
+} from './components/nodes'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
 const nodeTypes: NodeTypes = {
-  if: IfNode,
-  http: HttpNode,
-  filter: FilterNode,
-  switch: SwitchNode,
-  approval: ApprovalNode,
-  default: DefaultNode,
+  if: WorkflowIfNode,
+  http: WorkflowHttpNode,
+  filter: WorkflowFilterNode,
+  switch: WorkflowSwitchNode,
+  approval: WorkflowApprovalNode,
+  default: WorkflowDefaultNode,
 }
 
 const elk = new ELK()
@@ -110,6 +115,7 @@ export const Workflow = () => {
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'components' | 'blueprints'>('components')
   const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string; componentLabel?: string; blueprintId?: string } | null>(null)
+  const [emitModalNode, setEmitModalNode] = useState<{ id: string; name: string; channels: string[] } | null>(null)
 
   // Fetch workflow, components, and blueprints
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!)
@@ -125,6 +131,47 @@ export const Workflow = () => {
     ...components.map((p: any) => ({ ...p, type: 'component' as const })),
     ...blueprints.map((b: any) => ({ ...b, type: 'blueprint' as const }))
   ]
+
+  // Define handlers before they're used in useEffect
+  // Use setNodes to access current nodes without adding it as a dependency
+  const handleNodeEdit = useCallback((nodeId: string) => {
+    setNodes((currentNodes) => {
+      const node = currentNodes.find(n => n.id === nodeId)
+      if (!node) return currentNodes
+
+      const block = buildingBlocks.find((b: BuildingBlock) => {
+        if (node.data.blockType === 'component') {
+          return b.name === node.data.blockName && b.type === 'component'
+        } else {
+          return (b as any).id === node.data.blockId && b.type === 'blueprint'
+        }
+      })
+      if (!block) return currentNodes
+
+      setEditingNodeId(node.id)
+      setSelectedBlock(block)
+      setNodeName(node.data.label as string)
+      setNodeConfiguration((node.data.configuration as Record<string, any>) || {})
+      setIsAddNodeModalOpen(true)
+
+      return currentNodes
+    })
+  }, [buildingBlocks])
+
+  const handleNodeEmit = useCallback((nodeId: string) => {
+    setNodes((currentNodes) => {
+      const node = currentNodes.find(n => n.id === nodeId)
+      if (!node) return currentNodes
+
+      setEmitModalNode({
+        id: node.id,
+        name: node.data.label as string,
+        channels: (node.data.channels as string[]) || ['default']
+      })
+
+      return currentNodes
+    })
+  }, [])
 
   // Update nodes and edges when workflow data changes
   useEffect(() => {
@@ -160,6 +207,8 @@ export const Workflow = () => {
           blockType: isComponent ? 'component' : 'blueprint',
           channels,
           configuration: node.configuration || {},
+          onEdit: () => handleNodeEdit(node.id),
+          onEmit: () => handleNodeEmit(node.id),
         },
         position: { x: 0, y: 0 }, // Will be set by elk
       }
@@ -221,23 +270,22 @@ export const Workflow = () => {
     })
   }, [buildingBlocks])
 
-  const handleNodeDoubleClick = useCallback((_: any, node: Node) => {
-    const block = buildingBlocks.find((b: BuildingBlock) => {
-      if (node.data.blockType === 'component') {
-        return b.name === node.data.blockName && b.type === 'component'
-      } else {
-        // For blueprints, match by ID
-        return (b as any).id === node.data.blockId && b.type === 'blueprint'
-      }
-    })
-    if (!block) return
+  const handleEmit = async (channel: string, data: any) => {
+    if (!emitModalNode) return
 
-    setEditingNodeId(node.id)
-    setSelectedBlock(block)
-    setNodeName(node.data.label as string)
-    setNodeConfiguration((node.data.configuration as Record<string, any>) || {})
-    setIsAddNodeModalOpen(true)
-  }, [buildingBlocks])
+    await workflowsEmitNodeEvent(
+      withOrganizationHeader({
+        path: {
+          workflowId: workflowId!,
+          nodeId: emitModalNode.id
+        },
+        body: {
+          channel,
+          data
+        }
+      })
+    )
+  }
 
   const handleAddNode = () => {
     if (!selectedBlock || !nodeName.trim()) return
@@ -281,6 +329,8 @@ export const Workflow = () => {
           blockType: selectedBlock.type,
           channels,
           configuration: nodeConfiguration,
+          onEdit: () => handleNodeEdit(newNodeId),
+          onEmit: () => handleNodeEmit(newNodeId),
         } as Record<string, unknown>,
       }
       setNodes((nds) => [...nds, newNode])
@@ -521,7 +571,6 @@ export const Workflow = () => {
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onNodeClick={handleNodeClick}
-                onNodeDoubleClick={handleNodeDoubleClick}
                 fitView
                 colorMode="system"
               >
@@ -607,6 +656,20 @@ export const Workflow = () => {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* Emit Event Modal */}
+      {emitModalNode && (
+        <EmitEventModal
+          isOpen={true}
+          onClose={() => setEmitModalNode(null)}
+          nodeId={emitModalNode.id}
+          nodeName={emitModalNode.name}
+          workflowId={workflowId!}
+          organizationId={organizationId!}
+          channels={emitModalNode.channels}
+          onEmit={handleEmit}
+        />
+      )}
     </div>
   )
 }

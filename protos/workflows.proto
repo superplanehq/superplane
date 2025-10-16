@@ -95,6 +95,18 @@ service Workflows {
     };
   }
 
+  rpc EmitNodeEvent(EmitNodeEventRequest) returns (EmitNodeEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/events"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Emit output event for workflow node";
+      description: "Emit output event for workflow node";
+      tags: "WorkflowNode";
+    };
+  }
+
   rpc InvokeNodeExecutionAction(InvokeNodeExecutionActionRequest) returns (InvokeNodeExecutionActionResponse) {
     option (google.api.http) = {
       post: "/api/v1/workflows/{workflow_id}/executions/{execution_id}/actions/{action_name}"
@@ -188,6 +200,17 @@ message Workflow {
   google.protobuf.Timestamp updated_at = 6;
   repeated Components.Node nodes = 7;
   repeated Components.Edge edges = 8;
+}
+
+message EmitNodeEventRequest {
+  string workflow_id = 1;
+  string node_id = 2;
+  string channel = 3;
+  google.protobuf.Struct data = 4;
+}
+
+message EmitNodeEventResponse {
+  string event_id = 1;
 }
 
 message ListNodeExecutionsRequest {

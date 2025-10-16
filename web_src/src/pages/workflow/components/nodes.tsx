@@ -1,0 +1,62 @@
+import { NodeProps } from '@xyflow/react'
+import { WorkflowNodeWrapper } from './WorkflowNodeWrapper'
+import { IfNode } from '../../../pages/blueprint/components/nodes/IfNode'
+import { HttpNode } from '../../../pages/blueprint/components/nodes/HttpNode'
+import { FilterNode } from '../../../pages/blueprint/components/nodes/FilterNode'
+import { SwitchNode } from '../../../pages/blueprint/components/nodes/SwitchNode'
+import { ApprovalNode } from '../../../pages/blueprint/components/nodes/ApprovalNode'
+import { DefaultNode } from '../../../pages/blueprint/components/nodes/DefaultNode'
+
+export const WorkflowIfNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={IfNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowHttpNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={HttpNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowFilterNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={FilterNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowSwitchNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={SwitchNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowApprovalNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={ApprovalNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowDefaultNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={DefaultNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)

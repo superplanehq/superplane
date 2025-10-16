@@ -55,6 +55,32 @@ func (s *WorkflowService) ListNodeExecutions(ctx context.Context, req *pb.ListNo
 	return workflows.ListNodeExecutions(ctx, s.registry, req.WorkflowId, req.NodeId, req.States, req.Results, req.Limit, req.Before)
 }
 
+func (s *WorkflowService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEventRequest) (*pb.EmitNodeEventResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+
+	workflowID, err := uuid.Parse(req.WorkflowId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	if req.NodeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id is required")
+	}
+
+	if req.Channel == "" {
+		return nil, status.Error(codes.InvalidArgument, "channel is required")
+	}
+
+	return workflows.EmitNodeEvent(
+		ctx,
+		uuid.MustParse(organizationID),
+		workflowID,
+		req.NodeId,
+		req.Channel,
+		req.Data.AsMap(),
+	)
+}
+
 func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionRequest) (*pb.InvokeNodeExecutionActionResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
