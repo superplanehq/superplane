@@ -10,6 +10,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func RemoveSubject(ctx context.Context, authService authorization.Authorization, orgID string, canvasID string, subjectIdentifierType pbAuth.SubjectIdentifierType, subjectIdentifier string) (*pb.RemoveSubjectResponse, error) {
@@ -62,15 +63,12 @@ func removeInvitationFromCanvas(ctx context.Context, invitationID string, canvas
 	}
 
 	// Find the canvas ID in the invitation's canvas IDs and remove it
-	var updatedCanvasIDs []uuid.UUID
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
-	}
+	var updatedCanvasIDs []string
+	canvasIDs := invitation.CanvasIDs.Data()
 
 	found := false
-	for _, id := range invitation.CanvasIDs {
-		if id != canvasUUID {
+	for _, id := range canvasIDs {
+		if id != canvasID {
 			updatedCanvasIDs = append(updatedCanvasIDs, id)
 		} else {
 			found = true
@@ -81,7 +79,7 @@ func removeInvitationFromCanvas(ctx context.Context, invitationID string, canvas
 		return nil, status.Error(codes.NotFound, "invitation not associated with this canvas")
 	}
 
-	invitation.CanvasIDs = updatedCanvasIDs
+	invitation.CanvasIDs = datatypes.NewJSONType(updatedCanvasIDs)
 	err = models.SaveInvitation(invitation)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to update invitation")

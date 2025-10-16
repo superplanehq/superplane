@@ -1,5 +1,5 @@
 BEGIN;
 
-ALTER TABLE organization_invitations ADD COLUMN canvas_ids uuid[];
+ALTER TABLE organization_invitations ADD COLUMN canvas_ids jsonb;
 
 COMMIT;

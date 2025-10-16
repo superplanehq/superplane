@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +18,7 @@ const (
 type OrganizationInvitation struct {
 	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	OrganizationID uuid.UUID
-	CanvasIDs      UUIDArray `gorm:"type:text[]"`
+	CanvasIDs      datatypes.JSONType[[]string] `gorm:"type:jsonb"`
 	Email          string
 	InvitedBy      uuid.UUID
 	State          string

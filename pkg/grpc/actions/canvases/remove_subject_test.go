@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func Test_RemoveSubject(t *testing.T) {
@@ -66,7 +67,7 @@ func Test_RemoveSubject(t *testing.T) {
 			Email:          "test@example.com",
 			OrganizationID: r.Organization.ID,
 			State:          models.InvitationStatePending,
-			CanvasIDs:      []uuid.UUID{r.Canvas.ID},
+			CanvasIDs:      datatypes.NewJSONType([]string{r.Canvas.ID.String()}),
 		}
 		err := models.SaveInvitation(invitation)
 		require.NoError(t, err)
@@ -77,7 +78,7 @@ func Test_RemoveSubject(t *testing.T) {
 
 		updatedInvitation, err := models.FindInvitationByIDWithState(invitation.ID.String(), models.InvitationStatePending)
 		require.NoError(t, err)
-		assert.NotContains(t, updatedInvitation.CanvasIDs, r.Canvas.ID)
+		assert.NotContains(t, updatedInvitation.CanvasIDs.Data(), r.Canvas.ID.String())
 	})
 
 	t.Run("invitation not associated with canvas -> error", func(t *testing.T) {

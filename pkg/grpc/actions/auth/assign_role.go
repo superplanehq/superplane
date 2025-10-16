@@ -11,6 +11,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName string, subjectIdentifierType pbAuth.SubjectIdentifierType, subjectIdentifier string, authService authorization.Authorization) (*pb.AssignRoleResponse, error) {
@@ -69,13 +70,16 @@ func assignRoleToInvitation(invitationID, roleName, domainID, domainType string)
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
 	}
 
-	for _, existingCanvasID := range invitation.CanvasIDs {
-		if existingCanvasID == canvasID {
+	canvasIDStr := canvasID.String()
+	canvasIDs := invitation.CanvasIDs.Data()
+	for _, existingCanvasID := range canvasIDs {
+		if existingCanvasID == canvasIDStr {
 			return &pb.AssignRoleResponse{}, nil
 		}
 	}
 
-	invitation.CanvasIDs = append(invitation.CanvasIDs, canvasID)
+	canvasIDs = append(canvasIDs, canvasIDStr)
+	invitation.CanvasIDs = datatypes.NewJSONType(canvasIDs)
 
 	err = models.SaveInvitation(invitation)
 	if err != nil {

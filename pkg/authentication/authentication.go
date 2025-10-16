@@ -211,8 +211,8 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 		if err != nil {
 			return err
 		}
-		for _, canvasID := range invitation.CanvasIDs {
-			err = a.authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID.String(), models.DomainTypeCanvas)
+		for _, canvasID := range invitation.CanvasIDs.Data() {
+			err = a.authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
 			if err != nil {
 				return err
 			}

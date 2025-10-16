@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func Test_AssignRole(t *testing.T) {
@@ -83,7 +84,7 @@ func Test_AssignRole(t *testing.T) {
 
 		updatedInvitation, err := models.FindInvitationByIDWithState(invitation.ID.String(), models.InvitationStatePending)
 		require.NoError(t, err)
-		assert.Contains(t, updatedInvitation.CanvasIDs, canvas.ID)
+		assert.Contains(t, updatedInvitation.CanvasIDs.Data(), canvas.ID.String())
 	})
 
 	t.Run("assign canvas viewer role to invitation - already assigned", func(t *testing.T) {
@@ -92,7 +93,7 @@ func Test_AssignRole(t *testing.T) {
 			Email:          "test2@example.com",
 			OrganizationID: r.Organization.ID,
 			State:          models.InvitationStatePending,
-			CanvasIDs:      []uuid.UUID{canvas.ID},
+			CanvasIDs:      datatypes.NewJSONType([]string{canvas.ID.String()}),
 		}
 		err := models.SaveInvitation(invitation)
 		require.NoError(t, err)
@@ -103,8 +104,8 @@ func Test_AssignRole(t *testing.T) {
 		updatedInvitation, err := models.FindInvitationByIDWithState(invitation.ID.String(), models.InvitationStatePending)
 		require.NoError(t, err)
 		count := 0
-		for _, canvasID := range updatedInvitation.CanvasIDs {
-			if canvasID == canvas.ID {
+		for _, canvasID := range updatedInvitation.CanvasIDs.Data() {
+			if canvasID == canvas.ID.String() {
 				count++
 			}
 		}
