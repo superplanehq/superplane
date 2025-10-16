@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -60,7 +59,7 @@ func Test__CreateInvitation(t *testing.T) {
 		//
 		// Then, remove the user from the organization, and verify the user is soft-deleted.
 		//
-		_, err = RemoveSubject(ctx, r.AuthService, r.Organization.ID.String(), pbAuth.SubjectIdentifierType_USER_ID, user.ID.String())
+		_, err = RemoveUser(ctx, r.AuthService, r.Organization.ID.String(), user.ID.String())
 		require.NoError(t, err)
 		user, err = models.FindMaybeDeletedUserByID(r.Organization.ID.String(), user.ID.String())
 		require.NoError(t, err)

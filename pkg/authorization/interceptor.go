@@ -59,7 +59,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSuperplane.Superplane_DescribeCanvas_FullMethodName:               {Resource: "canvas", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbSuperplane.Superplane_ListCanvases_FullMethodName:                 {Resource: "canvas", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbSuperplane.Superplane_AddUser_FullMethodName:                      {Resource: "member", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbSuperplane.Superplane_RemoveSubject_FullMethodName:                {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_RemoveUser_FullMethodName:                   {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_CreateEventSource_FullMethodName:            {Resource: "eventsource", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ResetEventSourceKey_FullMethodName:          {Resource: "eventsource", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_UpdateEventSource_FullMethodName:            {Resource: "eventsource", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
@@ -114,9 +114,11 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		// Organization Rules
 		pbOrganization.Organizations_DescribeOrganization_FullMethodName: {Resource: "org", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbOrganization.Organizations_ListInvitations_FullMethodName:      {Resource: "org", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbOrganization.Organizations_UpdateInvitation_FullMethodName:     {Resource: "member", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbOrganization.Organizations_RemoveInvitation_FullMethodName:     {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbOrganization.Organizations_UpdateOrganization_FullMethodName:   {Resource: "org", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbOrganization.Organizations_CreateInvitation_FullMethodName:     {Resource: "member", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbOrganization.Organizations_RemoveSubject_FullMethodName:        {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbOrganization.Organizations_RemoveUser_FullMethodName:           {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:   {Resource: "org", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 	}
 

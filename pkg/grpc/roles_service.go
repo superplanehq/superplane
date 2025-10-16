@@ -25,7 +25,7 @@ func (s *RoleService) AssignRole(ctx context.Context, req *pb.AssignRoleRequest)
 	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.AssignRole(ctx, orgID, domainType, domainID, req.RoleName, req.SubjectIdentifierType, req.SubjectIdentifier, s.authService)
+	return auth.AssignRole(ctx, orgID, domainType, domainID, req.RoleName, req.UserId, req.UserEmail, s.authService)
 }
 
 func (s *RoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequest) (*pb.ListRolesResponse, error) {

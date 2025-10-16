@@ -282,3 +282,18 @@ func GetCanvasIDs() ([]string, error) {
 
 	return canvasIDs, nil
 }
+
+func ExistManyCanvases(orgID uuid.UUID, ids []uuid.UUID) (bool, error) {
+	var count int64
+
+	err := database.Conn().
+		Where("organization_id = ? AND id IN (?)", orgID, ids).
+		Count(&count).
+		Error
+
+	if err != nil {
+		return false, err
+	}
+
+	return count == int64(len(ids)), nil
+}

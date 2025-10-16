@@ -28,9 +28,9 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.Up
 	return organizations.UpdateOrganization(ctx, orgID, req.Organization)
 }
 
-func (s *OrganizationService) RemoveSubject(ctx context.Context, req *pb.RemoveSubjectRequest) (*pb.RemoveSubjectResponse, error) {
+func (s *OrganizationService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.RemoveSubject(ctx, s.authorizationService, orgID, req.SubjectIdentifierType, req.SubjectIdentifier)
+	return organizations.RemoveUser(ctx, s.authorizationService, orgID, req.UserId)
 }
 
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
@@ -46,4 +46,14 @@ func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.Crea
 func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.ListInvitations(ctx, orgID)
+}
+
+func (s *OrganizationService) RemoveInvitation(ctx context.Context, req *pb.RemoveInvitationRequest) (*pb.RemoveInvitationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.RemoveInvitation(ctx, s.authorizationService, orgID, req.InvitationId)
+}
+
+func (s *OrganizationService) UpdateInvitation(ctx context.Context, req *pb.UpdateInvitationRequest) (*pb.UpdateInvitationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateInvitation(ctx, s.authorizationService, orgID, req.InvitationId, req.CanvasIds)
 }

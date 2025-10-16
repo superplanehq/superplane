@@ -6,37 +6,16 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func RemoveSubject(ctx context.Context, authService authorization.Authorization, orgID string, subjectIdentifierType pbAuth.SubjectIdentifierType, subjectIdentifier string) (*pb.RemoveSubjectResponse, error) {
-	if subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_ID || subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_EMAIL {
-		return removeUser(ctx, authService, orgID, subjectIdentifierType, subjectIdentifier)
-	} else if subjectIdentifierType == pbAuth.SubjectIdentifierType_INVITATION_ID {
-		return removeInvitation(ctx, subjectIdentifier)
-	}
-
-	return nil, status.Error(codes.InvalidArgument, "invalid subject identifier type")
-}
-
-func removeUser(ctx context.Context, authService authorization.Authorization, orgID string, subjectIdentifierType pbAuth.SubjectIdentifierType, subjectIdentifier string) (*pb.RemoveSubjectResponse, error) {
-	var user *models.User
-	var err error
-
-	if subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_ID {
-		user, err = models.FindActiveUserByID(orgID, subjectIdentifier)
-	} else if subjectIdentifierType == pbAuth.SubjectIdentifierType_USER_EMAIL {
-		user, err = models.FindActiveUserByEmail(orgID, subjectIdentifier)
-	}
-
+func RemoveUser(ctx context.Context, authService authorization.Authorization, orgID, userID string) (*pb.RemoveUserResponse, error) {
+	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
-
-	userID := user.ID.String()
 
 	//
 	// TODO: this should all be inside of a transaction
@@ -86,21 +65,5 @@ func removeUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, status.Error(codes.Internal, "error deleting user")
 	}
 
-	return &pb.RemoveSubjectResponse{}, nil
-}
-
-func removeInvitation(ctx context.Context, invitationID string) (*pb.RemoveSubjectResponse, error) {
-	invitation, err := models.FindInvitationByIDWithState(invitationID, models.InvitationStatePending)
-	if err != nil {
-		log.Errorf("Invitation not found: %s", invitationID)
-		return nil, status.Error(codes.NotFound, "invitation not found")
-	}
-
-	err = invitation.Delete()
-	if err != nil {
-		log.Errorf("Error deleting invitation %s: %v", invitationID, err)
-		return nil, status.Error(codes.Internal, "failed to delete invitation")
-	}
-
-	return &pb.RemoveSubjectResponse{}, nil
+	return &pb.RemoveUserResponse{}, nil
 }
