@@ -29,7 +29,8 @@ import {
   useAssignRole,
   useRemoveOrganizationSubject,
   useOrganizationInvitations,
-  useCreateInvitation
+  useCreateInvitation,
+  useRemoveInvitation
 } from '../../../hooks/useOrganizationData'
 
 interface Member {
@@ -84,6 +85,7 @@ export function Members({ organizationId }: MembersProps) {
   // Mutations for role assignment and user removal
   const assignRoleMutation = useAssignRole(organizationId)
   const removeUserMutation = useRemoveOrganizationSubject(organizationId)
+  const removeInvitationMutation = useRemoveInvitation(organizationId)
 
   // Create invitation mutation
   const createInvitationMutation = useCreateInvitation(organizationId, {
@@ -218,14 +220,10 @@ export function Members({ organizationId }: MembersProps) {
     try {
       if (member.type === 'member') {
         await removeUserMutation.mutateAsync({
-          subjectId: member.id,
-          subjectType: 'USER_ID',
+          userId: member.id,
         })
       } else {
-        await removeUserMutation.mutateAsync({
-          subjectId: member.id,
-          subjectType: 'INVITATION_ID',
-        })
+        await removeInvitationMutation.mutateAsync(member.id)
       }
     } catch (err) {
       console.error('Error removing member:', err)

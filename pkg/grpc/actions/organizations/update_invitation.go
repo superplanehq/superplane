@@ -33,6 +33,7 @@ func UpdateInvitation(ctx context.Context, authService authorization.Authorizati
 
 		exists, err := models.ExistManyCanvases(uuid.MustParse(orgID), parsedCanvasIDs)
 		if err != nil {
+			log.Errorf("Error checking canvas existence: %v", err)
 			return nil, status.Error(codes.Internal, "failed to check canvas existence")
 		}
 

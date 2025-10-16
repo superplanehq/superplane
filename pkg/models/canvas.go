@@ -287,6 +287,7 @@ func ExistManyCanvases(orgID uuid.UUID, ids []uuid.UUID) (bool, error) {
 	var count int64
 
 	err := database.Conn().
+		Model(&Canvas{}).
 		Where("organization_id = ? AND id IN (?)", orgID, ids).
 		Count(&count).
 		Error

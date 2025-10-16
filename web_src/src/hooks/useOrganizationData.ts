@@ -20,11 +20,13 @@ import {
   superplaneListCanvases,
   superplaneCreateCanvas,
   superplaneDeleteCanvas,
-  organizationsRemoveSubject,
+  organizationsRemoveUser,
   organizationsListInvitations,
-  organizationsCreateInvitation
+  organizationsCreateInvitation,
+  organizationsUpdateInvitation,
+  organizationsRemoveInvitation
 } from '../api-client/sdk.gen'
-import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveSubjectData } from '@/api-client'
+import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData, OrganizationsUpdateInvitationData } from '@/api-client'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 
 // Query Keys
@@ -216,19 +218,15 @@ export const useRemoveOrganizationSubject = (organizationId: string) => {
 
   return useMutation({
     mutationFn: async (params: {
-      subjectId: string,
-      subjectType: 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID'
+      userId: string,
     }) => {
-      return await organizationsRemoveSubject(
+      return await organizationsRemoveUser(
         withOrganizationHeader({
           path: {
             id: organizationId,
-            subjectIdentifier: params.subjectId,
+            userId: params.userId,
           },
-          query: {
-            subjectIdentifierType: params.subjectType,
-          }
-        } as OrganizationsRemoveSubjectData) 
+        } as OrganizationsRemoveUserData) 
       )
     },
     onSuccess: () => {
@@ -261,6 +259,55 @@ export const useCreateInvitation = (organizationId: string, options?: {
       if (data.invitation?.state === 'accepted') {
         queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
       }
+    },
+    onError: options?.onError
+  })
+}
+
+export const useUpdateInvitation = (organizationId: string, options?: {
+  onError?: (error: Error) => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({invitationId, canvasIds}: {invitationId: string, canvasIds: string[]}) => {
+      const response = await organizationsUpdateInvitation(
+        withOrganizationHeader({
+          path: { id: organizationId, invitationId },
+          body: {
+            canvasIds: canvasIds,
+          }
+        } as OrganizationsUpdateInvitationData)
+      )
+      return response.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) })
+
+      if (data.invitation?.state === 'accepted') {
+        queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
+      }
+    },
+    onError: options?.onError
+  })
+}
+
+export const useRemoveInvitation = (organizationId: string, options?: {
+  onError?: (error: Error) => void
+}) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (invitationId: string) => {
+      const response = await organizationsRemoveInvitation(
+        withOrganizationHeader({
+          path: { id: organizationId, invitationId },
+        })
+      )
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(organizationId) })
     },
     onError: options?.onError
   })

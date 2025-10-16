@@ -24,13 +24,14 @@ import {
   useCanvasRoles,
   useCanvasUsers,
   useAssignCanvasRole,
-  useRemoveCanvasSubject,
-  useAddCanvasUser
+  useAddCanvasUser,
+  useRemoveCanvasUser
 } from '../../../hooks/useCanvasData'
 import {
   useOrganizationUsers,
   useOrganizationInvitations,
-  useCreateInvitation
+  useCreateInvitation,
+  useUpdateInvitation
 } from '../../../hooks/useOrganizationData'
 
 interface CanvasMembersProps {
@@ -82,7 +83,8 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
 
   // Mutations
   const assignRoleMutation = useAssignCanvasRole(canvasId)
-  const removeUserMutation = useRemoveCanvasSubject(canvasId)
+  const updateInvitationMutation = useUpdateInvitation(organizationId)
+  const removeUserMutation = useRemoveCanvasUser(canvasId)
   const addUserMutation = useAddCanvasUser(canvasId)
   const createInvitationMutation = useCreateInvitation(organizationId)
 
@@ -248,18 +250,14 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
   // Assign pending invitation to canvas by giving it canvas viewer role
   const handleAssignInvitationToCanvas = async (invitationId: string) => {
     try {
-      // Get the default viewer role for canvas
-      const viewerRole = canvasRoles.find(role =>
-        role.metadata?.name?.toLowerCase().includes('viewer') ||
-        role.spec?.displayName?.toLowerCase().includes('viewer')
-      )
-      const roleName = viewerRole?.metadata?.name || 'canvas-viewer' // fallback to default role name
-
-      // Use the updated assignRoleMutation with subjectId/subjectType support
-      await assignRoleMutation.mutateAsync({
-        subjectIdentifier: invitationId,
-        subjectIdentifierType: 'INVITATION_ID',
-        role: roleName,
+      const invitation = orgInvitations.find(inv => inv.id === invitationId)
+      if (!invitation) {
+        console.error('Invitation not found:', invitationId)
+        return
+      }
+      await updateInvitationMutation.mutateAsync({
+        invitationId,
+        canvasIds: invitation.canvasIds?.concat(canvasId) || [canvasId],
       })
     } catch (err) {
       console.error('Error assigning invitation to canvas:', err)
@@ -269,9 +267,7 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
   // Invite new user to organization and add to canvas
   const handleInviteNewUser = async (email: string) => {
     try {
-      // Create the organization invitation
       const result = await createInvitationMutation.mutateAsync(email)
-      // Assign canvas viewer role to the invitation
       await handleAssignInvitationToCanvas(result.invitation?.id || '')
 
     } catch (err) {
@@ -282,8 +278,7 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
     try {
       await assignRoleMutation.mutateAsync({
-        subjectIdentifier: memberId,
-        subjectIdentifierType: 'USER_ID',
+        userId: memberId,
         role: newRoleName,
       })
     } catch (err) {
@@ -294,8 +289,7 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
   const handleRemoveMember = async (userId: string) => {
     try {
       await removeUserMutation.mutateAsync({
-        subjectId: userId,
-        subjectType: 'USER_ID',
+        userId,
       })
     } catch (err) {
       console.error('Error removing member:', err)
@@ -304,9 +298,14 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
 
   const handleRemoveInvitation = async (invitationId: string) => {
     try {
-      await removeUserMutation.mutateAsync({
-        subjectId: invitationId,
-        subjectType: 'INVITATION_ID',
+      const invitation = orgInvitations.find(inv => inv.id === invitationId)
+      if (!invitation) {
+        console.error('Invitation not found:', invitationId)
+        return
+      }
+      await updateInvitationMutation.mutateAsync({
+        invitationId,
+        canvasIds: invitation.canvasIds?.filter(id => id !== canvasId) || [],
       })
     } catch (err) {
       console.error('Error removing invitation:', err)

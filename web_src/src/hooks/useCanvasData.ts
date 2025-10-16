@@ -20,13 +20,13 @@ import {
   superplaneDescribeConnectionGroup,
   integrationsListIntegrations,
   superplaneAddUser,
-  superplaneRemoveSubject,
   superplaneListEvents,
   superplaneListStageEvents,
   superplaneListStageExecutions,
   superplaneListEventRejections,
   superplaneListAlerts,
   superplaneAcknowledgeAlert,
+  superplaneRemoveUser,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState, SuperplaneAlert, RolesAssignRoleData } from '../api-client/types.gen'
@@ -100,15 +100,13 @@ export const useAssignCanvasRole = (canvasId: string) => {
 
   return useMutation({
     mutationFn: async (params: {
-      subjectIdentifier?: string,
-      subjectIdentifierType?: 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID',
+      userId?: string,
       role: string,
     }) => {
       return await rolesAssignRole(withOrganizationHeader({
         path: { roleName: params.role },
         body: {
-          subjectIdentifier: params.subjectIdentifier,
-          subjectIdentifierType: params.subjectIdentifierType,
+          userId: params.userId,
           domainId: canvasId,
           domainType: 'DOMAIN_TYPE_CANVAS'
         }
@@ -142,22 +140,18 @@ export const useAddCanvasUser = (canvasId: string) => {
   })
 }
 
-export const useRemoveCanvasSubject = (canvasId: string) => {
+export const useRemoveCanvasUser = (canvasId: string) => {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (params: {
-      subjectId: string,
-      subjectType: 'USER_ID' | 'USER_EMAIL' | 'INVITATION_ID'
+      userId: string,
     }) => {
-      return await superplaneRemoveSubject(withOrganizationHeader({
+      return await superplaneRemoveUser(withOrganizationHeader({
         path: {
           canvasIdOrName: canvasId,
-          subjectIdentifier: params.subjectId
+          userId: params.userId
         },
-        query: {
-          subjectIdentifierType: params.subjectType,
-        }
       }))
     },
     onSuccess: () => {
