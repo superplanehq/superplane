@@ -42,7 +42,17 @@ func UpdateInvitation(ctx context.Context, authService authorization.Authorizati
 		}
 	}
 
-	invitation.CanvasIDs = datatypes.NewJSONType(canvasIDs)
+	uniqueCanvasIDMap := make(map[uuid.UUID]bool)
+	for _, canvasID := range canvasIDs {
+		uniqueCanvasIDMap[uuid.MustParse(canvasID)] = true
+	}
+
+	uniqueCanvasIDs := make([]string, 0, len(uniqueCanvasIDMap))
+	for canvasID := range uniqueCanvasIDMap {
+		uniqueCanvasIDs = append(uniqueCanvasIDs, canvasID.String())
+	}
+
+	invitation.CanvasIDs = datatypes.NewJSONType(uniqueCanvasIDs)
 
 	err = models.SaveInvitation(invitation)
 	if err != nil {
