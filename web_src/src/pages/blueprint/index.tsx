@@ -38,6 +38,7 @@ import { FilterNode } from './components/nodes/FilterNode'
 import { SwitchNode } from './components/nodes/SwitchNode'
 import { DefaultNode } from './components/nodes/DefaultNode'
 import { ApprovalNode } from './components/nodes/ApprovalNode'
+import { OutputChannelNode } from './components/nodes/OutputChannelNode'
 import { ConfigurationFieldRenderer } from '../../components/ConfigurationFieldRenderer'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs'
@@ -51,6 +52,7 @@ const nodeTypes: NodeTypes = {
   switch: SwitchNode,
   approval: ApprovalNode,
   default: DefaultNode,
+  outputChannel: OutputChannelNode,
 }
 
 const elk = new ELK()
@@ -101,11 +103,15 @@ export const Blueprint = () => {
   const [nodeName, setNodeName] = useState('')
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'components' | 'configuration'>('components')
+  const [activeTab, setActiveTab] = useState<'components' | 'configuration' | 'outputChannels'>('components')
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([])
   const [isEditConfigFieldModalOpen, setIsEditConfigFieldModalOpen] = useState(false)
   const [editingConfigFieldIndex, setEditingConfigFieldIndex] = useState<number | null>(null)
   const [configFieldForm, setConfigFieldForm] = useState<any>({})
+  const [blueprintOutputChannels, setBlueprintOutputChannels] = useState<any[]>([])
+  const [isEditOutputChannelModalOpen, setIsEditOutputChannelModalOpen] = useState(false)
+  const [editingOutputChannelIndex, setEditingOutputChannelIndex] = useState<number | null>(null)
+  const [outputChannelForm, setOutputChannelForm] = useState<any>({})
 
   // Fetch blueprint and components
   const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId!, blueprintId!)
@@ -115,10 +121,13 @@ export const Blueprint = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
-  // Update blueprint configuration when blueprint loads
+  // Update blueprint configuration and output channels when blueprint loads
   useEffect(() => {
     if (blueprint?.configuration) {
       setBlueprintConfiguration(blueprint.configuration)
+    }
+    if (blueprint?.outputChannels) {
+      setBlueprintOutputChannels(blueprint.outputChannels)
     }
   }, [blueprint])
 
@@ -126,7 +135,20 @@ export const Blueprint = () => {
   useEffect(() => {
     if (!blueprint || components.length === 0) return
 
-    const loadedNodes: Node[] = (blueprint.nodes || []).map((node: any) => {
+    const allNodes: Node[] = (blueprint.nodes || []).map((node: any) => {
+      // Handle output channel nodes
+      if (node.type === 'TYPE_OUTPUT_CHANNEL') {
+        return {
+          id: node.id,
+          type: 'outputChannel',
+          data: {
+            label: node.name,
+          },
+          position: { x: 0, y: 0 }, // Will be set by elk
+        }
+      }
+
+      // Handle component nodes
       const component = components.find((p: any) => p.name === node.component?.name)
       const channels = component?.channels?.map((channel: any) => channel.name) || ['default']
       const componentName = node.component?.name
@@ -157,7 +179,7 @@ export const Blueprint = () => {
     }))
 
     // Apply elk layout
-    getLayoutedElements(loadedNodes, loadedEdges).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+    getLayoutedElements(allNodes, loadedEdges).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
       setNodes(layoutedNodes)
       setEdges(layoutedEdges)
     })
@@ -165,9 +187,16 @@ export const Blueprint = () => {
 
   const onConnect = useCallback(
     (params: Connection) => {
+      // Prevent connections from output channels (output channels can only have incoming connections)
+      const sourceNode = nodes.find(n => n.id === params.source)
+      if (sourceNode?.type === 'outputChannel') {
+        showErrorToast('Output channels cannot have outgoing connections')
+        return
+      }
+
       setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 2, stroke: '#64748b' } }, eds))
     },
-    [setEdges]
+    [setEdges, nodes]
   )
 
   const handleComponentClick = (component: any) => {
@@ -216,8 +245,8 @@ export const Blueprint = () => {
       )
     } else {
       // Add new node with left-to-right positioning
-      const channels = selectedComponent?.channels?.map((channel: any) => channel.name) || ['default']
       const newNodeId = generateNodeId(selectedComponent.name, nodeName.trim())
+      const channels = selectedComponent?.channels?.map((channel: any) => channel.name) || ['default']
 
       // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
       const nodeType = selectedComponent.name && nodeTypes[selectedComponent.name as keyof typeof nodeTypes]
@@ -311,21 +340,82 @@ export const Blueprint = () => {
     handleCloseConfigFieldModal()
   }
 
+  const handleOpenOutputChannelModal = (index?: number) => {
+    if (index !== undefined) {
+      setEditingOutputChannelIndex(index)
+      setOutputChannelForm(blueprintOutputChannels[index])
+    } else {
+      setEditingOutputChannelIndex(null)
+      setOutputChannelForm({
+        name: '',
+        nodeId: '',
+        nodeOutputChannel: 'default',
+      })
+    }
+    setIsEditOutputChannelModalOpen(true)
+  }
+
+  const handleCloseOutputChannelModal = () => {
+    setIsEditOutputChannelModalOpen(false)
+    setEditingOutputChannelIndex(null)
+    setOutputChannelForm({})
+  }
+
+  const handleSaveOutputChannel = () => {
+    if (!outputChannelForm.name.trim()) {
+      showErrorToast('Output channel name is required')
+      return
+    }
+
+    if (!outputChannelForm.nodeId) {
+      showErrorToast('Node selection is required')
+      return
+    }
+
+    if (editingOutputChannelIndex !== null) {
+      // Update existing output channel
+      const newOutputChannels = [...blueprintOutputChannels]
+      newOutputChannels[editingOutputChannelIndex] = outputChannelForm
+      setBlueprintOutputChannels(newOutputChannels)
+    } else {
+      // Add new output channel
+      setBlueprintOutputChannels([...blueprintOutputChannels, outputChannelForm])
+    }
+
+    handleCloseOutputChannelModal()
+  }
+
   const handleSave = async () => {
     try {
-      const blueprintNodes = nodes.map((node) => ({
-        id: node.id,
-        name: (node.data as any).label as string,
-        refType: 'REF_TYPE_COMPONENT',
-        component: {
-          name: (node.data as any).component as string,
-        },
-        configuration: (node.data as any).configuration || {},
-      }))
+      // Serialize all nodes including output channels
+      const blueprintNodes = nodes.map((node) => {
+        if (node.type === 'outputChannel') {
+          // Output channel nodes
+          return {
+            id: node.id,
+            name: (node.data as any).label as string,
+            type: 'TYPE_OUTPUT_CHANNEL',
+            outputChannel: {
+              name: (node.data as any).label as string,
+            },
+            configuration: {},
+          }
+        } else {
+          // Component nodes
+          return {
+            id: node.id,
+            name: (node.data as any).label as string,
+            type: 'TYPE_COMPONENT',
+            component: {
+              name: (node.data as any).component as string,
+            },
+            configuration: (node.data as any).configuration || {},
+          }
+        }
+      })
 
       const blueprintEdges = edges.map((edge) => ({
         sourceId: edge.source!,
-        targetType: 'REF_TYPE_NODE',
         targetId: edge.target!,
         channel: edge.sourceHandle || edge.label as string || 'default',
       }))
@@ -336,6 +426,7 @@ export const Blueprint = () => {
         nodes: blueprintNodes,
         edges: blueprintEdges,
         configuration: blueprintConfiguration,
+        outputChannels: blueprintOutputChannels,
       })
 
       showSuccessToast('Blueprint saved successfully')
@@ -416,9 +507,10 @@ export const Blueprint = () => {
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)} className="flex-1 flex flex-col">
-              <TabsList className="mx-4 mt-4 grid w-auto grid-cols-2">
+              <TabsList className="mx-4 mt-4 grid w-auto grid-cols-3">
                 <TabsTrigger value="components">Components</TabsTrigger>
                 <TabsTrigger value="configuration">Configuration</TabsTrigger>
+                <TabsTrigger value="outputChannels">Output Channels</TabsTrigger>
               </TabsList>
 
               {/* Components Tab */}
@@ -520,6 +612,66 @@ export const Blueprint = () => {
                   >
                     <MaterialSymbol name="add" />
                     Add Configuration Field
+                  </Button>
+                </div>
+              </TabsContent>
+
+              {/* Output Channels Tab */}
+              <TabsContent value="outputChannels" className="flex-1 overflow-y-auto mt-0">
+                <div className="text-left p-4 space-y-6">
+                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+                    Define output channels for this blueprint by selecting which node and channel should be exposed
+                  </div>
+
+                  {/* Output Channels List */}
+                  {blueprintOutputChannels.length > 0 && (
+                    <div className="space-y-4">
+                      {blueprintOutputChannels.map((outputChannel: any, index: number) => (
+                        <div
+                          key={index}
+                          className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3 cursor-pointer hover:border-green-400 dark:hover:border-green-600 transition-colors"
+                          onClick={() => handleOpenOutputChannelModal(index)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <MaterialSymbol name="output" className="text-green-600 dark:text-green-400" />
+                                <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">
+                                  {outputChannel.name}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-2">
+                                Node: {outputChannel.nodeId}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                Channel: {outputChannel.nodeOutputChannel || 'default'}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const newOutputChannels = blueprintOutputChannels.filter((_, i) => i !== index)
+                                setBlueprintOutputChannels(newOutputChannels)
+                              }}
+                            >
+                              <MaterialSymbol name="delete" className="text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add New Output Channel Button */}
+                  <Button
+                    variant="outline"
+                    onClick={() => handleOpenOutputChannelModal()}
+                    className="w-full"
+                  >
+                    <MaterialSymbol name="add" />
+                    Add Output Channel
                   </Button>
                 </div>
               </TabsContent>
@@ -786,6 +938,111 @@ export const Blueprint = () => {
                 disabled={!configFieldForm.name?.trim() || !configFieldForm.label?.trim()}
               >
                 {editingConfigFieldIndex !== null ? 'Save Changes' : 'Add Field'}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Output Channel Editor Modal */}
+      <Dialog open={isEditOutputChannelModalOpen} onOpenChange={(open) => !open && handleCloseOutputChannelModal()}>
+        <DialogContent className="max-w-2xl" showCloseButton={false}>
+          <VisuallyHidden>
+            <DialogTitle>
+              {editingOutputChannelIndex !== null ? 'Edit Output Channel' : 'Add Output Channel'}
+            </DialogTitle>
+            <DialogDescription>Configure the blueprint output channel</DialogDescription>
+          </VisuallyHidden>
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
+              {editingOutputChannelIndex !== null ? 'Edit Output Channel' : 'Add Output Channel'}
+            </h3>
+
+            <div className="space-y-4">
+              {/* Output Channel Name */}
+              <div>
+                <Label className="block text-sm font-medium mb-2">Output Channel Name *</Label>
+                <Input
+                  type="text"
+                  value={outputChannelForm.name || ''}
+                  onChange={(e) => setOutputChannelForm({ ...outputChannelForm, name: e.target.value })}
+                  placeholder="e.g., success, error, default"
+                  autoFocus
+                />
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                  The name of this output channel
+                </p>
+              </div>
+
+              {/* Node Selection */}
+              <div>
+                <Label className="block text-sm font-medium mb-2">Node *</Label>
+                <Select
+                  value={outputChannelForm.nodeId || ''}
+                  onValueChange={(val) => {
+                    // When node changes, reset the channel to default
+                    setOutputChannelForm({ ...outputChannelForm, nodeId: val, nodeOutputChannel: 'default' })
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a node" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {nodes
+                      .filter((node) => node.type !== 'outputChannel')
+                      .map((node) => (
+                        <SelectItem key={node.id} value={node.id}>
+                          {(node.data as any).label} ({node.id})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                  Select which node's output to use for this channel
+                </p>
+              </div>
+
+              {/* Node Output Channel Selection */}
+              {outputChannelForm.nodeId && (() => {
+                const selectedNode = nodes.find((n) => n.id === outputChannelForm.nodeId)
+                const nodeChannels = (selectedNode?.data as any)?.channels || ['default']
+
+                return (
+                  <div>
+                    <Label className="block text-sm font-medium mb-2">Node Output Channel *</Label>
+                    <Select
+                      value={outputChannelForm.nodeOutputChannel || 'default'}
+                      onValueChange={(val) => setOutputChannelForm({ ...outputChannelForm, nodeOutputChannel: val })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {nodeChannels.map((channel: string) => (
+                          <SelectItem key={channel} value={channel}>
+                            {channel}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
+                      Select which output channel from the node to expose
+                    </p>
+                  </div>
+                )
+              })()}
+            </div>
+
+            <DialogFooter className="mt-6">
+              <Button variant="outline" onClick={handleCloseOutputChannelModal}>
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                onClick={handleSaveOutputChannel}
+                disabled={!outputChannelForm.name?.trim() || !outputChannelForm.nodeId}
+              >
+                {editingOutputChannelIndex !== null ? 'Save Changes' : 'Add Output Channel'}
               </Button>
             </DialogFooter>
           </div>

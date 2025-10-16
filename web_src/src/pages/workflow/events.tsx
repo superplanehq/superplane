@@ -37,7 +37,7 @@ export const WorkflowEvents = () => {
     // Add workflow nodes
     if (workflow?.nodes) {
       workflow.nodes.forEach((node: any) => {
-        const isComponent = node.refType === 'REF_TYPE_COMPONENT'
+        const isComponent = node.type === 'TYPE_COMPONENT'
         const blockName = isComponent ? node.component?.name : node.blueprint?.name
         map.set(node.id, {
           blockName,
@@ -52,7 +52,7 @@ export const WorkflowEvents = () => {
       blueprints.forEach((blueprint: any) => {
         if (blueprint.nodes) {
           blueprint.nodes.forEach((node: any) => {
-            const isComponent = node.refType === 'REF_TYPE_COMPONENT'
+            const isComponent = node.type === 'TYPE_COMPONENT'
             const blockName = isComponent ? node.component?.name : node.blueprint?.name
             map.set(node.id, {
               blockName,

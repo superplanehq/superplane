@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
@@ -55,7 +56,27 @@ func (s *WorkflowService) ListNodeExecutions(ctx context.Context, req *pb.ListNo
 }
 
 func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionRequest) (*pb.InvokeNodeExecutionActionResponse, error) {
-	return workflows.InvokeNodeExecutionAction(ctx, s.registry, req.ExecutionId, req.ActionName, req.Parameters.AsMap())
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+
+	workflowID, err := uuid.Parse(req.WorkflowId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	executionID, err := uuid.Parse(req.ExecutionId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
+	}
+
+	return workflows.InvokeNodeExecutionAction(
+		ctx,
+		s.registry,
+		uuid.MustParse(organizationID),
+		workflowID,
+		executionID,
+		req.ActionName,
+		req.Parameters.AsMap(),
+	)
 }
 
 func (s *WorkflowService) ListWorkflowEvents(ctx context.Context, req *pb.ListWorkflowEventsRequest) (*pb.ListWorkflowEventsResponse, error) {

@@ -388,7 +388,7 @@ type Blueprint struct {
 	Nodes          []*components.Node               `protobuf:"bytes,7,rep,name=nodes,proto3" json:"nodes,omitempty"`
 	Edges          []*components.Edge               `protobuf:"bytes,8,rep,name=edges,proto3" json:"edges,omitempty"`
 	Configuration  []*components.ConfigurationField `protobuf:"bytes,9,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	OutputChannels []*components.OutputChannel      `protobuf:"bytes,10,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
+	OutputChannels []*OutputChannel                 `protobuf:"bytes,10,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -486,11 +486,71 @@ func (x *Blueprint) GetConfiguration() []*components.ConfigurationField {
 	return nil
 }
 
-func (x *Blueprint) GetOutputChannels() []*components.OutputChannel {
+func (x *Blueprint) GetOutputChannels() []*OutputChannel {
 	if x != nil {
 		return x.OutputChannels
 	}
 	return nil
+}
+
+type OutputChannel struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	NodeId            string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	NodeOutputChannel string                 `protobuf:"bytes,3,opt,name=node_output_channel,json=nodeOutputChannel,proto3" json:"node_output_channel,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *OutputChannel) Reset() {
+	*x = OutputChannel{}
+	mi := &file_blueprints_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OutputChannel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutputChannel) ProtoMessage() {}
+
+func (x *OutputChannel) ProtoReflect() protoreflect.Message {
+	mi := &file_blueprints_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutputChannel.ProtoReflect.Descriptor instead.
+func (*OutputChannel) Descriptor() ([]byte, []int) {
+	return file_blueprints_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *OutputChannel) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *OutputChannel) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *OutputChannel) GetNodeOutputChannel() string {
+	if x != nil {
+		return x.NodeOutputChannel
+	}
+	return ""
 }
 
 var File_blueprints_proto protoreflect.FileDescriptor
@@ -529,7 +589,11 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x05edges\x18\b \x03(\v2\x1b.Superplane.Components.EdgeR\x05edges\x12O\n" +
 	"\rconfiguration\x18\t \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12M\n" +
 	"\x0foutput_channels\x18\n" +
-	" \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels2\xcb\x06\n" +
+	" \x03(\v2$.Superplane.Blueprints.OutputChannelR\x0eoutputChannels\"l\n" +
+	"\rOutputChannel\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12.\n" +
+	"\x13node_output_channel\x18\x03 \x01(\tR\x11nodeOutputChannel2\xcb\x06\n" +
 	"\n" +
 	"Blueprints\x12\xca\x01\n" +
 	"\x0eListBlueprints\x12,.Superplane.Blueprints.ListBlueprintsRequest\x1a-.Superplane.Blueprints.ListBlueprintsResponse\"[\x92A>\n" +
@@ -555,7 +619,7 @@ func file_blueprints_proto_rawDescGZIP() []byte {
 	return file_blueprints_proto_rawDescData
 }
 
-var file_blueprints_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_blueprints_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_blueprints_proto_goTypes = []any{
 	(*ListBlueprintsRequest)(nil),         // 0: Superplane.Blueprints.ListBlueprintsRequest
 	(*ListBlueprintsResponse)(nil),        // 1: Superplane.Blueprints.ListBlueprintsResponse
@@ -566,11 +630,11 @@ var file_blueprints_proto_goTypes = []any{
 	(*UpdateBlueprintRequest)(nil),        // 6: Superplane.Blueprints.UpdateBlueprintRequest
 	(*UpdateBlueprintResponse)(nil),       // 7: Superplane.Blueprints.UpdateBlueprintResponse
 	(*Blueprint)(nil),                     // 8: Superplane.Blueprints.Blueprint
-	(*timestamp.Timestamp)(nil),           // 9: google.protobuf.Timestamp
-	(*components.Node)(nil),               // 10: Superplane.Components.Node
-	(*components.Edge)(nil),               // 11: Superplane.Components.Edge
-	(*components.ConfigurationField)(nil), // 12: Superplane.Components.ConfigurationField
-	(*components.OutputChannel)(nil),      // 13: Superplane.Components.OutputChannel
+	(*OutputChannel)(nil),                 // 9: Superplane.Blueprints.OutputChannel
+	(*timestamp.Timestamp)(nil),           // 10: google.protobuf.Timestamp
+	(*components.Node)(nil),               // 11: Superplane.Components.Node
+	(*components.Edge)(nil),               // 12: Superplane.Components.Edge
+	(*components.ConfigurationField)(nil), // 13: Superplane.Components.ConfigurationField
 }
 var file_blueprints_proto_depIdxs = []int32{
 	8,  // 0: Superplane.Blueprints.ListBlueprintsResponse.blueprints:type_name -> Superplane.Blueprints.Blueprint
@@ -579,12 +643,12 @@ var file_blueprints_proto_depIdxs = []int32{
 	8,  // 3: Superplane.Blueprints.CreateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
 	8,  // 4: Superplane.Blueprints.UpdateBlueprintRequest.blueprint:type_name -> Superplane.Blueprints.Blueprint
 	8,  // 5: Superplane.Blueprints.UpdateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
-	9,  // 6: Superplane.Blueprints.Blueprint.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 7: Superplane.Blueprints.Blueprint.updated_at:type_name -> google.protobuf.Timestamp
-	10, // 8: Superplane.Blueprints.Blueprint.nodes:type_name -> Superplane.Components.Node
-	11, // 9: Superplane.Blueprints.Blueprint.edges:type_name -> Superplane.Components.Edge
-	12, // 10: Superplane.Blueprints.Blueprint.configuration:type_name -> Superplane.Components.ConfigurationField
-	13, // 11: Superplane.Blueprints.Blueprint.output_channels:type_name -> Superplane.Components.OutputChannel
+	10, // 6: Superplane.Blueprints.Blueprint.created_at:type_name -> google.protobuf.Timestamp
+	10, // 7: Superplane.Blueprints.Blueprint.updated_at:type_name -> google.protobuf.Timestamp
+	11, // 8: Superplane.Blueprints.Blueprint.nodes:type_name -> Superplane.Components.Node
+	12, // 9: Superplane.Blueprints.Blueprint.edges:type_name -> Superplane.Components.Edge
+	13, // 10: Superplane.Blueprints.Blueprint.configuration:type_name -> Superplane.Components.ConfigurationField
+	9,  // 11: Superplane.Blueprints.Blueprint.output_channels:type_name -> Superplane.Blueprints.OutputChannel
 	0,  // 12: Superplane.Blueprints.Blueprints.ListBlueprints:input_type -> Superplane.Blueprints.ListBlueprintsRequest
 	2,  // 13: Superplane.Blueprints.Blueprints.DescribeBlueprint:input_type -> Superplane.Blueprints.DescribeBlueprintRequest
 	4,  // 14: Superplane.Blueprints.Blueprints.CreateBlueprint:input_type -> Superplane.Blueprints.CreateBlueprintRequest
@@ -611,7 +675,7 @@ func file_blueprints_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_blueprints_proto_rawDesc), len(file_blueprints_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

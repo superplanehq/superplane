@@ -15,35 +15,35 @@ import (
 	"encoding/json"
 )
 
-// checks if the ComponentsOutputChannel type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ComponentsOutputChannel{}
+// checks if the SuperplaneComponentsOutputChannel type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneComponentsOutputChannel{}
 
-// ComponentsOutputChannel struct for ComponentsOutputChannel
-type ComponentsOutputChannel struct {
+// SuperplaneComponentsOutputChannel struct for SuperplaneComponentsOutputChannel
+type SuperplaneComponentsOutputChannel struct {
 	Name *string `json:"name,omitempty"`
 	Label *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
 }
 
-// NewComponentsOutputChannel instantiates a new ComponentsOutputChannel object
+// NewSuperplaneComponentsOutputChannel instantiates a new SuperplaneComponentsOutputChannel object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewComponentsOutputChannel() *ComponentsOutputChannel {
-	this := ComponentsOutputChannel{}
+func NewSuperplaneComponentsOutputChannel() *SuperplaneComponentsOutputChannel {
+	this := SuperplaneComponentsOutputChannel{}
 	return &this
 }
 
-// NewComponentsOutputChannelWithDefaults instantiates a new ComponentsOutputChannel object
+// NewSuperplaneComponentsOutputChannelWithDefaults instantiates a new SuperplaneComponentsOutputChannel object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewComponentsOutputChannelWithDefaults() *ComponentsOutputChannel {
-	this := ComponentsOutputChannel{}
+func NewSuperplaneComponentsOutputChannelWithDefaults() *SuperplaneComponentsOutputChannel {
+	this := SuperplaneComponentsOutputChannel{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *ComponentsOutputChannel) GetName() string {
+func (o *SuperplaneComponentsOutputChannel) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -53,7 +53,7 @@ func (o *ComponentsOutputChannel) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsOutputChannel) GetNameOk() (*string, bool) {
+func (o *SuperplaneComponentsOutputChannel) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -61,7 +61,7 @@ func (o *ComponentsOutputChannel) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *ComponentsOutputChannel) HasName() bool {
+func (o *SuperplaneComponentsOutputChannel) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -70,12 +70,12 @@ func (o *ComponentsOutputChannel) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *ComponentsOutputChannel) SetName(v string) {
+func (o *SuperplaneComponentsOutputChannel) SetName(v string) {
 	o.Name = &v
 }
 
 // GetLabel returns the Label field value if set, zero value otherwise.
-func (o *ComponentsOutputChannel) GetLabel() string {
+func (o *SuperplaneComponentsOutputChannel) GetLabel() string {
 	if o == nil || IsNil(o.Label) {
 		var ret string
 		return ret
@@ -85,7 +85,7 @@ func (o *ComponentsOutputChannel) GetLabel() string {
 
 // GetLabelOk returns a tuple with the Label field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsOutputChannel) GetLabelOk() (*string, bool) {
+func (o *SuperplaneComponentsOutputChannel) GetLabelOk() (*string, bool) {
 	if o == nil || IsNil(o.Label) {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (o *ComponentsOutputChannel) GetLabelOk() (*string, bool) {
 }
 
 // HasLabel returns a boolean if a field has been set.
-func (o *ComponentsOutputChannel) HasLabel() bool {
+func (o *SuperplaneComponentsOutputChannel) HasLabel() bool {
 	if o != nil && !IsNil(o.Label) {
 		return true
 	}
@@ -102,12 +102,12 @@ func (o *ComponentsOutputChannel) HasLabel() bool {
 }
 
 // SetLabel gets a reference to the given string and assigns it to the Label field.
-func (o *ComponentsOutputChannel) SetLabel(v string) {
+func (o *SuperplaneComponentsOutputChannel) SetLabel(v string) {
 	o.Label = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
-func (o *ComponentsOutputChannel) GetDescription() string {
+func (o *SuperplaneComponentsOutputChannel) GetDescription() string {
 	if o == nil || IsNil(o.Description) {
 		var ret string
 		return ret
@@ -117,7 +117,7 @@ func (o *ComponentsOutputChannel) GetDescription() string {
 
 // GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsOutputChannel) GetDescriptionOk() (*string, bool) {
+func (o *SuperplaneComponentsOutputChannel) GetDescriptionOk() (*string, bool) {
 	if o == nil || IsNil(o.Description) {
 		return nil, false
 	}
@@ -125,7 +125,7 @@ func (o *ComponentsOutputChannel) GetDescriptionOk() (*string, bool) {
 }
 
 // HasDescription returns a boolean if a field has been set.
-func (o *ComponentsOutputChannel) HasDescription() bool {
+func (o *SuperplaneComponentsOutputChannel) HasDescription() bool {
 	if o != nil && !IsNil(o.Description) {
 		return true
 	}
@@ -134,11 +134,11 @@ func (o *ComponentsOutputChannel) HasDescription() bool {
 }
 
 // SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *ComponentsOutputChannel) SetDescription(v string) {
+func (o *SuperplaneComponentsOutputChannel) SetDescription(v string) {
 	o.Description = &v
 }
 
-func (o ComponentsOutputChannel) MarshalJSON() ([]byte, error) {
+func (o SuperplaneComponentsOutputChannel) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -146,7 +146,7 @@ func (o ComponentsOutputChannel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ComponentsOutputChannel) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneComponentsOutputChannel) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -160,38 +160,38 @@ func (o ComponentsOutputChannel) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableComponentsOutputChannel struct {
-	value *ComponentsOutputChannel
+type NullableSuperplaneComponentsOutputChannel struct {
+	value *SuperplaneComponentsOutputChannel
 	isSet bool
 }
 
-func (v NullableComponentsOutputChannel) Get() *ComponentsOutputChannel {
+func (v NullableSuperplaneComponentsOutputChannel) Get() *SuperplaneComponentsOutputChannel {
 	return v.value
 }
 
-func (v *NullableComponentsOutputChannel) Set(val *ComponentsOutputChannel) {
+func (v *NullableSuperplaneComponentsOutputChannel) Set(val *SuperplaneComponentsOutputChannel) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableComponentsOutputChannel) IsSet() bool {
+func (v NullableSuperplaneComponentsOutputChannel) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableComponentsOutputChannel) Unset() {
+func (v *NullableSuperplaneComponentsOutputChannel) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableComponentsOutputChannel(val *ComponentsOutputChannel) *NullableComponentsOutputChannel {
-	return &NullableComponentsOutputChannel{value: val, isSet: true}
+func NewNullableSuperplaneComponentsOutputChannel(val *SuperplaneComponentsOutputChannel) *NullableSuperplaneComponentsOutputChannel {
+	return &NullableSuperplaneComponentsOutputChannel{value: val, isSet: true}
 }
 
-func (v NullableComponentsOutputChannel) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneComponentsOutputChannel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableComponentsOutputChannel) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneComponentsOutputChannel) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

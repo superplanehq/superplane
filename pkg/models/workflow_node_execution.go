@@ -121,14 +121,65 @@ func CreatePendingChildExecution(tx *gorm.DB, parent *WorkflowNodeExecution, chi
 	return &execution, nil
 }
 
-func FindNodeExecution(id uuid.UUID) (*WorkflowNodeExecution, error) {
-	return FindNodeExecutionInTransaction(database.Conn(), id)
+func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]WorkflowNodeExecution, error) {
+	var executions []WorkflowNodeExecution
+	query := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Order("created_at DESC").
+		Limit(int(limit))
+
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+
+	if len(results) > 0 {
+		query = query.Where("result IN ?", results)
+	}
+
+	if beforeTime != nil {
+		query = query.Where("created_at < ?", beforeTime)
+	}
+
+	err := query.Find(&executions).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
 }
 
-func FindNodeExecutionInTransaction(tx *gorm.DB, id uuid.UUID) (*WorkflowNodeExecution, error) {
+func CountNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string) (int64, error) {
+	var totalCount int64
+	countQuery := database.Conn().
+		Model(&WorkflowNodeExecution{}).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID)
+
+	if len(states) > 0 {
+		countQuery = countQuery.Where("state IN ?", states)
+	}
+
+	if len(results) > 0 {
+		countQuery = countQuery.Where("result IN ?", results)
+	}
+
+	if err := countQuery.Count(&totalCount).Error; err != nil {
+		return 0, err
+	}
+
+	return totalCount, nil
+}
+
+func FindNodeExecution(workflowID, id uuid.UUID) (*WorkflowNodeExecution, error) {
+	return FindNodeExecutionInTransaction(database.Conn(), workflowID, id)
+}
+
+func FindNodeExecutionInTransaction(tx *gorm.DB, workflowID, id uuid.UUID) (*WorkflowNodeExecution, error) {
 	var execution WorkflowNodeExecution
 	err := tx.
 		Where("id = ?", id).
+		Where("workflow_id = ?", workflowID).
 		First(&execution).
 		Error
 

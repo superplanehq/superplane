@@ -11,12 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 
 interface ComponentActionsProps {
+  workflowId: string
   executionId: string
   componentName: string
   executionState: string
 }
 
-export const ComponentActions = ({ executionId, componentName, executionState }: ComponentActionsProps) => {
+export const ComponentActions = ({ workflowId, executionId, componentName, executionState }: ComponentActionsProps) => {
   const [selectedAction, setSelectedAction] = useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [actionParameters, setActionParameters] = useState<Record<string, any>>({})
@@ -43,6 +44,7 @@ export const ComponentActions = ({ executionId, componentName, executionState }:
       await workflowsInvokeNodeExecutionAction(
         withOrganizationHeader({
           path: {
+            workflowId,
             executionId,
             actionName,
           },

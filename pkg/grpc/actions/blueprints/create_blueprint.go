@@ -2,13 +2,14 @@ package blueprints
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 )
@@ -19,8 +20,13 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, err
 	}
 
-	// Validate node configurations
-	if err := ValidateNodes(nodes, registry); err != nil {
+	outputChannels, err := ParseOutputChannels(registry, blueprint.Nodes, blueprint.OutputChannels)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ValidateNodeConfigurations(nodes, registry)
+	if err != nil {
 		return nil, err
 	}
 
@@ -28,8 +34,6 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("Configuration: %v", configuration)
 
 	orgID, _ := uuid.Parse(organizationID)
 	now := time.Now()
@@ -43,6 +47,7 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		Nodes:          nodes,
 		Edges:          edges,
 		Configuration:  datatypes.NewJSONSlice(configuration),
+		OutputChannels: datatypes.NewJSONSlice(outputChannels),
 	}
 
 	if err := database.Conn().Create(model).Error; err != nil {
@@ -52,4 +57,70 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 	return &pb.CreateBlueprintResponse{
 		Blueprint: SerializeBlueprint(model),
 	}, nil
+}
+
+func ParseOutputChannels(registry *registry.Registry, nodes []*componentpb.Node, outputChannels []*pb.OutputChannel) ([]models.BlueprintOutputChannel, error) {
+	channels := []models.BlueprintOutputChannel{}
+	for _, outputChannel := range outputChannels {
+		if outputChannel.Name == "" {
+			return nil, fmt.Errorf("output channel name is required")
+		}
+
+		if outputChannel.NodeId == "" {
+			return nil, fmt.Errorf("output channel node id is required")
+		}
+
+		if outputChannel.NodeOutputChannel == "" {
+			return nil, fmt.Errorf("output channel node output channel is required")
+		}
+
+		err := validateOutputChannelReference(registry, nodes, outputChannel)
+		if err != nil {
+			return nil, err
+		}
+
+		channels = append(channels, models.BlueprintOutputChannel{
+			Name:              outputChannel.Name,
+			NodeID:            outputChannel.NodeId,
+			NodeOutputChannel: outputChannel.NodeOutputChannel,
+		})
+	}
+
+	return channels, nil
+}
+
+func validateOutputChannelReference(registry *registry.Registry, nodes []*componentpb.Node, outputChannel *pb.OutputChannel) error {
+	//
+	// Check if the node referenced exists
+	//
+	node := findNode(nodes, outputChannel.NodeId)
+	if node == nil {
+		return fmt.Errorf("output channel %s references a node that does not exist: %s", outputChannel.Name, outputChannel.NodeId)
+	}
+
+	//
+	// Check if the node has the output channel referenced
+	//
+	component, err := registry.GetComponent(node.Component.Name)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range component.OutputChannels(nil) {
+		if c.Name == outputChannel.NodeOutputChannel {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("output channel %s references an output channel that does not exist on node %s", outputChannel.NodeOutputChannel, outputChannel.NodeId)
+}
+
+func findNode(nodes []*componentpb.Node, id string) *componentpb.Node {
+	for _, node := range nodes {
+		if node.Id == id {
+			return node
+		}
+	}
+
+	return nil
 }

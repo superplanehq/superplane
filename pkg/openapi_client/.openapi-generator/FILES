@@ -50,9 +50,8 @@ docs/ComponentsListComponentActionsResponse.md
 docs/ComponentsListComponentsResponse.md
 docs/ComponentsListItemDefinition.md
 docs/ComponentsNode.md
-docs/ComponentsOutputChannel.md
+docs/ComponentsNodeType.md
 docs/ConnectionGroupAPI.md
-docs/EdgeTargetType.md
 docs/EventAPI.md
 docs/EventRejectionRejectionReason.md
 docs/EventSourceAPI.md
@@ -99,7 +98,6 @@ docs/MeAPI.md
 docs/MeRegenerateTokenResponse.md
 docs/NodeBlueprintRef.md
 docs/NodeComponentRef.md
-docs/NodeRefType.md
 docs/OrganizationAPI.md
 docs/OrganizationsCreateInvitationBody.md
 docs/OrganizationsCreateInvitationResponse.md
@@ -144,9 +142,11 @@ docs/SuperplaneAcknowledgeAlertResponse.md
 docs/SuperplaneAddUserBody.md
 docs/SuperplaneAlert.md
 docs/SuperplaneApproveStageEventResponse.md
+docs/SuperplaneBlueprintsOutputChannel.md
 docs/SuperplaneCancelStageExecutionResponse.md
 docs/SuperplaneCanvas.md
 docs/SuperplaneCanvasMetadata.md
+docs/SuperplaneComponentsOutputChannel.md
 docs/SuperplaneCondition.md
 docs/SuperplaneConditionApproval.md
 docs/SuperplaneConditionTimeWindow.md
@@ -259,7 +259,7 @@ docs/WorkflowsListWorkflowsResponse.md
 docs/WorkflowsUpdateWorkflowBody.md
 docs/WorkflowsUpdateWorkflowResponse.md
 docs/WorkflowsWorkflow.md
-docs/WorkflowsWorkflowInitialEvent.md
+docs/WorkflowsWorkflowEvent.md
 docs/WorkflowsWorkflowNodeExecution.md
 docs/WorkflowsWorkflowNodeExecutionResult.md
 docs/WorkflowsWorkflowNodeExecutionResultReason.md
@@ -286,8 +286,7 @@ model_components_list_component_actions_response.go
 model_components_list_components_response.go
 model_components_list_item_definition.go
 model_components_node.go
-model_components_output_channel.go
-model_edge_target_type.go
+model_components_node_type.go
 model_event_rejection_rejection_reason.go
 model_event_source_daily_schedule.go
 model_event_source_event_type.go
@@ -328,7 +327,6 @@ model_integrations_update_integration_response.go
 model_me_regenerate_token_response.go
 model_node_blueprint_ref.go
 model_node_component_ref.go
-model_node_ref_type.go
 model_organizations_create_invitation_body.go
 model_organizations_create_invitation_response.go
 model_organizations_describe_organization_response.go
@@ -369,9 +367,11 @@ model_superplane_acknowledge_alert_response.go
 model_superplane_add_user_body.go
 model_superplane_alert.go
 model_superplane_approve_stage_event_response.go
+model_superplane_blueprints_output_channel.go
 model_superplane_cancel_stage_execution_response.go
 model_superplane_canvas.go
 model_superplane_canvas_metadata.go
+model_superplane_components_output_channel.go
 model_superplane_condition.go
 model_superplane_condition_approval.go
 model_superplane_condition_time_window.go
@@ -479,7 +479,7 @@ model_workflows_list_workflows_response.go
 model_workflows_update_workflow_body.go
 model_workflows_update_workflow_response.go
 model_workflows_workflow.go
-model_workflows_workflow_initial_event.go
+model_workflows_workflow_event.go
 model_workflows_workflow_node_execution.go
 model_workflows_workflow_node_execution_result.go
 model_workflows_workflow_node_execution_result_reason.go

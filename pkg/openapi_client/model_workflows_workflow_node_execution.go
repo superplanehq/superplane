@@ -25,7 +25,6 @@ type WorkflowsWorkflowNodeExecution struct {
 	WorkflowId *string `json:"workflowId,omitempty"`
 	NodeId *string `json:"nodeId,omitempty"`
 	ParentExecutionId *string `json:"parentExecutionId,omitempty"`
-	BlueprintId *string `json:"blueprintId,omitempty"`
 	State *WorkflowsWorkflowNodeExecutionState `json:"state,omitempty"`
 	Result *WorkflowsWorkflowNodeExecutionResult `json:"result,omitempty"`
 	ResultReason *WorkflowsWorkflowNodeExecutionResultReason `json:"resultReason,omitempty"`
@@ -36,9 +35,6 @@ type WorkflowsWorkflowNodeExecution struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
-	PreviousExecutionId *string `json:"previousExecutionId,omitempty"`
-	PreviousOutputChannel *string `json:"previousOutputChannel,omitempty"`
-	PreviousOutputIndex *int32 `json:"previousOutputIndex,omitempty"`
 }
 
 // NewWorkflowsWorkflowNodeExecution instantiates a new WorkflowsWorkflowNodeExecution object
@@ -196,38 +192,6 @@ func (o *WorkflowsWorkflowNodeExecution) HasParentExecutionId() bool {
 // SetParentExecutionId gets a reference to the given string and assigns it to the ParentExecutionId field.
 func (o *WorkflowsWorkflowNodeExecution) SetParentExecutionId(v string) {
 	o.ParentExecutionId = &v
-}
-
-// GetBlueprintId returns the BlueprintId field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetBlueprintId() string {
-	if o == nil || IsNil(o.BlueprintId) {
-		var ret string
-		return ret
-	}
-	return *o.BlueprintId
-}
-
-// GetBlueprintIdOk returns a tuple with the BlueprintId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetBlueprintIdOk() (*string, bool) {
-	if o == nil || IsNil(o.BlueprintId) {
-		return nil, false
-	}
-	return o.BlueprintId, true
-}
-
-// HasBlueprintId returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNodeExecution) HasBlueprintId() bool {
-	if o != nil && !IsNil(o.BlueprintId) {
-		return true
-	}
-
-	return false
-}
-
-// SetBlueprintId gets a reference to the given string and assigns it to the BlueprintId field.
-func (o *WorkflowsWorkflowNodeExecution) SetBlueprintId(v string) {
-	o.BlueprintId = &v
 }
 
 // GetState returns the State field value if set, zero value otherwise.
@@ -550,102 +514,6 @@ func (o *WorkflowsWorkflowNodeExecution) SetConfiguration(v map[string]interface
 	o.Configuration = v
 }
 
-// GetPreviousExecutionId returns the PreviousExecutionId field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetPreviousExecutionId() string {
-	if o == nil || IsNil(o.PreviousExecutionId) {
-		var ret string
-		return ret
-	}
-	return *o.PreviousExecutionId
-}
-
-// GetPreviousExecutionIdOk returns a tuple with the PreviousExecutionId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetPreviousExecutionIdOk() (*string, bool) {
-	if o == nil || IsNil(o.PreviousExecutionId) {
-		return nil, false
-	}
-	return o.PreviousExecutionId, true
-}
-
-// HasPreviousExecutionId returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNodeExecution) HasPreviousExecutionId() bool {
-	if o != nil && !IsNil(o.PreviousExecutionId) {
-		return true
-	}
-
-	return false
-}
-
-// SetPreviousExecutionId gets a reference to the given string and assigns it to the PreviousExecutionId field.
-func (o *WorkflowsWorkflowNodeExecution) SetPreviousExecutionId(v string) {
-	o.PreviousExecutionId = &v
-}
-
-// GetPreviousOutputChannel returns the PreviousOutputChannel field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputChannel() string {
-	if o == nil || IsNil(o.PreviousOutputChannel) {
-		var ret string
-		return ret
-	}
-	return *o.PreviousOutputChannel
-}
-
-// GetPreviousOutputChannelOk returns a tuple with the PreviousOutputChannel field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputChannelOk() (*string, bool) {
-	if o == nil || IsNil(o.PreviousOutputChannel) {
-		return nil, false
-	}
-	return o.PreviousOutputChannel, true
-}
-
-// HasPreviousOutputChannel returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNodeExecution) HasPreviousOutputChannel() bool {
-	if o != nil && !IsNil(o.PreviousOutputChannel) {
-		return true
-	}
-
-	return false
-}
-
-// SetPreviousOutputChannel gets a reference to the given string and assigns it to the PreviousOutputChannel field.
-func (o *WorkflowsWorkflowNodeExecution) SetPreviousOutputChannel(v string) {
-	o.PreviousOutputChannel = &v
-}
-
-// GetPreviousOutputIndex returns the PreviousOutputIndex field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputIndex() int32 {
-	if o == nil || IsNil(o.PreviousOutputIndex) {
-		var ret int32
-		return ret
-	}
-	return *o.PreviousOutputIndex
-}
-
-// GetPreviousOutputIndexOk returns a tuple with the PreviousOutputIndex field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetPreviousOutputIndexOk() (*int32, bool) {
-	if o == nil || IsNil(o.PreviousOutputIndex) {
-		return nil, false
-	}
-	return o.PreviousOutputIndex, true
-}
-
-// HasPreviousOutputIndex returns a boolean if a field has been set.
-func (o *WorkflowsWorkflowNodeExecution) HasPreviousOutputIndex() bool {
-	if o != nil && !IsNil(o.PreviousOutputIndex) {
-		return true
-	}
-
-	return false
-}
-
-// SetPreviousOutputIndex gets a reference to the given int32 and assigns it to the PreviousOutputIndex field.
-func (o *WorkflowsWorkflowNodeExecution) SetPreviousOutputIndex(v int32) {
-	o.PreviousOutputIndex = &v
-}
-
 func (o WorkflowsWorkflowNodeExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -667,9 +535,6 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.ParentExecutionId) {
 		toSerialize["parentExecutionId"] = o.ParentExecutionId
-	}
-	if !IsNil(o.BlueprintId) {
-		toSerialize["blueprintId"] = o.BlueprintId
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
@@ -700,15 +565,6 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
-	}
-	if !IsNil(o.PreviousExecutionId) {
-		toSerialize["previousExecutionId"] = o.PreviousExecutionId
-	}
-	if !IsNil(o.PreviousOutputChannel) {
-		toSerialize["previousOutputChannel"] = o.PreviousOutputChannel
-	}
-	if !IsNil(o.PreviousOutputIndex) {
-		toSerialize["previousOutputIndex"] = o.PreviousOutputIndex
 	}
 	return toSerialize, nil
 }

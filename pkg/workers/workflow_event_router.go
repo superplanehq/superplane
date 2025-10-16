@@ -73,7 +73,7 @@ func (w *WorkflowEventRouter) LockAndProcessEvent(event models.WorkflowEvent) er
 }
 
 func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, event *models.WorkflowEvent) error {
-	workflow, err := models.FindWorkflowInTransaction(tx, event.WorkflowID)
+	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, event.WorkflowID)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (w *WorkflowEventRouter) processEvent(tx *gorm.DB, event *models.WorkflowEv
 		return w.processRootEvent(tx, workflow, event)
 	}
 
-	execution, err := models.FindNodeExecutionInTransaction(tx, *event.ExecutionID)
+	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Wor
 
 	w.log("Processing root event %s", event.ID)
 
-	edges := workflow.FindEdges(event.NodeID, models.EdgeTargetTypeNode, event.Channel)
+	edges := workflow.FindEdges(event.NodeID, event.Channel)
 	for _, edge := range edges {
 		targetNode, err := models.FindWorkflowNode(tx, workflow.ID, edge.TargetID)
 		if err != nil {
@@ -131,7 +131,7 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, workflow *model
 
 	w.log("Processing event %s for execution %s", event.ID, execution.ID)
 
-	edges := workflow.FindEdges(execution.NodeID, models.EdgeTargetTypeNode, event.Channel)
+	edges := workflow.FindEdges(execution.NodeID, event.Channel)
 	for _, edge := range edges {
 		targetNode, err := models.FindWorkflowNode(tx, workflow.ID, edge.TargetID)
 		if err != nil {
@@ -161,7 +161,7 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, workflow *model
 func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *models.Workflow, execution *models.WorkflowNodeExecution, event *models.WorkflowEvent) error {
 	w.log("Processing child execution event %s for execution %s", event.ID, execution.ID)
 
-	parentExecution, err := models.FindNodeExecutionInTransaction(tx, *execution.ParentExecutionID)
+	parentExecution, err := models.FindNodeExecutionInTransaction(tx, workflow.ID, *execution.ParentExecutionID)
 	if err != nil {
 		return err
 	}
@@ -172,13 +172,13 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 	}
 
 	blueprintID := parentNode.Ref.Data().Blueprint.ID
-	blueprint, err := models.FindBlueprintByIDInTransaction(tx, blueprintID)
+	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
 	if err != nil {
 		return err
 	}
 
 	childNodeID := execution.NodeID[len(parentNode.NodeID)+1:]
-	edges := blueprint.FindEdges(childNodeID, models.EdgeTargetTypeNode, event.Channel)
+	edges := blueprint.FindEdges(childNodeID, event.Channel)
 
 	//
 	// If there are no edges, it means the child node is a terminal node.
@@ -268,15 +268,15 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 	// No more pending/started executions, we can complete the parent execution.
 	//
 	outputs := make(map[string][]any)
-	for _, edge := range blueprint.OutputChannelEdges() {
-		fullNodeID := parentNode.NodeID + ":" + edge.SourceID
-		outputEvents, err := w.findOutputEventsForNode(tx, workflow.ID, fullNodeID, edge.Channel)
+	for _, outputChannel := range blueprint.OutputChannels {
+		fullNodeID := parentNode.NodeID + ":" + outputChannel.NodeID
+		outputEvents, err := w.findOutputEventsForNode(tx, workflow.ID, fullNodeID, outputChannel.NodeOutputChannel)
 		if err != nil {
 			return err
 		}
 
 		for _, outputEvent := range outputEvents {
-			outputs[edge.TargetID] = append(outputs[edge.TargetID], outputEvent.Data.Data())
+			outputs[outputChannel.Name] = append(outputs[outputChannel.Name], outputEvent.Data.Data())
 		}
 	}
 

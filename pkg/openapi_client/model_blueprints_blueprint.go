@@ -30,7 +30,7 @@ type BlueprintsBlueprint struct {
 	Nodes []ComponentsNode `json:"nodes,omitempty"`
 	Edges []ComponentsEdge `json:"edges,omitempty"`
 	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
-	OutputChannels []ComponentsOutputChannel `json:"outputChannels,omitempty"`
+	OutputChannels []SuperplaneBlueprintsOutputChannel `json:"outputChannels,omitempty"`
 }
 
 // NewBlueprintsBlueprint instantiates a new BlueprintsBlueprint object
@@ -339,9 +339,9 @@ func (o *BlueprintsBlueprint) SetConfiguration(v []ComponentsConfigurationField)
 }
 
 // GetOutputChannels returns the OutputChannels field value if set, zero value otherwise.
-func (o *BlueprintsBlueprint) GetOutputChannels() []ComponentsOutputChannel {
+func (o *BlueprintsBlueprint) GetOutputChannels() []SuperplaneBlueprintsOutputChannel {
 	if o == nil || IsNil(o.OutputChannels) {
-		var ret []ComponentsOutputChannel
+		var ret []SuperplaneBlueprintsOutputChannel
 		return ret
 	}
 	return o.OutputChannels
@@ -349,7 +349,7 @@ func (o *BlueprintsBlueprint) GetOutputChannels() []ComponentsOutputChannel {
 
 // GetOutputChannelsOk returns a tuple with the OutputChannels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprint) GetOutputChannelsOk() ([]ComponentsOutputChannel, bool) {
+func (o *BlueprintsBlueprint) GetOutputChannelsOk() ([]SuperplaneBlueprintsOutputChannel, bool) {
 	if o == nil || IsNil(o.OutputChannels) {
 		return nil, false
 	}
@@ -365,8 +365,8 @@ func (o *BlueprintsBlueprint) HasOutputChannels() bool {
 	return false
 }
 
-// SetOutputChannels gets a reference to the given []ComponentsOutputChannel and assigns it to the OutputChannels field.
-func (o *BlueprintsBlueprint) SetOutputChannels(v []ComponentsOutputChannel) {
+// SetOutputChannels gets a reference to the given []SuperplaneBlueprintsOutputChannel and assigns it to the OutputChannels field.
+func (o *BlueprintsBlueprint) SetOutputChannels(v []SuperplaneBlueprintsOutputChannel) {
 	o.OutputChannels = v
 }
 

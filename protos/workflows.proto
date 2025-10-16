@@ -97,7 +97,7 @@ service Workflows {
 
   rpc InvokeNodeExecutionAction(InvokeNodeExecutionActionRequest) returns (InvokeNodeExecutionActionResponse) {
     option (google.api.http) = {
-      post: "/api/v1/workflows/executions/{execution_id}/actions/{action_name}"
+      post: "/api/v1/workflows/{workflow_id}/executions/{execution_id}/actions/{action_name}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -231,9 +231,10 @@ message WorkflowNodeExecution {
 }
 
 message InvokeNodeExecutionActionRequest {
-  string execution_id = 1;
-  string action_name = 2;
-  google.protobuf.Struct parameters = 3;
+  string workflow_id = 1;
+  string execution_id = 2;
+  string action_name = 3;
+  google.protobuf.Struct parameters = 4;
 }
 
 message InvokeNodeExecutionActionResponse {}

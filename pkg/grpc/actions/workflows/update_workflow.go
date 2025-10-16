@@ -22,12 +22,12 @@ func UpdateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		return nil, status.Errorf(codes.InvalidArgument, "invalid workflow id: %v", err)
 	}
 
-	existingWorkflow, err := models.FindWorkflow(workflowID)
+	existingWorkflow, err := models.FindWorkflow(uuid.MustParse(organizationID), workflowID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
 	}
 
-	nodes, edges, err := ParseWorkflow(registry, pbWorkflow)
+	nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 	existingNode := findNode(existingNodes, node.ID)
 	if existingNode != nil {
 		existingNode.Name = node.Name
-		existingNode.RefType = node.RefType
+		existingNode.Type = node.Type
 		existingNode.Ref = datatypes.NewJSONType(node.Ref)
 		existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
 		existingNode.UpdatedAt = &now
@@ -111,7 +111,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		NodeID:        node.ID,
 		Name:          node.Name,
 		State:         models.WorkflowNodeStateReady,
-		RefType:       node.RefType,
+		Type:          node.Type,
 		Ref:           datatypes.NewJSONType(node.Ref),
 		Configuration: datatypes.NewJSONType(node.Configuration),
 		CreatedAt:     &now,

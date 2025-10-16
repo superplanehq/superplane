@@ -58,13 +58,14 @@ export const useCreateBlueprint = (organizationId: string) => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[]; configuration?: any[] }) => {
+    mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[]; configuration?: any[]; outputChannels?: any[] }) => {
       const payload = {
         name: data.name,
         description: data.description || '',
         nodes: data.nodes || [],
         edges: data.edges || [],
         configuration: data.configuration || [],
+        outputChannels: data.outputChannels || [],
       }
 
       return await blueprintsCreateBlueprint(
@@ -85,7 +86,7 @@ export const useUpdateBlueprint = (organizationId: string, blueprintId: string) 
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[]; configuration?: any[] }) => {
+    mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[]; configuration?: any[]; outputChannels?: any[] }) => {
       return await blueprintsUpdateBlueprint(
         withOrganizationHeader({
           path: { id: blueprintId },
@@ -96,6 +97,7 @@ export const useUpdateBlueprint = (organizationId: string, blueprintId: string) 
               nodes: data.nodes || [],
               edges: data.edges || [],
               configuration: data.configuration || [],
+              outputChannels: data.outputChannels || [],
             }
           }
         })

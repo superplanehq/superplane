@@ -24,96 +24,50 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Node_RefType int32
+type Node_Type int32
 
 const (
-	Node_REF_TYPE_COMPONENT Node_RefType = 0
-	Node_REF_TYPE_BLUEPRINT Node_RefType = 1
+	Node_TYPE_COMPONENT Node_Type = 0
+	Node_TYPE_BLUEPRINT Node_Type = 1
 )
 
-// Enum value maps for Node_RefType.
+// Enum value maps for Node_Type.
 var (
-	Node_RefType_name = map[int32]string{
-		0: "REF_TYPE_COMPONENT",
-		1: "REF_TYPE_BLUEPRINT",
+	Node_Type_name = map[int32]string{
+		0: "TYPE_COMPONENT",
+		1: "TYPE_BLUEPRINT",
 	}
-	Node_RefType_value = map[string]int32{
-		"REF_TYPE_COMPONENT": 0,
-		"REF_TYPE_BLUEPRINT": 1,
+	Node_Type_value = map[string]int32{
+		"TYPE_COMPONENT": 0,
+		"TYPE_BLUEPRINT": 1,
 	}
 )
 
-func (x Node_RefType) Enum() *Node_RefType {
-	p := new(Node_RefType)
+func (x Node_Type) Enum() *Node_Type {
+	p := new(Node_Type)
 	*p = x
 	return p
 }
 
-func (x Node_RefType) String() string {
+func (x Node_Type) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (Node_RefType) Descriptor() protoreflect.EnumDescriptor {
+func (Node_Type) Descriptor() protoreflect.EnumDescriptor {
 	return file_components_proto_enumTypes[0].Descriptor()
 }
 
-func (Node_RefType) Type() protoreflect.EnumType {
+func (Node_Type) Type() protoreflect.EnumType {
 	return &file_components_proto_enumTypes[0]
 }
 
-func (x Node_RefType) Number() protoreflect.EnumNumber {
+func (x Node_Type) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use Node_RefType.Descriptor instead.
-func (Node_RefType) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use Node_Type.Descriptor instead.
+func (Node_Type) EnumDescriptor() ([]byte, []int) {
 	return file_components_proto_rawDescGZIP(), []int{12, 0}
-}
-
-type Edge_TargetType int32
-
-const (
-	Edge_REF_TYPE_NODE           Edge_TargetType = 0
-	Edge_REF_TYPE_OUTPUT_CHANNEL Edge_TargetType = 1
-)
-
-// Enum value maps for Edge_TargetType.
-var (
-	Edge_TargetType_name = map[int32]string{
-		0: "REF_TYPE_NODE",
-		1: "REF_TYPE_OUTPUT_CHANNEL",
-	}
-	Edge_TargetType_value = map[string]int32{
-		"REF_TYPE_NODE":           0,
-		"REF_TYPE_OUTPUT_CHANNEL": 1,
-	}
-)
-
-func (x Edge_TargetType) Enum() *Edge_TargetType {
-	p := new(Edge_TargetType)
-	*p = x
-	return p
-}
-
-func (x Edge_TargetType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (Edge_TargetType) Descriptor() protoreflect.EnumDescriptor {
-	return file_components_proto_enumTypes[1].Descriptor()
-}
-
-func (Edge_TargetType) Type() protoreflect.EnumType {
-	return &file_components_proto_enumTypes[1]
-}
-
-func (x Edge_TargetType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use Edge_TargetType.Descriptor instead.
-func (Edge_TargetType) EnumDescriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{13, 0}
 }
 
 type ListComponentsRequest struct {
@@ -800,10 +754,10 @@ type Node struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	RefType       Node_RefType           `protobuf:"varint,3,opt,name=ref_type,json=refType,proto3,enum=Superplane.Components.Node_RefType" json:"ref_type,omitempty"`
-	Component     *Node_ComponentRef     `protobuf:"bytes,4,opt,name=component,proto3" json:"component,omitempty"`
-	Blueprint     *Node_BlueprintRef     `protobuf:"bytes,5,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
-	Configuration *_struct.Struct        `protobuf:"bytes,6,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	Type          Node_Type              `protobuf:"varint,3,opt,name=type,proto3,enum=Superplane.Components.Node_Type" json:"type,omitempty"`
+	Configuration *_struct.Struct        `protobuf:"bytes,4,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	Component     *Node_ComponentRef     `protobuf:"bytes,5,opt,name=component,proto3" json:"component,omitempty"`
+	Blueprint     *Node_BlueprintRef     `protobuf:"bytes,6,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -852,11 +806,18 @@ func (x *Node) GetName() string {
 	return ""
 }
 
-func (x *Node) GetRefType() Node_RefType {
+func (x *Node) GetType() Node_Type {
 	if x != nil {
-		return x.RefType
+		return x.Type
 	}
-	return Node_REF_TYPE_COMPONENT
+	return Node_TYPE_COMPONENT
+}
+
+func (x *Node) GetConfiguration() *_struct.Struct {
+	if x != nil {
+		return x.Configuration
+	}
+	return nil
 }
 
 func (x *Node) GetComponent() *Node_ComponentRef {
@@ -873,19 +834,11 @@ func (x *Node) GetBlueprint() *Node_BlueprintRef {
 	return nil
 }
 
-func (x *Node) GetConfiguration() *_struct.Struct {
-	if x != nil {
-		return x.Configuration
-	}
-	return nil
-}
-
 type Edge struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SourceId      string                 `protobuf:"bytes,1,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
-	TargetType    Edge_TargetType        `protobuf:"varint,2,opt,name=target_type,json=targetType,proto3,enum=Superplane.Components.Edge_TargetType" json:"target_type,omitempty"`
-	TargetId      string                 `protobuf:"bytes,3,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
-	Channel       string                 `protobuf:"bytes,4,opt,name=channel,proto3" json:"channel,omitempty"`
+	TargetId      string                 `protobuf:"bytes,2,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
+	Channel       string                 `protobuf:"bytes,3,opt,name=channel,proto3" json:"channel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -925,13 +878,6 @@ func (x *Edge) GetSourceId() string {
 		return x.SourceId
 	}
 	return ""
-}
-
-func (x *Edge) GetTargetType() Edge_TargetType {
-	if x != nil {
-		return x.TargetType
-	}
-	return Edge_REF_TYPE_NODE
 }
 
 func (x *Edge) GetTargetId() string {
@@ -1093,31 +1039,25 @@ const file_components_proto_rawDesc = "" +
 	"parameters\x18\x03 \x03(\v2).Superplane.Components.ConfigurationFieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
-	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xb8\x03\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xa3\x03\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12>\n" +
-	"\bref_type\x18\x03 \x01(\x0e2#.Superplane.Components.Node.RefTypeR\arefType\x12F\n" +
-	"\tcomponent\x18\x04 \x01(\v2(.Superplane.Components.Node.ComponentRefR\tcomponent\x12F\n" +
-	"\tblueprint\x18\x05 \x01(\v2(.Superplane.Components.Node.BlueprintRefR\tblueprint\x12=\n" +
-	"\rconfiguration\x18\x06 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x1a\"\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
+	"\x04type\x18\x03 \x01(\x0e2 .Superplane.Components.Node.TypeR\x04type\x12=\n" +
+	"\rconfiguration\x18\x04 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x12F\n" +
+	"\tcomponent\x18\x05 \x01(\v2(.Superplane.Components.Node.ComponentRefR\tcomponent\x12F\n" +
+	"\tblueprint\x18\x06 \x01(\v2(.Superplane.Components.Node.BlueprintRefR\tblueprint\x1a\"\n" +
 	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a\x1e\n" +
 	"\fBlueprintRef\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"9\n" +
-	"\aRefType\x12\x16\n" +
-	"\x12REF_TYPE_COMPONENT\x10\x00\x12\x16\n" +
-	"\x12REF_TYPE_BLUEPRINT\x10\x01\"\xe1\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\".\n" +
+	"\x04Type\x12\x12\n" +
+	"\x0eTYPE_COMPONENT\x10\x00\x12\x12\n" +
+	"\x0eTYPE_BLUEPRINT\x10\x01\"Z\n" +
 	"\x04Edge\x12\x1b\n" +
-	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12G\n" +
-	"\vtarget_type\x18\x02 \x01(\x0e2&.Superplane.Components.Edge.TargetTypeR\n" +
-	"targetType\x12\x1b\n" +
-	"\ttarget_id\x18\x03 \x01(\tR\btargetId\x12\x18\n" +
-	"\achannel\x18\x04 \x01(\tR\achannel\"<\n" +
-	"\n" +
-	"TargetType\x12\x11\n" +
-	"\rREF_TYPE_NODE\x10\x00\x12\x1b\n" +
-	"\x17REF_TYPE_OUTPUT_CHANNEL\x10\x012\xb6\x05\n" +
+	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12\x1b\n" +
+	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x18\n" +
+	"\achannel\x18\x03 \x01(\tR\achannel2\xb6\x05\n" +
 	"\n" +
 	"Components\x12\xca\x01\n" +
 	"\x0eListComponents\x12,.Superplane.Components.ListComponentsRequest\x1a-.Superplane.Components.ListComponentsResponse\"[\x92A>\n" +
@@ -1141,56 +1081,54 @@ func file_components_proto_rawDescGZIP() []byte {
 	return file_components_proto_rawDescData
 }
 
-var file_components_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_components_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_components_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_components_proto_goTypes = []any{
-	(Node_RefType)(0),                    // 0: Superplane.Components.Node.RefType
-	(Edge_TargetType)(0),                 // 1: Superplane.Components.Edge.TargetType
-	(*ListComponentsRequest)(nil),        // 2: Superplane.Components.ListComponentsRequest
-	(*ListComponentsResponse)(nil),       // 3: Superplane.Components.ListComponentsResponse
-	(*DescribeComponentRequest)(nil),     // 4: Superplane.Components.DescribeComponentRequest
-	(*DescribeComponentResponse)(nil),    // 5: Superplane.Components.DescribeComponentResponse
-	(*Component)(nil),                    // 6: Superplane.Components.Component
-	(*ConfigurationField)(nil),           // 7: Superplane.Components.ConfigurationField
-	(*FieldOption)(nil),                  // 8: Superplane.Components.FieldOption
-	(*ListItemDefinition)(nil),           // 9: Superplane.Components.ListItemDefinition
-	(*OutputChannel)(nil),                // 10: Superplane.Components.OutputChannel
-	(*ListComponentActionsRequest)(nil),  // 11: Superplane.Components.ListComponentActionsRequest
-	(*ComponentAction)(nil),              // 12: Superplane.Components.ComponentAction
-	(*ListComponentActionsResponse)(nil), // 13: Superplane.Components.ListComponentActionsResponse
-	(*Node)(nil),                         // 14: Superplane.Components.Node
-	(*Edge)(nil),                         // 15: Superplane.Components.Edge
-	(*Node_ComponentRef)(nil),            // 16: Superplane.Components.Node.ComponentRef
-	(*Node_BlueprintRef)(nil),            // 17: Superplane.Components.Node.BlueprintRef
-	(*_struct.Struct)(nil),               // 18: google.protobuf.Struct
+	(Node_Type)(0),                       // 0: Superplane.Components.Node.Type
+	(*ListComponentsRequest)(nil),        // 1: Superplane.Components.ListComponentsRequest
+	(*ListComponentsResponse)(nil),       // 2: Superplane.Components.ListComponentsResponse
+	(*DescribeComponentRequest)(nil),     // 3: Superplane.Components.DescribeComponentRequest
+	(*DescribeComponentResponse)(nil),    // 4: Superplane.Components.DescribeComponentResponse
+	(*Component)(nil),                    // 5: Superplane.Components.Component
+	(*ConfigurationField)(nil),           // 6: Superplane.Components.ConfigurationField
+	(*FieldOption)(nil),                  // 7: Superplane.Components.FieldOption
+	(*ListItemDefinition)(nil),           // 8: Superplane.Components.ListItemDefinition
+	(*OutputChannel)(nil),                // 9: Superplane.Components.OutputChannel
+	(*ListComponentActionsRequest)(nil),  // 10: Superplane.Components.ListComponentActionsRequest
+	(*ComponentAction)(nil),              // 11: Superplane.Components.ComponentAction
+	(*ListComponentActionsResponse)(nil), // 12: Superplane.Components.ListComponentActionsResponse
+	(*Node)(nil),                         // 13: Superplane.Components.Node
+	(*Edge)(nil),                         // 14: Superplane.Components.Edge
+	(*Node_ComponentRef)(nil),            // 15: Superplane.Components.Node.ComponentRef
+	(*Node_BlueprintRef)(nil),            // 16: Superplane.Components.Node.BlueprintRef
+	(*_struct.Struct)(nil),               // 17: google.protobuf.Struct
 }
 var file_components_proto_depIdxs = []int32{
-	6,  // 0: Superplane.Components.ListComponentsResponse.components:type_name -> Superplane.Components.Component
-	6,  // 1: Superplane.Components.DescribeComponentResponse.component:type_name -> Superplane.Components.Component
-	7,  // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Components.ConfigurationField
-	10, // 3: Superplane.Components.Component.channels:type_name -> Superplane.Components.OutputChannel
-	8,  // 4: Superplane.Components.ConfigurationField.options:type_name -> Superplane.Components.FieldOption
-	9,  // 5: Superplane.Components.ConfigurationField.list_item:type_name -> Superplane.Components.ListItemDefinition
-	7,  // 6: Superplane.Components.ConfigurationField.schema:type_name -> Superplane.Components.ConfigurationField
-	7,  // 7: Superplane.Components.ListItemDefinition.schema:type_name -> Superplane.Components.ConfigurationField
-	7,  // 8: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Components.ConfigurationField
-	12, // 9: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
-	0,  // 10: Superplane.Components.Node.ref_type:type_name -> Superplane.Components.Node.RefType
-	16, // 11: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
-	17, // 12: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
-	18, // 13: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
-	1,  // 14: Superplane.Components.Edge.target_type:type_name -> Superplane.Components.Edge.TargetType
-	2,  // 15: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
-	4,  // 16: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
-	11, // 17: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
-	3,  // 18: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
-	5,  // 19: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
-	13, // 20: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
-	18, // [18:21] is the sub-list for method output_type
-	15, // [15:18] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	5,  // 0: Superplane.Components.ListComponentsResponse.components:type_name -> Superplane.Components.Component
+	5,  // 1: Superplane.Components.DescribeComponentResponse.component:type_name -> Superplane.Components.Component
+	6,  // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Components.ConfigurationField
+	9,  // 3: Superplane.Components.Component.channels:type_name -> Superplane.Components.OutputChannel
+	7,  // 4: Superplane.Components.ConfigurationField.options:type_name -> Superplane.Components.FieldOption
+	8,  // 5: Superplane.Components.ConfigurationField.list_item:type_name -> Superplane.Components.ListItemDefinition
+	6,  // 6: Superplane.Components.ConfigurationField.schema:type_name -> Superplane.Components.ConfigurationField
+	6,  // 7: Superplane.Components.ListItemDefinition.schema:type_name -> Superplane.Components.ConfigurationField
+	6,  // 8: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Components.ConfigurationField
+	11, // 9: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
+	0,  // 10: Superplane.Components.Node.type:type_name -> Superplane.Components.Node.Type
+	17, // 11: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
+	15, // 12: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
+	16, // 13: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
+	1,  // 14: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
+	3,  // 15: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
+	10, // 16: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
+	2,  // 17: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
+	4,  // 18: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
+	12, // 19: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
+	17, // [17:20] is the sub-list for method output_type
+	14, // [14:17] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_components_proto_init() }
@@ -1204,7 +1142,7 @@ func file_components_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_components_proto_rawDesc), len(file_components_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      1,
 			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,

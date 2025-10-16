@@ -12,7 +12,7 @@ import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import { showSuccessToast, showErrorToast } from '../../../utils/toast'
 import { formatTimeAgo } from '../../../utils/date'
 
-const ApprovalActions = ({ execution }: { execution: any }) => {
+const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId: string }) => {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [comment, setComment] = useState('')
@@ -24,6 +24,7 @@ const ApprovalActions = ({ execution }: { execution: any }) => {
       await workflowsInvokeNodeExecutionAction(
         withOrganizationHeader({
           path: {
+            workflowId,
             executionId: execution.id,
             actionName,
           },
@@ -245,7 +246,7 @@ registerExecutionRenderer('approval', {
     )
   },
 
-  renderExpanded: ({ execution }: ExpandedViewProps) => {
+  renderExpanded: ({ execution, workflowId }: ExpandedViewProps) => {
     const metadata = execution.metadata || {}
     const approvals = metadata.approvals || []
 
@@ -266,7 +267,7 @@ registerExecutionRenderer('approval', {
         )}
 
         {/* Approval Actions */}
-        <ApprovalActions execution={execution} />
+        <ApprovalActions execution={execution} workflowId={workflowId} />
 
         {/* Approvals List */}
         {approvals.length > 0 && (

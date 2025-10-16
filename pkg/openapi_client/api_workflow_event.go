@@ -144,8 +144,14 @@ type ApiWorkflowsListWorkflowEventsRequest struct {
 	ctx context.Context
 	ApiService *WorkflowEventAPIService
 	workflowId string
+	nodeId *string
 	limit *int64
 	before *time.Time
+}
+
+func (r ApiWorkflowsListWorkflowEventsRequest) NodeId(nodeId string) ApiWorkflowsListWorkflowEventsRequest {
+	r.nodeId = &nodeId
+	return r
 }
 
 func (r ApiWorkflowsListWorkflowEventsRequest) Limit(limit int64) ApiWorkflowsListWorkflowEventsRequest {
@@ -201,6 +207,9 @@ func (a *WorkflowEventAPIService) WorkflowsListWorkflowEventsExecute(r ApiWorkfl
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.nodeId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "nodeId", r.nodeId, "", "")
+	}
 	if r.limit != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
 	}

@@ -24,7 +24,7 @@ export type BlueprintsBlueprint = {
     nodes?: Array<ComponentsNode>;
     edges?: Array<ComponentsEdge>;
     configuration?: Array<ComponentsConfigurationField>;
-    outputChannels?: Array<ComponentsOutputChannel>;
+    outputChannels?: Array<SuperplaneBlueprintsOutputChannel>;
 };
 
 export type BlueprintsCreateBlueprintRequest = {
@@ -56,7 +56,7 @@ export type ComponentsComponent = {
     label?: string;
     description?: string;
     configuration?: Array<ComponentsConfigurationField>;
-    channels?: Array<ComponentsOutputChannel>;
+    channels?: Array<SuperplaneComponentsOutputChannel>;
 };
 
 export type ComponentsComponentAction = {
@@ -85,7 +85,6 @@ export type ComponentsDescribeComponentResponse = {
 
 export type ComponentsEdge = {
     sourceId?: string;
-    targetType?: EdgeTargetType;
     targetId?: string;
     channel?: string;
 };
@@ -111,21 +110,15 @@ export type ComponentsListItemDefinition = {
 export type ComponentsNode = {
     id?: string;
     name?: string;
-    refType?: NodeRefType;
-    component?: NodeComponentRef;
-    blueprint?: NodeBlueprintRef;
+    type?: ComponentsNodeType;
     configuration?: {
         [key: string]: unknown;
     };
+    component?: NodeComponentRef;
+    blueprint?: NodeBlueprintRef;
 };
 
-export type ComponentsOutputChannel = {
-    name?: string;
-    label?: string;
-    description?: string;
-};
-
-export type EdgeTargetType = 'REF_TYPE_NODE' | 'REF_TYPE_OUTPUT_CHANNEL';
+export type ComponentsNodeType = 'TYPE_COMPONENT' | 'TYPE_BLUEPRINT';
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
@@ -327,8 +320,6 @@ export type NodeBlueprintRef = {
 export type NodeComponentRef = {
     name?: string;
 };
-
-export type NodeRefType = 'REF_TYPE_COMPONENT' | 'REF_TYPE_BLUEPRINT';
 
 export type OrganizationsCreateInvitationBody = {
     email?: string;
@@ -546,6 +537,12 @@ export type SuperplaneApproveStageEventResponse = {
     event?: SuperplaneStageEvent;
 };
 
+export type SuperplaneBlueprintsOutputChannel = {
+    name?: string;
+    nodeId?: string;
+    nodeOutputChannel?: string;
+};
+
 export type SuperplaneCancelStageExecutionBody = {
     [key: string]: unknown;
 };
@@ -564,6 +561,12 @@ export type SuperplaneCanvasMetadata = {
     description?: string;
     createdBy?: string;
     createdAt?: string;
+};
+
+export type SuperplaneComponentsOutputChannel = {
+    name?: string;
+    label?: string;
+    description?: string;
 };
 
 export type SuperplaneCondition = {
@@ -1164,7 +1167,7 @@ export type WorkflowsListNodeExecutionsResponse = {
 };
 
 export type WorkflowsListWorkflowEventsResponse = {
-    events?: Array<WorkflowsWorkflowInitialEvent>;
+    events?: Array<WorkflowsWorkflowEvent>;
     totalCount?: number;
     hasNextPage?: boolean;
     lastTimestamp?: string;
@@ -1193,9 +1196,11 @@ export type WorkflowsWorkflow = {
     edges?: Array<ComponentsEdge>;
 };
 
-export type WorkflowsWorkflowInitialEvent = {
+export type WorkflowsWorkflowEvent = {
     id?: string;
     workflowId?: string;
+    nodeId?: string;
+    channel?: string;
     data?: {
         [key: string]: unknown;
     };
@@ -1207,7 +1212,6 @@ export type WorkflowsWorkflowNodeExecution = {
     workflowId?: string;
     nodeId?: string;
     parentExecutionId?: string;
-    blueprintId?: string;
     state?: WorkflowsWorkflowNodeExecutionState;
     result?: WorkflowsWorkflowNodeExecutionResult;
     resultReason?: WorkflowsWorkflowNodeExecutionResultReason;
@@ -1226,9 +1230,6 @@ export type WorkflowsWorkflowNodeExecution = {
     configuration?: {
         [key: string]: unknown;
     };
-    previousExecutionId?: string;
-    previousOutputChannel?: string;
-    previousOutputIndex?: number;
 };
 
 export type WorkflowsWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';
@@ -3368,34 +3369,6 @@ export type WorkflowsCreateWorkflowResponses = {
 
 export type WorkflowsCreateWorkflowResponse2 = WorkflowsCreateWorkflowResponses[keyof WorkflowsCreateWorkflowResponses];
 
-export type WorkflowsInvokeNodeExecutionActionData = {
-    body: WorkflowsInvokeNodeExecutionActionBody;
-    path: {
-        executionId: string;
-        actionName: string;
-    };
-    query?: never;
-    url: '/api/v1/workflows/executions/{executionId}/actions/{actionName}';
-};
-
-export type WorkflowsInvokeNodeExecutionActionErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type WorkflowsInvokeNodeExecutionActionError = WorkflowsInvokeNodeExecutionActionErrors[keyof WorkflowsInvokeNodeExecutionActionErrors];
-
-export type WorkflowsInvokeNodeExecutionActionResponses = {
-    /**
-     * A successful response.
-     */
-    200: WorkflowsInvokeNodeExecutionActionResponse;
-};
-
-export type WorkflowsInvokeNodeExecutionActionResponse2 = WorkflowsInvokeNodeExecutionActionResponses[keyof WorkflowsInvokeNodeExecutionActionResponses];
-
 export type WorkflowsDeleteWorkflowData = {
     body?: never;
     path: {
@@ -3483,6 +3456,7 @@ export type WorkflowsListWorkflowEventsData = {
         workflowId: string;
     };
     query?: {
+        nodeId?: string;
         limit?: number;
         before?: string;
     };
@@ -3534,6 +3508,35 @@ export type WorkflowsListEventExecutionsResponses = {
 };
 
 export type WorkflowsListEventExecutionsResponse2 = WorkflowsListEventExecutionsResponses[keyof WorkflowsListEventExecutionsResponses];
+
+export type WorkflowsInvokeNodeExecutionActionData = {
+    body: WorkflowsInvokeNodeExecutionActionBody;
+    path: {
+        workflowId: string;
+        executionId: string;
+        actionName: string;
+    };
+    query?: never;
+    url: '/api/v1/workflows/{workflowId}/executions/{executionId}/actions/{actionName}';
+};
+
+export type WorkflowsInvokeNodeExecutionActionErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsInvokeNodeExecutionActionError = WorkflowsInvokeNodeExecutionActionErrors[keyof WorkflowsInvokeNodeExecutionActionErrors];
+
+export type WorkflowsInvokeNodeExecutionActionResponses = {
+    /**
+     * A successful response.
+     */
+    200: WorkflowsInvokeNodeExecutionActionResponse;
+};
+
+export type WorkflowsInvokeNodeExecutionActionResponse2 = WorkflowsInvokeNodeExecutionActionResponses[keyof WorkflowsInvokeNodeExecutionActionResponses];
 
 export type WorkflowsListNodeExecutionsData = {
     body?: never;

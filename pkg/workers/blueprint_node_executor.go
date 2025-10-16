@@ -77,7 +77,7 @@ func (w *BlueprintNodeExecutor) LockAndProcessExecution(execution models.Workflo
 
 // TODO: handle nested blueprints here?
 func (w *BlueprintNodeExecutor) processExecution(tx *gorm.DB, execution *models.WorkflowNodeExecution) error {
-	parent, err := models.FindNodeExecutionInTransaction(tx, *execution.ParentExecutionID)
+	parent, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
 	if err != nil {
 		return fmt.Errorf("failed to find parent execution: %w", err)
 	}
@@ -88,7 +88,7 @@ func (w *BlueprintNodeExecutor) processExecution(tx *gorm.DB, execution *models.
 	}
 
 	parentNodeRef := parentNode.Ref.Data()
-	blueprint, err := models.FindBlueprintByIDInTransaction(tx, parentNodeRef.Blueprint.ID)
+	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, parentNodeRef.Blueprint.ID)
 	if err != nil {
 		return fmt.Errorf("failed to find blueprint: %w", err)
 	}

@@ -27,6 +27,7 @@ type WorkflowNodeExecutionAPIService service
 type ApiWorkflowsInvokeNodeExecutionActionRequest struct {
 	ctx context.Context
 	ApiService *WorkflowNodeExecutionAPIService
+	workflowId string
 	executionId string
 	actionName string
 	body *WorkflowsInvokeNodeExecutionActionBody
@@ -47,14 +48,16 @@ WorkflowsInvokeNodeExecutionAction Invoke execution action
 Invokes a custom action on a workflow node execution
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param workflowId
  @param executionId
  @param actionName
  @return ApiWorkflowsInvokeNodeExecutionActionRequest
 */
-func (a *WorkflowNodeExecutionAPIService) WorkflowsInvokeNodeExecutionAction(ctx context.Context, executionId string, actionName string) ApiWorkflowsInvokeNodeExecutionActionRequest {
+func (a *WorkflowNodeExecutionAPIService) WorkflowsInvokeNodeExecutionAction(ctx context.Context, workflowId string, executionId string, actionName string) ApiWorkflowsInvokeNodeExecutionActionRequest {
 	return ApiWorkflowsInvokeNodeExecutionActionRequest{
 		ApiService: a,
 		ctx: ctx,
+		workflowId: workflowId,
 		executionId: executionId,
 		actionName: actionName,
 	}
@@ -75,7 +78,8 @@ func (a *WorkflowNodeExecutionAPIService) WorkflowsInvokeNodeExecutionActionExec
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/workflows/executions/{executionId}/actions/{actionName}"
+	localVarPath := localBasePath + "/api/v1/workflows/{workflowId}/executions/{executionId}/actions/{actionName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"workflowId"+"}", url.PathEscape(parameterValueToString(r.workflowId, "workflowId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"executionId"+"}", url.PathEscape(parameterValueToString(r.executionId, "executionId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"actionName"+"}", url.PathEscape(parameterValueToString(r.actionName, "actionName")), -1)
 

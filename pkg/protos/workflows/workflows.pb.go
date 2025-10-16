@@ -1010,9 +1010,10 @@ func (x *WorkflowNodeExecution) GetConfiguration() *_struct.Struct {
 
 type InvokeNodeExecutionActionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ExecutionId   string                 `protobuf:"bytes,1,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
-	ActionName    string                 `protobuf:"bytes,2,opt,name=action_name,json=actionName,proto3" json:"action_name,omitempty"`
-	Parameters    *_struct.Struct        `protobuf:"bytes,3,opt,name=parameters,proto3" json:"parameters,omitempty"`
+	WorkflowId    string                 `protobuf:"bytes,1,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
+	ExecutionId   string                 `protobuf:"bytes,2,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	ActionName    string                 `protobuf:"bytes,3,opt,name=action_name,json=actionName,proto3" json:"action_name,omitempty"`
+	Parameters    *_struct.Struct        `protobuf:"bytes,4,opt,name=parameters,proto3" json:"parameters,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1045,6 +1046,13 @@ func (x *InvokeNodeExecutionActionRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use InvokeNodeExecutionActionRequest.ProtoReflect.Descriptor instead.
 func (*InvokeNodeExecutionActionRequest) Descriptor() ([]byte, []int) {
 	return file_workflows_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *InvokeNodeExecutionActionRequest) GetWorkflowId() string {
+	if x != nil {
+		return x.WorkflowId
+	}
+	return ""
 }
 
 func (x *InvokeNodeExecutionActionRequest) GetExecutionId() string {
@@ -1502,13 +1510,15 @@ const file_workflows_proto_rawDesc = "" +
 	"\x10RESULT_CANCELLED\x10\x03\"=\n" +
 	"\fResultReason\x12\x14\n" +
 	"\x10RESULT_REASON_OK\x10\x00\x12\x17\n" +
-	"\x13RESULT_REASON_ERROR\x10\x01\"\x9f\x01\n" +
-	" InvokeNodeExecutionActionRequest\x12!\n" +
-	"\fexecution_id\x18\x01 \x01(\tR\vexecutionId\x12\x1f\n" +
-	"\vaction_name\x18\x02 \x01(\tR\n" +
+	"\x13RESULT_REASON_ERROR\x10\x01\"\xc0\x01\n" +
+	" InvokeNodeExecutionActionRequest\x12\x1f\n" +
+	"\vworkflow_id\x18\x01 \x01(\tR\n" +
+	"workflowId\x12!\n" +
+	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12\x1f\n" +
+	"\vaction_name\x18\x03 \x01(\tR\n" +
 	"actionName\x127\n" +
 	"\n" +
-	"parameters\x18\x03 \x01(\v2\x17.google.protobuf.StructR\n" +
+	"parameters\x18\x04 \x01(\v2\x17.google.protobuf.StructR\n" +
 	"parameters\"#\n" +
 	"!InvokeNodeExecutionActionResponse\"\x9f\x01\n" +
 	"\x19ListWorkflowEventsRequest\x12\x1f\n" +
@@ -1539,7 +1549,7 @@ const file_workflows_proto_rawDesc = "" +
 	"\x1bListEventExecutionsResponse\x12K\n" +
 	"\n" +
 	"executions\x18\x01 \x03(\v2+.Superplane.Workflows.WorkflowNodeExecutionR\n" +
-	"executions2\xb5\x11\n" +
+	"executions2\xc3\x11\n" +
 	"\tWorkflows\x12\xc1\x01\n" +
 	"\rListWorkflows\x12*.Superplane.Workflows.ListWorkflowsRequest\x1a+.Superplane.Workflows.ListWorkflowsResponse\"W\x92A;\n" +
 	"\bWorkflow\x12\x0eList workflows\x1a\x1fReturns a list of all workflows\x82\xd3\xe4\x93\x02\x13\x12\x11/api/v1/workflows\x12\xbf\x01\n" +
@@ -1552,9 +1562,9 @@ const file_workflows_proto_rawDesc = "" +
 	"\x0eDeleteWorkflow\x12+.Superplane.Workflows.DeleteWorkflowRequest\x1a,.Superplane.Workflows.DeleteWorkflowResponse\"Z\x92A9\n" +
 	"\bWorkflow\x12\x0fDelete workflow\x1a\x1cDeletes an existing workflow\x82\xd3\xe4\x93\x02\x18*\x16/api/v1/workflows/{id}\x12\x9e\x02\n" +
 	"\x12ListNodeExecutions\x12/.Superplane.Workflows.ListNodeExecutionsRequest\x1a0.Superplane.Workflows.ListNodeExecutionsResponse\"\xa4\x01\x92A_\n" +
-	"\fWorkflowNode\x12\x14List node executions\x1a9Returns a list of executions for a specific workflow node\x82\xd3\xe4\x93\x02<\x12:/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions\x12\xc4\x02\n" +
-	"\x19InvokeNodeExecutionAction\x126.Superplane.Workflows.InvokeNodeExecutionActionRequest\x1a7.Superplane.Workflows.InvokeNodeExecutionActionResponse\"\xb5\x01\x92Af\n" +
-	"\x15WorkflowNodeExecution\x12\x17Invoke execution action\x1a4Invokes a custom action on a workflow node execution\x82\xd3\xe4\x93\x02F:\x01*\"A/api/v1/workflows/executions/{execution_id}/actions/{action_name}\x12\x9a\x02\n" +
+	"\fWorkflowNode\x12\x14List node executions\x1a9Returns a list of executions for a specific workflow node\x82\xd3\xe4\x93\x02<\x12:/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions\x12\xd2\x02\n" +
+	"\x19InvokeNodeExecutionAction\x126.Superplane.Workflows.InvokeNodeExecutionActionRequest\x1a7.Superplane.Workflows.InvokeNodeExecutionActionResponse\"\xc3\x01\x92Af\n" +
+	"\x15WorkflowNodeExecution\x12\x17Invoke execution action\x1a4Invokes a custom action on a workflow node execution\x82\xd3\xe4\x93\x02T:\x01*\"O/api/v1/workflows/{workflow_id}/executions/{execution_id}/actions/{action_name}\x12\x9a\x02\n" +
 	"\x12ListWorkflowEvents\x12/.Superplane.Workflows.ListWorkflowEventsRequest\x1a0.Superplane.Workflows.ListWorkflowEventsResponse\"\xa0\x01\x92Ao\n" +
 	"\rWorkflowEvent\x12\x14List workflow events\x1aHReturns a list of initial events that triggered executions in a workflow\x82\xd3\xe4\x93\x02(\x12&/api/v1/workflows/{workflow_id}/events\x12\xb7\x02\n" +
 	"\x13ListEventExecutions\x120.Superplane.Workflows.ListEventExecutionsRequest\x1a1.Superplane.Workflows.ListEventExecutionsResponse\"\xba\x01\x92As\n" +

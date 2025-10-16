@@ -131,7 +131,7 @@ export const Workflow = () => {
     if (!workflow || buildingBlocks.length === 0) return
 
     const loadedNodes: Node[] = (workflow.nodes || []).map((node: any) => {
-      const isComponent = node.refType === 'REF_TYPE_COMPONENT'
+      const isComponent = node.type === 'TYPE_COMPONENT'
       const blockName = isComponent ? node.component?.name : node.blueprint?.name
       const blockId = isComponent ? node.component?.name : node.blueprint?.id
       const block = buildingBlocks.find((b: BuildingBlock) => {
@@ -306,7 +306,7 @@ export const Workflow = () => {
         const baseNode: any = {
           id: node.id,
           name: node.data.label,
-          refType: node.data.blockType === 'component' ? 'REF_TYPE_COMPONENT' : 'REF_TYPE_BLUEPRINT',
+          type: node.data.blockType === 'component' ? 'TYPE_COMPONENT' : 'TYPE_BLUEPRINT',
           configuration: node.data.configuration || {},
         }
 
@@ -322,7 +322,6 @@ export const Workflow = () => {
 
       const workflowEdges = edges.map((edge) => ({
         sourceId: edge.source!,
-        targetType: 'REF_TYPE_NODE',
         targetId: edge.target!,
         channel: edge.sourceHandle || edge.label as string || 'default',
       }))

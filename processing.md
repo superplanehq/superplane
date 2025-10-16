@@ -311,10 +311,6 @@ ex4 wf1   http1      ev1        ev3   ex3      ex2    finished
 ex5 wf1   http2      ev1        ev5   ex4      -      finished
 ```
 
-## How to solve the node ID conflicts
-
-TODO
-
 ## How to solve the N+1 problem when fetching executions with input and output
 
 --- 1. Fetch execution records
@@ -327,3 +323,127 @@ select * from workflow_events where id IN (ev1, ev2, ev3);
 select * from workflow_events where execution_id IN (ex1, ex2, ex3)
 
 --- Build the API response using the data above. Not great, but not a N+1 problem anymore
+
+## APIs
+
+GET    /workflows
+POST   /workflows
+GET    /workflows/{id}
+PUT    /workflows/{id}
+DELETE /workflows/{id}
+
+List all executions for a node
+  GET /workflows/{workflow_id}/nodes/{node_id}/executions
+
+List all events for a workflow node
+  GET /workflows/{workflow_id}/events?node_id=
+
+List all executions for a root event
+  GET /workflows/{workflow_id}/events/{event_id}/executions
+
+Invoke action on an execution
+  POST /workflows/{workflow_id}/executions/{execution_id}/actions/{action_name}
+
+List child executions
+  GET /workflows/{workflow_id}/executions/{execution_id}/children
+
+## Output channels
+
+```yaml
+#
+# Single output channel
+#
+outputChannels:
+  - name: default
+    nodeId: noop-noop-123
+    channel: default
+
+edges:
+  - sourceId: filter-filter-q8jpss
+    targetId: http-http-rt6ym1
+    channel: default
+  - sourceId: filter-filter-q8jpss
+    targetId: http-http-t8irns
+    channel: default
+  - sourceId: http-http-t8irns
+    targetId: noop-noop-123
+    channel: default
+  - sourceId: http-http-rt6ym1
+    targetId: noop-noop-123
+    channel: default
+
+nodes:
+  - id: filter-filter-q8jpss
+    name: filter
+    type: TYPE_COMPONENT
+    configuration:
+      expression: true
+    component:
+      name: filter
+  - id: http-http-t8irns
+    name: http
+    type: TYPE_COMPONENT
+    configuration:
+      method: POST
+      url: https://rbaskets.in/dhqfuva
+    component:
+      name: http
+  - id: http-http-rt6ym1
+    name: http
+    type: TYPE_COMPONENT
+    configuration:
+      method: POST
+      url: https://rbaskets.in/qe69jd4
+    component:
+      name: http
+  - id: noop-noop-123
+    name: noop
+    type: TYPE_COMPONENT
+    configuration: {}
+    component:
+      name: noop
+
+#
+# Multiple output channels
+#
+outputChannels:
+  - name: up
+    nodeId: http-http-rt6ym1
+    nodeOutputChannel: default
+  - name: down
+    nodeId: http-http-t8irns
+    nodeOutputChannel: default
+
+edges:
+  - sourceId: filter-filter-q8jpss
+    targetId: http-http-rt6ym1
+    channel: default
+  - sourceId: filter-filter-q8jpss
+    targetId: http-http-t8irns
+    channel: default
+
+nodes:
+  - id: filter-filter-q8jpss
+    name: filter
+    type: TYPE_COMPONENT
+    configuration:
+      expression: true
+    component:
+      name: filter
+  - id: http-http-t8irns
+    name: http
+    type: TYPE_COMPONENT
+    configuration:
+      method: POST
+      url: https://rbaskets.in/dhqfuva
+    component:
+      name: http
+  - id: http-http-rt6ym1
+    name: http
+    type: TYPE_COMPONENT
+    configuration:
+      method: POST
+      url: https://rbaskets.in/qe69jd4
+    component:
+      name: http
+```

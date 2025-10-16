@@ -24,7 +24,7 @@ type ComponentsComponent struct {
 	Label *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
-	Channels []ComponentsOutputChannel `json:"channels,omitempty"`
+	Channels []SuperplaneComponentsOutputChannel `json:"channels,omitempty"`
 }
 
 // NewComponentsComponent instantiates a new ComponentsComponent object
@@ -173,9 +173,9 @@ func (o *ComponentsComponent) SetConfiguration(v []ComponentsConfigurationField)
 }
 
 // GetChannels returns the Channels field value if set, zero value otherwise.
-func (o *ComponentsComponent) GetChannels() []ComponentsOutputChannel {
+func (o *ComponentsComponent) GetChannels() []SuperplaneComponentsOutputChannel {
 	if o == nil || IsNil(o.Channels) {
-		var ret []ComponentsOutputChannel
+		var ret []SuperplaneComponentsOutputChannel
 		return ret
 	}
 	return o.Channels
@@ -183,7 +183,7 @@ func (o *ComponentsComponent) GetChannels() []ComponentsOutputChannel {
 
 // GetChannelsOk returns a tuple with the Channels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsComponent) GetChannelsOk() ([]ComponentsOutputChannel, bool) {
+func (o *ComponentsComponent) GetChannelsOk() ([]SuperplaneComponentsOutputChannel, bool) {
 	if o == nil || IsNil(o.Channels) {
 		return nil, false
 	}
@@ -199,8 +199,8 @@ func (o *ComponentsComponent) HasChannels() bool {
 	return false
 }
 
-// SetChannels gets a reference to the given []ComponentsOutputChannel and assigns it to the Channels field.
-func (o *ComponentsComponent) SetChannels(v []ComponentsOutputChannel) {
+// SetChannels gets a reference to the given []SuperplaneComponentsOutputChannel and assigns it to the Channels field.
+func (o *ComponentsComponent) SetChannels(v []SuperplaneComponentsOutputChannel) {
 	o.Channels = v
 }
 

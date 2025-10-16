@@ -21,7 +21,7 @@ var _ MappedNullable = &WorkflowsListWorkflowEventsResponse{}
 
 // WorkflowsListWorkflowEventsResponse struct for WorkflowsListWorkflowEventsResponse
 type WorkflowsListWorkflowEventsResponse struct {
-	Events []WorkflowsWorkflowInitialEvent `json:"events,omitempty"`
+	Events []WorkflowsWorkflowEvent `json:"events,omitempty"`
 	TotalCount *int64 `json:"totalCount,omitempty"`
 	HasNextPage *bool `json:"hasNextPage,omitempty"`
 	LastTimestamp *time.Time `json:"lastTimestamp,omitempty"`
@@ -45,9 +45,9 @@ func NewWorkflowsListWorkflowEventsResponseWithDefaults() *WorkflowsListWorkflow
 }
 
 // GetEvents returns the Events field value if set, zero value otherwise.
-func (o *WorkflowsListWorkflowEventsResponse) GetEvents() []WorkflowsWorkflowInitialEvent {
+func (o *WorkflowsListWorkflowEventsResponse) GetEvents() []WorkflowsWorkflowEvent {
 	if o == nil || IsNil(o.Events) {
-		var ret []WorkflowsWorkflowInitialEvent
+		var ret []WorkflowsWorkflowEvent
 		return ret
 	}
 	return o.Events
@@ -55,7 +55,7 @@ func (o *WorkflowsListWorkflowEventsResponse) GetEvents() []WorkflowsWorkflowIni
 
 // GetEventsOk returns a tuple with the Events field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsListWorkflowEventsResponse) GetEventsOk() ([]WorkflowsWorkflowInitialEvent, bool) {
+func (o *WorkflowsListWorkflowEventsResponse) GetEventsOk() ([]WorkflowsWorkflowEvent, bool) {
 	if o == nil || IsNil(o.Events) {
 		return nil, false
 	}
@@ -71,8 +71,8 @@ func (o *WorkflowsListWorkflowEventsResponse) HasEvents() bool {
 	return false
 }
 
-// SetEvents gets a reference to the given []WorkflowsWorkflowInitialEvent and assigns it to the Events field.
-func (o *WorkflowsListWorkflowEventsResponse) SetEvents(v []WorkflowsWorkflowInitialEvent) {
+// SetEvents gets a reference to the given []WorkflowsWorkflowEvent and assigns it to the Events field.
+func (o *WorkflowsListWorkflowEventsResponse) SetEvents(v []WorkflowsWorkflowEvent) {
 	o.Events = v
 }
 

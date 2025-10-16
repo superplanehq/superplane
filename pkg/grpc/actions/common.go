@@ -734,7 +734,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 		result[i] = models.Node{
 			ID:            node.Id,
 			Name:          node.Name,
-			RefType:       ProtoToRefType(node.RefType),
+			Type:          ProtoToNodeType(node.Type),
 			Ref:           ProtoToNodeRef(node),
 			Configuration: node.Configuration.AsMap(),
 		}
@@ -746,9 +746,9 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 	result := make([]*componentpb.Node, len(nodes))
 	for i, node := range nodes {
 		result[i] = &componentpb.Node{
-			Id:      node.ID,
-			Name:    node.Name,
-			RefType: RefTypeToProto(node.RefType),
+			Id:   node.ID,
+			Name: node.Name,
+			Type: NodeTypeToProto(node.Type),
 		}
 
 		if node.Ref.Component != nil {
@@ -774,10 +774,9 @@ func ProtoToEdges(edges []*componentpb.Edge) []models.Edge {
 	result := make([]models.Edge, len(edges))
 	for i, edge := range edges {
 		result[i] = models.Edge{
-			SourceID:   edge.SourceId,
-			TargetID:   edge.TargetId,
-			TargetType: ProtoToTargetType(edge.TargetType),
-			Channel:    edge.Channel,
+			SourceID: edge.SourceId,
+			TargetID: edge.TargetId,
+			Channel:  edge.Channel,
 		}
 	}
 	return result
@@ -787,68 +786,45 @@ func EdgesToProto(edges []models.Edge) []*componentpb.Edge {
 	result := make([]*componentpb.Edge, len(edges))
 	for i, edge := range edges {
 		result[i] = &componentpb.Edge{
-			SourceId:   edge.SourceID,
-			TargetId:   edge.TargetID,
-			TargetType: TargetTypeToProto(edge.TargetType),
-			Channel:    edge.Channel,
+			SourceId: edge.SourceID,
+			TargetId: edge.TargetID,
+			Channel:  edge.Channel,
 		}
 	}
 	return result
 }
 
-func ProtoToRefType(refType componentpb.Node_RefType) string {
-	switch refType {
-	case componentpb.Node_REF_TYPE_COMPONENT:
-		return models.NodeRefTypeComponent
-	case componentpb.Node_REF_TYPE_BLUEPRINT:
-		return models.NodeRefTypeBlueprint
+func ProtoToNodeType(nodeType componentpb.Node_Type) string {
+	switch nodeType {
+	case componentpb.Node_TYPE_COMPONENT:
+		return models.NodeTypeComponent
+	case componentpb.Node_TYPE_BLUEPRINT:
+		return models.NodeTypeBlueprint
 	default:
 		return ""
 	}
 }
 
-func RefTypeToProto(refType string) componentpb.Node_RefType {
-	switch refType {
-	case models.NodeRefTypeBlueprint:
-		return componentpb.Node_REF_TYPE_BLUEPRINT
+func NodeTypeToProto(nodeType string) componentpb.Node_Type {
+	switch nodeType {
+	case models.NodeTypeBlueprint:
+		return componentpb.Node_TYPE_BLUEPRINT
 	default:
-		return componentpb.Node_REF_TYPE_COMPONENT
-	}
-}
-
-func ProtoToTargetType(targetType componentpb.Edge_TargetType) string {
-	switch targetType {
-	case componentpb.Edge_REF_TYPE_NODE:
-		return models.EdgeTargetTypeNode
-	case componentpb.Edge_REF_TYPE_OUTPUT_CHANNEL:
-		return models.EdgeTargetTypeOutputChannel
-	default:
-		return ""
-	}
-}
-
-func TargetTypeToProto(targetType string) componentpb.Edge_TargetType {
-	switch targetType {
-	case models.EdgeTargetTypeOutputChannel:
-		return componentpb.Edge_REF_TYPE_OUTPUT_CHANNEL
-	case models.EdgeTargetTypeNode:
-		return componentpb.Edge_REF_TYPE_NODE
-	default:
-		return componentpb.Edge_REF_TYPE_NODE
+		return componentpb.Node_TYPE_COMPONENT
 	}
 }
 
 func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
 	ref := models.NodeRef{}
 
-	switch node.RefType {
-	case componentpb.Node_REF_TYPE_COMPONENT:
+	switch node.Type {
+	case componentpb.Node_TYPE_COMPONENT:
 		if node.Component != nil {
 			ref.Component = &models.ComponentRef{
 				Name: node.Component.Name,
 			}
 		}
-	case componentpb.Node_REF_TYPE_BLUEPRINT:
+	case componentpb.Node_TYPE_BLUEPRINT:
 		if node.Blueprint != nil {
 			ref.Blueprint = &models.BlueprintRef{
 				ID: node.Blueprint.Id,

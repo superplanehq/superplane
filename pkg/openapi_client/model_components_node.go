@@ -22,10 +22,10 @@ var _ MappedNullable = &ComponentsNode{}
 type ComponentsNode struct {
 	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
-	RefType *NodeRefType `json:"refType,omitempty"`
+	Type *ComponentsNodeType `json:"type,omitempty"`
+	Configuration map[string]interface{} `json:"configuration,omitempty"`
 	Component *NodeComponentRef `json:"component,omitempty"`
 	Blueprint *NodeBlueprintRef `json:"blueprint,omitempty"`
-	Configuration map[string]interface{} `json:"configuration,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -34,8 +34,8 @@ type ComponentsNode struct {
 // will change when the set of required properties is changed
 func NewComponentsNode() *ComponentsNode {
 	this := ComponentsNode{}
-	var refType NodeRefType = NODEREFTYPE_REF_TYPE_COMPONENT
-	this.RefType = &refType
+	var type_ ComponentsNodeType = COMPONENTSNODETYPE_TYPE_COMPONENT
+	this.Type = &type_
 	return &this
 }
 
@@ -44,8 +44,8 @@ func NewComponentsNode() *ComponentsNode {
 // but it doesn't guarantee that properties required by API are set
 func NewComponentsNodeWithDefaults() *ComponentsNode {
 	this := ComponentsNode{}
-	var refType NodeRefType = NODEREFTYPE_REF_TYPE_COMPONENT
-	this.RefType = &refType
+	var type_ ComponentsNodeType = COMPONENTSNODETYPE_TYPE_COMPONENT
+	this.Type = &type_
 	return &this
 }
 
@@ -113,36 +113,68 @@ func (o *ComponentsNode) SetName(v string) {
 	o.Name = &v
 }
 
-// GetRefType returns the RefType field value if set, zero value otherwise.
-func (o *ComponentsNode) GetRefType() NodeRefType {
-	if o == nil || IsNil(o.RefType) {
-		var ret NodeRefType
+// GetType returns the Type field value if set, zero value otherwise.
+func (o *ComponentsNode) GetType() ComponentsNodeType {
+	if o == nil || IsNil(o.Type) {
+		var ret ComponentsNodeType
 		return ret
 	}
-	return *o.RefType
+	return *o.Type
 }
 
-// GetRefTypeOk returns a tuple with the RefType field value if set, nil otherwise
+// GetTypeOk returns a tuple with the Type field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsNode) GetRefTypeOk() (*NodeRefType, bool) {
-	if o == nil || IsNil(o.RefType) {
+func (o *ComponentsNode) GetTypeOk() (*ComponentsNodeType, bool) {
+	if o == nil || IsNil(o.Type) {
 		return nil, false
 	}
-	return o.RefType, true
+	return o.Type, true
 }
 
-// HasRefType returns a boolean if a field has been set.
-func (o *ComponentsNode) HasRefType() bool {
-	if o != nil && !IsNil(o.RefType) {
+// HasType returns a boolean if a field has been set.
+func (o *ComponentsNode) HasType() bool {
+	if o != nil && !IsNil(o.Type) {
 		return true
 	}
 
 	return false
 }
 
-// SetRefType gets a reference to the given NodeRefType and assigns it to the RefType field.
-func (o *ComponentsNode) SetRefType(v NodeRefType) {
-	o.RefType = &v
+// SetType gets a reference to the given ComponentsNodeType and assigns it to the Type field.
+func (o *ComponentsNode) SetType(v ComponentsNodeType) {
+	o.Type = &v
+}
+
+// GetConfiguration returns the Configuration field value if set, zero value otherwise.
+func (o *ComponentsNode) GetConfiguration() map[string]interface{} {
+	if o == nil || IsNil(o.Configuration) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.Configuration
+}
+
+// GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetConfigurationOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Configuration) {
+		return map[string]interface{}{}, false
+	}
+	return o.Configuration, true
+}
+
+// HasConfiguration returns a boolean if a field has been set.
+func (o *ComponentsNode) HasConfiguration() bool {
+	if o != nil && !IsNil(o.Configuration) {
+		return true
+	}
+
+	return false
+}
+
+// SetConfiguration gets a reference to the given map[string]interface{} and assigns it to the Configuration field.
+func (o *ComponentsNode) SetConfiguration(v map[string]interface{}) {
+	o.Configuration = v
 }
 
 // GetComponent returns the Component field value if set, zero value otherwise.
@@ -209,38 +241,6 @@ func (o *ComponentsNode) SetBlueprint(v NodeBlueprintRef) {
 	o.Blueprint = &v
 }
 
-// GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *ComponentsNode) GetConfiguration() map[string]interface{} {
-	if o == nil || IsNil(o.Configuration) {
-		var ret map[string]interface{}
-		return ret
-	}
-	return o.Configuration
-}
-
-// GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ComponentsNode) GetConfigurationOk() (map[string]interface{}, bool) {
-	if o == nil || IsNil(o.Configuration) {
-		return map[string]interface{}{}, false
-	}
-	return o.Configuration, true
-}
-
-// HasConfiguration returns a boolean if a field has been set.
-func (o *ComponentsNode) HasConfiguration() bool {
-	if o != nil && !IsNil(o.Configuration) {
-		return true
-	}
-
-	return false
-}
-
-// SetConfiguration gets a reference to the given map[string]interface{} and assigns it to the Configuration field.
-func (o *ComponentsNode) SetConfiguration(v map[string]interface{}) {
-	o.Configuration = v
-}
-
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -257,17 +257,17 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
 	}
-	if !IsNil(o.RefType) {
-		toSerialize["refType"] = o.RefType
+	if !IsNil(o.Type) {
+		toSerialize["type"] = o.Type
+	}
+	if !IsNil(o.Configuration) {
+		toSerialize["configuration"] = o.Configuration
 	}
 	if !IsNil(o.Component) {
 		toSerialize["component"] = o.Component
 	}
 	if !IsNil(o.Blueprint) {
 		toSerialize["blueprint"] = o.Blueprint
-	}
-	if !IsNil(o.Configuration) {
-		toSerialize["configuration"] = o.Configuration
 	}
 	return toSerialize, nil
 }

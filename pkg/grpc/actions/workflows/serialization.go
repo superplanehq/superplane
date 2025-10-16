@@ -25,7 +25,7 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		nodes[i] = models.Node{
 			ID:            wn.NodeID,
 			Name:          wn.Name,
-			RefType:       wn.RefType,
+			Type:          wn.Type,
 			Ref:           wn.Ref.Data(),
 			Configuration: wn.Configuration.Data(),
 		}
@@ -43,7 +43,7 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 	}
 }
 
-func ParseWorkflow(registry *registry.Registry, workflow *pb.Workflow) ([]models.Node, []models.Edge, error) {
+func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workflow) ([]models.Node, []models.Edge, error) {
 	if workflow.Name == "" {
 		return nil, nil, status.Error(codes.InvalidArgument, "workflow name is required")
 	}
@@ -69,7 +69,7 @@ func ParseWorkflow(registry *registry.Registry, workflow *pb.Workflow) ([]models
 
 		nodeIDs[node.Id] = true
 
-		if err := validateNodeRef(registry, node); err != nil {
+		if err := validateNodeRef(registry, orgID, node); err != nil {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: %v", node.Id, err)
 		}
 	}
@@ -79,15 +79,11 @@ func ParseWorkflow(registry *registry.Registry, workflow *pb.Workflow) ([]models
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
 		}
 
-		if edge.TargetType != compb.Edge_REF_TYPE_NODE {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target_type must be set to NODE", i)
-		}
-
 		if !nodeIDs[edge.SourceId] {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
 		}
 
-		if edge.TargetType == compb.Edge_REF_TYPE_NODE && !nodeIDs[edge.TargetId] {
+		if !nodeIDs[edge.TargetId] {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
 		}
 	}
@@ -99,9 +95,9 @@ func ParseWorkflow(registry *registry.Registry, workflow *pb.Workflow) ([]models
 	return actions.ProtoToNodes(workflow.Nodes), actions.ProtoToEdges(workflow.Edges), nil
 }
 
-func validateNodeRef(registry *registry.Registry, node *compb.Node) error {
-	switch node.RefType {
-	case compb.Node_REF_TYPE_COMPONENT:
+func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {
+	switch node.Type {
+	case compb.Node_TYPE_COMPONENT:
 		if node.Component == nil {
 			return fmt.Errorf("component reference is required for component ref type")
 		}
@@ -124,7 +120,7 @@ func validateNodeRef(registry *registry.Registry, node *compb.Node) error {
 
 		return nil
 
-	case compb.Node_REF_TYPE_BLUEPRINT:
+	case compb.Node_TYPE_BLUEPRINT:
 		if node.Blueprint == nil {
 			return fmt.Errorf("blueprint reference is required for blueprint ref type")
 		}
@@ -133,7 +129,7 @@ func validateNodeRef(registry *registry.Registry, node *compb.Node) error {
 			return fmt.Errorf("blueprint ID is required")
 		}
 
-		_, err := models.FindBlueprintByID(node.Blueprint.Id)
+		_, err := models.FindBlueprint(organizationID, node.Blueprint.Id)
 		if err != nil {
 			return fmt.Errorf("blueprint %s not found", node.Blueprint.Id)
 		}
@@ -141,6 +137,6 @@ func validateNodeRef(registry *registry.Registry, node *compb.Node) error {
 		return nil
 
 	default:
-		return fmt.Errorf("invalid ref type")
+		return fmt.Errorf("invalid node type: %s", node.Type)
 	}
 }

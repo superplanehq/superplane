@@ -48,11 +48,11 @@ func (w *Workflow) FindNodes() ([]WorkflowNode, error) {
 	return nodes, nil
 }
 
-func (w *Workflow) FindEdges(sourceID string, targetType string, channel string) []Edge {
+func (w *Workflow) FindEdges(sourceID string, channel string) []Edge {
 	edges := []Edge{}
 
 	for _, edge := range w.Edges {
-		if edge.SourceID == sourceID && edge.TargetType == targetType && edge.Channel == channel {
+		if edge.SourceID == sourceID && edge.Channel == channel {
 			edges = append(edges, edge)
 		}
 	}
@@ -60,11 +60,30 @@ func (w *Workflow) FindEdges(sourceID string, targetType string, channel string)
 	return edges
 }
 
-func FindWorkflow(id uuid.UUID) (*Workflow, error) {
-	return FindWorkflowInTransaction(database.Conn(), id)
+func FindWorkflow(orgID, id uuid.UUID) (*Workflow, error) {
+	return FindWorkflowInTransaction(database.Conn(), orgID, id)
 }
 
-func FindWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
+func FindWorkflowInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Workflow, error) {
+	var workflow Workflow
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("id = ?", id).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
+}
+
+func FindUnscopedWorkflow(id uuid.UUID) (*Workflow, error) {
+	return FindUnscopedWorkflowInTransaction(database.Conn(), id)
+}
+
+func FindUnscopedWorkflowInTransaction(tx *gorm.DB, id uuid.UUID) (*Workflow, error) {
 	var workflow Workflow
 	err := tx.
 		Where("id = ?", id).

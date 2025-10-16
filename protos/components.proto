@@ -126,9 +126,9 @@ message ListComponentActionsResponse {
 }
 
 message Node {
-  enum RefType {
-    REF_TYPE_COMPONENT = 0;
-    REF_TYPE_BLUEPRINT = 1;
+  enum Type {
+    TYPE_COMPONENT = 0;
+    TYPE_BLUEPRINT = 1;
   }
 
   message ComponentRef {
@@ -141,20 +141,14 @@ message Node {
 
   string id = 1;
   string name = 2;
-  RefType ref_type = 3;
-  ComponentRef component = 4;
-  BlueprintRef blueprint = 5;
-  google.protobuf.Struct configuration = 6;
+  Type type = 3;
+  google.protobuf.Struct configuration = 4;
+  ComponentRef component = 5;
+  BlueprintRef blueprint = 6;
 }
 
 message Edge {
-  enum TargetType {
-    REF_TYPE_NODE = 0;
-    REF_TYPE_OUTPUT_CHANNEL = 1;
-  }
-
   string source_id = 1;
-  TargetType target_type = 2;
-  string target_id = 3;
-  string channel = 4;
+  string target_id = 2;
+  string channel = 3;
 }

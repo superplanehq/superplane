@@ -9,8 +9,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-func ValidateNodes(nodes []models.Node, registry *registry.Registry) error {
+func ValidateNodeConfigurations(nodes []models.Node, registry *registry.Registry) error {
 	for _, node := range nodes {
+		if err := ValidateNodeConfiguration(node, registry); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ValidateNodeConfiguration(node models.Node, registry *registry.Registry) error {
+	switch node.Type {
+	case models.NodeTypeComponent:
 		if node.Ref.Component == nil {
 			return fmt.Errorf("node %s: component is required", node.ID)
 		}
@@ -20,13 +31,12 @@ func ValidateNodes(nodes []models.Node, registry *registry.Registry) error {
 			return fmt.Errorf("node %s: unknown component %s", node.ID, node.Ref.Component.Name)
 		}
 
-		// Validate configuration
-		if err := validateConfiguration(node.ID, node.Configuration, component); err != nil {
-			return err
-		}
+		return validateConfiguration(node.ID, node.Configuration, component)
+
+	default:
+		return fmt.Errorf("node %s: unknown node type %s", node.ID, node.Type)
 	}
 
-	return nil
 }
 
 func validateConfiguration(nodeID string, config any, component components.Component) error {

@@ -27,7 +27,8 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 		Where("root_event_id = ?", eventUUID).
 		Order("created_at ASC")
 
-	if err := query.Find(&executions).Error; err != nil {
+	err = query.Find(&executions).Error
+	if err != nil {
 		return nil, err
 	}
 

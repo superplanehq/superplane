@@ -181,6 +181,7 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
             {/* Actions Section */}
             {!isBlueprintNode && nodeType && (
               <ComponentActions
+                workflowId={workflowId}
                 executionId={execution.id!}
                 componentName={nodeType}
                 executionState={execution.state!}

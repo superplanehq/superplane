@@ -2,10 +2,11 @@ package workflows
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -16,7 +17,7 @@ import (
 )
 
 func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, pbStates []pb.WorkflowNodeExecution_State, pbResults []pb.WorkflowNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
-	workflowUUID, err := uuid.Parse(workflowID)
+	wfID, err := uuid.Parse(workflowID)
 	if err != nil {
 		return nil, err
 	}
@@ -34,44 +35,16 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
 
-	var executions []models.WorkflowNodeExecution
-	query := database.Conn().
-		Where("workflow_id = ?", workflowUUID).
-		Where("node_id = ?", nodeID).
-		Order("created_at DESC").
-		Limit(int(limit))
-
-	if len(states) > 0 {
-		query = query.Where("state IN ?", states)
-	}
-
-	if len(results) > 0 {
-		query = query.Where("result IN ?", results)
-	}
-
-	if beforeTime != nil {
-		query = query.Where("created_at < ?", beforeTime)
-	}
-
-	if err := query.Find(&executions).Error; err != nil {
+	//
+	// List and count executions
+	//
+	executions, err := models.ListNodeExecutions(wfID, nodeID, states, results, int(limit), beforeTime)
+	if err != nil {
 		return nil, err
 	}
 
-	var totalCount int64
-	countQuery := database.Conn().
-		Model(&models.WorkflowNodeExecution{}).
-		Where("workflow_id = ?", workflowUUID).
-		Where("node_id = ?", nodeID)
-
-	if len(states) > 0 {
-		countQuery = countQuery.Where("state IN ?", states)
-	}
-
-	if len(results) > 0 {
-		countQuery = countQuery.Where("result IN ?", results)
-	}
-
-	if err := countQuery.Count(&totalCount).Error; err != nil {
+	totalCount, err := models.CountNodeExecutions(wfID, nodeID, states, results)
+	if err != nil {
 		return nil, err
 	}
 
@@ -89,26 +62,36 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 }
 
 func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.WorkflowNodeExecution, error) {
+	//
+	// Fetch all input records
+	//
+	inputEvents, err := models.FindWorkflowEvents(eventIDs(executions))
+	if err != nil {
+		return nil, fmt.Errorf("error find input events: %v", err)
+	}
+
+	//
+	// Fetch all output records
+	//
+	outputEvents, err := models.FindWorkflowEventsForExecutions(executionIDs(executions))
+	if err != nil {
+		return nil, fmt.Errorf("error find output events: %v", err)
+	}
+
+	//
+	// Combine everything into the response
+	//
 	result := make([]*pb.WorkflowNodeExecution, 0, len(executions))
-
-	//
-	// TODO: this is very inefficient,
-	// we need a better way to the input and outputs for an execution.
-	//
 	for _, execution := range executions {
-		inputEvent, err := models.FindWorkflowEvent(execution.EventID)
+		input, err := getInputForExecution(execution, inputEvents)
 		if err != nil {
 			return nil, err
 		}
 
-		input, err := structpb.NewStruct(inputEvent.Data.Data().(map[string]any))
+		outputs, err := getOutputsForExecution(execution, outputEvents)
 		if err != nil {
 			return nil, err
 		}
-
-		//
-		// TODO: serialize outputs
-		//
 
 		metadata, err := structpb.NewStruct(execution.Metadata.Data())
 		if err != nil {
@@ -134,6 +117,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 			Metadata:          metadata,
 			Configuration:     configuration,
 			Input:             input,
+			Outputs:           outputs,
 		})
 	}
 
@@ -257,4 +241,72 @@ func getBefore(before *timestamppb.Timestamp) *time.Time {
 
 func hasNextPage(numResults, limit int, totalCount int64) bool {
 	return int64(numResults) >= int64(limit) && int64(numResults) < totalCount
+}
+
+func executionIDs(executions []models.WorkflowNodeExecution) []string {
+	ids := make([]string, len(executions))
+	for i, execution := range executions {
+		ids[i] = execution.ID.String()
+	}
+	return ids
+}
+
+func eventIDs(executions []models.WorkflowNodeExecution) []string {
+	ids := make([]string, len(executions))
+	for i, execution := range executions {
+		ids[i] = execution.EventID.String()
+	}
+
+	return ids
+}
+
+func getInputForExecution(execution models.WorkflowNodeExecution, events []models.WorkflowEvent) (*structpb.Struct, error) {
+	for _, event := range events {
+		if event.ID.String() == execution.EventID.String() {
+			eventData, ok := event.Data.Data().(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("event data cannot be turned into input for execution %s", execution.ID.String())
+			}
+
+			data, err := structpb.NewStruct(eventData)
+			if err != nil {
+				return nil, err
+			}
+
+			return data, nil
+		}
+	}
+
+	return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
+}
+
+func getOutputsForExecution(execution models.WorkflowNodeExecution, events []models.WorkflowEvent) (*structpb.Struct, error) {
+	outputMap := map[string][]any{}
+	for _, event := range events {
+		if event.ExecutionID.String() == execution.ID.String() {
+			if _, ok := outputMap[event.Channel]; !ok {
+				outputMap[event.Channel] = []any{event.Data.Data()}
+			} else {
+				outputMap[event.Channel] = append(outputMap[event.Channel], event.Data.Data())
+			}
+		}
+	}
+
+	m, err := json.Marshal(outputMap)
+	if err != nil {
+		return nil, err
+	}
+
+	var outputs map[string]any
+	err = json.Unmarshal(m, &outputs)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := structpb.NewStruct(outputs)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }

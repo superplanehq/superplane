@@ -25,6 +25,7 @@ func SerializeBlueprint(in *models.Blueprint) *pb.Blueprint {
 		Nodes:          actions.NodesToProto(in.Nodes),
 		Edges:          actions.EdgesToProto(in.Edges),
 		Configuration:  ConfigurationToProto(in.Configuration),
+		OutputChannels: OutputChannelsToProto(in.OutputChannels),
 	}
 }
 
@@ -48,7 +49,7 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 		}
 
 		nodeIDs[node.Id] = true
-		if err := validateNodeRef(registry, node); err != nil {
+		if err := validateNodeRef(registry, blueprint.Nodes, node); err != nil {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: %v", node.Id, err)
 		}
 	}
@@ -58,20 +59,8 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
 		}
 
-		if edge.TargetType != componentpb.Edge_REF_TYPE_NODE && edge.TargetType != componentpb.Edge_REF_TYPE_OUTPUT_CHANNEL {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target_type must be set to either NODE or OUTPUT_CHANNEL", i)
-		}
-
 		if !nodeIDs[edge.SourceId] {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source node %s not found", i, edge.SourceId)
-		}
-
-		if edge.TargetType == componentpb.Edge_REF_TYPE_NODE && !nodeIDs[edge.TargetId] {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target node %s not found", i, edge.TargetId)
-		}
-
-		if edge.TargetType == componentpb.Edge_REF_TYPE_OUTPUT_CHANNEL && !hasOutputChannel(blueprint.OutputChannels, edge.TargetId) {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: target output channel %s not found", i, edge.TargetId)
 		}
 	}
 
@@ -82,18 +71,9 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 	return actions.ProtoToNodes(blueprint.Nodes), actions.ProtoToEdges(blueprint.Edges), nil
 }
 
-func hasOutputChannel(channels []*componentpb.OutputChannel, name string) bool {
-	for _, channel := range channels {
-		if channel.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
-func validateNodeRef(registry *registry.Registry, node *componentpb.Node) error {
-	switch node.RefType {
-	case componentpb.Node_REF_TYPE_COMPONENT:
+func validateNodeRef(registry *registry.Registry, nodes []*componentpb.Node, node *componentpb.Node) error {
+	switch node.Type {
+	case componentpb.Node_TYPE_COMPONENT:
 		if node.Component == nil {
 			return fmt.Errorf("component reference is required for component ref type")
 		}
@@ -109,7 +89,7 @@ func validateNodeRef(registry *registry.Registry, node *componentpb.Node) error 
 
 		return nil
 	default:
-		return fmt.Errorf("invalid ref type")
+		return fmt.Errorf("invalid node type")
 	}
 }
 
@@ -277,4 +257,36 @@ func ProtoToConfiguration(config []*componentpb.ConfigurationField) ([]component
 		}
 	}
 	return result, nil
+}
+
+func OutputChannelsToProto(outputChannels []models.BlueprintOutputChannel) []*pb.OutputChannel {
+	if outputChannels == nil {
+		return []*pb.OutputChannel{}
+	}
+
+	result := make([]*pb.OutputChannel, len(outputChannels))
+	for i, oc := range outputChannels {
+		result[i] = &pb.OutputChannel{
+			Name:              oc.Name,
+			NodeId:            oc.NodeID,
+			NodeOutputChannel: oc.NodeOutputChannel,
+		}
+	}
+	return result
+}
+
+func ProtoToOutputChannels(outputChannels []*pb.OutputChannel) []models.BlueprintOutputChannel {
+	if len(outputChannels) == 0 {
+		return []models.BlueprintOutputChannel{}
+	}
+
+	result := make([]models.BlueprintOutputChannel, len(outputChannels))
+	for i, oc := range outputChannels {
+		result[i] = models.BlueprintOutputChannel{
+			Name:              oc.Name,
+			NodeID:            oc.NodeId,
+			NodeOutputChannel: oc.NodeOutputChannel,
+		}
+	}
+	return result
 }

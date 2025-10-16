@@ -12,12 +12,8 @@ import (
 )
 
 const (
-	NodeRefTypeComponent = "component"
-	NodeRefTypeBlueprint = "blueprint"
-	NodeRefTypeTrigger   = "trigger"
-
-	EdgeTargetTypeNode          = "node"
-	EdgeTargetTypeOutputChannel = "output-channel"
+	NodeTypeComponent = "component"
+	NodeTypeBlueprint = "blueprint"
 )
 
 type Blueprint struct {
@@ -30,7 +26,13 @@ type Blueprint struct {
 	Nodes          datatypes.JSONSlice[Node]
 	Edges          datatypes.JSONSlice[Edge]
 	Configuration  datatypes.JSONSlice[components.ConfigurationField]
-	OutputChannels datatypes.JSONSlice[components.OutputChannel]
+	OutputChannels datatypes.JSONSlice[BlueprintOutputChannel]
+}
+
+type BlueprintOutputChannel struct {
+	Name              string `json:"name"`
+	NodeID            string `json:"node_id"`
+	NodeOutputChannel string `json:"node_output_channel"`
 }
 
 func (b *Blueprint) FindNode(id string) (*Node, error) {
@@ -43,22 +45,11 @@ func (b *Blueprint) FindNode(id string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", id)
 }
 
-func (b *Blueprint) FindEdges(sourceID string, targetType string, channel string) []Edge {
+func (b *Blueprint) FindEdges(sourceID string, channel string) []Edge {
 	edges := []Edge{}
 
 	for _, edge := range b.Edges {
-		if edge.SourceID == sourceID && edge.TargetType == targetType && edge.Channel == channel {
-			edges = append(edges, edge)
-		}
-	}
-
-	return edges
-}
-
-func (b *Blueprint) OutputChannelEdges() []Edge {
-	edges := []Edge{}
-	for _, edge := range b.Edges {
-		if edge.TargetType == EdgeTargetTypeOutputChannel {
+		if edge.SourceID == sourceID && edge.Channel == channel {
 			edges = append(edges, edge)
 		}
 	}
@@ -70,9 +61,7 @@ func (b *Blueprint) OutputChannelEdges() []Edge {
 func (b *Blueprint) FindRootNode() *Node {
 	hasIncoming := make(map[string]bool)
 	for _, edge := range b.Edges {
-		if edge.TargetType == EdgeTargetTypeNode {
-			hasIncoming[edge.TargetID] = true
-		}
+		hasIncoming[edge.TargetID] = true
 	}
 
 	for _, node := range b.Nodes {
@@ -84,11 +73,26 @@ func (b *Blueprint) FindRootNode() *Node {
 	return nil
 }
 
-func FindBlueprintByID(id string) (*Blueprint, error) {
-	return FindBlueprintByIDInTransaction(database.Conn(), id)
+func FindBlueprint(orgID, id string) (*Blueprint, error) {
+	var blueprint Blueprint
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Where("id = ?", id).
+		First(&blueprint).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &blueprint, nil
 }
 
-func FindBlueprintByIDInTransaction(tx *gorm.DB, id string) (*Blueprint, error) {
+func FindUnscopedBlueprint(id string) (*Blueprint, error) {
+	return FindUnscopedBlueprintInTransaction(database.Conn(), id)
+}
+
+func FindUnscopedBlueprintInTransaction(tx *gorm.DB, id string) (*Blueprint, error) {
 	var blueprint Blueprint
 	err := tx.
 		Where("id = ?", id).
@@ -105,14 +109,19 @@ func FindBlueprintByIDInTransaction(tx *gorm.DB, id string) (*Blueprint, error) 
 type Node struct {
 	ID            string         `json:"id"`
 	Name          string         `json:"name"`
-	RefType       string         `json:"ref_type"`
+	Type          string         `json:"type"`
 	Ref           NodeRef        `json:"ref"`
 	Configuration map[string]any `json:"configuration"`
 }
 
 type NodeRef struct {
-	Component *ComponentRef `json:"component,omitempty"`
-	Blueprint *BlueprintRef `json:"blueprint,omitempty"`
+	Component     *ComponentRef     `json:"component,omitempty"`
+	Blueprint     *BlueprintRef     `json:"blueprint,omitempty"`
+	OutputChannel *OutputChannelRef `json:"output_channel,omitempty"`
+}
+
+type OutputChannelRef struct {
+	Name string `json:"name"`
 }
 
 type ComponentRef struct {
@@ -124,8 +133,7 @@ type BlueprintRef struct {
 }
 
 type Edge struct {
-	SourceID   string `json:"source_id"`
-	TargetType string `json:"target_type"`
-	TargetID   string `json:"target_id"`
-	Channel    string `json:"channel"`
+	SourceID string `json:"source_id"`
+	TargetID string `json:"target_id"`
+	Channel  string `json:"channel"`
 }

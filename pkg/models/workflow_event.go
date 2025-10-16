@@ -26,6 +26,34 @@ type WorkflowEvent struct {
 	CreatedAt   *time.Time
 }
 
+func FindWorkflowEvents(ids []string) ([]WorkflowEvent, error) {
+	var events []WorkflowEvent
+	err := database.Conn().
+		Where("id IN ?", ids).
+		Find(&events).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+func FindWorkflowEventsForExecutions(executionIDs []string) ([]WorkflowEvent, error) {
+	var events []WorkflowEvent
+	err := database.Conn().
+		Where("execution_id IN ?", executionIDs).
+		Find(&events).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
 func FindWorkflowEvent(id uuid.UUID) (*WorkflowEvent, error) {
 	return FindWorkflowEventInTransaction(database.Conn(), id)
 }
@@ -70,6 +98,7 @@ func CountWorkflowEventsForNode(workflowID uuid.UUID, nodeID string) (int64, err
 	var count int64
 
 	err := database.Conn().
+		Model(&WorkflowEvent{}).
 		Where("workflow_id = ?", workflowID).
 		Where("node_id = ?", nodeID).
 		Count(&count).

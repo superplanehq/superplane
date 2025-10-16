@@ -3143,52 +3143,6 @@
         ]
       }
     },
-    "/api/v1/workflows/executions/{executionId}/actions/{actionName}": {
-      "post": {
-        "summary": "Invoke execution action",
-        "description": "Invokes a custom action on a workflow node execution",
-        "operationId": "Workflows_InvokeNodeExecutionAction",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "executionId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "actionName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionBody"
-            }
-          }
-        ],
-        "tags": [
-          "WorkflowNodeExecution"
-        ]
-      }
-    },
     "/api/v1/workflows/{id}": {
       "get": {
         "summary": "Describe workflow",
@@ -3316,6 +3270,12 @@
             "type": "string"
           },
           {
+            "name": "nodeId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -3370,6 +3330,58 @@
         ],
         "tags": [
           "WorkflowEvent"
+        ]
+      }
+    },
+    "/api/v1/workflows/{workflowId}/executions/{executionId}/actions/{actionName}": {
+      "post": {
+        "summary": "Invoke execution action",
+        "description": "Invokes a custom action on a workflow node execution",
+        "operationId": "Workflows_InvokeNodeExecutionAction",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "actionName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNodeExecution"
         ]
       }
     },
@@ -3550,7 +3562,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsOutputChannel"
+            "$ref": "#/definitions/SuperplaneBlueprintsOutputChannel"
           }
         }
       }
@@ -3630,7 +3642,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsOutputChannel"
+            "$ref": "#/definitions/SuperplaneComponentsOutputChannel"
           }
         }
       }
@@ -3715,9 +3727,6 @@
         "sourceId": {
           "type": "string"
         },
-        "targetType": {
-          "$ref": "#/definitions/EdgeTargetType"
-        },
         "targetId": {
           "type": "string"
         },
@@ -3785,41 +3794,27 @@
         "name": {
           "type": "string"
         },
-        "refType": {
-          "$ref": "#/definitions/NodeRefType"
+        "type": {
+          "$ref": "#/definitions/ComponentsNodeType"
+        },
+        "configuration": {
+          "type": "object"
         },
         "component": {
           "$ref": "#/definitions/NodeComponentRef"
         },
         "blueprint": {
           "$ref": "#/definitions/NodeBlueprintRef"
-        },
-        "configuration": {
-          "type": "object"
         }
       }
     },
-    "ComponentsOutputChannel": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        }
-      }
-    },
-    "EdgeTargetType": {
+    "ComponentsNodeType": {
       "type": "string",
       "enum": [
-        "REF_TYPE_NODE",
-        "REF_TYPE_OUTPUT_CHANNEL"
+        "TYPE_COMPONENT",
+        "TYPE_BLUEPRINT"
       ],
-      "default": "REF_TYPE_NODE"
+      "default": "TYPE_COMPONENT"
     },
     "EventRejectionRejectionReason": {
       "type": "string",
@@ -4288,14 +4283,6 @@
           "type": "string"
         }
       }
-    },
-    "NodeRefType": {
-      "type": "string",
-      "enum": [
-        "REF_TYPE_COMPONENT",
-        "REF_TYPE_BLUEPRINT"
-      ],
-      "default": "REF_TYPE_COMPONENT"
     },
     "OrganizationsCreateInvitationBody": {
       "type": "object",
@@ -4786,6 +4773,20 @@
         }
       }
     },
+    "SuperplaneBlueprintsOutputChannel": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "nodeOutputChannel": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneCancelStageExecutionBody": {
       "type": "object"
     },
@@ -4824,6 +4825,20 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneComponentsOutputChannel": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
         }
       }
     },
@@ -6378,7 +6393,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/WorkflowsWorkflowInitialEvent"
+            "$ref": "#/definitions/WorkflowsWorkflowEvent"
           }
         },
         "totalCount": {
@@ -6461,13 +6476,19 @@
         }
       }
     },
-    "WorkflowsWorkflowInitialEvent": {
+    "WorkflowsWorkflowEvent": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string"
         },
         "workflowId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "channel": {
           "type": "string"
         },
         "data": {
@@ -6492,9 +6513,6 @@
           "type": "string"
         },
         "parentExecutionId": {
-          "type": "string"
-        },
-        "blueprintId": {
           "type": "string"
         },
         "state": {
@@ -6528,16 +6546,6 @@
         },
         "configuration": {
           "type": "object"
-        },
-        "previousExecutionId": {
-          "type": "string"
-        },
-        "previousOutputChannel": {
-          "type": "string"
-        },
-        "previousOutputIndex": {
-          "type": "integer",
-          "format": "int32"
         }
       }
     },

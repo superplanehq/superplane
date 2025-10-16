@@ -15,7 +15,7 @@ import (
 )
 
 func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizationID string, pbWorkflow *pb.Workflow) (*pb.CreateWorkflowResponse, error) {
-	nodes, edges, err := ParseWorkflow(registry, pbWorkflow)
+	nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 				NodeID:        node.ID,
 				Name:          node.Name,
 				State:         models.WorkflowNodeStateReady,
-				RefType:       node.RefType,
+				Type:          node.Type,
 				Ref:           datatypes.NewJSONType(node.Ref),
 				Configuration: datatypes.NewJSONType(node.Configuration),
 				CreatedAt:     &now,

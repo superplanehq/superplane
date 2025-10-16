@@ -20,7 +20,7 @@ type WorkflowNode struct {
 	NodeID        string    `gorm:"primaryKey"`
 	Name          string
 	State         string
-	RefType       string
+	Type          string
 	Ref           datatypes.JSONType[NodeRef]
 	Configuration datatypes.JSONType[map[string]any]
 	CreatedAt     *time.Time

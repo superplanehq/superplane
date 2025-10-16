@@ -21,7 +21,6 @@ var _ MappedNullable = &ComponentsEdge{}
 // ComponentsEdge struct for ComponentsEdge
 type ComponentsEdge struct {
 	SourceId *string `json:"sourceId,omitempty"`
-	TargetType *EdgeTargetType `json:"targetType,omitempty"`
 	TargetId *string `json:"targetId,omitempty"`
 	Channel *string `json:"channel,omitempty"`
 }
@@ -32,8 +31,6 @@ type ComponentsEdge struct {
 // will change when the set of required properties is changed
 func NewComponentsEdge() *ComponentsEdge {
 	this := ComponentsEdge{}
-	var targetType EdgeTargetType = EDGETARGETTYPE_REF_TYPE_NODE
-	this.TargetType = &targetType
 	return &this
 }
 
@@ -42,8 +39,6 @@ func NewComponentsEdge() *ComponentsEdge {
 // but it doesn't guarantee that properties required by API are set
 func NewComponentsEdgeWithDefaults() *ComponentsEdge {
 	this := ComponentsEdge{}
-	var targetType EdgeTargetType = EDGETARGETTYPE_REF_TYPE_NODE
-	this.TargetType = &targetType
 	return &this
 }
 
@@ -77,38 +72,6 @@ func (o *ComponentsEdge) HasSourceId() bool {
 // SetSourceId gets a reference to the given string and assigns it to the SourceId field.
 func (o *ComponentsEdge) SetSourceId(v string) {
 	o.SourceId = &v
-}
-
-// GetTargetType returns the TargetType field value if set, zero value otherwise.
-func (o *ComponentsEdge) GetTargetType() EdgeTargetType {
-	if o == nil || IsNil(o.TargetType) {
-		var ret EdgeTargetType
-		return ret
-	}
-	return *o.TargetType
-}
-
-// GetTargetTypeOk returns a tuple with the TargetType field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ComponentsEdge) GetTargetTypeOk() (*EdgeTargetType, bool) {
-	if o == nil || IsNil(o.TargetType) {
-		return nil, false
-	}
-	return o.TargetType, true
-}
-
-// HasTargetType returns a boolean if a field has been set.
-func (o *ComponentsEdge) HasTargetType() bool {
-	if o != nil && !IsNil(o.TargetType) {
-		return true
-	}
-
-	return false
-}
-
-// SetTargetType gets a reference to the given EdgeTargetType and assigns it to the TargetType field.
-func (o *ComponentsEdge) SetTargetType(v EdgeTargetType) {
-	o.TargetType = &v
 }
 
 // GetTargetId returns the TargetId field value if set, zero value otherwise.
@@ -187,9 +150,6 @@ func (o ComponentsEdge) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.SourceId) {
 		toSerialize["sourceId"] = o.SourceId
-	}
-	if !IsNil(o.TargetType) {
-		toSerialize["targetType"] = o.TargetType
 	}
 	if !IsNil(o.TargetId) {
 		toSerialize["targetId"] = o.TargetId

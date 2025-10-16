@@ -86,7 +86,7 @@ func (w *WorkflowNodeExecutor) processNode(tx *gorm.DB, node *models.WorkflowNod
 		return err
 	}
 
-	if node.RefType == models.NodeRefTypeBlueprint {
+	if node.Type == models.NodeTypeBlueprint {
 		return w.executeBlueprintNode(tx, execution, node)
 	}
 
@@ -95,7 +95,7 @@ func (w *WorkflowNodeExecutor) processNode(tx *gorm.DB, node *models.WorkflowNod
 
 func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.WorkflowNodeExecution, node *models.WorkflowNode) error {
 	ref := node.Ref.Data()
-	blueprint, err := models.FindBlueprintByIDInTransaction(tx, ref.Blueprint.ID)
+	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
 	if err != nil {
 		return fmt.Errorf("blueprint %s not found: %w", ref.Blueprint.ID, err)
 	}
