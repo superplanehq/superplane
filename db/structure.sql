@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8VwTA2olRP2FMclD4wi1Ri8X713MTdR9ZWssHwmsRpRXxPdl9JXigIfe1dLM5SK
+\restrict xSlqdPt5RKQdfvf5pW0Q6x2PLYfz2p8BVAd1lEBaZsIxpm5f3urHNb1bZVrB7ke
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -334,7 +334,7 @@ CREATE TABLE public.organization_invitations (
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    canvas_ids uuid[]
+    canvas_ids jsonb
 );
 
 
@@ -890,13 +890,6 @@ CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at)
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1243,13 +1236,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8VwTA2olRP2FMclD4wi1Ri8X713MTdR9ZWssHwmsRpRXxPdl9JXigIfe1dLM5SK
+\unrestrict xSlqdPt5RKQdfvf5pW0Q6x2PLYfz2p8BVAd1lEBaZsIxpm5f3urHNb1bZVrB7ke
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict edanSt0Yd1E7q43aOnkuRmlgKnloIZb7sLO6rGESwBdNzDukndTOzzg7S86T8AF
+\restrict 9hF2o13hRRgABO7IsmTwOxjfuuzH5OT7gZOt2h2MhXdBwbRsoZh169bsW8sWmyl
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1279,5 +1272,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict edanSt0Yd1E7q43aOnkuRmlgKnloIZb7sLO6rGESwBdNzDukndTOzzg7S86T8AF
+\unrestrict 9hF2o13hRRgABO7IsmTwOxjfuuzH5OT7gZOt2h2MhXdBwbRsoZh169bsW8sWmyl
 
