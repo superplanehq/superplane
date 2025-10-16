@@ -29,9 +29,9 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 
 	return &pb.DescribeComponentResponse{
 		Component: &pb.Component{
-			Name:          component.Name(),
-			Channels:      channels,
-			Configuration: configuration,
+			Name:           component.Name(),
+			OutputChannels: channels,
+			Configuration:  configuration,
 		},
 	}, nil
 }

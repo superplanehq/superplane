@@ -7,6 +7,7 @@ import {
   workflowsListNodeExecutions,
   workflowsListWorkflowEvents,
   workflowsListEventExecutions,
+  workflowsListChildExecutions,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 
@@ -25,6 +26,9 @@ export const workflowKeys = {
   eventExecutions: () => [...workflowKeys.all, 'eventExecutions'] as const,
   eventExecution: (workflowId: string, eventId: string) =>
     [...workflowKeys.eventExecutions(), workflowId, eventId] as const,
+  childExecutions: () => [...workflowKeys.all, 'childExecutions'] as const,
+  childExecution: (workflowId: string, executionId: string) =>
+    [...workflowKeys.childExecutions(), workflowId, executionId] as const,
 }
 
 // Hooks for fetching workflows
@@ -171,5 +175,26 @@ export const useEventExecutions = (workflowId: string, eventId: string | null) =
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!workflowId && !!eventId,
+  })
+}
+
+export const useChildExecutions = (workflowId: string, executionId: string | null) => {
+  return useQuery({
+    queryKey: workflowKeys.childExecution(workflowId, executionId!),
+    queryFn: async () => {
+      const response = await workflowsListChildExecutions(
+        withOrganizationHeader({
+          path: {
+            workflowId,
+            executionId: executionId!,
+          },
+          body: {}
+        })
+      )
+      return response.data
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!workflowId && !!executionId,
   })
 }

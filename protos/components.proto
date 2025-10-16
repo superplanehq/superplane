@@ -78,7 +78,7 @@ message Component {
   string label = 2;
   string description = 3;
   repeated ConfigurationField configuration = 4;
-  repeated OutputChannel channels = 5;
+  repeated OutputChannel output_channels = 5;
 }
 
 message ConfigurationField {

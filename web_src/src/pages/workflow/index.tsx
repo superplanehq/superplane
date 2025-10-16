@@ -95,7 +95,7 @@ type BuildingBlock = {
   label?: string
   description?: string
   type: 'component' | 'blueprint'
-  channels?: { name: string }[]
+  outputChannels?: { name: string }[]
   configuration?: any[]
 }
 
@@ -109,7 +109,7 @@ export const Workflow = () => {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'components' | 'blueprints'>('components')
-  const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string; componentLabel?: string } | null>(null)
+  const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string; componentLabel?: string; blueprintId?: string } | null>(null)
 
   // Fetch workflow, components, and blueprints
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!)
@@ -143,7 +143,7 @@ export const Workflow = () => {
         }
       })
 
-      const channels = block?.channels?.map((channel: any) => channel.name) || ['default']
+      const channels = block?.outputChannels?.map((channel: any) => channel.name) || ['default']
 
       // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
       const nodeType = isComponent && blockName && nodeTypes[blockName as keyof typeof nodeTypes]
@@ -216,7 +216,8 @@ export const Workflow = () => {
       name: node.data.label as string,
       isBlueprintNode: node.data.blockType === 'blueprint',
       nodeType: node.data.blockName as string,
-      componentLabel: block?.label
+      componentLabel: block?.label,
+      blueprintId: node.data.blockType === 'blueprint' ? node.data.blockId as string : undefined
     })
   }, [buildingBlocks])
 
@@ -259,7 +260,7 @@ export const Workflow = () => {
       )
     } else {
       // Add new node
-      const channels = selectedBlock?.channels?.map((channel: any) => channel.name) || ['default']
+      const channels = selectedBlock?.outputChannels?.map((channel: any) => channel.name) || ['default']
       const newNodeId = generateNodeId(selectedBlock.name || 'node', nodeName.trim())
 
       // Use block name as node type if it exists in nodeTypes and is a component
@@ -547,6 +548,8 @@ export const Workflow = () => {
                   isBlueprintNode={selectedNode.isBlueprintNode}
                   nodeType={selectedNode.nodeType}
                   componentLabel={selectedNode.componentLabel}
+                  organizationId={organizationId!}
+                  blueprintId={selectedNode.blueprintId}
                 />
               </ResizablePanel>
             </>

@@ -15,9 +15,11 @@ interface WorkflowNodeSidebarProps {
   isBlueprintNode?: boolean
   nodeType?: string
   componentLabel?: string
+  organizationId: string
+  blueprintId?: string
 }
 
-export const WorkflowNodeSidebar = ({ workflowId, nodeId, nodeName, onClose, isBlueprintNode, nodeType, componentLabel }: WorkflowNodeSidebarProps) => {
+export const WorkflowNodeSidebar = ({ workflowId, nodeId, nodeName, onClose, isBlueprintNode, nodeType, organizationId, blueprintId }: WorkflowNodeSidebarProps) => {
   const [activeTab, setActiveTab] = useState<Tab>('queue')
 
   return (
@@ -46,7 +48,14 @@ export const WorkflowNodeSidebar = ({ workflowId, nodeId, nodeName, onClose, isB
             <WorkflowNodeQueueTab workflowId={workflowId} nodeId={nodeId} />
           </TabsContent>
           <TabsContent value="executions" className="flex-1 overflow-hidden data-[state=inactive]:hidden">
-            <WorkflowNodeExecutionsTab workflowId={workflowId} nodeId={nodeId} isBlueprintNode={isBlueprintNode} nodeType={nodeType} />
+            <WorkflowNodeExecutionsTab
+              workflowId={workflowId}
+              nodeId={nodeId}
+              isBlueprintNode={isBlueprintNode}
+              nodeType={nodeType}
+              organizationId={organizationId}
+              blueprintId={blueprintId}
+            />
           </TabsContent>
         </Tabs>
       </div>

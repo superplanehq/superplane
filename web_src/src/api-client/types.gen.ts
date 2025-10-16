@@ -56,7 +56,7 @@ export type ComponentsComponent = {
     label?: string;
     description?: string;
     configuration?: Array<ComponentsConfigurationField>;
-    channels?: Array<SuperplaneComponentsOutputChannel>;
+    outputChannels?: Array<SuperplaneComponentsOutputChannel>;
 };
 
 export type ComponentsComponentAction = {
@@ -1155,6 +1155,14 @@ export type WorkflowsInvokeNodeExecutionActionResponse = {
     [key: string]: unknown;
 };
 
+export type WorkflowsListChildExecutionsBody = {
+    [key: string]: unknown;
+};
+
+export type WorkflowsListChildExecutionsResponse = {
+    executions?: Array<WorkflowsWorkflowNodeExecution>;
+};
+
 export type WorkflowsListEventExecutionsResponse = {
     executions?: Array<WorkflowsWorkflowNodeExecution>;
 };
@@ -1212,6 +1220,7 @@ export type WorkflowsWorkflowNodeExecution = {
     workflowId?: string;
     nodeId?: string;
     parentExecutionId?: string;
+    previousExecutionId?: string;
     state?: WorkflowsWorkflowNodeExecutionState;
     result?: WorkflowsWorkflowNodeExecutionResult;
     resultReason?: WorkflowsWorkflowNodeExecutionResultReason;
@@ -3456,7 +3465,6 @@ export type WorkflowsListWorkflowEventsData = {
         workflowId: string;
     };
     query?: {
-        nodeId?: string;
         limit?: number;
         before?: string;
     };
@@ -3537,6 +3545,34 @@ export type WorkflowsInvokeNodeExecutionActionResponses = {
 };
 
 export type WorkflowsInvokeNodeExecutionActionResponse2 = WorkflowsInvokeNodeExecutionActionResponses[keyof WorkflowsInvokeNodeExecutionActionResponses];
+
+export type WorkflowsListChildExecutionsData = {
+    body: WorkflowsListChildExecutionsBody;
+    path: {
+        workflowId: string;
+        executionId: string;
+    };
+    query?: never;
+    url: '/api/v1/workflows/{workflowId}/executions/{executionId}/children';
+};
+
+export type WorkflowsListChildExecutionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsListChildExecutionsError = WorkflowsListChildExecutionsErrors[keyof WorkflowsListChildExecutionsErrors];
+
+export type WorkflowsListChildExecutionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: WorkflowsListChildExecutionsResponse;
+};
+
+export type WorkflowsListChildExecutionsResponse2 = WorkflowsListChildExecutionsResponses[keyof WorkflowsListChildExecutionsResponses];
 
 export type WorkflowsListNodeExecutionsData = {
     body?: never;

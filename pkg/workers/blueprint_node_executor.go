@@ -124,7 +124,7 @@ func (w *BlueprintNodeExecutor) processExecution(tx *gorm.DB, execution *models.
 		return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
 	}
 
-	return nil
+	return tx.Save(execution).Error
 }
 
 func childNodeID(execution *models.WorkflowNodeExecution) string {

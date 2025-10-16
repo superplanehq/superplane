@@ -146,9 +146,8 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
 	}
 
-	w.log("Component Execute() returned for execution=%s, node=%s", execution.ID, node.NodeID)
-
-	return nil
+	w.log("Execute() returned for execution=%s, node=%s", execution.ID, node.NodeID)
+	return tx.Save(execution).Error
 }
 
 func (w *WorkflowNodeExecutor) log(format string, v ...any) {

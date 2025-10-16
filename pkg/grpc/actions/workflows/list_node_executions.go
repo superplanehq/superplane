@@ -104,20 +104,21 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 		}
 
 		result = append(result, &pb.WorkflowNodeExecution{
-			Id:                execution.ID.String(),
-			WorkflowId:        execution.WorkflowID.String(),
-			NodeId:            execution.NodeID,
-			ParentExecutionId: execution.GetParentExecutionID(),
-			State:             NodeExecutionStateToProto(execution.State),
-			Result:            NodeExecutionResultToProto(execution.Result),
-			ResultReason:      NodeExecutionResultReasonToProto(execution.ResultReason),
-			ResultMessage:     execution.ResultMessage,
-			CreatedAt:         timestamppb.New(*execution.CreatedAt),
-			UpdatedAt:         timestamppb.New(*execution.UpdatedAt),
-			Metadata:          metadata,
-			Configuration:     configuration,
-			Input:             input,
-			Outputs:           outputs,
+			Id:                  execution.ID.String(),
+			WorkflowId:          execution.WorkflowID.String(),
+			NodeId:              execution.NodeID,
+			ParentExecutionId:   execution.GetParentExecutionID(),
+			PreviousExecutionId: execution.GetPreviousExecutionID(),
+			State:               NodeExecutionStateToProto(execution.State),
+			Result:              NodeExecutionResultToProto(execution.Result),
+			ResultReason:        NodeExecutionResultReasonToProto(execution.ResultReason),
+			ResultMessage:       execution.ResultMessage,
+			CreatedAt:           timestamppb.New(*execution.CreatedAt),
+			UpdatedAt:           timestamppb.New(*execution.UpdatedAt),
+			Metadata:            metadata,
+			Configuration:       configuration,
+			Input:               input,
+			Outputs:             outputs,
 		})
 	}
 

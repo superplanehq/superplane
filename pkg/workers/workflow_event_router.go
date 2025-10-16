@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -185,10 +184,19 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 	// We should update the parent execution, if needed.
 	//
 	if len(edges) == 0 {
+
+		//
+		// Lock the parent execution to ensure we are not processing it multiple times for terminal nodes.
+		//
+		parentExecution, err := models.LockWorkflowNodeExecution(tx, *execution.ParentExecutionID)
+		if err != nil {
+			w.log("Child node %s is a terminal node, but parent is locked - skipping", childNodeID)
+			return nil
+		}
+
 		w.log("Child node %s is a terminal node - checking parent execution", childNodeID)
 		return w.completeParentExecutionIfNeeded(
 			tx,
-			workflow,
 			parentNode,
 			parentExecution,
 			execution,
@@ -237,7 +245,6 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 
 func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 	tx *gorm.DB,
-	workflow *models.Workflow,
 	parentNode *models.WorkflowNode,
 	parentExecution *models.WorkflowNodeExecution,
 	execution *models.WorkflowNodeExecution,
@@ -246,9 +253,17 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 ) error {
 
 	//
+	// If the parent already finished, no need to do anything.
+	//
+	if parentExecution.State == models.WorkflowNodeExecutionStateFinished {
+		w.log("Parent execution %s is already finished - skipping", parentExecution.ID)
+		return event.RoutedInTransaction(tx)
+	}
+
+	//
 	// Check if parent execution still has pending/started executions.
 	//
-	children, err := models.FindChildExecutionsInTransaction(tx, *execution.ParentExecutionID, []string{
+	nonFinished, err := models.FindChildExecutionsInTransaction(tx, *execution.ParentExecutionID, []string{
 		models.WorkflowNodeExecutionStatePending,
 		models.WorkflowNodeExecutionStateStarted,
 	})
@@ -260,8 +275,19 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 	//
 	// If there are still pending/started executions, we should not complete the parent execution yet.
 	//
-	if len(children) > 0 {
+	if len(nonFinished) > 0 {
+		w.log("Parent execution %s still has %d pending/started executions - skipping", parentExecution.ID, len(nonFinished))
 		return event.RoutedInTransaction(tx)
+	}
+
+	w.log("Parent execution %s has no more pending/started executions - completing", parentExecution.ID)
+
+	finishedChildren, err := models.FindChildExecutionsInTransaction(tx, *execution.ParentExecutionID, []string{
+		models.WorkflowNodeExecutionStateFinished,
+	})
+
+	if err != nil {
+		return err
 	}
 
 	//
@@ -270,9 +296,14 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 	outputs := make(map[string][]any)
 	for _, outputChannel := range blueprint.OutputChannels {
 		fullNodeID := parentNode.NodeID + ":" + outputChannel.NodeID
-		outputEvents, err := w.findOutputEventsForNode(tx, workflow.ID, fullNodeID, outputChannel.NodeOutputChannel)
+		childExecution := w.findChild(finishedChildren, fullNodeID)
+		if childExecution == nil {
+			continue
+		}
+
+		outputEvents, err := childExecution.GetOutputs()
 		if err != nil {
-			return err
+			return fmt.Errorf("error finding output events for %s: %v", fullNodeID, err)
 		}
 
 		for _, outputEvent := range outputEvents {
@@ -285,23 +316,18 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 		return err
 	}
 
+	w.log("Parent execution %s completed", parentExecution.ID)
 	return event.RoutedInTransaction(tx)
 }
 
-func (w *WorkflowEventRouter) findOutputEventsForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string, channel string) ([]models.WorkflowEvent, error) {
-	var events []models.WorkflowEvent
-	err := tx.
-		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID).
-		Where("channel = ?", channel).
-		Find(&events).
-		Error
-
-	if err != nil {
-		return nil, err
+func (w *WorkflowEventRouter) findChild(children []models.WorkflowNodeExecution, nodeID string) *models.WorkflowNodeExecution {
+	for _, child := range children {
+		if child.NodeID == nodeID {
+			return &child
+		}
 	}
 
-	return events, nil
+	return nil
 }
 
 func (w *WorkflowEventRouter) log(format string, v ...any) {

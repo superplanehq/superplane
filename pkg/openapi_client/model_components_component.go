@@ -24,7 +24,7 @@ type ComponentsComponent struct {
 	Label *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
-	Channels []SuperplaneComponentsOutputChannel `json:"channels,omitempty"`
+	OutputChannels []SuperplaneComponentsOutputChannel `json:"outputChannels,omitempty"`
 }
 
 // NewComponentsComponent instantiates a new ComponentsComponent object
@@ -172,36 +172,36 @@ func (o *ComponentsComponent) SetConfiguration(v []ComponentsConfigurationField)
 	o.Configuration = v
 }
 
-// GetChannels returns the Channels field value if set, zero value otherwise.
-func (o *ComponentsComponent) GetChannels() []SuperplaneComponentsOutputChannel {
-	if o == nil || IsNil(o.Channels) {
+// GetOutputChannels returns the OutputChannels field value if set, zero value otherwise.
+func (o *ComponentsComponent) GetOutputChannels() []SuperplaneComponentsOutputChannel {
+	if o == nil || IsNil(o.OutputChannels) {
 		var ret []SuperplaneComponentsOutputChannel
 		return ret
 	}
-	return o.Channels
+	return o.OutputChannels
 }
 
-// GetChannelsOk returns a tuple with the Channels field value if set, nil otherwise
+// GetOutputChannelsOk returns a tuple with the OutputChannels field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsComponent) GetChannelsOk() ([]SuperplaneComponentsOutputChannel, bool) {
-	if o == nil || IsNil(o.Channels) {
+func (o *ComponentsComponent) GetOutputChannelsOk() ([]SuperplaneComponentsOutputChannel, bool) {
+	if o == nil || IsNil(o.OutputChannels) {
 		return nil, false
 	}
-	return o.Channels, true
+	return o.OutputChannels, true
 }
 
-// HasChannels returns a boolean if a field has been set.
-func (o *ComponentsComponent) HasChannels() bool {
-	if o != nil && !IsNil(o.Channels) {
+// HasOutputChannels returns a boolean if a field has been set.
+func (o *ComponentsComponent) HasOutputChannels() bool {
+	if o != nil && !IsNil(o.OutputChannels) {
 		return true
 	}
 
 	return false
 }
 
-// SetChannels gets a reference to the given []SuperplaneComponentsOutputChannel and assigns it to the Channels field.
-func (o *ComponentsComponent) SetChannels(v []SuperplaneComponentsOutputChannel) {
-	o.Channels = v
+// SetOutputChannels gets a reference to the given []SuperplaneComponentsOutputChannel and assigns it to the OutputChannels field.
+func (o *ComponentsComponent) SetOutputChannels(v []SuperplaneComponentsOutputChannel) {
+	o.OutputChannels = v
 }
 
 func (o ComponentsComponent) MarshalJSON() ([]byte, error) {
@@ -226,8 +226,8 @@ func (o ComponentsComponent) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
 	}
-	if !IsNil(o.Channels) {
-		toSerialize["channels"] = o.Channels
+	if !IsNil(o.OutputChannels) {
+		toSerialize["outputChannels"] = o.OutputChannels
 	}
 	return toSerialize, nil
 }

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
 import { getExecutionRenderer } from './executionRenderers'
 import { ComponentActions } from './ComponentActions'
+import { ChildExecutions } from '../ChildExecutions'
 import { formatTimeAgo } from '../../utils/date'
 import { WorkflowsWorkflowNodeExecution } from '@/api-client'
 
@@ -15,9 +17,13 @@ interface ExecutionItemProps {
   workflowId: string
   isBlueprintNode?: boolean
   nodeType?: string
+  organizationId?: string
+  blueprintId?: string
+  onToggleChildExecutions?: (executionId: string) => void
+  isChildExpanded?: boolean
 }
 
-export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNode = false, nodeType }: ExecutionItemProps) => {
+export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNode = false, nodeType, organizationId, blueprintId, onToggleChildExecutions, isChildExpanded }: ExecutionItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
 
   // Get custom renderer if available
@@ -263,6 +269,30 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
                 )}
 
               </>
+            )}
+
+            {/* Child Executions Section - Only show for blueprint nodes */}
+            {isBlueprintNode && blueprintId && organizationId && onToggleChildExecutions && (
+              <div className="space-y-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onToggleChildExecutions(execution.id!)}
+                  className="text-xs w-full"
+                >
+                  <MaterialSymbol name={isChildExpanded ? 'expand_less' : 'expand_more'} size="sm" />
+                  {isChildExpanded ? 'Hide' : 'See'} child executions
+                </Button>
+
+                {isChildExpanded && (
+                  <ChildExecutions
+                    workflowId={workflowId}
+                    executionId={execution.id!}
+                    organizationId={organizationId}
+                    blueprintId={blueprintId}
+                  />
+                )}
+              </div>
             )}
           </div>
         )}

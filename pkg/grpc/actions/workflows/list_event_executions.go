@@ -25,6 +25,7 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 	query := database.Conn().
 		Where("workflow_id = ?", workflowUUID).
 		Where("root_event_id = ?", eventUUID).
+		Where("parent_execution_id IS NULL").
 		Order("created_at ASC")
 
 	err = query.Find(&executions).Error

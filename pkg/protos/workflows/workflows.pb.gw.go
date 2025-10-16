@@ -335,6 +335,64 @@ func local_request_Workflows_InvokeNodeExecutionAction_0(ctx context.Context, ma
 	return msg, metadata, err
 }
 
+func request_Workflows_ListChildExecutions_0(ctx context.Context, marshaler runtime.Marshaler, client WorkflowsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListChildExecutionsRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["workflow_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "workflow_id")
+	}
+	protoReq.WorkflowId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "workflow_id", err)
+	}
+	val, ok = pathParams["execution_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "execution_id")
+	}
+	protoReq.ExecutionId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "execution_id", err)
+	}
+	msg, err := client.ListChildExecutions(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Workflows_ListChildExecutions_0(ctx context.Context, marshaler runtime.Marshaler, server WorkflowsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListChildExecutionsRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["workflow_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "workflow_id")
+	}
+	protoReq.WorkflowId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "workflow_id", err)
+	}
+	val, ok = pathParams["execution_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "execution_id")
+	}
+	protoReq.ExecutionId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "execution_id", err)
+	}
+	msg, err := server.ListChildExecutions(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 var filter_Workflows_ListWorkflowEvents_0 = &utilities.DoubleArray{Encoding: map[string]int{"workflow_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
 func request_Workflows_ListWorkflowEvents_0(ctx context.Context, marshaler runtime.Marshaler, client WorkflowsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -585,6 +643,26 @@ func RegisterWorkflowsHandlerServer(ctx context.Context, mux *runtime.ServeMux, 
 		}
 		forward_Workflows_InvokeNodeExecutionAction_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_Workflows_ListChildExecutions_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Workflows.Workflows/ListChildExecutions", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/executions/{execution_id}/children"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Workflows_ListChildExecutions_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Workflows_ListChildExecutions_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_Workflows_ListWorkflowEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -784,6 +862,23 @@ func RegisterWorkflowsHandlerClient(ctx context.Context, mux *runtime.ServeMux, 
 		}
 		forward_Workflows_InvokeNodeExecutionAction_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_Workflows_ListChildExecutions_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Workflows.Workflows/ListChildExecutions", runtime.WithHTTPPathPattern("/api/v1/workflows/{workflow_id}/executions/{execution_id}/children"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Workflows_ListChildExecutions_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Workflows_ListChildExecutions_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_Workflows_ListWorkflowEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -829,6 +924,7 @@ var (
 	pattern_Workflows_DeleteWorkflow_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "workflows", "id"}, ""))
 	pattern_Workflows_ListNodeExecutions_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "workflows", "workflow_id", "nodes", "node_id", "executions"}, ""))
 	pattern_Workflows_InvokeNodeExecutionAction_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "workflows", "workflow_id", "executions", "execution_id", "actions", "action_name"}, ""))
+	pattern_Workflows_ListChildExecutions_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "workflows", "workflow_id", "executions", "execution_id", "children"}, ""))
 	pattern_Workflows_ListWorkflowEvents_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "workflows", "workflow_id", "events"}, ""))
 	pattern_Workflows_ListEventExecutions_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "workflows", "workflow_id", "events", "event_id", "executions"}, ""))
 )
@@ -841,6 +937,7 @@ var (
 	forward_Workflows_DeleteWorkflow_0            = runtime.ForwardResponseMessage
 	forward_Workflows_ListNodeExecutions_0        = runtime.ForwardResponseMessage
 	forward_Workflows_InvokeNodeExecutionAction_0 = runtime.ForwardResponseMessage
+	forward_Workflows_ListChildExecutions_0       = runtime.ForwardResponseMessage
 	forward_Workflows_ListWorkflowEvents_0        = runtime.ForwardResponseMessage
 	forward_Workflows_ListEventExecutions_0       = runtime.ForwardResponseMessage
 )

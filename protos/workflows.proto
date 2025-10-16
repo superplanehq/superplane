@@ -107,6 +107,18 @@ service Workflows {
     };
   }
 
+  rpc ListChildExecutions(ListChildExecutionsRequest) returns (ListChildExecutionsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/workflows/{workflow_id}/executions/{execution_id}/children"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List child executions for an execution";
+      description: "List child executions for an execution";
+      tags: "WorkflowNodeExecution";
+    };
+  }
+
   rpc ListWorkflowEvents(ListWorkflowEventsRequest) returns (ListWorkflowEventsResponse) {
     option (google.api.http) = {
       get: "/api/v1/workflows/{workflow_id}/events"
@@ -194,6 +206,15 @@ message ListNodeExecutionsResponse {
   google.protobuf.Timestamp last_timestamp = 4;
 }
 
+message ListChildExecutionsRequest {
+  string workflow_id = 1;
+  string execution_id = 2;
+}
+
+message ListChildExecutionsResponse {
+  repeated WorkflowNodeExecution executions = 1;
+}
+
 message WorkflowNodeExecution {
   enum State {
     STATE_UNKNOWN = 0;
@@ -218,16 +239,17 @@ message WorkflowNodeExecution {
   string workflow_id = 2;
   string node_id = 3;
   string parent_execution_id = 4;
-  State state = 5;
-  Result result = 6;
-  ResultReason result_reason = 7;
-  string result_message = 8;
-  google.protobuf.Struct input = 9;
-  google.protobuf.Struct outputs = 10;
-  google.protobuf.Timestamp created_at = 11;
-  google.protobuf.Timestamp updated_at = 12;
-  google.protobuf.Struct metadata = 13;
-  google.protobuf.Struct configuration = 14;
+  string previous_execution_id = 5;
+  State state = 6;
+  Result result = 7;
+  ResultReason result_reason = 8;
+  string result_message = 9;
+  google.protobuf.Struct input = 10;
+  google.protobuf.Struct outputs = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  google.protobuf.Struct metadata = 14;
+  google.protobuf.Struct configuration = 15;
 }
 
 message InvokeNodeExecutionActionRequest {
@@ -241,9 +263,8 @@ message InvokeNodeExecutionActionResponse {}
 
 message ListWorkflowEventsRequest {
   string workflow_id = 1;
-  string node_id = 2;
-  uint32 limit = 3;
-  google.protobuf.Timestamp before = 4;
+  uint32 limit = 2;
+  google.protobuf.Timestamp before = 3;
 }
 
 message ListWorkflowEventsResponse {

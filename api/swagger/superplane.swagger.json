@@ -3270,12 +3270,6 @@
             "type": "string"
           },
           {
-            "name": "nodeId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -3377,6 +3371,52 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/WorkflowsInvokeNodeExecutionActionBody"
+            }
+          }
+        ],
+        "tags": [
+          "WorkflowNodeExecution"
+        ]
+      }
+    },
+    "/api/v1/workflows/{workflowId}/executions/{executionId}/children": {
+      "post": {
+        "summary": "List child executions for an execution",
+        "description": "List child executions for an execution",
+        "operationId": "Workflows_ListChildExecutions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsListChildExecutionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WorkflowsListChildExecutionsBody"
             }
           }
         ],
@@ -3638,7 +3678,7 @@
             "$ref": "#/definitions/ComponentsConfigurationField"
           }
         },
-        "channels": {
+        "outputChannels": {
           "type": "array",
           "items": {
             "type": "object",
@@ -6351,6 +6391,21 @@
     "WorkflowsInvokeNodeExecutionActionResponse": {
       "type": "object"
     },
+    "WorkflowsListChildExecutionsBody": {
+      "type": "object"
+    },
+    "WorkflowsListChildExecutionsResponse": {
+      "type": "object",
+      "properties": {
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
+          }
+        }
+      }
+    },
     "WorkflowsListEventExecutionsResponse": {
       "type": "object",
       "properties": {
@@ -6513,6 +6568,9 @@
           "type": "string"
         },
         "parentExecutionId": {
+          "type": "string"
+        },
+        "previousExecutionId": {
           "type": "string"
         },
         "state": {

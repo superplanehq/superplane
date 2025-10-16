@@ -228,6 +228,14 @@ func FindChildExecutionsInTransaction(tx *gorm.DB, parentExecutionID uuid.UUID, 
 	return executions, nil
 }
 
+func (e *WorkflowNodeExecution) GetPreviousExecutionID() string {
+	if e.PreviousExecutionID == nil {
+		return ""
+	}
+
+	return e.PreviousExecutionID.String()
+}
+
 func (e *WorkflowNodeExecution) GetParentExecutionID() string {
 	if e.ParentExecutionID == nil {
 		return ""

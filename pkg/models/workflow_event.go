@@ -72,11 +72,11 @@ func FindWorkflowEventInTransaction(tx *gorm.DB, id uuid.UUID) (*WorkflowEvent, 
 	return &event, nil
 }
 
-func ListWorkflowEventsForNode(workflowID uuid.UUID, nodeID string, limit int, before *time.Time) ([]WorkflowEvent, error) {
+func ListRootWorkflowEvents(workflowID uuid.UUID, limit int, before *time.Time) ([]WorkflowEvent, error) {
 	var events []WorkflowEvent
 	query := database.Conn().
 		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID)
+		Where("execution_id IS NULL")
 
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -94,13 +94,13 @@ func ListWorkflowEventsForNode(workflowID uuid.UUID, nodeID string, limit int, b
 	return events, nil
 }
 
-func CountWorkflowEventsForNode(workflowID uuid.UUID, nodeID string) (int64, error) {
+func CountRootWorkflowEvents(workflowID uuid.UUID) (int64, error) {
 	var count int64
 
 	err := database.Conn().
 		Model(&WorkflowEvent{}).
 		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID).
+		Where("execution_id IS NULL").
 		Count(&count).
 		Error
 

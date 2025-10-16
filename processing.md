@@ -326,6 +326,16 @@ select * from workflow_events where execution_id IN (ex1, ex2, ex3)
 
 ## APIs
 
+GET /components
+GET /components/{name}
+GET /components/{name}/actions
+
+GET    /blueprints
+POST   /blueprints
+GET    /blueprints/{id}
+PUT    /blueprints/{id}
+DELETE /blueprints/{id}
+
 GET    /workflows
 POST   /workflows
 GET    /workflows/{id}
@@ -335,17 +345,17 @@ DELETE /workflows/{id}
 List all executions for a node
   GET /workflows/{workflow_id}/nodes/{node_id}/executions
 
-List all events for a workflow node
-  GET /workflows/{workflow_id}/events?node_id=
-
-List all executions for a root event
-  GET /workflows/{workflow_id}/events/{event_id}/executions
+List all child executions for a parent execution
+  GET /workflows/{workflow_id}/executions/{execution_id}/children
 
 Invoke action on an execution
   POST /workflows/{workflow_id}/executions/{execution_id}/actions/{action_name}
 
-List child executions
-  GET /workflows/{workflow_id}/executions/{execution_id}/children
+List all root events for a workflow - workflow_events records with execution_id set
+  GET /workflows/{workflow_id}/events
+
+List all executions for a root event
+  GET /workflows/{workflow_id}/events/{event_id}/executions
 
 ## Output channels
 

@@ -9,10 +9,13 @@ interface WorkflowNodeExecutionsTabProps {
   nodeId: string
   isBlueprintNode?: boolean
   nodeType?: string
+  organizationId: string
+  blueprintId?: string
 }
 
-export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode, nodeType }: WorkflowNodeExecutionsTabProps) => {
+export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode, nodeType, organizationId, blueprintId }: WorkflowNodeExecutionsTabProps) => {
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [expandedExecutionIds, setExpandedExecutionIds] = useState<Set<string>>(new Set())
 
   // Detect dark mode
   useEffect(() => {
@@ -56,6 +59,16 @@ export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode,
 
   const executions = data?.executions || []
 
+  const handleToggleChildExecutions = (executionId: string) => {
+    const newSet = new Set(expandedExecutionIds)
+    if (newSet.has(executionId)) {
+      newSet.delete(executionId)
+    } else {
+      newSet.add(executionId)
+    }
+    setExpandedExecutionIds(newSet)
+  }
+
   if (executions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
@@ -84,6 +97,10 @@ export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode,
             workflowId={workflowId}
             isBlueprintNode={isBlueprintNode}
             nodeType={nodeType}
+            organizationId={organizationId}
+            blueprintId={blueprintId}
+            onToggleChildExecutions={handleToggleChildExecutions}
+            isChildExpanded={expandedExecutionIds.has(execution.id!)}
           />
         ))}
       </div>

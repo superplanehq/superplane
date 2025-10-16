@@ -8,30 +8,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListWorkflowEvents(ctx context.Context, registry *registry.Registry, workflowID string, nodeID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListWorkflowEventsResponse, error) {
-	workflowUUID, err := uuid.Parse(workflowID)
-	if err != nil {
-		return nil, err
-	}
-
-	if nodeID == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "node_id is required")
-	}
-
+func ListWorkflowEvents(ctx context.Context, registry *registry.Registry, workflowID uuid.UUID, limit uint32, before *timestamppb.Timestamp) (*pb.ListWorkflowEventsResponse, error) {
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
-	events, err := models.ListWorkflowEventsForNode(workflowUUID, nodeID, int(limit), beforeTime)
+	events, err := models.ListRootWorkflowEvents(workflowID, int(limit), beforeTime)
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := models.CountWorkflowEventsForNode(workflowUUID, nodeID)
+	count, err := models.CountRootWorkflowEvents(workflowID)
 	if err != nil {
 		return nil, err
 	}

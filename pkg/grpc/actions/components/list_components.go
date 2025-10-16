@@ -32,11 +32,11 @@ func serializeComponents(in []components.Component) []*pb.Component {
 		}
 
 		out[i] = &pb.Component{
-			Name:          component.Name(),
-			Label:         component.Label(),
-			Description:   component.Description(),
-			Channels:      channels,
-			Configuration: configuration,
+			Name:           component.Name(),
+			Label:          component.Label(),
+			Description:    component.Description(),
+			OutputChannels: channels,
+			Configuration:  configuration,
 		}
 	}
 	return out

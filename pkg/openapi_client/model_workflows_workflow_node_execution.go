@@ -25,6 +25,7 @@ type WorkflowsWorkflowNodeExecution struct {
 	WorkflowId *string `json:"workflowId,omitempty"`
 	NodeId *string `json:"nodeId,omitempty"`
 	ParentExecutionId *string `json:"parentExecutionId,omitempty"`
+	PreviousExecutionId *string `json:"previousExecutionId,omitempty"`
 	State *WorkflowsWorkflowNodeExecutionState `json:"state,omitempty"`
 	Result *WorkflowsWorkflowNodeExecutionResult `json:"result,omitempty"`
 	ResultReason *WorkflowsWorkflowNodeExecutionResultReason `json:"resultReason,omitempty"`
@@ -192,6 +193,38 @@ func (o *WorkflowsWorkflowNodeExecution) HasParentExecutionId() bool {
 // SetParentExecutionId gets a reference to the given string and assigns it to the ParentExecutionId field.
 func (o *WorkflowsWorkflowNodeExecution) SetParentExecutionId(v string) {
 	o.ParentExecutionId = &v
+}
+
+// GetPreviousExecutionId returns the PreviousExecutionId field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousExecutionId() string {
+	if o == nil || IsNil(o.PreviousExecutionId) {
+		var ret string
+		return ret
+	}
+	return *o.PreviousExecutionId
+}
+
+// GetPreviousExecutionIdOk returns a tuple with the PreviousExecutionId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetPreviousExecutionIdOk() (*string, bool) {
+	if o == nil || IsNil(o.PreviousExecutionId) {
+		return nil, false
+	}
+	return o.PreviousExecutionId, true
+}
+
+// HasPreviousExecutionId returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasPreviousExecutionId() bool {
+	if o != nil && !IsNil(o.PreviousExecutionId) {
+		return true
+	}
+
+	return false
+}
+
+// SetPreviousExecutionId gets a reference to the given string and assigns it to the PreviousExecutionId field.
+func (o *WorkflowsWorkflowNodeExecution) SetPreviousExecutionId(v string) {
+	o.PreviousExecutionId = &v
 }
 
 // GetState returns the State field value if set, zero value otherwise.
@@ -535,6 +568,9 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.ParentExecutionId) {
 		toSerialize["parentExecutionId"] = o.ParentExecutionId
+	}
+	if !IsNil(o.PreviousExecutionId) {
+		toSerialize["previousExecutionId"] = o.PreviousExecutionId
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State

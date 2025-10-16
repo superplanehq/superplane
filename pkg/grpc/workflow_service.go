@@ -80,9 +80,28 @@ func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb
 }
 
 func (s *WorkflowService) ListWorkflowEvents(ctx context.Context, req *pb.ListWorkflowEventsRequest) (*pb.ListWorkflowEventsResponse, error) {
-	return workflows.ListWorkflowEvents(ctx, s.registry, req.WorkflowId, req.NodeId, req.Limit, req.Before)
+	workflowID, err := uuid.Parse(req.WorkflowId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	return workflows.ListWorkflowEvents(ctx, s.registry, workflowID, req.Limit, req.Before)
 }
 
 func (s *WorkflowService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {
 	return workflows.ListEventExecutions(ctx, s.registry, req.WorkflowId, req.EventId)
+}
+
+func (s *WorkflowService) ListChildExecutions(ctx context.Context, req *pb.ListChildExecutionsRequest) (*pb.ListChildExecutionsResponse, error) {
+	workflowID, err := uuid.Parse(req.WorkflowId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	executionID, err := uuid.Parse(req.ExecutionId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid execution_id")
+	}
+
+	return workflows.ListChildExecutions(ctx, s.registry, workflowID, executionID)
 }

@@ -239,14 +239,14 @@ func (x *DescribeComponentResponse) GetComponent() *Component {
 }
 
 type Component struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Configuration []*ConfigurationField  `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
-	Channels      []*OutputChannel       `protobuf:"bytes,5,rep,name=channels,proto3" json:"channels,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Name           string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Label          string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Description    string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Configuration  []*ConfigurationField  `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
+	OutputChannels []*OutputChannel       `protobuf:"bytes,5,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Component) Reset() {
@@ -307,9 +307,9 @@ func (x *Component) GetConfiguration() []*ConfigurationField {
 	return nil
 }
 
-func (x *Component) GetChannels() []*OutputChannel {
+func (x *Component) GetOutputChannels() []*OutputChannel {
 	if x != nil {
-		return x.Channels
+		return x.OutputChannels
 	}
 	return nil
 }
@@ -995,13 +995,13 @@ const file_components_proto_rawDesc = "" +
 	"\x18DescribeComponentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"[\n" +
 	"\x19DescribeComponentResponse\x12>\n" +
-	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xea\x01\n" +
+	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xf7\x01\n" +
 	"\tComponent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12O\n" +
-	"\rconfiguration\x18\x04 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12@\n" +
-	"\bchannels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\bchannels\"\xe6\x03\n" +
+	"\rconfiguration\x18\x04 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12M\n" +
+	"\x0foutput_channels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels\"\xe6\x03\n" +
 	"\x12ConfigurationField\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
@@ -1107,7 +1107,7 @@ var file_components_proto_depIdxs = []int32{
 	5,  // 0: Superplane.Components.ListComponentsResponse.components:type_name -> Superplane.Components.Component
 	5,  // 1: Superplane.Components.DescribeComponentResponse.component:type_name -> Superplane.Components.Component
 	6,  // 2: Superplane.Components.Component.configuration:type_name -> Superplane.Components.ConfigurationField
-	9,  // 3: Superplane.Components.Component.channels:type_name -> Superplane.Components.OutputChannel
+	9,  // 3: Superplane.Components.Component.output_channels:type_name -> Superplane.Components.OutputChannel
 	7,  // 4: Superplane.Components.ConfigurationField.options:type_name -> Superplane.Components.FieldOption
 	8,  // 5: Superplane.Components.ConfigurationField.list_item:type_name -> Superplane.Components.ListItemDefinition
 	6,  // 6: Superplane.Components.ConfigurationField.schema:type_name -> Superplane.Components.ConfigurationField
