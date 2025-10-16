@@ -32,8 +32,7 @@ const (
 	WorkflowNodeExecution_STATE_UNKNOWN  WorkflowNodeExecution_State = 0
 	WorkflowNodeExecution_STATE_PENDING  WorkflowNodeExecution_State = 1
 	WorkflowNodeExecution_STATE_STARTED  WorkflowNodeExecution_State = 2
-	WorkflowNodeExecution_STATE_ROUTING  WorkflowNodeExecution_State = 3
-	WorkflowNodeExecution_STATE_FINISHED WorkflowNodeExecution_State = 4
+	WorkflowNodeExecution_STATE_FINISHED WorkflowNodeExecution_State = 3
 )
 
 // Enum value maps for WorkflowNodeExecution_State.
@@ -42,15 +41,13 @@ var (
 		0: "STATE_UNKNOWN",
 		1: "STATE_PENDING",
 		2: "STATE_STARTED",
-		3: "STATE_ROUTING",
-		4: "STATE_FINISHED",
+		3: "STATE_FINISHED",
 	}
 	WorkflowNodeExecution_State_value = map[string]int32{
 		"STATE_UNKNOWN":  0,
 		"STATE_PENDING":  1,
 		"STATE_STARTED":  2,
-		"STATE_ROUTING":  3,
-		"STATE_FINISHED": 4,
+		"STATE_FINISHED": 3,
 	}
 )
 
@@ -864,27 +861,23 @@ func (x *ListNodeExecutionsResponse) GetLastTimestamp() *timestamp.Timestamp {
 }
 
 type WorkflowNodeExecution struct {
-	state                 protoimpl.MessageState             `protogen:"open.v1"`
-	Id                    string                             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	WorkflowId            string                             `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
-	NodeId                string                             `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	ParentExecutionId     string                             `protobuf:"bytes,4,opt,name=parent_execution_id,json=parentExecutionId,proto3" json:"parent_execution_id,omitempty"`
-	BlueprintId           string                             `protobuf:"bytes,5,opt,name=blueprint_id,json=blueprintId,proto3" json:"blueprint_id,omitempty"`
-	State                 WorkflowNodeExecution_State        `protobuf:"varint,6,opt,name=state,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_State" json:"state,omitempty"`
-	Result                WorkflowNodeExecution_Result       `protobuf:"varint,7,opt,name=result,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_Result" json:"result,omitempty"`
-	ResultReason          WorkflowNodeExecution_ResultReason `protobuf:"varint,8,opt,name=result_reason,json=resultReason,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_ResultReason" json:"result_reason,omitempty"`
-	ResultMessage         string                             `protobuf:"bytes,9,opt,name=result_message,json=resultMessage,proto3" json:"result_message,omitempty"`
-	Input                 *_struct.Struct                    `protobuf:"bytes,10,opt,name=input,proto3" json:"input,omitempty"`
-	Outputs               *_struct.Struct                    `protobuf:"bytes,11,opt,name=outputs,proto3" json:"outputs,omitempty"`
-	CreatedAt             *timestamp.Timestamp               `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt             *timestamp.Timestamp               `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	Metadata              *_struct.Struct                    `protobuf:"bytes,14,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Configuration         *_struct.Struct                    `protobuf:"bytes,15,opt,name=configuration,proto3" json:"configuration,omitempty"`
-	PreviousExecutionId   string                             `protobuf:"bytes,16,opt,name=previous_execution_id,json=previousExecutionId,proto3" json:"previous_execution_id,omitempty"`
-	PreviousOutputChannel string                             `protobuf:"bytes,17,opt,name=previous_output_channel,json=previousOutputChannel,proto3" json:"previous_output_channel,omitempty"`
-	PreviousOutputIndex   int32                              `protobuf:"varint,18,opt,name=previous_output_index,json=previousOutputIndex,proto3" json:"previous_output_index,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state             protoimpl.MessageState             `protogen:"open.v1"`
+	Id                string                             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkflowId        string                             `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
+	NodeId            string                             `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ParentExecutionId string                             `protobuf:"bytes,4,opt,name=parent_execution_id,json=parentExecutionId,proto3" json:"parent_execution_id,omitempty"`
+	State             WorkflowNodeExecution_State        `protobuf:"varint,5,opt,name=state,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_State" json:"state,omitempty"`
+	Result            WorkflowNodeExecution_Result       `protobuf:"varint,6,opt,name=result,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_Result" json:"result,omitempty"`
+	ResultReason      WorkflowNodeExecution_ResultReason `protobuf:"varint,7,opt,name=result_reason,json=resultReason,proto3,enum=Superplane.Workflows.WorkflowNodeExecution_ResultReason" json:"result_reason,omitempty"`
+	ResultMessage     string                             `protobuf:"bytes,8,opt,name=result_message,json=resultMessage,proto3" json:"result_message,omitempty"`
+	Input             *_struct.Struct                    `protobuf:"bytes,9,opt,name=input,proto3" json:"input,omitempty"`
+	Outputs           *_struct.Struct                    `protobuf:"bytes,10,opt,name=outputs,proto3" json:"outputs,omitempty"`
+	CreatedAt         *timestamp.Timestamp               `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt         *timestamp.Timestamp               `protobuf:"bytes,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Metadata          *_struct.Struct                    `protobuf:"bytes,13,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Configuration     *_struct.Struct                    `protobuf:"bytes,14,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *WorkflowNodeExecution) Reset() {
@@ -941,13 +934,6 @@ func (x *WorkflowNodeExecution) GetNodeId() string {
 func (x *WorkflowNodeExecution) GetParentExecutionId() string {
 	if x != nil {
 		return x.ParentExecutionId
-	}
-	return ""
-}
-
-func (x *WorkflowNodeExecution) GetBlueprintId() string {
-	if x != nil {
-		return x.BlueprintId
 	}
 	return ""
 }
@@ -1020,27 +1006,6 @@ func (x *WorkflowNodeExecution) GetConfiguration() *_struct.Struct {
 		return x.Configuration
 	}
 	return nil
-}
-
-func (x *WorkflowNodeExecution) GetPreviousExecutionId() string {
-	if x != nil {
-		return x.PreviousExecutionId
-	}
-	return ""
-}
-
-func (x *WorkflowNodeExecution) GetPreviousOutputChannel() string {
-	if x != nil {
-		return x.PreviousOutputChannel
-	}
-	return ""
-}
-
-func (x *WorkflowNodeExecution) GetPreviousOutputIndex() int32 {
-	if x != nil {
-		return x.PreviousOutputIndex
-	}
-	return 0
 }
 
 type InvokeNodeExecutionActionRequest struct {
@@ -1142,8 +1107,9 @@ func (*InvokeNodeExecutionActionResponse) Descriptor() ([]byte, []int) {
 type ListWorkflowEventsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorkflowId    string                 `protobuf:"bytes,1,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
-	Limit         uint32                 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	Before        *timestamp.Timestamp   `protobuf:"bytes,3,opt,name=before,proto3" json:"before,omitempty"`
+	NodeId        string                 `protobuf:"bytes,2,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Limit         uint32                 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Before        *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=before,proto3" json:"before,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1185,6 +1151,13 @@ func (x *ListWorkflowEventsRequest) GetWorkflowId() string {
 	return ""
 }
 
+func (x *ListWorkflowEventsRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
 func (x *ListWorkflowEventsRequest) GetLimit() uint32 {
 	if x != nil {
 		return x.Limit
@@ -1200,11 +1173,11 @@ func (x *ListWorkflowEventsRequest) GetBefore() *timestamp.Timestamp {
 }
 
 type ListWorkflowEventsResponse struct {
-	state         protoimpl.MessageState  `protogen:"open.v1"`
-	Events        []*WorkflowInitialEvent `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
-	TotalCount    uint32                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
-	HasNextPage   bool                    `protobuf:"varint,3,opt,name=has_next_page,json=hasNextPage,proto3" json:"has_next_page,omitempty"`
-	LastTimestamp *timestamp.Timestamp    `protobuf:"bytes,4,opt,name=last_timestamp,json=lastTimestamp,proto3" json:"last_timestamp,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*WorkflowEvent       `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	TotalCount    uint32                 `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	HasNextPage   bool                   `protobuf:"varint,3,opt,name=has_next_page,json=hasNextPage,proto3" json:"has_next_page,omitempty"`
+	LastTimestamp *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=last_timestamp,json=lastTimestamp,proto3" json:"last_timestamp,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1239,7 +1212,7 @@ func (*ListWorkflowEventsResponse) Descriptor() ([]byte, []int) {
 	return file_workflows_proto_rawDescGZIP(), []int{17}
 }
 
-func (x *ListWorkflowEventsResponse) GetEvents() []*WorkflowInitialEvent {
+func (x *ListWorkflowEventsResponse) GetEvents() []*WorkflowEvent {
 	if x != nil {
 		return x.Events
 	}
@@ -1267,30 +1240,32 @@ func (x *ListWorkflowEventsResponse) GetLastTimestamp() *timestamp.Timestamp {
 	return nil
 }
 
-type WorkflowInitialEvent struct {
+type WorkflowEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	WorkflowId    string                 `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
-	Data          *_struct.Struct        `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	NodeId        string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Channel       string                 `protobuf:"bytes,4,opt,name=channel,proto3" json:"channel,omitempty"`
+	Data          *_struct.Struct        `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *WorkflowInitialEvent) Reset() {
-	*x = WorkflowInitialEvent{}
+func (x *WorkflowEvent) Reset() {
+	*x = WorkflowEvent{}
 	mi := &file_workflows_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WorkflowInitialEvent) String() string {
+func (x *WorkflowEvent) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WorkflowInitialEvent) ProtoMessage() {}
+func (*WorkflowEvent) ProtoMessage() {}
 
-func (x *WorkflowInitialEvent) ProtoReflect() protoreflect.Message {
+func (x *WorkflowEvent) ProtoReflect() protoreflect.Message {
 	mi := &file_workflows_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1302,33 +1277,47 @@ func (x *WorkflowInitialEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WorkflowInitialEvent.ProtoReflect.Descriptor instead.
-func (*WorkflowInitialEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use WorkflowEvent.ProtoReflect.Descriptor instead.
+func (*WorkflowEvent) Descriptor() ([]byte, []int) {
 	return file_workflows_proto_rawDescGZIP(), []int{18}
 }
 
-func (x *WorkflowInitialEvent) GetId() string {
+func (x *WorkflowEvent) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *WorkflowInitialEvent) GetWorkflowId() string {
+func (x *WorkflowEvent) GetWorkflowId() string {
 	if x != nil {
 		return x.WorkflowId
 	}
 	return ""
 }
 
-func (x *WorkflowInitialEvent) GetData() *_struct.Struct {
+func (x *WorkflowEvent) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *WorkflowEvent) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *WorkflowEvent) GetData() *_struct.Struct {
 	if x != nil {
 		return x.Data
 	}
 	return nil
 }
 
-func (x *WorkflowInitialEvent) GetCreatedAt() *timestamp.Timestamp {
+func (x *WorkflowEvent) GetCreatedAt() *timestamp.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
@@ -1481,36 +1470,31 @@ const file_workflows_proto_rawDesc = "" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xbd\t\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xe7\a\n" +
 	"\x15WorkflowNodeExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vworkflow_id\x18\x02 \x01(\tR\n" +
 	"workflowId\x12\x17\n" +
 	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x12.\n" +
-	"\x13parent_execution_id\x18\x04 \x01(\tR\x11parentExecutionId\x12!\n" +
-	"\fblueprint_id\x18\x05 \x01(\tR\vblueprintId\x12G\n" +
-	"\x05state\x18\x06 \x01(\x0e21.Superplane.Workflows.WorkflowNodeExecution.StateR\x05state\x12J\n" +
-	"\x06result\x18\a \x01(\x0e22.Superplane.Workflows.WorkflowNodeExecution.ResultR\x06result\x12]\n" +
-	"\rresult_reason\x18\b \x01(\x0e28.Superplane.Workflows.WorkflowNodeExecution.ResultReasonR\fresultReason\x12%\n" +
-	"\x0eresult_message\x18\t \x01(\tR\rresultMessage\x12-\n" +
-	"\x05input\x18\n" +
-	" \x01(\v2\x17.google.protobuf.StructR\x05input\x121\n" +
-	"\aoutputs\x18\v \x01(\v2\x17.google.protobuf.StructR\aoutputs\x129\n" +
+	"\x13parent_execution_id\x18\x04 \x01(\tR\x11parentExecutionId\x12G\n" +
+	"\x05state\x18\x05 \x01(\x0e21.Superplane.Workflows.WorkflowNodeExecution.StateR\x05state\x12J\n" +
+	"\x06result\x18\x06 \x01(\x0e22.Superplane.Workflows.WorkflowNodeExecution.ResultR\x06result\x12]\n" +
+	"\rresult_reason\x18\a \x01(\x0e28.Superplane.Workflows.WorkflowNodeExecution.ResultReasonR\fresultReason\x12%\n" +
+	"\x0eresult_message\x18\b \x01(\tR\rresultMessage\x12-\n" +
+	"\x05input\x18\t \x01(\v2\x17.google.protobuf.StructR\x05input\x121\n" +
+	"\aoutputs\x18\n" +
+	" \x01(\v2\x17.google.protobuf.StructR\aoutputs\x129\n" +
 	"\n" +
-	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x123\n" +
-	"\bmetadata\x18\x0e \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12=\n" +
-	"\rconfiguration\x18\x0f \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x122\n" +
-	"\x15previous_execution_id\x18\x10 \x01(\tR\x13previousExecutionId\x126\n" +
-	"\x17previous_output_channel\x18\x11 \x01(\tR\x15previousOutputChannel\x122\n" +
-	"\x15previous_output_index\x18\x12 \x01(\x05R\x13previousOutputIndex\"g\n" +
+	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x123\n" +
+	"\bmetadata\x18\r \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12=\n" +
+	"\rconfiguration\x18\x0e \x01(\v2\x17.google.protobuf.StructR\rconfiguration\"T\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
-	"\rSTATE_STARTED\x10\x02\x12\x11\n" +
-	"\rSTATE_ROUTING\x10\x03\x12\x12\n" +
-	"\x0eSTATE_FINISHED\x10\x04\"X\n" +
+	"\rSTATE_STARTED\x10\x02\x12\x12\n" +
+	"\x0eSTATE_FINISHED\x10\x03\"X\n" +
 	"\x06Result\x12\x12\n" +
 	"\x0eRESULT_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rRESULT_PASSED\x10\x01\x12\x11\n" +
@@ -1526,25 +1510,28 @@ const file_workflows_proto_rawDesc = "" +
 	"\n" +
 	"parameters\x18\x03 \x01(\v2\x17.google.protobuf.StructR\n" +
 	"parameters\"#\n" +
-	"!InvokeNodeExecutionActionResponse\"\x86\x01\n" +
+	"!InvokeNodeExecutionActionResponse\"\x9f\x01\n" +
 	"\x19ListWorkflowEventsRequest\x12\x1f\n" +
 	"\vworkflow_id\x18\x01 \x01(\tR\n" +
-	"workflowId\x12\x14\n" +
-	"\x05limit\x18\x02 \x01(\rR\x05limit\x122\n" +
-	"\x06before\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\"\xe8\x01\n" +
-	"\x1aListWorkflowEventsResponse\x12B\n" +
-	"\x06events\x18\x01 \x03(\v2*.Superplane.Workflows.WorkflowInitialEventR\x06events\x12\x1f\n" +
+	"workflowId\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\rR\x05limit\x122\n" +
+	"\x06before\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\"\xe1\x01\n" +
+	"\x1aListWorkflowEventsResponse\x12;\n" +
+	"\x06events\x18\x01 \x03(\v2#.Superplane.Workflows.WorkflowEventR\x06events\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\rR\n" +
 	"totalCount\x12\"\n" +
 	"\rhas_next_page\x18\x03 \x01(\bR\vhasNextPage\x12A\n" +
-	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xaf\x01\n" +
-	"\x14WorkflowInitialEvent\x12\x0e\n" +
+	"\x0elast_timestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"\xdb\x01\n" +
+	"\rWorkflowEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vworkflow_id\x18\x02 \x01(\tR\n" +
-	"workflowId\x12+\n" +
-	"\x04data\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04data\x129\n" +
+	"workflowId\x12\x17\n" +
+	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x12\x18\n" +
+	"\achannel\x18\x04 \x01(\tR\achannel\x12+\n" +
+	"\x04data\x18\x05 \x01(\v2\x17.google.protobuf.StructR\x04data\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"X\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"X\n" +
 	"\x1aListEventExecutionsRequest\x12\x1f\n" +
 	"\vworkflow_id\x18\x01 \x01(\tR\n" +
 	"workflowId\x12\x19\n" +
@@ -1611,7 +1598,7 @@ var file_workflows_proto_goTypes = []any{
 	(*InvokeNodeExecutionActionResponse)(nil), // 18: Superplane.Workflows.InvokeNodeExecutionActionResponse
 	(*ListWorkflowEventsRequest)(nil),         // 19: Superplane.Workflows.ListWorkflowEventsRequest
 	(*ListWorkflowEventsResponse)(nil),        // 20: Superplane.Workflows.ListWorkflowEventsResponse
-	(*WorkflowInitialEvent)(nil),              // 21: Superplane.Workflows.WorkflowInitialEvent
+	(*WorkflowEvent)(nil),                     // 21: Superplane.Workflows.WorkflowEvent
 	(*ListEventExecutionsRequest)(nil),        // 22: Superplane.Workflows.ListEventExecutionsRequest
 	(*ListEventExecutionsResponse)(nil),       // 23: Superplane.Workflows.ListEventExecutionsResponse
 	(*timestamp.Timestamp)(nil),               // 24: google.protobuf.Timestamp
@@ -1646,10 +1633,10 @@ var file_workflows_proto_depIdxs = []int32{
 	27, // 23: Superplane.Workflows.WorkflowNodeExecution.configuration:type_name -> google.protobuf.Struct
 	27, // 24: Superplane.Workflows.InvokeNodeExecutionActionRequest.parameters:type_name -> google.protobuf.Struct
 	24, // 25: Superplane.Workflows.ListWorkflowEventsRequest.before:type_name -> google.protobuf.Timestamp
-	21, // 26: Superplane.Workflows.ListWorkflowEventsResponse.events:type_name -> Superplane.Workflows.WorkflowInitialEvent
+	21, // 26: Superplane.Workflows.ListWorkflowEventsResponse.events:type_name -> Superplane.Workflows.WorkflowEvent
 	24, // 27: Superplane.Workflows.ListWorkflowEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	27, // 28: Superplane.Workflows.WorkflowInitialEvent.data:type_name -> google.protobuf.Struct
-	24, // 29: Superplane.Workflows.WorkflowInitialEvent.created_at:type_name -> google.protobuf.Timestamp
+	27, // 28: Superplane.Workflows.WorkflowEvent.data:type_name -> google.protobuf.Struct
+	24, // 29: Superplane.Workflows.WorkflowEvent.created_at:type_name -> google.protobuf.Timestamp
 	16, // 30: Superplane.Workflows.ListEventExecutionsResponse.executions:type_name -> Superplane.Workflows.WorkflowNodeExecution
 	3,  // 31: Superplane.Workflows.Workflows.ListWorkflows:input_type -> Superplane.Workflows.ListWorkflowsRequest
 	7,  // 32: Superplane.Workflows.Workflows.CreateWorkflow:input_type -> Superplane.Workflows.CreateWorkflowRequest

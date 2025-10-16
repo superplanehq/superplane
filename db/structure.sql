@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QEwDEbYufDy4Hv2QFu78VGQJyu23l3uhb85fkEhsunYBBE6AWa8VGJLxRJ9SOrN
+\restrict OZd9z2MY2UVlBWD07PKfG3sHkvVy4c5WAlFa8xQzLempeOrQLV6wtvUtHMbW1RO
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -529,13 +529,17 @@ CREATE TABLE public.users (
 
 
 --
--- Name: workflow_initial_events; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_events; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.workflow_initial_events (
+CREATE TABLE public.workflow_events (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
+    node_id character varying(128),
+    channel character varying(64),
     data jsonb NOT NULL,
+    state character varying(32) NOT NULL,
+    execution_id uuid,
     created_at timestamp without time zone NOT NULL
 );
 
@@ -549,17 +553,32 @@ CREATE TABLE public.workflow_node_executions (
     workflow_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
     root_event_id uuid NOT NULL,
+    event_id uuid NOT NULL,
     previous_execution_id uuid,
-    previous_output_channel character varying(64),
-    previous_output_index integer,
     parent_execution_id uuid,
     blueprint_id uuid,
     state character varying(32) NOT NULL,
     result character varying(32),
     result_reason character varying(128),
     result_message text,
-    outputs jsonb,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: workflow_nodes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_nodes (
+    workflow_id uuid NOT NULL,
+    node_id character varying(128) NOT NULL,
+    name character varying(128) NOT NULL,
+    state character varying(32) NOT NULL,
+    ref_type character varying(32) NOT NULL,
+    ref jsonb NOT NULL,
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
@@ -577,7 +596,6 @@ CREATE TABLE public.workflows (
     description text,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
@@ -934,11 +952,11 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: workflow_initial_events workflow_initial_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.workflow_initial_events
-    ADD CONSTRAINT workflow_initial_events_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_pkey PRIMARY KEY (id);
 
 
 --
@@ -947,6 +965,14 @@ ALTER TABLE ONLY public.workflow_initial_events
 
 ALTER TABLE ONLY public.workflow_node_executions
     ADD CONSTRAINT workflow_node_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_nodes workflow_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_nodes
+    ADD CONSTRAINT workflow_nodes_pkey PRIMARY KEY (workflow_id, node_id);
 
 
 --
@@ -1127,59 +1153,24 @@ CREATE INDEX idx_stages_deleted_at ON public.stages USING btree (deleted_at);
 
 
 --
--- Name: idx_workflow_initial_events_workflow_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_events_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_initial_events_workflow_id ON public.workflow_initial_events USING btree (workflow_id);
-
-
---
--- Name: idx_workflow_node_executions_blueprint; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_node_executions_blueprint ON public.workflow_node_executions USING btree (blueprint_id) WHERE (blueprint_id IS NOT NULL);
+CREATE INDEX idx_workflow_events_workflow_node_id ON public.workflow_events USING btree (workflow_id, node_id);
 
 
 --
--- Name: idx_workflow_node_executions_parent; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_node_executions_parent ON public.workflow_node_executions USING btree (parent_execution_id);
-
-
---
--- Name: idx_workflow_node_executions_previous; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_node_executions_previous ON public.workflow_node_executions USING btree (previous_execution_id);
+CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_node_executions USING btree (workflow_id, node_id);
 
 
 --
--- Name: idx_workflow_node_executions_root_event; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_nodes_state; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_node_executions_root_event ON public.workflow_node_executions USING btree (root_event_id);
-
-
---
--- Name: idx_workflow_node_executions_state_pending; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_node_executions_state_pending ON public.workflow_node_executions USING btree (state) WHERE ((state)::text = 'pending'::text);
-
-
---
--- Name: idx_workflow_node_executions_state_routing; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_node_executions_state_routing ON public.workflow_node_executions USING btree (state) WHERE ((state)::text = 'routing'::text);
-
-
---
--- Name: idx_workflow_node_executions_workflow_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_workflow_node_executions_workflow_id ON public.workflow_node_executions USING btree (workflow_id, node_id);
+CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (state);
 
 
 --
@@ -1421,11 +1412,19 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: workflow_initial_events workflow_initial_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_events workflow_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.workflow_initial_events
-    ADD CONSTRAINT workflow_initial_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_executions workflow_node_executions_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_executions
+    ADD CONSTRAINT workflow_node_executions_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
 
 
 --
@@ -1449,7 +1448,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_initial_events(id) ON DELETE CASCADE;
+    ADD CONSTRAINT workflow_node_executions_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
 
 
 --
@@ -1461,16 +1460,24 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
+-- Name: workflow_nodes workflow_nodes_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_nodes
+    ADD CONSTRAINT workflow_nodes_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QEwDEbYufDy4Hv2QFu78VGQJyu23l3uhb85fkEhsunYBBE6AWa8VGJLxRJ9SOrN
+\unrestrict OZd9z2MY2UVlBWD07PKfG3sHkvVy4c5WAlFa8xQzLempeOrQLV6wtvUtHMbW1RO
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict UgxnleTETyfYhRWUPIHYuXtSxUiWWhmdj8HqZtUV4Tcp7mIcNkv2fKb2ySun1Y7
+\restrict tB4fG0dGuILYD7KYODRnbCRaEybVl2IZ5lkbZDMSfqH7lyOQKzuWSqPcHsq8zQO
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1500,5 +1507,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UgxnleTETyfYhRWUPIHYuXtSxUiWWhmdj8HqZtUV4Tcp7mIcNkv2fKb2ySun1Y7
+\unrestrict tB4fG0dGuILYD7KYODRnbCRaEybVl2IZ5lkbZDMSfqH7lyOQKzuWSqPcHsq8zQO
 

@@ -3416,7 +3416,6 @@
                 "STATE_UNKNOWN",
                 "STATE_PENDING",
                 "STATE_STARTED",
-                "STATE_ROUTING",
                 "STATE_FINISHED"
               ]
             },
@@ -6566,7 +6565,6 @@
         "STATE_UNKNOWN",
         "STATE_PENDING",
         "STATE_STARTED",
-        "STATE_ROUTING",
         "STATE_FINISHED"
       ],
       "default": "STATE_UNKNOWN"

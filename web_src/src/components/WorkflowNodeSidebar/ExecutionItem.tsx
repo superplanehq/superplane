@@ -55,24 +55,6 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
     )
   }
 
-  const getStateIcon = (state: string) => {
-    switch (state) {
-      case 'STATE_PENDING': return 'schedule'
-      case 'STATE_STARTED': return 'play_arrow'
-      case 'STATE_FINISHED': return 'check_circle'
-      default: return 'help'
-    }
-  }
-
-  const getStateColor = (state: string) => {
-    switch (state) {
-      case 'STATE_PENDING': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30'
-      case 'STATE_STARTED': return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30'
-      case 'STATE_FINISHED': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30'
-      default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900/30'
-    }
-  }
-
   const getStateBadge = (state: string, result: string) => {
     // For finished states, show the result
     if (state === 'STATE_FINISHED') {
@@ -208,7 +190,7 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
             {/* Custom Renderer or Default Sections */}
             {customRenderer ? (
               // Use custom renderer if available
-              customRenderer.renderCustomSections?.({ execution, isDarkMode })
+              customRenderer.renderCustomSections?.({ execution, isDarkMode, workflowId })
             ) : (
               // Default rendering
               <>

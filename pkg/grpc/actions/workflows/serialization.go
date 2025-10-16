@@ -15,6 +15,22 @@ import (
 )
 
 func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
+	workflowNodes, err := workflow.FindNodes()
+	if err != nil {
+		return nil
+	}
+
+	nodes := make([]models.Node, len(workflowNodes))
+	for i, wn := range workflowNodes {
+		nodes[i] = models.Node{
+			ID:            wn.NodeID,
+			Name:          wn.Name,
+			RefType:       wn.RefType,
+			Ref:           wn.Ref.Data(),
+			Configuration: wn.Configuration.Data(),
+		}
+	}
+
 	return &pb.Workflow{
 		Id:             workflow.ID.String(),
 		OrganizationId: workflow.OrganizationID.String(),
@@ -22,7 +38,7 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		Description:    workflow.Description,
 		CreatedAt:      timestamppb.New(*workflow.CreatedAt),
 		UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
-		Nodes:          actions.NodesToProto(workflow.Nodes),
+		Nodes:          actions.NodesToProto(nodes),
 		Edges:          actions.EdgesToProto(workflow.Edges),
 	}
 }

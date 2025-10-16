@@ -10,33 +10,66 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizationID string, workflow *pb.Workflow) (*pb.CreateWorkflowResponse, error) {
-	nodes, edges, err := ParseWorkflow(registry, workflow)
+func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizationID string, pbWorkflow *pb.Workflow) (*pb.CreateWorkflowResponse, error) {
+	nodes, edges, err := ParseWorkflow(registry, pbWorkflow)
 	if err != nil {
 		return nil, err
 	}
 
-	orgID, _ := uuid.Parse(organizationID)
 	now := time.Now()
-
-	model := &models.Workflow{
+	workflow := models.Workflow{
 		ID:             uuid.New(),
-		OrganizationID: orgID,
-		Name:           workflow.Name,
-		Description:    workflow.Description,
+		OrganizationID: uuid.MustParse(organizationID),
+		Name:           pbWorkflow.Name,
+		Description:    pbWorkflow.Description,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
-		Nodes:          datatypes.NewJSONSlice(nodes),
 		Edges:          datatypes.NewJSONSlice(edges),
 	}
 
-	if err := database.Conn().Create(model).Error; err != nil {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+
+		//
+		// Create the workflow record
+		//
+		err := tx.Clauses(clause.Returning{}).Create(&workflow).Error
+		if err != nil {
+			return err
+		}
+
+		//
+		// Create the workflow node records
+		//
+		for _, node := range nodes {
+			workflowNode := models.WorkflowNode{
+				WorkflowID:    workflow.ID,
+				NodeID:        node.ID,
+				Name:          node.Name,
+				State:         models.WorkflowNodeStateReady,
+				RefType:       node.RefType,
+				Ref:           datatypes.NewJSONType(node.Ref),
+				Configuration: datatypes.NewJSONType(node.Configuration),
+				CreatedAt:     &now,
+				UpdatedAt:     &now,
+			}
+
+			if err := tx.Create(&workflowNode).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
 	return &pb.CreateWorkflowResponse{
-		Workflow: SerializeWorkflow(model),
+		Workflow: SerializeWorkflow(&workflow),
 	}, nil
 }

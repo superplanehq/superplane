@@ -199,8 +199,7 @@ message WorkflowNodeExecution {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_STARTED = 2;
-    STATE_ROUTING = 3;
-    STATE_FINISHED = 4;
+    STATE_FINISHED = 3;
   }
 
   enum Result {
@@ -219,20 +218,16 @@ message WorkflowNodeExecution {
   string workflow_id = 2;
   string node_id = 3;
   string parent_execution_id = 4;
-  string blueprint_id = 5;
-  State state = 6;
-  Result result = 7;
-  ResultReason result_reason = 8;
-  string result_message = 9;
-  google.protobuf.Struct input = 10;
-  google.protobuf.Struct outputs = 11;
-  google.protobuf.Timestamp created_at = 12;
-  google.protobuf.Timestamp updated_at = 13;
-  google.protobuf.Struct metadata = 14;
-  google.protobuf.Struct configuration = 15;
-  string previous_execution_id = 16;
-  string previous_output_channel = 17;
-  int32 previous_output_index = 18;
+  State state = 5;
+  Result result = 6;
+  ResultReason result_reason = 7;
+  string result_message = 8;
+  google.protobuf.Struct input = 9;
+  google.protobuf.Struct outputs = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Struct metadata = 13;
+  google.protobuf.Struct configuration = 14;
 }
 
 message InvokeNodeExecutionActionRequest {
@@ -245,22 +240,25 @@ message InvokeNodeExecutionActionResponse {}
 
 message ListWorkflowEventsRequest {
   string workflow_id = 1;
-  uint32 limit = 2;
-  google.protobuf.Timestamp before = 3;
+  string node_id = 2;
+  uint32 limit = 3;
+  google.protobuf.Timestamp before = 4;
 }
 
 message ListWorkflowEventsResponse {
-  repeated WorkflowInitialEvent events = 1;
+  repeated WorkflowEvent events = 1;
   uint32 total_count = 2;
   bool has_next_page = 3;
   google.protobuf.Timestamp last_timestamp = 4;
 }
 
-message WorkflowInitialEvent {
+message WorkflowEvent {
   string id = 1;
   string workflow_id = 2;
-  google.protobuf.Struct data = 3;
-  google.protobuf.Timestamp created_at = 4;
+  string node_id = 3;
+  string channel = 4;
+  google.protobuf.Struct data = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message ListEventExecutionsRequest {

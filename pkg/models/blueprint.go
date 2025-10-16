@@ -8,15 +8,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 const (
 	NodeRefTypeComponent = "component"
 	NodeRefTypeBlueprint = "blueprint"
 	NodeRefTypeTrigger   = "trigger"
-
-	EdgeSourceTypeNode    = "node"
-	EdgeSourceTypeTrigger = "trigger"
 
 	EdgeTargetTypeNode          = "node"
 	EdgeTargetTypeOutputChannel = "output-channel"
@@ -45,9 +43,54 @@ func (b *Blueprint) FindNode(id string) (*Node, error) {
 	return nil, fmt.Errorf("node %s not found", id)
 }
 
+func (b *Blueprint) FindEdges(sourceID string, targetType string, channel string) []Edge {
+	edges := []Edge{}
+
+	for _, edge := range b.Edges {
+		if edge.SourceID == sourceID && edge.TargetType == targetType && edge.Channel == channel {
+			edges = append(edges, edge)
+		}
+	}
+
+	return edges
+}
+
+func (b *Blueprint) OutputChannelEdges() []Edge {
+	edges := []Edge{}
+	for _, edge := range b.Edges {
+		if edge.TargetType == EdgeTargetTypeOutputChannel {
+			edges = append(edges, edge)
+		}
+	}
+
+	return edges
+}
+
+// TODO: this is where input channels come in
+func (b *Blueprint) FindRootNode() *Node {
+	hasIncoming := make(map[string]bool)
+	for _, edge := range b.Edges {
+		if edge.TargetType == EdgeTargetTypeNode {
+			hasIncoming[edge.TargetID] = true
+		}
+	}
+
+	for _, node := range b.Nodes {
+		if !hasIncoming[node.ID] {
+			return &node
+		}
+	}
+
+	return nil
+}
+
 func FindBlueprintByID(id string) (*Blueprint, error) {
+	return FindBlueprintByIDInTransaction(database.Conn(), id)
+}
+
+func FindBlueprintByIDInTransaction(tx *gorm.DB, id string) (*Blueprint, error) {
 	var blueprint Blueprint
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", id).
 		First(&blueprint).
 		Error
@@ -70,7 +113,6 @@ type Node struct {
 type NodeRef struct {
 	Component *ComponentRef `json:"component,omitempty"`
 	Blueprint *BlueprintRef `json:"blueprint,omitempty"`
-	Trigger   *TriggerRef   `json:"trigger,omitempty"`
 }
 
 type ComponentRef struct {
@@ -81,12 +123,7 @@ type BlueprintRef struct {
 	ID string `json:"id"`
 }
 
-type TriggerRef struct {
-	Name string `json:"name"`
-}
-
 type Edge struct {
-	SourceType string `json:"source_type"`
 	SourceID   string `json:"source_id"`
 	TargetType string `json:"target_type"`
 	TargetID   string `json:"target_id"`

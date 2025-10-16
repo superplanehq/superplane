@@ -134,17 +134,24 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start()
 	}
 
-	if os.Getenv("START_EXECUTION_ROUTER") == "yes" {
+	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" {
 		log.Println("Starting Execution Router")
 
-		w := workers.NewExecutionRouter()
+		w := workers.NewWorkflowEventRouter()
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_PENDING_NODE_EXECUTION_WORKER") == "yes" {
+	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" {
 		log.Println("Starting Pending Node Execution Worker")
 
-		w := workers.NewPendingNodeExecutionWorker(registry)
+		w := workers.NewWorkflowNodeExecutor(registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_BLUEPRINT_NODE_EXECUTOR") == "yes" {
+		log.Println("Starting Pending Node Execution Worker")
+
+		w := workers.NewBlueprintNodeExecutor(registry)
 		go w.Start(context.Background())
 	}
 }

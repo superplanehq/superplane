@@ -59,7 +59,7 @@ func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb
 }
 
 func (s *WorkflowService) ListWorkflowEvents(ctx context.Context, req *pb.ListWorkflowEventsRequest) (*pb.ListWorkflowEventsResponse, error) {
-	return workflows.ListWorkflowEvents(ctx, s.registry, req.WorkflowId, req.Limit, req.Before)
+	return workflows.ListWorkflowEvents(ctx, s.registry, req.WorkflowId, req.NodeId, req.Limit, req.Before)
 }
 
 func (s *WorkflowService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {

@@ -44,11 +44,11 @@ func InvokeNodeExecutionAction(ctx context.Context, registry *registry.Registry,
 	// TODO
 	// Blueprint nodes don't expose actions for now.
 	//
-	if node.Ref.Component == nil {
+	if node.Ref.Data().Component == nil {
 		return nil, fmt.Errorf("node is not a component node")
 	}
 
-	component, err := registry.GetComponent(node.Ref.Component.Name)
+	component, err := registry.GetComponent(node.Ref.Data().Component.Name)
 	if err != nil {
 		return nil, fmt.Errorf("component not found: %w", err)
 	}
@@ -62,7 +62,7 @@ func InvokeNodeExecutionAction(ctx context.Context, registry *registry.Registry,
 		}
 	}
 	if actionDef == nil {
-		return nil, fmt.Errorf("action '%s' not found for component '%s'", actionName, node.Ref.Component.Name)
+		return nil, fmt.Errorf("action '%s' not found for component '%s'", actionName, node.Ref.Data().Component.Name)
 	}
 
 	// Validate action parameters
@@ -75,7 +75,7 @@ func InvokeNodeExecutionAction(ctx context.Context, registry *registry.Registry,
 		Name:                  actionName,
 		Parameters:            parameters,
 		MetadataContext:       contexts.NewMetadataContext(&execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(&execution),
+		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), &execution),
 	}
 
 	err = component.HandleAction(actionCtx)

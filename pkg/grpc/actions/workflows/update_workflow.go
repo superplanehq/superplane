@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,36 +13,123 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
-func UpdateWorkflow(ctx context.Context, registry *registry.Registry, organizationID string, id string, workflow *pb.Workflow) (*pb.UpdateWorkflowResponse, error) {
+func UpdateWorkflow(ctx context.Context, registry *registry.Registry, organizationID string, id string, pbWorkflow *pb.Workflow) (*pb.UpdateWorkflowResponse, error) {
 	workflowID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid workflow id: %v", err)
 	}
 
-	nodes, edges, err := ParseWorkflow(registry, workflow)
+	existingWorkflow, err := models.FindWorkflow(workflowID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
+	}
+
+	nodes, edges, err := ParseWorkflow(registry, pbWorkflow)
 	if err != nil {
 		return nil, err
 	}
 
-	var existing models.Workflow
-	if err := database.Conn().Where("id = ? AND organization_id = ?", workflowID, organizationID).First(&existing).Error; err != nil {
-		return nil, status.Errorf(codes.NotFound, "workflow not found: %v", err)
-	}
-
 	now := time.Now()
-	existing.Name = workflow.Name
-	existing.Description = workflow.Description
-	existing.UpdatedAt = &now
-	existing.Nodes = datatypes.NewJSONSlice(nodes)
-	existing.Edges = datatypes.NewJSONSlice(edges)
 
-	if err := database.Conn().Save(&existing).Error; err != nil {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		//
+		// Update the workflow record first
+		//
+		existingWorkflow.Name = pbWorkflow.Name
+		existingWorkflow.Description = pbWorkflow.Description
+		existingWorkflow.UpdatedAt = &now
+		existingWorkflow.Edges = datatypes.NewJSONSlice(edges)
+		err := tx.Save(&existingWorkflow).Error
+		if err != nil {
+			return err
+		}
+
+		//
+		// Update the workflow node records
+		//
+		existingNodes, err := existingWorkflow.FindNodes()
+		if err != nil {
+			return err
+		}
+
+		//
+		// Go through each node in the new workflow, creating / updating it,
+		// and tracking which nodes we've seen, to delete nodes that are no longer in the workflow at the end.
+		//
+		for _, node := range nodes {
+			err := upsertNode(tx, existingNodes, node, workflowID)
+			if err != nil {
+				return err
+			}
+		}
+
+		return deleteNodes(tx, existingNodes, nodes, workflowID)
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
 	return &pb.UpdateWorkflowResponse{
-		Workflow: SerializeWorkflow(&existing),
+		Workflow: SerializeWorkflow(existingWorkflow),
 	}, nil
+}
+
+func findNode(nodes []models.WorkflowNode, nodeID string) *models.WorkflowNode {
+	for _, node := range nodes {
+		if node.NodeID == nodeID {
+			return &node
+		}
+	}
+	return nil
+}
+
+func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.Node, workflowID uuid.UUID) error {
+	now := time.Now()
+
+	//
+	// Node exists, just update it
+	//
+	existingNode := findNode(existingNodes, node.ID)
+	if existingNode != nil {
+		existingNode.Name = node.Name
+		existingNode.RefType = node.RefType
+		existingNode.Ref = datatypes.NewJSONType(node.Ref)
+		existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
+		existingNode.UpdatedAt = &now
+		return tx.Save(&existingNode).Error
+	}
+
+	//
+	// Node doesn't exist, create it
+	//
+	workflowNode := models.WorkflowNode{
+		WorkflowID:    workflowID,
+		NodeID:        node.ID,
+		Name:          node.Name,
+		State:         models.WorkflowNodeStateReady,
+		RefType:       node.RefType,
+		Ref:           datatypes.NewJSONType(node.Ref),
+		Configuration: datatypes.NewJSONType(node.Configuration),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+
+	return tx.Create(&workflowNode).Error
+}
+
+func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []models.Node, workflowID uuid.UUID) error {
+	for _, existingNode := range existingNodes {
+		if !slices.ContainsFunc(newNodes, func(n models.Node) bool { return n.ID == existingNode.NodeID }) {
+			err := models.DeleteWorkflowNode(tx, workflowID, existingNode.NodeID)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
