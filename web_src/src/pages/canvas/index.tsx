@@ -306,7 +306,7 @@ export function Canvas() {
             {selectedEventSource && <EventSourceSidebar selectedEventSource={selectedEventSource} onClose={() => cleanSelectedEventSourceId()} initialWidth={DEFAULT_SIDEBAR_WIDTH} />}
           </div>
         ) : (
-          <div className="h-[calc(100%-2.7rem)] p-6 bg-zinc-50 dark:bg-zinc-950" >
+          <div className="h-[calc(100%-2.7rem)] dark:bg-zinc-950" >
             <CanvasNavigationContent canvasId={canvasId!} activeView={activeView} organizationId={organizationId!} />
           </div>
         )}

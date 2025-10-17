@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BEh7gGlIzFZRKG7JPMjib0hku4XDgPe5DesZ6CRxq7wl6GUn1JyQ6Sab50mRgin
+\restrict xSlqdPt5RKQdfvf5pW0Q6x2PLYfz2p8BVAd1lEBaZsIxpm5f3urHNb1bZVrB7ke
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -333,7 +333,8 @@ CREATE TABLE public.organization_invitations (
     invited_by uuid NOT NULL,
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    canvas_ids jsonb
 );
 
 
@@ -1235,13 +1236,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BEh7gGlIzFZRKG7JPMjib0hku4XDgPe5DesZ6CRxq7wl6GUn1JyQ6Sab50mRgin
+\unrestrict xSlqdPt5RKQdfvf5pW0Q6x2PLYfz2p8BVAd1lEBaZsIxpm5f3urHNb1bZVrB7ke
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict OzyenkWxv3X5PKoo1N1BtWASfd2oNHlfn5AguF5vXwnp6vHLEt2MDbSGfb0HIeM
+\restrict 9hF2o13hRRgABO7IsmTwOxjfuuzH5OT7gZOt2h2MhXdBwbRsoZh169bsW8sWmyl
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1263,7 +1264,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251006144130	f
+20251014143835	f
 \.
 
 
@@ -1271,5 +1272,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OzyenkWxv3X5PKoo1N1BtWASfd2oNHlfn5AguF5vXwnp6vHLEt2MDbSGfb0HIeM
+\unrestrict 9hF2o13hRRgABO7IsmTwOxjfuuzH5OT7gZOt2h2MhXdBwbRsoZh169bsW8sWmyl
 

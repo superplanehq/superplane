@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -17,6 +18,7 @@ const (
 type OrganizationInvitation struct {
 	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	OrganizationID uuid.UUID
+	CanvasIDs      datatypes.JSONType[[]string] `gorm:"type:jsonb"`
 	Email          string
 	InvitedBy      uuid.UUID
 	State          string
@@ -35,6 +37,29 @@ func FindPendingInvitationInTransaction(tx *gorm.DB, email, organizationID strin
 		Where("email = ?", email).
 		Where("organization_id = ?", organizationID).
 		Where("state = ?", InvitationStatePending).
+		First(&invitation).
+		Error
+
+	return &invitation, err
+}
+
+func FindInvitationByID(invitationID string) (*OrganizationInvitation, error) {
+	var invitation OrganizationInvitation
+
+	err := database.Conn().
+		Where("id = ?", invitationID).
+		First(&invitation).
+		Error
+
+	return &invitation, err
+}
+
+func FindInvitationByIDWithState(invitationID string, state string) (*OrganizationInvitation, error) {
+	var invitation OrganizationInvitation
+
+	err := database.Conn().
+		Where("id = ?", invitationID).
+		Where("state = ?", state).
 		First(&invitation).
 		Error
 
@@ -77,4 +102,12 @@ func CreateInvitationInTransaction(tx *gorm.DB, organizationID, invitedBy uuid.U
 	}
 
 	return invitation, err
+}
+
+func SaveInvitation(invitation *OrganizationInvitation) error {
+	return database.Conn().Save(invitation).Error
+}
+
+func (i *OrganizationInvitation) Delete() error {
+	return database.Conn().Delete(i).Error
 }

@@ -234,6 +234,7 @@ export type OrganizationsInvitation = {
     organizationId?: string;
     email?: string;
     state?: string;
+    canvasIds?: Array<string>;
     createdAt?: string;
 };
 
@@ -251,6 +252,18 @@ export type OrganizationsOrganizationMetadata = {
     description?: string;
     createdAt?: string;
     updatedAt?: string;
+};
+
+export type OrganizationsRemoveInvitationResponse = {
+    [key: string]: unknown;
+};
+
+export type OrganizationsUpdateInvitationBody = {
+    canvasIds?: Array<string>;
+};
+
+export type OrganizationsUpdateInvitationResponse = {
+    invitation?: OrganizationsInvitation;
 };
 
 export type OrganizationsUpdateOrganizationBody = {
@@ -2480,6 +2493,62 @@ export type OrganizationsCreateInvitationResponses = {
 };
 
 export type OrganizationsCreateInvitationResponse2 = OrganizationsCreateInvitationResponses[keyof OrganizationsCreateInvitationResponses];
+
+export type OrganizationsRemoveInvitationData = {
+    body?: never;
+    path: {
+        id: string;
+        invitationId: string;
+    };
+    query?: never;
+    url: '/api/v1/organizations/{id}/invitations/{invitationId}';
+};
+
+export type OrganizationsRemoveInvitationErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type OrganizationsRemoveInvitationError = OrganizationsRemoveInvitationErrors[keyof OrganizationsRemoveInvitationErrors];
+
+export type OrganizationsRemoveInvitationResponses = {
+    /**
+     * A successful response.
+     */
+    200: OrganizationsRemoveInvitationResponse;
+};
+
+export type OrganizationsRemoveInvitationResponse2 = OrganizationsRemoveInvitationResponses[keyof OrganizationsRemoveInvitationResponses];
+
+export type OrganizationsUpdateInvitationData = {
+    body: OrganizationsUpdateInvitationBody;
+    path: {
+        id: string;
+        invitationId: string;
+    };
+    query?: never;
+    url: '/api/v1/organizations/{id}/invitations/{invitationId}';
+};
+
+export type OrganizationsUpdateInvitationErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type OrganizationsUpdateInvitationError = OrganizationsUpdateInvitationErrors[keyof OrganizationsUpdateInvitationErrors];
+
+export type OrganizationsUpdateInvitationResponses = {
+    /**
+     * A successful response.
+     */
+    200: OrganizationsUpdateInvitationResponse;
+};
+
+export type OrganizationsUpdateInvitationResponse2 = OrganizationsUpdateInvitationResponses[keyof OrganizationsUpdateInvitationResponses];
 
 export type OrganizationsRemoveUserData = {
     body?: never;
