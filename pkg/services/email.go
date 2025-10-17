@@ -20,6 +20,7 @@ type SendGridEmailService struct {
 	fromName    string
 	fromEmail   string
 	templateDir string
+	client      *sendgrid.Client
 }
 
 func NewSendGridEmailService(apiKey, fromName, fromEmail, templateDir string) *SendGridEmailService {
@@ -28,6 +29,7 @@ func NewSendGridEmailService(apiKey, fromName, fromEmail, templateDir string) *S
 		fromName:    fromName,
 		fromEmail:   fromEmail,
 		templateDir: templateDir,
+		client:      sendgrid.NewSendClient(apiKey),
 	}
 }
 
@@ -63,8 +65,7 @@ func (s *SendGridEmailService) SendInvitationEmail(toEmail, toName, organization
 
 	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
 
-	client := sendgrid.NewSendClient(s.apiKey)
-	response, err := client.Send(message)
+	response, err := s.client.Send(message)
 	if err != nil {
 		log.Errorf("Error sending invitation email to %s: %v", toEmail, err)
 		return err
