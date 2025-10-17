@@ -28,9 +28,10 @@ const DomainTypeContextKey contextKey = "domainType"
 const DomainIdContextKey contextKey = "domainId"
 
 type AuthorizationRule struct {
-	Resource    string
-	Action      string
-	DomainTypes []string
+	Resource          string
+	Action            string
+	DomainTypes       []string
+	AllowGlobalDomain bool
 }
 
 type AuthorizationInterceptor struct {
@@ -104,12 +105,12 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbUsers.Users_ListUsers_FullMethodName:           {Resource: "member", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
 
 		// Roles rules
-		pbRoles.Roles_AssignRole_FullMethodName:   {Resource: "member", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
-		pbRoles.Roles_ListRoles_FullMethodName:    {Resource: "role", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
-		pbRoles.Roles_DescribeRole_FullMethodName: {Resource: "role", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
-		pbRoles.Roles_CreateRole_FullMethodName:   {Resource: "role", Action: "create", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
-		pbRoles.Roles_UpdateRole_FullMethodName:   {Resource: "role", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
-		pbRoles.Roles_DeleteRole_FullMethodName:   {Resource: "role", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbRoles.Roles_AssignRole_FullMethodName:   {Resource: "member", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}, AllowGlobalDomain: true},
+		pbRoles.Roles_ListRoles_FullMethodName:    {Resource: "role", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}, AllowGlobalDomain: true},
+		pbRoles.Roles_DescribeRole_FullMethodName: {Resource: "role", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}, AllowGlobalDomain: true},
+		pbRoles.Roles_CreateRole_FullMethodName:   {Resource: "role", Action: "create", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}, AllowGlobalDomain: true},
+		pbRoles.Roles_UpdateRole_FullMethodName:   {Resource: "role", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}, AllowGlobalDomain: true},
+		pbRoles.Roles_DeleteRole_FullMethodName:   {Resource: "role", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}, AllowGlobalDomain: true},
 
 		// Organization Rules
 		pbOrganization.Organizations_DescribeOrganization_FullMethodName: {Resource: "org", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
@@ -155,7 +156,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 		userID := userMeta[0]
 		organizationID := orgMeta[0]
-		domainType, domainID, err := a.getDomainTypeAndId(req, rule.DomainTypes, organizationID)
+		domainType, domainID, err := a.getDomainTypeAndId(req, rule.DomainTypes, organizationID, rule.AllowGlobalDomain)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
@@ -168,9 +169,19 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 			}
 		}
 		if domainType == models.DomainTypeCanvas {
-			allowed, err = a.authService.CheckCanvasPermission(userID, domainID, rule.Resource, rule.Action)
+			allowed, err = a.authService.CheckCanvasGlobalPermission(userID, organizationID, rule.Resource, rule.Action)
 			if err != nil {
 				return nil, err
+			}
+
+			//
+			// Fallback to canvas permission if global permission is not allowed
+			//
+			if !allowed {
+				allowed, err = a.authService.CheckCanvasPermission(userID, domainID, rule.Resource, rule.Action)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 
@@ -186,7 +197,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 	}
 }
 
-func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTypes []string, organizationID string) (string, string, error) {
+func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTypes []string, organizationID string, allowGlobalDomain bool) (string, string, error) {
 	if len(domainTypes) == 1 && domainTypes[0] == models.DomainTypeOrganization {
 		org, err := models.FindOrganizationByID(organizationID)
 		if err != nil {
@@ -201,23 +212,35 @@ func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTyp
 	}
 
 	// Handle mixed domain types (multiple domain types supported)
-	return a.getDomainTypeAndIdFromRequest(req, organizationID)
+	return a.getDomainTypeAndIdFromRequest(req, organizationID, allowGlobalDomain)
 }
 
-func (a *AuthorizationInterceptor) getDomainTypeAndIdFromRequest(req interface{}, organizationID string) (string, string, error) {
+func (a *AuthorizationInterceptor) getDomainTypeAndIdFromRequest(req interface{}, organizationID string, allowGlobalDomain bool) (string, string, error) {
 	switch r := req.(type) {
 	case interface {
 		GetDomainType() pbAuth.DomainType
 		GetDomainId() string
 	}:
-		return getDomainTypeAndId(r.GetDomainId(), r.GetDomainType(), organizationID)
+		return getDomainTypeAndId(r.GetDomainId(), r.GetDomainType(), organizationID, allowGlobalDomain)
 
 	default:
 		return "", "", fmt.Errorf("unable to extract domain information from request")
 	}
 }
 
-func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType, organizationID string) (string, string, error) {
+func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType, organizationID string, allowGlobalDomain bool) (string, string, error) {
+	if domainID == "*" {
+		if !allowGlobalDomain {
+			return "", "", fmt.Errorf("global domain not allowed for this operation")
+		}
+
+		if domainType == pbAuth.DomainType_DOMAIN_TYPE_CANVAS {
+			return models.DomainTypeCanvas, "*", nil
+		}
+
+		return "", "", fmt.Errorf("global domains not supported for domain type: %v", domainType)
+	}
+
 	switch domainType {
 	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
 		_, err := uuid.Parse(domainID)

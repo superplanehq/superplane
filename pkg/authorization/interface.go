@@ -3,6 +3,7 @@ package authorization
 // Permission checking interface
 type PermissionChecker interface {
 	CheckCanvasPermission(userID, canvasID, resource, action string) (bool, error)
+	CheckCanvasGlobalPermission(userID, orgID, resource, action string) (bool, error)
 	CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error)
 }
 

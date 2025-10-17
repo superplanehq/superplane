@@ -89,6 +89,12 @@ func (a *AuthService) CheckCanvasPermission(userID, canvasID, resource, action s
 	return a.checkPermission(userID, canvasID, models.DomainTypeCanvas, resource, action)
 }
 
+func (a *AuthService) CheckCanvasGlobalPermission(userID, orgID, resource, action string) (bool, error) {
+	domain := fmt.Sprintf("canvas:*|org:%s", orgID)
+	prefixedUserID := prefixUserID(userID)
+	return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
+}
+
 func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error) {
 	return a.checkPermission(userID, orgID, models.DomainTypeOrganization, resource, action)
 }
