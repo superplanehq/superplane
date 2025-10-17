@@ -25,6 +25,8 @@ const (
 	Organizations_RemoveUser_FullMethodName           = "/Superplane.Organizations.Organizations/RemoveUser"
 	Organizations_CreateInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/CreateInvitation"
 	Organizations_ListInvitations_FullMethodName      = "/Superplane.Organizations.Organizations/ListInvitations"
+	Organizations_RemoveInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/RemoveInvitation"
+	Organizations_UpdateInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/UpdateInvitation"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -37,6 +39,8 @@ type OrganizationsClient interface {
 	RemoveUser(ctx context.Context, in *RemoveUserRequest, opts ...grpc.CallOption) (*RemoveUserResponse, error)
 	CreateInvitation(ctx context.Context, in *CreateInvitationRequest, opts ...grpc.CallOption) (*CreateInvitationResponse, error)
 	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
+	RemoveInvitation(ctx context.Context, in *RemoveInvitationRequest, opts ...grpc.CallOption) (*RemoveInvitationResponse, error)
+	UpdateInvitation(ctx context.Context, in *UpdateInvitationRequest, opts ...grpc.CallOption) (*UpdateInvitationResponse, error)
 }
 
 type organizationsClient struct {
@@ -107,6 +111,26 @@ func (c *organizationsClient) ListInvitations(ctx context.Context, in *ListInvit
 	return out, nil
 }
 
+func (c *organizationsClient) RemoveInvitation(ctx context.Context, in *RemoveInvitationRequest, opts ...grpc.CallOption) (*RemoveInvitationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveInvitationResponse)
+	err := c.cc.Invoke(ctx, Organizations_RemoveInvitation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) UpdateInvitation(ctx context.Context, in *UpdateInvitationRequest, opts ...grpc.CallOption) (*UpdateInvitationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateInvitationResponse)
+	err := c.cc.Invoke(ctx, Organizations_UpdateInvitation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrganizationsServer is the server API for Organizations service.
 // All implementations should embed UnimplementedOrganizationsServer
 // for forward compatibility.
@@ -117,6 +141,8 @@ type OrganizationsServer interface {
 	RemoveUser(context.Context, *RemoveUserRequest) (*RemoveUserResponse, error)
 	CreateInvitation(context.Context, *CreateInvitationRequest) (*CreateInvitationResponse, error)
 	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
+	RemoveInvitation(context.Context, *RemoveInvitationRequest) (*RemoveInvitationResponse, error)
+	UpdateInvitation(context.Context, *UpdateInvitationRequest) (*UpdateInvitationResponse, error)
 }
 
 // UnimplementedOrganizationsServer should be embedded to have
@@ -143,6 +169,12 @@ func (UnimplementedOrganizationsServer) CreateInvitation(context.Context, *Creat
 }
 func (UnimplementedOrganizationsServer) ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListInvitations not implemented")
+}
+func (UnimplementedOrganizationsServer) RemoveInvitation(context.Context, *RemoveInvitationRequest) (*RemoveInvitationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveInvitation not implemented")
+}
+func (UnimplementedOrganizationsServer) UpdateInvitation(context.Context, *UpdateInvitationRequest) (*UpdateInvitationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateInvitation not implemented")
 }
 func (UnimplementedOrganizationsServer) testEmbeddedByValue() {}
 
@@ -272,6 +304,42 @@ func _Organizations_ListInvitations_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_RemoveInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveInvitationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).RemoveInvitation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_RemoveInvitation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).RemoveInvitation(ctx, req.(*RemoveInvitationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_UpdateInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateInvitationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).UpdateInvitation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_UpdateInvitation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).UpdateInvitation(ctx, req.(*UpdateInvitationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Organizations_ServiceDesc is the grpc.ServiceDesc for Organizations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -302,6 +370,14 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListInvitations",
 			Handler:    _Organizations_ListInvitations_Handler,
+		},
+		{
+			MethodName: "RemoveInvitation",
+			Handler:    _Organizations_RemoveInvitation_Handler,
+		},
+		{
+			MethodName: "UpdateInvitation",
+			Handler:    _Organizations_UpdateInvitation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

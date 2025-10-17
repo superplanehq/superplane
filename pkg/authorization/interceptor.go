@@ -114,6 +114,8 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		// Organization Rules
 		pbOrganization.Organizations_DescribeOrganization_FullMethodName: {Resource: "org", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbOrganization.Organizations_ListInvitations_FullMethodName:      {Resource: "org", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbOrganization.Organizations_UpdateInvitation_FullMethodName:     {Resource: "member", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbOrganization.Organizations_RemoveInvitation_FullMethodName:     {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbOrganization.Organizations_UpdateOrganization_FullMethodName:   {Resource: "org", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbOrganization.Organizations_CreateInvitation_FullMethodName:     {Resource: "member", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbOrganization.Organizations_RemoveUser_FullMethodName:           {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},

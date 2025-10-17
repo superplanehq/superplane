@@ -2,8 +2,6 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { Avatar } from '../../../components/Avatar/avatar'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarItem, SidebarLabel, SidebarSection } from '../../../components/Sidebar/sidebar'
 import { General } from './General'
-import { Members } from './Members'
-import { Invitations } from './Invitations'
 import { Groups } from './Groups'
 import { Roles } from './Roles'
 import { GroupMembersPage } from './GroupMembersPage'
@@ -13,6 +11,7 @@ import { Profile } from './Profile'
 import { useOrganization } from '../../../hooks/useOrganizationData'
 import { useAccount } from '../../../contexts/AccountContext'
 import { useParams } from 'react-router-dom'
+import { Members } from './Members'
 
 export function OrganizationSettings() {
   const navigate = useNavigate()
@@ -62,7 +61,6 @@ export function OrganizationSettings() {
     { id: 'profile', label: 'Profile', icon: 'person' },
     { id: 'general', label: 'General', icon: 'settings' },
     { id: 'members', label: 'Members', icon: 'group' },
-    { id: 'invitations', label: 'Invitations', icon: 'mail' },
     { id: 'groups', label: 'Groups', icon: 'group' },
     { id: 'roles', label: 'Roles', icon: 'admin_panel_settings' }
   ]
@@ -129,7 +127,6 @@ export function OrganizationSettings() {
                 )
               } />
               <Route path="members" element={<Members organizationId={organizationId || ''} />} />
-              <Route path="invitations" element={<Invitations organizationId={organizationId || ''} />} />
               <Route path="groups" element={<Groups organizationId={organizationId || ''} />} />
               <Route path="roles" element={<Roles organizationId={organizationId || ''} />} />
               <Route path="groups/:groupName/members" element={<GroupMembersPage />} />

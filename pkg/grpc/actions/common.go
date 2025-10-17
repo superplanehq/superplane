@@ -21,6 +21,10 @@ import (
 )
 
 func ValidateUUIDs(ids ...string) error {
+	return ValidateUUIDsArray(ids)
+}
+
+func ValidateUUIDsArray(ids []string) error {
 	for _, id := range ids {
 		_, err := uuid.Parse(id)
 		if err != nil {
@@ -660,4 +664,3 @@ func StageEventStateReasonToProto(stateReason string) pb.StageEvent_StateReason 
 		return pb.StageEvent_STATE_REASON_UNKNOWN
 	}
 }
-
