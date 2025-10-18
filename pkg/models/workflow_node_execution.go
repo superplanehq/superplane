@@ -342,6 +342,19 @@ func (e *WorkflowNodeExecution) Fail(reason, message string) error {
 func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) error {
 	now := time.Now()
 
+	err := tx.Model(e).
+		Updates(map[string]interface{}{
+			"state":          WorkflowNodeExecutionStateFinished,
+			"result":         WorkflowNodeExecutionResultFailed,
+			"result_reason":  reason,
+			"result_message": message,
+			"updated_at":     &now,
+		}).Error
+
+	if err != nil {
+		return err
+	}
+
 	//
 	// Update the workflow node state to ready.
 	//
@@ -351,20 +364,27 @@ func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message s
 	}
 
 	if node != nil {
-		err = node.UpdateState(tx, WorkflowNodeStateReady)
+		err := node.UpdateState(tx, WorkflowNodeStateReady)
 		if err != nil {
 			return err
 		}
 	}
 
-	return tx.Model(e).
-		Updates(map[string]interface{}{
-			"state":          WorkflowNodeExecutionStateFinished,
-			"result":         WorkflowNodeExecutionResultFailed,
-			"result_reason":  reason,
-			"result_message": message,
-			"updated_at":     &now,
-		}).Error
+	//
+	// Since an execution failure does not emit anything,
+	// we need to update the parent execution here too,
+	// if this execution is a child one.
+	//
+	if e.ParentExecutionID != nil {
+		parent, err := FindNodeExecution(e.WorkflowID, *e.ParentExecutionID)
+		if err != nil {
+			return err
+		}
+
+		return parent.FailInTransaction(tx, reason, message)
+	}
+
+	return nil
 }
 
 func (e *WorkflowNodeExecution) GetInput(tx *gorm.DB) (any, error) {
