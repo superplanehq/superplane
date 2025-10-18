@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/components"
@@ -22,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/filter"
 	httpComponent "github.com/superplanehq/superplane/pkg/components/http"
 	ifp "github.com/superplanehq/superplane/pkg/components/if"
+	noopComponent "github.com/superplanehq/superplane/pkg/components/noop"
 	switchp "github.com/superplanehq/superplane/pkg/components/switch"
 	"gorm.io/gorm"
 )
@@ -87,6 +89,7 @@ func (r *Registry) Init() {
 	r.Components["switch"] = &switchp.Switch{}
 	r.Components["http"] = &httpComponent.HTTP{}
 	r.Components["approval"] = &approval.Approval{}
+	r.Components["noop"] = &noopComponent.NoOp{}
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {
@@ -234,6 +237,10 @@ func (r *Registry) ListComponents() []components.Component {
 	for _, component := range r.Components {
 		components = append(components, component)
 	}
+
+	sort.Slice(components, func(i, j int) bool {
+		return components[i].Name() < components[j].Name()
+	})
 
 	return components
 }

@@ -1,3 +1,5 @@
+import React from 'react'
+import Editor from '@monaco-editor/react'
 import { ComponentsConfigurationField } from '../../api-client'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -259,24 +261,77 @@ const ObjectFieldRenderer = ({
   onChange: (value: Record<string, any>) => void
 }) => {
   const objValue = value ?? {}
+  const [isDarkMode, setIsDarkMode] = React.useState(false)
+  const [jsonError, setJsonError] = React.useState<string | null>(null)
+
+  // Detect dark mode
+  React.useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    }
+
+    checkDarkMode()
+
+    const observer = new MutationObserver(checkDarkMode)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   if (!field.schema || field.schema.length === 0) {
-    // Fallback to JSON textarea if no schema defined
+    // Fallback to Monaco Editor if no schema defined
+    const handleEditorChange = (value: string | undefined) => {
+      const newValue = value || '{}'
+      try {
+        const parsed = JSON.parse(newValue)
+        onChange(parsed)
+        setJsonError(null)
+      } catch (error) {
+        setJsonError('Invalid JSON format')
+      }
+    }
+
     return (
-      <textarea
-        className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 font-mono text-sm"
-        value={JSON.stringify(objValue, null, 2)}
-        onChange={(e) => {
-          try {
-            const parsed = e.target.value ? JSON.parse(e.target.value) : {}
-            onChange(parsed)
-          } catch {
-            // Invalid JSON, ignore
-          }
-        }}
-        placeholder="Enter JSON object"
-        rows={5}
-      />
+      <div className="flex flex-col gap-2">
+        <div className="border border-gray-300 dark:border-zinc-700 rounded-md overflow-hidden" style={{ height: '200px' }}>
+          <Editor
+            height="100%"
+            defaultLanguage="json"
+            value={JSON.stringify(objValue, null, 2)}
+            onChange={handleEditorChange}
+            theme={isDarkMode ? 'vs-dark' : 'vs'}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 13,
+              lineNumbers: 'on',
+              wordWrap: 'on',
+              folding: true,
+              bracketPairColorization: {
+                enabled: true
+              },
+              autoIndent: 'advanced',
+              formatOnPaste: true,
+              formatOnType: true,
+              tabSize: 2,
+              insertSpaces: true,
+              scrollBeyondLastLine: false,
+              renderWhitespace: 'boundary',
+              smoothScrolling: true,
+              cursorBlinking: 'smooth',
+              contextmenu: true,
+              selectOnLineNumbers: true
+            }}
+          />
+        </div>
+        {jsonError && (
+          <p className="text-red-600 dark:text-red-400 text-xs">
+            {jsonError}
+          </p>
+        )}
+      </div>
     )
   }
 

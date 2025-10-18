@@ -107,6 +107,7 @@ registerExecutionRenderer('http', {
     // Extract HTTP-specific information from configuration
     const method = execution.configuration?.method || 'GET'
     const url = execution.configuration?.url || ''
+    const payload = execution.configuration?.payload || {}
 
     // Extract response information from outputs
     const response = outputs?.default?.[0]
@@ -128,10 +129,10 @@ registerExecutionRenderer('http', {
                 <span className="text-gray-800 dark:text-gray-200 font-mono break-all">{url}</span>
               </div>
 
-              {execution.input && (
+              {payload && (
                 <div>
                   <pre className="pl-4 text-gray-800 dark:text-gray-200 font-mono text-xs overflow-x-auto bg-white dark:bg-zinc-900 p-2 rounded border border-gray-200 dark:border-zinc-600">
-                    {JSON.stringify(execution.input, null, 2)}
+                    {JSON.stringify(payload, null, 2)}
                   </pre>
                 </div>
               )}

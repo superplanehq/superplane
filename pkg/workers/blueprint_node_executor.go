@@ -18,16 +18,14 @@ import (
 )
 
 type BlueprintNodeExecutor struct {
-	registry      *registry.Registry
-	semaphore     *semaphore.Weighted
-	configBuilder components.ConfigurationBuilder
+	registry  *registry.Registry
+	semaphore *semaphore.Weighted
 }
 
 func NewBlueprintNodeExecutor(registry *registry.Registry) *BlueprintNodeExecutor {
 	return &BlueprintNodeExecutor{
-		registry:      registry,
-		semaphore:     semaphore.NewWeighted(25),
-		configBuilder: components.ConfigurationBuilder{},
+		registry:  registry,
+		semaphore: semaphore.NewWeighted(25),
 	}
 }
 

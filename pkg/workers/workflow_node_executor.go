@@ -18,16 +18,14 @@ import (
 )
 
 type WorkflowNodeExecutor struct {
-	registry      *registry.Registry
-	semaphore     *semaphore.Weighted
-	configBuilder components.ConfigurationBuilder
+	registry  *registry.Registry
+	semaphore *semaphore.Weighted
 }
 
 func NewWorkflowNodeExecutor(registry *registry.Registry) *WorkflowNodeExecutor {
 	return &WorkflowNodeExecutor{
-		registry:      registry,
-		semaphore:     semaphore.NewWeighted(25),
-		configBuilder: components.ConfigurationBuilder{},
+		registry:  registry,
+		semaphore: semaphore.NewWeighted(25),
 	}
 }
 
@@ -105,9 +103,20 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("blueprint %s has no start node", blueprint.ID)
 	}
 
-	config, err := w.configBuilder.Build(firstNode.Configuration, node.Configuration.Data())
+	input, err := execution.GetInput(tx)
 	if err != nil {
-		return fmt.Errorf("error building configuration: %v", err)
+		return fmt.Errorf("error finding input: %v", err)
+	}
+
+	config, err := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+		WithRootEvent(&execution.RootEventID).
+		WithPreviousExecution(&execution.ID).
+		ForBlueprintNode(node).
+		WithInput(input).
+		Build(firstNode.Configuration)
+
+	if err != nil {
+		return err
 	}
 
 	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)

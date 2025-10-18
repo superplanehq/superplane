@@ -10,20 +10,18 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
-	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type WorkflowEventRouter struct {
-	semaphore     *semaphore.Weighted
-	configBuilder components.ConfigurationBuilder
+	semaphore *semaphore.Weighted
 }
 
 func NewWorkflowEventRouter() *WorkflowEventRouter {
 	return &WorkflowEventRouter{
-		semaphore:     semaphore.NewWeighted(25),
-		configBuilder: components.ConfigurationBuilder{},
+		semaphore: semaphore.NewWeighted(25),
 	}
 }
 
@@ -105,6 +103,15 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Wor
 			return err
 		}
 
+		config, err := contexts.NewNodeConfigurationBuilder(tx, workflow.ID).
+			WithRootEvent(&event.ID).
+			WithInput(event.Data.Data()).
+			Build(targetNode.Configuration.Data())
+
+		if err != nil {
+			return err
+		}
+
 		nodeExecution := models.WorkflowNodeExecution{
 			WorkflowID:          workflow.ID,
 			NodeID:              targetNode.NodeID,
@@ -112,7 +119,7 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Wor
 			EventID:             event.ID,
 			PreviousExecutionID: nil,
 			State:               models.WorkflowNodeExecutionStatePending,
-			Configuration:       targetNode.Configuration,
+			Configuration:       datatypes.NewJSONType(config),
 			CreatedAt:           &now,
 			UpdatedAt:           &now,
 		}
@@ -137,6 +144,16 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, workflow *model
 			return err
 		}
 
+		config, err := contexts.NewNodeConfigurationBuilder(tx, workflow.ID).
+			WithRootEvent(&execution.RootEventID).
+			WithPreviousExecution(&execution.ID).
+			WithInput(event.Data.Data()).
+			Build(targetNode.Configuration.Data())
+
+		if err != nil {
+			return err
+		}
+
 		nodeExecution := models.WorkflowNodeExecution{
 			WorkflowID:          workflow.ID,
 			NodeID:              targetNode.NodeID,
@@ -144,7 +161,7 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, workflow *model
 			EventID:             event.ID,
 			PreviousExecutionID: &execution.ID,
 			State:               models.WorkflowNodeExecutionStatePending,
-			Configuration:       targetNode.Configuration,
+			Configuration:       datatypes.NewJSONType(config),
 			CreatedAt:           &now,
 			UpdatedAt:           &now,
 		}
@@ -217,9 +234,15 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 			return err
 		}
 
-		configuration, err := w.configBuilder.Build(nextNode.Configuration, parentExecution.Configuration.Data())
+		config, err := contexts.NewNodeConfigurationBuilder(tx, workflow.ID).
+			WithRootEvent(&execution.RootEventID).
+			WithPreviousExecution(&execution.ID).
+			ForBlueprintNode(parentNode).
+			WithInput(event.Data.Data()).
+			Build(nextNode.Configuration)
+
 		if err != nil {
-			return fmt.Errorf("failed to build configuration: %w", err)
+			return err
 		}
 
 		nodeExecution := models.WorkflowNodeExecution{
@@ -230,7 +253,7 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 			PreviousExecutionID: &execution.ID,
 			ParentExecutionID:   execution.ParentExecutionID,
 			State:               models.WorkflowNodeExecutionStatePending,
-			Configuration:       datatypes.NewJSONType(configuration),
+			Configuration:       datatypes.NewJSONType(config),
 			CreatedAt:           &now,
 			UpdatedAt:           &now,
 		}
