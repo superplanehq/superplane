@@ -72,6 +72,8 @@ type ExecutionContext struct {
 	Configuration         any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
+	WorkflowContext       WorkflowContext
+	RequestContext        RequestContext
 }
 
 /*
@@ -92,12 +94,58 @@ type ExecutionStateContext interface {
 }
 
 /*
+ * WorkflowContext allows components to access information about the workflow.
+ */
+type WorkflowContext interface {
+
+	//
+	// The source of the current input data.
+	//
+	SourceNode() (*WorkflowNode, error)
+
+	//
+	// All the nodes connected to the node currently executing
+	//
+	PreviousNodes() ([]WorkflowNode, error)
+
+	//
+	// Fetch the next item in the queue.
+	//
+	Dequeue() (*NodeQueueItem, error)
+}
+
+type NodeQueueItem struct {
+	ID     string
+	Source WorkflowNode
+	Data   any
+}
+
+type WorkflowNode struct {
+	ID string
+}
+
+type RequestContext interface {
+
+	//
+	// Allows the scheduling of a certain component action at a later time
+	//
+	ScheduleActionCall(actionName string, parameters map[string]any) error
+
+	//
+	// Allows the component execution to fetch the next item in the node's queue.
+	// After the processing does so, {actionName} is called.
+	//
+	SubscribeTo(eventType string, actionName string) error
+}
+
+/*
  * Custom action definition for a component.
  */
 type Action struct {
-	Name        string
-	Description string
-	Parameters  []ConfigurationField
+	Name         string
+	Description  string
+	IsUserAction bool
+	Parameters   []ConfigurationField
 }
 
 /*
@@ -106,9 +154,12 @@ type Action struct {
  */
 type ActionContext struct {
 	Name                  string
-	Parameters            map[string]any
+	Data                  any
+	ActionParameters      map[string]any
+	NodeConfiguration     any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
+	WorkflowContext       WorkflowContext
 }
 
 const (

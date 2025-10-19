@@ -62,7 +62,7 @@ func InvokeNodeExecutionAction(
 	// TODO: pass user context
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
-		Parameters:            parameters,
+		ActionParameters:      parameters,
 		MetadataContext:       contexts.NewMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
 	}

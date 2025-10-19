@@ -106,8 +106,9 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 func (a *Approval) Actions() []components.Action {
 	return []components.Action{
 		{
-			Name:        "approve",
-			Description: "Approve this execution",
+			Name:         "approve",
+			Description:  "Approve this execution",
+			IsUserAction: true,
 			Parameters: []components.ConfigurationField{
 				{
 					Name:        "comment",
@@ -119,8 +120,9 @@ func (a *Approval) Actions() []components.Action {
 			},
 		},
 		{
-			Name:        "reject",
-			Description: "Reject this execution",
+			Name:         "reject",
+			Description:  "Reject this execution",
+			IsUserAction: true,
 			Parameters: []components.ConfigurationField{
 				{
 					Name:        "reason",
@@ -155,7 +157,7 @@ func (a *Approval) handleApprove(ctx components.ActionContext) error {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	metadata.addApproval(ctx.Parameters)
+	metadata.addApproval(ctx.ActionParameters)
 	ctx.MetadataContext.Set(metadata)
 
 	//
@@ -175,7 +177,7 @@ func (a *Approval) handleApprove(ctx components.ActionContext) error {
 }
 
 func (a *Approval) handleReject(ctx components.ActionContext) error {
-	reason, ok := ctx.Parameters["reason"]
+	reason, ok := ctx.ActionParameters["reason"]
 	if !ok || reason == nil {
 		return fmt.Errorf("reason is required for rejection")
 	}
