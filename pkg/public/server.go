@@ -410,6 +410,14 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = s.authService.SetupGlobalCanvasRoles(organization.ID.String())
+	if err != nil {
+		log.Errorf("Error setting up global canvas roles for %s: %v", organization.Name, err)
+		models.HardDeleteOrganization(organization.ID.String())
+		http.Error(w, "Failed to set up global canvas roles", http.StatusInternalServerError)
+		return
+	}
+
 	//
 	// Create the owner user for it
 	//

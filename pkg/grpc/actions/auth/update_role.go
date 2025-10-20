@@ -4,7 +4,9 @@ import (
 	"context"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -15,10 +17,27 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-	_, err := authService.GetRoleDefinition(roleName, domainType, domainID)
-	if err != nil {
-		log.Errorf("role %s not found: %v", roleName, err)
-		return nil, status.Error(codes.NotFound, "role not found")
+	if authService.IsDefaultRole(roleName, domainType) {
+		return nil, status.Error(codes.InvalidArgument, "cannot update default role")
+	}
+
+	if domainType == models.DomainTypeCanvas && domainID == "*" {
+		orgID, ok := authentication.GetOrganizationIdFromMetadata(ctx)
+		if !ok {
+			return nil, status.Error(codes.InvalidArgument, "organization context required for global canvas roles")
+		}
+
+		_, err := authService.GetGlobalCanvasRoleDefinition(roleName, orgID)
+		if err != nil {
+			log.Errorf("global canvas role %s not found: %v", roleName, err)
+			return nil, status.Error(codes.NotFound, "role not found")
+		}
+	} else {
+		_, err := authService.GetRoleDefinition(roleName, domainType, domainID)
+		if err != nil {
+			log.Errorf("role %s not found: %v", roleName, err)
+			return nil, status.Error(codes.NotFound, "role not found")
+		}
 	}
 
 	permissions := []*authorization.Permission{}
@@ -58,7 +77,17 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 		roleDefinition.InheritsFrom = inheritedRoleDef
 	}
 
-	err = authService.UpdateCustomRole(domainID, roleDefinition)
+	//
+	// Update the role
+	//
+	var err error
+	if domainType == models.DomainTypeCanvas && domainID == "*" {
+		orgID, _ := authentication.GetOrganizationIdFromMetadata(ctx)
+		err = authService.UpdateCustomRoleWithOrgContext(domainID, orgID, roleDefinition)
+	} else {
+		err = authService.UpdateCustomRole(domainID, roleDefinition)
+	}
+
 	if err != nil {
 		log.Errorf("failed to update role %s: %v", roleName, err)
 		return nil, status.Error(codes.Internal, err.Error())

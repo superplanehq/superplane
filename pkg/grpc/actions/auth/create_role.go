@@ -4,7 +4,9 @@ import (
 	"context"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -69,7 +71,17 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 		roleDefinition.InheritsFrom = inheritedRoleDef
 	}
 
-	err := authService.CreateCustomRole(domainID, roleDefinition)
+	var err error
+	if domainType == models.DomainTypeCanvas && domainID == "*" {
+		if orgID, ok := authentication.GetOrganizationIdFromMetadata(ctx); ok {
+			err = authService.CreateCustomRoleWithOrgContext(domainID, orgID, roleDefinition)
+		} else {
+			return nil, status.Error(codes.InvalidArgument, "organization context required for global canvas roles")
+		}
+	} else {
+		err = authService.CreateCustomRole(domainID, roleDefinition)
+	}
+
 	if err != nil {
 		log.Errorf("failed to create role %s: %v", role.Metadata.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())

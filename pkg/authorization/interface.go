@@ -22,6 +22,7 @@ type GroupManager interface {
 // Role management interface
 type RoleManager interface {
 	AssignRole(userID, role, domainID string, domainType string) error
+	AssignRoleWithOrgContext(userID, role, domainID string, domainType string, orgID string) error
 	RemoveRole(userID, role, domainID string, domainType string) error
 	GetOrgUsersForRole(role string, orgID string) ([]string, error)
 	GetCanvasUsersForRole(role string, canvasID string) ([]string, error)
@@ -31,8 +32,10 @@ type RoleManager interface {
 type AuthorizationSetup interface {
 	SetupOrganizationRoles(orgID string) error
 	SetupCanvasRoles(canvasID string) error
+	SetupGlobalCanvasRoles(orgID string) error
 	DestroyOrganizationRoles(orgID string) error
 	DestroyCanvasRoles(canvasID string) error
+	DestroyGlobalCanvasRoles(orgID string) error
 	CreateOrganizationOwner(userID, orgID string) error
 }
 
@@ -46,7 +49,9 @@ type UserAccessQuery interface {
 // Role definition and hierarchy interface
 type RoleDefinitionQuery interface {
 	GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error)
+	GetGlobalCanvasRoleDefinition(roleName string, orgID string) (*RoleDefinition, error)
 	GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error)
+	GetAllRoleDefinitionsWithOrgContext(domainType string, domainID string, orgID string) ([]*RoleDefinition, error)
 	GetRolePermissions(roleName string, domainType string, domainID string) ([]*Permission, error)
 	GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error)
 }
@@ -54,8 +59,11 @@ type RoleDefinitionQuery interface {
 // Custom role management interface
 type CustomRoleManager interface {
 	CreateCustomRole(domainID string, roleDefinition *RoleDefinition) error
+	CreateCustomRoleWithOrgContext(domainID string, orgID string, roleDefinition *RoleDefinition) error
 	UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error
+	UpdateCustomRoleWithOrgContext(domainID string, orgID string, roleDefinition *RoleDefinition) error
 	DeleteCustomRole(domainID string, domainType string, roleName string) error
+	DeleteCustomRoleWithOrgContext(domainID string, orgID string, domainType string, roleName string) error
 	IsDefaultRole(roleName string, domainType string) bool
 }
 

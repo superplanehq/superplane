@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/metadata"
 )
 
 func Test_DeleteRole(t *testing.T) {
@@ -111,5 +112,78 @@ func Test_DeleteRole(t *testing.T) {
 		for _, role := range userRoles {
 			assert.NotEqual(t, "test-role-with-users", role.Name)
 		}
+	})
+
+	t.Run("delete global canvas role with organization context", func(t *testing.T) {
+		err := r.AuthService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		md := metadata.Pairs("x-organization-id", orgID)
+		ctxWithOrg := metadata.NewIncomingContext(ctx, md)
+
+		globalRoleDef := &authorization.RoleDefinition{
+			Name:        "global-canvas-deletable-role",
+			DisplayName: "Global Canvas Deletable Role",
+			Description: "Role to be deleted",
+			DomainType:  models.DomainTypeCanvas,
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   "canvas",
+					Action:     "read",
+					DomainType: models.DomainTypeCanvas,
+				},
+			},
+		}
+		err = r.AuthService.CreateCustomRoleWithOrgContext("*", orgID, globalRoleDef)
+		require.NoError(t, err)
+
+		_, err = r.AuthService.GetGlobalCanvasRoleDefinition("global-canvas-deletable-role", orgID)
+		require.NoError(t, err)
+
+		resp, err := DeleteRole(ctxWithOrg, models.DomainTypeCanvas, "*", "global-canvas-deletable-role", r.AuthService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+
+		_, err = r.AuthService.GetGlobalCanvasRoleDefinition("global-canvas-deletable-role", orgID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("delete global canvas role without organization context fails", func(t *testing.T) {
+		// Create another global canvas role first
+		globalRoleDef2 := &authorization.RoleDefinition{
+			Name:        "global-canvas-deletable-role-2",
+			DisplayName: "Global Canvas Deletable Role 2",
+			Description: "Another role to test deletion failure",
+			DomainType:  models.DomainTypeCanvas,
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   "canvas",
+					Action:     "write",
+					DomainType: models.DomainTypeCanvas,
+				},
+			},
+		}
+		err = r.AuthService.CreateCustomRoleWithOrgContext("*", orgID, globalRoleDef2)
+		require.NoError(t, err)
+
+		_, err := DeleteRole(ctx, models.DomainTypeCanvas, "*", "global-canvas-deletable-role-2", r.AuthService)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "organization context required for global canvas roles")
+
+		_, err = r.AuthService.GetGlobalCanvasRoleDefinition("global-canvas-deletable-role-2", orgID)
+		require.NoError(t, err)
+	})
+
+	t.Run("cannot delete default global canvas roles", func(t *testing.T) {
+		err := r.AuthService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		md := metadata.Pairs("x-organization-id", orgID)
+		ctxWithOrg := metadata.NewIncomingContext(ctx, md)
+
+		_, deleteErr := DeleteRole(ctxWithOrg, models.DomainTypeCanvas, "*", models.RoleCanvasViewer, r.AuthService)
+		assert.Error(t, deleteErr)
+		assert.Contains(t, deleteErr.Error(), "cannot delete default role")
 	})
 }

@@ -10,6 +10,7 @@ import (
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/metadata"
 )
 
 func Test_CreateRole(t *testing.T) {
@@ -164,5 +165,71 @@ func Test_CreateRole(t *testing.T) {
 		_, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "inherited role not found")
+	})
+
+	t.Run("create global canvas role with organization context", func(t *testing.T) {
+		err := r.AuthService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		md := metadata.Pairs("x-organization-id", orgID)
+		ctxWithOrg := metadata.NewIncomingContext(ctx, md)
+
+		role := &pb.Role{
+			Metadata: &pb.Role_Metadata{
+				Name: "global-canvas-custom-role",
+			},
+			Spec: &pb.Role_Spec{
+				DisplayName: "Global Canvas Custom Role",
+				Description: "Custom role for global canvas operations",
+				Permissions: []*pbAuth.Permission{
+					{
+						Resource:   "canvas",
+						Action:     "read",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+					},
+					{
+						Resource:   "canvas",
+						Action:     "write",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+					},
+				},
+			},
+		}
+
+		resp, err := CreateRole(ctxWithOrg, models.DomainTypeCanvas, "*", role, r.AuthService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+
+		retrievedRole, err := r.AuthService.GetGlobalCanvasRoleDefinition("global-canvas-custom-role", orgID)
+		require.NoError(t, err)
+		assert.Equal(t, "global-canvas-custom-role", retrievedRole.Name)
+		assert.Equal(t, "Global Canvas Custom Role", retrievedRole.DisplayName)
+		assert.Equal(t, "Custom role for global canvas operations", retrievedRole.Description)
+		assert.Equal(t, models.DomainTypeCanvas, retrievedRole.DomainType)
+		assert.Len(t, retrievedRole.Permissions, 2)
+		assert.False(t, retrievedRole.Readonly)
+	})
+
+	t.Run("create global canvas role without organization context fails", func(t *testing.T) {
+		role := &pb.Role{
+			Metadata: &pb.Role_Metadata{
+				Name: "global-canvas-without-org-context",
+			},
+			Spec: &pb.Role_Spec{
+				DisplayName: "Global Canvas Role Without Context",
+				Description: "Should fail without organization context",
+				Permissions: []*pbAuth.Permission{
+					{
+						Resource:   "canvas",
+						Action:     "read",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+					},
+				},
+			},
+		}
+
+		_, err := CreateRole(ctx, models.DomainTypeCanvas, "*", role, r.AuthService)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "organization context required for global canvas roles")
 	})
 }

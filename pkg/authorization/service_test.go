@@ -1258,3 +1258,255 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 		assert.GreaterOrEqual(t, len(roles), 3)
 	})
 }
+
+func Test__AuthService_GlobalCanvasRoles(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	org, err := models.CreateOrganization("test-org", "Test Organization")
+	require.NoError(t, err)
+	orgID := org.ID.String()
+
+	t.Run("setup global canvas roles", func(t *testing.T) {
+		err := authService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		roles, err := authService.GetAllRoleDefinitionsWithOrgContext(models.DomainTypeCanvas, "*", orgID)
+		require.NoError(t, err)
+		assert.Equal(t, len(roles), 3)
+	})
+
+	t.Run("create global canvas role with org context", func(t *testing.T) {
+		err := authService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		customRoleDef := &authorization.RoleDefinition{
+			Name:        "global-canvas-manager",
+			DomainType:  models.DomainTypeCanvas,
+			DisplayName: "Global Canvas Manager",
+			Description: "Manages all canvases in the organization",
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   "canvas",
+					Action:     "read",
+					DomainType: models.DomainTypeCanvas,
+				},
+				{
+					Resource:   "canvas",
+					Action:     "update",
+					DomainType: models.DomainTypeCanvas,
+				},
+			},
+		}
+
+		err = authService.CreateCustomRoleWithOrgContext("*", orgID, customRoleDef)
+		require.NoError(t, err)
+
+		retrievedRole, err := authService.GetGlobalCanvasRoleDefinition("global-canvas-manager", orgID)
+		require.NoError(t, err)
+		assert.Equal(t, "global-canvas-manager", retrievedRole.Name)
+		assert.Equal(t, models.DomainTypeCanvas, retrievedRole.DomainType)
+		assert.Equal(t, "Global Canvas Manager", retrievedRole.DisplayName)
+		assert.Equal(t, "Manages all canvases in the organization", retrievedRole.Description)
+		assert.Len(t, retrievedRole.Permissions, 2)
+	})
+
+	t.Run("assign global canvas role", func(t *testing.T) {
+		testUserID := uuid.New().String()
+
+		err := authService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		err = authService.AssignRoleWithOrgContext(testUserID, models.RoleCanvasAdmin, "*", models.DomainTypeCanvas, orgID)
+		require.NoError(t, err)
+
+		allowed, err := authService.CheckCanvasGlobalPermission(testUserID, orgID, "role", "read")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+	})
+
+	t.Run("update global canvas role with org context", func(t *testing.T) {
+		err := authService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		customRoleDef := &authorization.RoleDefinition{
+			Name:        "global-updatable-role",
+			DomainType:  models.DomainTypeCanvas,
+			DisplayName: "Updatable Global Role",
+			Description: "Role that can be updated",
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   "canvas",
+					Action:     "read",
+					DomainType: models.DomainTypeCanvas,
+				},
+			},
+		}
+
+		err = authService.CreateCustomRoleWithOrgContext("*", orgID, customRoleDef)
+		require.NoError(t, err)
+
+		updatedRoleDef := &authorization.RoleDefinition{
+			Name:        "global-updatable-role",
+			DomainType:  models.DomainTypeCanvas,
+			DisplayName: "Updated Global Role",
+			Description: "Updated role with more permissions",
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   "canvas",
+					Action:     "read",
+					DomainType: models.DomainTypeCanvas,
+				},
+				{
+					Resource:   "canvas",
+					Action:     "update",
+					DomainType: models.DomainTypeCanvas,
+				},
+				{
+					Resource:   "stage",
+					Action:     "create",
+					DomainType: models.DomainTypeCanvas,
+				},
+			},
+		}
+
+		err = authService.UpdateCustomRoleWithOrgContext("*", orgID, updatedRoleDef)
+		require.NoError(t, err)
+
+		retrievedRole, err := authService.GetGlobalCanvasRoleDefinition("global-updatable-role", orgID)
+		require.NoError(t, err)
+		assert.Equal(t, "Updated Global Role", retrievedRole.DisplayName)
+		assert.Equal(t, "Updated role with more permissions", retrievedRole.Description)
+		assert.Len(t, retrievedRole.Permissions, 3)
+	})
+
+	t.Run("delete global canvas role with org context", func(t *testing.T) {
+		err := authService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		customRoleDef := &authorization.RoleDefinition{
+			Name:        "global-deletable-role",
+			DomainType:  models.DomainTypeCanvas,
+			DisplayName: "Deletable Global Role",
+			Description: "Role that will be deleted",
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   "canvas",
+					Action:     "read",
+					DomainType: models.DomainTypeCanvas,
+				},
+			},
+		}
+
+		err = authService.CreateCustomRoleWithOrgContext("*", orgID, customRoleDef)
+		require.NoError(t, err)
+
+		_, err = authService.GetGlobalCanvasRoleDefinition("global-deletable-role", orgID)
+		require.NoError(t, err)
+
+		err = authService.DeleteCustomRoleWithOrgContext("*", orgID, models.DomainTypeCanvas, "global-deletable-role")
+		require.NoError(t, err)
+
+		_, err = authService.GetGlobalCanvasRoleDefinition("global-deletable-role", orgID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("global canvas permissions isolation", func(t *testing.T) {
+		org2, err := models.CreateOrganization("test-org-2", "Second Test Organization")
+		require.NoError(t, err)
+		org2ID := org2.ID.String()
+
+		err = authService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+		err = authService.SetupGlobalCanvasRoles(org2ID)
+		require.NoError(t, err)
+
+		role1Def := &authorization.RoleDefinition{
+			Name:        "org1-global-role",
+			DomainType:  models.DomainTypeCanvas,
+			DisplayName: "Org 1 Global Role",
+			Description: "Global role for org 1",
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   "canvas",
+					Action:     "read",
+					DomainType: models.DomainTypeCanvas,
+				},
+			},
+		}
+
+		role2Def := &authorization.RoleDefinition{
+			Name:        "org2-global-role",
+			DomainType:  models.DomainTypeCanvas,
+			DisplayName: "Org 2 Global Role",
+			Description: "Global role for org 2",
+			Permissions: []*authorization.Permission{
+				{
+					Resource:   "canvas",
+					Action:     "update",
+					DomainType: models.DomainTypeCanvas,
+				},
+			},
+		}
+
+		err = authService.CreateCustomRoleWithOrgContext("*", orgID, role1Def)
+		require.NoError(t, err)
+		err = authService.CreateCustomRoleWithOrgContext("*", org2ID, role2Def)
+		require.NoError(t, err)
+
+		testUserID := uuid.New().String()
+		testUser2ID := uuid.New().String()
+		err = authService.AssignRoleWithOrgContext(testUserID, "org1-global-role", "*", models.DomainTypeCanvas, orgID)
+		require.NoError(t, err)
+		err = authService.AssignRoleWithOrgContext(testUser2ID, "org2-global-role", "*", models.DomainTypeCanvas, org2ID)
+		require.NoError(t, err)
+
+		allowed, err := authService.CheckCanvasGlobalPermission(testUserID, orgID, "canvas", "read")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+
+		allowed, err = authService.CheckCanvasGlobalPermission(testUserID, orgID, "canvas", "update")
+		require.NoError(t, err)
+		assert.False(t, allowed)
+
+		allowed, err = authService.CheckCanvasGlobalPermission(testUserID, org2ID, "canvas", "read")
+		require.NoError(t, err)
+		assert.False(t, allowed)
+
+		allowed, err = authService.CheckCanvasGlobalPermission(testUserID, org2ID, "canvas", "update")
+		require.NoError(t, err)
+		assert.False(t, allowed)
+
+		allowed, err = authService.CheckCanvasGlobalPermission(testUser2ID, org2ID, "canvas", "update")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+
+		allowed, err = authService.CheckCanvasGlobalPermission(testUser2ID, org2ID, "canvas", "read")
+		require.NoError(t, err)
+		assert.False(t, allowed)
+	})
+
+	t.Run("destroy global canvas roles", func(t *testing.T) {
+		err := authService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		err = authService.DestroyGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		err = authService.DestroyGlobalCanvasRoles(orgID)
+		assert.Error(t, err)
+	})
+
+	t.Run("cannot delete default roles as global roles", func(t *testing.T) {
+		err := authService.SetupGlobalCanvasRoles(orgID)
+		require.NoError(t, err)
+
+		err = authService.DeleteCustomRoleWithOrgContext("*", orgID, models.DomainTypeCanvas, models.RoleCanvasAdmin)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot delete default role")
+	})
+}
