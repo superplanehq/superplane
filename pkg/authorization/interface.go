@@ -44,6 +44,7 @@ type UserAccessQuery interface {
 	GetAccessibleCanvasesForUser(userID string) ([]string, error)
 	GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error)
 	GetUserRolesForCanvas(userID string, canvasID string) ([]*RoleDefinition, error)
+	GetUserRolesForCanvasWithOrgContext(userID string, canvasID string, orgID string) ([]*RoleDefinition, error)
 }
 
 // Role definition and hierarchy interface

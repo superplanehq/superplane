@@ -1010,22 +1010,17 @@ func Test__AuthService_DetectMissingPermissions(t *testing.T) {
 		newOrg, err := models.CreateOrganization("test-org", "Test Organization")
 		require.NoError(t, err)
 
-		newCanvas, err := models.CreateCanvas(uuid.New(), newOrg.ID, "Test Canvas", "Test Canvas")
-		require.NoError(t, err)
-
-		missingOrgs, missingCanvases, err := r.AuthService.DetectMissingPermissions()
+		missingOrgs, err := r.AuthService.DetectMissingPermissions()
 		require.NoError(t, err)
 
 		// Should detect missing permissions for new out-of-sync org and canvas
 		assert.Contains(t, missingOrgs, newOrg.ID.String())
-		assert.Contains(t, missingCanvases, newCanvas.ID.String())
 	})
 
 	t.Run("detect no missing permissions after setup", func(t *testing.T) {
-		missingOrgs, missingCanvases, err := r.AuthService.DetectMissingPermissions()
+		missingOrgs, err := r.AuthService.DetectMissingPermissions()
 		require.NoError(t, err)
 		assert.NotContains(t, missingOrgs, r.Organization.ID.String())
-		assert.NotContains(t, missingCanvases, r.Canvas.ID.String())
 	})
 }
 
@@ -1040,20 +1035,19 @@ func Test__AuthService_SyncDefaultRoles(t *testing.T) {
 		require.NoError(t, err)
 		_, err = models.CreateCanvas(uuid.New(), newOrg.ID, "Test Canvas", "Test Canvas")
 		require.NoError(t, err)
-		missingOrgsBefore, missingCanvasesBefore, err := r.AuthService.DetectMissingPermissions()
+		missingOrgsBefore, err := r.AuthService.DetectMissingPermissions()
 		require.NoError(t, err)
 
 		// Sync default roles
-		err = r.AuthService.SyncDefaultRoles()
+		err = r.AuthService.SyncDefaultRoles(missingOrgsBefore)
 		require.NoError(t, err)
 
 		// Check that missing permissions are now resolved
-		missingOrgsAfter, missingCanvasesAfter, err := r.AuthService.DetectMissingPermissions()
+		missingOrgsAfter, err := r.AuthService.DetectMissingPermissions()
 		require.NoError(t, err)
 
 		// Should have fewer or same missing permissions after sync
 		assert.LessOrEqual(t, len(missingOrgsAfter), len(missingOrgsBefore))
-		assert.LessOrEqual(t, len(missingCanvasesAfter), len(missingCanvasesBefore))
 
 		// Verify that roles are properly set up
 		roles, err := r.AuthService.GetAllRoleDefinitions(models.DomainTypeOrganization, orgID)
@@ -1067,10 +1061,10 @@ func Test__AuthService_SyncDefaultRoles(t *testing.T) {
 
 	t.Run("sync is idempotent", func(t *testing.T) {
 		// Run sync twice
-		err := r.AuthService.SyncDefaultRoles()
+		err := r.AuthService.SyncDefaultRoles([]string{orgID})
 		require.NoError(t, err)
 
-		err = r.AuthService.SyncDefaultRoles()
+		err = r.AuthService.SyncDefaultRoles([]string{orgID})
 		require.NoError(t, err)
 
 		// Should still work and not create duplicates
@@ -1097,8 +1091,6 @@ func Test__AuthService_CheckAndSyncMissingPermissions(t *testing.T) {
 
 	org, err := models.CreateOrganization("test-org", "Test Organization")
 	require.NoError(t, err)
-	canvas, err := models.CreateCanvas(uuid.New(), org.ID, "Test Canvas", "Test Canvas")
-	require.NoError(t, err)
 
 	t.Run("check and sync in one operation", func(t *testing.T) {
 		// Run the combined operation
@@ -1111,7 +1103,7 @@ func Test__AuthService_CheckAndSyncMissingPermissions(t *testing.T) {
 		assert.GreaterOrEqual(t, len(roles), 3)
 
 		// Test canvas permissions
-		canvasRoles, err := authService.GetAllRoleDefinitions(models.DomainTypeCanvas, canvas.ID.String())
+		canvasRoles, err := authService.GetAllRoleDefinitionsWithOrgContext(models.DomainTypeCanvas, "*", org.ID.String())
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(canvasRoles), 3)
 
@@ -1207,28 +1199,25 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 	userID := uuid.New()
 	org, err := models.CreateOrganization("test-org", "Test Organization")
 	require.NoError(t, err)
-	canvas, err := models.CreateCanvas(userID, org.ID, "Test Canvas", "Test Canvas")
-	require.NoError(t, err)
 
 	t.Run("sync canvas roles creates expected policies", func(t *testing.T) {
-		err := authService.SyncCanvasRoles(canvas.ID.String())
+		err := authService.SyncGlobalCanvasRoles(org.ID.String())
 		require.NoError(t, err)
 
-		// Test that all expected roles exist
 		expectedRoles := []string{models.RoleCanvasViewer, models.RoleCanvasAdmin, models.RoleCanvasOwner}
 		for _, role := range expectedRoles {
-			roleDef, err := authService.GetRoleDefinition(role, models.DomainTypeCanvas, canvas.ID.String())
+			roleDef, err := authService.GetGlobalCanvasRoleDefinition(role, org.ID.String())
 			require.NoError(t, err)
 			assert.Equal(t, role, roleDef.Name)
 			assert.NotEmpty(t, roleDef.Permissions)
 		}
 
 		// Test role hierarchy
-		err = authService.AssignRole(userID.String(), models.RoleCanvasOwner, canvas.ID.String(), models.DomainTypeCanvas)
+		err = authService.AssignRoleWithOrgContext(userID.String(), models.RoleCanvasOwner, "*", models.DomainTypeCanvas, org.ID.String())
 		require.NoError(t, err)
 
 		// Owner should have admin and viewer permissions through inheritance
-		roles, err := authService.GetUserRolesForCanvas(userID.String(), canvas.ID.String())
+		roles, err := authService.GetUserRolesForCanvasWithOrgContext(userID.String(), "*", org.ID.String())
 		require.NoError(t, err)
 
 		flatRoles := make(map[string]bool)
@@ -1236,26 +1225,11 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 			flatRoles[role.Name] = true
 		}
 
+		assert.Equal(t, len(roles), 3)
+
 		assert.True(t, flatRoles[models.RoleCanvasOwner])
 		assert.True(t, flatRoles[models.RoleCanvasAdmin])
 		assert.True(t, flatRoles[models.RoleCanvasViewer])
-	})
-
-	t.Run("sync is idempotent for canvases", func(t *testing.T) {
-		// Sync multiple times
-		err := authService.SyncCanvasRoles(canvas.ID.String())
-		require.NoError(t, err)
-
-		err = authService.SyncCanvasRoles(canvas.ID.String())
-		require.NoError(t, err)
-
-		err = authService.SyncCanvasRoles(canvas.ID.String())
-		require.NoError(t, err)
-
-		// Should still work correctly
-		roles, err := authService.GetAllRoleDefinitions(models.DomainTypeCanvas, canvas.ID.String())
-		require.NoError(t, err)
-		assert.GreaterOrEqual(t, len(roles), 3)
 	})
 }
 

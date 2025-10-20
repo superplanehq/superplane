@@ -83,6 +83,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, err)
 	r.AuthService.SetupOrganizationRoles(organization.ID.String())
 	require.NoError(t, err)
+	r.AuthService.SetupGlobalCanvasRoles(organization.ID.String())
+	require.NoError(t, err)
 
 	account, err := models.CreateAccount("test@example.com", "test")
 	require.NoError(t, err)
