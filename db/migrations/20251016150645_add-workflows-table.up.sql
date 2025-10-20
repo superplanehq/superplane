@@ -42,6 +42,20 @@ CREATE TABLE workflow_nodes (
   FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE
 );
 
+CREATE TABLE workflow_node_queue_items (
+  id            uuid NOT NULL DEFAULT uuid_generate_v4(),
+  workflow_id   uuid NOT NULL,
+  node_id       CHARACTER VARYING(128) NOT NULL,
+  root_event_id uuid NOT NULL,
+  event_id      uuid NOT NULL,
+  created_at    TIMESTAMP NOT NULL,
+
+  PRIMARY KEY (id),
+  FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
+  FOREIGN KEY (root_event_id) REFERENCES workflow_events(id) ON DELETE CASCADE,
+  FOREIGN KEY (event_id) REFERENCES workflow_events(id) ON DELETE CASCADE
+);
+
 CREATE TABLE workflow_node_executions (
   id                      uuid NOT NULL DEFAULT uuid_generate_v4(),
   workflow_id             uuid NOT NULL,
@@ -50,7 +64,6 @@ CREATE TABLE workflow_node_executions (
   event_id                uuid NOT NULL,
   previous_execution_id   uuid,
   parent_execution_id     uuid,
-  blueprint_id            uuid,
   state                   CHARACTER VARYING(32) NOT NULL,
   result                  CHARACTER VARYING(32),
   result_reason           CHARACTER VARYING(128),

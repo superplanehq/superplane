@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FtOni2HpfL639kpjXz4ImgNZQgEEsw0rwErXyGCeJ4HUreHMQk3Cy1n1wAWhQcY
+\restrict qnQvGaqR3gkoOYKHcRDiKR0KTZDqzurLx7D2goWneOaN7pr8Cnlco3ePddc3XRx
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -575,7 +575,6 @@ CREATE TABLE public.workflow_node_executions (
     event_id uuid NOT NULL,
     previous_execution_id uuid,
     parent_execution_id uuid,
-    blueprint_id uuid,
     state character varying(32) NOT NULL,
     result character varying(32),
     result_reason character varying(128),
@@ -584,6 +583,20 @@ CREATE TABLE public.workflow_node_executions (
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: workflow_node_queue_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_node_queue_items (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    node_id character varying(128) NOT NULL,
+    root_event_id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL
 );
 
 
@@ -992,6 +1005,14 @@ ALTER TABLE ONLY public.workflow_node_execution_requests
 
 ALTER TABLE ONLY public.workflow_node_executions
     ADD CONSTRAINT workflow_node_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workflow_node_queue_items workflow_node_queue_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_queue_items
+    ADD CONSTRAINT workflow_node_queue_items_pkey PRIMARY KEY (id);
 
 
 --
@@ -1510,6 +1531,30 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
+-- Name: workflow_node_queue_items workflow_node_queue_items_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_queue_items
+    ADD CONSTRAINT workflow_node_queue_items_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_queue_items workflow_node_queue_items_root_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_queue_items
+    ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_queue_items workflow_node_queue_items_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_queue_items
+    ADD CONSTRAINT workflow_node_queue_items_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_nodes workflow_nodes_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1521,13 +1566,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FtOni2HpfL639kpjXz4ImgNZQgEEsw0rwErXyGCeJ4HUreHMQk3Cy1n1wAWhQcY
+\unrestrict qnQvGaqR3gkoOYKHcRDiKR0KTZDqzurLx7D2goWneOaN7pr8Cnlco3ePddc3XRx
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict pEIUQBZiYa7UUvW4kih0YRD1F5cMydk89B0V7ZPcE46ISWNNFW8TEQUp9zkc4tz
+\restrict ahkKfch15PvapnALWQNoJcAVLIn5a5Ry6se3spA9XgnwXZmEcnhLrweS7pJTXUd
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1557,5 +1602,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pEIUQBZiYa7UUvW4kih0YRD1F5cMydk89B0V7ZPcE46ISWNNFW8TEQUp9zkc4tz
+\unrestrict ahkKfch15PvapnALWQNoJcAVLIn5a5Ry6se3spA9XgnwXZmEcnhLrweS7pJTXUd
 

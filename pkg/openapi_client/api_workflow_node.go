@@ -318,3 +318,136 @@ func (a *WorkflowNodeAPIService) WorkflowsListNodeExecutionsExecute(r ApiWorkflo
 
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
+
+type ApiWorkflowsListNodeQueueItemsRequest struct {
+	ctx context.Context
+	ApiService *WorkflowNodeAPIService
+	workflowId string
+	nodeId string
+	limit *int64
+	before *time.Time
+}
+
+func (r ApiWorkflowsListNodeQueueItemsRequest) Limit(limit int64) ApiWorkflowsListNodeQueueItemsRequest {
+	r.limit = &limit
+	return r
+}
+
+func (r ApiWorkflowsListNodeQueueItemsRequest) Before(before time.Time) ApiWorkflowsListNodeQueueItemsRequest {
+	r.before = &before
+	return r
+}
+
+func (r ApiWorkflowsListNodeQueueItemsRequest) Execute() (*WorkflowsListNodeQueueItemsResponse, *http.Response, error) {
+	return r.ApiService.WorkflowsListNodeQueueItemsExecute(r)
+}
+
+/*
+WorkflowsListNodeQueueItems List items in a node's queue
+
+Returns a list of items in a node's queue
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param workflowId
+ @param nodeId
+ @return ApiWorkflowsListNodeQueueItemsRequest
+*/
+func (a *WorkflowNodeAPIService) WorkflowsListNodeQueueItems(ctx context.Context, workflowId string, nodeId string) ApiWorkflowsListNodeQueueItemsRequest {
+	return ApiWorkflowsListNodeQueueItemsRequest{
+		ApiService: a,
+		ctx: ctx,
+		workflowId: workflowId,
+		nodeId: nodeId,
+	}
+}
+
+// Execute executes the request
+//  @return WorkflowsListNodeQueueItemsResponse
+func (a *WorkflowNodeAPIService) WorkflowsListNodeQueueItemsExecute(r ApiWorkflowsListNodeQueueItemsRequest) (*WorkflowsListNodeQueueItemsResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *WorkflowsListNodeQueueItemsResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowNodeAPIService.WorkflowsListNodeQueueItems")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue"
+	localVarPath = strings.Replace(localVarPath, "{"+"workflowId"+"}", url.PathEscape(parameterValueToString(r.workflowId, "workflowId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.limit != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
+	}
+	if r.before != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}

@@ -84,6 +84,17 @@ service Workflows {
     };
   }
 
+  rpc ListNodeQueueItems(ListNodeQueueItemsRequest) returns (ListNodeQueueItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/queue"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List items in a node's queue";
+      description: "Returns a list of items in a node's queue";
+      tags: "WorkflowNode";
+    };
+  }
+
   rpc ListNodeExecutions(ListNodeExecutionsRequest) returns (ListNodeExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/workflows/{workflow_id}/nodes/{node_id}/executions"
@@ -213,6 +224,20 @@ message EmitNodeEventResponse {
   string event_id = 1;
 }
 
+message ListNodeQueueItemsRequest {
+  string workflow_id = 1;
+  string node_id = 2;
+  uint32 limit = 3;
+  google.protobuf.Timestamp before = 4;
+}
+
+message ListNodeQueueItemsResponse {
+  repeated WorkflowNodeQueueItem items = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
 message ListNodeExecutionsRequest {
   string workflow_id = 1;
   string node_id = 2;
@@ -273,6 +298,14 @@ message WorkflowNodeExecution {
   google.protobuf.Timestamp updated_at = 13;
   google.protobuf.Struct metadata = 14;
   google.protobuf.Struct configuration = 15;
+}
+
+message WorkflowNodeQueueItem {
+  string id = 1;
+  string workflow_id = 2;
+  string node_id = 3;
+  google.protobuf.Struct input = 4;
+  google.protobuf.Timestamp created_at = 5;
 }
 
 message InvokeNodeExecutionActionRequest {

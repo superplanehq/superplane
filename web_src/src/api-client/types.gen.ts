@@ -1201,6 +1201,13 @@ export type WorkflowsListNodeExecutionsResponse = {
     lastTimestamp?: string;
 };
 
+export type WorkflowsListNodeQueueItemsResponse = {
+    items?: Array<WorkflowsWorkflowNodeQueueItem>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
+};
+
 export type WorkflowsListWorkflowEventsResponse = {
     events?: Array<WorkflowsWorkflowEvent>;
     totalCount?: number;
@@ -1273,6 +1280,16 @@ export type WorkflowsWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PA
 export type WorkflowsWorkflowNodeExecutionResultReason = 'RESULT_REASON_OK' | 'RESULT_REASON_ERROR';
 
 export type WorkflowsWorkflowNodeExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
+
+export type WorkflowsWorkflowNodeQueueItem = {
+    id?: string;
+    workflowId?: string;
+    nodeId?: string;
+    input?: {
+        [key: string]: unknown;
+    };
+    createdAt?: string;
+};
 
 export type GooglerpcStatus = {
     code?: number;
@@ -3717,6 +3734,37 @@ export type WorkflowsListNodeExecutionsResponses = {
 };
 
 export type WorkflowsListNodeExecutionsResponse2 = WorkflowsListNodeExecutionsResponses[keyof WorkflowsListNodeExecutionsResponses];
+
+export type WorkflowsListNodeQueueItemsData = {
+    body?: never;
+    path: {
+        workflowId: string;
+        nodeId: string;
+    };
+    query?: {
+        limit?: number;
+        before?: string;
+    };
+    url: '/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue';
+};
+
+export type WorkflowsListNodeQueueItemsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsListNodeQueueItemsError = WorkflowsListNodeQueueItemsErrors[keyof WorkflowsListNodeQueueItemsErrors];
+
+export type WorkflowsListNodeQueueItemsResponses = {
+    /**
+     * A successful response.
+     */
+    200: WorkflowsListNodeQueueItemsResponse;
+};
+
+export type WorkflowsListNodeQueueItemsResponse2 = WorkflowsListNodeQueueItemsResponses[keyof WorkflowsListNodeQueueItemsResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

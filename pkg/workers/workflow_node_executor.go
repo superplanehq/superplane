@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -38,49 +37,44 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			nodes, err := models.ListWorkflowNodesReady()
+			executions, err := models.ListPendingNodeExecutions()
 			if err != nil {
 				w.log("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
-			for _, node := range nodes {
+			for _, execution := range executions {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.log("Error acquiring semaphore: %v", err)
 					continue
 				}
 
-				go func(node models.WorkflowNode) {
+				go func(execution models.WorkflowNodeExecution) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessNode(node); err != nil {
-						w.log("Error processing workflow node - workflow=%s, node=%s: %v", node.WorkflowID, node.NodeID, err)
+					if err := w.LockAndProcessNodeExecution(execution); err != nil {
+						w.log("Error processing execution %s - workflow=%s, node=%s: %v", execution.ID, execution.WorkflowID, execution.NodeID, err)
 					}
-				}(node)
+				}(execution)
 			}
 		}
 	}
 }
 
-func (w *WorkflowNodeExecutor) LockAndProcessNode(node models.WorkflowNode) error {
+func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(execution models.WorkflowNodeExecution) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		n, err := models.LockWorkflowNode(tx, node.WorkflowID, node.NodeID)
+		e, err := models.LockWorkflowNodeExecution(tx, execution.ID)
 		if err != nil {
 			w.log("Node already being processed - skipping")
 			return nil
 		}
 
-		return w.processNode(tx, n)
+		return w.processNodeExecution(tx, e)
 	})
 }
 
-func (w *WorkflowNodeExecutor) processNode(tx *gorm.DB, node *models.WorkflowNode) error {
-	execution, err := node.FirstPendingExecution(tx)
+func (w *WorkflowNodeExecutor) processNodeExecution(tx *gorm.DB, execution *models.WorkflowNodeExecution) error {
+	node, err := models.FindWorkflowNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			w.log("No pending execution found for node=%s workflow=%s - skipping", node.NodeID, node.WorkflowID)
-			return nil
-		}
-
 		return err
 	}
 

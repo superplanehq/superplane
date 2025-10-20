@@ -121,6 +121,21 @@ func CreatePendingChildExecution(tx *gorm.DB, parent *WorkflowNodeExecution, chi
 	return &execution, nil
 }
 
+func ListPendingNodeExecutions() ([]WorkflowNodeExecution, error) {
+	var executions []WorkflowNodeExecution
+	query := database.Conn().
+		Where("state = ?", WorkflowNodeExecutionStatePending).
+		Where("parent_execution_id IS NULL").
+		Order("created_at DESC")
+
+	err := query.Find(&executions).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
 func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]WorkflowNodeExecution, error) {
 	var executions []WorkflowNodeExecution
 	query := database.Conn().

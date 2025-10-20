@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
-import { useNodeExecutions } from '../../hooks/useWorkflowData'
+import { useNodeQueueItems } from '../../hooks/useWorkflowData'
 import { formatTimeAgo } from '../../utils/date'
 
 interface WorkflowNodeQueueTabProps {
@@ -31,13 +31,7 @@ export const WorkflowNodeQueueTab = ({ workflowId, nodeId }: WorkflowNodeQueueTa
     return () => observer.disconnect()
   }, [])
 
-  const { data, isLoading, error } = useNodeExecutions(
-    workflowId,
-    nodeId,
-    {
-      states: ['STATE_PENDING'],
-    }
-  )
+  const { data, isLoading, error } = useNodeQueueItems(workflowId, nodeId)
 
   if (isLoading) {
     return (
@@ -58,16 +52,13 @@ export const WorkflowNodeQueueTab = ({ workflowId, nodeId }: WorkflowNodeQueueTa
     )
   }
 
-  const executions = data?.executions || []
+  const items = data?.items || []
 
-  if (executions.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
         <MaterialSymbol name="inbox" className="text-gray-400 dark:text-zinc-500 mb-3" size="xl" />
         <p className="text-sm text-gray-600 dark:text-zinc-400 font-medium mb-1">No items in queue</p>
-        <p className="text-xs text-gray-500 dark:text-zinc-500 text-center">
-          Pending executions will appear here
-        </p>
       </div>
     )
   }
@@ -76,13 +67,13 @@ export const WorkflowNodeQueueTab = ({ workflowId, nodeId }: WorkflowNodeQueueTa
     <div className="flex flex-col h-full">
       <div className="flex-shrink-0 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
         <p className="text-xs text-gray-500 dark:text-zinc-400">
-          {executions.length} pending {executions.length === 1 ? 'execution' : 'executions'}
+          {items.length} pending {items.length === 1 ? 'item' : 'items'}
         </p>
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {executions.map((execution: any) => (
-            <div key={execution.id} className="p-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors">
+          {items.map((item: any) => (
+            <div key={item.id} className="p-4 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                   <MaterialSymbol name="schedule" size="sm" className="text-blue-600 dark:text-blue-400" />
@@ -90,36 +81,22 @@ export const WorkflowNodeQueueTab = ({ workflowId, nodeId }: WorkflowNodeQueueTa
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-xs font-mono text-gray-600 dark:text-zinc-400 truncate">
-                      {execution.id}
+                      {item.id}
                     </p>
                   </div>
 
-                  {execution.state && (
-                    <div className="mb-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">
-                        {execution.state}
-                      </span>
-                    </div>
-                  )}
-
-                  {execution.blueprintId && (
-                    <p className="text-xs text-gray-500 dark:text-zinc-400 mb-1">
-                      Blueprint: <span className="font-medium">{execution.blueprintId}</span>
-                    </p>
-                  )}
-
                   <p className="text-xs text-gray-400 dark:text-zinc-500">
-                    Created {formatTimeAgo(new Date(execution.createdAt))}
+                    Created {formatTimeAgo(new Date(item.createdAt))}
                   </p>
 
-                  {execution.input && Object.keys(execution.input).length > 0 && (
+                  {item.input && Object.keys(item.input).length > 0 && (
                     <div className="mt-3 space-y-2">
                       <div className="text-xs font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
                         Input Data
                       </div>
                       <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 p-3 rounded text-left">
                         <JsonView
-                          value={execution.input}
+                          value={item.input}
                           style={{
                             fontSize: '12px',
                             fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',

@@ -150,7 +150,7 @@ export const Blueprint = () => {
 
       // Handle component nodes
       const component = components.find((p: any) => p.name === node.component?.name)
-      const channels = component?.channels?.map((channel: any) => channel.name) || ['default']
+      const channels = component?.outputChannels?.map((channel: any) => channel.name) || ['default']
       const componentName = node.component?.name
 
       // Use the component name as node type if it exists in nodeTypes, otherwise use 'default'
@@ -246,7 +246,7 @@ export const Blueprint = () => {
     } else {
       // Add new node with left-to-right positioning
       const newNodeId = generateNodeId(selectedComponent.name, nodeName.trim())
-      const channels = selectedComponent?.channels?.map((channel: any) => channel.name) || ['default']
+      const channels = selectedComponent?.outputChannels?.map((channel: any) => channel.name) || ['default']
 
       // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
       const nodeType = selectedComponent.name && nodeTypes[selectedComponent.name as keyof typeof nodeTypes]

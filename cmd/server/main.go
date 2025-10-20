@@ -171,7 +171,16 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	}
 
 	if os.Getenv("START_NODE_EXECUTION_REQUEST_WORKER") == "yes" {
+		log.Println("Starting Node Execution Request Worker")
+
 		w := workers.NewNodeExecutionRequestWorker(registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" {
+		log.Println("Starting Workflow Node Queue Worker")
+
+		w := workers.NewWorkflowNodeQueueWorker(registry)
 		go w.Start(context.Background())
 	}
 }

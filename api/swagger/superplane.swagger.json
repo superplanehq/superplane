@@ -3636,6 +3636,58 @@
           "WorkflowNode"
         ]
       }
+    },
+    "/api/v1/workflows/{workflowId}/nodes/{nodeId}/queue": {
+      "get": {
+        "summary": "List items in a node's queue",
+        "description": "Returns a list of items in a node's queue",
+        "operationId": "Workflows_ListNodeQueueItems",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsListNodeQueueItemsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      }
     }
   },
   "definitions": {
@@ -6627,6 +6679,29 @@
         }
       }
     },
+    "WorkflowsListNodeQueueItemsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeQueueItem"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "WorkflowsListWorkflowEventsResponse": {
       "type": "object",
       "properties": {
@@ -6820,6 +6895,27 @@
         "STATE_FINISHED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "WorkflowsWorkflowNodeQueueItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "workflowId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "input": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
     },
     "googlerpcStatus": {
       "type": "object",

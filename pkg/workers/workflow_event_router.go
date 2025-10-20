@@ -103,28 +103,15 @@ func (w *WorkflowEventRouter) processRootEvent(tx *gorm.DB, workflow *models.Wor
 			return err
 		}
 
-		config, err := contexts.NewNodeConfigurationBuilder(tx, workflow.ID).
-			WithRootEvent(&event.ID).
-			WithInput(event.Data.Data()).
-			Build(targetNode.Configuration.Data())
-
-		if err != nil {
-			return err
+		queueItem := models.WorkflowNodeQueueItem{
+			WorkflowID:  workflow.ID,
+			NodeID:      targetNode.NodeID,
+			RootEventID: event.ID,
+			EventID:     event.ID,
+			CreatedAt:   &now,
 		}
 
-		nodeExecution := models.WorkflowNodeExecution{
-			WorkflowID:          workflow.ID,
-			NodeID:              targetNode.NodeID,
-			RootEventID:         event.ID,
-			EventID:             event.ID,
-			PreviousExecutionID: nil,
-			State:               models.WorkflowNodeExecutionStatePending,
-			Configuration:       datatypes.NewJSONType(config),
-			CreatedAt:           &now,
-			UpdatedAt:           &now,
-		}
-
-		if err := tx.Create(&nodeExecution).Error; err != nil {
+		if err := tx.Create(&queueItem).Error; err != nil {
 			return err
 		}
 	}
@@ -144,29 +131,15 @@ func (w *WorkflowEventRouter) processExecutionEvent(tx *gorm.DB, workflow *model
 			return err
 		}
 
-		config, err := contexts.NewNodeConfigurationBuilder(tx, workflow.ID).
-			WithRootEvent(&execution.RootEventID).
-			WithPreviousExecution(&execution.ID).
-			WithInput(event.Data.Data()).
-			Build(targetNode.Configuration.Data())
-
-		if err != nil {
-			return err
+		queueItem := models.WorkflowNodeQueueItem{
+			WorkflowID:  workflow.ID,
+			NodeID:      targetNode.NodeID,
+			RootEventID: execution.RootEventID,
+			EventID:     event.ID,
+			CreatedAt:   &now,
 		}
 
-		nodeExecution := models.WorkflowNodeExecution{
-			WorkflowID:          workflow.ID,
-			NodeID:              targetNode.NodeID,
-			RootEventID:         execution.RootEventID,
-			EventID:             event.ID,
-			PreviousExecutionID: &execution.ID,
-			State:               models.WorkflowNodeExecutionStatePending,
-			Configuration:       datatypes.NewJSONType(config),
-			CreatedAt:           &now,
-			UpdatedAt:           &now,
-		}
-
-		if err := tx.Create(&nodeExecution).Error; err != nil {
+		if err := tx.Create(&queueItem).Error; err != nil {
 			return err
 		}
 	}
