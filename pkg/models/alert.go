@@ -14,6 +14,10 @@ const (
 	AlertTypeInfo    = "info"
 )
 
+const (
+	AlertOriginTypeEventRejection = "event_rejection"
+)
+
 type Alert struct {
 	ID             uuid.UUID  `gorm:"primary_key;default:uuid_generate_v4()" json:"id"`
 	CanvasID       uuid.UUID  `gorm:"column:canvas_id" json:"canvasId"`
@@ -23,10 +27,11 @@ type Alert struct {
 	Acknowledged   bool       `gorm:"column:acknowledged" json:"acknowledged"`
 	AcknowledgedAt *time.Time `gorm:"column:acknowledged_at" json:"acknowledgedAt"`
 	Type           string     `gorm:"column:type" json:"type"`
+	OriginType     string     `gorm:"column:origin_type" json:"originType"`
 	CreatedAt      *time.Time `gorm:"column:created_at" json:"createdAt"`
 }
 
-func NewAlert(canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, message string, alertType string) (*Alert, error) {
+func NewAlert(canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, message string, alertType string, originType string) (*Alert, error) {
 	now := time.Now()
 	return &Alert{
 		CanvasID:   canvasID,
@@ -34,6 +39,7 @@ func NewAlert(canvasID uuid.UUID, sourceID uuid.UUID, sourceType string, message
 		SourceType: sourceType,
 		Message:    message,
 		Type:       alertType,
+		OriginType: originType,
 		CreatedAt:  &now,
 	}, nil
 }

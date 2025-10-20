@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 454KLiLHc3FDbVwCkEXCMPVTSPP5ktBss9FmsKfirAbfjvfoKc7xVffDmrl3cMf
+\restrict JCsq9rURZQICOpqgZHUHRKTBbeH4J0NFGIkCowDTrsi4XIvOMaGCLjoRCk2uLAN
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -84,7 +84,8 @@ CREATE TABLE public.alerts (
     acknowledged boolean DEFAULT false NOT NULL,
     acknowledged_at timestamp with time zone,
     type character varying(50) NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    origin_type character varying(255)
 );
 
 
@@ -350,7 +351,8 @@ CREATE TABLE public.organization_invitations (
     invited_by uuid NOT NULL,
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    canvas_ids jsonb DEFAULT '[]'::jsonb
 );
 
 
@@ -1471,13 +1473,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 454KLiLHc3FDbVwCkEXCMPVTSPP5ktBss9FmsKfirAbfjvfoKc7xVffDmrl3cMf
+\unrestrict JCsq9rURZQICOpqgZHUHRKTBbeH4J0NFGIkCowDTrsi4XIvOMaGCLjoRCk2uLAN
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict mpDfuD83i9AIMzTbuV5662MwBWMvDhIqgMI5aZPhJeabx1mtHHl0xawUZAtleZR
+\restrict uw54RO59Dzfnh8CeXycOaF9ugiMh1noXnlRZvvemCipsERaLKxv0h0qHsdfTkCK
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1499,7 +1501,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251006150645	f
+20251016150645	f
 \.
 
 
@@ -1507,5 +1509,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mpDfuD83i9AIMzTbuV5662MwBWMvDhIqgMI5aZPhJeabx1mtHHl0xawUZAtleZR
+\unrestrict uw54RO59Dzfnh8CeXycOaF9ugiMh1noXnlRZvvemCipsERaLKxv0h0qHsdfTkCK
 

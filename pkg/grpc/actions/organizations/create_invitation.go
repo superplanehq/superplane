@@ -4,9 +4,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
@@ -89,6 +91,11 @@ func handleNewUser(authService authorization.Authorization, orgID, userID uuid.U
 			return nil, status.Errorf(codes.InvalidArgument, "Failed to create invitation: %v", err)
 		}
 
+		message := messages.NewInvitationCreatedMessage(invitation)
+		if err := message.Publish(); err != nil {
+			log.Errorf("Failed to publish invitation created message for invitation %s: %v", invitation.ID, err)
+		}
+
 		return &pb.CreateInvitationResponse{
 			Invitation: serializeInvitation(invitation),
 		}, nil
@@ -137,11 +144,13 @@ func serializeInvitations(invitations []models.OrganizationInvitation) []*pb.Inv
 }
 
 func serializeInvitation(invitation *models.OrganizationInvitation) *pb.Invitation {
+	canvasIDs := invitation.CanvasIDs.Data()
 	pbInvitation := &pb.Invitation{
 		Id:             invitation.ID.String(),
 		OrganizationId: invitation.OrganizationID.String(),
 		Email:          invitation.Email,
 		State:          string(invitation.State),
+		CanvasIds:      canvasIDs,
 		CreatedAt:      timestamppb.New(invitation.CreatedAt),
 	}
 

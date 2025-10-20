@@ -26,6 +26,7 @@ func SerializeAlert(alert *models.Alert) *pb.Alert {
 		Message:      alert.Message,
 		SourceId:     alert.SourceID.String(),
 		SourceType:   eventSourceTypeToProto(alert.SourceType),
+		OriginType:   alertOriginTypeToProto(alert.OriginType),
 		Acknowledged: alert.Acknowledged,
 	}
 
@@ -50,6 +51,15 @@ func alertTypeToProto(alertType string) pb.Alert_AlertType {
 		return pb.Alert_ALERT_TYPE_INFO
 	default:
 		return pb.Alert_ALERT_TYPE_UNKNOWN
+	}
+}
+
+func alertOriginTypeToProto(originType string) pb.Alert_AlertOriginType {
+	switch originType {
+	case models.AlertOriginTypeEventRejection:
+		return pb.Alert_ALERT_ORIGIN_TYPE_EVENT_REJECTION
+	default:
+		return pb.Alert_ALERT_ORIGIN_TYPE_UNKNOWN
 	}
 }
 

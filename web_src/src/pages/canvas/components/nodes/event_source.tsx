@@ -23,8 +23,9 @@ import { EmitEventModal } from '@/components/EmitEventModal/EmitEventModal';
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { convertUTCToLocalTime, formatTimestampInUserTimezone, getUserTimezoneDisplay } from '@/utils/timezone';
 import { isRegularEventSource } from '@/utils/components';
-import { AlertsTooltip } from '@/components/Tooltip/alerts-tooltip';
+import { ErrorsTooltip } from '@/components/Tooltip/errors-tooltip';
 import { showErrorToast } from '@/utils/toast';
+import { alertsToErrorTooltip } from '@/utils/errors';
 
 const getEventSourceIcon = (sourceType: string) => {
   switch (sourceType) {
@@ -79,7 +80,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [yamlUpdateCounter, setYamlUpdateCounter] = useState(0);
   const [integrationError, setIntegrationError] = useState(false);
   const [showEmitEventModal, setShowEmitEventModal] = useState(false);
-  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource, updateConnectionSourceNames } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId, setNodes, setFocusedNodeId, addEventSource, updateConnectionSourceNames, removeConnectionSourceNames } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
   const { data: alerts = {}, isLoading: alertsLoading } = useAlertsBySourceId(canvasId);
@@ -267,6 +268,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           return;
         }
       }
+
+      const eventSourceName = currentEventSource.metadata?.name;
+      if (eventSourceName) {
+        removeConnectionSourceNames(eventSourceName);
+      }
+
       removeEventSource(currentEventSource.metadata.id);
     }
     setShowDiscardConfirm(false);
@@ -410,271 +417,272 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }
         }}
       >
-      {(isHovered || isEditMode) && (
-        <NodeActionButtons
-          isNewNode={!!isNewNode}
-          onSave={handleSaveEventSource}
-          onCancel={handleCancelEdit}
-          onDiscard={() => setShowDiscardConfirm(true)}
-          onEdit={handleEditClick}
-          onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
-          onSend={eventSourceId ? () => setShowEmitEventModal(true) : undefined}
-          isEditMode={isEditMode}
-          entityType="event source"
-          entityData={currentFormData ? {
-            metadata: {
-              name: eventSourceName,
-              description: eventSourceDescription
-            },
-            spec: currentFormData.spec
-          } : (currentEventSource ? {
-            metadata: {
-              name: currentEventSource.metadata?.name,
-              description: currentEventSource.metadata?.description
-            },
-            spec: currentEventSource.spec || {}
-          } : null)}
-          onYamlApply={handleYamlApply}
-        />
-      )}
+        {(isHovered || isEditMode) && (
+          <NodeActionButtons
+            isNewNode={!!isNewNode}
+            onSave={handleSaveEventSource}
+            onCancel={handleCancelEdit}
+            onDiscard={() => setShowDiscardConfirm(true)}
+            onEdit={handleEditClick}
+            onDuplicate={!isNewNode ? handleDuplicateEventSource : undefined}
+            onSend={eventSourceId ? () => setShowEmitEventModal(true) : undefined}
+            isEditMode={isEditMode}
+            entityType="event source"
+            entityData={currentFormData ? {
+              metadata: {
+                name: eventSourceName,
+                description: eventSourceDescription
+              },
+              spec: currentFormData.spec
+            } : (currentEventSource ? {
+              metadata: {
+                name: currentEventSource.metadata?.name,
+                description: currentEventSource.metadata?.description
+              },
+              spec: currentEventSource.spec || {}
+            } : null)}
+            onYamlApply={handleYamlApply}
+          />
+        )}
 
 
-      {/* Header Section */}
-      <div className="px-4 py-4 justify-between items-start">
-        <div className="flex items-start justify-between w-full">
-          <div className="flex items-start flex-1 min-w-0">
-            <div className='max-w-8 mt-1 flex items-center justify-center'>
-              {getEventSourceIcon(sourceType)}
-            </div>
-            <div className="flex-1 min-w-0 ml-2">
-              <div className="mb-1">
-                <InlineEditable
-                  value={eventSourceName}
-                  onSave={handleEventSourceNameChange}
-                  placeholder="Event source name"
-                  className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
-                    nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
-                    isEditMode ? 'text-sm' : '')}
-                  onKeyDown={() => isNewNode && setDirtyByUser(true)}
-                  isEditMode={isEditMode}
-                  autoFocus={isEditMode && sourceType === "webhook"}
-                  dataTestId="event-source-name-input"
-                />
-                {nameError && isEditMode && (
-                  <div className="text-xs text-red-600 text-left mt-1 px-2">
-                    {nameError}
-                  </div>
-                )}
+        {/* Header Section */}
+        <div className="px-4 py-4 justify-between items-start">
+          <div className="flex items-start justify-between w-full">
+            <div className="flex items-start flex-1 min-w-0">
+              <div className='max-w-8 mt-1 flex items-center justify-center'>
+                {getEventSourceIcon(sourceType)}
               </div>
-              <div>
-                {isEditMode && <InlineEditable
-                  value={eventSourceDescription}
-                  onSave={handleEventSourceDescriptionChange}
-                  placeholder={isEditMode ? "Add description..." : ""}
-                  className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
-                  isEditMode={isEditMode}
-                />}
-              </div>
-            </div>
-          </div>
-          {!isEditMode && (eventSourceAlerts.length > 0 || alertsLoading) && (
-            <div className="ml-2">
-              <AlertsTooltip
-                alerts={eventSourceAlerts}
-                onAcknowledge={handleAcknowledgeAlert}
-                className="flex-shrink-0"
-                isLoading={alertsLoading}
-              />
-            </div>
-          )}
-        </div>
-        {!isEditMode && (
-          <>
-            <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
-            {/* Schedule Status */}
-            {currentEventSource?.spec?.schedule && (
-              <div className="w-full mt-3 space-y-2">
-                {/* Schedule Type and Configuration */}
-                <div className="flex items-center gap-2 text-xs">
-                  <MaterialSymbol name="event_repeat" size="sm" className="text-purple-600 dark:text-purple-400" />
-                  <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
-                    {currentEventSource.spec.schedule.type === 'TYPE_HOURLY' &&
-                      `Hourly, ${currentEventSource.spec.schedule.hourly?.minute || 0} minutes past the hour`
-                    }
-                    {currentEventSource.spec.schedule.type === 'TYPE_DAILY' &&
-                      `Daily at ${convertUTCToLocalTime(currentEventSource.spec.schedule.daily?.time || '00:00')}, ${getUserTimezoneDisplay()}`
-                    }
-                    {currentEventSource.spec.schedule.type === 'TYPE_WEEKLY' && (
-                      <div className="leading-tight">
-                        <div>Weekly on {currentEventSource.spec.schedule.weekly?.weekDay?.replace('WEEK_DAY_', '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday'}</div>
-                        <div>{convertUTCToLocalTime(currentEventSource.spec.schedule.weekly?.time || '00:00')}, {getUserTimezoneDisplay()}</div>
-                      </div>
-                    )}
-                  </span>
-                </div>
-
-                {/* Timestamps - only show if status is available */}
-                {currentEventSource?.status?.schedule && (
-                  <>
-                    <div className="flex items-center gap-2 text-xs">
-                      <MaterialSymbol name="history" size="sm" className="text-green-600 dark:text-green-400" />
-                      <span className="text-gray-500 dark:text-gray-400">Last:</span>
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {currentEventSource.status.schedule.lastTrigger
-                          ? formatTimestampInUserTimezone(currentEventSource.status.schedule.lastTrigger)
-                          : '-'
-                        }
-                      </span>
+              <div className="flex-1 min-w-0 ml-2">
+                <div className="mb-1">
+                  <InlineEditable
+                    value={eventSourceName}
+                    onSave={handleEventSourceNameChange}
+                    placeholder="Event source name"
+                    className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                      nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                      isEditMode ? 'text-sm' : '')}
+                    onKeyDown={() => isNewNode && setDirtyByUser(true)}
+                    isEditMode={isEditMode}
+                    autoFocus={isEditMode && sourceType === "webhook"}
+                    dataTestId="event-source-name-input"
+                  />
+                  {nameError && isEditMode && (
+                    <div className="text-xs text-red-600 text-left mt-1 px-2">
+                      {nameError}
                     </div>
-                    {currentEventSource.status.schedule.nextTrigger && (
+                  )}
+                </div>
+                <div>
+                  {isEditMode && <InlineEditable
+                    value={eventSourceDescription}
+                    onSave={handleEventSourceDescriptionChange}
+                    placeholder={isEditMode ? "Add description..." : ""}
+                    className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
+                    isEditMode={isEditMode}
+                  />}
+                </div>
+              </div>
+            </div>
+            {!isEditMode && (eventSourceAlerts.length > 0 || alertsLoading) && (
+              <div className="ml-2">
+                <ErrorsTooltip
+                  errors={alertsToErrorTooltip(eventSourceAlerts)}
+                  onAcknowledge={handleAcknowledgeAlert}
+                  className="flex-shrink-0"
+                  isLoading={alertsLoading}
+                  title="Alerts"
+                />
+              </div>
+            )}
+          </div>
+          {!isEditMode && (
+            <>
+              <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
+              {/* Schedule Status */}
+              {currentEventSource?.spec?.schedule && (
+                <div className="w-full mt-3 space-y-2">
+                  {/* Schedule Type and Configuration */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <MaterialSymbol name="event_repeat" size="sm" className="text-purple-600 dark:text-purple-400" />
+                    <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
+                      {currentEventSource.spec.schedule.type === 'TYPE_HOURLY' &&
+                        `Hourly, ${currentEventSource.spec.schedule.hourly?.minute || 0} minutes past the hour`
+                      }
+                      {currentEventSource.spec.schedule.type === 'TYPE_DAILY' &&
+                        `Daily at ${convertUTCToLocalTime(currentEventSource.spec.schedule.daily?.time || '00:00')}, ${getUserTimezoneDisplay()}`
+                      }
+                      {currentEventSource.spec.schedule.type === 'TYPE_WEEKLY' && (
+                        <div className="leading-tight">
+                          <div>Weekly on {currentEventSource.spec.schedule.weekly?.weekDay?.replace('WEEK_DAY_', '').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || 'Monday'}</div>
+                          <div>{convertUTCToLocalTime(currentEventSource.spec.schedule.weekly?.time || '00:00')}, {getUserTimezoneDisplay()}</div>
+                        </div>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Timestamps - only show if status is available */}
+                  {currentEventSource?.status?.schedule && (
+                    <>
                       <div className="flex items-center gap-2 text-xs">
-                        <MaterialSymbol name="schedule" size="sm" className="text-blue-600 dark:text-blue-400" />
-                        <span className="text-gray-500 dark:text-gray-400">Next:</span>
+                        <MaterialSymbol name="history" size="sm" className="text-green-600 dark:text-green-400" />
+                        <span className="text-gray-500 dark:text-gray-400">Last:</span>
                         <span className="text-gray-700 dark:text-gray-300">
-                          {formatTimestampInUserTimezone(currentEventSource.status.schedule.nextTrigger)}
+                          {currentEventSource.status.schedule.lastTrigger
+                            ? formatTimestampInUserTimezone(currentEventSource.status.schedule.lastTrigger)
+                            : '-'
+                          }
                         </span>
                       </div>
-                    )}
-                  </>
-                )}
+                      {currentEventSource.status.schedule.nextTrigger && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <MaterialSymbol name="schedule" size="sm" className="text-blue-600 dark:text-blue-400" />
+                          <span className="text-gray-500 dark:text-gray-400">Next:</span>
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {formatTimestampInUserTimezone(currentEventSource.status.schedule.nextTrigger)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Manual Trigger Status */}
+              {sourceType === 'manual' && (
+                <div className="w-full mt-3 space-y-2">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
+                      Manual trigger
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                    Events are created on demand
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+        </div>
+
+        {!isEditMode && (
+          <EventSourceBadges
+            resourceName={props.data.resource?.name}
+            currentEventSource={currentEventSource}
+            sourceType={sourceType}
+            integration={integration}
+          />
+        )}
+
+        {isEditMode ? (
+          <EventSourceEditModeContent
+            key={yamlUpdateCounter}
+            nodeId={props.id}
+            data={{
+              ...props.data,
+              name: eventSourceName,
+              description: eventSourceDescription,
+              ...(currentFormData?.spec && {
+                integration: currentFormData.spec.integration,
+                resource: currentFormData.spec.resource,
+                events: currentFormData.spec.events,
+                schedule: currentFormData.spec.schedule,
+              })
+            }}
+            canvasId={canvasId}
+            organizationId={organizationId!}
+            sourceType={sourceType}
+            eventSourceKey={eventSourceKey}
+            onDataChange={({ spec }) => {
+              if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) {
+                setCurrentFormData(prev => ({ ...prev!, spec }));
+                // Clear API errors when user makes changes
+                setApiError(null);
+
+                if (isNewNode && !dirtyByUser && !currentEventSource?.isDuplicate) {
+                  const autoGeneratedName = generateEventSourceName(spec.resource?.name || '');
+                  setEventSourceName(autoGeneratedName);
+                  if (currentFormData) {
+                    setCurrentFormData(prevFormData => ({ ...prevFormData!, name: autoGeneratedName }));
+                  }
+                  validateEventSourceName(autoGeneratedName);
+                }
+              }
+            }}
+            onDelete={handleDiscardEventSource}
+            apiError={apiError}
+            shouldValidate={true}
+            onValidationResult={setValidationPassed}
+            integrationError={integrationError}
+          />
+        ) : (
+          <>
+
+            {currentEventSource?.status?.lastEvent ? (
+              <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center w-full justify-between mb-2 py-2">
+                  <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last Event</div>
+                </div>
+
+                <div className="space-y-1">
+                  <EventStateItem
+                    key={currentEventSource.status.lastEvent.id}
+                    state={currentEventSource.status.lastEvent.state}
+                    receivedAt={currentEventSource.status.lastEvent.receivedAt}
+                    eventType={currentEventSource.status.lastEvent.type}
+                  />
+                </div>
               </div>
+            ) : (
+              // Only show EventSourceZeroState for webhook and non-regular event sources
+              (sourceType === 'webhook' || !isRegularEventSource(sourceType)) && (
+                <EventSourceZeroState
+                  sourceType={sourceType}
+                />
+              )
             )}
 
-            {/* Manual Trigger Status */}
-            {sourceType === 'manual' && (
-              <div className="w-full mt-3 space-y-2">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-gray-700 dark:text-gray-300 font-medium text-left">
-                    Manual trigger
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-left">
-                  Events are created on demand
-                </div>
-              </div>
-            )}
           </>
         )}
 
-      </div>
+        <CustomBarHandle type="source" />
 
-      {!isEditMode && (
-        <EventSourceBadges
-          resourceName={props.data.resource?.name}
-          currentEventSource={currentEventSource}
-          sourceType={sourceType}
-          integration={integration}
+        <ConfirmDialog
+          isOpen={showDiscardConfirm}
+          title="Delete Event Source"
+          message="Are you sure you want to delete this event source? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          confirmVariant="danger"
+          onConfirm={handleDiscardEventSource}
+          onCancel={() => setShowDiscardConfirm(false)}
         />
-      )}
 
-      {isEditMode ? (
-        <EventSourceEditModeContent
-          key={yamlUpdateCounter}
-          nodeId={props.id}
-          data={{
-            ...props.data,
-            name: eventSourceName,
-            description: eventSourceDescription,
-            ...(currentFormData?.spec && {
-              integration: currentFormData.spec.integration,
-              resource: currentFormData.spec.resource,
-              events: currentFormData.spec.events,
-              schedule: currentFormData.spec.schedule,
-            })
-          }}
-          canvasId={canvasId}
-          organizationId={organizationId!}
-          sourceType={sourceType}
-          eventSourceKey={eventSourceKey}
-          onDataChange={({ spec }) => {
-            if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) {
-              setCurrentFormData(prev => ({ ...prev!, spec }));
-              // Clear API errors when user makes changes
-              setApiError(null);
-
-              if (isNewNode && !dirtyByUser && !currentEventSource?.isDuplicate) {
-                const autoGeneratedName = generateEventSourceName(spec.resource?.name || '');
-                setEventSourceName(autoGeneratedName);
-                if (currentFormData) {
-                  setCurrentFormData(prevFormData => ({ ...prevFormData!, name: autoGeneratedName }));
+        {currentEventSource?.metadata?.id && (
+          <EmitEventModal
+            isOpen={showEmitEventModal}
+            onClose={() => setShowEmitEventModal(false)}
+            sourceName={currentEventSource.metadata.name || ''}
+            nodeType="event_source"
+            loadLastEvent={async () => {
+              // For event sources, return the latest event immediately
+              return currentEventSource.events?.[0] || null;
+            }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onSubmit={async (eventType: string, eventData: any) => {
+              await superplaneCreateEvent(withOrganizationHeader({
+                path: { canvasIdOrName: canvasId! },
+                body: {
+                  sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE',
+                  sourceId: currentEventSource.metadata!.id,
+                  type: eventType,
+                  raw: eventData
                 }
-                validateEventSourceName(autoGeneratedName);
-              }
-            }
-          }}
-          onDelete={handleDiscardEventSource}
-          apiError={apiError}
-          shouldValidate={true}
-          onValidationResult={setValidationPassed}
-          integrationError={integrationError}
-        />
-      ) : (
-        <>
-
-          {currentEventSource?.status?.lastEvent ? (
-            <div className="px-3 py-3 pt-2 w-full border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center w-full justify-between mb-2 py-2">
-                <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last Event</div>
-              </div>
-
-              <div className="space-y-1">
-                <EventStateItem
-                  key={currentEventSource.status.lastEvent.id}
-                  state={currentEventSource.status.lastEvent.state}
-                  receivedAt={currentEventSource.status.lastEvent.receivedAt}
-                  eventType={currentEventSource.status.lastEvent.type}
-                />
-              </div>
-            </div>
-          ) : (
-            // Only show EventSourceZeroState for webhook and non-regular event sources
-            (sourceType === 'webhook' || !isRegularEventSource(sourceType)) && (
-              <EventSourceZeroState
-                sourceType={sourceType}
-              />
-            )
-          )}
-
-        </>
-      )}
-
-      <CustomBarHandle type="source" />
-
-      <ConfirmDialog
-        isOpen={showDiscardConfirm}
-        title="Delete Event Source"
-        message="Are you sure you want to delete this event source? This action cannot be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
-        confirmVariant="danger"
-        onConfirm={handleDiscardEventSource}
-        onCancel={() => setShowDiscardConfirm(false)}
-      />
-
-      {currentEventSource?.metadata?.id && (
-        <EmitEventModal
-          isOpen={showEmitEventModal}
-          onClose={() => setShowEmitEventModal(false)}
-          sourceName={currentEventSource.metadata.name || ''}
-          nodeType="event_source"
-          loadLastEvent={async () => {
-            // For event sources, return the latest event immediately
-            return currentEventSource.events?.[0] || null;
-          }}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onSubmit={async (eventType: string, eventData: any) => {
-            await superplaneCreateEvent(withOrganizationHeader({
-              path: { canvasIdOrName: canvasId! },
-              body: {
-                sourceType: 'EVENT_SOURCE_TYPE_EVENT_SOURCE',
-                sourceId: currentEventSource.metadata!.id,
-                type: eventType,
-                raw: eventData
-              }
-            }));
-          }}
-        />
-      )}
+              }));
+            }}
+          />
+        )}
       </div>
     </div>
   );

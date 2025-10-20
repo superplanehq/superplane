@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stage } from "../store/types";
+import { useCanvasStore } from "../store/canvasStore";
 
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { useStageExecutions, useStageEvents, canvasKeys } from "@/hooks/useCanvasData";
@@ -34,7 +35,10 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStageEvent, cancelStageExecution, initialWidth = DEFAULT_SIDEBAR_WIDTH }: SidebarProps) => {
-  const [activeTab, setActiveTab] = useState('activity');
+  const sidebarTab = useCanvasStore(state => state.sidebarTab);
+  const setSidebarTab = useCanvasStore(state => state.setSidebarTab)
+  const sidebarEventFilter = useCanvasStore(state => state.sidebarEventFilter);
+  const [activeTab, setActiveTab] = useState(sidebarTab || 'activity');
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(initialWidth);
   const queryClient = useQueryClient();
@@ -43,7 +47,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
   const handleApproveStageEvent = async (stageEventId: string, stageId: string) => {
     try {
       await approveStageEvent(stageEventId, stageId);
-      
+
       // Invalidate queries to refresh both stage events and executions data
       await queryClient.invalidateQueries({
         queryKey: canvasKeys.stageEvents(canvasId || '', stageId, ['STATE_PENDING', 'STATE_WAITING'])
@@ -60,7 +64,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
   const handleDiscardStageEvent = async (stageEventId: string, stageId: string) => {
     try {
       await discardStageEvent(stageEventId, stageId);
-      
+
       // Invalidate queries to refresh the data
       await queryClient.invalidateQueries({
         queryKey: canvasKeys.stageEvents(canvasId || '', stageId, ['STATE_PENDING', 'STATE_WAITING'])
@@ -74,7 +78,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
   const handleCancelStageExecution = async (executionId: string, stageId: string) => {
     try {
       await cancelStageExecution(executionId, stageId);
-      
+
       // Invalidate queries to refresh the data
       await queryClient.invalidateQueries({
         queryKey: canvasKeys.stageExecutions(canvasId || '', stageId)
@@ -138,6 +142,12 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
     [allQueueEvents]
   );
 
+  useEffect(() => {
+    if (sidebarTab) {
+      setActiveTab(sidebarTab);
+      setSidebarTab('');
+    }
+  }, [sidebarTab, setSidebarTab]);
 
   // Render the appropriate content based on the active tab
   const renderTabContent = () => {
@@ -181,6 +191,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent, discardStag
           canvasId={canvasId!}
           selectedStage={selectedStage}
           organizationId={organizationId!}
+          initialFilter={sidebarEventFilter || undefined}
         />;
 
 

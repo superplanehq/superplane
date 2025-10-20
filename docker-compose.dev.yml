@@ -52,7 +52,13 @@ services:
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
+      GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
+      TEMPLATE_DIR: "/app/templates"
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Superplane}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@superplane.com}
 
     ports:
       - 5173:5173

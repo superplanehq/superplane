@@ -7,7 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -84,6 +87,11 @@ func Test__CreateInvitation(t *testing.T) {
 	})
 
 	t.Run("account does not exist -> creates pending invitation", func(t *testing.T) {
+		amqpURL, _ := config.RabbitMQURL()
+		testconsumer := testconsumer.New(amqpURL, messages.InvitationCreatedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
 		email := "does-not-exist@example.com"
 		response, err := CreateInvitation(ctx, r.AuthService, r.Organization.ID.String(), email)
 		require.NoError(t, err)
@@ -94,9 +102,16 @@ func Test__CreateInvitation(t *testing.T) {
 		// Verify user for this account is not added to organization
 		_, err = models.FindActiveUserByEmail(r.Organization.ID.String(), email)
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
 	t.Run("account exists -> creates accepted invitation and adds user immediately", func(t *testing.T) {
+		amqpURL, _ := config.RabbitMQURL()
+		testconsumer := testconsumer.New(amqpURL, messages.InvitationCreatedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
 		//
 		// Create a separate account that is not yet in the organization
 		//
@@ -122,6 +137,8 @@ func Test__CreateInvitation(t *testing.T) {
 		roles, err := r.AuthService.GetUserRolesForOrg(user.ID.String(), r.Organization.ID.String())
 		require.NoError(t, err)
 		assert.Contains(t, roles[0].Name, models.RoleOrgViewer)
+
+		assert.False(t, testconsumer.HasReceivedMessage())
 	})
 
 	t.Run("duplicate invitation for non-existent account -> error", func(t *testing.T) {
