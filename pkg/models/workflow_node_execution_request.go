@@ -12,26 +12,25 @@ import (
 
 const (
 	NodeExecutionRequestTypeInvokeAction = "invoke-action"
-	NodeExecutionRequestTypeQueueCheck   = "queue-check"
 
 	NodeExecutionRequestStatePending   = "pending"
 	NodeExecutionRequestStateCompleted = "completed"
 )
 
-type NodeExecutionRequest struct {
+type WorkflowNodeExecutionRequest struct {
 	ID          uuid.UUID
 	WorkflowID  uuid.UUID
 	ExecutionID uuid.UUID
 	State       string
 	Type        string
 	Spec        datatypes.JSONType[NodeExecutionRequestSpec]
-	RunAt       *time.Time
+	RunAt       time.Time
 	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type NodeExecutionRequestSpec struct {
 	InvokeAction *InvokeAction `json:"invoke_action,omitempty"`
-	QueueCheck   *QueueCheck   `json:"queue_check,omitempty"`
 }
 
 type InvokeAction struct {
@@ -39,12 +38,8 @@ type InvokeAction struct {
 	Parameters map[string]any `json:"parameters"`
 }
 
-type QueueCheck struct {
-	ActionName string `json:"action_name"`
-}
-
-func LockNodeExecutionRequest(tx *gorm.DB, id uuid.UUID) (*NodeExecutionRequest, error) {
-	var request NodeExecutionRequest
+func LockNodeExecutionRequest(tx *gorm.DB, id uuid.UUID) (*WorkflowNodeExecutionRequest, error) {
+	var request WorkflowNodeExecutionRequest
 
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
@@ -59,8 +54,8 @@ func LockNodeExecutionRequest(tx *gorm.DB, id uuid.UUID) (*NodeExecutionRequest,
 	return &request, nil
 }
 
-func ListNodeExecutionRequests() ([]NodeExecutionRequest, error) {
-	var requests []NodeExecutionRequest
+func ListNodeExecutionRequests() ([]WorkflowNodeExecutionRequest, error) {
+	var requests []WorkflowNodeExecutionRequest
 
 	now := time.Now()
 	err := database.Conn().
@@ -76,8 +71,9 @@ func ListNodeExecutionRequests() ([]NodeExecutionRequest, error) {
 	return requests, nil
 }
 
-func (r *NodeExecutionRequest) Complete(tx *gorm.DB) error {
+func (r *WorkflowNodeExecutionRequest) Complete(tx *gorm.DB) error {
 	return tx.Model(r).
 		Update("state", NodeExecutionRequestStateCompleted).
+		Update("updated_at", time.Now()).
 		Error
 }

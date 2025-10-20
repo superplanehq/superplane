@@ -1189,14 +1189,20 @@ message Alert {
     ALERT_TYPE_INFO = 3;
   }
 
+  enum AlertOriginType {
+    ALERT_ORIGIN_TYPE_UNKNOWN = 0;
+    ALERT_ORIGIN_TYPE_EVENT_REJECTION = 1;
+  }
+
   string id = 1;
   AlertType type = 2;
-  string message = 3;
-  string source_id = 4;
-  EventSourceType source_type = 5;
-  bool acknowledged = 6;
-  google.protobuf.Timestamp acknowledged_at = 7;
-  google.protobuf.Timestamp created_at = 8;
+  AlertOriginType origin_type = 3;
+  string message = 4;
+  string source_id = 5;
+  EventSourceType source_type = 6;
+  bool acknowledged = 7;
+  google.protobuf.Timestamp acknowledged_at = 8;
+  google.protobuf.Timestamp created_at = 9;
 }
 
 message StageCreated {

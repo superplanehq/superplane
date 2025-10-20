@@ -174,7 +174,7 @@ func (c *GroupBy) Execute(ctx components.ExecutionContext) error {
 
 	//
 	// We are still waiting for events from some nodes.
-	// Save the metadata and schedule queue check.
+	// Save the metadata and schedule action to be executed when new item appears in the queue.
 	//
 	ctx.MetadataContext.Set(metadata)
 	return ctx.RequestContext.SubscribeTo("new-queue-item", "onQueueItem")
@@ -183,10 +183,10 @@ func (c *GroupBy) Execute(ctx components.ExecutionContext) error {
 func (c *GroupBy) Actions() []components.Action {
 	return []components.Action{
 		{
-			Name:         "onQueueItem",
-			Description:  "Receive new queue item from processing engine",
-			Parameters:   []components.ConfigurationField{},
-			IsUserAction: false,
+			Name:           "onQueueItem",
+			Description:    "Receive new queue item from processing engine",
+			Parameters:     []components.ConfigurationField{},
+			UserAccessible: false,
 		},
 	}
 }

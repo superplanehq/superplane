@@ -48,7 +48,7 @@ func (w *NodeExecutionRequestWorker) Start(ctx context.Context) {
 					continue
 				}
 
-				go func(request models.NodeExecutionRequest) {
+				go func(request models.WorkflowNodeExecutionRequest) {
 					defer w.semaphore.Release(1)
 
 					if err := w.LockAndProcessRequest(request); err != nil {
@@ -60,7 +60,7 @@ func (w *NodeExecutionRequestWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *NodeExecutionRequestWorker) LockAndProcessRequest(request models.NodeExecutionRequest) error {
+func (w *NodeExecutionRequestWorker) LockAndProcessRequest(request models.WorkflowNodeExecutionRequest) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeExecutionRequest(tx, request.ID)
 		if err != nil {
@@ -72,7 +72,7 @@ func (w *NodeExecutionRequestWorker) LockAndProcessRequest(request models.NodeEx
 	})
 }
 
-func (w *NodeExecutionRequestWorker) processRequest(tx *gorm.DB, request *models.NodeExecutionRequest) error {
+func (w *NodeExecutionRequestWorker) processRequest(tx *gorm.DB, request *models.WorkflowNodeExecutionRequest) error {
 	switch request.Type {
 	case models.NodeExecutionRequestTypeInvokeAction:
 		return w.invokeAction(tx, request)
@@ -81,7 +81,7 @@ func (w *NodeExecutionRequestWorker) processRequest(tx *gorm.DB, request *models
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
 }
 
-func (w *NodeExecutionRequestWorker) invokeAction(tx *gorm.DB, request *models.NodeExecutionRequest) error {
+func (w *NodeExecutionRequestWorker) invokeAction(tx *gorm.DB, request *models.WorkflowNodeExecutionRequest) error {
 	execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, request.ExecutionID)
 	if err != nil {
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
@@ -115,9 +115,10 @@ func (w *NodeExecutionRequestWorker) invokeAction(tx *gorm.DB, request *models.N
 
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
-		ActionParameters:      spec.InvokeAction.Parameters,
+		Parameters:            spec.InvokeAction.Parameters,
 		MetadataContext:       contexts.NewMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
+		WorkflowContext:       contexts.NewWorkflowContext(tx, execution),
 	}
 
 	err = component.HandleAction(actionCtx)

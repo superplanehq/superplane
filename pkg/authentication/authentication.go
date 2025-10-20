@@ -5,12 +5,15 @@ import (
 	"encoding/base64"
 	"html/template"
 	"net/http"
+	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
+	"github.com/markbates/goth/providers/google"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -25,6 +28,7 @@ type Handler struct {
 	authService authorization.Authorization
 	encryptor   crypto.Encryptor
 	isDev       bool
+	templateDir string
 }
 
 type ProviderConfig struct {
@@ -33,12 +37,13 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string) *Handler {
 	return &Handler{
 		jwtSigner:   jwtSigner,
 		encryptor:   encryptor,
 		authService: authService,
 		isDev:       appEnv == "development",
+		templateDir: templateDir,
 	}
 }
 
@@ -55,6 +60,9 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		case models.ProviderGitHub:
 			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "user:email"))
 			log.Infof("GitHub OAuth provider initialized")
+		case models.ProviderGoogle:
+			gothProviders = append(gothProviders, google.New(config.Key, config.Secret, config.CallbackURL, "email", "profile"))
+			log.Infof("Google OAuth provider initialized")
 		default:
 			log.Warnf("Unknown provider: %s", providerName)
 		}
@@ -199,7 +207,17 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 		//
 		// TODO: this is not using the transaction properly
 		//
-		return a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
+		err = a.authService.AssignRole(user.ID.String(), models.RoleOrgViewer, invitation.OrganizationID.String(), models.DomainTypeOrganization)
+		if err != nil {
+			return err
+		}
+		for _, canvasID := range invitation.CanvasIDs.Data() {
+			err = a.authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -247,8 +265,11 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
-	t, err := template.New("login").Parse(loginTemplate)
+	templatePath := filepath.Join(a.templateDir, "login.html")
+
+	t, err := template.ParseFiles(templatePath)
 	if err != nil {
+		log.Errorf("Error parsing login template: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -258,6 +279,7 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	for name := range providers {
 		providerNames = append(providerNames, name)
 	}
+	sort.Strings(providerNames)
 
 	data := struct {
 		Providers []string
@@ -265,7 +287,11 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		Providers: providerNames,
 	}
 
-	t.Execute(w, data)
+	err = t.Execute(w, data)
+	if err != nil {
+		log.Errorf("Error executing login template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 func findOrCreateAccount(name, email string) (*models.Account, error) {
@@ -325,90 +351,3 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 
 	return database.Conn().Create(accountProvider).Error
 }
-
-const loginTemplate = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Superplane</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .login-container {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-        }
-        .logo {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 2rem;
-        }
-        .login-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.2s;
-            width: 100%;
-            box-sizing: border-box;
-            margin-bottom: 12px;
-        }
-        .login-btn:last-child {
-            margin-bottom: 0;
-        }
-        .login-btn.github {
-            background: #24292e;
-            color: white;
-        }
-        .login-btn.github:hover {
-            background: #1a1e22;
-        }
-        .provider-icon {
-            width: 20px;
-            height: 20px;
-            margin-right: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <div class="logo">Superplane</div>
-        <div class="subtitle">Welcome back! Please sign in to continue.</div>
-        
-        {{range .Providers}}
-        <a href="/auth/{{.}}" class="login-btn {{.}}">
-            {{if eq . "github"}}
-                <svg class="provider-icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-                Continue with GitHub
-            {{end}}
-        </a>
-    {{end}}
-    </div>
-</body>
-</html>
-`

@@ -38,6 +38,7 @@ func HandleEventRejectionCreated(messageBody []byte) (*models.Alert, error) {
 		rejection.TargetType,
 		rejection.Message,
 		models.AlertTypeError,
+		models.AlertOriginTypeEventRejection,
 	)
 
 	if err != nil {

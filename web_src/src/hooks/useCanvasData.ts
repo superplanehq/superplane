@@ -20,16 +20,16 @@ import {
   superplaneDescribeConnectionGroup,
   integrationsListIntegrations,
   superplaneAddUser,
-  superplaneRemoveUser,
   superplaneListEvents,
   superplaneListStageEvents,
   superplaneListStageExecutions,
   superplaneListEventRejections,
   superplaneListAlerts,
   superplaneAcknowledgeAlert,
+  superplaneRemoveUser,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
-import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState, SuperplaneAlert } from '../api-client/types.gen'
+import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping, SuperplaneStageEventState, SuperplaneAlert, RolesAssignRoleData } from '../api-client/types.gen'
 
 export const canvasKeys = {
   all: ['canvas'] as const,
@@ -97,26 +97,26 @@ export const useOrganizationUsersForCanvas = (organizationId: string) => {
 
 export const useAssignCanvasRole = (canvasId: string) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: async (params: { 
-      userId?: string, 
-      userEmail?: string,
+    mutationFn: async (params: {
+      userId?: string,
       role: string,
     }) => {
       return await rolesAssignRole(withOrganizationHeader({
         path: { roleName: params.role },
         body: {
           userId: params.userId,
-          userEmail: params.userEmail,
           domainId: canvasId,
           domainType: 'DOMAIN_TYPE_CANVAS'
         }
-      }))
+      } as RolesAssignRoleData))
     },
     onSuccess: () => {
       // Invalidate and refetch canvas users
       queryClient.invalidateQueries({ queryKey: canvasKeys.users(canvasId) })
+      // Invalidate organization invitations - we need to get the organizationId
+      queryClient.invalidateQueries({ queryKey: ['organization', 'invitations'] })
     }
   })
 }
@@ -142,18 +142,22 @@ export const useAddCanvasUser = (canvasId: string) => {
 
 export const useRemoveCanvasUser = (canvasId: string) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: async (params: { 
+    mutationFn: async (params: {
       userId: string,
     }) => {
       return await superplaneRemoveUser(withOrganizationHeader({
-        path: { canvasIdOrName: canvasId, userId: params.userId }
+        path: {
+          canvasIdOrName: canvasId,
+          userId: params.userId
+        },
       }))
     },
     onSuccess: () => {
-      // Invalidate and refetch canvas users
       queryClient.invalidateQueries({ queryKey: canvasKeys.users(canvasId) })
+      // Invalidate organization invitations
+      queryClient.invalidateQueries({ queryKey: ['organization', 'invitations'] })
     }
   })
 }

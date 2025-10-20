@@ -3,6 +3,10 @@ import { Heading } from '../../../components/Heading/heading'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Avatar } from '../../../components/Avatar/avatar'
 import { Input, InputGroup } from '../../../components/Input/input'
+import { Button } from '../../../components/Button/button'
+import { Textarea } from '../../../components/Textarea/textarea'
+import { Text } from '../../../components/Text/text'
+import { Badge } from '../../../components/Badge/badge'
 import {
   Dropdown,
   DropdownButton,
@@ -19,7 +23,15 @@ import {
   TableHeader,
   TableCell
 } from '../../../components/Table/table'
-import { useOrganizationUsers, useOrganizationRoles, useAssignRole, useRemoveOrganizationUser } from '../../../hooks/useOrganizationData'
+import {
+  useOrganizationUsers,
+  useOrganizationRoles,
+  useAssignRole,
+  useRemoveOrganizationSubject,
+  useOrganizationInvitations,
+  useCreateInvitation,
+  useRemoveInvitation
+} from '../../../hooks/useOrganizationData'
 
 interface Member {
   id: string
@@ -29,7 +41,24 @@ interface Member {
   roleName: string
   initials: string
   avatar?: string
+  type: 'member'
+  status: 'active'
 }
+
+interface PendingInvitation {
+  id: string
+  name: string
+  email: string
+  role: string
+  roleName: string
+  initials: string
+  type: 'invitation'
+  status: 'pending'
+  createdAt?: string
+  state?: string
+}
+
+type UnifiedMember = Member | PendingInvitation
 
 interface MembersProps {
   organizationId: string
@@ -38,23 +67,40 @@ interface MembersProps {
 export function Members({ organizationId }: MembersProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Member | null
+    key: keyof UnifiedMember | null
     direction: 'asc' | 'desc'
   }>({ key: null, direction: 'asc' })
+  const [emailsInput, setEmailsInput] = useState('')
+  const [invitationError, setInvitationError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'invited'>('all')
+
 
   // Use React Query hooks for data fetching
   const { data: users = [], isLoading: loadingMembers, error: usersError } = useOrganizationUsers(organizationId)
   const { data: organizationRoles = [], isLoading: loadingRoles, error: rolesError } = useOrganizationRoles(organizationId)
 
+  // Fetch pending invitations
+  const { data: invitations = [], isLoading: loadingInvitations, error: invitationsError } = useOrganizationInvitations(organizationId)
+
   // Mutations for role assignment and user removal
   const assignRoleMutation = useAssignRole(organizationId)
-  const removeUserMutation = useRemoveOrganizationUser(organizationId)
+  const removeUserMutation = useRemoveOrganizationSubject(organizationId)
+  const removeInvitationMutation = useRemoveInvitation(organizationId)
 
-  const error = usersError || rolesError
+  // Create invitation mutation
+  const createInvitationMutation = useCreateInvitation(organizationId, {
+    onError: (error: Error) => {
+      setInvitationError(error.message)
+    }
+  })
+
+
+  const error = usersError || rolesError || invitationsError
+  const isInviting = createInvitationMutation.isPending
 
   // Transform users to Member interface format
   const members = useMemo(() => {
-    return users.map((user) => {
+    return users.map((user): Member => {
       // Generate initials from displayName or userId
       const name = user.spec?.displayName || 'Unknown User'
       const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -70,19 +116,47 @@ export function Members({ organizationId }: MembersProps) {
         role: primaryRoleDisplayName,
         roleName: primaryRoleName,
         initials: initials,
-        avatar: user.spec?.accountProviders?.[0]?.avatarUrl
+        avatar: user.spec?.accountProviders?.[0]?.avatarUrl,
+        type: 'member',
+        status: 'active'
       }
     })
   }, [users])
 
-  const handleSort = (key: keyof Member) => {
+  // Transform invitations to PendingInvitation interface format
+  const pendingInvitations = useMemo(() => {
+    return invitations.map((invitation): PendingInvitation => {
+      const name = invitation.email?.split('@')[0] || 'Unknown'
+      const initials = name.charAt(0).toUpperCase()
+
+      return {
+        id: invitation.id || '',
+        name: name,
+        email: invitation.email || '',
+        role: 'Invited',
+        roleName: 'pending',
+        initials: initials,
+        type: 'invitation',
+        status: 'pending',
+        createdAt: invitation.createdAt,
+        state: invitation.state
+      }
+    })
+  }, [invitations])
+
+  // Combine members and invitations
+  const unifiedMembers = useMemo(() => {
+    return [...members, ...pendingInvitations]
+  }, [members, pendingInvitations])
+
+  const handleSort = (key: keyof UnifiedMember) => {
     setSortConfig(prevConfig => ({
       key,
       direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
     }))
   }
 
-  const getSortIcon = (columnKey: keyof Member) => {
+  const getSortIcon = (columnKey: keyof UnifiedMember) => {
     if (sortConfig.key !== columnKey) {
       return 'unfold_more'
     }
@@ -90,9 +164,9 @@ export function Members({ organizationId }: MembersProps) {
   }
 
   const getSortedMembers = () => {
-    if (!sortConfig.key) return members
+    if (!sortConfig.key) return unifiedMembers
 
-    return [...members].sort((a, b) => {
+    return [...unifiedMembers].sort((a, b) => {
       const aValue = a[sortConfig.key!]
       const bValue = b[sortConfig.key!]
 
@@ -112,9 +186,19 @@ export function Members({ organizationId }: MembersProps) {
 
   const getFilteredMembers = () => {
     const sorted = getSortedMembers()
-    if (!searchTerm) return sorted
+    let filtered = sorted
 
-    return sorted.filter(member =>
+    // Apply tab filter
+    if (activeTab === 'active') {
+      filtered = sorted.filter(member => member.type === 'member')
+    } else if (activeTab === 'invited') {
+      filtered = sorted.filter(member => member.type === 'invitation')
+    }
+
+    // Apply search filter
+    if (!searchTerm) return filtered
+
+    return filtered.filter(member =>
       member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.role.toLowerCase().includes(searchTerm.toLowerCase())
@@ -132,16 +216,84 @@ export function Members({ organizationId }: MembersProps) {
     }
   }
 
-  const handleMemberRemove = async (memberId: string) => {
+  const handleMemberRemove = async (member: UnifiedMember) => {
     try {
-      await removeUserMutation.mutateAsync({
-        userId: memberId,
-      })
+      if (member.type === 'member') {
+        await removeUserMutation.mutateAsync({
+          userId: member.id,
+        })
+      } else {
+        await removeInvitationMutation.mutateAsync(member.id)
+      }
     } catch (err) {
       console.error('Error removing member:', err)
     }
   }
 
+  const isEmailValid = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const handleEmailsSubmit = async () => {
+    if (!emailsInput.trim()) return
+
+    try {
+      const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0 && isEmailValid(email))
+
+      // Process each email
+      for (const email of emails) {
+        await createInvitationMutation.mutateAsync(email)
+      }
+
+      setEmailsInput('')
+      setInvitationError(null)
+    } catch {
+      console.error('Failed to send invitations')
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleEmailsSubmit()
+    }
+  }
+
+  const getStateBadge = (member: UnifiedMember) => {
+    if (member.type === 'member') {
+      return <Badge color="green">Active</Badge>
+    } else {
+      return <Badge color="yellow">Invited</Badge>
+    }
+  }
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A'
+
+    const date = new Date(dateString)
+
+    if (isNaN(date.getTime())) {
+      console.error('Invalid date string:', dateString)
+      return 'Invalid Date'
+    }
+
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
+  const getTabCounts = () => {
+    const activeCount = members.length
+    const invitedCount = pendingInvitations.length
+    const totalCount = activeCount + invitedCount
+
+    return { activeCount, invitedCount, totalCount }
+  }
+
+  const { activeCount, invitedCount, totalCount } = getTabCounts()
 
   return (
     <div className="space-y-6 pt-6">
@@ -157,10 +309,86 @@ export function Members({ organizationId }: MembersProps) {
         </div>
       )}
 
+      {/* Send Invitations Section */}
+      <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <Text className="text-left font-semibold text-zinc-900 dark:text-white mb-1">
+              Invite new members
+            </Text>
+            <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+              Add people to your organization by sending them an invitation
+            </Text>
+          </div>
+        </div>
+
+        {invitationError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p className="text-sm">{invitationError}</p>
+          </div>
+        )}
+
+        {/* Email Input Section */}
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <Textarea
+              rows={1}
+              placeholder="Email addresses, separated by commas"
+              className="flex-1"
+              value={emailsInput}
+              onChange={(e) => setEmailsInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+            <Button
+              color="blue"
+              className='flex items-center text-sm gap-2'
+              onClick={handleEmailsSubmit}
+              disabled={!emailsInput.trim() || isInviting}
+            >
+              <MaterialSymbol name="add" size="sm" />
+              {isInviting ? 'Sending...' : 'Send Invitations'}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Members List */}
       <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         <div className="px-6 pt-6 pb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              {/* Tab Navigation */}
+              <div className="flex border border-zinc-200 dark:border-zinc-700 rounded-lg p-1">
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'all'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                >
+                  All ({totalCount})
+                </button>
+                <button
+                  onClick={() => setActiveTab('active')}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'active'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                >
+                  Active ({activeCount})
+                </button>
+                <button
+                  onClick={() => setActiveTab('invited')}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${activeTab === 'invited'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    }`}
+                >
+                  Invited ({invitedCount})
+                </button>
+              </div>
+            </div>
+
             <InputGroup>
               <Input
                 name="search"
@@ -175,9 +403,9 @@ export function Members({ organizationId }: MembersProps) {
         </div>
 
         <div className="px-6 pb-6">
-          {loadingMembers ? (
+          {loadingMembers || loadingInvitations ? (
             <div className="flex justify-center items-center h-32">
-              <p className="text-zinc-500 dark:text-zinc-400">Loading members...</p>
+              <p className="text-zinc-500 dark:text-zinc-400">Loading...</p>
             </div>
           ) : (
             <Table dense>
@@ -210,6 +438,15 @@ export function Members({ organizationId }: MembersProps) {
                       <MaterialSymbol name={getSortIcon('role')} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
+                  <TableHeader
+                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Status
+                      <MaterialSymbol name={getSortIcon('status')} size="sm" className="text-zinc-400" />
+                    </div>
+                  </TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
@@ -219,7 +456,7 @@ export function Members({ organizationId }: MembersProps) {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar
-                          src={member.avatar}
+                          src={member.type === 'member' ? member.avatar : undefined}
                           initials={member.initials}
                           className="size-8"
                         />
@@ -227,6 +464,11 @@ export function Members({ organizationId }: MembersProps) {
                           <div className="text-sm font-medium text-zinc-900 dark:text-white">
                             {member.name}
                           </div>
+                          {member.type === 'invitation' && (
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                              Invited {formatDate(member.createdAt)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -234,31 +476,40 @@ export function Members({ organizationId }: MembersProps) {
                       {member.email}
                     </TableCell>
                     <TableCell>
-                      <Dropdown>
-                        <DropdownButton outline className="flex items-center gap-2 text-sm">
-                          {member.role}
-                          <MaterialSymbol name="keyboard_arrow_down" />
-                        </DropdownButton>
-                        <DropdownMenu>
-                          {organizationRoles.map((role) => (
-                            <DropdownItem
-                              key={role.metadata?.name}
-                              onClick={() => handleRoleChange(member.id, role.metadata?.name || '')}
-                              disabled={loadingRoles}
-                            >
-                              <DropdownLabel>{role.spec?.displayName || role.metadata?.name}</DropdownLabel>
-                              {role.spec?.description && (
-                                <DropdownDescription>{role.spec?.description}</DropdownDescription>
-                              )}
-                            </DropdownItem>
-                          ))}
-                          {loadingRoles && (
-                            <DropdownItem disabled>
-                              <DropdownLabel>Loading roles...</DropdownLabel>
-                            </DropdownItem>
-                          )}
-                        </DropdownMenu>
-                      </Dropdown>
+                      {member.type === 'member' ? (
+                        <Dropdown>
+                          <DropdownButton outline className="flex items-center gap-2 text-sm">
+                            {member.role}
+                            <MaterialSymbol name="keyboard_arrow_down" />
+                          </DropdownButton>
+                          <DropdownMenu>
+                            {organizationRoles.map((role) => (
+                              <DropdownItem
+                                key={role.metadata?.name}
+                                onClick={() => handleRoleChange(member.id, role.metadata?.name || '')}
+                                disabled={loadingRoles}
+                              >
+                                <DropdownLabel>{role.spec?.displayName || role.metadata?.name}</DropdownLabel>
+                                {role.spec?.description && (
+                                  <DropdownDescription>{role.spec?.description}</DropdownDescription>
+                                )}
+                              </DropdownItem>
+                            ))}
+                            {loadingRoles && (
+                              <DropdownItem disabled>
+                                <DropdownLabel>Loading roles...</DropdownLabel>
+                              </DropdownItem>
+                            )}
+                          </DropdownMenu>
+                        </Dropdown>
+                      ) : (
+                        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                          -
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {getStateBadge(member)}
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
@@ -267,9 +518,9 @@ export function Members({ organizationId }: MembersProps) {
                             <MaterialSymbol name="more_vert" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>
-                            <DropdownItem onClick={() => handleMemberRemove(member.id)}>
+                            <DropdownItem onClick={() => handleMemberRemove(member)}>
                               <MaterialSymbol name="delete" />
-                              Remove
+                              {member.type === 'member' ? 'Remove' : 'Cancel invitation'}
                             </DropdownItem>
                           </DropdownMenu>
                         </Dropdown>

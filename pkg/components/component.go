@@ -1,5 +1,7 @@
 package components
 
+import "time"
+
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
 
 type Component interface {
@@ -124,28 +126,31 @@ type WorkflowNode struct {
 	ID string
 }
 
+/*
+ * RequestContext allows the execution to schedule
+ * work with the processing engine.
+ */
 type RequestContext interface {
 
 	//
 	// Allows the scheduling of a certain component action at a later time
 	//
-	ScheduleActionCall(actionName string, parameters map[string]any) error
+	ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error
 
 	//
-	// Allows the component execution to fetch the next item in the node's queue.
-	// After the processing does so, {actionName} is called.
+	// Subscribe to a system event.
 	//
-	SubscribeTo(eventType string, actionName string) error
+	SubscribeTo(eventName string, actionName string) error
 }
 
 /*
  * Custom action definition for a component.
  */
 type Action struct {
-	Name         string
-	Description  string
-	IsUserAction bool
-	Parameters   []ConfigurationField
+	Name           string
+	Description    string
+	UserAccessible bool
+	Parameters     []ConfigurationField
 }
 
 /*
@@ -155,7 +160,7 @@ type Action struct {
 type ActionContext struct {
 	Name                  string
 	Data                  any
-	ActionParameters      map[string]any
+	Parameters            map[string]any
 	NodeConfiguration     any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
@@ -168,7 +173,6 @@ const (
 	FieldTypeBool        = "boolean"
 	FieldTypeSelect      = "select"
 	FieldTypeMultiSelect = "multi_select"
-	FieldTypeDate        = "date"
 	FieldTypeURL         = "url"
 	FieldTypeList        = "list"
 	FieldTypeObject      = "object"

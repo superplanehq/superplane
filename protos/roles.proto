@@ -130,16 +130,6 @@ message AssignRoleRequest {
 
 message AssignRoleResponse {}
 
-message RemoveRoleRequest {
-  Authorization.DomainType domain_type = 1;
-  string domain_id = 2;
-  string role_name = 3;
-  string user_id = 4;
-  string user_email = 5;
-}
-
-message RemoveRoleResponse {}
-
 message ListRolesRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;

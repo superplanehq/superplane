@@ -25,6 +25,7 @@ import (
 	ifp "github.com/superplanehq/superplane/pkg/components/if"
 	noopComponent "github.com/superplanehq/superplane/pkg/components/noop"
 	switchp "github.com/superplanehq/superplane/pkg/components/switch"
+	"github.com/superplanehq/superplane/pkg/components/wait"
 	"gorm.io/gorm"
 )
 
@@ -90,6 +91,7 @@ func (r *Registry) Init() {
 	r.Components["http"] = &httpComponent.HTTP{}
 	r.Components["approval"] = &approval.Approval{}
 	r.Components["noop"] = &noopComponent.NoOp{}
+	r.Components["wait"] = &wait.Wait{}
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {

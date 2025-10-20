@@ -81,7 +81,7 @@ spec:
           valueFrom:
             eventData:
               connection: terraform
-              expression: ref
+              expression: '$.ref'
         - name: IMAGE
           valueFrom:
             lastExecution:
@@ -98,7 +98,7 @@ spec:
           valueFrom:
             eventData:
               connection: build-test-release
-              expression: outputs.IMAGE
+              expression: '$.outputs.IMAGE'
 
   executor:
     type: TYPE_HTTP
@@ -131,7 +131,7 @@ spec:
           valueFrom:
             eventData:
               connection: build-test-release
-              expression: outputs.IMAGE
+              expression: '$.outputs.IMAGE'
 
   executor:
     type: TYPE_HTTP
@@ -156,7 +156,7 @@ spec:
       filters:
         - type: FILTER_TYPE_DATA
           data:
-            expression: outputs.IMAGE != ""
+            expression: '$.outputs.IMAGE != ""'
 
   inputs:
     - name: IMAGE
@@ -167,7 +167,7 @@ spec:
           valueFrom:
             eventData:
               connection: deploy-devel
-              expression: outputs.IMAGE
+              expression: '$.outputs.IMAGE'
 
   executor:
     type: TYPE_HTTP
@@ -195,7 +195,7 @@ spec:
       filters:
         - type: FILTER_TYPE_DATA
           data:
-            expression: outputs.TERRAFORM != ""
+            expression: `$.outputs.TERRAFORM != ""`
     - type: TYPE_STAGE
       name: security-scan
     - type: TYPE_STAGE
@@ -214,7 +214,7 @@ spec:
           valueFrom:
             eventData:
               connection: deploy-devel
-              expression: outputs.TERRAFORM
+              expression: '$.outputs.TERRAFORM'
         - name: IMAGE
           valueFrom:
             lastExecution:
@@ -227,7 +227,7 @@ spec:
           valueFrom:
             eventData:
               connection: security-scan
-              expression: outputs.IMAGE
+              expression: '$.outputs.IMAGE'
         - name: TERRAFORM
           valueFrom:
             lastExecution:
@@ -240,7 +240,7 @@ spec:
           valueFrom:
             eventData:
               connection: e2e-tests
-              expression: outputs.IMAGE
+              expression: '$.outputs.IMAGE'
         - name: TERRAFORM
           valueFrom:
             lastExecution:

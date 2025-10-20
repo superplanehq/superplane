@@ -32,7 +32,7 @@ spec:
       filters:
         - type: FILTER_TYPE_DATA
           data:
-            expression: "ref == 'refs/heads/main'"
+            expression: "$.ref == 'refs/heads/main'"
         - type: FILTER_TYPE_HEADER
           header:
             expression: "headers['X-GitHub-Event'] == 'push'"
@@ -65,7 +65,7 @@ spec:
           valueFrom:
             eventData:
               connection: github-webhook
-              expression: "commit_sha[0:7]" # Use first 7 chars of commit SHA
+              expression: "$.commits[0].id[0:7]" # Use first 7 chars of commit SHA
         - name: ENVIRONMENT
           value: "staging" # Static value
 

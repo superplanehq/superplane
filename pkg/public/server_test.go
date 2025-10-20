@@ -35,7 +35,7 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService)
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -65,7 +65,7 @@ func Test__ReceiveWebhookFromIntegration(t *testing.T) {
 		Create()
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", r.AuthService)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", r.AuthService)
 	require.NoError(t, err)
 
 	validEvent, _ := json.Marshal(semaphore.Hook{
@@ -195,7 +195,7 @@ func Test__ReceiveCustomWebhook(t *testing.T) {
 	authService.EnableCache(false)
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService)
 	require.NoError(t, err)
 
 	key, err := r.Encryptor.Decrypt(context.Background(), r.Source.Key, []byte(r.Source.ID.String()))
@@ -357,7 +357,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService)
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, stage)
@@ -540,7 +540,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService)
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -610,7 +610,7 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", "/app/templates", authService)
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")

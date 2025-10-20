@@ -24,6 +24,10 @@ import (
 )
 
 func ValidateUUIDs(ids ...string) error {
+	return ValidateUUIDsArray(ids)
+}
+
+func ValidateUUIDsArray(ids []string) error {
 	for _, id := range ids {
 		_, err := uuid.Parse(id)
 		if err != nil {

@@ -82,12 +82,13 @@ func NewServer(
 	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
 	appEnv string,
+	templateDir string,
 	authorizationService authorization.Authorization,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -133,7 +134,16 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 		}
 	}
 
-	// ...Other providers must be added here
+	// Google
+	if googleKey := os.Getenv("GOOGLE_CLIENT_ID"); googleKey != "" {
+		if googleSecret := os.Getenv("GOOGLE_CLIENT_SECRET"); googleSecret != "" {
+			providers["google"] = authentication.ProviderConfig{
+				Key:         googleKey,
+				Secret:      googleSecret,
+				CallbackURL: fmt.Sprintf("%s/auth/google/callback", baseURL),
+			}
+		}
+	}
 	return providers
 }
 

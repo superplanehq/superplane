@@ -1,0 +1,364 @@
+import React, { useState, useEffect, useRef, forwardRef } from 'react';
+import { twMerge } from 'tailwind-merge';
+import { flattenForAutocomplete, getAutocompleteSuggestions, getAutocompleteSuggestionsWithTypes, getValueAtPath } from './core';
+
+export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithoutRef<'input'>, 'onChange' | 'size'> {
+  exampleObj: Record<string, unknown> | null;
+  value?: string;
+  onChange?: (value: string) => void;
+  className?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  prefix?: string;
+  suffix?: string;
+  startWord?: string;
+  inputSize?: 'xs' | 'sm' | 'md' | 'lg';
+  noExampleObjectText?: string;
+  showValuePreview?: boolean;
+}
+
+let blurTimeout: NodeJS.Timeout;
+
+export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noExampleObjectText = 'No suggestions found', showValuePreview = false, ...props }) => {
+    const [inputValue, setInputValue] = useState(value);
+    const [suggestions, setSuggestions] = useState<Array<{ suggestion: string; type: string }>>([]);
+    const [isOpen, setIsOpen] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
+    const [highlightedIndex, setHighlightedIndex] = useState(-1);
+    const [flattenedData, setFlattenedData] = useState<Record<string, string[]>>({});
+    const [highlightedValue, setHighlightedValue] = useState<unknown>(undefined);
+    const previousWordLength = useRef<number>(0);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    const suggestionsRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const getWordAtCursor = (text: string, position: number) => {
+      const beforeCursor = text.substring(0, position);
+      const afterCursor = text.substring(position);
+
+      const wordStart = Math.max(0, beforeCursor.lastIndexOf(' ') + 1);
+      const wordEndInAfter = afterCursor.indexOf(' ');
+      const wordEnd = wordEndInAfter === -1 ? text.length : position + wordEndInAfter;
+
+      const word = text.substring(wordStart, wordEnd);
+      return {
+        word,
+        start: wordStart,
+        end: wordEnd
+      };
+    };
+
+    // Helper function to replace word at cursor position
+    const replaceWordAtCursor = (text: string, position: number, newWord: string) => {
+      const { start, end } = getWordAtCursor(text, position);
+      return text.substring(0, start) + newWord + text.substring(end);
+    };
+
+    // Helper function to build full path for a suggestion
+    const buildFullPath = (suggestion: string) => {
+      const cursorPosition = inputRef.current?.selectionStart || 0;
+      const { word } = getWordAtCursor(inputValue, cursorPosition);
+      const allPreviousKeys = word.split('.');
+      const withoutLastKey = allPreviousKeys.slice(0, -1).join('.');
+
+      return suggestion.startsWith(withoutLastKey) ? suggestion :
+        withoutLastKey ? `${withoutLastKey}.${suggestion}` : suggestion;
+    };
+
+    // Flatten the example object when it changes
+    useEffect(() => {
+      if (exampleObj) {
+        const flattened = flattenForAutocomplete(exampleObj);
+        setFlattenedData(flattened);
+      }
+    }, [exampleObj]);
+
+    useEffect(() => {
+      setInputValue(value);
+    }, [value]);
+
+    useEffect(() => {
+      if (!flattenedData || !isFocused) {
+        setSuggestions([]);
+        setIsOpen(false);
+        return;
+      }
+
+      const cursorPosition = inputRef.current?.selectionStart || 0;
+      const { word } = getWordAtCursor(inputValue, cursorPosition);
+
+      if (word === '') {
+        previousWordLength.current = 0;
+        setSuggestions([]);
+        setIsOpen(false);
+        return;
+      }
+
+      if (startWord && word === startWord && previousWordLength.current < word.length) {
+        const newValue = replaceWordAtCursor(inputValue, cursorPosition, prefix || '');
+        setInputValue(newValue);
+        onChange?.(newValue);
+        setSuggestions([]);
+        setIsOpen(false);
+        return;
+      }
+
+      const lastKey = word.split('.').slice(-1)[0];
+      const parsedInput = word.split('.').slice(0, -1).join('.');
+      const basePath = parsedInput || '';
+
+      const newSuggestions = getAutocompleteSuggestionsWithTypes(flattenedData, parsedInput || 'root', basePath, exampleObj);
+      const arraySuggestions = getAutocompleteSuggestionsWithTypes(flattenedData, parsedInput ? `${parsedInput}.${lastKey}` : lastKey, basePath, exampleObj).filter(({ suggestion }) => suggestion.match(/\[\d+\]$/));
+      const similarSuggestions = newSuggestions.filter(({ suggestion }) => suggestion.startsWith(lastKey) && suggestion !== lastKey);
+
+      // Merge suggestions and remove duplicates based on suggestion text
+      const allSuggestionsMap = new Map();
+      [...arraySuggestions, ...similarSuggestions].forEach(item => {
+        allSuggestionsMap.set(item.suggestion, item);
+      });
+      const allSuggestions = Array.from(allSuggestionsMap.values());
+
+      setSuggestions(allSuggestions);
+      setIsOpen(allSuggestions.length > 0 || (allSuggestions.length === 0 && word.endsWith('.')) || (!exampleObj && word.endsWith('.')));
+      setHighlightedIndex(-1);
+      previousWordLength.current = word.length;
+
+    }, [inputValue, flattenedData, isFocused, startWord, prefix, onChange]);
+
+    // Handle clicking outside to close suggestions
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+          setIsOpen(false);
+          setIsFocused(false);
+          setHighlightedIndex(-1);
+          setHighlightedValue(undefined);
+        }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = e.target.value;
+      setInputValue(newValue);
+      onChange?.(newValue);
+    };
+
+    const handleSuggestionClick = (suggestionItem: { suggestion: string; type: string }) => {
+      const cursorPosition = inputRef.current?.selectionStart || 0;
+      const { word } = getWordAtCursor(inputValue, cursorPosition);
+
+      const allPreviousKeys = word.split('.');
+      const withoutLastKey = allPreviousKeys.slice(0, -1).join('.');
+      let newValue = suggestionItem.suggestion.startsWith(withoutLastKey) ? suggestionItem.suggestion : `${withoutLastKey}.${suggestionItem.suggestion}`;
+      const nextSuggestions = getAutocompleteSuggestions(flattenedData, newValue);
+      const nextSuggestionsAreArraySuggestions = nextSuggestions.some((suggestion: string) => suggestion.match(/\[\d+\]$/));
+      const isFinalKey = (nextSuggestions.length > 0 && !nextSuggestionsAreArraySuggestions);
+      if (isFinalKey) {
+        newValue += '.';
+      } else {
+        newValue = `${newValue}${suffix}`;
+      }
+
+      newValue = replaceWordAtCursor(inputValue, cursorPosition, newValue);
+      setInputValue(newValue);
+      onChange?.(newValue);
+      setHighlightedIndex(-1);
+
+      if (nextSuggestions.length === 0) {
+        setIsOpen(false);
+        return;
+      }
+
+      clearTimeout(blurTimeout);
+      setTimeout(() => {
+        setIsFocused(true);
+        setIsOpen(true);
+        setHighlightedIndex(highlightedIndex);
+      }, 100);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!isOpen || suggestions.length === 0) return;
+
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setHighlightedIndex(prev => {
+            const newIndex = prev < suggestions.length - 1 ? prev + 1 : 0;
+            if (exampleObj && suggestions[newIndex]) {
+              const fullPath = buildFullPath(suggestions[newIndex].suggestion);
+              const value = getValueAtPath(exampleObj, fullPath);
+              setHighlightedValue(value);
+            }
+            return newIndex;
+          });
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setHighlightedIndex(prev => {
+            const newIndex = prev > 0 ? prev - 1 : suggestions.length - 1;
+            if (exampleObj && suggestions[newIndex]) {
+              const fullPath = buildFullPath(suggestions[newIndex].suggestion);
+              const value = getValueAtPath(exampleObj, fullPath);
+              setHighlightedValue(value);
+            }
+            return newIndex;
+          });
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (highlightedIndex >= 0) {
+            handleSuggestionClick(suggestions[highlightedIndex]);
+          }
+          break;
+        case 'Escape':
+          setIsOpen(false);
+          setHighlightedIndex(-1);
+          setHighlightedValue(undefined);
+          break;
+      }
+    };
+
+    // Scroll highlighted item into view
+    useEffect(() => {
+      if (highlightedIndex >= 0 && suggestionsRef.current) {
+        const highlightedElement = suggestionsRef.current.children[highlightedIndex] as HTMLElement;
+        if (highlightedElement) {
+          highlightedElement.scrollIntoView({
+            block: 'nearest',
+          });
+        }
+      }
+    }, [highlightedIndex]);
+
+    return (
+      <div ref={containerRef} className="relative w-full">
+        {/* Input Field */}
+        <span
+          data-slot="control"
+          className={twMerge([
+            'relative block w-full',
+            'before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm',
+            'dark:before:hidden',
+            'after:pointer-events-none after:absolute after:inset-0 after:rounded-lg after:ring-transparent after:ring-inset sm:focus-within:after:ring-2 sm:focus-within:after:ring-blue-500',
+            'has-data-disabled:opacity-50 has-data-disabled:before:bg-zinc-950/5 has-data-disabled:before:shadow-none',
+            'has-data-invalid:before:shadow-red-500/10',
+            className
+          ])}
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => {
+              setIsFocused(true);
+              if (suggestions.length > 0) {
+                setIsOpen(true);
+              }
+            }}
+            onBlur={() => {
+              // Small delay to allow click on suggestions
+              blurTimeout = setTimeout(() => {
+                setIsFocused(false);
+                setIsOpen(false);
+                setHighlightedValue(undefined);
+              }, 150);
+            }}
+            placeholder={placeholder}
+            disabled={disabled}
+            className={twMerge([
+              'relative block w-full appearance-none rounded-lg border border-zinc-950/10 hover:border-zinc-950/20 dark:border-white/10 dark:hover:border-white/20',
+              'bg-transparent dark:bg-white/5',
+              'text-zinc-950 placeholder:text-zinc-500 dark:text-white',
+              'focus:outline-none',
+              'invalid:border-red-500 dark:invalid:border-red-500',
+              'disabled:border-zinc-950/20 dark:disabled:border-white/15 dark:disabled:bg-white/2.5',
+              // Size variants
+              inputSize === 'xs' && 'px-2 py-1 text-xs',
+              inputSize === 'sm' && 'px-2 py-1.5 text-sm',
+              inputSize === 'md' && 'px-3 py-2 text-base sm:px-3 sm:py-1.5 sm:text-sm',
+              inputSize === 'lg' && 'px-4 py-3 text-lg',
+            ])}
+            {...props}
+          />
+        </span>
+
+        {/* Value Preview Box */}
+        {showValuePreview && highlightedIndex >= 0 && highlightedValue !== undefined && isOpen &&
+          (highlightedValue === null || (typeof highlightedValue !== 'object' && !Array.isArray(highlightedValue))) && (
+            <div className={twMerge([
+              'absolute z-50 w-full bottom-full mb-1 bg-white border border-zinc-200 rounded-lg shadow-lg p-3',
+              'dark:bg-zinc-800 dark:border-zinc-700'
+            ])}>
+              <div className="text-xs text-zinc-600 dark:text-zinc-300 mb-1">
+                Value Preview:
+              </div>
+              <div className="text-sm text-zinc-950 dark:text-white font-mono break-all">
+                {highlightedValue === null
+                  ? 'null'
+                  : typeof highlightedValue === 'string'
+                    ? `"${highlightedValue}"`
+                    : String(highlightedValue)}
+              </div>
+            </div>
+          )}
+
+        {/* Suggestions Dropdown */}
+        {isOpen && suggestions.length > 0 && (
+          <div
+            ref={suggestionsRef}
+            className={twMerge([
+              'absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg max-h-60 overflow-auto',
+              'dark:bg-zinc-800 dark:border-zinc-700'
+            ])}
+          >
+            {suggestions.map((suggestionItem, index) => (
+              <div
+                key={suggestionItem.suggestion}
+                className={twMerge([
+                  'px-3 py-2 cursor-pointer text-sm flex justify-between items-center',
+                  'hover:bg-zinc-100 dark:hover:bg-zinc-700',
+                  'text-zinc-950 dark:text-white',
+                  highlightedIndex === index && 'bg-zinc-100 dark:bg-zinc-700'
+                ])}
+                onClick={() => handleSuggestionClick(suggestionItem)}
+                onMouseEnter={() => {
+                  setHighlightedIndex(index);
+                  if (exampleObj) {
+                    const fullPath = buildFullPath(suggestionItem.suggestion);
+                    const value = getValueAtPath(exampleObj, fullPath);
+                    setHighlightedValue(value);
+                  }
+                }}
+              >
+                <span>{suggestionItem.suggestion}</span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-2">
+                  {suggestionItem.type}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {isOpen && suggestions.length === 0 && inputValue && (
+          <div className={twMerge([
+            'absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-lg shadow-lg',
+            'dark:bg-zinc-800 dark:border-zinc-700'
+          ])}>
+            <div className="px-3 py-2 text-sm text-zinc-500 dark:text-zinc-400">
+              {!exampleObj ? noExampleObjectText : 'No suggestions found'}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+);

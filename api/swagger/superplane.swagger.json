@@ -2441,6 +2441,88 @@
         ]
       }
     },
+    "/api/v1/organizations/{id}/invitations/{invitationId}": {
+      "delete": {
+        "summary": "Remove an organization invitation",
+        "description": "Removes an organization invitation",
+        "operationId": "Organizations_RemoveInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsRemoveInvitationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "put": {
+        "summary": "Update an organization invitation",
+        "description": "Updates an organization invitation",
+        "operationId": "Organizations_UpdateInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateInvitationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "invitationId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateInvitationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/organizations/{id}/users/{userId}": {
       "delete": {
         "summary": "Remove a user from an organization",
@@ -3557,6 +3639,14 @@
     }
   },
   "definitions": {
+    "AlertAlertOriginType": {
+      "type": "string",
+      "enum": [
+        "ALERT_ORIGIN_TYPE_UNKNOWN",
+        "ALERT_ORIGIN_TYPE_EVENT_REJECTION"
+      ],
+      "default": "ALERT_ORIGIN_TYPE_UNKNOWN"
+    },
     "AlertAlertType": {
       "type": "string",
       "enum": [
@@ -4412,6 +4502,12 @@
         "state": {
           "type": "string"
         },
+        "canvasIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -4457,6 +4553,28 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "OrganizationsRemoveInvitationResponse": {
+      "type": "object"
+    },
+    "OrganizationsUpdateInvitationBody": {
+      "type": "object",
+      "properties": {
+        "canvasIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "OrganizationsUpdateInvitationResponse": {
+      "type": "object",
+      "properties": {
+        "invitation": {
+          "$ref": "#/definitions/OrganizationsInvitation"
         }
       }
     },
@@ -4825,6 +4943,9 @@
         },
         "type": {
           "$ref": "#/definitions/AlertAlertType"
+        },
+        "originType": {
+          "$ref": "#/definitions/AlertAlertOriginType"
         },
         "message": {
           "type": "string"
