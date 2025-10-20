@@ -106,8 +106,9 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 func (a *Approval) Actions() []components.Action {
 	return []components.Action{
 		{
-			Name:        "approve",
-			Description: "Approve this execution",
+			Name:           "approve",
+			Description:    "Approve this execution",
+			UserAccessible: true,
 			Parameters: []components.ConfigurationField{
 				{
 					Name:        "comment",
@@ -119,8 +120,9 @@ func (a *Approval) Actions() []components.Action {
 			},
 		},
 		{
-			Name:        "reject",
-			Description: "Reject this execution",
+			Name:           "reject",
+			Description:    "Reject this execution",
+			UserAccessible: true,
 			Parameters: []components.ConfigurationField{
 				{
 					Name:        "reason",

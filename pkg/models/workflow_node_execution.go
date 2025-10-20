@@ -409,3 +409,17 @@ func (e *WorkflowNodeExecution) GetOutputs() ([]WorkflowEvent, error) {
 
 	return events, nil
 }
+
+func (e *WorkflowNodeExecution) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
+	return tx.Create(&WorkflowNodeExecutionRequest{
+		WorkflowID:  e.WorkflowID,
+		ExecutionID: e.ID,
+		ID:          uuid.New(),
+		State:       NodeExecutionRequestStatePending,
+		Type:        reqType,
+		Spec:        datatypes.NewJSONType(spec),
+		RunAt:       *runAt,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}).Error
+}

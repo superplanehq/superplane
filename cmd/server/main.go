@@ -169,6 +169,11 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		w := workers.NewBlueprintNodeExecutor(registry)
 		go w.Start(context.Background())
 	}
+
+	if os.Getenv("START_NODE_EXECUTION_REQUEST_WORKER") == "yes" {
+		w := workers.NewNodeExecutionRequestWorker(registry)
+		go w.Start(context.Background())
+	}
 }
 
 func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {

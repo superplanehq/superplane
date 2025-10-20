@@ -1,5 +1,7 @@
 package components
 
+import "time"
+
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
 
 type Component interface {
@@ -72,6 +74,7 @@ type ExecutionContext struct {
 	Configuration         any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
+	RequestContext        RequestContext
 }
 
 /*
@@ -92,12 +95,25 @@ type ExecutionStateContext interface {
 }
 
 /*
+ * RequestContext allows the execution to schedule
+ * work with the processing engine.
+ */
+type RequestContext interface {
+
+	//
+	// Allows the scheduling of a certain component action at a later time
+	//
+	ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error
+}
+
+/*
  * Custom action definition for a component.
  */
 type Action struct {
-	Name        string
-	Description string
-	Parameters  []ConfigurationField
+	Name           string
+	Description    string
+	UserAccessible bool
+	Parameters     []ConfigurationField
 }
 
 /*
@@ -117,7 +133,6 @@ const (
 	FieldTypeBool        = "boolean"
 	FieldTypeSelect      = "select"
 	FieldTypeMultiSelect = "multi_select"
-	FieldTypeDate        = "date"
 	FieldTypeURL         = "url"
 	FieldTypeList        = "list"
 	FieldTypeObject      = "object"

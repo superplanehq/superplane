@@ -75,12 +75,6 @@ func validateFieldValue(field ConfigurationField, value any) error {
 			return fmt.Errorf("must be a valid URL")
 		}
 
-	case FieldTypeDate:
-		if _, ok := value.(string); !ok {
-			return fmt.Errorf("must be a date string")
-		}
-		// Additional date format validation could be added here
-
 	case FieldTypeSelect:
 		str, ok := value.(string)
 		if !ok {
