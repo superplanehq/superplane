@@ -90,7 +90,7 @@ func (a *AuthService) CheckCanvasPermission(userID, canvasID, resource, action s
 }
 
 func (a *AuthService) CheckCanvasGlobalPermission(userID, orgID, resource, action string) (bool, error) {
-	domain := fmt.Sprintf("canvas:*|org:%s", orgID)
+	domain := prefixDomainWithOrgContext(models.DomainTypeCanvas, "*", orgID)
 	prefixedUserID := prefixUserID(userID)
 	return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
 }
@@ -375,12 +375,15 @@ func (a *AuthService) GetGroupRole(domainID string, domainType string, group str
 }
 
 func (a *AuthService) AssignRoleWithOrgContext(userID, role, domainID string, domainType string, orgID string) error {
-	newDomainId := domainID + "|org:" + orgID
-	return a.AssignRole(userID, role, newDomainId, domainType)
+	newDomainId := prefixDomainWithOrgContext(domainType, domainID, orgID)
+	return a.assignRoleWithRawDomain(userID, role, newDomainId, domainType)
 }
-
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
 	domain := prefixDomain(domainType, domainID)
+	return a.assignRoleWithRawDomain(userID, role, domain, domainType)
+}
+
+func (a *AuthService) assignRoleWithRawDomain(userID, role, domain string, domainType string) error {
 	prefixedRole := prefixRoleName(role)
 
 	// Check if it's a default role
@@ -654,7 +657,7 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 }
 
 func (a *AuthService) SetupGlobalCanvasRoles(orgID string) error {
-	domain := fmt.Sprintf("canvas:*|org:%s", orgID)
+	domain := prefixDomainWithOrgContext(models.DomainTypeCanvas, "*", orgID)
 
 	a.enforcer.EnableAutoSave(false)
 	defer a.enforcer.EnableAutoSave(true)
@@ -717,7 +720,7 @@ func (a *AuthService) DestroyCanvasRoles(canvasID string) error {
 }
 
 func (a *AuthService) DestroyGlobalCanvasRoles(orgID string) error {
-	domain := fmt.Sprintf("canvas:*|org:%s", orgID)
+	domain := prefixDomainWithOrgContext(models.DomainTypeCanvas, "*", orgID)
 
 	ok, err := a.enforcer.RemoveFilteredGroupingPolicy(2, domain)
 	if err != nil {
@@ -739,7 +742,7 @@ func (a *AuthService) DestroyGlobalCanvasRoles(orgID string) error {
 }
 
 func (a *AuthService) GetGlobalCanvasRoleDefinition(roleName string, orgID string) (*RoleDefinition, error) {
-	domain := fmt.Sprintf("canvas:*|org:%s", orgID)
+	domain := prefixDomainWithOrgContext(models.DomainTypeCanvas, "*", orgID)
 	return a.getRoleDefinitionForDomain(roleName, "canvas", domain)
 }
 
@@ -818,12 +821,16 @@ func (a *AuthService) GetRoleDefinition(roleName string, domainType string, doma
 }
 
 func (a *AuthService) GetAllRoleDefinitionsWithOrgContext(domainType string, domainID string, orgID string) ([]*RoleDefinition, error) {
-	domain := fmt.Sprintf("%s|org:%s", domainID, orgID)
-	return a.GetAllRoleDefinitions(domainType, domain)
+	domain := prefixDomainWithOrgContext(domainType, domainID, orgID)
+	return a.getAllRoleDefinitionsWithRawDomain(domainType, domain)
 }
 
 func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error) {
 	domain := prefixDomain(domainType, domainID)
+	return a.getAllRoleDefinitionsWithRawDomain(domainType, domain)
+}
+
+func (a *AuthService) getAllRoleDefinitionsWithRawDomain(domainType string, domain string) ([]*RoleDefinition, error) {
 
 	roles, err := a.getRolesFromPolicies(domain)
 	if err != nil {
@@ -832,7 +839,7 @@ func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) 
 
 	roleDefinitions := []*RoleDefinition{}
 	for _, roleName := range roles {
-		roleDef, err := a.GetRoleDefinition(roleName, domainType, domainID)
+		roleDef, err := a.getRoleDefinitionForDomain(roleName, domainType, domain)
 		if err != nil {
 			continue
 		}
@@ -1173,7 +1180,7 @@ func (a *AuthService) CreateCustomRoleWithOrgContext(domainID string, orgID stri
 func (a *AuthService) createCustomRoleWithNestedTransaction(domainID string, orgID string, roleDefinition *RoleDefinition) error {
 	var domain string
 	if roleDefinition.DomainType == models.DomainTypeCanvas && domainID == "*" && orgID != "" {
-		domain = fmt.Sprintf("canvas:*|org:%s", orgID)
+		domain = prefixDomainWithOrgContext(roleDefinition.DomainType, domainID, orgID)
 	} else {
 		domain = prefixDomain(roleDefinition.DomainType, domainID)
 	}
@@ -1241,7 +1248,7 @@ func (a *AuthService) UpdateCustomRoleWithOrgContext(domainID string, orgID stri
 func (a *AuthService) updateCustomRoleWithNestedTransaction(domainID string, orgID string, roleDefinition *RoleDefinition) error {
 	var domain string
 	if roleDefinition.DomainType == models.DomainTypeCanvas && domainID == "*" && orgID != "" {
-		domain = fmt.Sprintf("canvas:*|org:%s", orgID)
+		domain = prefixDomainWithOrgContext(roleDefinition.DomainType, domainID, orgID)
 	} else {
 		domain = prefixDomain(roleDefinition.DomainType, domainID)
 	}
@@ -1323,7 +1330,7 @@ func (a *AuthService) DeleteCustomRoleWithOrgContext(domainID string, orgID stri
 func (a *AuthService) deleteCustomRoleWithNestedTransaction(domainID string, orgID string, domainType string, roleName string) error {
 	var domain string
 	if domainType == models.DomainTypeCanvas && domainID == "*" && orgID != "" {
-		domain = fmt.Sprintf("canvas:*|org:%s", orgID)
+		domain = prefixDomainWithOrgContext(domainType, domainID, orgID)
 	} else {
 		domain = prefixDomain(domainType, domainID)
 	}
@@ -1679,4 +1686,8 @@ func prefixUserID(userID string) string {
 
 func prefixDomain(domainType string, domainID string) string {
 	return fmt.Sprintf("%s:%s", domainType, domainID)
+}
+
+func prefixDomainWithOrgContext(domainType string, domainID string, orgID string) string {
+	return fmt.Sprintf("%s:%s|org:%s", domainType, domainID, orgID)
 }
