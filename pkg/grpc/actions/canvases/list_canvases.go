@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -19,14 +20,29 @@ func ListCanvases(ctx context.Context, orgID string, authorizationService author
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	accessibleCanvasIDs, err := authorizationService.GetAccessibleCanvasesForUser(userID)
+	roles, err := authorizationService.GetUserRolesForCanvasWithOrgContext(userID, "*", orgID)
 	if err != nil {
 		return nil, err
 	}
 
-	canvases, err := models.ListCanvasesByIDs(accessibleCanvasIDs, orgID)
+	//
+	// If user has global canvas role, he can see all canvases in the organization
+	//
+	var canvases []models.Canvas
+	if len(roles) > 0 {
+		canvases, err = models.ListCanvasesByOrgID(orgID)
+	} else {
+		accessibleCanvasIDs, err := authorizationService.GetAccessibleCanvasesForUser(userID)
+		if err != nil {
+			log.Errorf("failed to list canvases IDs by org ID: %v", err)
+			return nil, status.Error(codes.Internal, "failed to list canvases IDs")
+		}
+		canvases, err = models.ListCanvasesByIDs(accessibleCanvasIDs, orgID)
+	}
+
 	if err != nil {
-		return nil, err
+		log.Errorf("failed to list canvases IDs by org ID: %v", err)
+		return nil, status.Error(codes.Internal, "failed to list canvases IDs")
 	}
 
 	response := &pb.ListCanvasesResponse{

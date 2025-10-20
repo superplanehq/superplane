@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,12 +19,21 @@ func ListUserRoles(ctx context.Context, domainType, domainID, userID string, aut
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
+	orgID, orgIsSet := authentication.GetOrganizationIdFromMetadata(ctx)
+	if !orgIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
 	var roles []*authorization.RoleDefinition
 	switch domainType {
 	case models.DomainTypeOrganization:
 		roles, err = authService.GetUserRolesForOrg(userID, domainID)
 	case models.DomainTypeCanvas:
-		roles, err = authService.GetUserRolesForCanvas(userID, domainID)
+		if domainID == "*" {
+			roles, err = authService.GetAllRoleDefinitionsWithOrgContext(models.DomainTypeCanvas, "*", orgID)
+		} else {
+			roles, err = authService.GetUserRolesForCanvas(userID, domainID)
+		}
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
@@ -40,7 +50,14 @@ func ListUserRoles(ctx context.Context, domainType, domainID, userID string, aut
 		}
 	}
 
-	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
+	var roleMetadataMap map[string]*models.RoleMetadata
+	if domainID == "*" {
+		roleMetadataMap, err = models.FindRoleMetadataByNamesWithOrgContext(roleNames, domainType, domainID, orgID)
+
+	} else {
+		roleMetadataMap, err = models.FindRoleMetadataByNames(roleNames, domainType, domainID)
+	}
+
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "role metadata not found")
 	}

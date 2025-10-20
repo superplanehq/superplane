@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
@@ -14,7 +15,8 @@ import (
 func Test__ListUsers(t *testing.T) {
 	r := support.Setup(t)
 
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), r.AuthService)
+	ctx := authentication.SetOrganizationIdInMetadata(context.Background(), r.Organization.ID.String())
+	resp, err := ListUsers(ctx, models.DomainTypeCanvas, "*", r.AuthService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Len(t, resp.Users, 1)
@@ -25,7 +27,7 @@ func Test__ListUsers(t *testing.T) {
 		for _, roleAssignment := range user.Status.RoleAssignments {
 			assert.NotEmpty(t, roleAssignment.RoleName)
 			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, roleAssignment.DomainType)
-			assert.Equal(t, r.Canvas.ID.String(), roleAssignment.DomainId)
+			assert.Equal(t, "*", roleAssignment.DomainId)
 		}
 	}
 }

@@ -40,5 +40,11 @@ func Test__DeleteOrganization(t *testing.T) {
 
 		_, err = models.FindOrganizationByID(r.Organization.ID.String())
 		assert.Error(t, err)
+		roles, err := r.AuthService.GetAllRoleDefinitions(models.DomainTypeOrganization, r.Organization.ID.String())
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(roles))
+		roles, err = r.AuthService.GetAllRoleDefinitionsWithOrgContext(models.DomainTypeCanvas, "*", r.Organization.ID.String())
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(roles))
 	})
 }

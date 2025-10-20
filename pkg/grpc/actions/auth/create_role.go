@@ -13,6 +13,11 @@ import (
 )
 
 func CreateRole(ctx context.Context, domainType string, domainID string, role *pb.Role, authService authorization.Authorization) (*pb.CreateRoleResponse, error) {
+	orgID, ok := authentication.GetOrganizationIdFromMetadata(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user is not authenticated")
+	}
+
 	if role == nil {
 		return nil, status.Error(codes.InvalidArgument, "role must be specified")
 	}
@@ -73,11 +78,7 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 
 	var err error
 	if domainType == models.DomainTypeCanvas && domainID == "*" {
-		if orgID, ok := authentication.GetOrganizationIdFromMetadata(ctx); ok {
-			err = authService.CreateCustomRoleWithOrgContext(domainID, orgID, roleDefinition)
-		} else {
-			return nil, status.Error(codes.InvalidArgument, "organization context required for global canvas roles")
-		}
+		err = authService.CreateCustomRoleWithOrgContext(domainID, orgID, roleDefinition)
 	} else {
 		err = authService.CreateCustomRole(domainID, roleDefinition)
 	}

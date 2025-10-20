@@ -13,6 +13,7 @@ type RoleMetadata struct {
 	RoleName    string    `json:"role_name" gorm:"not null;index"`
 	DomainType  string    `json:"domain_type" gorm:"not null;index"`
 	DomainID    string    `json:"domain_id" gorm:"not null;index"`
+	OrgID       string    `json:"org_id" gorm:"index"`
 	DisplayName string    `json:"display_name" gorm:"not null"`
 	Description string    `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -77,8 +78,18 @@ func (gm *GroupMetadata) UpdateInTransaction(tx *gorm.DB) error {
 }
 
 func FindRoleMetadata(roleName, domainType, domainID string) (*RoleMetadata, error) {
+	return FindRoleMetadataWithOrgContext(roleName, domainType, domainID, "")
+}
+
+func FindRoleMetadataWithOrgContext(roleName, domainType, domainID string, orgID string) (*RoleMetadata, error) {
 	var metadata RoleMetadata
-	err := database.Conn().Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
+	query := database.Conn().Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID)
+
+	if orgID != "" {
+		query = query.Where("org_id = ?", orgID)
+	}
+
+	err := query.First(&metadata).Error
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +110,22 @@ func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description
 }
 
 func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID, displayName, description string) error {
+	return UpsertRoleMetadataWithOrgContextInTransaction(tx, roleName, domainType, domainID, displayName, description, "")
+}
+
+func UpsertRoleMetadataWithOrgContext(roleName, domainType, domainID, displayName, description string, orgID string) error {
+	return UpsertRoleMetadataWithOrgContextInTransaction(database.Conn(), roleName, domainType, domainID, displayName, description, orgID)
+}
+
+func UpsertRoleMetadataWithOrgContextInTransaction(tx *gorm.DB, roleName, domainType, domainID, displayName, description string, orgID string) error {
 	var metadata RoleMetadata
-	err := tx.Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
+	query := tx.Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID)
+
+	if orgID != "" {
+		query = query.Where("org_id = ?", orgID)
+	}
+
+	err := query.First(&metadata).Error
 
 	if err == gorm.ErrRecordNotFound {
 		metadata = RoleMetadata{
@@ -109,6 +134,7 @@ func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID
 			DomainID:    domainID,
 			DisplayName: displayName,
 			Description: description,
+			OrgID:       orgID,
 		}
 		return metadata.CreateInTransaction(tx)
 	} else if err != nil {
@@ -154,6 +180,14 @@ func DeleteRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID
 	return tx.Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).Delete(&RoleMetadata{}).Error
 }
 
+func DeleteRoleMetadataWithOrgContext(roleName, domainType, domainID, orgID string) error {
+	return DeleteRoleMetadataWithOrgContextInTransaction(database.Conn(), roleName, domainType, domainID, orgID)
+}
+
+func DeleteRoleMetadataWithOrgContextInTransaction(tx *gorm.DB, roleName, domainType, domainID, orgID string) error {
+	return tx.Where("role_name = ? AND domain_type = ? AND domain_id = ? AND org_id = ?", roleName, domainType, domainID, orgID).Delete(&RoleMetadata{}).Error
+}
+
 func DeleteGroupMetadata(groupName, domainType, domainID string) error {
 	return DeleteGroupMetadataInTransaction(database.Conn(), groupName, domainType, domainID)
 }
@@ -163,8 +197,18 @@ func DeleteGroupMetadataInTransaction(tx *gorm.DB, groupName, domainType, domain
 }
 
 func FindRoleMetadataByNames(roleNames []string, domainType, domainID string) (map[string]*RoleMetadata, error) {
+	return FindRoleMetadataByNamesWithOrgContext(roleNames, domainType, domainID, "")
+}
+
+func FindRoleMetadataByNamesWithOrgContext(roleNames []string, domainType, domainID, orgID string) (map[string]*RoleMetadata, error) {
 	var metadata []RoleMetadata
-	err := database.Conn().Where("role_name IN ? AND domain_type = ? AND domain_id = ?", roleNames, domainType, domainID).Find(&metadata).Error
+	query := database.Conn().Where("role_name IN ? AND domain_type = ? AND domain_id = ?", roleNames, domainType, domainID)
+
+	if orgID != "" {
+		query = query.Where("org_id = ?", orgID)
+	}
+
+	err := query.Find(&metadata).Error
 	if err != nil {
 		return nil, err
 	}

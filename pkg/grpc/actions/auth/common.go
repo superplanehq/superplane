@@ -94,20 +94,30 @@ func FindUser(org, id, email string) (*models.User, error) {
 	return models.FindActiveUserByEmail(orgID.String(), email)
 }
 
-func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {
-	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
+func GetUsersWithRolesInDomain(domainID, domainType string, orgID string, authService authorization.Authorization) ([]*pbUsers.User, error) {
+	var roleDefinitions []*authorization.RoleDefinition
+	var err error
+	if domainID == "*" && orgID == "" {
+		roleDefinitions, err = authService.GetAllRoleDefinitions(domainType, domainID)
+	} else {
+		roleDefinitions, err = authService.GetAllRoleDefinitionsWithOrgContext(domainType, domainID, orgID)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	// Extract all role names for batch metadata lookup
 	roleNames := make([]string, len(roleDefinitions))
 	for i, roleDef := range roleDefinitions {
 		roleNames[i] = roleDef.Name
 	}
 
-	// Batch fetch role metadata
-	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
+	var roleMetadataMap map[string]*models.RoleMetadata
+	if orgID == "" {
+		roleMetadataMap, err = models.FindRoleMetadataByNames(roleNames, domainType, domainID)
+	} else {
+		roleMetadataMap, err = models.FindRoleMetadataByNamesWithOrgContext(roleNames, domainType, domainID, orgID)
+	}
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "role not found")
 	}
@@ -120,7 +130,11 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 		if domainType == models.DomainTypeOrganization {
 			userIDs, err = authService.GetOrgUsersForRole(roleDef.Name, domainID)
 		} else {
-			userIDs, err = authService.GetCanvasUsersForRole(roleDef.Name, domainID)
+			if domainID == "*" && orgID == "" {
+				userIDs, err = authService.GetCanvasUsersForRole(roleDef.Name, domainID)
+			} else {
+				userIDs, err = authService.GetCanvasUsersForRoleWithOrgContext(roleDef.Name, domainID, orgID)
+			}
 		}
 
 		if err != nil {

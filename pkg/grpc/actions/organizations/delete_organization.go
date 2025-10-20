@@ -41,5 +41,11 @@ func DeleteOrganization(ctx context.Context, authService authorization.Authoriza
 		return nil, err
 	}
 
+	err = authService.DestroyGlobalCanvasRoles(orgID)
+	if err != nil {
+		log.Errorf("Error deleting global canvas roles for %s: %v", orgID, err)
+		return nil, err
+	}
+
 	return &pb.DeleteOrganizationResponse{}, nil
 }

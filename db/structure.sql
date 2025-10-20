@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xSlqdPt5RKQdfvf5pW0Q6x2PLYfz2p8BVAd1lEBaZsIxpm5f3urHNb1bZVrB7ke
+\restrict 9STvcmW5eTP5Otsqieq3QFYyMfMlroalWTDXTVwxg6BCm7dIKibLjvsDtKoXFsu
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -334,7 +334,7 @@ CREATE TABLE public.organization_invitations (
     state character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    canvas_ids jsonb
+    canvas_ids jsonb DEFAULT '[]'::jsonb
 );
 
 
@@ -381,7 +381,8 @@ CREATE TABLE public.role_metadata (
     display_name character varying(255) NOT NULL,
     description text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    org_id character varying(255)
 );
 
 
@@ -836,7 +837,7 @@ ALTER TABLE ONLY public.group_metadata
 --
 
 ALTER TABLE ONLY public.role_metadata
-    ADD CONSTRAINT uq_role_metadata_key UNIQUE (role_name, domain_type, domain_id);
+    ADD CONSTRAINT uq_role_metadata_key UNIQUE (role_name, domain_type, domain_id, org_id);
 
 
 --
@@ -971,6 +972,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_role_metadata_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_role_metadata_org_id ON public.role_metadata USING btree (org_id);
 
 
 --
@@ -1236,13 +1244,13 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xSlqdPt5RKQdfvf5pW0Q6x2PLYfz2p8BVAd1lEBaZsIxpm5f3urHNb1bZVrB7ke
+\unrestrict 9STvcmW5eTP5Otsqieq3QFYyMfMlroalWTDXTVwxg6BCm7dIKibLjvsDtKoXFsu
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict 9hF2o13hRRgABO7IsmTwOxjfuuzH5OT7gZOt2h2MhXdBwbRsoZh169bsW8sWmyl
+\restrict CIBNAdVDaXp6E04wBt3xnRJUuYVyzweKVk7wjlWoInOU1DWgsuijcUCiP3Sr9uF
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1264,7 +1272,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251014143835	f
+20251020202037	f
 \.
 
 
@@ -1272,5 +1280,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9hF2o13hRRgABO7IsmTwOxjfuuzH5OT7gZOt2h2MhXdBwbRsoZh169bsW8sWmyl
+\unrestrict CIBNAdVDaXp6E04wBt3xnRJUuYVyzweKVk7wjlWoInOU1DWgsuijcUCiP3Sr9uF
 

@@ -10,6 +10,10 @@ func SetUserIdInMetadata(ctx context.Context, userId string) context.Context {
 	return metadata.NewIncomingContext(ctx, metadata.Pairs("x-user-id", userId))
 }
 
+func SetOrganizationIdInMetadata(ctx context.Context, orgId string) context.Context {
+	return metadata.NewIncomingContext(ctx, metadata.Pairs("x-organization-id", orgId))
+}
+
 func GetUserIdFromMetadata(ctx context.Context) (string, bool) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {

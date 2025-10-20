@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -20,7 +21,15 @@ func ListUserPermissions(ctx context.Context, domainType string, domainID string
 	case models.DomainTypeOrganization:
 		roles, err = authService.GetUserRolesForOrg(userID, domainID)
 	case models.DomainTypeCanvas:
-		roles, err = authService.GetUserRolesForCanvas(userID, domainID)
+		if domainID == "*" {
+			orgID, orgIsSet := authentication.GetOrganizationIdFromMetadata(ctx)
+			if !orgIsSet {
+				return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+			}
+			roles, err = authService.GetAllRoleDefinitionsWithOrgContext(models.DomainTypeCanvas, "*", orgID)
+		} else {
+			roles, err = authService.GetUserRolesForCanvas(userID, domainID)
+		}
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}

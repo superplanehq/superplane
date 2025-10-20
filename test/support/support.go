@@ -92,6 +92,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, err)
 	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
+	err = r.AuthService.AssignRoleWithOrgContext(user.ID.String(), models.RoleCanvasOwner, "*", models.DomainTypeCanvas, organization.ID.String())
+	require.NoError(t, err)
 
 	r.Account = account
 	r.User = user.ID

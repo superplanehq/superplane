@@ -177,6 +177,21 @@ func ListCanvasesByIDs(ids []string, organizationID string) ([]Canvas, error) {
 	return canvases, nil
 }
 
+func ListCanvasesByOrgID(orgID string) ([]Canvas, error) {
+	var canvasIDs []Canvas
+	err := database.Conn().
+		Model(&Canvas{}).
+		Where("organization_id = ?", orgID).
+		Find(&canvasIDs).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return canvasIDs, nil
+}
+
 func FindUnscopedCanvasByID(id string) (*Canvas, error) {
 	return FindUnscopedCanvasByIDInTransaction(database.Conn(), id)
 }

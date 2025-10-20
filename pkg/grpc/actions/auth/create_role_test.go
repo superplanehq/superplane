@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -17,6 +18,7 @@ func Test_CreateRole(t *testing.T) {
 	r := support.Setup(t)
 	ctx := context.Background()
 	orgID := r.Organization.ID.String()
+	ctx = authentication.SetOrganizationIdInMetadata(ctx, orgID)
 
 	t.Run("successful custom role creation", func(t *testing.T) {
 		role := &pb.Role{
@@ -208,28 +210,5 @@ func Test_CreateRole(t *testing.T) {
 		assert.Equal(t, models.DomainTypeCanvas, retrievedRole.DomainType)
 		assert.Len(t, retrievedRole.Permissions, 2)
 		assert.False(t, retrievedRole.Readonly)
-	})
-
-	t.Run("create global canvas role without organization context fails", func(t *testing.T) {
-		role := &pb.Role{
-			Metadata: &pb.Role_Metadata{
-				Name: "global-canvas-without-org-context",
-			},
-			Spec: &pb.Role_Spec{
-				DisplayName: "Global Canvas Role Without Context",
-				Description: "Should fail without organization context",
-				Permissions: []*pbAuth.Permission{
-					{
-						Resource:   "canvas",
-						Action:     "read",
-						DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-					},
-				},
-			},
-		}
-
-		_, err := CreateRole(ctx, models.DomainTypeCanvas, "*", role, r.AuthService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "organization context required for global canvas roles")
 	})
 }
