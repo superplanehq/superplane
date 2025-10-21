@@ -92,7 +92,7 @@ FROM ${RUNNER_IMAGE} AS runner
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.
 # Install PostgreSQL 17.5 client tools
-RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates curl gnupg lsb-release \
+RUN apt-get clean && apt-get update -y && apt-get install --no-install-recommends -y ca-certificates curl gnupg lsb-release \
     && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
     && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
     && apt-get update -y \
