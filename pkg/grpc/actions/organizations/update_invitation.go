@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"slices"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -22,6 +23,16 @@ func UpdateInvitation(ctx context.Context, authService authorization.Authorizati
 	}
 
 	if len(canvasIDs) > 0 {
+		hasGlobalCanvas := false
+		globalCanvasIDIndex := slices.IndexFunc(canvasIDs, func(canvasID string) bool {
+			return canvasID == "*"
+		})
+
+		if globalCanvasIDIndex != -1 {
+			hasGlobalCanvas = true
+			canvasIDs = append(canvasIDs[:globalCanvasIDIndex], canvasIDs[globalCanvasIDIndex+1:]...)
+		}
+
 		if err := actions.ValidateUUIDsArray(canvasIDs); err != nil {
 			return nil, err
 		}
@@ -40,16 +51,20 @@ func UpdateInvitation(ctx context.Context, authService authorization.Authorizati
 		if !exists {
 			return nil, status.Error(codes.NotFound, "canvas not found")
 		}
+
+		if hasGlobalCanvas {
+			canvasIDs = append(canvasIDs, "*")
+		}
 	}
 
-	uniqueCanvasIDMap := make(map[uuid.UUID]bool)
+	uniqueCanvasIDMap := make(map[string]bool)
 	for _, canvasID := range canvasIDs {
-		uniqueCanvasIDMap[uuid.MustParse(canvasID)] = true
+		uniqueCanvasIDMap[canvasID] = true
 	}
 
 	uniqueCanvasIDs := make([]string, 0, len(uniqueCanvasIDMap))
 	for canvasID := range uniqueCanvasIDMap {
-		uniqueCanvasIDs = append(uniqueCanvasIDs, canvasID.String())
+		uniqueCanvasIDs = append(uniqueCanvasIDs, canvasID)
 	}
 
 	invitation.CanvasIDs = datatypes.NewJSONType(uniqueCanvasIDs)

@@ -36,7 +36,7 @@ func Test_UpdateInvitation(t *testing.T) {
 		err = models.SaveInvitation(invitation)
 		require.NoError(t, err)
 
-		canvasIDs := []string{canvas.ID.String()}
+		canvasIDs := []string{canvas.ID.String(), "*"}
 
 		// Update the invitation
 		response, err := UpdateInvitation(ctx, r.AuthService, orgID, invitation.ID.String(), canvasIDs)

@@ -212,7 +212,11 @@ func (a *Handler) acceptInvitation(invitation models.OrganizationInvitation, acc
 			return err
 		}
 		for _, canvasID := range invitation.CanvasIDs.Data() {
-			err = a.authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+			if canvasID == "*" {
+				err = a.authService.AssignRoleWithOrgContext(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas, invitation.OrganizationID.String())
+			} else {
+				err = a.authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+			}
 			if err != nil {
 				return err
 			}
