@@ -8,19 +8,19 @@ import (
 	"gorm.io/datatypes"
 )
 
-type MetadataContext struct {
+type ExecutionMetadataContext struct {
 	execution *models.WorkflowNodeExecution
 }
 
-func NewMetadataContext(execution *models.WorkflowNodeExecution) components.MetadataContext {
-	return &MetadataContext{execution: execution}
+func NewExecutionMetadataContext(execution *models.WorkflowNodeExecution) components.MetadataContext {
+	return &ExecutionMetadataContext{execution: execution}
 }
 
-func (m *MetadataContext) Get() any {
+func (m *ExecutionMetadataContext) Get() any {
 	return m.execution.Metadata.Data()
 }
 
-func (m *MetadataContext) Set(value any) {
+func (m *ExecutionMetadataContext) Set(value any) {
 	b, err := json.Marshal(value)
 	if err != nil {
 		return

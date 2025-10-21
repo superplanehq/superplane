@@ -93,11 +93,17 @@ message ConfigurationField {
   optional ListItemDefinition list_item = 9;
   repeated ConfigurationField schema = 10;
   string label = 11;
+  repeated VisibilityCondition visibility_conditions = 12;
 }
 
 message FieldOption {
   string label = 1;
   string value = 2;
+}
+
+message VisibilityCondition {
+  string field = 1;
+  repeated string values = 2;
 }
 
 message ListItemDefinition {
@@ -150,6 +156,7 @@ message Node {
   google.protobuf.Struct configuration = 4;
   ComponentRef component = 5;
   BlueprintRef blueprint = 6;
+  TriggerRef trigger = 7;
 }
 
 message Edge {

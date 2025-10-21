@@ -13,7 +13,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -21,7 +20,7 @@ type WorkflowNodeQueueWorker struct {
 	semaphore *semaphore.Weighted
 }
 
-func NewWorkflowNodeQueueWorker(registry *registry.Registry) *WorkflowNodeQueueWorker {
+func NewWorkflowNodeQueueWorker() *WorkflowNodeQueueWorker {
 	return &WorkflowNodeQueueWorker{
 		semaphore: semaphore.NewWeighted(25),
 	}

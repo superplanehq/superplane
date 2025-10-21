@@ -32,11 +32,6 @@ type Trigger interface {
 	Configuration() []components.ConfigurationField
 
 	/*
-	 * Setup the trigger.
-	 */
-	Setup(ctx SetupContext) error
-
-	/*
 	 * Starts the trigger
 	 */
 	Start(ctx TriggerContext) error
@@ -61,14 +56,8 @@ type TriggerContext struct {
 }
 
 type WebhookContext interface {
-	RegisterActionCall(actionName string) error
-	Create() error
-}
-
-type SetupContext struct {
-	Configuration   any
-	MetadataContext components.MetadataContext
-	WebhookContext  WebhookContext
+	Setup(actionName string) error
+	GetSecret() ([]byte, error)
 }
 
 type EventContext interface {
@@ -76,16 +65,17 @@ type EventContext interface {
 }
 
 type TriggerActionContext struct {
-	Name            string
-	Parameters      map[string]any
-	Configuration   any
-	MetadataContext components.MetadataContext
-	RequestContext  components.RequestContext
-	EventContext    EventContext
-	WebhookContext  WebhookRequestContext
+	Name               string
+	Parameters         map[string]any
+	Configuration      any
+	MetadataContext    components.MetadataContext
+	RequestContext     components.RequestContext
+	EventContext       EventContext
+	WebhookContext     WebhookContext
+	HttpRequestContext *HttpRequestContext
 }
 
-type WebhookRequestContext struct {
+type HttpRequestContext struct {
 	Request  *http.Request
 	Response http.ResponseWriter
 }

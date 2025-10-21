@@ -80,6 +80,8 @@ type APIClient struct {
 
 	StageAPI *StageAPIService
 
+	TriggerAPI *TriggerAPIService
+
 	UsersAPI *UsersAPIService
 
 	WorkflowAPI *WorkflowAPIService
@@ -122,6 +124,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.RolesAPI = (*RolesAPIService)(&c.common)
 	c.SecretAPI = (*SecretAPIService)(&c.common)
 	c.StageAPI = (*StageAPIService)(&c.common)
+	c.TriggerAPI = (*TriggerAPIService)(&c.common)
 	c.UsersAPI = (*UsersAPIService)(&c.common)
 	c.WorkflowAPI = (*WorkflowAPIService)(&c.common)
 	c.WorkflowEventAPI = (*WorkflowEventAPIService)(&c.common)

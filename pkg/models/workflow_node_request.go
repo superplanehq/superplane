@@ -11,16 +11,17 @@ import (
 )
 
 const (
-	NodeExecutionRequestTypeInvokeAction = "invoke-action"
+	NodeRequestTypeInvokeAction = "invoke-action"
 
 	NodeExecutionRequestStatePending   = "pending"
 	NodeExecutionRequestStateCompleted = "completed"
 )
 
-type WorkflowNodeExecutionRequest struct {
+type WorkflowNodeRequest struct {
 	ID          uuid.UUID
 	WorkflowID  uuid.UUID
-	ExecutionID uuid.UUID
+	NodeID      string
+	ExecutionID *uuid.UUID
 	State       string
 	Type        string
 	Spec        datatypes.JSONType[NodeExecutionRequestSpec]
@@ -38,8 +39,8 @@ type InvokeAction struct {
 	Parameters map[string]any `json:"parameters"`
 }
 
-func LockNodeExecutionRequest(tx *gorm.DB, id uuid.UUID) (*WorkflowNodeExecutionRequest, error) {
-	var request WorkflowNodeExecutionRequest
+func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*WorkflowNodeRequest, error) {
+	var request WorkflowNodeRequest
 
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
@@ -54,8 +55,8 @@ func LockNodeExecutionRequest(tx *gorm.DB, id uuid.UUID) (*WorkflowNodeExecution
 	return &request, nil
 }
 
-func ListNodeExecutionRequests() ([]WorkflowNodeExecutionRequest, error) {
-	var requests []WorkflowNodeExecutionRequest
+func ListNodeRequests() ([]WorkflowNodeRequest, error) {
+	var requests []WorkflowNodeRequest
 
 	now := time.Now()
 	err := database.Conn().
@@ -71,7 +72,7 @@ func ListNodeExecutionRequests() ([]WorkflowNodeExecutionRequest, error) {
 	return requests, nil
 }
 
-func (r *WorkflowNodeExecutionRequest) Complete(tx *gorm.DB) error {
+func (r *WorkflowNodeRequest) Complete(tx *gorm.DB) error {
 	return tx.Model(r).
 		Update("state", NodeExecutionRequestStateCompleted).
 		Update("updated_at", time.Now()).

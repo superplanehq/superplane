@@ -79,6 +79,7 @@ export type ComponentsConfigurationField = {
     listItem?: ComponentsListItemDefinition;
     schema?: Array<ComponentsConfigurationField>;
     label?: string;
+    visibilityConditions?: Array<ComponentsVisibilityCondition>;
 };
 
 export type ComponentsDescribeComponentResponse = {
@@ -118,9 +119,15 @@ export type ComponentsNode = {
     };
     component?: NodeComponentRef;
     blueprint?: NodeBlueprintRef;
+    trigger?: NodeTriggerRef;
 };
 
-export type ComponentsNodeType = 'TYPE_COMPONENT' | 'TYPE_BLUEPRINT';
+export type ComponentsNodeType = 'TYPE_COMPONENT' | 'TYPE_BLUEPRINT' | 'TYPE_TRIGGER';
+
+export type ComponentsVisibilityCondition = {
+    field?: string;
+    values?: Array<string>;
+};
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 
@@ -320,6 +327,10 @@ export type NodeBlueprintRef = {
 };
 
 export type NodeComponentRef = {
+    name?: string;
+};
+
+export type NodeTriggerRef = {
     name?: string;
 };
 
@@ -1090,6 +1101,21 @@ export type SuperplaneValueFromSecret = {
     domainType?: AuthorizationDomainType;
     name?: string;
     key?: string;
+};
+
+export type TriggersDescribeTriggerResponse = {
+    trigger?: TriggersTrigger;
+};
+
+export type TriggersListTriggersResponse = {
+    triggers?: Array<TriggersTrigger>;
+};
+
+export type TriggersTrigger = {
+    name?: string;
+    label?: string;
+    description?: string;
+    configuration?: Array<ComponentsConfigurationField>;
 };
 
 export type UsersAccountProvider = {
@@ -3339,6 +3365,58 @@ export type SecretsUpdateSecretResponses = {
 };
 
 export type SecretsUpdateSecretResponse2 = SecretsUpdateSecretResponses[keyof SecretsUpdateSecretResponses];
+
+export type TriggersListTriggersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/triggers';
+};
+
+export type TriggersListTriggersErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type TriggersListTriggersError = TriggersListTriggersErrors[keyof TriggersListTriggersErrors];
+
+export type TriggersListTriggersResponses = {
+    /**
+     * A successful response.
+     */
+    200: TriggersListTriggersResponse;
+};
+
+export type TriggersListTriggersResponse2 = TriggersListTriggersResponses[keyof TriggersListTriggersResponses];
+
+export type TriggersDescribeTriggerData = {
+    body?: never;
+    path: {
+        name: string;
+    };
+    query?: never;
+    url: '/api/v1/triggers/{name}';
+};
+
+export type TriggersDescribeTriggerErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type TriggersDescribeTriggerError = TriggersDescribeTriggerErrors[keyof TriggersDescribeTriggerErrors];
+
+export type TriggersDescribeTriggerResponses = {
+    /**
+     * A successful response.
+     */
+    200: TriggersDescribeTriggerResponse;
+};
+
+export type TriggersDescribeTriggerResponse2 = TriggersDescribeTriggerResponses[keyof TriggersDescribeTriggerResponses];
 
 export type UsersListUsersData = {
     body?: never;

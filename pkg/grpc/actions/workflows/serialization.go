@@ -111,14 +111,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			return fmt.Errorf("component %s not found", node.Component.Name)
 		}
 
-		// Validate component configuration
-		configMap := node.Configuration.AsMap()
-		configFields := component.Configuration()
-		if err := components.ValidateConfiguration(configFields, configMap); err != nil {
-			return fmt.Errorf("configuration validation failed: %w", err)
-		}
-
-		return nil
+		return components.ValidateConfiguration(component.Configuration(), node.Configuration.AsMap())
 
 	case compb.Node_TYPE_BLUEPRINT:
 		if node.Blueprint == nil {
@@ -135,6 +128,22 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 		}
 
 		return nil
+
+	case compb.Node_TYPE_TRIGGER:
+		if node.Trigger == nil {
+			return fmt.Errorf("trigger reference is required for trigger ref type")
+		}
+
+		if node.Trigger.Name == "" {
+			return fmt.Errorf("trigger name is required")
+		}
+
+		trigger, err := registry.GetTrigger(node.Trigger.Name)
+		if err != nil {
+			return fmt.Errorf("trigger %s not found", node.Trigger.Name)
+		}
+
+		return components.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
 
 	default:
 		return fmt.Errorf("invalid node type: %s", node.Type)

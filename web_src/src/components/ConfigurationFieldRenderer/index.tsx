@@ -12,13 +12,42 @@ interface ConfigurationFieldRendererProps {
   field: ComponentsConfigurationField
   value: any
   onChange: (value: any) => void
+  allValues?: Record<string, any>
 }
 
 export const ConfigurationFieldRenderer = ({
   field,
   value,
-  onChange
+  onChange,
+  allValues = {}
 }: ConfigurationFieldRendererProps) => {
+  // Check visibility conditions
+  const isVisible = React.useMemo(() => {
+    if (!field.visibilityConditions || field.visibilityConditions.length === 0) {
+      return true
+    }
+
+    // All conditions must be satisfied (AND logic)
+    return field.visibilityConditions.every((condition) => {
+      if (!condition.field || !condition.values) {
+        return true
+      }
+
+      const fieldValue = allValues[condition.field]
+
+      // Convert field value to string for comparison
+      const fieldValueStr = fieldValue !== undefined && fieldValue !== null
+        ? String(fieldValue)
+        : ''
+
+      // Check if the field value matches any of the expected values
+      return condition.values.some((expectedValue) => fieldValueStr === expectedValue)
+    })
+  }, [field.visibilityConditions, allValues])
+
+  if (!isVisible) {
+    return null
+  }
   const renderField = () => {
     switch (field.type) {
       case 'string':
@@ -212,6 +241,7 @@ const ListFieldRenderer = ({
                       const newItem = { ...item, [schemaField.name!]: val }
                       updateItem(index, newItem)
                     }}
+                    allValues={item}
                   />
                 ))}
               </div>
@@ -346,6 +376,7 @@ const ObjectFieldRenderer = ({
             const newValue = { ...objValue, [schemaField.name!]: val }
             onChange(newValue)
           }}
+          allValues={objValue}
         />
       ))}
     </div>

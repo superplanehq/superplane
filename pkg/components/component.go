@@ -167,6 +167,12 @@ type ConfigurationField struct {
 	Default     any    `json:"default"`
 
 	/*
+	 * Used for controlling when the field is visible.
+	 * No visibility conditions - always visible.
+	 */
+	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
+
+	/*
 	 * Used for select / multi_select types
 	 */
 	Options []FieldOption `json:"options,omitempty"`
@@ -206,4 +212,9 @@ type FieldOption struct {
 type ListItemDefinition struct {
 	Type   string
 	Schema []ConfigurationField
+}
+
+type VisibilityCondition struct {
+	Field  string   `json:"field"`
+	Values []string `json:"values"`
 }

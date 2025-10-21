@@ -23,7 +23,7 @@ func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, paramete
 	}
 
 	runAt := time.Now().Add(interval)
-	return c.execution.CreateRequest(database.Conn(), models.NodeExecutionRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+	return c.execution.CreateRequest(database.Conn(), models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{
 			ActionName: actionName,
 			Parameters: parameters,

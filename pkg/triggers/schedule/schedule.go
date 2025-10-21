@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -12,9 +13,9 @@ import (
 )
 
 const (
-	SpecTypeHourly = "hourly"
-	SpecTypeDaily  = "daily"
-	SpecTypeWeekly = "weekly"
+	TypeHourly = "hourly"
+	TypeDaily  = "daily"
+	TypeWeekly = "weekly"
 
 	WeekDayMonday    = "monday"
 	WeekDayTuesday   = "tuesday"
@@ -28,27 +29,14 @@ const (
 type Schedule struct{}
 
 type Metadata struct {
-	NextTrigger time.Time `mapstructure:"next_trigger" json:"next_trigger"`
+	NextTrigger *time.Time `mapstructure:"next_trigger" json:"next_trigger"`
 }
 
-type Spec struct {
-	Type   string          `json:"type"`
-	Hourly *HourlySchedule `json:"hourly,omitempty"`
-	Daily  *DailySchedule  `json:"daily,omitempty"`
-	Weekly *WeeklySchedule `json:"weekly,omitempty"`
-}
-
-type HourlySchedule struct {
-	Minute int `json:"minute"` // 0-59
-}
-
-type DailySchedule struct {
-	Time string `json:"time"` // Format: "HH:MM" UTC
-}
-
-type WeeklySchedule struct {
-	WeekDay string `json:"week_day"` // Monday, Tuesday, etc.
-	Time    string `json:"time"`     // Format: "HH:MM" in UTC (24-hour format)
+type Configuration struct {
+	Type    string  `json:"type"`
+	Minute  *int    `json:"minute"`   // 0-59
+	Time    *string `json:"time"`     // Format: "HH:MM" UTC
+	WeekDay *string `json:"week_day"` // Monday, Tuesday, etc.
 }
 
 func (s *Schedule) Name() string {
@@ -70,9 +58,9 @@ func (s *Schedule) OutputChannels() []components.OutputChannel {
 func (s *Schedule) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{
-			Name:        "type",
-			Type:        components.FieldTypeSelect,
-			Description: "Type of schedule to use",
+			Name:  "type",
+			Label: "Schedule Type",
+			Type:  components.FieldTypeSelect,
 			Options: []components.FieldOption{
 				{Label: "Hourly", Value: "hourly"},
 				{Label: "Daily", Value: "daily"},
@@ -81,68 +69,54 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 			Required: true,
 		},
 		{
-			// TODO: This should only be shown if type=hourly
-			Name:        "hourly",
-			Type:        components.FieldTypeNumber,
-			Description: "Hourly schedule",
-			Min:         intPtr(0),
-			Max:         intPtr(59),
+			Name:  "minute",
+			Label: "Minute of the hour",
+			Type:  components.FieldTypeNumber,
+			Min:   intPtr(0),
+			Max:   intPtr(59),
+			VisibilityConditions: []components.VisibilityCondition{
+				{Field: "type", Values: []string{"hourly"}},
+			},
 		},
 		{
-			// TODO: This should only be shown if type=daily
-			Name:        "daily",
+			Name:        "time",
+			Label:       "Time",
 			Type:        components.FieldTypeString,
-			Description: "Daily schedule",
+			Description: "Time of the day, in HH:MM format",
+			VisibilityConditions: []components.VisibilityCondition{
+				{Field: "type", Values: []string{"daily", "weekly"}},
+			},
 		},
 		{
-			// TODO: This should only be shown if type=daily
-			Name:        "weekly",
-			Type:        components.FieldTypeObject,
-			Description: "Weekly schedule",
-			Schema: []components.ConfigurationField{
-				{
-					Name:  "week_day",
-					Label: "Week Day",
-					Type:  components.FieldTypeSelect,
-					Options: []components.FieldOption{
-						{Label: "Monday", Value: "Monday"},
-						{Label: "Tuesday", Value: "Tuesday"},
-						{Label: "Wednesday", Value: "Wednesday"},
-						{Label: "Thursday", Value: "Thursday"},
-						{Label: "Friday", Value: "Friday"},
-						{Label: "Saturday", Value: "Saturday"},
-						{Label: "Sunday", Value: "Sunday"},
-					},
-				},
+			Name:  "week_day",
+			Label: "Day of the week",
+			Type:  components.FieldTypeSelect,
+			VisibilityConditions: []components.VisibilityCondition{
+				{Field: "type", Values: []string{"weekly"}},
+			},
+			Options: []components.FieldOption{
+				{Label: "Monday", Value: "Monday"},
+				{Label: "Tuesday", Value: "Tuesday"},
+				{Label: "Wednesday", Value: "Wednesday"},
+				{Label: "Thursday", Value: "Thursday"},
+				{Label: "Friday", Value: "Friday"},
+				{Label: "Saturday", Value: "Saturday"},
+				{Label: "Sunday", Value: "Sunday"},
 			},
 		},
 	}
 }
 
-func (s *Schedule) Setup(ctx triggers.SetupContext) error {
-	spec := Spec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now()
-	nextTrigger, err := getNextTrigger(spec, now)
-	if err != nil {
-		return err
-	}
-
-	metadata := Metadata{NextTrigger: *nextTrigger}
-	ctx.MetadataContext.Set(metadata)
-	return nil
-}
-
 func (s *Schedule) Start(ctx triggers.TriggerContext) error {
-	spec := Spec{}
-	err := mapstructure.Decode(ctx.Configuration, &spec)
+	log.Printf("Configuration before: %v", ctx.Configuration)
+
+	config := Configuration{}
+	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
+
+	log.Printf("Configuration after: %v", config)
 
 	var metadata Metadata
 	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
@@ -150,29 +124,32 @@ func (s *Schedule) Start(ctx triggers.TriggerContext) error {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	nextTrigger := metadata.NextTrigger
-
 	//
 	// If nextTrigger timestamp is before the current time, emit an event.
 	//
-	if metadata.NextTrigger.Before(time.Now()) {
+	if metadata.NextTrigger != nil && metadata.NextTrigger.Before(time.Now()) {
 		err = ctx.EventContext.Emit(map[string]any{})
 		if err != nil {
 			return err
 		}
+	}
 
-		next, err := getNextTrigger(spec, time.Now())
-		if err != nil {
-			return err
-		}
-
-		nextTrigger = *next
+	nextTrigger, err := getNextTrigger(config, time.Now())
+	if err != nil {
+		return err
 	}
 
 	//
-	// Always schedule the next
+	// Always schedule the next and save the next trigger in the metadata.
 	//
-	return ctx.RequestContext.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(nextTrigger))
+	err = ctx.RequestContext.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
+	if err != nil {
+		return err
+	}
+
+	metadata.NextTrigger = nextTrigger
+	ctx.MetadataContext.Set(metadata)
+	return nil
 }
 
 func (s *Schedule) Actions() []components.Action {
@@ -199,7 +176,7 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 		return err
 	}
 
-	spec := Spec{}
+	spec := Configuration{}
 	err = mapstructure.Decode(ctx.Configuration, &spec)
 	if err != nil {
 		return err
@@ -211,34 +188,53 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 		return err
 	}
 
-	return ctx.RequestContext.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
+	err = ctx.RequestContext.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
+	if err != nil {
+		return err
+	}
+
+	var metadata Metadata
+	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata: %w", err)
+	}
+
+	metadata.NextTrigger = nextTrigger
+	ctx.MetadataContext.Set(metadata)
+	return nil
 }
 
-func getNextTrigger(spec Spec, now time.Time) (*time.Time, error) {
-	switch spec.Type {
-	case SpecTypeHourly:
-		if spec.Hourly == nil {
-			return nil, fmt.Errorf("hourly schedule configuration is missing")
+func getNextTrigger(config Configuration, now time.Time) (*time.Time, error) {
+	log.Printf("Configuration: %v", config)
+
+	switch config.Type {
+	case TypeHourly:
+		if config.Minute == nil {
+			return nil, fmt.Errorf("minute is required for hourly schedule")
 		}
 
-		return nextHourlyTrigger(spec.Hourly.Minute, now)
+		return nextHourlyTrigger(*config.Minute, now)
 
-	case SpecTypeDaily:
-		if spec.Daily == nil {
-			return nil, fmt.Errorf("daily schedule configuration is missing")
+	case TypeDaily:
+		if config.Time == nil {
+			return nil, fmt.Errorf("time is required for daily schedule")
 		}
 
-		return nextDailyTrigger(spec.Daily.Time, now)
+		return nextDailyTrigger(*config.Time, now)
 
-	case SpecTypeWeekly:
-		if spec.Weekly == nil {
-			return nil, fmt.Errorf("weekly schedule configuration is missing")
+	case TypeWeekly:
+		if config.Time == nil {
+			return nil, fmt.Errorf("time is required for weekly schedule")
 		}
 
-		return nextWeeklyTrigger(spec.Weekly.WeekDay, spec.Weekly.Time, now)
+		if config.WeekDay == nil {
+			return nil, fmt.Errorf("week_day is required for weekly schedule")
+		}
+
+		return nextWeeklyTrigger(*config.WeekDay, *config.Time, now)
 
 	default:
-		return nil, fmt.Errorf("unsupported schedule type: %s", spec.Type)
+		return nil, fmt.Errorf("unsupported schedule type: %s", config.Type)
 	}
 }
 

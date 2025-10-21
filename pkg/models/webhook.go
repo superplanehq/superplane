@@ -4,11 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
-)
-
-const (
-	WebhookHandlerTypeTrigger   = "trigger"
-	WebhookHandlerTypeComponent = "component"
+	"gorm.io/gorm"
 )
 
 type Webhook struct {
@@ -17,24 +13,15 @@ type Webhook struct {
 }
 
 type WebhookHandler struct {
-	WebhookID uuid.UUID
-	Type      string
-	Spec      datatypes.JSONType[WebhookHandlerSpec]
+	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	WebhookID  uuid.UUID
+	WorkflowID uuid.UUID
+	NodeID     string
+	Spec       datatypes.JSONType[WebhookHandlerSpec]
 }
 
 type WebhookHandlerSpec struct {
-	Trigger   *WebhookTriggerHandler   `json:"trigger,omitempty"`
-	Component *WebhookComponentHandler `json:"component,omitempty"`
-}
-
-type WebhookTriggerHandler struct {
-	WorkflowID string `json:"workflow_id"`
-	NodeID     string `json:"node_id"`
-}
-
-type WebhookComponentHandler struct {
-	NodeID      string `json:"node_id"`
-	ExecutionID string `json:"execution_id"`
+	InvokeAction *InvokeAction `json:"invoke_action,omitempty"`
 }
 
 func FindWebhook(id uuid.UUID) (*Webhook, error) {
@@ -50,10 +37,10 @@ func FindWebhook(id uuid.UUID) (*Webhook, error) {
 	return &webhook, nil
 }
 
-func (w *Webhook) Handlers() ([]WebhookHandler, error) {
+func FindWebhookHandlers(webhookID string) ([]WebhookHandler, error) {
 	var handlers []WebhookHandler
 	err := database.Conn().
-		Where("webhook_id = ?", w.ID).
+		Where("webhook_id = ?", webhookID).
 		Find(&handlers).
 		Error
 
@@ -64,12 +51,13 @@ func (w *Webhook) Handlers() ([]WebhookHandler, error) {
 	return handlers, nil
 }
 
-func CreateWebhookHandler(webhookID uuid.UUID, handlerType string, spec WebhookHandlerSpec) error {
-	return database.Conn().
+func CreateWebhookHandler(tx *gorm.DB, workflowID uuid.UUID, nodeID string, webhookID uuid.UUID, spec WebhookHandlerSpec) error {
+	return tx.
 		Create(&WebhookHandler{
-			WebhookID: webhookID,
-			Type:      handlerType,
-			Spec:      datatypes.NewJSONType(spec),
+			WebhookID:  webhookID,
+			WorkflowID: workflowID,
+			NodeID:     nodeID,
+			Spec:       datatypes.NewJSONType(spec),
 		}).
 		Error
 }

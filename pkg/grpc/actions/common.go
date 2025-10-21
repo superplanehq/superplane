@@ -729,6 +729,17 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb
 		}
 	}
 
+	// Handle visibility conditions
+	if len(field.VisibilityConditions) > 0 {
+		pbField.VisibilityConditions = make([]*componentpb.VisibilityCondition, len(field.VisibilityConditions))
+		for i, cond := range field.VisibilityConditions {
+			pbField.VisibilityConditions[i] = &componentpb.VisibilityCondition{
+				Field:  cond.Field,
+				Values: cond.Values,
+			}
+		}
+	}
+
 	return pbField
 }
 
@@ -764,6 +775,12 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		if node.Ref.Blueprint != nil {
 			result[i].Blueprint = &componentpb.Node_BlueprintRef{
 				Id: node.Ref.Blueprint.ID,
+			}
+		}
+
+		if node.Ref.Trigger != nil {
+			result[i].Trigger = &componentpb.Node_TriggerRef{
+				Name: node.Ref.Trigger.Name,
 			}
 		}
 
@@ -804,6 +821,8 @@ func ProtoToNodeType(nodeType componentpb.Node_Type) string {
 		return models.NodeTypeComponent
 	case componentpb.Node_TYPE_BLUEPRINT:
 		return models.NodeTypeBlueprint
+	case componentpb.Node_TYPE_TRIGGER:
+		return models.NodeTypeTrigger
 	default:
 		return ""
 	}
@@ -813,6 +832,8 @@ func NodeTypeToProto(nodeType string) componentpb.Node_Type {
 	switch nodeType {
 	case models.NodeTypeBlueprint:
 		return componentpb.Node_TYPE_BLUEPRINT
+	case models.NodeTypeTrigger:
+		return componentpb.Node_TYPE_TRIGGER
 	default:
 		return componentpb.Node_TYPE_COMPONENT
 	}
@@ -832,6 +853,12 @@ func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
 		if node.Blueprint != nil {
 			ref.Blueprint = &models.BlueprintRef{
 				ID: node.Blueprint.Id,
+			}
+		}
+	case componentpb.Node_TYPE_TRIGGER:
+		if node.Trigger != nil {
+			ref.Trigger = &models.TriggerRef{
+				Name: node.Trigger.Name,
 			}
 		}
 	}

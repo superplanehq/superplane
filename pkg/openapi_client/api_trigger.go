@@ -18,61 +18,56 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 
-// WorkflowEventAPIService WorkflowEventAPI service
-type WorkflowEventAPIService service
+// TriggerAPIService TriggerAPI service
+type TriggerAPIService service
 
-type ApiWorkflowsListEventExecutionsRequest struct {
+type ApiTriggersDescribeTriggerRequest struct {
 	ctx context.Context
-	ApiService *WorkflowEventAPIService
-	workflowId string
-	eventId string
+	ApiService *TriggerAPIService
+	name string
 }
 
-func (r ApiWorkflowsListEventExecutionsRequest) Execute() (*WorkflowsListEventExecutionsResponse, *http.Response, error) {
-	return r.ApiService.WorkflowsListEventExecutionsExecute(r)
+func (r ApiTriggersDescribeTriggerRequest) Execute() (*TriggersDescribeTriggerResponse, *http.Response, error) {
+	return r.ApiService.TriggersDescribeTriggerExecute(r)
 }
 
 /*
-WorkflowsListEventExecutions List event executions
+TriggersDescribeTrigger Describe trigger
 
-Returns a list of all node executions triggered by a root event
+Returns a trigger by its name
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param workflowId
- @param eventId
- @return ApiWorkflowsListEventExecutionsRequest
+ @param name
+ @return ApiTriggersDescribeTriggerRequest
 */
-func (a *WorkflowEventAPIService) WorkflowsListEventExecutions(ctx context.Context, workflowId string, eventId string) ApiWorkflowsListEventExecutionsRequest {
-	return ApiWorkflowsListEventExecutionsRequest{
+func (a *TriggerAPIService) TriggersDescribeTrigger(ctx context.Context, name string) ApiTriggersDescribeTriggerRequest {
+	return ApiTriggersDescribeTriggerRequest{
 		ApiService: a,
 		ctx: ctx,
-		workflowId: workflowId,
-		eventId: eventId,
+		name: name,
 	}
 }
 
 // Execute executes the request
-//  @return WorkflowsListEventExecutionsResponse
-func (a *WorkflowEventAPIService) WorkflowsListEventExecutionsExecute(r ApiWorkflowsListEventExecutionsRequest) (*WorkflowsListEventExecutionsResponse, *http.Response, error) {
+//  @return TriggersDescribeTriggerResponse
+func (a *TriggerAPIService) TriggersDescribeTriggerExecute(r ApiTriggersDescribeTriggerRequest) (*TriggersDescribeTriggerResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *WorkflowsListEventExecutionsResponse
+		localVarReturnValue  *TriggersDescribeTriggerResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowEventAPIService.WorkflowsListEventExecutions")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "TriggerAPIService.TriggersDescribeTrigger")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/workflows/{workflowId}/events/{eventId}/executions"
-	localVarPath = strings.Replace(localVarPath, "{"+"workflowId"+"}", url.PathEscape(parameterValueToString(r.workflowId, "workflowId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"eventId"+"}", url.PathEscape(parameterValueToString(r.eventId, "eventId")), -1)
+	localVarPath := localBasePath + "/api/v1/triggers/{name}"
+	localVarPath = strings.Replace(localVarPath, "{"+"name"+"}", url.PathEscape(parameterValueToString(r.name, "name")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -140,73 +135,51 @@ func (a *WorkflowEventAPIService) WorkflowsListEventExecutionsExecute(r ApiWorkf
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiWorkflowsListWorkflowEventsRequest struct {
+type ApiTriggersListTriggersRequest struct {
 	ctx context.Context
-	ApiService *WorkflowEventAPIService
-	workflowId string
-	limit *int64
-	before *time.Time
+	ApiService *TriggerAPIService
 }
 
-func (r ApiWorkflowsListWorkflowEventsRequest) Limit(limit int64) ApiWorkflowsListWorkflowEventsRequest {
-	r.limit = &limit
-	return r
-}
-
-func (r ApiWorkflowsListWorkflowEventsRequest) Before(before time.Time) ApiWorkflowsListWorkflowEventsRequest {
-	r.before = &before
-	return r
-}
-
-func (r ApiWorkflowsListWorkflowEventsRequest) Execute() (*WorkflowsListWorkflowEventsResponse, *http.Response, error) {
-	return r.ApiService.WorkflowsListWorkflowEventsExecute(r)
+func (r ApiTriggersListTriggersRequest) Execute() (*TriggersListTriggersResponse, *http.Response, error) {
+	return r.ApiService.TriggersListTriggersExecute(r)
 }
 
 /*
-WorkflowsListWorkflowEvents List workflow events
+TriggersListTriggers List triggers
 
-Returns a list of root events that triggered executions in a workflow
+Returns a list of all available triggers
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param workflowId
- @return ApiWorkflowsListWorkflowEventsRequest
+ @return ApiTriggersListTriggersRequest
 */
-func (a *WorkflowEventAPIService) WorkflowsListWorkflowEvents(ctx context.Context, workflowId string) ApiWorkflowsListWorkflowEventsRequest {
-	return ApiWorkflowsListWorkflowEventsRequest{
+func (a *TriggerAPIService) TriggersListTriggers(ctx context.Context) ApiTriggersListTriggersRequest {
+	return ApiTriggersListTriggersRequest{
 		ApiService: a,
 		ctx: ctx,
-		workflowId: workflowId,
 	}
 }
 
 // Execute executes the request
-//  @return WorkflowsListWorkflowEventsResponse
-func (a *WorkflowEventAPIService) WorkflowsListWorkflowEventsExecute(r ApiWorkflowsListWorkflowEventsRequest) (*WorkflowsListWorkflowEventsResponse, *http.Response, error) {
+//  @return TriggersListTriggersResponse
+func (a *TriggerAPIService) TriggersListTriggersExecute(r ApiTriggersListTriggersRequest) (*TriggersListTriggersResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *WorkflowsListWorkflowEventsResponse
+		localVarReturnValue  *TriggersListTriggersResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "WorkflowEventAPIService.WorkflowsListWorkflowEvents")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "TriggerAPIService.TriggersListTriggers")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/workflows/{workflowId}/events"
-	localVarPath = strings.Replace(localVarPath, "{"+"workflowId"+"}", url.PathEscape(parameterValueToString(r.workflowId, "workflowId")), -1)
+	localVarPath := localBasePath + "/api/v1/triggers"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.limit != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "limit", r.limit, "", "")
-	}
-	if r.before != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "before", r.before, "", "")
-	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

@@ -9,6 +9,8 @@ import {
   workflowsListEventExecutions,
   workflowsListChildExecutions,
   workflowsListNodeQueueItems,
+  triggersListTriggers,
+  triggersDescribeTrigger,
 } from '../api-client/sdk.gen'
 import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 
@@ -33,6 +35,14 @@ export const workflowKeys = {
   nodeQueueItems: () => [...workflowKeys.all, 'nodeQueueItems'] as const,
   nodeQueueItem: (workflowId: string, nodeId: string) =>
     [...workflowKeys.nodeQueueItems(), workflowId, nodeId] as const,
+}
+
+export const triggerKeys = {
+  all: ['triggers'] as const,
+  lists: () => [...triggerKeys.all, 'list'] as const,
+  list: () => [...triggerKeys.lists()] as const,
+  details: () => [...triggerKeys.all, 'detail'] as const,
+  detail: (name: string) => [...triggerKeys.details(), name] as const,
 }
 
 // Hooks for fetching workflows
@@ -220,5 +230,33 @@ export const useNodeQueueItems = (workflowId: string, nodeId: string) => {
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!workflowId && !!nodeId,
+  })
+}
+
+// Hooks for fetching triggers
+export const useTriggers = () => {
+  return useQuery({
+    queryKey: triggerKeys.list(),
+    queryFn: async () => {
+      const response = await triggersListTriggers(
+        withOrganizationHeader({})
+      )
+      return response.data?.triggers || []
+    },
+  })
+}
+
+export const useTrigger = (triggerName: string) => {
+  return useQuery({
+    queryKey: triggerKeys.detail(triggerName),
+    queryFn: async () => {
+      const response = await triggersDescribeTrigger(
+        withOrganizationHeader({
+          path: { name: triggerName }
+        })
+      )
+      return response.data?.trigger
+    },
+    enabled: !!triggerName,
   })
 }

@@ -26,6 +26,7 @@ type ComponentsNode struct {
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 	Component *NodeComponentRef `json:"component,omitempty"`
 	Blueprint *NodeBlueprintRef `json:"blueprint,omitempty"`
+	Trigger *NodeTriggerRef `json:"trigger,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -241,6 +242,38 @@ func (o *ComponentsNode) SetBlueprint(v NodeBlueprintRef) {
 	o.Blueprint = &v
 }
 
+// GetTrigger returns the Trigger field value if set, zero value otherwise.
+func (o *ComponentsNode) GetTrigger() NodeTriggerRef {
+	if o == nil || IsNil(o.Trigger) {
+		var ret NodeTriggerRef
+		return ret
+	}
+	return *o.Trigger
+}
+
+// GetTriggerOk returns a tuple with the Trigger field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetTriggerOk() (*NodeTriggerRef, bool) {
+	if o == nil || IsNil(o.Trigger) {
+		return nil, false
+	}
+	return o.Trigger, true
+}
+
+// HasTrigger returns a boolean if a field has been set.
+func (o *ComponentsNode) HasTrigger() bool {
+	if o != nil && !IsNil(o.Trigger) {
+		return true
+	}
+
+	return false
+}
+
+// SetTrigger gets a reference to the given NodeTriggerRef and assigns it to the Trigger field.
+func (o *ComponentsNode) SetTrigger(v NodeTriggerRef) {
+	o.Trigger = &v
+}
+
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -268,6 +301,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Blueprint) {
 		toSerialize["blueprint"] = o.Blueprint
+	}
+	if !IsNil(o.Trigger) {
+		toSerialize["trigger"] = o.Trigger
 	}
 	return toSerialize, nil
 }

@@ -31,6 +31,7 @@ type ComponentsConfigurationField struct {
 	ListItem *ComponentsListItemDefinition `json:"listItem,omitempty"`
 	Schema []ComponentsConfigurationField `json:"schema,omitempty"`
 	Label *string `json:"label,omitempty"`
+	VisibilityConditions []ComponentsVisibilityCondition `json:"visibilityConditions,omitempty"`
 }
 
 // NewComponentsConfigurationField instantiates a new ComponentsConfigurationField object
@@ -402,6 +403,38 @@ func (o *ComponentsConfigurationField) SetLabel(v string) {
 	o.Label = &v
 }
 
+// GetVisibilityConditions returns the VisibilityConditions field value if set, zero value otherwise.
+func (o *ComponentsConfigurationField) GetVisibilityConditions() []ComponentsVisibilityCondition {
+	if o == nil || IsNil(o.VisibilityConditions) {
+		var ret []ComponentsVisibilityCondition
+		return ret
+	}
+	return o.VisibilityConditions
+}
+
+// GetVisibilityConditionsOk returns a tuple with the VisibilityConditions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsConfigurationField) GetVisibilityConditionsOk() ([]ComponentsVisibilityCondition, bool) {
+	if o == nil || IsNil(o.VisibilityConditions) {
+		return nil, false
+	}
+	return o.VisibilityConditions, true
+}
+
+// HasVisibilityConditions returns a boolean if a field has been set.
+func (o *ComponentsConfigurationField) HasVisibilityConditions() bool {
+	if o != nil && !IsNil(o.VisibilityConditions) {
+		return true
+	}
+
+	return false
+}
+
+// SetVisibilityConditions gets a reference to the given []ComponentsVisibilityCondition and assigns it to the VisibilityConditions field.
+func (o *ComponentsConfigurationField) SetVisibilityConditions(v []ComponentsVisibilityCondition) {
+	o.VisibilityConditions = v
+}
+
 func (o ComponentsConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -444,6 +477,9 @@ func (o ComponentsConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Label) {
 		toSerialize["label"] = o.Label
+	}
+	if !IsNil(o.VisibilityConditions) {
+		toSerialize["visibilityConditions"] = o.VisibilityConditions
 	}
 	return toSerialize, nil
 }

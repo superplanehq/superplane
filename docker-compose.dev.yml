@@ -46,7 +46,8 @@ services:
       START_WORKFLOW_NODE_EXECUTOR: "yes"
       START_BLUEPRINT_NODE_EXECUTOR: "yes"
       START_WORKFLOW_NODE_QUEUE_WORKER: "yes"
-      START_NODE_EXECUTION_REQUEST_WORKER: "yes"
+      START_NODE_REQUEST_WORKER: "yes"
+      START_TRIGGER_STARTER: "yes"
       WEB_BASE_PATH: ""
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv

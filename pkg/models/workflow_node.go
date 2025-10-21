@@ -27,6 +27,7 @@ type WorkflowNode struct {
 	Type          string
 	Ref           datatypes.JSONType[NodeRef]
 	Configuration datatypes.JSONType[map[string]any]
+	Metadata      datatypes.JSONType[map[string]any]
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
 }
@@ -58,6 +59,22 @@ func ListWorkflowNodesReady() ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
 	err := database.Conn().
 		Where("state = ?", WorkflowNodeStateReady).
+		Where("type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
+		Find(&nodes).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+func ListReadyTriggers() ([]WorkflowNode, error) {
+	var nodes []WorkflowNode
+	err := database.Conn().
+		Where("state = ?", WorkflowNodeStateReady).
+		Where("type = ?", NodeTypeTrigger).
 		Find(&nodes).
 		Error
 
@@ -107,6 +124,20 @@ func (w *WorkflowNode) FirstQueueItem(tx *gorm.DB) (*WorkflowNodeQueueItem, erro
 	}
 
 	return &queueItem, nil
+}
+
+func (e *WorkflowNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
+	return tx.Create(&WorkflowNodeRequest{
+		WorkflowID: e.WorkflowID,
+		NodeID:     e.NodeID,
+		ID:         uuid.New(),
+		State:      NodeExecutionRequestStatePending,
+		Type:       reqType,
+		Spec:       datatypes.NewJSONType(spec),
+		RunAt:      *runAt,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}).Error
 }
 
 type WorkflowNodeQueueItem struct {

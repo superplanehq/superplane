@@ -24,6 +24,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/triggers"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -37,6 +39,7 @@ import (
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -198,6 +201,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}
 
 	err = pbComponents.RegisterComponentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbTriggers.RegisterTriggersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -710,51 +718,49 @@ func (s *Server) HandleTriggerWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	webhook, err := models.FindWebhook(webhookID)
+	_, err = models.FindWebhook(webhookID)
 	if err != nil {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}
 
-	handlers, err := webhook.Handlers()
+	handlers, err := models.FindWebhookHandlers(webhookID.String())
 	if err != nil {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}
 
 	for _, handler := range handlers {
-		s.executeWebhookHandler(w, r, handler)
+		err = s.executeWebhookHandler(w, r, handler)
+		if err != nil {
+			log.Errorf("Error executing webhook handler: %v", err)
+		}
 	}
 }
 
 func (s *Server) executeWebhookHandler(w http.ResponseWriter, r *http.Request, handler models.WebhookHandler) error {
-	switch handler.Type {
-	case models.WebhookHandlerTypeTrigger:
-		return s.executeWebhookTriggerHandler(w, r, handler)
-	case models.WebhookHandlerTypeComponent:
-		return s.executeWebhookComponentHandler(w, r, handler)
-	default:
-		return nil
-	}
-}
-
-func (s *Server) executeWebhookTriggerHandler(w http.ResponseWriter, r *http.Request, handler models.WebhookHandler) error {
-	spec := handler.Spec.Data()
-	if spec.Trigger == nil {
-		return nil
-	}
-
-	workflowNode, err := models.FindWorkflowNode(database.Conn(), uuid.MustParse(spec.Trigger.WorkflowID), spec.Trigger.NodeID)
+	workflowNode, err := models.FindWorkflowNode(database.Conn(), handler.WorkflowID, handler.NodeID)
 	if err != nil {
-		return err
+		return fmt.Errorf("workflow node not found: %w", err)
 	}
 
-	return nil
-}
+	ref := workflowNode.Ref.Data()
+	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
+	if err != nil {
+		return fmt.Errorf("trigger not found: %w", err)
+	}
 
-func (s *Server) executeWebhookComponentHandler(w http.ResponseWriter, r *http.Request, handler models.WebhookHandler) error {
-	// TODO
-	return nil
+	spec := handler.Spec.Data()
+	return trigger.HandleAction(triggers.TriggerActionContext{
+		Name:               spec.InvokeAction.ActionName,
+		Parameters:         spec.InvokeAction.Parameters,
+		Configuration:      workflowNode.Configuration.Data(),
+		MetadataContext:    contexts.NewNodeMetadataContext(workflowNode),
+		RequestContext:     contexts.NewNodeRequestContext(database.Conn(), workflowNode),
+		EventContext:       contexts.NewEventContext(database.Conn(), workflowNode),
+		WebhookContext:     contexts.NewWebhookContext(database.Conn(), r.Context(), s.encryptor, workflowNode),
+		HttpRequestContext: &triggers.HttpRequestContext{Request: r, Response: w},
+	})
 }
 
 func (s *Server) HandleCustomWebhook(w http.ResponseWriter, r *http.Request) {

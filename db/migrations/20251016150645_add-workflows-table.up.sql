@@ -35,6 +35,7 @@ CREATE TABLE workflow_nodes (
   type          CHARACTER VARYING(32) NOT NULL,
   ref           JSONB NOT NULL,
   configuration JSONB NOT NULL DEFAULT '{}'::jsonb,
+  metadata      JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at    TIMESTAMP NOT NULL,
   updated_at    TIMESTAMP NOT NULL,
 
