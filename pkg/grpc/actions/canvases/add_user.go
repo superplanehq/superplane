@@ -17,11 +17,16 @@ func AddUser(ctx context.Context, authService authorization.Authorization, orgID
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
 
-	err = authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+	isGlobalDomain := canvasID == "*" && orgID != ""
+	if isGlobalDomain {
+		err = authService.AssignRoleWithOrgContext(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas, orgID)
+	} else {
+		err = authService.AssignRole(user.ID.String(), models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+	}
 	if err != nil {
 		log.Errorf("Error adding user %s to canvas %s: %v", userID, canvasID, err)
 		return nil, status.Error(codes.Internal, "error adding user")
 	}
-
 	return &pb.AddUserResponse{}, nil
+
 }
