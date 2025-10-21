@@ -932,7 +932,7 @@ func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
 	return a.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 }
 
-func (a *AuthService) SyncDefaultRoles(orgIDs []string) error {
+func (a *AuthService) SyncDefaultRoles(orgIDs []string, canvasIDs []string) error {
 	if err := a.syncOrganizationDefaultRoles(orgIDs); err != nil {
 		return fmt.Errorf("failed to sync organization default roles: %w", err)
 	}
@@ -941,17 +941,26 @@ func (a *AuthService) SyncDefaultRoles(orgIDs []string) error {
 		return fmt.Errorf("failed to sync canvas default roles: %w", err)
 	}
 
+	if err := a.syncCanvasDefaultRoles(canvasIDs); err != nil {
+		return fmt.Errorf("failed to sync canvas default roles: %w", err)
+	}
+
 	log.Info("Successfully synced default roles for all organizations and canvases")
 	return nil
 }
 
-func (a *AuthService) DetectMissingPermissions() ([]string, error) {
+func (a *AuthService) DetectMissingPermissions() ([]string, []string, error) {
 	orgIDs, err := a.getOrganizationsWithMissingPermissions()
 	if err != nil {
-		return nil, fmt.Errorf("failed to detect missing organization permissions: %w", err)
+		return nil, nil, fmt.Errorf("failed to detect missing organization permissions: %w", err)
 	}
 
-	return orgIDs, nil
+	canvases, err := a.getCanvasesWithMissingPermissions()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to detect missing canvas permissions: %w", err)
+	}
+
+	return orgIDs, canvases, nil
 }
 
 func (a *AuthService) getOrganizationsWithMissingPermissions() ([]string, error) {
@@ -1073,10 +1082,28 @@ func (a *AuthService) syncGlobalCanvasDefaultRoles(orgIDs []string) error {
 	return nil
 }
 
+func (a *AuthService) syncCanvasDefaultRoles(canvasIDs []string) error {
+	if len(canvasIDs) == 0 {
+		log.Debug("No canvases with missing permissions found")
+		return nil
+	}
+
+	log.Infof("Found %d canvases with missing permissions", len(canvasIDs))
+
+	for _, canvasID := range canvasIDs {
+		if err := a.SyncCanvasRoles(canvasID); err != nil {
+			log.Errorf("Failed to sync default canvas roles for canvas %s: %v", canvasID, err)
+			continue
+		}
+		log.Infof("Synced default canvas roles for canvas %s", canvasID)
+	}
+
+	return nil
+}
+
 func (a *AuthService) SyncOrganizationRoles(orgID string) error {
 	domain := prefixDomain(models.DomainTypeOrganization, orgID)
 
-	// First, apply default permissions from CSV templates
 	err := a.applyDefaultPolicies(domain, a.orgPolicyTemplates)
 	if err != nil {
 		return fmt.Errorf("failed to apply default org policies: %w", err)
@@ -1088,7 +1115,17 @@ func (a *AuthService) SyncOrganizationRoles(orgID string) error {
 func (a *AuthService) SyncGlobalCanvasRoles(orgID string) error {
 	domain := prefixDomainWithOrgContext(models.DomainTypeCanvas, "*", orgID)
 
-	// First, apply default permissions from CSV templates
+	err := a.applyDefaultPolicies(domain, a.canvasPolicyTemplates)
+	if err != nil {
+		return fmt.Errorf("failed to apply global default canvas policies: %w", err)
+	}
+
+	return nil
+}
+
+func (a *AuthService) SyncCanvasRoles(canvasID string) error {
+	domain := prefixDomain(models.DomainTypeCanvas, canvasID)
+
 	err := a.applyDefaultPolicies(domain, a.canvasPolicyTemplates)
 	if err != nil {
 		return fmt.Errorf("failed to apply default canvas policies: %w", err)
@@ -1137,20 +1174,20 @@ func (a *AuthService) applyDefaultPolicies(domain string, policyTemplates [][5]s
 // Example usage function for checking and syncing missing permissions
 func (a *AuthService) CheckAndSyncMissingPermissions() error {
 	// First, detect missing permissions
-	missingOrgs, err := a.DetectMissingPermissions()
+	missingOrgs, missingCanvases, err := a.DetectMissingPermissions()
 	if err != nil {
 		return fmt.Errorf("failed to detect missing permissions: %w", err)
 	}
 
-	if len(missingOrgs) > 0 {
-		log.Infof("Found %d organizations with missing permissions: %v", len(missingOrgs), missingOrgs)
+	if len(missingOrgs) > 0 || len(missingCanvases) > 0 {
+		log.Infof("Found %d organizations and %d canvases with missing permissions", len(missingOrgs), len(missingCanvases))
 		log.Info("Syncing missing default roles...")
-		if err := a.SyncDefaultRoles(missingOrgs); err != nil {
+		if err := a.SyncDefaultRoles(missingOrgs, missingCanvases); err != nil {
 			return fmt.Errorf("failed to sync default roles: %w", err)
 		}
 		log.Info("Successfully synced all missing permissions")
 	} else {
-		log.Info("No missing permissions found - all organizations are up to date")
+		log.Info("No missing permissions found - all organizations and canvases are up to date")
 	}
 
 	return nil
