@@ -59,8 +59,8 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSuperplane.Superplane_DeleteCanvas_FullMethodName:                 {Resource: "canvas", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbSuperplane.Superplane_DescribeCanvas_FullMethodName:               {Resource: "canvas", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbSuperplane.Superplane_ListCanvases_FullMethodName:                 {Resource: "canvas", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbSuperplane.Superplane_AddUser_FullMethodName:                      {Resource: "member", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbSuperplane.Superplane_RemoveUser_FullMethodName:                   {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}},
+		pbSuperplane.Superplane_AddUser_FullMethodName:                      {Resource: "member", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}, AllowGlobalDomain: true},
+		pbSuperplane.Superplane_RemoveUser_FullMethodName:                   {Resource: "member", Action: "delete", DomainTypes: []string{models.DomainTypeCanvas}, AllowGlobalDomain: true},
 		pbSuperplane.Superplane_CreateEventSource_FullMethodName:            {Resource: "eventsource", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ResetEventSourceKey_FullMethodName:          {Resource: "eventsource", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_UpdateEventSource_FullMethodName:            {Resource: "eventsource", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
@@ -102,7 +102,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		// Users rules
 		pbUsers.Users_ListUserPermissions_FullMethodName: {Resource: "member", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
 		pbUsers.Users_ListUserRoles_FullMethodName:       {Resource: "member", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
-		pbUsers.Users_ListUsers_FullMethodName:           {Resource: "member", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbUsers.Users_ListUsers_FullMethodName:           {Resource: "member", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}, AllowGlobalDomain: true},
 
 		// Roles rules
 		pbRoles.Roles_AssignRole_FullMethodName:   {Resource: "member", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}, AllowGlobalDomain: true},
@@ -208,7 +208,7 @@ func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTyp
 	}
 
 	if len(domainTypes) == 1 && domainTypes[0] == models.DomainTypeCanvas {
-		return getCanvasIdFromRequest(req, organizationID)
+		return getCanvasIdFromRequest(req, organizationID, allowGlobalDomain)
 	}
 
 	// Handle mixed domain types (multiple domain types supported)
@@ -287,7 +287,7 @@ func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType, organizat
 	}
 }
 
-func getCanvasIdFromRequest(req interface{}, organizationID string) (string, string, error) {
+func getCanvasIdFromRequest(req interface{}, organizationID string, allowGlobalDomain bool) (string, string, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid organization ID: %s", organizationID)
@@ -295,15 +295,25 @@ func getCanvasIdFromRequest(req interface{}, organizationID string) (string, str
 
 	switch r := req.(type) {
 	case interface{ GetCanvasId() string }:
-		_, err := models.FindCanvasByID(r.GetCanvasId(), orgUUID)
-		if err != nil {
-			return "", "", fmt.Errorf("canvas %s not found in organization", r.GetCanvasId())
+		canvasID := r.GetCanvasId()
+		if canvasID == "*" && allowGlobalDomain {
+			return models.DomainTypeCanvas, canvasID, nil
 		}
 
-		return models.DomainTypeCanvas, r.GetCanvasId(), nil
+		_, err := models.FindCanvasByID(canvasID, orgUUID)
+		if err != nil {
+			return "", "", fmt.Errorf("canvas %s not found in organization", canvasID)
+		}
+
+		return models.DomainTypeCanvas, canvasID, nil
 
 	case interface{ GetCanvasIdOrName() string }:
 		canvasIDOrName := r.GetCanvasIdOrName()
+
+		if canvasIDOrName == "*" && allowGlobalDomain {
+			return models.DomainTypeCanvas, "*", nil
+		}
+
 		_, err := uuid.Parse(canvasIDOrName)
 		if err == nil {
 			_, err := models.FindCanvasByID(canvasIDOrName, orgUUID)

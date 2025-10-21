@@ -32,6 +32,7 @@ import {
   useCreateInvitation,
   useRemoveInvitation
 } from '../../../hooks/useOrganizationData'
+import { CanvasMembersSection } from '../../../components/CanvasMembersSection/canvas-members-section'
 
 interface Member {
   id: string
@@ -547,6 +548,16 @@ export function Members({ organizationId }: MembersProps) {
             </Table>
           )}
         </div>
+      </div>
+
+      {/* Global Canvas Members Section */}
+      <div className="mt-8">
+        <CanvasMembersSection
+          canvasId="*"
+          organizationId={organizationId}
+          title="Global Canvas Members"
+          description="Manage members with global canvas roles across all canvases"
+        />
       </div>
     </div>
   )
