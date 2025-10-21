@@ -24,6 +24,7 @@ type RoleManager interface {
 	AssignRole(userID, role, domainID string, domainType string) error
 	AssignRoleWithOrgContext(userID, role, domainID string, domainType string, orgID string) error
 	RemoveRole(userID, role, domainID string, domainType string) error
+	RemoveRoleWithOrgContext(userID, role, domainID string, domainType string, orgID string) error
 	GetOrgUsersForRole(role string, orgID string) ([]string, error)
 	GetCanvasUsersForRole(role string, canvasID string) ([]string, error)
 	GetCanvasUsersForRoleWithOrgContext(role string, canvasID string, orgID string) ([]string, error)

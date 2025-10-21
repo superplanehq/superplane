@@ -79,5 +79,9 @@ func Test_RemoveUser(t *testing.T) {
 		roles, err = r.AuthService.GetUserRolesForCanvas(newUser.ID.String(), canvas2.ID.String())
 		require.NoError(t, err)
 		require.Len(t, roles, 0)
+
+		roles, err = r.AuthService.GetUserRolesForCanvasWithOrgContext(newUser.ID.String(), "*", orgID)
+		require.NoError(t, err)
+		require.Len(t, roles, 0)
 	})
 }

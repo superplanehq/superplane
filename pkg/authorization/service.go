@@ -434,7 +434,17 @@ func (a *AuthService) assignRoleWithRawDomain(userID, role, domain string, domai
 }
 
 func (a *AuthService) RemoveRole(userID, role, domainID string, domainType string) error {
-	domain := prefixDomain(domainType, domainID)
+	return a.RemoveRoleWithOrgContext(userID, role, domainID, domainType, "")
+}
+
+func (a *AuthService) RemoveRoleWithOrgContext(userID, role, domainID string, domainType string, orgID string) error {
+	var domain string
+
+	if orgID == "" {
+		domain = prefixDomain(domainType, domainID)
+	} else {
+		domain = prefixDomainWithOrgContext(domainType, domainID, orgID)
+	}
 	prefixedRole := prefixRoleName(role)
 	prefixedUserID := prefixUserID(userID)
 	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedRole, domain)

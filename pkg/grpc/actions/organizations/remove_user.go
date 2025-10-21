@@ -21,6 +21,20 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 	// TODO: this should all be inside of a transaction
 	// Remove the access to all the canvases first
 	//
+	globalCanvasRoles, err := authService.GetUserRolesForCanvasWithOrgContext(user.ID.String(), "*", orgID)
+	if err != nil {
+		log.Errorf("Error getting user roles for canvas %s: %v", "*", err)
+		return nil, status.Error(codes.Internal, "error removing access to canvases")
+	}
+
+	for _, role := range globalCanvasRoles {
+		err = authService.RemoveRoleWithOrgContext(userID, role.Name, "*", models.DomainTypeCanvas, orgID)
+		if err != nil {
+			log.Errorf("Error removing role %s for %s: %v", role.Name, userID, err)
+			return nil, status.Error(codes.Internal, "error removing role")
+		}
+	}
+
 	canvases, err := authService.GetAccessibleCanvasesForUser(userID)
 	if err != nil {
 		log.Errorf("Error getting accessible canvases for %s: %v", userID, err)

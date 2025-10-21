@@ -373,5 +373,7 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	require.NoError(t, err)
 	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgViewer, organizationID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
+	err = r.AuthService.AssignRoleWithOrgContext(user.ID.String(), models.RoleCanvasViewer, "*", models.DomainTypeCanvas, organizationID.String())
+	require.NoError(t, err)
 	return user
 }
