@@ -17,7 +17,7 @@ tidy:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
 
 test.setup:
-	docker compose $(DOCKER_COMPOSE_OPTS) build
+	docker compose $(DOCKER_COMPOSE_OPTS) build --no-cache
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
