@@ -148,7 +148,7 @@ service Workflows {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List workflow events";
-      description: "Returns a list of initial events that triggered executions in a workflow";
+      description: "Returns a list of root events that triggered executions in a workflow";
       tags: "WorkflowEvent";
     };
   }
@@ -159,7 +159,7 @@ service Workflows {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List event executions";
-      description: "Returns a list of all node executions triggered by a specific initial event";
+      description: "Returns a list of all node executions triggered by a root event";
       tags: "WorkflowEvent";
     };
   }

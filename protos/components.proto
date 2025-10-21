@@ -129,9 +129,14 @@ message Node {
   enum Type {
     TYPE_COMPONENT = 0;
     TYPE_BLUEPRINT = 1;
+    TYPE_TRIGGER = 2;
   }
 
   message ComponentRef {
+    string name = 1;
+  }
+
+  message TriggerRef {
     string name = 1;
   }
 

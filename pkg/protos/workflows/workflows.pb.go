@@ -2005,7 +2005,7 @@ const file_workflows_proto_rawDesc = "" +
 	"\x1bListEventExecutionsResponse\x12K\n" +
 	"\n" +
 	"executions\x18\x01 \x03(\v2+.Superplane.Workflows.WorkflowNodeExecutionR\n" +
-	"executions2\x98\x18\n" +
+	"executions2\x89\x18\n" +
 	"\tWorkflows\x12\xc1\x01\n" +
 	"\rListWorkflows\x12*.Superplane.Workflows.ListWorkflowsRequest\x1a+.Superplane.Workflows.ListWorkflowsResponse\"W\x92A;\n" +
 	"\bWorkflow\x12\x0eList workflows\x1a\x1fReturns a list of all workflows\x82\xd3\xe4\x93\x02\x13\x12\x11/api/v1/workflows\x12\xbf\x01\n" +
@@ -2026,11 +2026,11 @@ const file_workflows_proto_rawDesc = "" +
 	"\x19InvokeNodeExecutionAction\x126.Superplane.Workflows.InvokeNodeExecutionActionRequest\x1a7.Superplane.Workflows.InvokeNodeExecutionActionResponse\"\xc3\x01\x92Af\n" +
 	"\x15WorkflowNodeExecution\x12\x17Invoke execution action\x1a4Invokes a custom action on a workflow node execution\x82\xd3\xe4\x93\x02T:\x01*\"O/api/v1/workflows/{workflow_id}/executions/{execution_id}/actions/{action_name}\x12\xb4\x02\n" +
 	"\x13ListChildExecutions\x120.Superplane.Workflows.ListChildExecutionsRequest\x1a1.Superplane.Workflows.ListChildExecutionsResponse\"\xb7\x01\x92Ag\n" +
-	"\x15WorkflowNodeExecution\x12&List child executions for an execution\x1a&List child executions for an execution\x82\xd3\xe4\x93\x02G:\x01*\"B/api/v1/workflows/{workflow_id}/executions/{execution_id}/children\x12\x9a\x02\n" +
-	"\x12ListWorkflowEvents\x12/.Superplane.Workflows.ListWorkflowEventsRequest\x1a0.Superplane.Workflows.ListWorkflowEventsResponse\"\xa0\x01\x92Ao\n" +
-	"\rWorkflowEvent\x12\x14List workflow events\x1aHReturns a list of initial events that triggered executions in a workflow\x82\xd3\xe4\x93\x02(\x12&/api/v1/workflows/{workflow_id}/events\x12\xb7\x02\n" +
-	"\x13ListEventExecutions\x120.Superplane.Workflows.ListEventExecutionsRequest\x1a1.Superplane.Workflows.ListEventExecutionsResponse\"\xba\x01\x92As\n" +
-	"\rWorkflowEvent\x12\x15List event executions\x1aKReturns a list of all node executions triggered by a specific initial event\x82\xd3\xe4\x93\x02>\x12</api/v1/workflows/{workflow_id}/events/{event_id}/executionsB\xcb\x01\x92A\x8e\x01\x12d\n" +
+	"\x15WorkflowNodeExecution\x12&List child executions for an execution\x1a&List child executions for an execution\x82\xd3\xe4\x93\x02G:\x01*\"B/api/v1/workflows/{workflow_id}/executions/{execution_id}/children\x12\x97\x02\n" +
+	"\x12ListWorkflowEvents\x12/.Superplane.Workflows.ListWorkflowEventsRequest\x1a0.Superplane.Workflows.ListWorkflowEventsResponse\"\x9d\x01\x92Al\n" +
+	"\rWorkflowEvent\x12\x14List workflow events\x1aEReturns a list of root events that triggered executions in a workflow\x82\xd3\xe4\x93\x02(\x12&/api/v1/workflows/{workflow_id}/events\x12\xab\x02\n" +
+	"\x13ListEventExecutions\x120.Superplane.Workflows.ListEventExecutionsRequest\x1a1.Superplane.Workflows.ListEventExecutionsResponse\"\xae\x01\x92Ag\n" +
+	"\rWorkflowEvent\x12\x15List event executions\x1a?Returns a list of all node executions triggered by a root event\x82\xd3\xe4\x93\x02>\x12</api/v1/workflows/{workflow_id}/events/{event_id}/executionsB\xcb\x01\x92A\x8e\x01\x12d\n" +
 	"\x18Superplane Workflows API\x12\x1cAPI for Superplane workflows\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ7github.com/superplanehq/superplane/pkg/protos/workflowsb\x06proto3"
 

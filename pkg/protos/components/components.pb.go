@@ -29,6 +29,7 @@ type Node_Type int32
 const (
 	Node_TYPE_COMPONENT Node_Type = 0
 	Node_TYPE_BLUEPRINT Node_Type = 1
+	Node_TYPE_TRIGGER   Node_Type = 2
 )
 
 // Enum value maps for Node_Type.
@@ -36,10 +37,12 @@ var (
 	Node_Type_name = map[int32]string{
 		0: "TYPE_COMPONENT",
 		1: "TYPE_BLUEPRINT",
+		2: "TYPE_TRIGGER",
 	}
 	Node_Type_value = map[string]int32{
 		"TYPE_COMPONENT": 0,
 		"TYPE_BLUEPRINT": 1,
+		"TYPE_TRIGGER":   2,
 	}
 )
 
@@ -938,6 +941,50 @@ func (x *Node_ComponentRef) GetName() string {
 	return ""
 }
 
+type Node_TriggerRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Node_TriggerRef) Reset() {
+	*x = Node_TriggerRef{}
+	mi := &file_components_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Node_TriggerRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Node_TriggerRef) ProtoMessage() {}
+
+func (x *Node_TriggerRef) ProtoReflect() protoreflect.Message {
+	mi := &file_components_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Node_TriggerRef.ProtoReflect.Descriptor instead.
+func (*Node_TriggerRef) Descriptor() ([]byte, []int) {
+	return file_components_proto_rawDescGZIP(), []int{12, 1}
+}
+
+func (x *Node_TriggerRef) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type Node_BlueprintRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -947,7 +994,7 @@ type Node_BlueprintRef struct {
 
 func (x *Node_BlueprintRef) Reset() {
 	*x = Node_BlueprintRef{}
-	mi := &file_components_proto_msgTypes[15]
+	mi := &file_components_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -959,7 +1006,7 @@ func (x *Node_BlueprintRef) String() string {
 func (*Node_BlueprintRef) ProtoMessage() {}
 
 func (x *Node_BlueprintRef) ProtoReflect() protoreflect.Message {
-	mi := &file_components_proto_msgTypes[15]
+	mi := &file_components_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -972,7 +1019,7 @@ func (x *Node_BlueprintRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Node_BlueprintRef.ProtoReflect.Descriptor instead.
 func (*Node_BlueprintRef) Descriptor() ([]byte, []int) {
-	return file_components_proto_rawDescGZIP(), []int{12, 1}
+	return file_components_proto_rawDescGZIP(), []int{12, 2}
 }
 
 func (x *Node_BlueprintRef) GetId() string {
@@ -1039,7 +1086,7 @@ const file_components_proto_rawDesc = "" +
 	"parameters\x18\x03 \x03(\v2).Superplane.Components.ConfigurationFieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
-	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xa3\x03\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xd7\x03\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
@@ -1048,12 +1095,16 @@ const file_components_proto_rawDesc = "" +
 	"\tcomponent\x18\x05 \x01(\v2(.Superplane.Components.Node.ComponentRefR\tcomponent\x12F\n" +
 	"\tblueprint\x18\x06 \x01(\v2(.Superplane.Components.Node.BlueprintRefR\tblueprint\x1a\"\n" +
 	"\fComponentRef\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x1a \n" +
+	"\n" +
+	"TriggerRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a\x1e\n" +
 	"\fBlueprintRef\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\".\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"@\n" +
 	"\x04Type\x12\x12\n" +
 	"\x0eTYPE_COMPONENT\x10\x00\x12\x12\n" +
-	"\x0eTYPE_BLUEPRINT\x10\x01\"Z\n" +
+	"\x0eTYPE_BLUEPRINT\x10\x01\x12\x10\n" +
+	"\fTYPE_TRIGGER\x10\x02\"Z\n" +
 	"\x04Edge\x12\x1b\n" +
 	"\tsource_id\x18\x01 \x01(\tR\bsourceId\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x18\n" +
@@ -1082,7 +1133,7 @@ func file_components_proto_rawDescGZIP() []byte {
 }
 
 var file_components_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_components_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_components_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_components_proto_goTypes = []any{
 	(Node_Type)(0),                       // 0: Superplane.Components.Node.Type
 	(*ListComponentsRequest)(nil),        // 1: Superplane.Components.ListComponentsRequest
@@ -1100,8 +1151,9 @@ var file_components_proto_goTypes = []any{
 	(*Node)(nil),                         // 13: Superplane.Components.Node
 	(*Edge)(nil),                         // 14: Superplane.Components.Edge
 	(*Node_ComponentRef)(nil),            // 15: Superplane.Components.Node.ComponentRef
-	(*Node_BlueprintRef)(nil),            // 16: Superplane.Components.Node.BlueprintRef
-	(*_struct.Struct)(nil),               // 17: google.protobuf.Struct
+	(*Node_TriggerRef)(nil),              // 16: Superplane.Components.Node.TriggerRef
+	(*Node_BlueprintRef)(nil),            // 17: Superplane.Components.Node.BlueprintRef
+	(*_struct.Struct)(nil),               // 18: google.protobuf.Struct
 }
 var file_components_proto_depIdxs = []int32{
 	5,  // 0: Superplane.Components.ListComponentsResponse.components:type_name -> Superplane.Components.Component
@@ -1115,9 +1167,9 @@ var file_components_proto_depIdxs = []int32{
 	6,  // 8: Superplane.Components.ComponentAction.parameters:type_name -> Superplane.Components.ConfigurationField
 	11, // 9: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
 	0,  // 10: Superplane.Components.Node.type:type_name -> Superplane.Components.Node.Type
-	17, // 11: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
+	18, // 11: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
 	15, // 12: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
-	16, // 13: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
+	17, // 13: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
 	1,  // 14: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
 	3,  // 15: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
 	10, // 16: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
@@ -1143,7 +1195,7 @@ func file_components_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_components_proto_rawDesc), len(file_components_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

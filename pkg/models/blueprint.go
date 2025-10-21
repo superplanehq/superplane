@@ -11,11 +11,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	NodeTypeComponent = "component"
-	NodeTypeBlueprint = "blueprint"
-)
-
 type Blueprint struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
@@ -115,16 +110,16 @@ type Node struct {
 }
 
 type NodeRef struct {
-	Component     *ComponentRef     `json:"component,omitempty"`
-	Blueprint     *BlueprintRef     `json:"blueprint,omitempty"`
-	OutputChannel *OutputChannelRef `json:"output_channel,omitempty"`
-}
-
-type OutputChannelRef struct {
-	Name string `json:"name"`
+	Component *ComponentRef `json:"component,omitempty"`
+	Blueprint *BlueprintRef `json:"blueprint,omitempty"`
+	Trigger   *TriggerRef   `json:"trigger,omitempty"`
 }
 
 type ComponentRef struct {
+	Name string `json:"name"`
+}
+
+type TriggerRef struct {
 	Name string `json:"name"`
 }
 

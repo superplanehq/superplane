@@ -18,6 +18,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
+	"github.com/superplanehq/superplane/pkg/triggers"
+	"github.com/superplanehq/superplane/pkg/triggers/schedule"
+	"github.com/superplanehq/superplane/pkg/triggers/webhook"
 
 	"github.com/superplanehq/superplane/pkg/components/approval"
 	"github.com/superplanehq/superplane/pkg/components/filter"
@@ -42,6 +45,7 @@ type Registry struct {
 	Integrations map[string]Integration
 	Executors    map[string]executors.Executor
 	Components   map[string]components.Component
+	Triggers     map[string]triggers.Trigger
 }
 
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
@@ -51,6 +55,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 		Integrations: map[string]Integration{},
 		httpClient:   &http.Client{Timeout: 10 * time.Second},
 		Components:   map[string]components.Component{},
+		Triggers:     map[string]triggers.Trigger{},
 	}
 
 	r.Init()
@@ -92,6 +97,12 @@ func (r *Registry) Init() {
 	r.Components["approval"] = &approval.Approval{}
 	r.Components["noop"] = &noopComponent.NoOp{}
 	r.Components["wait"] = &wait.Wait{}
+
+	//
+	// Register the triggers
+	//
+	r.Triggers["webhook"] = &webhook.Webhook{}
+	r.Triggers["schedule"] = &schedule.Schedule{}
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {
@@ -232,6 +243,28 @@ func (r *Registry) NewExecutor(executorType string) (executors.Executor, error) 
 	}
 
 	return executor, nil
+}
+
+func (r *Registry) ListTriggers() []triggers.Trigger {
+	triggers := make([]triggers.Trigger, 0, len(r.Triggers))
+	for _, trigger := range r.Triggers {
+		triggers = append(triggers, trigger)
+	}
+
+	sort.Slice(triggers, func(i, j int) bool {
+		return triggers[i].Name() < triggers[j].Name()
+	})
+
+	return triggers
+}
+
+func (r *Registry) GetTrigger(name string) (triggers.Trigger, error) {
+	trigger, ok := r.Triggers[name]
+	if !ok {
+		return nil, fmt.Errorf("trigger %s not registered", name)
+	}
+
+	return trigger, nil
 }
 
 func (r *Registry) ListComponents() []components.Component {

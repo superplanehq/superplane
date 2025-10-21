@@ -13,6 +13,10 @@ import (
 const (
 	WorkflowNodeStateReady      = "ready"
 	WorkflowNodeStateProcessing = "processing"
+
+	NodeTypeTrigger   = "trigger"
+	NodeTypeComponent = "component"
+	NodeTypeBlueprint = "blueprint"
 )
 
 type WorkflowNode struct {

@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -229,6 +230,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
@@ -339,6 +341,14 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
+
+	//
+	// Webhook endpoints for triggers
+	//
+	publicRoute.
+		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleTriggerWebhook).
+		Headers("Content-Type", "application/json").
+		Methods("POST")
 
 	//
 	// Webhook endpoints for integrations (they have their own authentication).
@@ -689,6 +699,62 @@ func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]a
 	}
 
 	return outputs, nil
+}
+
+func (s *Server) HandleTriggerWebhook(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	webhookIDFromRequest := vars["webhookID"]
+	webhookID, err := uuid.Parse(webhookIDFromRequest)
+	if err != nil {
+		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+
+	webhook, err := models.FindWebhook(webhookID)
+	if err != nil {
+		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+
+	handlers, err := webhook.Handlers()
+	if err != nil {
+		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+
+	for _, handler := range handlers {
+		s.executeWebhookHandler(w, r, handler)
+	}
+}
+
+func (s *Server) executeWebhookHandler(w http.ResponseWriter, r *http.Request, handler models.WebhookHandler) error {
+	switch handler.Type {
+	case models.WebhookHandlerTypeTrigger:
+		return s.executeWebhookTriggerHandler(w, r, handler)
+	case models.WebhookHandlerTypeComponent:
+		return s.executeWebhookComponentHandler(w, r, handler)
+	default:
+		return nil
+	}
+}
+
+func (s *Server) executeWebhookTriggerHandler(w http.ResponseWriter, r *http.Request, handler models.WebhookHandler) error {
+	spec := handler.Spec.Data()
+	if spec.Trigger == nil {
+		return nil
+	}
+
+	workflowNode, err := models.FindWorkflowNode(database.Conn(), uuid.MustParse(spec.Trigger.WorkflowID), spec.Trigger.NodeID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) executeWebhookComponentHandler(w http.ResponseWriter, r *http.Request, handler models.WebhookHandler) error {
+	// TODO
+	return nil
 }
 
 func (s *Server) HandleCustomWebhook(w http.ResponseWriter, r *http.Request) {
