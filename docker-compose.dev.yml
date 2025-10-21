@@ -63,11 +63,12 @@ services:
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@superplane.com}
 
     ports:
-      - 5173:5173
-      - 4173:4173
-      - 6006:6006
-      - 8000:8000
-      - 50051:50051
+      - 5173:5173  # Vite dev server (web_src)
+      - 4173:4173  # Vite preview server
+      - 5174:5174  # Vite dev server (ui library)
+      - 6006:6006  # Storybook
+      - 8000:8000  # Go server
+      - 50051:50051  # gRPC
 
     links:
       - db:db
@@ -83,6 +84,9 @@ services:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
+      - node_modules_cache:/app/node_modules
+      - ui_node_modules_cache:/app/ui/node_modules
+      - web_src_node_modules_cache:/app/web_src/node_modules
 
   db:
     image: postgres:17.5
@@ -130,4 +134,13 @@ volumes:
     driver: local
 
   postgres-data:
+    driver: local
+
+  node_modules_cache:
+    driver: local
+
+  ui_node_modules_cache:
+    driver: local
+
+  web_src_node_modules_cache:
     driver: local

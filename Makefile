@@ -43,16 +43,31 @@ dev.setup:
 dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up
 
+# Start UI library in watch mode for development
+dev.ui.watch:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash -c "./dev-ui-lib.sh"
+
+# Start web development server
+dev.web:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash -c "cd web_src && npm run dev"
+
+# Build UI library
+build.ui:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /bin/bash -c "cd ui && npm run build:lib"
+
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app /bin/bash
 
 check.build.ui:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run build"
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "npm run build:ui-lib && cd web_src && npm run build"
 
 check.build.app:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app go build cmd/server/main.go
 
 storybook:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash -c "cd ui && npm run storybook"
+
+storybook.web:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash -c "cd web_src && npm install && npm run storybook"
 
 #

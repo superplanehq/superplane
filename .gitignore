@@ -6,3 +6,4 @@ design/node_modules/
 # macOS Finder metadata
 .DS_Store
 main
+node_modules

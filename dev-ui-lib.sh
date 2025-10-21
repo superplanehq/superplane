@@ -16,10 +16,10 @@ echo "Performing initial build..."
 npm run build:lib
 
 echo "Starting UI library build in watch mode..."
-BUILD_MODE=lib ./node_modules/.bin/vite build --watch &
+BUILD_MODE=lib VITE_FORCE_POLLING=true ./node_modules/.bin/vite build --watch &
 VITE_PID=$!
 
-BUILD_MODE=lib ./node_modules/.bin/tsc -p tsconfig.lib.json -w &
+BUILD_MODE=lib ./node_modules/.bin/tsc -p tsconfig.lib.json -w --preserveWatchOutput &
 TSC_PID=$!
 
 echo "UI library watch mode started (Vite PID: $VITE_PID, TypeScript PID: $TSC_PID)"

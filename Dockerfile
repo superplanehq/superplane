@@ -52,7 +52,10 @@ COPY go.mod go.mod
 COPY go.sum go.sum
 COPY db/migrations /app/db/migrations
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY ui ui
 COPY web_src web_src
+COPY package.json package.json
+COPY package-lock.json package-lock.json
 COPY protos protos
 COPY api/swagger api/swagger
 COPY rbac rbac
@@ -83,8 +86,15 @@ ARG BASE_URL=https://app.superplane.com
 WORKDIR /app
 RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
-WORKDIR /app/web_src
+# Install workspace dependencies
 RUN npm install
+
+# Build UI library first
+WORKDIR /app/ui
+RUN npm run build:lib
+
+# Build web application
+WORKDIR /app/web_src
 RUN VITE_BASE_URL=$BASE_URL npm run build
 
 FROM ${RUNNER_IMAGE} AS runner
