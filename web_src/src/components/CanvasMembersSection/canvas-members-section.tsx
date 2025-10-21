@@ -33,6 +33,8 @@ import {
   useCreateInvitation,
   useUpdateInvitation
 } from '../../hooks/useOrganizationData'
+import { usersListUsers } from '@/api-client'
+import { withOrganizationHeader } from '@/utils/withOrganizationHeader'
 
 interface CanvasMembersSectionProps {
   canvasId: string
@@ -280,7 +282,19 @@ export function CanvasMembersSection({
   const handleInviteNewUser = async (email: string) => {
     try {
       const result = await createInvitationMutation.mutateAsync(email)
-      await handleAssignInvitationToCanvas(result.invitation?.id || '')
+
+      if (result.invitation?.state === 'pending') {
+        await handleAssignInvitationToCanvas(result.invitation?.id || '')
+      }
+
+      if (result.invitation?.state === 'accepted') {
+        const response = await usersListUsers(withOrganizationHeader({
+          query: { domainId: canvasId, domainType: 'DOMAIN_TYPE_CANVAS' },
+        }))
+        const users = response.data?.users || []
+        const user = users.find(user => user.metadata?.email === email)
+        await handleAddMember(user?.metadata?.id || '')
+      }
 
     } catch (err) {
       console.error('Error creating invitation:', err)
