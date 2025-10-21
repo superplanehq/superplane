@@ -97,10 +97,12 @@ func FindUser(org, id, email string) (*models.User, error) {
 func GetUsersWithRolesInDomain(domainID, domainType string, orgID string, authService authorization.Authorization) ([]*pbUsers.User, error) {
 	var roleDefinitions []*authorization.RoleDefinition
 	var err error
-	if domainID == "*" && orgID == "" {
-		roleDefinitions, err = authService.GetAllRoleDefinitions(domainType, domainID)
-	} else {
+	isGlobalRole := domainID == "*" && orgID != ""
+
+	if isGlobalRole {
 		roleDefinitions, err = authService.GetAllRoleDefinitionsWithOrgContext(domainType, domainID, orgID)
+	} else {
+		roleDefinitions, err = authService.GetAllRoleDefinitions(domainType, domainID)
 	}
 
 	if err != nil {
@@ -113,10 +115,10 @@ func GetUsersWithRolesInDomain(domainID, domainType string, orgID string, authSe
 	}
 
 	var roleMetadataMap map[string]*models.RoleMetadata
-	if orgID == "" {
-		roleMetadataMap, err = models.FindRoleMetadataByNames(roleNames, domainType, domainID)
-	} else {
+	if isGlobalRole {
 		roleMetadataMap, err = models.FindRoleMetadataByNamesWithOrgContext(roleNames, domainType, domainID, orgID)
+	} else {
+		roleMetadataMap, err = models.FindRoleMetadataByNames(roleNames, domainType, domainID)
 	}
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "role not found")
@@ -130,10 +132,10 @@ func GetUsersWithRolesInDomain(domainID, domainType string, orgID string, authSe
 		if domainType == models.DomainTypeOrganization {
 			userIDs, err = authService.GetOrgUsersForRole(roleDef.Name, domainID)
 		} else {
-			if domainID == "*" && orgID == "" {
-				userIDs, err = authService.GetCanvasUsersForRole(roleDef.Name, domainID)
-			} else {
+			if isGlobalRole {
 				userIDs, err = authService.GetCanvasUsersForRoleWithOrgContext(roleDef.Name, domainID, orgID)
+			} else {
+				userIDs, err = authService.GetCanvasUsersForRole(roleDef.Name, domainID)
 			}
 		}
 

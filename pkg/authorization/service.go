@@ -929,7 +929,19 @@ func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domai
 }
 
 func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
-	return a.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
+	err := a.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
+	if err != nil {
+		log.Errorf("failed to assign role %s to user %s in org %s. Error: %v", models.RoleOrgOwner, userID, orgID, err)
+		return fmt.Errorf("failed to assign role %s to user %s in org %s", models.RoleOrgOwner, userID, orgID)
+	}
+
+	err = a.AssignRoleWithOrgContext(userID, models.RoleCanvasOwner, "*", models.DomainTypeCanvas, orgID)
+	if err != nil {
+		log.Errorf("failed to assign role %s to user %s in org %s. Error: %v", models.RoleCanvasOwner, userID, orgID, err)
+		return fmt.Errorf("failed to assign role %s to user %s in org %s", models.RoleCanvasOwner, userID, orgID)
+	}
+
+	return nil
 }
 
 func (a *AuthService) SyncDefaultRoles(orgIDs []string, canvasIDs []string) error {
