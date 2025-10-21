@@ -19,11 +19,9 @@ import {
   TableHeader,
   TableCell
 } from '../../../components/Table/table'
-import { useOrganizationRoles, useDeleteRole, useOrganizationCanvases } from '../../../hooks/useOrganizationData'
+import { useOrganizationRoles, useDeleteRole } from '../../../hooks/useOrganizationData'
 import { useCanvasRoles } from '../../../hooks/useCanvasData'
-import { RolesRole } from '../../../api-client/types.gen'
-import { Select, type SelectOption } from '../../../components/Select/index'
-
+import { AuthorizationDomainType, RolesRole } from '../../../api-client/types.gen'
 interface RolesProps {
   organizationId: string
 }
@@ -32,7 +30,6 @@ interface RolesProps {
 export function Roles({ organizationId }: RolesProps) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const [selectedCanvasId, setSelectedCanvasId] = useState<string>('')
   const [sortConfig, setSortConfig] = useState<{
     key: string | null
     direction: 'asc' | 'desc'
@@ -44,8 +41,7 @@ export function Roles({ organizationId }: RolesProps) {
   const setDebouncedSearch = debounce((search: string) => setSearch(search), 500)
 
   // Use React Query hooks for data fetching
-  const { data: roles = [], isLoading: loadingRoles, error } = useOrganizationRoles(organizationId)
-  const { data: canvases = [] } = useOrganizationCanvases(organizationId)
+  const { data: roles = [], isLoading: loadingRoles, refetch: refetchOrganizationRoles, error } = useOrganizationRoles(organizationId)
 
   // Mutation for role deletion
   const deleteRoleMutation = useDeleteRole(organizationId)
@@ -58,7 +54,7 @@ export function Roles({ organizationId }: RolesProps) {
     navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`)
   }
 
-  const handleDeleteRole = async (role: RolesRole) => {
+  const handleDeleteRole = async (role: RolesRole, domainType: AuthorizationDomainType) => {
     if (!role.metadata?.name) return
 
     const confirmed = window.confirm(
@@ -70,9 +66,14 @@ export function Roles({ organizationId }: RolesProps) {
     try {
       await deleteRoleMutation.mutateAsync({
         roleName: role.metadata?.name,
-        domainType: 'DOMAIN_TYPE_ORGANIZATION',
-        domainId: organizationId
+        domainType: domainType,
+        domainId: role.metadata?.domainId || ''
       })
+      if (domainType === 'DOMAIN_TYPE_ORGANIZATION') {
+        refetchOrganizationRoles()
+      } else {
+        refetchCanvasRoles()
+      }
     } catch (err) {
       console.error('Error deleting role:', err)
     }
@@ -117,7 +118,7 @@ export function Roles({ organizationId }: RolesProps) {
 
   const isDefaultRole = (roleName: string | undefined) => {
     if (!roleName) return false
-    const defaultRoles = ['org_viewer', 'org_admin', 'org_owner']
+    const defaultRoles = ['org_viewer', 'org_admin', 'org_owner', 'canvas_viewer', 'canvas_admin', 'canvas_owner']
     return defaultRoles.includes(roleName)
   }
 
@@ -142,19 +143,8 @@ export function Roles({ organizationId }: RolesProps) {
     return getSortedData(filtered)
   }, [roles, search, getSortedData])
 
-  // Canvas options for the select
-  const canvasOptions: SelectOption[] = useMemo(() => {
-    return canvases
-      .filter((canvas) => canvas.metadata?.id)
-      .map((canvas) => ({
-        value: canvas.metadata!.id!,
-        label: canvas.metadata?.name || 'Unnamed Canvas',
-        description: canvas.metadata?.description,
-      }))
-  }, [canvases])
-
   // Get canvas roles for selected canvas
-  const { data: canvasRoles = [], isLoading: loadingCanvasRoles } = useCanvasRoles(selectedCanvasId)
+  const { data: canvasRoles = [], isLoading: loadingCanvasRoles, refetch: refetchCanvasRoles } = useCanvasRoles("*")
 
   const filteredCanvasRoles = useMemo(() => {
     const filtered = canvasRoles.filter((role) => {
@@ -167,13 +157,11 @@ export function Roles({ organizationId }: RolesProps) {
     return getSortedData(filtered)
   }, [canvasRoles, search, getSortedData])
 
-  const selectedCanvas = canvases.find(canvas => canvas.metadata?.id === selectedCanvasId)
-
   return (
-    <div className="space-y-8 pt-6 text-left">
+    <div className="space-y-4 pt-6 text-left">
       <div className="flex items-center justify-between">
         <div>
-          <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white mb-1">
+          <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
             Roles
           </Heading>
         </div>
@@ -185,7 +173,7 @@ export function Roles({ organizationId }: RolesProps) {
       )}
 
       {/* Search Bar - shared across both sections */}
-      <div className="flex justify-center">
+      <div className="flex justify-left">
         <InputGroup>
           <Input
             name="search"
@@ -286,7 +274,7 @@ export function Roles({ organizationId }: RolesProps) {
                                         Edit
                                       </DropdownItem>
                                       <DropdownItem
-                                        onClick={() => handleDeleteRole(role)}
+                                        onClick={() => handleDeleteRole(role, 'DOMAIN_TYPE_ORGANIZATION')}
                                         className="text-red-600 dark:text-red-400"
                                       >
                                         <MaterialSymbol name="delete" />
@@ -318,50 +306,23 @@ export function Roles({ organizationId }: RolesProps) {
                 Canvas Roles
               </h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Roles specific to individual canvases
+                Roles applied to all canvases
               </p>
             </div>
-            {selectedCanvasId && (
-              <Button
-                color="blue"
-                className='flex items-center'
-                onClick={() => navigate(`/${organizationId}/settings/create-role?canvasId=${selectedCanvasId}`)}
-              >
-                <MaterialSymbol name="add" />
-                New Canvas Role
-              </Button>
-            )}
+            <Button
+              color="blue"
+              className='flex items-center'
+              onClick={() => navigate(`/${organizationId}/settings/create-role?canvasId=${"*"}`)}
+            >
+              <MaterialSymbol name="add" />
+              New Canvas Role
+            </Button>
           </div>
         </div>
 
         <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-zinc-200 dark:border-zinc-800">
-            <div className="flex items-center gap-4">
-              <div className="flex-1 max-w-xs">
-                <Select
-                  options={canvasOptions}
-                  value={selectedCanvasId}
-                  onChange={setSelectedCanvasId}
-                  placeholder="Select a canvas to view roles..."
-                />
-              </div>
-              {selectedCanvas && (
-                <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                  Showing roles for <span className="font-medium text-zinc-900 dark:text-zinc-100">{selectedCanvas.metadata?.name}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
           <div className="px-6 pb-6 pt-6">
-            {!selectedCanvasId ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="text-center">
-                  <MaterialSymbol name="account_circle" className="text-zinc-300 dark:text-zinc-600 text-4xl mb-2" />
-                  <p className="text-zinc-500 dark:text-zinc-400">Select a canvas to view its roles</p>
-                </div>
-              </div>
-            ) : loadingCanvasRoles ? (
+            {loadingCanvasRoles ? (
               <div className="flex justify-center items-center h-32">
                 <p className="text-zinc-500 dark:text-zinc-400">Loading canvas roles...</p>
               </div>
@@ -414,18 +375,18 @@ export function Roles({ organizationId }: RolesProps) {
                                 </DropdownButton>
                                 <DropdownMenu>
                                   {isDefault ? (
-                                    <DropdownItem onClick={() => navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}?canvasId=${selectedCanvasId}`)}>
+                                    <DropdownItem onClick={() => navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}?canvasId=${"*"}`)}>
                                       <MaterialSymbol name="visibility" />
                                       View
                                     </DropdownItem>
                                   ) : (
                                     <>
-                                      <DropdownItem onClick={() => navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}?canvasId=${selectedCanvasId}`)}>
+                                      <DropdownItem onClick={() => navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}?canvasId=${"*"}`)}>
                                         <MaterialSymbol name="edit" />
                                         Edit
                                       </DropdownItem>
                                       <DropdownItem
-                                        onClick={() => handleDeleteRole(role)}
+                                        onClick={() => handleDeleteRole(role, 'DOMAIN_TYPE_CANVAS')}
                                         className="text-red-600 dark:text-red-400"
                                       >
                                         <MaterialSymbol name="delete" />

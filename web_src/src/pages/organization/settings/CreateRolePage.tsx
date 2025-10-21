@@ -7,9 +7,8 @@ import { Checkbox, CheckboxField } from '../../../components/Checkbox/checkbox'
 import { Label, Description } from '../../../components/Fieldset/fieldset'
 import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
-import { useRole, useCreateRole, useUpdateRole, useOrganizationCanvases } from '../../../hooks/useOrganizationData'
+import { useRole, useCreateRole, useUpdateRole } from '../../../hooks/useOrganizationData'
 import { useCanvasRole, useCreateCanvasRole, useUpdateCanvasRole } from '../../../hooks/useCanvasData'
-import { Select, type SelectOption } from '../../../components/Select/index'
 import { AuthorizationDomainType } from '../../../api-client/types.gen'
 import { Heading } from '@/components/Heading/heading'
 
@@ -185,12 +184,10 @@ export function CreateRolePage() {
   const [roleName, setRoleName] = useState('')
   const [roleDescription, setRoleDescription] = useState('')
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
-  const [selectedCanvasId, setSelectedCanvasId] = useState<string>(canvasIdFromParams || '')
 
   // React Query hooks - use canvas or org hooks based on role type
   const { data: existingOrgRole, isLoading: isLoadingOrgRole, error: orgError } = useRole(orgId || '', roleNameParam || '')
-  const { data: existingCanvasRole, isLoading: isLoadingCanvasRole, error: canvasError } = useCanvasRole(selectedCanvasId, roleNameParam || '')
-  const { data: canvases = [] } = useOrganizationCanvases(orgId || '')
+  const { data: existingCanvasRole, isLoading: isLoadingCanvasRole, error: canvasError } = useCanvasRole(canvasIdFromParams || '', roleNameParam || '')
 
   // Use the appropriate role data and loading state
   const existingRole = isCanvasRole ? existingCanvasRole : existingOrgRole
@@ -200,22 +197,13 @@ export function CreateRolePage() {
   // Use appropriate mutation hooks
   const createOrgRoleMutation = useCreateRole(orgId || '')
   const updateOrgRoleMutation = useUpdateRole(orgId || '')
-  const createCanvasRoleMutation = useCreateCanvasRole(selectedCanvasId)
-  const updateCanvasRoleMutation = useUpdateCanvasRole(selectedCanvasId)
+  const createCanvasRoleMutation = useCreateCanvasRole(canvasIdFromParams || '')
+  const updateCanvasRoleMutation = useUpdateCanvasRole(canvasIdFromParams || '')
 
   const createRoleMutation = isCanvasRole ? createCanvasRoleMutation : createOrgRoleMutation
   const updateRoleMutation = isCanvasRole ? updateCanvasRoleMutation : updateOrgRoleMutation
 
   const isSubmitting = createRoleMutation.isPending || updateRoleMutation.isPending
-
-  // Canvas options for the select
-  const canvasOptions: SelectOption[] = canvases
-    .filter((canvas) => canvas.metadata?.id)
-    .map((canvas) => ({
-      value: canvas.metadata!.id!,
-      label: canvas.metadata?.name || 'Unnamed Canvas',
-      description: canvas.metadata?.description,
-    }))
 
   // Check if this is a default role
   const isDefaultRole = (roleName: string | undefined) => {
@@ -274,7 +262,7 @@ export function CreateRolePage() {
 
   const handleSubmitRole = async () => {
     if (!roleName.trim() || selectedPermissions.size === 0 || !orgId) return
-    if (isCanvasRole && !isEditMode && !selectedCanvasId) return
+    if (isCanvasRole && !isEditMode && !canvasIdFromParams) return
 
     try {
       // Convert selected permissions to the protobuf format
@@ -297,7 +285,7 @@ export function CreateRolePage() {
       if (isEditMode && roleNameParam) {
         // Update existing role
         const domainType = (isCanvasRole ? 'DOMAIN_TYPE_CANVAS' : 'DOMAIN_TYPE_ORGANIZATION') as AuthorizationDomainType
-        const domainId = isCanvasRole ? selectedCanvasId : orgId
+        const domainId = isCanvasRole ? canvasIdFromParams : orgId
 
         await updateRoleMutation.mutateAsync({
           roleName: roleNameParam,
@@ -310,7 +298,7 @@ export function CreateRolePage() {
       } else {
         // Create new role
         const domainType = (isCanvasRole ? 'DOMAIN_TYPE_CANVAS' : 'DOMAIN_TYPE_ORGANIZATION') as AuthorizationDomainType
-        const domainId = isCanvasRole ? selectedCanvasId : orgId
+        const domainId = isCanvasRole ? canvasIdFromParams : orgId
 
         await createRoleMutation.mutateAsync({
           role: {
@@ -351,9 +339,9 @@ export function CreateRolePage() {
                 {
                   label: isEditMode
                     ? (isViewingDefaultRole
-                        ? (isCanvasRole ? 'View canvas role' : 'View organization role')
-                        : (isCanvasRole ? 'Edit canvas role' : 'Edit organization role')
-                      )
+                      ? (isCanvasRole ? 'View canvas role' : 'View organization role')
+                      : (isCanvasRole ? 'Edit canvas role' : 'Edit organization role')
+                    )
                     : (isCanvasRole ? 'Create new canvas role' : 'Create new organization role'),
                   current: true
                 }
@@ -367,25 +355,25 @@ export function CreateRolePage() {
               <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">
                 {isEditMode
                   ? (isViewingDefaultRole
-                      ? (isCanvasRole ? 'View Canvas Role' : 'View Organization Role')
-                      : (isCanvasRole ? 'Edit Canvas Role' : 'Edit Organization Role')
-                    )
+                    ? (isCanvasRole ? 'View Canvas Role' : 'View Organization Role')
+                    : (isCanvasRole ? 'Edit Canvas Role' : 'Edit Organization Role')
+                  )
                   : (isCanvasRole ? 'Create New Canvas Role' : 'Create New Organization Role')
                 }
               </Heading>
               <Text className="text-zinc-600 dark:text-zinc-400">
                 {isEditMode
                   ? (isViewingDefaultRole
-                      ? 'View the permissions and details of this default role. Default roles cannot be modified.'
-                      : (isCanvasRole
-                          ? 'Update the role with specific canvas permissions.'
-                          : 'Update the role with specific organization permissions.'
-                        )
+                    ? 'View the permissions and details of this default role. Default roles cannot be modified.'
+                    : (isCanvasRole
+                      ? 'Update the role with specific canvas permissions.'
+                      : 'Update the role with specific organization permissions.'
                     )
+                  )
                   : (isCanvasRole
-                      ? 'Define a custom role with specific canvas permissions.'
-                      : 'Define a custom role with specific organization permissions.'
-                    )
+                    ? 'Define a custom role with specific canvas permissions.'
+                    : 'Define a custom role with specific organization permissions.'
+                  )
                 }
               </Text>
             </div>
@@ -463,26 +451,6 @@ export function CreateRolePage() {
                   />
                 </div>
 
-                {/* Canvas Selection for Canvas Roles */}
-                {isCanvasRole && !isEditMode && (
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                      Canvas *
-                    </label>
-                    <div className="max-w-lg">
-                      <Select
-                        options={canvasOptions}
-                        value={selectedCanvasId}
-                        onChange={setSelectedCanvasId}
-                        placeholder="Select a canvas for this role..."
-                      />
-                    </div>
-                    <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      This role will apply to the selected canvas
-                    </Text>
-                  </div>
-                )}
-
                 {/* Permissions */}
                 <div className="pt-4 mb-4">
                   <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
@@ -557,7 +525,7 @@ export function CreateRolePage() {
                     Please select at least one permission for this role
                   </Text>
                 )}
-                {isCanvasRole && !isEditMode && !selectedCanvasId && (
+                {isCanvasRole && !isEditMode && !canvasIdFromParams && (
                   <Text className="text-sm text-red-600 dark:text-red-400 mt-2">
                     Please select a canvas for this role
                   </Text>
@@ -577,7 +545,7 @@ export function CreateRolePage() {
               <Button
                 color="blue"
                 onClick={handleSubmitRole}
-                disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading || (isCanvasRole && !isEditMode && !selectedCanvasId)}
+                disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading || (isCanvasRole && !isEditMode && !canvasIdFromParams)}
               >
                 {isSubmitting
                   ? (isEditMode ? 'Updating...' : 'Creating...')
