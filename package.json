@@ -1,0 +1,11 @@
+{
+  "name": "superplane-workspace",
+  "private": true,
+  "scripts": {
+    "dev:ui-lib": "./dev-ui-lib.sh",
+    "build:ui-lib": "cd ui && npm run build:lib",
+    "dev:web": "cd web_src && npm run dev",
+    "build:web": "cd web_src && npm run build"
+  },
+  "workspaces": ["ui", "web_src"]
+}

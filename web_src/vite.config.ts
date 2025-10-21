@@ -49,6 +49,7 @@ export default defineConfig(({ command }: { command: string} ) => {
     alias: {
       '@/canvas': path.resolve(__dirname, 'src/pages/canvas'),
       "@": path.resolve(__dirname, 'src'),
+      "ui": path.resolve(__dirname, '../ui/dist/index.js'),
     },
   },
   build: {

@@ -50,4 +50,4 @@ const BadgeWithVariants = Object.assign(Badge, {
   variants: badgeVariants,
 }) as BadgeComponent
 
-export { BadgeWithVariants as Badge }
+export { BadgeWithVariants as Badge, badgeVariants }
