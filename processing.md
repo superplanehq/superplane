@@ -522,27 +522,25 @@ filter1 -> approval1 -> if1 - true --> (up)
 The workflow nodes would be:
 
 ```
-ID    WF_ID   NODE_ID   PARENT_ID  PREVIOUS   PREVIOUS_CHANNEL
-wn1   wf1     http1     -          -          -
-wn2   wf1     test1     -          wn1        default
-wn3   wf1     http2     -          wn2        up
-wn4   wf1     http3     -          wn2        down
-wn5   wf1     test2     -          wn4        default
-wn6   wf1     noop1     -          wn5        up
-wn7   wf1     noop2     -          wn5        down
-wn8   wf1     filter1   wn2        -          -
-wn9   wf1     approval1 wn2        wn8        default
-wn10  wf1     if1       wn2        wn9        default
-wn11  wf1     filter1   wn5        -          -
-wn12  wf1     approval1 wn5        wn11       default
-wn13  wf1     if1       wn5        wn12       default
+WF_ID   NODE_ID         PARENT_ID  PREVIOUS         PREVIOUS_CHANNEL
+wf1     http1           -          -                -
+wf1     test1           -          http1            default
+wf1     http2           -          test1            up
+wf1     http3           -          test1            down
+wf1     test2           -          http3            default
+wf1     noop1           -          test2            up
+wf1     noop2           -          test2            down
+wf1     test1:filter1   test1      -                -
+wf1     test1:approval1 test1      test1:filter1    default
+wf1     test1:if1       test1      test1:approval1  default
+wf1     test2:filter1   test2      -                -
+wf1     test2:approval1 test2      test2:filter1    default
+wf1     test2:if1       test2      test2:if1        default
 ```
 
 One thing that gets more complicated though is what happens when a blueprint gets updated. When that happens, we need to update all `workflow_node` records that use that blueprint - and its children.
 
 One idea of how to this is through `blueprint_update_requests`: when a blueprint is updated, we don't update it right away. We wait until the current execution finishes, and before creating another one, we update the blueprint definition.
-
-How would the we represent the workflow graph entirely through `workflow_node` records?
 
 ### 1 - grouping outputs that look different
 
