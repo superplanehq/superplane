@@ -23,9 +23,11 @@ export interface TriggerProps {
   title: string;
   metadata: TriggerMetadataItem[];
   lastEventData: TriggerLastEventData;
+  collapsedBackground?: string;
+  collapsed?: boolean;
 }
 
-export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconBackground, headerColor, title, metadata, lastEventData }) => {
+export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconBackground, headerColor, title, metadata, lastEventData, collapsed = false, collapsedBackground }) => {
   const resolveIcon = React.useCallback((slug?: string): LucideIcon => {
     if (!slug) {
       return BookMarked
@@ -90,6 +92,28 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconBackground, heade
       return "bg-red-200"
     }
   }, [lastEventData])
+
+  if (collapsed) {
+    return (
+      <div className="flex w-fit flex-col items-center">
+        <div className={`flex h-20 w-20 items-center justify-center rounded-full border border-border ${collapsedBackground || ''}`}>
+          <img src={iconSrc} alt={title} className="h-12 w-12 object-contain" />
+        </div>
+        <h2 className="text-base font-semibold text-neutral-900 pt-1">{title}</h2>
+        <div className="flex flex-col items-center gap-1 mt-2">
+          {metadata.map((item, index) => {
+            const Icon = resolveIcon(item.icon)
+            return (
+              <div key={index} className="flex items-center gap-1 text-xs text-gray-500">
+                <Icon size={12} />
+                <span>{item.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col border border-border rounded-md w-[23rem]" >

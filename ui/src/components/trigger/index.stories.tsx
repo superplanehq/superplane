@@ -65,3 +65,19 @@ export const GitHub: Story = {
 export const DockerHub: Story = {
   args: DockerHubProps,
 };
+
+export const GitHubCollapsed: Story = {
+  args: {
+    ...GithubProps,
+    collapsed: true,
+    collapsedBackground: "bg-black",
+  },
+};
+
+export const DockerHubCollapsed: Story = {
+  args: {
+    ...DockerHubProps,
+    collapsed: true,
+    collapsedBackground: "bg-sky-100",
+  },
+};
