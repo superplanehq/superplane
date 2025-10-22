@@ -50,6 +50,7 @@ func serializeResources(resources []integrations.Resource) []*pb.ResourceRef {
 		out = append(out, &pb.ResourceRef{
 			Type: r.Type(),
 			Name: r.Name(),
+			Id:   r.Id(),
 		})
 	}
 

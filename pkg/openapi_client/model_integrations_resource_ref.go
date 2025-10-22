@@ -22,6 +22,7 @@ var _ MappedNullable = &IntegrationsResourceRef{}
 type IntegrationsResourceRef struct {
 	Type *string `json:"type,omitempty"`
 	Name *string `json:"name,omitempty"`
+	Id *string `json:"id,omitempty"`
 }
 
 // NewIntegrationsResourceRef instantiates a new IntegrationsResourceRef object
@@ -105,6 +106,38 @@ func (o *IntegrationsResourceRef) SetName(v string) {
 	o.Name = &v
 }
 
+// GetId returns the Id field value if set, zero value otherwise.
+func (o *IntegrationsResourceRef) GetId() string {
+	if o == nil || IsNil(o.Id) {
+		var ret string
+		return ret
+	}
+	return *o.Id
+}
+
+// GetIdOk returns a tuple with the Id field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *IntegrationsResourceRef) GetIdOk() (*string, bool) {
+	if o == nil || IsNil(o.Id) {
+		return nil, false
+	}
+	return o.Id, true
+}
+
+// HasId returns a boolean if a field has been set.
+func (o *IntegrationsResourceRef) HasId() bool {
+	if o != nil && !IsNil(o.Id) {
+		return true
+	}
+
+	return false
+}
+
+// SetId gets a reference to the given string and assigns it to the Id field.
+func (o *IntegrationsResourceRef) SetId(v string) {
+	o.Id = &v
+}
+
 func (o IntegrationsResourceRef) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o IntegrationsResourceRef) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
+	}
+	if !IsNil(o.Id) {
+		toSerialize["id"] = o.Id
 	}
 	return toSerialize, nil
 }

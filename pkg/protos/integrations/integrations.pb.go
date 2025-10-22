@@ -710,6 +710,7 @@ type ResourceRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Id            string                 `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -754,6 +755,13 @@ func (x *ResourceRef) GetType() string {
 func (x *ResourceRef) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *ResourceRef) GetId() string {
+	if x != nil {
+		return x.Id
 	}
 	return ""
 }
@@ -1176,10 +1184,11 @@ const file_integrations_proto_rawDesc = "" +
 	"\x0eIntegrationRef\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"5\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"E\n" +
 	"\vResourceRef\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"M\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
+	"\x02id\x18\x03 \x01(\tR\x02id\"M\n" +
 	"\tValueFrom\x12@\n" +
 	"\x06secret\x18\x03 \x01(\v2(.Superplane.Integrations.ValueFromSecretR\x06secret\"~\n" +
 	"\x0fValueFromSecret\x12E\n" +

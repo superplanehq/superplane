@@ -53,3 +53,9 @@ func (s *IntegrationService) UpdateIntegration(ctx context.Context, req *pb.Upda
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return integrations.UpdateIntegration(ctx, s.encryptor, s.registry, domainType, domainID, req.IdOrName, req.Integration)
 }
+
+func (s *IntegrationService) ListResources(ctx context.Context, req *pb.ListResourcesRequest) (*pb.ListResourcesResponse, error) {
+	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
+	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return integrations.ListResources(ctx, s.registry, domainType, domainID, req.IdOrName, req.Type)
+}

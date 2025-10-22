@@ -348,6 +348,7 @@ export type IntegrationsListResourcesResponse = {
 export type IntegrationsResourceRef = {
     type?: string;
     name?: string;
+    id?: string;
 };
 
 export type IntegrationsUpdateIntegrationBody = {

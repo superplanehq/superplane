@@ -179,6 +179,7 @@ message IntegrationRef {
 message ResourceRef {
   string type = 1;
   string name = 2;
+  string id = 3;
 }
 
 message ValueFrom {

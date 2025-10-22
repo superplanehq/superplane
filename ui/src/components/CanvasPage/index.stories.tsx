@@ -22,42 +22,49 @@ const sampleNodes: Node[] = [
   {
     id: "listen-code",
     position: { x: 60, y: 80 },
-    data: { label: "Listen to code changes", state: "working" },
-    type: "input",
+    data: {
+      label: "Listen to code changes",
+      state: "working",
+      type: "trigger",
+    },
   },
   {
     id: "listen-image",
     position: { x: 60, y: 260 },
-    data: { label: "Listen to Docker image updates", state: "pending" },
-    type: "input",
+    data: {
+      label: "Listen to Docker image updates",
+      state: "pending",
+      type: "trigger",
+    },
   },
   {
     id: "build-stage",
     position: { x: 320, y: 150 },
-    data: { label: "Build/Test/Deploy to Stage", state: "pending" },
+    data: {
+      label: "Build/Test/Deploy to Stage",
+      state: "pending",
+      type: "composite",
+    },
   },
   {
     id: "approve",
     position: { x: 620, y: 150 },
-    data: { label: "Approve release", state: "pending" },
+    data: { label: "Approve release", state: "pending", type: "composite" },
   },
   {
     id: "deploy-us",
     position: { x: 940, y: 40 },
-    data: { label: "Deploy to US", state: "pending" },
-    type: "output",
+    data: { label: "Deploy to US", state: "pending", type: "composite" },
   },
   {
     id: "deploy-eu",
     position: { x: 940, y: 180 },
-    data: { label: "Deploy to EU", state: "pending" },
-    type: "output",
+    data: { label: "Deploy to EU", state: "pending", type: "composite" },
   },
   {
     id: "deploy-asia",
     position: { x: 940, y: 320 },
-    data: { label: "Deploy to Asia", state: "pending" },
-    type: "output",
+    data: { label: "Deploy to Asia", state: "pending", type: "composite" },
   },
 ];
 
@@ -108,7 +115,9 @@ export const SimpleDeployment: Story = {
       while (frontier.length) {
         // mark nodes in this layer as working + set lastEvent
         const layerIds = frontier.map((f) => f.id);
-        const valuesById = new Map(frontier.map((f) => [f.id, f.value] as const));
+        const valuesById = new Map(
+          frontier.map((f) => [f.id, f.value] as const)
+        );
 
         setNodes((prev) =>
           prev.map((n) =>
