@@ -3,6 +3,7 @@ package components
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -24,7 +25,7 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 	configFields := component.Configuration()
 	configuration := make([]*pb.ConfigurationField, len(configFields))
 	for i, field := range configFields {
-		configuration[i] = ConfigurationFieldToProto(field)
+		configuration[i] = actions.ConfigurationFieldToProto(field)
 	}
 
 	return &pb.DescribeComponentResponse{
