@@ -93,7 +93,7 @@ function Composite({ data }: BlockProps) {
       : { background: "lightgray" };
 
   return (
-    <div className="p-4 rounded" style={style}>
+    <div className="p-4 rounded w-52" style={style}>
       <div className="font-medium text-gray-800">
         <div className="text-[10px]">{data?.label}</div>
       </div>
