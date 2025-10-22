@@ -5,18 +5,20 @@ import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
 import { formatTimeAgo } from '../../../utils/date'
 
-// Custom renderer for IF component executions
+interface IfConfiguration {
+  expression?: string
+}
+
 registerExecutionRenderer('if', {
   renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
     const outputs = execution.outputs
     const isFailed = execution.result === 'RESULT_FAILED'
 
-    // Extract condition expression from configuration
-    const conditionExpression = execution.configuration?.expression || 'No expression'
+    const configuration = execution.configuration as IfConfiguration | undefined
+    const conditionExpression = configuration?.expression || 'No expression'
 
-    // Determine which channel was taken
-    const trueChannel = outputs?.true
-    const falseChannel = outputs?.false
+    const trueChannel = outputs?.true as any[] | undefined
+    const falseChannel = outputs?.false as any[] | undefined
     const channelTaken = trueChannel && trueChannel.length > 0 ? 'TRUE' :
                         falseChannel && falseChannel.length > 0 ? 'FALSE' :
                         'NONE'
