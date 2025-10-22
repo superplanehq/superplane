@@ -691,10 +691,10 @@ func selectTypeOptionsToProto(opts *components.SelectTypeOptions) *componentpb.S
 	}
 
 	pbOpts := &componentpb.SelectTypeOptions{
-		Options: make([]*componentpb.FieldOption, len(opts.Options)),
+		Options: make([]*componentpb.SelectOption, len(opts.Options)),
 	}
 	for i, opt := range opts.Options {
-		pbOpts.Options[i] = &componentpb.FieldOption{
+		pbOpts.Options[i] = &componentpb.SelectOption{
 			Label: opt.Label,
 			Value: opt.Value,
 		}
@@ -708,10 +708,10 @@ func multiSelectTypeOptionsToProto(opts *components.MultiSelectTypeOptions) *com
 	}
 
 	pbOpts := &componentpb.MultiSelectTypeOptions{
-		Options: make([]*componentpb.FieldOption, len(opts.Options)),
+		Options: make([]*componentpb.SelectOption, len(opts.Options)),
 	}
 	for i, opt := range opts.Options {
-		pbOpts.Options[i] = &componentpb.FieldOption{
+		pbOpts.Options[i] = &componentpb.SelectOption{
 			Label: opt.Label,
 			Value: opt.Value,
 		}
@@ -798,11 +798,10 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb
 		Type:        field.Type,
 		Description: field.Description,
 		Required:    field.Required,
+		TypeOptions: typeOptionsToProto(field.TypeOptions),
 	}
 
-	// Handle default value
 	if field.Default != nil {
-		// Convert default value to JSON string for proto
 		defaultBytes, err := json.Marshal(field.Default)
 		if err == nil {
 			defaultStr := string(defaultBytes)
@@ -810,10 +809,6 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb
 		}
 	}
 
-	// Handle TypeOptions
-	pbField.TypeOptions = typeOptionsToProto(field.TypeOptions)
-
-	// Handle visibility conditions
 	if len(field.VisibilityConditions) > 0 {
 		pbField.VisibilityConditions = make([]*componentpb.VisibilityCondition, len(field.VisibilityConditions))
 		for i, cond := range field.VisibilityConditions {
@@ -957,17 +952,13 @@ func ProtoToConfigurationField(pbField *componentpb.ConfigurationField) componen
 		Type:        pbField.Type,
 		Description: pbField.Description,
 		Required:    pbField.Required,
+		TypeOptions: protoToTypeOptions(pbField.TypeOptions),
 	}
 
-	// Handle default value
 	if pbField.DefaultValue != nil {
 		field.Default = *pbField.DefaultValue
 	}
 
-	// Handle TypeOptions
-	field.TypeOptions = protoToTypeOptions(pbField.TypeOptions)
-
-	// Handle visibility conditions
 	if len(pbField.VisibilityConditions) > 0 {
 		field.VisibilityConditions = make([]components.VisibilityCondition, len(pbField.VisibilityConditions))
 		for i, pbCond := range pbField.VisibilityConditions {

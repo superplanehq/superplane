@@ -20,7 +20,7 @@ var _ MappedNullable = &ComponentsMultiSelectTypeOptions{}
 
 // ComponentsMultiSelectTypeOptions struct for ComponentsMultiSelectTypeOptions
 type ComponentsMultiSelectTypeOptions struct {
-	Options []ComponentsFieldOption `json:"options,omitempty"`
+	Options []ComponentsSelectOption `json:"options,omitempty"`
 }
 
 // NewComponentsMultiSelectTypeOptions instantiates a new ComponentsMultiSelectTypeOptions object
@@ -41,9 +41,9 @@ func NewComponentsMultiSelectTypeOptionsWithDefaults() *ComponentsMultiSelectTyp
 }
 
 // GetOptions returns the Options field value if set, zero value otherwise.
-func (o *ComponentsMultiSelectTypeOptions) GetOptions() []ComponentsFieldOption {
+func (o *ComponentsMultiSelectTypeOptions) GetOptions() []ComponentsSelectOption {
 	if o == nil || IsNil(o.Options) {
-		var ret []ComponentsFieldOption
+		var ret []ComponentsSelectOption
 		return ret
 	}
 	return o.Options
@@ -51,7 +51,7 @@ func (o *ComponentsMultiSelectTypeOptions) GetOptions() []ComponentsFieldOption 
 
 // GetOptionsOk returns a tuple with the Options field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsMultiSelectTypeOptions) GetOptionsOk() ([]ComponentsFieldOption, bool) {
+func (o *ComponentsMultiSelectTypeOptions) GetOptionsOk() ([]ComponentsSelectOption, bool) {
 	if o == nil || IsNil(o.Options) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *ComponentsMultiSelectTypeOptions) HasOptions() bool {
 	return false
 }
 
-// SetOptions gets a reference to the given []ComponentsFieldOption and assigns it to the Options field.
-func (o *ComponentsMultiSelectTypeOptions) SetOptions(v []ComponentsFieldOption) {
+// SetOptions gets a reference to the given []ComponentsSelectOption and assigns it to the Options field.
+func (o *ComponentsMultiSelectTypeOptions) SetOptions(v []ComponentsSelectOption) {
 	o.Options = v
 }
 

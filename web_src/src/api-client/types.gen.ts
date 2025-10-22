@@ -88,11 +88,6 @@ export type ComponentsEdge = {
     channel?: string;
 };
 
-export type ComponentsFieldOption = {
-    label?: string;
-    value?: string;
-};
-
 export type ComponentsIntegrationTypeOptions = {
     type?: string;
 };
@@ -115,7 +110,7 @@ export type ComponentsListTypeOptions = {
 };
 
 export type ComponentsMultiSelectTypeOptions = {
-    options?: Array<ComponentsFieldOption>;
+    options?: Array<ComponentsSelectOption>;
 };
 
 export type ComponentsNode = {
@@ -148,8 +143,13 @@ export type ComponentsResourceTypeOptions = {
     type?: string;
 };
 
+export type ComponentsSelectOption = {
+    label?: string;
+    value?: string;
+};
+
 export type ComponentsSelectTypeOptions = {
-    options?: Array<ComponentsFieldOption>;
+    options?: Array<ComponentsSelectOption>;
 };
 
 export type ComponentsTypeOptions = {

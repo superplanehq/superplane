@@ -170,16 +170,16 @@ type ConfigurationField struct {
 	Default     any    `json:"default"`
 
 	/*
-	 * Used for controlling when the field is visible.
-	 * No visibility conditions - always visible.
-	 */
-	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
-
-	/*
 	 * Type-specific options for fields.
 	 * The structure depends on the field type.
 	 */
 	TypeOptions *TypeOptions `json:"type_options,omitempty"`
+
+	/*
+	 * Used for controlling when the field is visible.
+	 * No visibility conditions - always visible.
+	 */
+	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
 }
 
 /*

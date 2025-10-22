@@ -4113,17 +4113,6 @@
         }
       }
     },
-    "ComponentsFieldOption": {
-      "type": "object",
-      "properties": {
-        "label": {
-          "type": "string"
-        },
-        "value": {
-          "type": "string"
-        }
-      }
-    },
     "ComponentsIntegrationTypeOptions": {
       "type": "object",
       "properties": {
@@ -4186,7 +4175,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsFieldOption"
+            "$ref": "#/definitions/ComponentsSelectOption"
           }
         }
       }
@@ -4262,6 +4251,17 @@
         }
       }
     },
+    "ComponentsSelectOption": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
     "ComponentsSelectTypeOptions": {
       "type": "object",
       "properties": {
@@ -4269,7 +4269,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsFieldOption"
+            "$ref": "#/definitions/ComponentsSelectOption"
           }
         }
       }

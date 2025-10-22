@@ -47,7 +47,6 @@ docs/ComponentsComponentAction.md
 docs/ComponentsConfigurationField.md
 docs/ComponentsDescribeComponentResponse.md
 docs/ComponentsEdge.md
-docs/ComponentsFieldOption.md
 docs/ComponentsIntegrationTypeOptions.md
 docs/ComponentsListComponentActionsResponse.md
 docs/ComponentsListComponentsResponse.md
@@ -59,6 +58,7 @@ docs/ComponentsNodeType.md
 docs/ComponentsNumberTypeOptions.md
 docs/ComponentsObjectTypeOptions.md
 docs/ComponentsResourceTypeOptions.md
+docs/ComponentsSelectOption.md
 docs/ComponentsSelectTypeOptions.md
 docs/ComponentsTypeOptions.md
 docs/ComponentsVisibilityCondition.md
@@ -307,7 +307,6 @@ model_components_component_action.go
 model_components_configuration_field.go
 model_components_describe_component_response.go
 model_components_edge.go
-model_components_field_option.go
 model_components_integration_type_options.go
 model_components_list_component_actions_response.go
 model_components_list_components_response.go
@@ -319,6 +318,7 @@ model_components_node_type.go
 model_components_number_type_options.go
 model_components_object_type_options.go
 model_components_resource_type_options.go
+model_components_select_option.go
 model_components_select_type_options.go
 model_components_type_options.go
 model_components_visibility_condition.go

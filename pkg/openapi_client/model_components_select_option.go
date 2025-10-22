@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the ComponentsFieldOption type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ComponentsFieldOption{}
+// checks if the ComponentsSelectOption type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ComponentsSelectOption{}
 
-// ComponentsFieldOption struct for ComponentsFieldOption
-type ComponentsFieldOption struct {
+// ComponentsSelectOption struct for ComponentsSelectOption
+type ComponentsSelectOption struct {
 	Label *string `json:"label,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
 
-// NewComponentsFieldOption instantiates a new ComponentsFieldOption object
+// NewComponentsSelectOption instantiates a new ComponentsSelectOption object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewComponentsFieldOption() *ComponentsFieldOption {
-	this := ComponentsFieldOption{}
+func NewComponentsSelectOption() *ComponentsSelectOption {
+	this := ComponentsSelectOption{}
 	return &this
 }
 
-// NewComponentsFieldOptionWithDefaults instantiates a new ComponentsFieldOption object
+// NewComponentsSelectOptionWithDefaults instantiates a new ComponentsSelectOption object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewComponentsFieldOptionWithDefaults() *ComponentsFieldOption {
-	this := ComponentsFieldOption{}
+func NewComponentsSelectOptionWithDefaults() *ComponentsSelectOption {
+	this := ComponentsSelectOption{}
 	return &this
 }
 
 // GetLabel returns the Label field value if set, zero value otherwise.
-func (o *ComponentsFieldOption) GetLabel() string {
+func (o *ComponentsSelectOption) GetLabel() string {
 	if o == nil || IsNil(o.Label) {
 		var ret string
 		return ret
@@ -52,7 +52,7 @@ func (o *ComponentsFieldOption) GetLabel() string {
 
 // GetLabelOk returns a tuple with the Label field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsFieldOption) GetLabelOk() (*string, bool) {
+func (o *ComponentsSelectOption) GetLabelOk() (*string, bool) {
 	if o == nil || IsNil(o.Label) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *ComponentsFieldOption) GetLabelOk() (*string, bool) {
 }
 
 // HasLabel returns a boolean if a field has been set.
-func (o *ComponentsFieldOption) HasLabel() bool {
+func (o *ComponentsSelectOption) HasLabel() bool {
 	if o != nil && !IsNil(o.Label) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *ComponentsFieldOption) HasLabel() bool {
 }
 
 // SetLabel gets a reference to the given string and assigns it to the Label field.
-func (o *ComponentsFieldOption) SetLabel(v string) {
+func (o *ComponentsSelectOption) SetLabel(v string) {
 	o.Label = &v
 }
 
 // GetValue returns the Value field value if set, zero value otherwise.
-func (o *ComponentsFieldOption) GetValue() string {
+func (o *ComponentsSelectOption) GetValue() string {
 	if o == nil || IsNil(o.Value) {
 		var ret string
 		return ret
@@ -84,7 +84,7 @@ func (o *ComponentsFieldOption) GetValue() string {
 
 // GetValueOk returns a tuple with the Value field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsFieldOption) GetValueOk() (*string, bool) {
+func (o *ComponentsSelectOption) GetValueOk() (*string, bool) {
 	if o == nil || IsNil(o.Value) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *ComponentsFieldOption) GetValueOk() (*string, bool) {
 }
 
 // HasValue returns a boolean if a field has been set.
-func (o *ComponentsFieldOption) HasValue() bool {
+func (o *ComponentsSelectOption) HasValue() bool {
 	if o != nil && !IsNil(o.Value) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *ComponentsFieldOption) HasValue() bool {
 }
 
 // SetValue gets a reference to the given string and assigns it to the Value field.
-func (o *ComponentsFieldOption) SetValue(v string) {
+func (o *ComponentsSelectOption) SetValue(v string) {
 	o.Value = &v
 }
 
-func (o ComponentsFieldOption) MarshalJSON() ([]byte, error) {
+func (o ComponentsSelectOption) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o ComponentsFieldOption) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ComponentsFieldOption) ToMap() (map[string]interface{}, error) {
+func (o ComponentsSelectOption) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Label) {
 		toSerialize["label"] = o.Label
@@ -124,38 +124,38 @@ func (o ComponentsFieldOption) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableComponentsFieldOption struct {
-	value *ComponentsFieldOption
+type NullableComponentsSelectOption struct {
+	value *ComponentsSelectOption
 	isSet bool
 }
 
-func (v NullableComponentsFieldOption) Get() *ComponentsFieldOption {
+func (v NullableComponentsSelectOption) Get() *ComponentsSelectOption {
 	return v.value
 }
 
-func (v *NullableComponentsFieldOption) Set(val *ComponentsFieldOption) {
+func (v *NullableComponentsSelectOption) Set(val *ComponentsSelectOption) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableComponentsFieldOption) IsSet() bool {
+func (v NullableComponentsSelectOption) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableComponentsFieldOption) Unset() {
+func (v *NullableComponentsSelectOption) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableComponentsFieldOption(val *ComponentsFieldOption) *NullableComponentsFieldOption {
-	return &NullableComponentsFieldOption{value: val, isSet: true}
+func NewNullableComponentsSelectOption(val *ComponentsSelectOption) *NullableComponentsSelectOption {
+	return &NullableComponentsSelectOption{value: val, isSet: true}
 }
 
-func (v NullableComponentsFieldOption) MarshalJSON() ([]byte, error) {
+func (v NullableComponentsSelectOption) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableComponentsFieldOption) UnmarshalJSON(src []byte) error {
+func (v *NullableComponentsSelectOption) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

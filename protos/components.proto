@@ -87,9 +87,9 @@ message ConfigurationField {
   string description = 3;
   bool required = 4;
   optional string default_value = 5;
-  string label = 11;
-  repeated VisibilityCondition visibility_conditions = 12;
-  optional TypeOptions type_options = 13;
+  string label = 6;
+  repeated VisibilityCondition visibility_conditions = 7;
+  optional TypeOptions type_options = 8;
 }
 
 message TypeOptions {
@@ -108,11 +108,11 @@ message NumberTypeOptions {
 }
 
 message SelectTypeOptions {
-  repeated FieldOption options = 1;
+  repeated SelectOption options = 1;
 }
 
 message MultiSelectTypeOptions {
-  repeated FieldOption options = 1;
+  repeated SelectOption options = 1;
 }
 
 message IntegrationTypeOptions {
@@ -131,7 +131,7 @@ message ObjectTypeOptions {
   repeated ConfigurationField schema = 1;
 }
 
-message FieldOption {
+message SelectOption {
   string label = 1;
   string value = 2;
 }

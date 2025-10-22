@@ -30,7 +30,6 @@ import (
 	httpComponent "github.com/superplanehq/superplane/pkg/components/http"
 	ifp "github.com/superplanehq/superplane/pkg/components/if"
 	noopComponent "github.com/superplanehq/superplane/pkg/components/noop"
-	switchp "github.com/superplanehq/superplane/pkg/components/switch"
 	"github.com/superplanehq/superplane/pkg/components/wait"
 	"gorm.io/gorm"
 )
@@ -95,7 +94,6 @@ func (r *Registry) Init() {
 	//
 	r.Components["if"] = &ifp.If{}
 	r.Components["filter"] = &filter.Filter{}
-	r.Components["switch"] = &switchp.Switch{}
 	r.Components["http"] = &httpComponent.HTTP{}
 	r.Components["approval"] = &approval.Approval{}
 	r.Components["noop"] = &noopComponent.NoOp{}

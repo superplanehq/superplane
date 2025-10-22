@@ -324,9 +324,9 @@ type ConfigurationField struct {
 	Description          string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	Required             bool                   `protobuf:"varint,4,opt,name=required,proto3" json:"required,omitempty"`
 	DefaultValue         *string                `protobuf:"bytes,5,opt,name=default_value,json=defaultValue,proto3,oneof" json:"default_value,omitempty"`
-	Label                string                 `protobuf:"bytes,11,opt,name=label,proto3" json:"label,omitempty"`
-	VisibilityConditions []*VisibilityCondition `protobuf:"bytes,12,rep,name=visibility_conditions,json=visibilityConditions,proto3" json:"visibility_conditions,omitempty"`
-	TypeOptions          *TypeOptions           `protobuf:"bytes,13,opt,name=type_options,json=typeOptions,proto3,oneof" json:"type_options,omitempty"`
+	Label                string                 `protobuf:"bytes,6,opt,name=label,proto3" json:"label,omitempty"`
+	VisibilityConditions []*VisibilityCondition `protobuf:"bytes,7,rep,name=visibility_conditions,json=visibilityConditions,proto3" json:"visibility_conditions,omitempty"`
+	TypeOptions          *TypeOptions           `protobuf:"bytes,8,opt,name=type_options,json=typeOptions,proto3,oneof" json:"type_options,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -563,7 +563,7 @@ func (x *NumberTypeOptions) GetMax() int32 {
 
 type SelectTypeOptions struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Options       []*FieldOption         `protobuf:"bytes,1,rep,name=options,proto3" json:"options,omitempty"`
+	Options       []*SelectOption        `protobuf:"bytes,1,rep,name=options,proto3" json:"options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -598,7 +598,7 @@ func (*SelectTypeOptions) Descriptor() ([]byte, []int) {
 	return file_components_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *SelectTypeOptions) GetOptions() []*FieldOption {
+func (x *SelectTypeOptions) GetOptions() []*SelectOption {
 	if x != nil {
 		return x.Options
 	}
@@ -607,7 +607,7 @@ func (x *SelectTypeOptions) GetOptions() []*FieldOption {
 
 type MultiSelectTypeOptions struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Options       []*FieldOption         `protobuf:"bytes,1,rep,name=options,proto3" json:"options,omitempty"`
+	Options       []*SelectOption        `protobuf:"bytes,1,rep,name=options,proto3" json:"options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -642,7 +642,7 @@ func (*MultiSelectTypeOptions) Descriptor() ([]byte, []int) {
 	return file_components_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *MultiSelectTypeOptions) GetOptions() []*FieldOption {
+func (x *MultiSelectTypeOptions) GetOptions() []*SelectOption {
 	if x != nil {
 		return x.Options
 	}
@@ -825,7 +825,7 @@ func (x *ObjectTypeOptions) GetSchema() []*ConfigurationField {
 	return nil
 }
 
-type FieldOption struct {
+type SelectOption struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Label         string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
 	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
@@ -833,20 +833,20 @@ type FieldOption struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *FieldOption) Reset() {
-	*x = FieldOption{}
+func (x *SelectOption) Reset() {
+	*x = SelectOption{}
 	mi := &file_components_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *FieldOption) String() string {
+func (x *SelectOption) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FieldOption) ProtoMessage() {}
+func (*SelectOption) ProtoMessage() {}
 
-func (x *FieldOption) ProtoReflect() protoreflect.Message {
+func (x *SelectOption) ProtoReflect() protoreflect.Message {
 	mi := &file_components_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -858,19 +858,19 @@ func (x *FieldOption) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FieldOption.ProtoReflect.Descriptor instead.
-func (*FieldOption) Descriptor() ([]byte, []int) {
+// Deprecated: Use SelectOption.ProtoReflect.Descriptor instead.
+func (*SelectOption) Descriptor() ([]byte, []int) {
 	return file_components_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *FieldOption) GetLabel() string {
+func (x *SelectOption) GetLabel() string {
 	if x != nil {
 		return x.Label
 	}
 	return ""
 }
 
-func (x *FieldOption) GetValue() string {
+func (x *SelectOption) GetValue() string {
 	if x != nil {
 		return x.Value
 	}
@@ -1507,9 +1507,9 @@ const file_components_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1a\n" +
 	"\brequired\x18\x04 \x01(\bR\brequired\x12(\n" +
 	"\rdefault_value\x18\x05 \x01(\tH\x00R\fdefaultValue\x88\x01\x01\x12\x14\n" +
-	"\x05label\x18\v \x01(\tR\x05label\x12_\n" +
-	"\x15visibility_conditions\x18\f \x03(\v2*.Superplane.Components.VisibilityConditionR\x14visibilityConditions\x12J\n" +
-	"\ftype_options\x18\r \x01(\v2\".Superplane.Components.TypeOptionsH\x01R\vtypeOptions\x88\x01\x01B\x10\n" +
+	"\x05label\x18\x06 \x01(\tR\x05label\x12_\n" +
+	"\x15visibility_conditions\x18\a \x03(\v2*.Superplane.Components.VisibilityConditionR\x14visibilityConditions\x12J\n" +
+	"\ftype_options\x18\b \x01(\v2\".Superplane.Components.TypeOptionsH\x01R\vtypeOptions\x88\x01\x01B\x10\n" +
 	"\x0e_default_valueB\x0f\n" +
 	"\r_type_options\"\xf5\x04\n" +
 	"\vTypeOptions\x12E\n" +
@@ -1531,11 +1531,11 @@ const file_components_proto_rawDesc = "" +
 	"\x03min\x18\x01 \x01(\x05H\x00R\x03min\x88\x01\x01\x12\x15\n" +
 	"\x03max\x18\x02 \x01(\x05H\x01R\x03max\x88\x01\x01B\x06\n" +
 	"\x04_minB\x06\n" +
-	"\x04_max\"Q\n" +
-	"\x11SelectTypeOptions\x12<\n" +
-	"\aoptions\x18\x01 \x03(\v2\".Superplane.Components.FieldOptionR\aoptions\"V\n" +
-	"\x16MultiSelectTypeOptions\x12<\n" +
-	"\aoptions\x18\x01 \x03(\v2\".Superplane.Components.FieldOptionR\aoptions\",\n" +
+	"\x04_max\"R\n" +
+	"\x11SelectTypeOptions\x12=\n" +
+	"\aoptions\x18\x01 \x03(\v2#.Superplane.Components.SelectOptionR\aoptions\"W\n" +
+	"\x16MultiSelectTypeOptions\x12=\n" +
+	"\aoptions\x18\x01 \x03(\v2#.Superplane.Components.SelectOptionR\aoptions\",\n" +
 	"\x16IntegrationTypeOptions\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\")\n" +
 	"\x13ResourceTypeOptions\x12\x12\n" +
@@ -1543,8 +1543,8 @@ const file_components_proto_rawDesc = "" +
 	"\x0fListTypeOptions\x12R\n" +
 	"\x0fitem_definition\x18\x01 \x01(\v2).Superplane.Components.ListItemDefinitionR\x0eitemDefinition\"V\n" +
 	"\x11ObjectTypeOptions\x12A\n" +
-	"\x06schema\x18\x01 \x03(\v2).Superplane.Components.ConfigurationFieldR\x06schema\"9\n" +
-	"\vFieldOption\x12\x14\n" +
+	"\x06schema\x18\x01 \x03(\v2).Superplane.Components.ConfigurationFieldR\x06schema\":\n" +
+	"\fSelectOption\x12\x14\n" +
 	"\x05label\x18\x01 \x01(\tR\x05label\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"C\n" +
 	"\x13VisibilityCondition\x12\x14\n" +
@@ -1632,7 +1632,7 @@ var file_components_proto_goTypes = []any{
 	(*ResourceTypeOptions)(nil),          // 12: Superplane.Components.ResourceTypeOptions
 	(*ListTypeOptions)(nil),              // 13: Superplane.Components.ListTypeOptions
 	(*ObjectTypeOptions)(nil),            // 14: Superplane.Components.ObjectTypeOptions
-	(*FieldOption)(nil),                  // 15: Superplane.Components.FieldOption
+	(*SelectOption)(nil),                 // 15: Superplane.Components.SelectOption
 	(*VisibilityCondition)(nil),          // 16: Superplane.Components.VisibilityCondition
 	(*ListItemDefinition)(nil),           // 17: Superplane.Components.ListItemDefinition
 	(*OutputChannel)(nil),                // 18: Superplane.Components.OutputChannel
@@ -1660,8 +1660,8 @@ var file_components_proto_depIdxs = []int32{
 	13, // 10: Superplane.Components.TypeOptions.list:type_name -> Superplane.Components.ListTypeOptions
 	14, // 11: Superplane.Components.TypeOptions.object:type_name -> Superplane.Components.ObjectTypeOptions
 	12, // 12: Superplane.Components.TypeOptions.resource:type_name -> Superplane.Components.ResourceTypeOptions
-	15, // 13: Superplane.Components.SelectTypeOptions.options:type_name -> Superplane.Components.FieldOption
-	15, // 14: Superplane.Components.MultiSelectTypeOptions.options:type_name -> Superplane.Components.FieldOption
+	15, // 13: Superplane.Components.SelectTypeOptions.options:type_name -> Superplane.Components.SelectOption
+	15, // 14: Superplane.Components.MultiSelectTypeOptions.options:type_name -> Superplane.Components.SelectOption
 	17, // 15: Superplane.Components.ListTypeOptions.item_definition:type_name -> Superplane.Components.ListItemDefinition
 	6,  // 16: Superplane.Components.ObjectTypeOptions.schema:type_name -> Superplane.Components.ConfigurationField
 	6,  // 17: Superplane.Components.ListItemDefinition.schema:type_name -> Superplane.Components.ConfigurationField

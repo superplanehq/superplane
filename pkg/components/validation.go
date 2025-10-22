@@ -144,6 +144,57 @@ func validateMultiSelect(field ConfigurationField, value any) error {
 	return nil
 }
 
+func validateObject(field ConfigurationField, value any) error {
+	obj, ok := value.(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be an object")
+	}
+
+	if field.TypeOptions == nil || field.TypeOptions.Object == nil {
+		return nil
+	}
+
+	options := field.TypeOptions.Object
+	if len(options.Schema) == 0 {
+		return nil
+	}
+
+	return ValidateConfiguration(options.Schema, obj)
+}
+
+func validateList(field ConfigurationField, value any) error {
+	list, ok := value.([]any)
+	if !ok {
+		return fmt.Errorf("must be a list of values")
+	}
+
+	if field.TypeOptions.List == nil {
+		return nil
+	}
+
+	listOptions := field.TypeOptions.List
+	if listOptions.ItemDefinition == nil {
+		return nil
+	}
+
+	itemDef := listOptions.ItemDefinition
+	for i, item := range list {
+		if itemDef.Type == FieldTypeObject && len(itemDef.Schema) > 0 {
+			itemMap, ok := item.(map[string]any)
+			if !ok {
+				return fmt.Errorf("item at index %d must be an object", i)
+			}
+
+			err := ValidateConfiguration(itemDef.Schema, itemMap)
+			if err != nil {
+				return fmt.Errorf("item at index %d: %w", i, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 func validateFieldValue(field ConfigurationField, value any) error {
 	switch field.Type {
 	case FieldTypeString:
@@ -186,55 +237,4 @@ func validateFieldValue(field ConfigurationField, value any) error {
 	}
 
 	return nil
-}
-
-func validateList(field ConfigurationField, value any) error {
-	list, ok := value.([]any)
-	if !ok {
-		return fmt.Errorf("must be a list of values")
-	}
-
-	if field.TypeOptions.List == nil {
-		return nil
-	}
-
-	listOptions := field.TypeOptions.List
-	if listOptions.ItemDefinition == nil {
-		return nil
-	}
-
-	itemDef := listOptions.ItemDefinition
-	for i, item := range list {
-		if itemDef.Type == FieldTypeObject && len(itemDef.Schema) > 0 {
-			itemMap, ok := item.(map[string]any)
-			if !ok {
-				return fmt.Errorf("item at index %d must be an object", i)
-			}
-
-			err := ValidateConfiguration(itemDef.Schema, itemMap)
-			if err != nil {
-				return fmt.Errorf("item at index %d: %w", i, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func validateObject(field ConfigurationField, value any) error {
-	obj, ok := value.(map[string]any)
-	if !ok {
-		return fmt.Errorf("must be an object")
-	}
-
-	if field.TypeOptions.Object == nil {
-		return nil
-	}
-
-	options := field.TypeOptions.Object
-	if len(options.Schema) == 0 {
-		return nil
-	}
-
-	return ValidateConfiguration(options.Schema, obj)
 }

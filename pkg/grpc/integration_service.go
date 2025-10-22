@@ -42,12 +42,6 @@ func (s *IntegrationService) ListIntegrations(ctx context.Context, req *pb.ListI
 	return integrations.ListIntegrations(ctx, domainType, domainID)
 }
 
-func (s *IntegrationService) ListResources(ctx context.Context, req *pb.ListResourcesRequest) (*pb.ListResourcesResponse, error) {
-	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
-	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return integrations.ListResources(ctx, s.registry, domainType, domainID, req.IdOrName, req.Type)
-}
-
 func (s *IntegrationService) UpdateIntegration(ctx context.Context, req *pb.UpdateIntegrationRequest) (*pb.UpdateIntegrationResponse, error) {
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
