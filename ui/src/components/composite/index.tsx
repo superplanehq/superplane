@@ -34,7 +34,7 @@ export interface CompositeProps {
   iconBackground?: string;
   headerColor: string;
   title: string;
-  description: string;
+  description?: string;
   parameters: string[];
   parametersIcon: string;
   lastRunItem: LastRunItem;
@@ -42,12 +42,14 @@ export interface CompositeProps {
   collapsedBackground?: string;
   collapsed?: boolean;
 
+  startLastValuesOpen?: boolean;
+
   onExpandChildEvents?: () => void;
   onReRunChildEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, headerColor, title, description, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents }) => {
-  const [showLastRunValues, setShowLastRunValues] = React.useState(false)
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, headerColor, title, description, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, startLastValuesOpen = false }) => {
+  const [showLastRunValues, setShowLastRunValues] = React.useState(startLastValuesOpen)
 
   const resolveIcon = React.useCallback((slug?: string): LucideIcon => {
     if (!slug) {
@@ -184,7 +186,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
           </div>
           <h2 className="text-md font-semibold">{title}</h2>
         </div>
-        {description && <p className="w-full text-sm text-gray-500 ml-16">{description}</p>}
+        {description && <p className="w-full text-sm text-gray-500 pl-8">{description}</p>}
       </div>
 
       {parameters.length > 0 &&
