@@ -208,7 +208,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
         <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
           <span className="uppercase text-sm font-medium">Next In Queue</span>
         </div>
-        {false ? <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100`}>
+        {nextInQueue ? <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100`}>
           <div className="flex items-center gap-2 w-[80%] text-gray-500">
             <div className={`w-5 h-5 rounded-full flex items-center justify-center`}>
               <NextInQueueIcon size={20} className="text-gray-500" />
