@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Edge, EdgeChange, Node, NodeChange } from "reactflow";
-import { applyEdgeChanges, applyNodeChanges } from "reactflow";
+import type { Edge, EdgeChange, Node, NodeChange } from "@xyflow/react";
+import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 
 export function useCanvasState({ nodes: initialNodes, edges: initialEdges }: { nodes?: Node[]; edges?: Edge[] }) {
   const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);

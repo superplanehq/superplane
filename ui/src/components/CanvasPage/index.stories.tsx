@@ -1,8 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { Edge, Node } from "reactflow";
+import type { Edge, Node } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import "./canvas-reset.css";
 
+import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+
+import { applyNodeChanges, type NodeChange } from "@xyflow/react";
 import { useCallback, useState } from "react";
-import { applyNodeChanges, type NodeChange } from "reactflow";
 import { CanvasPage } from "./index";
 
 const meta = {
@@ -21,20 +26,51 @@ type Story = StoryObj<typeof CanvasPage>;
 const sampleNodes: Node[] = [
   {
     id: "listen-code",
-    position: { x: 60, y: 80 },
+    position: { x: -140, y: -80 },
     data: {
       label: "Listen to code changes",
       state: "working",
       type: "trigger",
+      trigger: {
+        title: "GitHub",
+        iconSrc: githubIcon,
+        iconBackground: "bg-black",
+        headerColor: "bg-gray-100",
+        metadata: [
+          { icon: "book", label: "monarch-app" },
+          { icon: "filter", label: "branch=main" },
+        ],
+        lastEventData: {
+          title: "refactor: update README.md",
+          sizeInMB: 1,
+          receivedAt: new Date(),
+          state: "processed",
+        },
+      },
     },
   },
   {
     id: "listen-image",
-    position: { x: 60, y: 260 },
+    position: { x: -140, y: 240 },
     data: {
       label: "Listen to Docker image updates",
       state: "pending",
       type: "trigger",
+      trigger: {
+        title: "DockerHub",
+        iconSrc: dockerIcon,
+        headerColor: "bg-sky-100",
+        metadata: [
+          { icon: "box", label: "monarch-app-base-image" },
+          { icon: "filter", label: "push" },
+        ],
+        lastEventData: {
+          title: "v3.18.217",
+          sizeInMB: 972.5,
+          receivedAt: new Date(),
+          state: "processed",
+        },
+      },
     },
   },
   {
@@ -48,7 +84,7 @@ const sampleNodes: Node[] = [
   },
   {
     id: "approve",
-    position: { x: 620, y: 150 },
+    position: { x: 620, y: 157 },
     data: { label: "Approve release", state: "pending", type: "composite" },
   },
   {
