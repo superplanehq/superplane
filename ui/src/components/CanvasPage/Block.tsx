@@ -1,5 +1,3 @@
-// No global CSS import here; keep node rendering isolated from library defaults.
-
 import { Trigger, type TriggerProps } from "@/components/trigger";
 import { Handle, Position } from "@xyflow/react";
 
@@ -89,7 +87,7 @@ function Composite({ data }: BlockProps) {
       : { background: "lightgray" };
 
   return (
-    <div className="text-left" style={style}>
+    <div className="p-4 rounded" style={style}>
       <div className="font-medium text-gray-800">
         <div className="text-[10px]">{data?.label}</div>
       </div>

@@ -1,15 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import '@xyflow/react/dist/style.css';
-import './canvas-reset.css';
 import type { Edge, Node } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import "./canvas-reset.css";
 
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
-import { useCallback, useState } from "react";
 import { applyNodeChanges, type NodeChange } from "@xyflow/react";
+import { useCallback, useState } from "react";
 import { CanvasPage } from "./index";
-// Intentionally omit @xyflow/react base CSS to avoid default styles.
 
 const meta = {
   title: "Pages/CanvasPage",
@@ -27,7 +26,7 @@ type Story = StoryObj<typeof CanvasPage>;
 const sampleNodes: Node[] = [
   {
     id: "listen-code",
-    position: { x: 60, y: 80 },
+    position: { x: -140, y: -80 },
     data: {
       label: "Listen to code changes",
       state: "working",
@@ -52,7 +51,7 @@ const sampleNodes: Node[] = [
   },
   {
     id: "listen-image",
-    position: { x: 60, y: 260 },
+    position: { x: -140, y: 240 },
     data: {
       label: "Listen to Docker image updates",
       state: "pending",
@@ -85,7 +84,7 @@ const sampleNodes: Node[] = [
   },
   {
     id: "approve",
-    position: { x: 620, y: 150 },
+    position: { x: 620, y: 157 },
     data: { label: "Approve release", state: "pending", type: "composite" },
   },
   {
