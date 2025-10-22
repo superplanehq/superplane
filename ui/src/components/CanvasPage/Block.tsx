@@ -25,6 +25,8 @@ type NodeState = "pending" | "working";
 interface BlockData {
   label?: string;
   state?: NodeState;
+  // last input event received by this block (for simulation display)
+  lastEvent?: unknown;
 }
 
 export function InputBlock({ data }: { data: BlockData }) {
@@ -68,6 +70,11 @@ export function Block({ data, leftHandle, rightHandle }: BlockProps) {
       <div className="text-[10px]">
         {data.state === "working" ? "Brrrrr...." : ""}
       </div>
+      {data.lastEvent !== undefined && (
+        <div className="text-[10px] text-gray-700 break-all px-1 py-0.5">
+          evt: {typeof data.lastEvent === "string" ? data.lastEvent : JSON.stringify(data.lastEvent)}
+        </div>
+      )}
 
       {rightHandle && (
         <Handle
