@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import '@xyflow/react/dist/style.css';
+import './canvas-reset.css';
 import type { Edge, Node } from "@xyflow/react";
 
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
@@ -7,6 +9,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import { useCallback, useState } from "react";
 import { applyNodeChanges, type NodeChange } from "@xyflow/react";
 import { CanvasPage } from "./index";
+// Intentionally omit @xyflow/react base CSS to avoid default styles.
 
 const meta = {
   title: "Pages/CanvasPage",

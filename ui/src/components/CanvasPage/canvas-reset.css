@@ -1,0 +1,12 @@
+.sp-canvas .react-flow__node {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Optional: unset default controls/minimap visuals if you style your own */
+.sp-canvas .react-flow__controls,
+.sp-canvas .react-flow__minimap {
+  all: unset;
+}
