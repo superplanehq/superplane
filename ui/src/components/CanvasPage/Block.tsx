@@ -20,27 +20,39 @@ const RIGHT_HANDLE_STYLE = {
   right: -10,
 };
 
-export function InputBlock({ data }: { data: { label?: string } }) {
+type NodeState = "pending" | "working";
+
+interface BlockData {
+  label?: string;
+  state?: NodeState;
+}
+
+export function InputBlock({ data }: { data: BlockData }) {
   return <Block data={data} rightHandle />;
 }
 
-export function OutputBlock({ data }: { data: { label?: string } }) {
+export function OutputBlock({ data }: { data: BlockData }) {
   return <Block data={data} leftHandle />;
 }
 
-export function DefaultBlock({ data }: { data: { label?: string } }) {
+export function DefaultBlock({ data }: { data: BlockData }) {
   return <Block data={data} leftHandle rightHandle />;
 }
 
 interface BlockProps {
-  data: { label?: string };
+  data: BlockData;
   leftHandle?: boolean;
   rightHandle?: boolean;
 }
 
 export function Block({ data, leftHandle, rightHandle }: BlockProps) {
+  const style =
+    data.state === "working"
+      ? { background: "lightblue" }
+      : { background: "lightgray" };
+
   return (
-    <div>
+    <div className="text-left p-0" style={style}>
       {leftHandle && (
         <Handle
           type="target"
@@ -49,7 +61,13 @@ export function Block({ data, leftHandle, rightHandle }: BlockProps) {
         />
       )}
 
-      <div className="font-medium text-gray-800">{data?.label}</div>
+      <div className="font-medium text-gray-800">
+        <div className="text-[10px]">{data?.label}</div>
+      </div>
+
+      <div className="text-[10px]">
+        {data.state === "working" ? "Brrrrr...." : ""}
+      </div>
 
       {rightHandle && (
         <Handle
