@@ -95,7 +95,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconBackground, heade
 
   if (collapsed) {
     return (
-      <div className="flex w-fit flex-col items-center">
+      <div className="flex w-fit flex-col items-center bg-white">
         <div className={`flex h-20 w-20 items-center justify-center rounded-full border border-border ${collapsedBackground || ''}`}>
           <img src={iconSrc} alt={title} className="h-12 w-12 object-contain" />
         </div>
