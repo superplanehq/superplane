@@ -44,12 +44,12 @@ const DockerHubProps: TriggerProps = {
   headerColor: "bg-sky-100",
   metadata: [
     {
-      icon: "book",
-      label: "monarch-app",
+      icon: "box",
+      label: "monarch-app-base-image",
     },
     {
       icon: "filter",
-      label: "branch=main",
+      label: "push",
     },
   ],
   lastEventData: {
