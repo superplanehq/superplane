@@ -178,7 +178,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
   }, [])
 
   return (
-    <div className="flex flex-col border border-border rounded-md w-[26rem]" >
+    <div className="flex flex-col border border-border rounded-md w-[26rem] bg-white" >
       <div className={"w-full px-2 flex flex-col border-b p-2 gap-2 rounded-t-md items-center " + headerColor}>
         <div className="w-full flex items-center gap-2">
           <div className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
