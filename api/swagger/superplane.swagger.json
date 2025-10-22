@@ -2223,6 +2223,62 @@
         ]
       }
     },
+    "/api/v1/integrations/{idOrName}/resources": {
+      "get": {
+        "summary": "List integration resources",
+        "description": "List integration resources",
+        "operationId": "Integrations_ListResources",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/IntegrationsListResourcesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "summary": "Get current user",
@@ -4505,6 +4561,18 @@
         }
       }
     },
+    "IntegrationsListResourcesResponse": {
+      "type": "object",
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/IntegrationsResourceRef"
+          }
+        }
+      }
+    },
     "IntegrationsResourceRef": {
       "type": "object",
       "properties": {
@@ -4512,6 +4580,9 @@
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "id": {
           "type": "string"
         }
       }

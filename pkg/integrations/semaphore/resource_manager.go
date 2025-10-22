@@ -83,6 +83,15 @@ func (i *SemaphoreResourceManager) Get(resourceType, id string) (integrations.Re
 	}
 }
 
+func (i *SemaphoreResourceManager) List(resourceTypes string) ([]integrations.Resource, error) {
+	switch resourceTypes {
+	case ResourceTypeProject:
+		return i.listProjects()
+	default:
+		return nil, fmt.Errorf("unsupported resource type %s", resourceTypes)
+	}
+}
+
 type CreateWorkflowRequest struct {
 	ProjectID    string            `json:"project_id"`
 	Reference    string            `json:"reference"`

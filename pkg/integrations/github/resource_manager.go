@@ -188,6 +188,33 @@ func (i *GitHubResourceManager) Get(resourceType, id string) (integrations.Resou
 	}
 }
 
+func (i *GitHubResourceManager) List(resourceType string) ([]integrations.Resource, error) {
+	switch resourceType {
+	case ResourceTypeRepository:
+		return i.listRepositories()
+	default:
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}
+
+func (i *GitHubResourceManager) listRepositories() ([]integrations.Resource, error) {
+	opts := &github.RepositoryListByAuthenticatedUserOptions{}
+	repositories, _, err := i.client.Repositories.ListByAuthenticatedUser(context.Background(), opts)
+	if err != nil {
+		return nil, fmt.Errorf("error getting repository: %v", err)
+	}
+
+	resources := []integrations.Resource{}
+	for _, repository := range repositories {
+		resources = append(resources, &Repository{
+			ID:             repository.GetID(),
+			RepositoryName: repository.GetFullName(),
+		})
+	}
+
+	return resources, nil
+}
+
 func (i *GitHubResourceManager) Status(resourceType, id string, parentResource integrations.Resource) (integrations.StatefulResource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:

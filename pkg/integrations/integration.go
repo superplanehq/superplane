@@ -37,12 +37,13 @@ type EventHandler interface {
 
 type ResourceManager interface {
 	//
-	// Describe a resource by its type and name.
+	// Describe and list resources by their type and name.
 	// Used when creating event sources or stage executors,
 	// to validate that the resource reference in the event source
 	// or executor really exists.
 	//
 	Get(resourceType, id string) (Resource, error)
+	List(resourceType string) ([]Resource, error)
 
 	//
 	// Get the status of a resource created by the executor.

@@ -402,6 +402,147 @@ func (a *IntegrationAPIService) IntegrationsListIntegrationsExecute(r ApiIntegra
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiIntegrationsListResourcesRequest struct {
+	ctx context.Context
+	ApiService *IntegrationAPIService
+	idOrName string
+	domainType *string
+	domainId *string
+	type_ *string
+}
+
+func (r ApiIntegrationsListResourcesRequest) DomainType(domainType string) ApiIntegrationsListResourcesRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiIntegrationsListResourcesRequest) DomainId(domainId string) ApiIntegrationsListResourcesRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiIntegrationsListResourcesRequest) Type_(type_ string) ApiIntegrationsListResourcesRequest {
+	r.type_ = &type_
+	return r
+}
+
+func (r ApiIntegrationsListResourcesRequest) Execute() (*IntegrationsListResourcesResponse, *http.Response, error) {
+	return r.ApiService.IntegrationsListResourcesExecute(r)
+}
+
+/*
+IntegrationsListResources List integration resources
+
+List integration resources
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param idOrName
+ @return ApiIntegrationsListResourcesRequest
+*/
+func (a *IntegrationAPIService) IntegrationsListResources(ctx context.Context, idOrName string) ApiIntegrationsListResourcesRequest {
+	return ApiIntegrationsListResourcesRequest{
+		ApiService: a,
+		ctx: ctx,
+		idOrName: idOrName,
+	}
+}
+
+// Execute executes the request
+//  @return IntegrationsListResourcesResponse
+func (a *IntegrationAPIService) IntegrationsListResourcesExecute(r ApiIntegrationsListResourcesRequest) (*IntegrationsListResourcesResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *IntegrationsListResourcesResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsListResources")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/integrations/{idOrName}/resources"
+	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
+	if r.type_ != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "type", r.type_, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v GooglerpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiIntegrationsUpdateIntegrationRequest struct {
 	ctx context.Context
 	ApiService *IntegrationAPIService

@@ -296,9 +296,14 @@ export type IntegrationsListIntegrationsResponse = {
     integrations?: Array<IntegrationsIntegration>;
 };
 
+export type IntegrationsListResourcesResponse = {
+    resources?: Array<IntegrationsResourceRef>;
+};
+
 export type IntegrationsResourceRef = {
     type?: string;
     name?: string;
+    id?: string;
 };
 
 export type IntegrationsUpdateIntegrationBody = {
@@ -2770,6 +2775,37 @@ export type IntegrationsUpdateIntegrationResponses = {
 };
 
 export type IntegrationsUpdateIntegrationResponse2 = IntegrationsUpdateIntegrationResponses[keyof IntegrationsUpdateIntegrationResponses];
+
+export type IntegrationsListResourcesData = {
+    body?: never;
+    path: {
+        idOrName: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+        type?: string;
+    };
+    url: '/api/v1/integrations/{idOrName}/resources';
+};
+
+export type IntegrationsListResourcesErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type IntegrationsListResourcesError = IntegrationsListResourcesErrors[keyof IntegrationsListResourcesErrors];
+
+export type IntegrationsListResourcesResponses = {
+    /**
+     * A successful response.
+     */
+    200: IntegrationsListResourcesResponse;
+};
+
+export type IntegrationsListResourcesResponse2 = IntegrationsListResourcesResponses[keyof IntegrationsListResourcesResponses];
 
 export type MeMeData = {
     body?: never;
