@@ -6,6 +6,19 @@ import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
 import { formatTimeAgo } from '../../../utils/date'
 
+interface HTTPConfiguration {
+  url?: string
+  method?: string
+  payload?: Record<string, any>
+  headers?: Array<{ name: string; value: string }>
+}
+
+interface HTTPResponse {
+  status?: number
+  headers?: Record<string, string | string[]>
+  body?: any
+}
+
 const getResultBadge = (result: string) => {
   switch (result) {
     case 'RESULT_PASSED':
@@ -34,13 +47,13 @@ const getResultBadge = (result: string) => {
   }
 }
 
-// Custom renderer for HTTP component executions
 registerExecutionRenderer('http', {
   renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
-    // Extract response status from outputs
-    const response = execution.outputs?.default?.[0]
-    const method = execution.configuration?.method
-    const url = execution.configuration?.url
+    const metadata = execution.metadata || {}
+    const configuration = metadata.configuration as HTTPConfiguration | undefined
+    const response = (execution.outputs?.default as HTTPResponse[] | undefined)?.[0]
+    const method = configuration?.method
+    const url = configuration?.url
     const statusCode = response?.status
 
     // Determine status badge styling
@@ -77,7 +90,7 @@ registerExecutionRenderer('http', {
               </>
             ) : (
               <>
-                {getResultBadge(execution.result)}
+                {execution.result && getResultBadge(execution.result)}
                 {execution.state === 'STATE_STARTED' && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                     Running
@@ -102,15 +115,13 @@ registerExecutionRenderer('http', {
   },
 
   renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
-    const outputs = execution.outputs
+    const metadata = execution.metadata || {}
+    const configuration = metadata.configuration as HTTPConfiguration | undefined
+    const method = configuration?.method || 'GET'
+    const url = configuration?.url || ''
+    const payload = configuration?.payload || {}
 
-    // Extract HTTP-specific information from configuration
-    const method = execution.configuration?.method || 'GET'
-    const url = execution.configuration?.url || ''
-    const payload = execution.configuration?.payload || {}
-
-    // Extract response information from outputs
-    const response = outputs?.default?.[0]
+    const response = (execution.outputs?.default as HTTPResponse[] | undefined)?.[0]
     const statusCode = response?.status
     const responseHeaders = response?.headers
     const responseBody = response?.body

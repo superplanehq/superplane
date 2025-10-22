@@ -6,13 +6,16 @@ import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
 import { formatTimeAgo } from '../../../utils/date'
 
-// Custom renderer for Filter component executions
+interface FilterConfiguration {
+  expression?: string
+}
+
 registerExecutionRenderer('filter', {
   renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
     const outputs = execution.outputs
 
     // Check if the filter matched (outputs will have data if it matched)
-    const hasOutput = outputs?.default && outputs.default.length > 0
+    const hasOutput = outputs?.default && Array.isArray(outputs.default) && outputs.default.length > 0
     const matched = hasOutput
 
     // Determine icon, colors, and label based on filter result
@@ -50,7 +53,9 @@ registerExecutionRenderer('filter', {
   },
 
   renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
-    const filterExpression = execution.configuration?.expression
+    const metadata = execution.metadata || {}
+    const configuration = metadata.configuration as FilterConfiguration | undefined
+    const filterExpression = configuration?.expression
 
     return (
       <div className="mt-4 space-y-4 text-left">

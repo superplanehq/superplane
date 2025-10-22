@@ -1,11 +1,11 @@
 import React, { JSX } from 'react';
-import { ExecutionResult, ExecutionResultReason, SuperplaneExecutionState, SuperplaneEvent, SuperplaneExecutionResource } from '@/api-client';
+import { SuperplaneExecutionResult, SuperplaneExecutionResultReason, SuperplaneExecutionState, SuperplaneEvent, SuperplaneExecutionResource } from '@/api-client';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 interface RunItemProps {
   state: SuperplaneExecutionState;
-  result: ExecutionResult;
-  resultReason?: ExecutionResultReason;
+  result: SuperplaneExecutionResult;
+  resultReason?: SuperplaneExecutionResultReason;
   resultMessage?: string;
   title: string;
   runId?: string;

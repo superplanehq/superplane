@@ -19,7 +19,7 @@ interface WorkflowNodeSidebarProps {
   blueprintId?: string
 }
 
-export const WorkflowNodeSidebar = ({ workflowId, nodeId, nodeName, onClose, isBlueprintNode, nodeType, organizationId, blueprintId }: WorkflowNodeSidebarProps) => {
+export const WorkflowNodeSidebar = ({ workflowId, nodeId, onClose, isBlueprintNode, nodeType, organizationId, blueprintId }: WorkflowNodeSidebarProps) => {
   const [activeTab, setActiveTab] = useState<Tab>('queue')
 
   return (
