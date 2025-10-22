@@ -20,11 +20,8 @@ interface WorkflowNodeSidebarProps {
   blueprintId?: string
 }
 
-export const WorkflowNodeSidebar = ({ workflowId, nodeId, nodeName, onClose, isBlueprintNode, nodeType, organizationId, blueprintId }: WorkflowNodeSidebarProps) => {
-  // Check if this is a trigger node
+export const WorkflowNodeSidebar = ({ workflowId, nodeId, onClose, isBlueprintNode, nodeType, organizationId, blueprintId }: WorkflowNodeSidebarProps) => {
   const isTriggerNode = nodeType === 'trigger'
-
-  // Set default tab based on node type
   const [activeTab, setActiveTab] = useState<Tab>(isTriggerNode ? 'events' : 'queue')
 
   return (

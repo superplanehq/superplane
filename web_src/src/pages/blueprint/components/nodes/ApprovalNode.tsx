@@ -3,8 +3,8 @@ import { Handle, Position, NodeProps, Node } from '@xyflow/react'
 import { MaterialSymbol } from '../../../../components/MaterialSymbol/material-symbol'
 
 type ApprovalNodeData = Node<{
-  label: string
-  configuration: Record<string, any>
+  label?: string
+  configuration?: Record<string, any>
 }>
 
 export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
@@ -28,7 +28,7 @@ export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
       </div>
 
       {/* Configuration */}
-      {data.configuration.count && (
+      {data.configuration?.count && (
         <div className="px-4 py-2 border-t border-zinc-200 dark:border-zinc-700 text-xs text-slate-600 dark:text-slate-400 text-left">
           Requires {data.configuration.count} approval{data.configuration.count !== 1 ? 's' : ''}
         </div>

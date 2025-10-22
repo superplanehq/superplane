@@ -55,6 +55,12 @@ check.build.app:
 storybook:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash -c "cd web_src && npm install && npm run storybook"
 
+ui.setup:
+	npm install
+
+ui.start:
+	npm run storybook
+
 #
 # Database target helpers
 #
