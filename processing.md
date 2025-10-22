@@ -459,26 +459,15 @@ You can emit an event for any node in the workflow with:
   /api/v1/workflows/{workflow_id}/nodes/{node_id}/events
 
 Trigger nodes may also have another endpoint, which uses different authentication than the one used by the API:
-  /webhooks/{webhook_id}
+  /api/v1/webhooks/{webhook_id}
 
-The handle for that endpoint will find the webhook and invoke the action specified in it.
+The handler for that endpoint will find the webhook and its handlers, and invoke the actions specified on them.
 
-How does the webhook know which node to invoke?
 
-webhooks (
-  id                 uuid
-  secret             uuid
-)
 
-webhook_handlers (
-  webhook_id         uuid
-  node_id            string
-  execution_id       uuid
-  invoke_action_spec jsonb
-)
+How do I give the plain key back to the user?
+When I update the schedule configuration, the next_trigger should be updated too.
 
-integration_resources (
-  integration_id
-  resource_id
-  webhook_id
-)
+I'm thinking of going back to the Setup() method instead of the Start() one.
+
+We also need a way to reset the secret for webhook triggers

@@ -154,9 +154,10 @@ message Node {
   string name = 2;
   Type type = 3;
   google.protobuf.Struct configuration = 4;
-  ComponentRef component = 5;
-  BlueprintRef blueprint = 6;
-  TriggerRef trigger = 7;
+  google.protobuf.Struct metadata = 5;
+  ComponentRef component = 6;
+  BlueprintRef blueprint = 7;
+  TriggerRef trigger = 8;
 }
 
 message Edge {

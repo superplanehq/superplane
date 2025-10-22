@@ -117,6 +117,9 @@ export type ComponentsNode = {
     configuration?: {
         [key: string]: unknown;
     };
+    metadata?: {
+        [key: string]: unknown;
+    };
     component?: NodeComponentRef;
     blueprint?: NodeBlueprintRef;
     trigger?: NodeTriggerRef;
@@ -1218,6 +1221,13 @@ export type WorkflowsListChildExecutionsResponse = {
 
 export type WorkflowsListEventExecutionsResponse = {
     executions?: Array<WorkflowsWorkflowNodeExecution>;
+};
+
+export type WorkflowsListNodeEventsResponse = {
+    events?: Array<WorkflowsWorkflowEvent>;
+    totalCount?: number;
+    hasNextPage?: boolean;
+    lastTimestamp?: string;
 };
 
 export type WorkflowsListNodeExecutionsResponse = {
@@ -3751,6 +3761,37 @@ export type WorkflowsListChildExecutionsResponses = {
 };
 
 export type WorkflowsListChildExecutionsResponse2 = WorkflowsListChildExecutionsResponses[keyof WorkflowsListChildExecutionsResponses];
+
+export type WorkflowsListNodeEventsData = {
+    body?: never;
+    path: {
+        workflowId: string;
+        nodeId: string;
+    };
+    query?: {
+        limit?: number;
+        before?: string;
+    };
+    url: '/api/v1/workflows/{workflowId}/nodes/{nodeId}/events';
+};
+
+export type WorkflowsListNodeEventsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type WorkflowsListNodeEventsError = WorkflowsListNodeEventsErrors[keyof WorkflowsListNodeEventsErrors];
+
+export type WorkflowsListNodeEventsResponses = {
+    /**
+     * A successful response.
+     */
+    200: WorkflowsListNodeEventsResponse;
+};
+
+export type WorkflowsListNodeEventsResponse2 = WorkflowsListNodeEventsResponses[keyof WorkflowsListNodeEventsResponses];
 
 export type WorkflowsEmitNodeEventData = {
     body: WorkflowsEmitNodeEventBody;

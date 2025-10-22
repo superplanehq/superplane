@@ -107,6 +107,7 @@ type Node struct {
 	Type          string         `json:"type"`
 	Ref           NodeRef        `json:"ref"`
 	Configuration map[string]any `json:"configuration"`
+	Metadata      map[string]any `json:"metadata"`
 }
 
 type NodeRef struct {

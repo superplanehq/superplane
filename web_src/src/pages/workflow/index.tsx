@@ -43,7 +43,10 @@ import {
   WorkflowFilterNode,
   WorkflowSwitchNode,
   WorkflowApprovalNode,
-  WorkflowDefaultNode
+  WorkflowDefaultNode,
+  WorkflowManualTriggerNode,
+  WorkflowScheduledTriggerNode,
+  WorkflowWebhookTriggerNode
 } from './components/nodes'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
@@ -53,6 +56,9 @@ const nodeTypes: NodeTypes = {
   filter: WorkflowFilterNode,
   switch: WorkflowSwitchNode,
   approval: WorkflowApprovalNode,
+  manual: WorkflowManualTriggerNode,
+  schedule: WorkflowScheduledTriggerNode,
+  webhook: WorkflowWebhookTriggerNode,
   default: WorkflowDefaultNode,
 }
 
@@ -206,8 +212,8 @@ export const Workflow = () => {
 
       const channels = block?.outputChannels?.map((channel: any) => channel.name) || ['default']
 
-      // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
-      const nodeType = isComponent && blockName && nodeTypes[blockName as keyof typeof nodeTypes]
+      // Use component or trigger name as node type if it exists in nodeTypes, otherwise use 'default'
+      const nodeType = blockName && nodeTypes[blockName as keyof typeof nodeTypes]
         ? blockName
         : 'default'
 
@@ -221,6 +227,7 @@ export const Workflow = () => {
           blockType: isComponent ? 'component' : isTrigger ? 'trigger' : 'blueprint',
           channels,
           configuration: node.configuration || {},
+          metadata: node.metadata || {},
           onEdit: () => handleNodeEdit(node.id),
           onEmit: () => handleNodeEmit(node.id),
         },
@@ -280,7 +287,7 @@ export const Workflow = () => {
       id: node.id,
       name: node.data.label as string,
       isBlueprintNode: node.data.blockType === 'blueprint',
-      nodeType: node.data.blockName as string,
+      nodeType: node.data.blockType as string,
       componentLabel: block?.label,
       blueprintId: node.data.blockType === 'blueprint' ? node.data.blockId as string : undefined
     })
@@ -327,10 +334,8 @@ export const Workflow = () => {
       const channels = selectedBlock?.outputChannels?.map((channel: any) => channel.name) || ['default']
       const newNodeId = generateNodeId(selectedBlock.name || 'node', nodeName.trim())
 
-      // Use block name as node type if it exists in nodeTypes and is a component
-      const nodeType = selectedBlock.type === 'component' &&
-                      selectedBlock.name &&
-                      nodeTypes[selectedBlock.name as keyof typeof nodeTypes]
+      // Use block name as node type if it exists in nodeTypes (works for both components and triggers)
+      const nodeType = selectedBlock.name && nodeTypes[selectedBlock.name as keyof typeof nodeTypes]
         ? selectedBlock.name
         : 'default'
 

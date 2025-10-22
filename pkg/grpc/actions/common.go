@@ -787,7 +787,12 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		if node.Configuration != nil {
 			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
 		}
+
+		if node.Metadata != nil {
+			result[i].Metadata, _ = structpb.NewStruct(node.Metadata)
+		}
 	}
+
 	return result
 }
 

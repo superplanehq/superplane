@@ -28,6 +28,7 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 			Type:          wn.Type,
 			Ref:           wn.Ref.Data(),
 			Configuration: wn.Configuration.Data(),
+			Metadata:      wn.Metadata.Data(),
 		}
 	}
 

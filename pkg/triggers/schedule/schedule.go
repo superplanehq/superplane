@@ -2,7 +2,6 @@ package schedule
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -108,15 +107,11 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 }
 
 func (s *Schedule) Start(ctx triggers.TriggerContext) error {
-	log.Printf("Configuration before: %v", ctx.Configuration)
-
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-
-	log.Printf("Configuration after: %v", config)
 
 	var metadata Metadata
 	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
@@ -193,20 +188,11 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 		return err
 	}
 
-	var metadata Metadata
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
-	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
-	}
-
-	metadata.NextTrigger = nextTrigger
-	ctx.MetadataContext.Set(metadata)
+	ctx.MetadataContext.Set(Metadata{NextTrigger: nextTrigger})
 	return nil
 }
 
 func getNextTrigger(config Configuration, now time.Time) (*time.Time, error) {
-	log.Printf("Configuration: %v", config)
-
 	switch config.Type {
 	case TypeHourly:
 		if config.Minute == nil {

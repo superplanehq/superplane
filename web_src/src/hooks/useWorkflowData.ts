@@ -9,6 +9,7 @@ import {
   workflowsListEventExecutions,
   workflowsListChildExecutions,
   workflowsListNodeQueueItems,
+  workflowsListNodeEvents,
   triggersListTriggers,
   triggersDescribeTrigger,
 } from '../api-client/sdk.gen'
@@ -35,6 +36,9 @@ export const workflowKeys = {
   nodeQueueItems: () => [...workflowKeys.all, 'nodeQueueItems'] as const,
   nodeQueueItem: (workflowId: string, nodeId: string) =>
     [...workflowKeys.nodeQueueItems(), workflowId, nodeId] as const,
+  nodeEvents: () => [...workflowKeys.all, 'nodeEvents'] as const,
+  nodeEvent: (workflowId: string, nodeId: string) =>
+    [...workflowKeys.nodeEvents(), workflowId, nodeId] as const,
 }
 
 export const triggerKeys = {
@@ -218,6 +222,26 @@ export const useNodeQueueItems = (workflowId: string, nodeId: string) => {
     queryKey: workflowKeys.nodeQueueItem(workflowId, nodeId),
     queryFn: async () => {
       const response = await workflowsListNodeQueueItems(
+        withOrganizationHeader({
+          path: {
+            workflowId,
+            nodeId,
+          },
+        })
+      )
+      return response.data
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!workflowId && !!nodeId,
+  })
+}
+
+export const useNodeEvents = (workflowId: string, nodeId: string) => {
+  return useQuery({
+    queryKey: workflowKeys.nodeEvent(workflowId, nodeId),
+    queryFn: async () => {
+      const response = await workflowsListNodeEvents(
         withOrganizationHeader({
           path: {
             workflowId,

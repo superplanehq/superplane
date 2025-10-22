@@ -819,9 +819,10 @@ type Node struct {
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Type          Node_Type              `protobuf:"varint,3,opt,name=type,proto3,enum=Superplane.Components.Node_Type" json:"type,omitempty"`
 	Configuration *_struct.Struct        `protobuf:"bytes,4,opt,name=configuration,proto3" json:"configuration,omitempty"`
-	Component     *Node_ComponentRef     `protobuf:"bytes,5,opt,name=component,proto3" json:"component,omitempty"`
-	Blueprint     *Node_BlueprintRef     `protobuf:"bytes,6,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
-	Trigger       *Node_TriggerRef       `protobuf:"bytes,7,opt,name=trigger,proto3" json:"trigger,omitempty"`
+	Metadata      *_struct.Struct        `protobuf:"bytes,5,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Component     *Node_ComponentRef     `protobuf:"bytes,6,opt,name=component,proto3" json:"component,omitempty"`
+	Blueprint     *Node_BlueprintRef     `protobuf:"bytes,7,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
+	Trigger       *Node_TriggerRef       `protobuf:"bytes,8,opt,name=trigger,proto3" json:"trigger,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -880,6 +881,13 @@ func (x *Node) GetType() Node_Type {
 func (x *Node) GetConfiguration() *_struct.Struct {
 	if x != nil {
 		return x.Configuration
+	}
+	return nil
+}
+
+func (x *Node) GetMetadata() *_struct.Struct {
+	if x != nil {
+		return x.Metadata
 	}
 	return nil
 }
@@ -1158,15 +1166,16 @@ const file_components_proto_rawDesc = "" +
 	"parameters\x18\x03 \x03(\v2).Superplane.Components.ConfigurationFieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
-	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\x99\x04\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xce\x04\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
 	"\x04type\x18\x03 \x01(\x0e2 .Superplane.Components.Node.TypeR\x04type\x12=\n" +
-	"\rconfiguration\x18\x04 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x12F\n" +
-	"\tcomponent\x18\x05 \x01(\v2(.Superplane.Components.Node.ComponentRefR\tcomponent\x12F\n" +
-	"\tblueprint\x18\x06 \x01(\v2(.Superplane.Components.Node.BlueprintRefR\tblueprint\x12@\n" +
-	"\atrigger\x18\a \x01(\v2&.Superplane.Components.Node.TriggerRefR\atrigger\x1a\"\n" +
+	"\rconfiguration\x18\x04 \x01(\v2\x17.google.protobuf.StructR\rconfiguration\x123\n" +
+	"\bmetadata\x18\x05 \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12F\n" +
+	"\tcomponent\x18\x06 \x01(\v2(.Superplane.Components.Node.ComponentRefR\tcomponent\x12F\n" +
+	"\tblueprint\x18\a \x01(\v2(.Superplane.Components.Node.BlueprintRefR\tblueprint\x12@\n" +
+	"\atrigger\x18\b \x01(\v2&.Superplane.Components.Node.TriggerRefR\atrigger\x1a\"\n" +
 	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a \n" +
 	"\n" +
@@ -1243,20 +1252,21 @@ var file_components_proto_depIdxs = []int32{
 	12, // 10: Superplane.Components.ListComponentActionsResponse.actions:type_name -> Superplane.Components.ComponentAction
 	0,  // 11: Superplane.Components.Node.type:type_name -> Superplane.Components.Node.Type
 	19, // 12: Superplane.Components.Node.configuration:type_name -> google.protobuf.Struct
-	16, // 13: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
-	18, // 14: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
-	17, // 15: Superplane.Components.Node.trigger:type_name -> Superplane.Components.Node.TriggerRef
-	1,  // 16: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
-	3,  // 17: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
-	11, // 18: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
-	2,  // 19: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
-	4,  // 20: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
-	13, // 21: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
-	19, // [19:22] is the sub-list for method output_type
-	16, // [16:19] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	19, // 13: Superplane.Components.Node.metadata:type_name -> google.protobuf.Struct
+	16, // 14: Superplane.Components.Node.component:type_name -> Superplane.Components.Node.ComponentRef
+	18, // 15: Superplane.Components.Node.blueprint:type_name -> Superplane.Components.Node.BlueprintRef
+	17, // 16: Superplane.Components.Node.trigger:type_name -> Superplane.Components.Node.TriggerRef
+	1,  // 17: Superplane.Components.Components.ListComponents:input_type -> Superplane.Components.ListComponentsRequest
+	3,  // 18: Superplane.Components.Components.DescribeComponent:input_type -> Superplane.Components.DescribeComponentRequest
+	11, // 19: Superplane.Components.Components.ListComponentActions:input_type -> Superplane.Components.ListComponentActionsRequest
+	2,  // 20: Superplane.Components.Components.ListComponents:output_type -> Superplane.Components.ListComponentsResponse
+	4,  // 21: Superplane.Components.Components.DescribeComponent:output_type -> Superplane.Components.DescribeComponentResponse
+	13, // 22: Superplane.Components.Components.ListComponentActions:output_type -> Superplane.Components.ListComponentActionsResponse
+	20, // [20:23] is the sub-list for method output_type
+	17, // [17:20] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_components_proto_init() }

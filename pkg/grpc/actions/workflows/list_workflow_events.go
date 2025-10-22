@@ -25,7 +25,7 @@ func ListWorkflowEvents(ctx context.Context, registry *registry.Registry, workfl
 		return nil, err
 	}
 
-	serialized, err := SerializeWorkflowInitialEvents(events)
+	serialized, err := SerializeWorkflowEvents(events)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func ListWorkflowEvents(ctx context.Context, registry *registry.Registry, workfl
 	}, nil
 }
 
-func SerializeWorkflowInitialEvents(events []models.WorkflowEvent) ([]*pb.WorkflowEvent, error) {
+func SerializeWorkflowEvents(events []models.WorkflowEvent) ([]*pb.WorkflowEvent, error) {
 	result := make([]*pb.WorkflowEvent, 0, len(events))
 
 	for _, event := range events {

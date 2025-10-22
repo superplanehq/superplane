@@ -6,6 +6,9 @@ import { FilterNode } from '../../../pages/blueprint/components/nodes/FilterNode
 import { SwitchNode } from '../../../pages/blueprint/components/nodes/SwitchNode'
 import { ApprovalNode } from '../../../pages/blueprint/components/nodes/ApprovalNode'
 import { DefaultNode } from '../../../pages/blueprint/components/nodes/DefaultNode'
+import { ManualTriggerNode } from '../../../pages/blueprint/components/nodes/ManualTriggerNode'
+import { ScheduledTriggerNode } from '../../../pages/blueprint/components/nodes/ScheduledTriggerNode'
+import { WebhookTriggerNode } from '../../../pages/blueprint/components/nodes/WebhookTriggerNode'
 
 export const WorkflowIfNode = (props: NodeProps) => (
   <WorkflowNodeWrapper
@@ -56,6 +59,33 @@ export const WorkflowDefaultNode = (props: NodeProps) => (
   <WorkflowNodeWrapper
     {...props}
     BaseNodeComponent={DefaultNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowManualTriggerNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={ManualTriggerNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowScheduledTriggerNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={ScheduledTriggerNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowWebhookTriggerNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={WebhookTriggerNode}
     onEdit={props.data.onEdit as (() => void) | undefined}
     onEmit={props.data.onEmit as (() => void) | undefined}
   />

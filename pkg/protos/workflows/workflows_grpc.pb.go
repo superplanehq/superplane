@@ -26,6 +26,7 @@ const (
 	Workflows_DeleteWorkflow_FullMethodName            = "/Superplane.Workflows.Workflows/DeleteWorkflow"
 	Workflows_ListNodeQueueItems_FullMethodName        = "/Superplane.Workflows.Workflows/ListNodeQueueItems"
 	Workflows_ListNodeExecutions_FullMethodName        = "/Superplane.Workflows.Workflows/ListNodeExecutions"
+	Workflows_ListNodeEvents_FullMethodName            = "/Superplane.Workflows.Workflows/ListNodeEvents"
 	Workflows_EmitNodeEvent_FullMethodName             = "/Superplane.Workflows.Workflows/EmitNodeEvent"
 	Workflows_InvokeNodeExecutionAction_FullMethodName = "/Superplane.Workflows.Workflows/InvokeNodeExecutionAction"
 	Workflows_ListChildExecutions_FullMethodName       = "/Superplane.Workflows.Workflows/ListChildExecutions"
@@ -44,6 +45,7 @@ type WorkflowsClient interface {
 	DeleteWorkflow(ctx context.Context, in *DeleteWorkflowRequest, opts ...grpc.CallOption) (*DeleteWorkflowResponse, error)
 	ListNodeQueueItems(ctx context.Context, in *ListNodeQueueItemsRequest, opts ...grpc.CallOption) (*ListNodeQueueItemsResponse, error)
 	ListNodeExecutions(ctx context.Context, in *ListNodeExecutionsRequest, opts ...grpc.CallOption) (*ListNodeExecutionsResponse, error)
+	ListNodeEvents(ctx context.Context, in *ListNodeEventsRequest, opts ...grpc.CallOption) (*ListNodeEventsResponse, error)
 	EmitNodeEvent(ctx context.Context, in *EmitNodeEventRequest, opts ...grpc.CallOption) (*EmitNodeEventResponse, error)
 	InvokeNodeExecutionAction(ctx context.Context, in *InvokeNodeExecutionActionRequest, opts ...grpc.CallOption) (*InvokeNodeExecutionActionResponse, error)
 	ListChildExecutions(ctx context.Context, in *ListChildExecutionsRequest, opts ...grpc.CallOption) (*ListChildExecutionsResponse, error)
@@ -129,6 +131,16 @@ func (c *workflowsClient) ListNodeExecutions(ctx context.Context, in *ListNodeEx
 	return out, nil
 }
 
+func (c *workflowsClient) ListNodeEvents(ctx context.Context, in *ListNodeEventsRequest, opts ...grpc.CallOption) (*ListNodeEventsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListNodeEventsResponse)
+	err := c.cc.Invoke(ctx, Workflows_ListNodeEvents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workflowsClient) EmitNodeEvent(ctx context.Context, in *EmitNodeEventRequest, opts ...grpc.CallOption) (*EmitNodeEventResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EmitNodeEventResponse)
@@ -190,6 +202,7 @@ type WorkflowsServer interface {
 	DeleteWorkflow(context.Context, *DeleteWorkflowRequest) (*DeleteWorkflowResponse, error)
 	ListNodeQueueItems(context.Context, *ListNodeQueueItemsRequest) (*ListNodeQueueItemsResponse, error)
 	ListNodeExecutions(context.Context, *ListNodeExecutionsRequest) (*ListNodeExecutionsResponse, error)
+	ListNodeEvents(context.Context, *ListNodeEventsRequest) (*ListNodeEventsResponse, error)
 	EmitNodeEvent(context.Context, *EmitNodeEventRequest) (*EmitNodeEventResponse, error)
 	InvokeNodeExecutionAction(context.Context, *InvokeNodeExecutionActionRequest) (*InvokeNodeExecutionActionResponse, error)
 	ListChildExecutions(context.Context, *ListChildExecutionsRequest) (*ListChildExecutionsResponse, error)
@@ -224,6 +237,9 @@ func (UnimplementedWorkflowsServer) ListNodeQueueItems(context.Context, *ListNod
 }
 func (UnimplementedWorkflowsServer) ListNodeExecutions(context.Context, *ListNodeExecutionsRequest) (*ListNodeExecutionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListNodeExecutions not implemented")
+}
+func (UnimplementedWorkflowsServer) ListNodeEvents(context.Context, *ListNodeEventsRequest) (*ListNodeEventsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListNodeEvents not implemented")
 }
 func (UnimplementedWorkflowsServer) EmitNodeEvent(context.Context, *EmitNodeEventRequest) (*EmitNodeEventResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EmitNodeEvent not implemented")
@@ -386,6 +402,24 @@ func _Workflows_ListNodeExecutions_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Workflows_ListNodeEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListNodeEventsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowsServer).ListNodeEvents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Workflows_ListNodeEvents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowsServer).ListNodeEvents(ctx, req.(*ListNodeEventsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Workflows_EmitNodeEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EmitNodeEventRequest)
 	if err := dec(in); err != nil {
@@ -510,6 +544,10 @@ var Workflows_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListNodeExecutions",
 			Handler:    _Workflows_ListNodeExecutions_Handler,
+		},
+		{
+			MethodName: "ListNodeEvents",
+			Handler:    _Workflows_ListNodeEvents_Handler,
 		},
 		{
 			MethodName: "EmitNodeEvent",
