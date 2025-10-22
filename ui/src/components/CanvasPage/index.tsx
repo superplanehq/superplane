@@ -8,7 +8,7 @@ import ReactFlow, {
   type Node,
 } from "reactflow";
 
-import { DefaultBlock, InputBlock, OutputBlock } from "./Block";
+import { Block } from "./Block";
 import { useCanvasState } from "./useCanvasState";
 
 namespace CanvasPage {
@@ -37,11 +37,7 @@ function CanvasPage(props: CanvasPage.Props) {
       <ReactFlow
         nodes={nodes}
         edges={edges?.map((e) => ({ ...e, ...EDGE_STYLE }))}
-        nodeTypes={{
-          default: DefaultBlock,
-          input: InputBlock,
-          output: OutputBlock,
-        }}
+        nodeTypes={{ default: Block }}
         fitView={true}
         nodesDraggable={true}
         nodesConnectable={false}
