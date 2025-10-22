@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { Trigger, type TriggerProps } from './';
+import githubIcon from '@/assets/icons/integrations/github.svg';
+import dockerIcon from '@/assets/icons/integrations/docker.svg';
 
 const GithubProps: TriggerProps = {
   title: "GitHub",
-  iconSrc: "/src/assets/icons/integrations/github.svg",
+  iconSrc: githubIcon,
   iconBackground: "bg-black",
   headerColor: "bg-gray-100",
   metadata: [
@@ -38,7 +40,7 @@ type Story = StoryObj<typeof meta>;
 
 const DockerHubProps: TriggerProps = {
   title: "DockerHub",
-  iconSrc: "/src/assets/icons/integrations/docker.svg",
+  iconSrc: dockerIcon,
   headerColor: "bg-sky-100",
   metadata: [
     {
