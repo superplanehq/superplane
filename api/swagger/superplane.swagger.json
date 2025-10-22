@@ -4017,33 +4017,18 @@
         "defaultValue": {
           "type": "string"
         },
-        "options": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsFieldOption"
-          }
-        },
-        "min": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "max": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "listItem": {
-          "$ref": "#/definitions/ComponentsListItemDefinition"
-        },
-        "schema": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
-          }
-        },
         "label": {
           "type": "string"
+        },
+        "visibilityConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsVisibilityCondition"
+          }
+        },
+        "typeOptions": {
+          "$ref": "#/definitions/ComponentsTypeOptions"
         }
       }
     },
@@ -4069,13 +4054,10 @@
         }
       }
     },
-    "ComponentsFieldOption": {
+    "ComponentsIntegrationTypeOptions": {
       "type": "object",
       "properties": {
-        "label": {
-          "type": "string"
-        },
-        "value": {
+        "type": {
           "type": "string"
         }
       }
@@ -4119,6 +4101,26 @@
         }
       }
     },
+    "ComponentsListTypeOptions": {
+      "type": "object",
+      "properties": {
+        "itemDefinition": {
+          "$ref": "#/definitions/ComponentsListItemDefinition"
+        }
+      }
+    },
+    "ComponentsMultiSelectTypeOptions": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsSelectOption"
+          }
+        }
+      }
+    },
     "ComponentsNode": {
       "type": "object",
       "properties": {
@@ -4149,6 +4151,102 @@
         "TYPE_BLUEPRINT"
       ],
       "default": "TYPE_COMPONENT"
+    },
+    "ComponentsNumberTypeOptions": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "max": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "ComponentsObjectTypeOptions": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsConfigurationField"
+          }
+        }
+      }
+    },
+    "ComponentsResourceTypeOptions": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "ComponentsSelectOption": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "ComponentsSelectTypeOptions": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsSelectOption"
+          }
+        }
+      }
+    },
+    "ComponentsTypeOptions": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "$ref": "#/definitions/ComponentsNumberTypeOptions"
+        },
+        "select": {
+          "$ref": "#/definitions/ComponentsSelectTypeOptions"
+        },
+        "multiSelect": {
+          "$ref": "#/definitions/ComponentsMultiSelectTypeOptions"
+        },
+        "integration": {
+          "$ref": "#/definitions/ComponentsIntegrationTypeOptions"
+        },
+        "list": {
+          "$ref": "#/definitions/ComponentsListTypeOptions"
+        },
+        "object": {
+          "$ref": "#/definitions/ComponentsObjectTypeOptions"
+        },
+        "resource": {
+          "$ref": "#/definitions/ComponentsResourceTypeOptions"
+        }
+      }
+    },
+    "ComponentsVisibilityCondition": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     "EventRejectionRejectionReason": {
       "type": "string",

@@ -167,29 +167,63 @@ type ConfigurationField struct {
 	Default     any    `json:"default"`
 
 	/*
-	 * Used for select / multi_select types
+	 * Type-specific options for fields.
+	 * The structure depends on the field type.
 	 */
-	Options []FieldOption `json:"options,omitempty"`
+	TypeOptions *TypeOptions `json:"type_options,omitempty"`
 
 	/*
-	 * Used for number type to specify minimum value
+	 * Used for controlling when the field is visible.
+	 * No visibility conditions - always visible.
 	 */
+	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
+}
+
+/*
+ * TypeOptions contains type-specific configuration for fields.
+ */
+type TypeOptions struct {
+	Number      *NumberTypeOptions      `json:"number,omitempty"`
+	Select      *SelectTypeOptions      `json:"select,omitempty"`
+	MultiSelect *MultiSelectTypeOptions `json:"multi_select,omitempty"`
+	List        *ListTypeOptions        `json:"list,omitempty"`
+	Object      *ObjectTypeOptions      `json:"object,omitempty"`
+}
+
+/*
+ * NumberTypeOptions specifies constraints for number fields
+ */
+type NumberTypeOptions struct {
 	Min *int `json:"min,omitempty"`
-
-	/*
-	 * Used for number type to specify maximum value
-	 */
 	Max *int `json:"max,omitempty"`
+}
 
-	/*
-	 * Defines structures of items on a 'list' type.
-	 */
-	ListItem *ListItemDefinition `json:"list_item,omitempty"`
+/*
+ * SelectTypeOptions specifies options for select fields
+ */
+type SelectTypeOptions struct {
+	Options []FieldOption `json:"options"`
+}
 
-	/*
-	 * Schema allows us to define nested object structures for 'object' type.
-	 */
-	Schema []ConfigurationField `json:"schema,omitempty"`
+/*
+ * MultiSelectTypeOptions specifies options for multi_select fields
+ */
+type MultiSelectTypeOptions struct {
+	Options []FieldOption `json:"options"`
+}
+
+/*
+ * ListTypeOptions defines the structure of list items
+ */
+type ListTypeOptions struct {
+	ItemDefinition *ListItemDefinition `json:"item_definition"`
+}
+
+/*
+ * ObjectTypeOptions defines the schema for object fields
+ */
+type ObjectTypeOptions struct {
+	Schema []ConfigurationField `json:"schema"`
 }
 
 /*
@@ -206,4 +240,9 @@ type FieldOption struct {
 type ListItemDefinition struct {
 	Type   string
 	Schema []ConfigurationField
+}
+
+type VisibilityCondition struct {
+	Field  string   `json:"field"`
+	Values []string `json:"values"`
 }

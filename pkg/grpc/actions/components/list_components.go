@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -28,7 +29,7 @@ func serializeComponents(in []components.Component) []*pb.Component {
 		configFields := component.Configuration()
 		configuration := make([]*pb.ConfigurationField, len(configFields))
 		for j, field := range configFields {
-			configuration[j] = ConfigurationFieldToProto(field)
+			configuration[j] = actions.ConfigurationFieldToProto(field)
 		}
 
 		out[i] = &pb.Component{

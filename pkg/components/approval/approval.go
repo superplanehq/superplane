@@ -84,7 +84,9 @@ func (a *Approval) Configuration() []components.ConfigurationField {
 			Type:        components.FieldTypeNumber,
 			Description: "Number of approvals required before execution continues",
 			Required:    true,
-			Min:         &min,
+			TypeOptions: &components.TypeOptions{
+				Number: &components.NumberTypeOptions{Min: &min},
+			},
 		},
 	}
 }

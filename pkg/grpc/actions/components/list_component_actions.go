@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -14,17 +15,17 @@ func ListComponentActions(ctx context.Context, registry *registry.Registry, name
 		return nil, fmt.Errorf("component not found: %w", err)
 	}
 
-	actions := component.Actions()
+	componentActions := component.Actions()
 	pbActions := []*pb.ComponentAction{}
 
-	for i, action := range actions {
+	for i, action := range componentActions {
 		if !action.UserAccessible {
 			continue
 		}
 
 		parameters := make([]*pb.ConfigurationField, len(action.Parameters))
 		for j, param := range action.Parameters {
-			parameters[j] = ConfigurationFieldToProto(param)
+			parameters[j] = actions.ConfigurationFieldToProto(param)
 		}
 
 		pbActions[i] = &pb.ComponentAction{

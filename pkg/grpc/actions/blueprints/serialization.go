@@ -159,7 +159,6 @@ func ProtoToConfiguration(config []*componentpb.ConfigurationField) ([]component
 
 	result := make([]components.ConfigurationField, len(config))
 	for i, field := range config {
-		// Validate required fields
 		if field.Name == "" {
 			return nil, status.Errorf(codes.InvalidArgument, "configuration field %d: name is required", i)
 		}
@@ -167,95 +166,31 @@ func ProtoToConfiguration(config []*componentpb.ConfigurationField) ([]component
 			return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: label is required", field.Name)
 		}
 
-		// Type-specific validation
-		switch field.Type {
-		case components.FieldTypeNumber:
-			if field.Min == nil {
-				return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: min is required for number type", field.Name)
-			}
-			if field.Max == nil {
-				return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: max is required for number type", field.Name)
-			}
-		case components.FieldTypeSelect, components.FieldTypeMultiSelect:
-			if len(field.Options) == 0 {
-				return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: options are required for %s type", field.Name, field.Type)
-			}
-		}
-
-		// If field is not required, default value should be provided
 		if !field.Required && field.DefaultValue == nil {
 			return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: default value is required when field is not required", field.Name)
 		}
 
-		result[i] = components.ConfigurationField{
-			Name:        field.Name,
-			Label:       field.Label,
-			Type:        field.Type,
-			Description: field.Description,
-			Required:    field.Required,
-		}
-
-		// Handle default value
-		if field.DefaultValue != nil {
-			result[i].Default = *field.DefaultValue
-		}
-
-		// Handle options (for select/multi_select)
-		if len(field.Options) > 0 {
-			result[i].Options = make([]components.FieldOption, len(field.Options))
-			for j, opt := range field.Options {
-				result[i].Options[j] = components.FieldOption{
-					Label: opt.Label,
-					Value: opt.Value,
+		// Type-specific validation
+		if field.TypeOptions != nil {
+			switch field.Type {
+			case components.FieldTypeNumber:
+				if field.TypeOptions.Number == nil || (field.TypeOptions.Number.Min == nil && field.TypeOptions.Number.Max == nil) {
+					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: number type options are required for number type", field.Name)
+				}
+			case components.FieldTypeSelect:
+				if field.TypeOptions.Select == nil || len(field.TypeOptions.Select.Options) == 0 {
+					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: options are required for select type", field.Name)
+				}
+			case components.FieldTypeMultiSelect:
+				if field.TypeOptions.MultiSelect == nil || len(field.TypeOptions.MultiSelect.Options) == 0 {
+					return nil, status.Errorf(codes.InvalidArgument, "configuration field %s: options are required for multi_select type", field.Name)
 				}
 			}
 		}
 
-		// Handle min/max (for number type)
-		if field.Min != nil {
-			min := int(*field.Min)
-			result[i].Min = &min
-		}
-		if field.Max != nil {
-			max := int(*field.Max)
-			result[i].Max = &max
-		}
-
-		// Handle list item definition (for list type)
-		if field.ListItem != nil {
-			result[i].ListItem = &components.ListItemDefinition{
-				Type: field.ListItem.Type,
-			}
-			if len(field.ListItem.Schema) > 0 {
-				listItemSchema := make([]components.ConfigurationField, len(field.ListItem.Schema))
-				for j, schemaField := range field.ListItem.Schema {
-					listItemSchema[j] = components.ConfigurationField{
-						Name:        schemaField.Name,
-						Label:       schemaField.Label,
-						Type:        schemaField.Type,
-						Description: schemaField.Description,
-						Required:    schemaField.Required,
-					}
-				}
-				result[i].ListItem.Schema = listItemSchema
-			}
-		}
-
-		// Handle object schema (for object type)
-		if len(field.Schema) > 0 {
-			objectSchema := make([]components.ConfigurationField, len(field.Schema))
-			for j, schemaField := range field.Schema {
-				objectSchema[j] = components.ConfigurationField{
-					Name:        schemaField.Name,
-					Label:       schemaField.Label,
-					Type:        schemaField.Type,
-					Description: schemaField.Description,
-					Required:    schemaField.Required,
-				}
-			}
-			result[i].Schema = objectSchema
-		}
+		result[i] = actions.ProtoToConfigurationField(field)
 	}
+
 	return result, nil
 }
 

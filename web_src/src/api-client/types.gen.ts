@@ -73,12 +73,9 @@ export type ComponentsConfigurationField = {
     description?: string;
     required?: boolean;
     defaultValue?: string;
-    options?: Array<ComponentsFieldOption>;
-    min?: number;
-    max?: number;
-    listItem?: ComponentsListItemDefinition;
-    schema?: Array<ComponentsConfigurationField>;
     label?: string;
+    visibilityConditions?: Array<ComponentsVisibilityCondition>;
+    typeOptions?: ComponentsTypeOptions;
 };
 
 export type ComponentsDescribeComponentResponse = {
@@ -91,9 +88,8 @@ export type ComponentsEdge = {
     channel?: string;
 };
 
-export type ComponentsFieldOption = {
-    label?: string;
-    value?: string;
+export type ComponentsIntegrationTypeOptions = {
+    type?: string;
 };
 
 export type ComponentsListComponentActionsResponse = {
@@ -109,6 +105,14 @@ export type ComponentsListItemDefinition = {
     schema?: Array<ComponentsConfigurationField>;
 };
 
+export type ComponentsListTypeOptions = {
+    itemDefinition?: ComponentsListItemDefinition;
+};
+
+export type ComponentsMultiSelectTypeOptions = {
+    options?: Array<ComponentsSelectOption>;
+};
+
 export type ComponentsNode = {
     id?: string;
     name?: string;
@@ -121,6 +125,43 @@ export type ComponentsNode = {
 };
 
 export type ComponentsNodeType = 'TYPE_COMPONENT' | 'TYPE_BLUEPRINT';
+
+export type ComponentsNumberTypeOptions = {
+    min?: number;
+    max?: number;
+};
+
+export type ComponentsObjectTypeOptions = {
+    schema?: Array<ComponentsConfigurationField>;
+};
+
+export type ComponentsResourceTypeOptions = {
+    type?: string;
+};
+
+export type ComponentsSelectOption = {
+    label?: string;
+    value?: string;
+};
+
+export type ComponentsSelectTypeOptions = {
+    options?: Array<ComponentsSelectOption>;
+};
+
+export type ComponentsTypeOptions = {
+    number?: ComponentsNumberTypeOptions;
+    select?: ComponentsSelectTypeOptions;
+    multiSelect?: ComponentsMultiSelectTypeOptions;
+    integration?: ComponentsIntegrationTypeOptions;
+    list?: ComponentsListTypeOptions;
+    object?: ComponentsObjectTypeOptions;
+    resource?: ComponentsResourceTypeOptions;
+};
+
+export type ComponentsVisibilityCondition = {
+    field?: string;
+    values?: Array<string>;
+};
 
 export type EventRejectionRejectionReason = 'REJECTION_REASON_UNKNOWN' | 'REJECTION_REASON_FILTERED' | 'REJECTION_REASON_ERROR';
 

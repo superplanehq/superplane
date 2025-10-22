@@ -55,12 +55,16 @@ func (e *HTTP) Configuration() []components.ConfigurationField {
 			Label:    "Method",
 			Required: true,
 			Default:  "POST",
-			Options: []components.FieldOption{
-				{Label: "GET", Value: "GET"},
-				{Label: "POST", Value: "POST"},
-				{Label: "PUT", Value: "PUT"},
-				{Label: "DELETE", Value: "DELETE"},
-				{Label: "PATCH", Value: "PATCH"},
+			TypeOptions: &components.TypeOptions{
+				Select: &components.SelectTypeOptions{
+					Options: []components.FieldOption{
+						{Label: "GET", Value: "GET"},
+						{Label: "POST", Value: "POST"},
+						{Label: "PUT", Value: "PUT"},
+						{Label: "DELETE", Value: "DELETE"},
+						{Label: "PATCH", Value: "PATCH"},
+					},
+				},
 			},
 		},
 		{
@@ -75,20 +79,24 @@ func (e *HTTP) Configuration() []components.ConfigurationField {
 			Label:    "Headers",
 			Type:     components.FieldTypeList,
 			Required: false,
-			ListItem: &components.ListItemDefinition{
-				Type: components.FieldTypeObject,
-				Schema: []components.ConfigurationField{
-					{
-						Name:     "name",
-						Type:     components.FieldTypeString,
-						Label:    "Header Name",
-						Required: true,
-					},
-					{
-						Name:     "value",
-						Type:     components.FieldTypeString,
-						Label:    "Header value",
-						Required: true,
+			TypeOptions: &components.TypeOptions{
+				List: &components.ListTypeOptions{
+					ItemDefinition: &components.ListItemDefinition{
+						Type: components.FieldTypeObject,
+						Schema: []components.ConfigurationField{
+							{
+								Name:     "name",
+								Type:     components.FieldTypeString,
+								Label:    "Header Name",
+								Required: true,
+							},
+							{
+								Name:     "value",
+								Type:     components.FieldTypeString,
+								Label:    "Header value",
+								Required: true,
+							},
+						},
 					},
 				},
 			},
