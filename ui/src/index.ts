@@ -1,4 +1,5 @@
 // UI Components Library - Main Export
+import './index-scoped.css';
 export { Button, buttonVariants, type ButtonProps } from "./components/button"
 export { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./components/accordion"
 export { Alert, AlertDescription, AlertTitle } from "./components/alert"
@@ -24,6 +25,7 @@ export { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 export { EventItem } from "./components/eventItem"
 export { EventSource } from "./components/eventSource"
 export { HoverCard, HoverCardContent, HoverCardTrigger } from "./components/hoverCard"
+export { If } from "./components/if"
 export { Input } from "./components/input"
 export { Item } from "./components/item"
 export { Label } from "./components/label"

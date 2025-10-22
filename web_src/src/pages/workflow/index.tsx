@@ -296,13 +296,13 @@ export const Workflow = () => {
         nds.map((node) =>
           node.id === editingNodeId
             ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  label: nodeName.trim(),
-                  configuration: nodeConfiguration,
-                },
-              }
+              ...node,
+              data: {
+                ...node.data,
+                label: nodeName.trim(),
+                configuration: nodeConfiguration,
+              },
+            }
             : node
         )
       )
@@ -313,8 +313,8 @@ export const Workflow = () => {
 
       // Use block name as node type if it exists in nodeTypes and is a component
       const nodeType = selectedBlock.type === 'component' &&
-                      selectedBlock.name &&
-                      nodeTypes[selectedBlock.name as keyof typeof nodeTypes]
+        selectedBlock.name &&
+        nodeTypes[selectedBlock.name as keyof typeof nodeTypes]
         ? selectedBlock.name
         : 'default'
 
@@ -608,7 +608,7 @@ export const Workflow = () => {
 
       {/* Add/Edit Node Modal */}
       <Dialog open={isAddNodeModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
-        <DialogContent className="max-w-2xl p-0" showCloseButton={false}>
+        <DialogContent className="max-w-2xl p-0 bg-white dark:bg-zinc-800" showCloseButton={false}>
           <ScrollArea className="max-h-[80vh]">
             <div className="p-6">
               <div className="space-y-6">
