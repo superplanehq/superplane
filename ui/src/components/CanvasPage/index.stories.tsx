@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { Edge, Node } from "reactflow";
 
+import dockerIcon from "@/assets/icons/integrations/docker.svg";
+import githubIcon from "@/assets/icons/integrations/github.svg";
+
 import { useCallback, useState } from "react";
 import { applyNodeChanges, type NodeChange } from "reactflow";
 import { CanvasPage } from "./index";
@@ -26,6 +29,22 @@ const sampleNodes: Node[] = [
       label: "Listen to code changes",
       state: "working",
       type: "trigger",
+      trigger: {
+        title: "GitHub",
+        iconSrc: githubIcon,
+        iconBackground: "bg-black",
+        headerColor: "bg-gray-100",
+        metadata: [
+          { icon: "book", label: "monarch-app" },
+          { icon: "filter", label: "branch=main" },
+        ],
+        lastEventData: {
+          title: "refactor: update README.md",
+          sizeInMB: 1,
+          receivedAt: new Date(),
+          state: "processed",
+        },
+      },
     },
   },
   {
@@ -35,6 +54,21 @@ const sampleNodes: Node[] = [
       label: "Listen to Docker image updates",
       state: "pending",
       type: "trigger",
+      trigger: {
+        title: "DockerHub",
+        iconSrc: dockerIcon,
+        headerColor: "bg-sky-100",
+        metadata: [
+          { icon: "box", label: "monarch-app-base-image" },
+          { icon: "filter", label: "push" },
+        ],
+        lastEventData: {
+          title: "v3.18.217",
+          sizeInMB: 972.5,
+          receivedAt: new Date(),
+          state: "processed",
+        },
+      },
     },
   },
   {
