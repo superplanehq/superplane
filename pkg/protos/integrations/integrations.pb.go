@@ -71,7 +71,7 @@ func (x Integration_AuthType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Integration_AuthType.Descriptor instead.
 func (Integration_AuthType) EnumDescriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{8, 0}
+	return file_integrations_proto_rawDescGZIP(), []int{10, 0}
 }
 
 type CreateIntegrationRequest struct {
@@ -386,6 +386,118 @@ func (x *ListIntegrationsResponse) GetIntegrations() []*Integration {
 	return nil
 }
 
+type ListResourcesRequest struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	IdOrName      string                   `protobuf:"bytes,3,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
+	Type          string                   `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListResourcesRequest) Reset() {
+	*x = ListResourcesRequest{}
+	mi := &file_integrations_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListResourcesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListResourcesRequest) ProtoMessage() {}
+
+func (x *ListResourcesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_integrations_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListResourcesRequest.ProtoReflect.Descriptor instead.
+func (*ListResourcesRequest) Descriptor() ([]byte, []int) {
+	return file_integrations_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListResourcesRequest) GetDomainType() authorization.DomainType {
+	if x != nil {
+		return x.DomainType
+	}
+	return authorization.DomainType(0)
+}
+
+func (x *ListResourcesRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
+func (x *ListResourcesRequest) GetIdOrName() string {
+	if x != nil {
+		return x.IdOrName
+	}
+	return ""
+}
+
+func (x *ListResourcesRequest) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+type ListResourcesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Resources     []*ResourceRef         `protobuf:"bytes,1,rep,name=resources,proto3" json:"resources,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListResourcesResponse) Reset() {
+	*x = ListResourcesResponse{}
+	mi := &file_integrations_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListResourcesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListResourcesResponse) ProtoMessage() {}
+
+func (x *ListResourcesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_integrations_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListResourcesResponse.ProtoReflect.Descriptor instead.
+func (*ListResourcesResponse) Descriptor() ([]byte, []int) {
+	return file_integrations_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListResourcesResponse) GetResources() []*ResourceRef {
+	if x != nil {
+		return x.Resources
+	}
+	return nil
+}
+
 type DescribeIntegrationRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
@@ -397,7 +509,7 @@ type DescribeIntegrationRequest struct {
 
 func (x *DescribeIntegrationRequest) Reset() {
 	*x = DescribeIntegrationRequest{}
-	mi := &file_integrations_proto_msgTypes[6]
+	mi := &file_integrations_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -409,7 +521,7 @@ func (x *DescribeIntegrationRequest) String() string {
 func (*DescribeIntegrationRequest) ProtoMessage() {}
 
 func (x *DescribeIntegrationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[6]
+	mi := &file_integrations_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -422,7 +534,7 @@ func (x *DescribeIntegrationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeIntegrationRequest.ProtoReflect.Descriptor instead.
 func (*DescribeIntegrationRequest) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{6}
+	return file_integrations_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DescribeIntegrationRequest) GetDomainType() authorization.DomainType {
@@ -455,7 +567,7 @@ type DescribeIntegrationResponse struct {
 
 func (x *DescribeIntegrationResponse) Reset() {
 	*x = DescribeIntegrationResponse{}
-	mi := &file_integrations_proto_msgTypes[7]
+	mi := &file_integrations_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -467,7 +579,7 @@ func (x *DescribeIntegrationResponse) String() string {
 func (*DescribeIntegrationResponse) ProtoMessage() {}
 
 func (x *DescribeIntegrationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[7]
+	mi := &file_integrations_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -480,7 +592,7 @@ func (x *DescribeIntegrationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeIntegrationResponse.ProtoReflect.Descriptor instead.
 func (*DescribeIntegrationResponse) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{7}
+	return file_integrations_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DescribeIntegrationResponse) GetIntegration() *Integration {
@@ -500,7 +612,7 @@ type Integration struct {
 
 func (x *Integration) Reset() {
 	*x = Integration{}
-	mi := &file_integrations_proto_msgTypes[8]
+	mi := &file_integrations_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -512,7 +624,7 @@ func (x *Integration) String() string {
 func (*Integration) ProtoMessage() {}
 
 func (x *Integration) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[8]
+	mi := &file_integrations_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -525,7 +637,7 @@ func (x *Integration) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration.ProtoReflect.Descriptor instead.
 func (*Integration) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{8}
+	return file_integrations_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Integration) GetMetadata() *Integration_Metadata {
@@ -552,7 +664,7 @@ type IntegrationRef struct {
 
 func (x *IntegrationRef) Reset() {
 	*x = IntegrationRef{}
-	mi := &file_integrations_proto_msgTypes[9]
+	mi := &file_integrations_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -564,7 +676,7 @@ func (x *IntegrationRef) String() string {
 func (*IntegrationRef) ProtoMessage() {}
 
 func (x *IntegrationRef) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[9]
+	mi := &file_integrations_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -577,7 +689,7 @@ func (x *IntegrationRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IntegrationRef.ProtoReflect.Descriptor instead.
 func (*IntegrationRef) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{9}
+	return file_integrations_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *IntegrationRef) GetDomainType() authorization.DomainType {
@@ -604,7 +716,7 @@ type ResourceRef struct {
 
 func (x *ResourceRef) Reset() {
 	*x = ResourceRef{}
-	mi := &file_integrations_proto_msgTypes[10]
+	mi := &file_integrations_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +728,7 @@ func (x *ResourceRef) String() string {
 func (*ResourceRef) ProtoMessage() {}
 
 func (x *ResourceRef) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[10]
+	mi := &file_integrations_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -629,7 +741,7 @@ func (x *ResourceRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceRef.ProtoReflect.Descriptor instead.
 func (*ResourceRef) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{10}
+	return file_integrations_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ResourceRef) GetType() string {
@@ -655,7 +767,7 @@ type ValueFrom struct {
 
 func (x *ValueFrom) Reset() {
 	*x = ValueFrom{}
-	mi := &file_integrations_proto_msgTypes[11]
+	mi := &file_integrations_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -667,7 +779,7 @@ func (x *ValueFrom) String() string {
 func (*ValueFrom) ProtoMessage() {}
 
 func (x *ValueFrom) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[11]
+	mi := &file_integrations_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -680,7 +792,7 @@ func (x *ValueFrom) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValueFrom.ProtoReflect.Descriptor instead.
 func (*ValueFrom) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{11}
+	return file_integrations_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ValueFrom) GetSecret() *ValueFromSecret {
@@ -701,7 +813,7 @@ type ValueFromSecret struct {
 
 func (x *ValueFromSecret) Reset() {
 	*x = ValueFromSecret{}
-	mi := &file_integrations_proto_msgTypes[12]
+	mi := &file_integrations_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -713,7 +825,7 @@ func (x *ValueFromSecret) String() string {
 func (*ValueFromSecret) ProtoMessage() {}
 
 func (x *ValueFromSecret) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[12]
+	mi := &file_integrations_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -726,7 +838,7 @@ func (x *ValueFromSecret) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValueFromSecret.ProtoReflect.Descriptor instead.
 func (*ValueFromSecret) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{12}
+	return file_integrations_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ValueFromSecret) GetDomainType() authorization.DomainType {
@@ -764,7 +876,7 @@ type Integration_Metadata struct {
 
 func (x *Integration_Metadata) Reset() {
 	*x = Integration_Metadata{}
-	mi := &file_integrations_proto_msgTypes[13]
+	mi := &file_integrations_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -776,7 +888,7 @@ func (x *Integration_Metadata) String() string {
 func (*Integration_Metadata) ProtoMessage() {}
 
 func (x *Integration_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[13]
+	mi := &file_integrations_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -789,7 +901,7 @@ func (x *Integration_Metadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration_Metadata.ProtoReflect.Descriptor instead.
 func (*Integration_Metadata) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{8, 0}
+	return file_integrations_proto_rawDescGZIP(), []int{10, 0}
 }
 
 func (x *Integration_Metadata) GetId() string {
@@ -844,7 +956,7 @@ type Integration_Auth struct {
 
 func (x *Integration_Auth) Reset() {
 	*x = Integration_Auth{}
-	mi := &file_integrations_proto_msgTypes[14]
+	mi := &file_integrations_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -856,7 +968,7 @@ func (x *Integration_Auth) String() string {
 func (*Integration_Auth) ProtoMessage() {}
 
 func (x *Integration_Auth) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[14]
+	mi := &file_integrations_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -869,7 +981,7 @@ func (x *Integration_Auth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration_Auth.ProtoReflect.Descriptor instead.
 func (*Integration_Auth) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{8, 1}
+	return file_integrations_proto_rawDescGZIP(), []int{10, 1}
 }
 
 func (x *Integration_Auth) GetUse() Integration_AuthType {
@@ -897,7 +1009,7 @@ type Integration_Spec struct {
 
 func (x *Integration_Spec) Reset() {
 	*x = Integration_Spec{}
-	mi := &file_integrations_proto_msgTypes[15]
+	mi := &file_integrations_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -909,7 +1021,7 @@ func (x *Integration_Spec) String() string {
 func (*Integration_Spec) ProtoMessage() {}
 
 func (x *Integration_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[15]
+	mi := &file_integrations_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -922,7 +1034,7 @@ func (x *Integration_Spec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration_Spec.ProtoReflect.Descriptor instead.
 func (*Integration_Spec) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{8, 2}
+	return file_integrations_proto_rawDescGZIP(), []int{10, 2}
 }
 
 func (x *Integration_Spec) GetType() string {
@@ -955,7 +1067,7 @@ type Integration_Auth_Token struct {
 
 func (x *Integration_Auth_Token) Reset() {
 	*x = Integration_Auth_Token{}
-	mi := &file_integrations_proto_msgTypes[16]
+	mi := &file_integrations_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +1079,7 @@ func (x *Integration_Auth_Token) String() string {
 func (*Integration_Auth_Token) ProtoMessage() {}
 
 func (x *Integration_Auth_Token) ProtoReflect() protoreflect.Message {
-	mi := &file_integrations_proto_msgTypes[16]
+	mi := &file_integrations_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,7 +1092,7 @@ func (x *Integration_Auth_Token) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Integration_Auth_Token.ProtoReflect.Descriptor instead.
 func (*Integration_Auth_Token) Descriptor() ([]byte, []int) {
-	return file_integrations_proto_rawDescGZIP(), []int{8, 1, 0}
+	return file_integrations_proto_rawDescGZIP(), []int{10, 1, 0}
 }
 
 func (x *Integration_Auth_Token) GetValueFrom() *ValueFrom {
@@ -1016,7 +1128,16 @@ const file_integrations_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\"d\n" +
 	"\x18ListIntegrationsResponse\x12H\n" +
-	"\fintegrations\x18\x01 \x03(\v2$.Superplane.Integrations.IntegrationR\fintegrations\"\x9e\x01\n" +
+	"\fintegrations\x18\x01 \x03(\v2$.Superplane.Integrations.IntegrationR\fintegrations\"\xac\x01\n" +
+	"\x14ListResourcesRequest\x12E\n" +
+	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1c\n" +
+	"\n" +
+	"id_or_name\x18\x03 \x01(\tR\bidOrName\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\"[\n" +
+	"\x15ListResourcesResponse\x12B\n" +
+	"\tresources\x18\x01 \x03(\v2$.Superplane.Integrations.ResourceRefR\tresources\"\x9e\x01\n" +
 	"\x1aDescribeIntegrationRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
@@ -1065,10 +1186,12 @@ const file_integrations_proto_rawDesc = "" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
-	"\x03key\x18\x03 \x01(\tR\x03key2\xb0\a\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key2\x9e\t\n" +
 	"\fIntegrations\x12\xcb\x01\n" +
 	"\x10ListIntegrations\x120.Superplane.Integrations.ListIntegrationsRequest\x1a1.Superplane.Integrations.ListIntegrationsResponse\"R\x92A3\n" +
-	"\vIntegration\x12\x11List integrations\x1a\x11List integrations\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/integrations\x12\xed\x01\n" +
+	"\vIntegration\x12\x11List integrations\x1a\x11List integrations\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/integrations\x12\xeb\x01\n" +
+	"\rListResources\x12-.Superplane.Integrations.ListResourcesRequest\x1a..Superplane.Integrations.ListResourcesResponse\"{\x92AE\n" +
+	"\vIntegration\x12\x1aList integration resources\x1a\x1aList integration resources\x82\xd3\xe4\x93\x02-\x12+/api/v1/integrations/{id_or_name}/resources\x12\xed\x01\n" +
 	"\x13DescribeIntegration\x123.Superplane.Integrations.DescribeIntegrationRequest\x1a4.Superplane.Integrations.DescribeIntegrationResponse\"k\x92A?\n" +
 	"\vIntegration\x12\x17Describe an integration\x1a\x17Describe an integration\x82\xd3\xe4\x93\x02#\x12!/api/v1/integrations/{id_or_name}\x12\xee\x01\n" +
 	"\x11CreateIntegration\x121.Superplane.Integrations.CreateIntegrationRequest\x1a2.Superplane.Integrations.CreateIntegrationResponse\"r\x92AP\n" +
@@ -1091,7 +1214,7 @@ func file_integrations_proto_rawDescGZIP() []byte {
 }
 
 var file_integrations_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_integrations_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_integrations_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_integrations_proto_goTypes = []any{
 	(Integration_AuthType)(0),           // 0: Superplane.Integrations.Integration.AuthType
 	(*CreateIntegrationRequest)(nil),    // 1: Superplane.Integrations.CreateIntegrationRequest
@@ -1100,55 +1223,61 @@ var file_integrations_proto_goTypes = []any{
 	(*UpdateIntegrationResponse)(nil),   // 4: Superplane.Integrations.UpdateIntegrationResponse
 	(*ListIntegrationsRequest)(nil),     // 5: Superplane.Integrations.ListIntegrationsRequest
 	(*ListIntegrationsResponse)(nil),    // 6: Superplane.Integrations.ListIntegrationsResponse
-	(*DescribeIntegrationRequest)(nil),  // 7: Superplane.Integrations.DescribeIntegrationRequest
-	(*DescribeIntegrationResponse)(nil), // 8: Superplane.Integrations.DescribeIntegrationResponse
-	(*Integration)(nil),                 // 9: Superplane.Integrations.Integration
-	(*IntegrationRef)(nil),              // 10: Superplane.Integrations.IntegrationRef
-	(*ResourceRef)(nil),                 // 11: Superplane.Integrations.ResourceRef
-	(*ValueFrom)(nil),                   // 12: Superplane.Integrations.ValueFrom
-	(*ValueFromSecret)(nil),             // 13: Superplane.Integrations.ValueFromSecret
-	(*Integration_Metadata)(nil),        // 14: Superplane.Integrations.Integration.Metadata
-	(*Integration_Auth)(nil),            // 15: Superplane.Integrations.Integration.Auth
-	(*Integration_Spec)(nil),            // 16: Superplane.Integrations.Integration.Spec
-	(*Integration_Auth_Token)(nil),      // 17: Superplane.Integrations.Integration.Auth.Token
-	(authorization.DomainType)(0),       // 18: Superplane.Authorization.DomainType
-	(*timestamp.Timestamp)(nil),         // 19: google.protobuf.Timestamp
+	(*ListResourcesRequest)(nil),        // 7: Superplane.Integrations.ListResourcesRequest
+	(*ListResourcesResponse)(nil),       // 8: Superplane.Integrations.ListResourcesResponse
+	(*DescribeIntegrationRequest)(nil),  // 9: Superplane.Integrations.DescribeIntegrationRequest
+	(*DescribeIntegrationResponse)(nil), // 10: Superplane.Integrations.DescribeIntegrationResponse
+	(*Integration)(nil),                 // 11: Superplane.Integrations.Integration
+	(*IntegrationRef)(nil),              // 12: Superplane.Integrations.IntegrationRef
+	(*ResourceRef)(nil),                 // 13: Superplane.Integrations.ResourceRef
+	(*ValueFrom)(nil),                   // 14: Superplane.Integrations.ValueFrom
+	(*ValueFromSecret)(nil),             // 15: Superplane.Integrations.ValueFromSecret
+	(*Integration_Metadata)(nil),        // 16: Superplane.Integrations.Integration.Metadata
+	(*Integration_Auth)(nil),            // 17: Superplane.Integrations.Integration.Auth
+	(*Integration_Spec)(nil),            // 18: Superplane.Integrations.Integration.Spec
+	(*Integration_Auth_Token)(nil),      // 19: Superplane.Integrations.Integration.Auth.Token
+	(authorization.DomainType)(0),       // 20: Superplane.Authorization.DomainType
+	(*timestamp.Timestamp)(nil),         // 21: google.protobuf.Timestamp
 }
 var file_integrations_proto_depIdxs = []int32{
-	18, // 0: Superplane.Integrations.CreateIntegrationRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	9,  // 1: Superplane.Integrations.CreateIntegrationRequest.integration:type_name -> Superplane.Integrations.Integration
-	9,  // 2: Superplane.Integrations.CreateIntegrationResponse.integration:type_name -> Superplane.Integrations.Integration
-	18, // 3: Superplane.Integrations.UpdateIntegrationRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	9,  // 4: Superplane.Integrations.UpdateIntegrationRequest.integration:type_name -> Superplane.Integrations.Integration
-	9,  // 5: Superplane.Integrations.UpdateIntegrationResponse.integration:type_name -> Superplane.Integrations.Integration
-	18, // 6: Superplane.Integrations.ListIntegrationsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	9,  // 7: Superplane.Integrations.ListIntegrationsResponse.integrations:type_name -> Superplane.Integrations.Integration
-	18, // 8: Superplane.Integrations.DescribeIntegrationRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	9,  // 9: Superplane.Integrations.DescribeIntegrationResponse.integration:type_name -> Superplane.Integrations.Integration
-	14, // 10: Superplane.Integrations.Integration.metadata:type_name -> Superplane.Integrations.Integration.Metadata
-	16, // 11: Superplane.Integrations.Integration.spec:type_name -> Superplane.Integrations.Integration.Spec
-	18, // 12: Superplane.Integrations.IntegrationRef.domain_type:type_name -> Superplane.Authorization.DomainType
-	13, // 13: Superplane.Integrations.ValueFrom.secret:type_name -> Superplane.Integrations.ValueFromSecret
-	18, // 14: Superplane.Integrations.ValueFromSecret.domain_type:type_name -> Superplane.Authorization.DomainType
-	19, // 15: Superplane.Integrations.Integration.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	18, // 16: Superplane.Integrations.Integration.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
-	0,  // 17: Superplane.Integrations.Integration.Auth.use:type_name -> Superplane.Integrations.Integration.AuthType
-	17, // 18: Superplane.Integrations.Integration.Auth.token:type_name -> Superplane.Integrations.Integration.Auth.Token
-	15, // 19: Superplane.Integrations.Integration.Spec.auth:type_name -> Superplane.Integrations.Integration.Auth
-	12, // 20: Superplane.Integrations.Integration.Auth.Token.value_from:type_name -> Superplane.Integrations.ValueFrom
-	5,  // 21: Superplane.Integrations.Integrations.ListIntegrations:input_type -> Superplane.Integrations.ListIntegrationsRequest
-	7,  // 22: Superplane.Integrations.Integrations.DescribeIntegration:input_type -> Superplane.Integrations.DescribeIntegrationRequest
-	1,  // 23: Superplane.Integrations.Integrations.CreateIntegration:input_type -> Superplane.Integrations.CreateIntegrationRequest
-	3,  // 24: Superplane.Integrations.Integrations.UpdateIntegration:input_type -> Superplane.Integrations.UpdateIntegrationRequest
-	6,  // 25: Superplane.Integrations.Integrations.ListIntegrations:output_type -> Superplane.Integrations.ListIntegrationsResponse
-	8,  // 26: Superplane.Integrations.Integrations.DescribeIntegration:output_type -> Superplane.Integrations.DescribeIntegrationResponse
-	2,  // 27: Superplane.Integrations.Integrations.CreateIntegration:output_type -> Superplane.Integrations.CreateIntegrationResponse
-	4,  // 28: Superplane.Integrations.Integrations.UpdateIntegration:output_type -> Superplane.Integrations.UpdateIntegrationResponse
-	25, // [25:29] is the sub-list for method output_type
-	21, // [21:25] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	20, // 0: Superplane.Integrations.CreateIntegrationRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	11, // 1: Superplane.Integrations.CreateIntegrationRequest.integration:type_name -> Superplane.Integrations.Integration
+	11, // 2: Superplane.Integrations.CreateIntegrationResponse.integration:type_name -> Superplane.Integrations.Integration
+	20, // 3: Superplane.Integrations.UpdateIntegrationRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	11, // 4: Superplane.Integrations.UpdateIntegrationRequest.integration:type_name -> Superplane.Integrations.Integration
+	11, // 5: Superplane.Integrations.UpdateIntegrationResponse.integration:type_name -> Superplane.Integrations.Integration
+	20, // 6: Superplane.Integrations.ListIntegrationsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	11, // 7: Superplane.Integrations.ListIntegrationsResponse.integrations:type_name -> Superplane.Integrations.Integration
+	20, // 8: Superplane.Integrations.ListResourcesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	13, // 9: Superplane.Integrations.ListResourcesResponse.resources:type_name -> Superplane.Integrations.ResourceRef
+	20, // 10: Superplane.Integrations.DescribeIntegrationRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	11, // 11: Superplane.Integrations.DescribeIntegrationResponse.integration:type_name -> Superplane.Integrations.Integration
+	16, // 12: Superplane.Integrations.Integration.metadata:type_name -> Superplane.Integrations.Integration.Metadata
+	18, // 13: Superplane.Integrations.Integration.spec:type_name -> Superplane.Integrations.Integration.Spec
+	20, // 14: Superplane.Integrations.IntegrationRef.domain_type:type_name -> Superplane.Authorization.DomainType
+	15, // 15: Superplane.Integrations.ValueFrom.secret:type_name -> Superplane.Integrations.ValueFromSecret
+	20, // 16: Superplane.Integrations.ValueFromSecret.domain_type:type_name -> Superplane.Authorization.DomainType
+	21, // 17: Superplane.Integrations.Integration.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	20, // 18: Superplane.Integrations.Integration.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
+	0,  // 19: Superplane.Integrations.Integration.Auth.use:type_name -> Superplane.Integrations.Integration.AuthType
+	19, // 20: Superplane.Integrations.Integration.Auth.token:type_name -> Superplane.Integrations.Integration.Auth.Token
+	17, // 21: Superplane.Integrations.Integration.Spec.auth:type_name -> Superplane.Integrations.Integration.Auth
+	14, // 22: Superplane.Integrations.Integration.Auth.Token.value_from:type_name -> Superplane.Integrations.ValueFrom
+	5,  // 23: Superplane.Integrations.Integrations.ListIntegrations:input_type -> Superplane.Integrations.ListIntegrationsRequest
+	7,  // 24: Superplane.Integrations.Integrations.ListResources:input_type -> Superplane.Integrations.ListResourcesRequest
+	9,  // 25: Superplane.Integrations.Integrations.DescribeIntegration:input_type -> Superplane.Integrations.DescribeIntegrationRequest
+	1,  // 26: Superplane.Integrations.Integrations.CreateIntegration:input_type -> Superplane.Integrations.CreateIntegrationRequest
+	3,  // 27: Superplane.Integrations.Integrations.UpdateIntegration:input_type -> Superplane.Integrations.UpdateIntegrationRequest
+	6,  // 28: Superplane.Integrations.Integrations.ListIntegrations:output_type -> Superplane.Integrations.ListIntegrationsResponse
+	8,  // 29: Superplane.Integrations.Integrations.ListResources:output_type -> Superplane.Integrations.ListResourcesResponse
+	10, // 30: Superplane.Integrations.Integrations.DescribeIntegration:output_type -> Superplane.Integrations.DescribeIntegrationResponse
+	2,  // 31: Superplane.Integrations.Integrations.CreateIntegration:output_type -> Superplane.Integrations.CreateIntegrationResponse
+	4,  // 32: Superplane.Integrations.Integrations.UpdateIntegration:output_type -> Superplane.Integrations.UpdateIntegrationResponse
+	28, // [28:33] is the sub-list for method output_type
+	23, // [23:28] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_integrations_proto_init() }
@@ -1162,7 +1291,7 @@ func file_integrations_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_integrations_proto_rawDesc), len(file_integrations_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

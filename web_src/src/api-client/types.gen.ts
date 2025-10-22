@@ -73,13 +73,9 @@ export type ComponentsConfigurationField = {
     description?: string;
     required?: boolean;
     defaultValue?: string;
-    options?: Array<ComponentsFieldOption>;
-    min?: number;
-    max?: number;
-    listItem?: ComponentsListItemDefinition;
-    schema?: Array<ComponentsConfigurationField>;
     label?: string;
     visibilityConditions?: Array<ComponentsVisibilityCondition>;
+    typeOptions?: ComponentsTypeOptions;
 };
 
 export type ComponentsDescribeComponentResponse = {
@@ -97,6 +93,10 @@ export type ComponentsFieldOption = {
     value?: string;
 };
 
+export type ComponentsIntegrationTypeOptions = {
+    type?: string;
+};
+
 export type ComponentsListComponentActionsResponse = {
     actions?: Array<ComponentsComponentAction>;
 };
@@ -108,6 +108,14 @@ export type ComponentsListComponentsResponse = {
 export type ComponentsListItemDefinition = {
     type?: string;
     schema?: Array<ComponentsConfigurationField>;
+};
+
+export type ComponentsListTypeOptions = {
+    itemDefinition?: ComponentsListItemDefinition;
+};
+
+export type ComponentsMultiSelectTypeOptions = {
+    options?: Array<ComponentsFieldOption>;
 };
 
 export type ComponentsNode = {
@@ -126,6 +134,33 @@ export type ComponentsNode = {
 };
 
 export type ComponentsNodeType = 'TYPE_COMPONENT' | 'TYPE_BLUEPRINT' | 'TYPE_TRIGGER';
+
+export type ComponentsNumberTypeOptions = {
+    min?: number;
+    max?: number;
+};
+
+export type ComponentsObjectTypeOptions = {
+    schema?: Array<ComponentsConfigurationField>;
+};
+
+export type ComponentsResourceTypeOptions = {
+    type?: string;
+};
+
+export type ComponentsSelectTypeOptions = {
+    options?: Array<ComponentsFieldOption>;
+};
+
+export type ComponentsTypeOptions = {
+    number?: ComponentsNumberTypeOptions;
+    select?: ComponentsSelectTypeOptions;
+    multiSelect?: ComponentsMultiSelectTypeOptions;
+    integration?: ComponentsIntegrationTypeOptions;
+    list?: ComponentsListTypeOptions;
+    object?: ComponentsObjectTypeOptions;
+    resource?: ComponentsResourceTypeOptions;
+};
 
 export type ComponentsVisibilityCondition = {
     field?: string;
@@ -304,6 +339,10 @@ export type IntegrationsIntegrationSpec = {
 
 export type IntegrationsListIntegrationsResponse = {
     integrations?: Array<IntegrationsIntegration>;
+};
+
+export type IntegrationsListResourcesResponse = {
+    resources?: Array<IntegrationsResourceRef>;
 };
 
 export type IntegrationsResourceRef = {
@@ -2799,6 +2838,37 @@ export type IntegrationsUpdateIntegrationResponses = {
 };
 
 export type IntegrationsUpdateIntegrationResponse2 = IntegrationsUpdateIntegrationResponses[keyof IntegrationsUpdateIntegrationResponses];
+
+export type IntegrationsListResourcesData = {
+    body?: never;
+    path: {
+        idOrName: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+        type?: string;
+    };
+    url: '/api/v1/integrations/{idOrName}/resources';
+};
+
+export type IntegrationsListResourcesErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type IntegrationsListResourcesError = IntegrationsListResourcesErrors[keyof IntegrationsListResourcesErrors];
+
+export type IntegrationsListResourcesResponses = {
+    /**
+     * A successful response.
+     */
+    200: IntegrationsListResourcesResponse;
+};
+
+export type IntegrationsListResourcesResponse2 = IntegrationsListResourcesResponses[keyof IntegrationsListResourcesResponses];
 
 export type MeMeData = {
     body?: never;

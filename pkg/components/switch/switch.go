@@ -52,21 +52,25 @@ func (s *Switch) Configuration() []components.ConfigurationField {
 			Label:    "Branches",
 			Type:     components.FieldTypeList,
 			Required: true,
-			ListItem: &components.ListItemDefinition{
-				Type: components.FieldTypeObject,
-				Schema: []components.ConfigurationField{
-					{
-						Name:     "name",
-						Label:    "Branch Name",
-						Type:     components.FieldTypeString,
-						Required: true,
-					},
-					{
-						Name:        "expression",
-						Label:       "Branch Expression",
-						Type:        components.FieldTypeString,
-						Description: "Boolean expression to evaluate for this branch",
-						Required:    true,
+			TypeOptions: &components.TypeOptions{
+				List: &components.ListTypeOptions{
+					ItemDefinition: &components.ListItemDefinition{
+						Type: components.FieldTypeObject,
+						Schema: []components.ConfigurationField{
+							{
+								Name:     "name",
+								Label:    "Branch Name",
+								Type:     components.FieldTypeString,
+								Required: true,
+							},
+							{
+								Name:        "expression",
+								Label:       "Branch Expression",
+								Type:        components.FieldTypeString,
+								Description: "Boolean expression to evaluate for this branch",
+								Required:    true,
+							},
+						},
 					},
 				},
 			},

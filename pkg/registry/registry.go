@@ -19,8 +19,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/pkg/triggers"
+	ghtrigger "github.com/superplanehq/superplane/pkg/triggers/github"
 	"github.com/superplanehq/superplane/pkg/triggers/manual"
 	"github.com/superplanehq/superplane/pkg/triggers/schedule"
+	semtrigger "github.com/superplanehq/superplane/pkg/triggers/semaphore"
 	"github.com/superplanehq/superplane/pkg/triggers/webhook"
 
 	"github.com/superplanehq/superplane/pkg/components/approval"
@@ -105,6 +107,8 @@ func (r *Registry) Init() {
 	r.Triggers["webhook"] = &webhook.Webhook{}
 	r.Triggers["schedule"] = &schedule.Schedule{}
 	r.Triggers["manual"] = &manual.Manual{}
+	r.Triggers["github"] = &ghtrigger.GitHub{}
+	r.Triggers["semaphore"] = &semtrigger.Semaphore{}
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {

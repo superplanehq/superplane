@@ -7,19 +7,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from '../ui/button'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip'
+import { useIntegrations, useIntegrationResources } from '../../pages/canvas/hooks/useIntegrations'
 
 interface ConfigurationFieldRendererProps {
   field: ComponentsConfigurationField
   value: any
   onChange: (value: any) => void
   allValues?: Record<string, any>
+  domainId?: string
+  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION"
 }
 
 export const ConfigurationFieldRenderer = ({
   field,
   value,
   onChange,
-  allValues = {}
+  allValues = {},
+  domainId,
+  domainType
 }: ConfigurationFieldRendererProps) => {
   // Check visibility conditions
   const isVisible = React.useMemo(() => {
@@ -41,7 +46,14 @@ export const ConfigurationFieldRenderer = ({
         : ''
 
       // Check if the field value matches any of the expected values
-      return condition.values.some((expectedValue) => fieldValueStr === expectedValue)
+      // Support wildcard "*" to match any non-empty value
+      return condition.values.some((expectedValue) => {
+        if (expectedValue === '*') {
+          // Wildcard matches any non-empty value
+          return fieldValueStr !== ''
+        }
+        return fieldValueStr === expectedValue
+      })
     })
   }, [field.visibilityConditions, allValues])
 
@@ -61,6 +73,7 @@ export const ConfigurationFieldRenderer = ({
         )
 
       case 'number':
+        const numberOptions = field.typeOptions?.number
         return (
           <Input
             type="number"
@@ -70,8 +83,8 @@ export const ConfigurationFieldRenderer = ({
               onChange(val)
             }}
             placeholder={`Enter ${field.name}`}
-            min={field.min}
-            max={field.max}
+            min={numberOptions?.min}
+            max={numberOptions?.max}
           />
         )
 
@@ -86,6 +99,7 @@ export const ConfigurationFieldRenderer = ({
         )
 
       case 'select':
+        const selectOptions = field.typeOptions?.select?.options ?? []
         return (
           <Select
             value={value ?? field.defaultValue ?? ''}
@@ -95,7 +109,7 @@ export const ConfigurationFieldRenderer = ({
               <SelectValue placeholder={`Select ${field.label || field.name}`} />
             </SelectTrigger>
             <SelectContent>
-              {field.options?.map((opt) => (
+              {selectOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value ?? ''}>
                   {opt.label}
                 </SelectItem>
@@ -105,6 +119,7 @@ export const ConfigurationFieldRenderer = ({
         )
 
       case 'multi_select':
+        const multiSelectOptions = field.typeOptions?.multiSelect?.options ?? []
         return (
           <select
             multiple
@@ -114,9 +129,9 @@ export const ConfigurationFieldRenderer = ({
               onChange(selected.length > 0 ? selected : undefined)
             }}
             className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100"
-            size={Math.min(field.options?.length ?? 5, 5)}
+            size={Math.min(multiSelectOptions.length ?? 5, 5)}
           >
-            {field.options?.map((opt) => (
+            {multiSelectOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
@@ -142,6 +157,12 @@ export const ConfigurationFieldRenderer = ({
             placeholder="https://example.com"
           />
         )
+
+      case 'integration':
+        return <IntegrationFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} domainType={domainType} />
+
+      case 'integration-resource':
+        return <IntegrationResourceFieldRenderer field={field} value={value} onChange={onChange} allValues={allValues} domainId={domainId} domainType={domainType} />
 
       case 'list':
         return <ListFieldRenderer field={field} value={value} onChange={onChange} />
@@ -184,12 +205,210 @@ export const ConfigurationFieldRenderer = ({
           </Tooltip>
         )}
       </div>
-      {field.min !== undefined && field.max !== undefined && (
+      {field.typeOptions?.number?.min !== undefined && field.typeOptions?.number?.max !== undefined && (
         <p className="text-xs text-gray-500 dark:text-zinc-400 text-left">
-          Range: {field.min} - {field.max}
+          Range: {field.typeOptions.number.min} - {field.typeOptions.number.max}
         </p>
       )}
     </div>
+  )
+}
+
+// Integration field renderer with select dropdown
+const IntegrationFieldRenderer = ({
+  field,
+  value,
+  onChange,
+  domainId,
+  domainType
+}: {
+  field: ComponentsConfigurationField
+  value: string
+  onChange: (value: string | undefined) => void
+  domainId?: string
+  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION"
+}) => {
+  const integrationType = field.typeOptions?.integration?.type
+
+  // Fetch integrations if we have the required context
+  const { data: integrations, isLoading } = useIntegrations(
+    domainId ?? '',
+    domainType ?? 'DOMAIN_TYPE_CANVAS'
+  )
+
+  // Filter integrations by type
+  const filteredIntegrations = React.useMemo(() => {
+    if (!integrations || !integrationType) return []
+    return integrations.filter((integration) => integration.spec?.type === integrationType)
+  }, [integrations, integrationType])
+
+  if (!domainId || !domainType) {
+    return (
+      <div className="text-sm text-red-500 dark:text-red-400">
+        Integration field requires domainId and domainType props
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="text-sm text-gray-500 dark:text-zinc-400">
+        Loading {integrationType} integrations...
+      </div>
+    )
+  }
+
+  if (filteredIntegrations.length === 0) {
+    return (
+      <div className="space-y-2">
+        <Select disabled>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="No integrations available" />
+          </SelectTrigger>
+        </Select>
+        <p className="text-xs text-gray-500 dark:text-zinc-400">
+          No {integrationType} integrations found. Please create one in the settings.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <Select
+      value={value ?? ''}
+      onValueChange={(val) => onChange(val || undefined)}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder={`Select ${integrationType} integration`} />
+      </SelectTrigger>
+      <SelectContent>
+        {filteredIntegrations.map((integration) => (
+          <SelectItem key={integration.metadata?.id} value={integration.metadata?.id ?? ''}>
+            {integration.metadata?.name} ({integration.spec?.type})
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+// Integration resource field renderer with select dropdown for resources
+const IntegrationResourceFieldRenderer = ({
+  field,
+  value,
+  onChange,
+  allValues,
+  domainId,
+  domainType
+}: {
+  field: ComponentsConfigurationField
+  value: string
+  onChange: (value: string | undefined) => void
+  allValues?: Record<string, any>
+  domainId?: string
+  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION"
+}) => {
+  const resourceType = field.typeOptions?.resource?.type
+
+  // Find the integration field by looking at the visibility conditions
+  // The integration field should be referenced in the visibility condition
+  const integrationFieldName = React.useMemo(() => {
+    if (!field.visibilityConditions || field.visibilityConditions.length === 0) {
+      return undefined
+    }
+    // Find the first visibility condition that references a field (should be the integration field)
+    const condition = field.visibilityConditions.find(c => c.field)
+    return condition?.field
+  }, [field.visibilityConditions])
+
+  // Get the selected integration ID from allValues
+  const selectedIntegrationId = integrationFieldName ? allValues?.[integrationFieldName] : undefined
+
+  // Fetch integrations to get the selected integration details
+  const { data: integrations } = useIntegrations(
+    domainId ?? '',
+    domainType ?? 'DOMAIN_TYPE_CANVAS'
+  )
+
+  // Find the selected integration
+  const selectedIntegration = React.useMemo(() => {
+    if (!integrations || !selectedIntegrationId) return null
+    return integrations.find((integration) => integration.metadata?.id === selectedIntegrationId)
+  }, [integrations, selectedIntegrationId])
+
+  // Fetch resources using the hook
+  const { data: resources, isLoading: isLoadingResources, error: resourcesError } = useIntegrationResources(
+    domainId ?? '',
+    domainType ?? 'DOMAIN_TYPE_CANVAS',
+    selectedIntegrationId ?? '',
+    resourceType ?? ''
+  )
+
+  if (!domainId || !domainType) {
+    return (
+      <div className="text-sm text-red-500 dark:text-red-400">
+        Integration resource field requires domainId and domainType props
+      </div>
+    )
+  }
+
+  if (!selectedIntegrationId) {
+    return (
+      <Select disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder={`Select ${resourceType} integration first`} />
+        </SelectTrigger>
+      </Select>
+    )
+  }
+
+  if (isLoadingResources) {
+    return (
+      <div className="text-sm text-gray-500 dark:text-zinc-400">
+        Loading {resourceType} resources...
+      </div>
+    )
+  }
+
+  if (resourcesError) {
+    return (
+      <div className="text-sm text-red-500 dark:text-red-400">
+        Failed to load resources
+      </div>
+    )
+  }
+
+  if (!resources || resources.length === 0) {
+    return (
+      <div className="space-y-2">
+        <Select disabled>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="No resources available" />
+          </SelectTrigger>
+        </Select>
+        <p className="text-xs text-gray-500 dark:text-zinc-400">
+          No {resourceType} resources found in {selectedIntegration?.metadata?.name}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <Select
+      value={value ?? ''}
+      onValueChange={(val) => onChange(val || undefined)}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder={`Select ${resourceType}`} />
+      </SelectTrigger>
+      <SelectContent>
+        {resources.map((resource) => (
+          <SelectItem key={resource.name} value={resource.name}>
+            {resource.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 
@@ -204,11 +423,13 @@ const ListFieldRenderer = ({
   onChange: (value: any) => void
 }) => {
   const items = Array.isArray(value) ? value : []
+  const listOptions = field.typeOptions?.list
+  const itemDefinition = listOptions?.itemDefinition
 
   const addItem = () => {
-    const newItem = field.listItem?.type === 'object'
+    const newItem = itemDefinition?.type === 'object'
       ? {}
-      : field.listItem?.type === 'number'
+      : itemDefinition?.type === 'number'
       ? 0
       : ''
     onChange([...items, newItem])
@@ -230,9 +451,9 @@ const ListFieldRenderer = ({
       {items.map((item, index) => (
         <div key={index} className="flex gap-2 items-center">
           <div className="flex-1">
-            {field.listItem?.type === 'object' && field.listItem.schema ? (
+            {itemDefinition?.type === 'object' && itemDefinition.schema ? (
               <div className="border border-gray-300 dark:border-zinc-700 rounded-md p-4 space-y-4">
-                {field.listItem.schema.map((schemaField) => (
+                {itemDefinition.schema.map((schemaField) => (
                   <ConfigurationFieldRenderer
                     key={schemaField.name}
                     field={schemaField}
@@ -247,10 +468,10 @@ const ListFieldRenderer = ({
               </div>
             ) : (
               <Input
-                type={field.listItem?.type === 'number' ? 'number' : 'text'}
+                type={itemDefinition?.type === 'number' ? 'number' : 'text'}
                 value={item ?? ''}
                 onChange={(e) => {
-                  const val = field.listItem?.type === 'number'
+                  const val = itemDefinition?.type === 'number'
                     ? (e.target.value === '' ? undefined : Number(e.target.value))
                     : e.target.value
                   updateItem(index, val)
@@ -293,6 +514,8 @@ const ObjectFieldRenderer = ({
   const objValue = value ?? {}
   const [isDarkMode, setIsDarkMode] = React.useState(false)
   const [jsonError, setJsonError] = React.useState<string | null>(null)
+  const objectOptions = field.typeOptions?.object
+  const schema = objectOptions?.schema
 
   // Detect dark mode
   React.useEffect(() => {
@@ -311,7 +534,7 @@ const ObjectFieldRenderer = ({
     return () => observer.disconnect()
   }, [])
 
-  if (!field.schema || field.schema.length === 0) {
+  if (!schema || schema.length === 0) {
     // Fallback to Monaco Editor if no schema defined
     const handleEditorChange = (value: string | undefined) => {
       const newValue = value || '{}'
@@ -367,7 +590,7 @@ const ObjectFieldRenderer = ({
 
   return (
     <div className="border border-gray-300 dark:border-zinc-700 rounded-md p-4 space-y-4">
-      {field.schema.map((schemaField) => (
+      {schema.map((schemaField) => (
         <ConfigurationFieldRenderer
           key={schemaField.name}
           field={schemaField}

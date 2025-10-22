@@ -25,13 +25,9 @@ type ComponentsConfigurationField struct {
 	Description *string `json:"description,omitempty"`
 	Required *bool `json:"required,omitempty"`
 	DefaultValue *string `json:"defaultValue,omitempty"`
-	Options []ComponentsFieldOption `json:"options,omitempty"`
-	Min *int32 `json:"min,omitempty"`
-	Max *int32 `json:"max,omitempty"`
-	ListItem *ComponentsListItemDefinition `json:"listItem,omitempty"`
-	Schema []ComponentsConfigurationField `json:"schema,omitempty"`
 	Label *string `json:"label,omitempty"`
 	VisibilityConditions []ComponentsVisibilityCondition `json:"visibilityConditions,omitempty"`
+	TypeOptions *ComponentsTypeOptions `json:"typeOptions,omitempty"`
 }
 
 // NewComponentsConfigurationField instantiates a new ComponentsConfigurationField object
@@ -211,166 +207,6 @@ func (o *ComponentsConfigurationField) SetDefaultValue(v string) {
 	o.DefaultValue = &v
 }
 
-// GetOptions returns the Options field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetOptions() []ComponentsFieldOption {
-	if o == nil || IsNil(o.Options) {
-		var ret []ComponentsFieldOption
-		return ret
-	}
-	return o.Options
-}
-
-// GetOptionsOk returns a tuple with the Options field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetOptionsOk() ([]ComponentsFieldOption, bool) {
-	if o == nil || IsNil(o.Options) {
-		return nil, false
-	}
-	return o.Options, true
-}
-
-// HasOptions returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasOptions() bool {
-	if o != nil && !IsNil(o.Options) {
-		return true
-	}
-
-	return false
-}
-
-// SetOptions gets a reference to the given []ComponentsFieldOption and assigns it to the Options field.
-func (o *ComponentsConfigurationField) SetOptions(v []ComponentsFieldOption) {
-	o.Options = v
-}
-
-// GetMin returns the Min field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetMin() int32 {
-	if o == nil || IsNil(o.Min) {
-		var ret int32
-		return ret
-	}
-	return *o.Min
-}
-
-// GetMinOk returns a tuple with the Min field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetMinOk() (*int32, bool) {
-	if o == nil || IsNil(o.Min) {
-		return nil, false
-	}
-	return o.Min, true
-}
-
-// HasMin returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasMin() bool {
-	if o != nil && !IsNil(o.Min) {
-		return true
-	}
-
-	return false
-}
-
-// SetMin gets a reference to the given int32 and assigns it to the Min field.
-func (o *ComponentsConfigurationField) SetMin(v int32) {
-	o.Min = &v
-}
-
-// GetMax returns the Max field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetMax() int32 {
-	if o == nil || IsNil(o.Max) {
-		var ret int32
-		return ret
-	}
-	return *o.Max
-}
-
-// GetMaxOk returns a tuple with the Max field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetMaxOk() (*int32, bool) {
-	if o == nil || IsNil(o.Max) {
-		return nil, false
-	}
-	return o.Max, true
-}
-
-// HasMax returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasMax() bool {
-	if o != nil && !IsNil(o.Max) {
-		return true
-	}
-
-	return false
-}
-
-// SetMax gets a reference to the given int32 and assigns it to the Max field.
-func (o *ComponentsConfigurationField) SetMax(v int32) {
-	o.Max = &v
-}
-
-// GetListItem returns the ListItem field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetListItem() ComponentsListItemDefinition {
-	if o == nil || IsNil(o.ListItem) {
-		var ret ComponentsListItemDefinition
-		return ret
-	}
-	return *o.ListItem
-}
-
-// GetListItemOk returns a tuple with the ListItem field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetListItemOk() (*ComponentsListItemDefinition, bool) {
-	if o == nil || IsNil(o.ListItem) {
-		return nil, false
-	}
-	return o.ListItem, true
-}
-
-// HasListItem returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasListItem() bool {
-	if o != nil && !IsNil(o.ListItem) {
-		return true
-	}
-
-	return false
-}
-
-// SetListItem gets a reference to the given ComponentsListItemDefinition and assigns it to the ListItem field.
-func (o *ComponentsConfigurationField) SetListItem(v ComponentsListItemDefinition) {
-	o.ListItem = &v
-}
-
-// GetSchema returns the Schema field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetSchema() []ComponentsConfigurationField {
-	if o == nil || IsNil(o.Schema) {
-		var ret []ComponentsConfigurationField
-		return ret
-	}
-	return o.Schema
-}
-
-// GetSchemaOk returns a tuple with the Schema field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetSchemaOk() ([]ComponentsConfigurationField, bool) {
-	if o == nil || IsNil(o.Schema) {
-		return nil, false
-	}
-	return o.Schema, true
-}
-
-// HasSchema returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasSchema() bool {
-	if o != nil && !IsNil(o.Schema) {
-		return true
-	}
-
-	return false
-}
-
-// SetSchema gets a reference to the given []ComponentsConfigurationField and assigns it to the Schema field.
-func (o *ComponentsConfigurationField) SetSchema(v []ComponentsConfigurationField) {
-	o.Schema = v
-}
-
 // GetLabel returns the Label field value if set, zero value otherwise.
 func (o *ComponentsConfigurationField) GetLabel() string {
 	if o == nil || IsNil(o.Label) {
@@ -435,6 +271,38 @@ func (o *ComponentsConfigurationField) SetVisibilityConditions(v []ComponentsVis
 	o.VisibilityConditions = v
 }
 
+// GetTypeOptions returns the TypeOptions field value if set, zero value otherwise.
+func (o *ComponentsConfigurationField) GetTypeOptions() ComponentsTypeOptions {
+	if o == nil || IsNil(o.TypeOptions) {
+		var ret ComponentsTypeOptions
+		return ret
+	}
+	return *o.TypeOptions
+}
+
+// GetTypeOptionsOk returns a tuple with the TypeOptions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsConfigurationField) GetTypeOptionsOk() (*ComponentsTypeOptions, bool) {
+	if o == nil || IsNil(o.TypeOptions) {
+		return nil, false
+	}
+	return o.TypeOptions, true
+}
+
+// HasTypeOptions returns a boolean if a field has been set.
+func (o *ComponentsConfigurationField) HasTypeOptions() bool {
+	if o != nil && !IsNil(o.TypeOptions) {
+		return true
+	}
+
+	return false
+}
+
+// SetTypeOptions gets a reference to the given ComponentsTypeOptions and assigns it to the TypeOptions field.
+func (o *ComponentsConfigurationField) SetTypeOptions(v ComponentsTypeOptions) {
+	o.TypeOptions = &v
+}
+
 func (o ComponentsConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -460,26 +328,14 @@ func (o ComponentsConfigurationField) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.DefaultValue) {
 		toSerialize["defaultValue"] = o.DefaultValue
 	}
-	if !IsNil(o.Options) {
-		toSerialize["options"] = o.Options
-	}
-	if !IsNil(o.Min) {
-		toSerialize["min"] = o.Min
-	}
-	if !IsNil(o.Max) {
-		toSerialize["max"] = o.Max
-	}
-	if !IsNil(o.ListItem) {
-		toSerialize["listItem"] = o.ListItem
-	}
-	if !IsNil(o.Schema) {
-		toSerialize["schema"] = o.Schema
-	}
 	if !IsNil(o.Label) {
 		toSerialize["label"] = o.Label
 	}
 	if !IsNil(o.VisibilityConditions) {
 		toSerialize["visibilityConditions"] = o.VisibilityConditions
+	}
+	if !IsNil(o.TypeOptions) {
+		toSerialize["typeOptions"] = o.TypeOptions
 	}
 	return toSerialize, nil
 }

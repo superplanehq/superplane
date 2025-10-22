@@ -38,6 +38,17 @@ service Integrations {
     };
   }
 
+  rpc ListResources(ListResourcesRequest) returns (ListResourcesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/integrations/{id_or_name}/resources"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integration resources";
+      description: "List integration resources";
+      tags: "Integration";
+    };
+  }
+
   rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
     option (google.api.http) = {
       get: "/api/v1/integrations/{id_or_name}"
@@ -102,6 +113,17 @@ message ListIntegrationsRequest {
 
 message ListIntegrationsResponse {
   repeated Integration integrations = 1;
+}
+
+message ListResourcesRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string id_or_name = 3;
+  string type = 4;
+}
+
+message ListResourcesResponse {
+  repeated ResourceRef resources = 1;
 }
 
 message DescribeIntegrationRequest {

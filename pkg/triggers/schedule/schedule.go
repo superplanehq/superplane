@@ -57,24 +57,32 @@ func (s *Schedule) OutputChannels() []components.OutputChannel {
 func (s *Schedule) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{
-			Name:  "type",
-			Label: "Schedule Type",
-			Type:  components.FieldTypeSelect,
-			Options: []components.FieldOption{
-				{Label: "Hourly", Value: "hourly"},
-				{Label: "Daily", Value: "daily"},
-				{Label: "Weekly", Value: "weekly"},
-			},
+			Name:     "type",
+			Label:    "Schedule Type",
+			Type:     components.FieldTypeSelect,
 			Required: true,
+			TypeOptions: &components.TypeOptions{
+				Select: &components.SelectTypeOptions{
+					Options: []components.FieldOption{
+						{Label: "Hourly", Value: "hourly"},
+						{Label: "Daily", Value: "daily"},
+						{Label: "Weekly", Value: "weekly"},
+					},
+				},
+			},
 		},
 		{
 			Name:  "minute",
 			Label: "Minute of the hour",
 			Type:  components.FieldTypeNumber,
-			Min:   intPtr(0),
-			Max:   intPtr(59),
 			VisibilityConditions: []components.VisibilityCondition{
 				{Field: "type", Values: []string{"hourly"}},
+			},
+			TypeOptions: &components.TypeOptions{
+				Number: &components.NumberTypeOptions{
+					Min: intPtr(0),
+					Max: intPtr(59),
+				},
 			},
 		},
 		{
@@ -93,14 +101,18 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 			VisibilityConditions: []components.VisibilityCondition{
 				{Field: "type", Values: []string{"weekly"}},
 			},
-			Options: []components.FieldOption{
-				{Label: "Monday", Value: "Monday"},
-				{Label: "Tuesday", Value: "Tuesday"},
-				{Label: "Wednesday", Value: "Wednesday"},
-				{Label: "Thursday", Value: "Thursday"},
-				{Label: "Friday", Value: "Friday"},
-				{Label: "Saturday", Value: "Saturday"},
-				{Label: "Sunday", Value: "Sunday"},
+			TypeOptions: &components.TypeOptions{
+				Select: &components.SelectTypeOptions{
+					Options: []components.FieldOption{
+						{Label: "Monday", Value: "Monday"},
+						{Label: "Tuesday", Value: "Tuesday"},
+						{Label: "Wednesday", Value: "Wednesday"},
+						{Label: "Thursday", Value: "Thursday"},
+						{Label: "Friday", Value: "Friday"},
+						{Label: "Saturday", Value: "Saturday"},
+						{Label: "Sunday", Value: "Sunday"},
+					},
+				},
 			},
 		},
 	}

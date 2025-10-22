@@ -128,14 +128,16 @@ type ActionContext struct {
 }
 
 const (
-	FieldTypeString      = "string"
-	FieldTypeNumber      = "number"
-	FieldTypeBool        = "boolean"
-	FieldTypeSelect      = "select"
-	FieldTypeMultiSelect = "multi_select"
-	FieldTypeURL         = "url"
-	FieldTypeList        = "list"
-	FieldTypeObject      = "object"
+	FieldTypeString              = "string"
+	FieldTypeNumber              = "number"
+	FieldTypeBool                = "boolean"
+	FieldTypeSelect              = "select"
+	FieldTypeMultiSelect         = "multi-select"
+	FieldTypeIntegration         = "integration"
+	FieldTypeIntegrationResource = "integration-resource"
+	FieldTypeURL                 = "url"
+	FieldTypeList                = "list"
+	FieldTypeObject              = "object"
 )
 
 type ConfigurationField struct {
@@ -156,6 +158,7 @@ type ConfigurationField struct {
 	 * - boolean
 	 * - select
 	 * - multi_select
+	 * - integration
 	 * - date
 	 * - url
 	 * - list
@@ -173,29 +176,73 @@ type ConfigurationField struct {
 	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
 
 	/*
-	 * Used for select / multi_select types
+	 * Type-specific options for fields.
+	 * The structure depends on the field type.
 	 */
-	Options []FieldOption `json:"options,omitempty"`
+	TypeOptions *TypeOptions `json:"type_options,omitempty"`
+}
 
-	/*
-	 * Used for number type to specify minimum value
-	 */
+/*
+ * TypeOptions contains type-specific configuration for fields.
+ */
+type TypeOptions struct {
+	Number      *NumberTypeOptions      `json:"number,omitempty"`
+	Select      *SelectTypeOptions      `json:"select,omitempty"`
+	MultiSelect *MultiSelectTypeOptions `json:"multi_select,omitempty"`
+	Integration *IntegrationTypeOptions `json:"integration,omitempty"`
+	Resource    *ResourceTypeOptions    `json:"resource,omitempty"`
+	List        *ListTypeOptions        `json:"list,omitempty"`
+	Object      *ObjectTypeOptions      `json:"object,omitempty"`
+}
+
+/*
+ * ResourceTypeOptions specifies which resource type to display
+ */
+type ResourceTypeOptions struct {
+	Type string `json:"type"`
+}
+
+/*
+ * NumberTypeOptions specifies constraints for number fields
+ */
+type NumberTypeOptions struct {
 	Min *int `json:"min,omitempty"`
-
-	/*
-	 * Used for number type to specify maximum value
-	 */
 	Max *int `json:"max,omitempty"`
+}
 
-	/*
-	 * Defines structures of items on a 'list' type.
-	 */
-	ListItem *ListItemDefinition `json:"list_item,omitempty"`
+/*
+ * SelectTypeOptions specifies options for select fields
+ */
+type SelectTypeOptions struct {
+	Options []FieldOption `json:"options"`
+}
 
-	/*
-	 * Schema allows us to define nested object structures for 'object' type.
-	 */
-	Schema []ConfigurationField `json:"schema,omitempty"`
+/*
+ * MultiSelectTypeOptions specifies options for multi_select fields
+ */
+type MultiSelectTypeOptions struct {
+	Options []FieldOption `json:"options"`
+}
+
+/*
+ * IntegrationTypeOptions specifies which integration type to display
+ */
+type IntegrationTypeOptions struct {
+	Type string `json:"type"`
+}
+
+/*
+ * ListTypeOptions defines the structure of list items
+ */
+type ListTypeOptions struct {
+	ItemDefinition *ListItemDefinition `json:"item_definition"`
+}
+
+/*
+ * ObjectTypeOptions defines the schema for object fields
+ */
+type ObjectTypeOptions struct {
+	Schema []ConfigurationField `json:"schema"`
 }
 
 /*

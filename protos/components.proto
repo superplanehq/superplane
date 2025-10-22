@@ -87,13 +87,48 @@ message ConfigurationField {
   string description = 3;
   bool required = 4;
   optional string default_value = 5;
-  repeated FieldOption options = 6;
-  optional int32 min = 7;
-  optional int32 max = 8;
-  optional ListItemDefinition list_item = 9;
-  repeated ConfigurationField schema = 10;
   string label = 11;
   repeated VisibilityCondition visibility_conditions = 12;
+  optional TypeOptions type_options = 13;
+}
+
+message TypeOptions {
+  optional NumberTypeOptions number = 1;
+  optional SelectTypeOptions select = 2;
+  optional MultiSelectTypeOptions multi_select = 3;
+  optional IntegrationTypeOptions integration = 4;
+  optional ListTypeOptions list = 5;
+  optional ObjectTypeOptions object = 6;
+  optional ResourceTypeOptions resource = 7;
+}
+
+message NumberTypeOptions {
+  optional int32 min = 1;
+  optional int32 max = 2;
+}
+
+message SelectTypeOptions {
+  repeated FieldOption options = 1;
+}
+
+message MultiSelectTypeOptions {
+  repeated FieldOption options = 1;
+}
+
+message IntegrationTypeOptions {
+  string type = 1;
+}
+
+message ResourceTypeOptions {
+  string type = 1;
+}
+
+message ListTypeOptions {
+  ListItemDefinition item_definition = 1;
+}
+
+message ObjectTypeOptions {
+  repeated ConfigurationField schema = 1;
 }
 
 message FieldOption {
