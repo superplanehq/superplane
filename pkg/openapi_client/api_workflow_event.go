@@ -39,7 +39,7 @@ func (r ApiWorkflowsListEventExecutionsRequest) Execute() (*WorkflowsListEventEx
 /*
 WorkflowsListEventExecutions List event executions
 
-Returns a list of all node executions triggered by a specific initial event
+Returns a list of all node executions triggered by a specific root event
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param workflowId
@@ -165,7 +165,7 @@ func (r ApiWorkflowsListWorkflowEventsRequest) Execute() (*WorkflowsListWorkflow
 /*
 WorkflowsListWorkflowEvents List workflow events
 
-Returns a list of initial events that triggered executions in a workflow
+Returns a list of root events that triggered executions in a workflow
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param workflowId

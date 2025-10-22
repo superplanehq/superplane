@@ -3328,7 +3328,7 @@
     "/api/v1/workflows/{workflowId}/events": {
       "get": {
         "summary": "List workflow events",
-        "description": "Returns a list of initial events that triggered executions in a workflow",
+        "description": "Returns a list of root events that triggered executions in a workflow",
         "operationId": "Workflows_ListWorkflowEvents",
         "responses": {
           "200": {
@@ -3374,7 +3374,7 @@
     "/api/v1/workflows/{workflowId}/events/{eventId}/executions": {
       "get": {
         "summary": "List event executions",
-        "description": "Returns a list of all node executions triggered by a specific initial event",
+        "description": "Returns a list of all node executions triggered by a specific root event",
         "operationId": "Workflows_ListEventExecutions",
         "responses": {
           "200": {
@@ -3508,6 +3508,56 @@
       }
     },
     "/api/v1/workflows/{workflowId}/nodes/{nodeId}/events": {
+      "get": {
+        "summary": "List node events",
+        "description": "Returns a list of events for a specific workflow node",
+        "operationId": "Workflows_ListNodeEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/WorkflowsListNodeEventsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workflowId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "WorkflowNode"
+        ]
+      },
       "post": {
         "summary": "Emit output event for workflow node",
         "description": "Emit output event for workflow node",
@@ -6653,6 +6703,29 @@
             "type": "object",
             "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
           }
+        }
+      }
+    },
+    "WorkflowsListNodeEventsResponse": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowEvent"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
