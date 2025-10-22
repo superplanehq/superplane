@@ -49,8 +49,7 @@ const getResultBadge = (result: string) => {
 
 registerExecutionRenderer('http', {
   renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
-    const metadata = execution.metadata || {}
-    const configuration = metadata.configuration as HTTPConfiguration | undefined
+    const configuration = execution.configuration as HTTPConfiguration | undefined
     const response = (execution.outputs?.default as HTTPResponse[] | undefined)?.[0]
     const method = configuration?.method
     const url = configuration?.url
@@ -115,8 +114,7 @@ registerExecutionRenderer('http', {
   },
 
   renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
-    const metadata = execution.metadata || {}
-    const configuration = metadata.configuration as HTTPConfiguration | undefined
+    const configuration = execution.configuration as HTTPConfiguration | undefined
     const method = configuration?.method || 'GET'
     const url = configuration?.url || ''
     const payload = configuration?.payload || {}

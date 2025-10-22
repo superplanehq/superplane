@@ -53,8 +53,7 @@ registerExecutionRenderer('filter', {
   },
 
   renderExpanded: ({ execution, isDarkMode }: ExpandedViewProps) => {
-    const metadata = execution.metadata || {}
-    const configuration = metadata.configuration as FilterConfiguration | undefined
+    const configuration = execution.configuration as FilterConfiguration | undefined
     const filterExpression = configuration?.expression
 
     return (

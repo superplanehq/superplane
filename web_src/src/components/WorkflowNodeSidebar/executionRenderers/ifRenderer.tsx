@@ -14,8 +14,7 @@ registerExecutionRenderer('if', {
     const outputs = execution.outputs
     const isFailed = execution.result === 'RESULT_FAILED'
 
-    const metadata = execution.metadata || {}
-    const configuration = metadata.configuration as IfConfiguration | undefined
+    const configuration = execution.configuration as IfConfiguration | undefined
     const conditionExpression = configuration?.expression || 'No expression'
 
     const trueChannel = outputs?.true as any[] | undefined
