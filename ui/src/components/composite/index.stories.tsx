@@ -14,7 +14,22 @@ const DeployToEu: CompositeProps = {
     title: "fix: open rejected events",
     subtitle: "ef758d40",
     receivedAt: new Date(),
-    childEvents: [],
+    childEventsInfo: {
+      count: 2,
+      state: "running",
+      waitingInfos: [
+        {
+          icon: "calendar",
+          info: "Wait if it's weekend",
+          futureTimeDate: new Date(new Date().getTime() + 200000000),
+        },
+        {
+          icon: "calendar",
+          info: "Haloween Holiday",
+          futureTimeDate: new Date(new Date().getTime() + 300000000),
+        },
+      ],
+    },
     state: "running",
     values: {
       "Author": "Bart Willems",

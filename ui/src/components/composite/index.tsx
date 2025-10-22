@@ -3,14 +3,18 @@ import * as LucideIcons from "lucide-react"
 import React from "react";
 
 type LastRunState = "success" | "failed" | "running"
-type ChildEventState = "processed" | "discarded" | "waiting"
+type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
 
-interface ChildEvent {
-  title: string;
-  subtitle: string;
-  state: ChildEventState;
-  stateReason: string;
-  stateIcon: string;
+interface WaitingInfo {
+  icon: string;
+  info: string;
+  futureTimeDate: Date;
+}
+
+interface ChildEventsInfo {
+  count: number;
+  state?: ChildEventsState;
+  waitingInfos: WaitingInfo[];
 }
 
 interface QueueItem {
@@ -20,7 +24,7 @@ interface QueueItem {
 }
 
 interface LastRunItem extends QueueItem {
-  childEvents: ChildEvent[];
+  childEventsInfo?: ChildEventsInfo;
   state: LastRunState;
   values: Record<string, string>;
 }
@@ -37,9 +41,12 @@ export interface CompositeProps {
   nextInQueue?: QueueItem;
   collapsedBackground?: string;
   collapsed?: boolean;
+
+  onExpandChildEvents?: () => void;
+  onReRunChildEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, headerColor, title, description, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, headerColor, title, description, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents }) => {
   const [showLastRunValues, setShowLastRunValues] = React.useState(false)
 
   const resolveIcon = React.useCallback((slug?: string): LucideIcon => {
@@ -65,9 +72,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
     return BookMarked
   }, [])
 
-  const timeAgo = React.useMemo(() => {
-    const now = new Date()
-    const diff = now.getTime() - lastRunItem.receivedAt.getTime()
+  const calcRelativeTimeFromDiff = (diff: number) => {
     const seconds = Math.floor(diff / 1000)
     const minutes = Math.floor(seconds / 60)
     const hours = Math.floor(minutes / 60)
@@ -81,6 +86,12 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
     } else {
       return `${seconds}s`
     }
+  }
+
+  const timeAgo = React.useMemo(() => {
+    const now = new Date()
+    const diff = now.getTime() - lastRunItem.receivedAt.getTime()
+    return calcRelativeTimeFromDiff(diff)
   }, [lastRunItem])
 
   const LastRunIcon = React.useMemo(() => {
@@ -141,6 +152,10 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
     return resolveIcon(parametersIcon)
   }, [parametersIcon])
 
+  const ChildEventsArrowIcon = React.useMemo(() => {
+    return resolveIcon("corner-down-right")
+  }, [])
+
   if (collapsed) {
     return (
       <div className="flex w-fit flex-col items-center">
@@ -151,6 +166,14 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
       </div>
     )
   }
+
+  const ExpandChildEventsIcon = React.useMemo(() => {
+    return resolveIcon("expand")
+  }, [])
+
+  const ReRunChildEventsIcon = React.useMemo(() => {
+    return resolveIcon("rotate-ccw")
+  }, [])
 
   return (
     <div className="flex flex-col border border-border rounded-md w-[26rem]" >
@@ -173,7 +196,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
         </div>
       }
 
-      <div className="px-4 pt-3 pb-6 border-b">
+      <div className="px-4 py-3 border-b">
         <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
           <span className="uppercase text-sm font-medium">Last Run</span>
           <span className="text-sm">{timeAgo}</span>
@@ -188,7 +211,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
               <span className="truncate text-sm">{lastRunItem.title}</span>
             </div>
             {lastRunItem.subtitle && (
-              <span className="text-sm no-wrap whitespace-nowrap w-[20%]">{lastRunItem.subtitle}</span>
+              <span className="text-sm text-gray-500 no-wrap whitespace-nowrap w-[20%]">{lastRunItem.subtitle}</span>
             )}
           </div>
           {showLastRunValues && (
@@ -202,6 +225,39 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
             </div>
           )}
         </div>
+        {lastRunItem.childEventsInfo && (
+          <div className="mt-3 ml-3 text-gray-500">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 w-full">
+                <ChildEventsArrowIcon size={18} className="text-gray-500" />
+                <span className="text-sm">{lastRunItem.childEventsInfo.count} child event{lastRunItem.childEventsInfo.count === 1 ? "" : "s"} {lastRunItem.childEventsInfo.state || ""}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ExpandChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onExpandChildEvents} />
+                <ReRunChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onReRunChildEvents} />
+              </div>
+            </div>
+            {lastRunItem.childEventsInfo.waitingInfos && (
+              <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
+                {lastRunItem.childEventsInfo.waitingInfos.map((waitingInfo) => {
+                  const Icon = resolveIcon(waitingInfo.icon)
+                  return (
+                    <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
+                      <span className="text-sm text-right flex items-center gap-2">
+                        <Icon size={18} className="text-gray-500" />
+                        {waitingInfo.info}
+                      </span>
+                      <span className="text-sm">
+                        {calcRelativeTimeFromDiff(waitingInfo.futureTimeDate.getTime() - new Date().getTime())}
+                        &nbsp;left
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="px-4 pt-3 pb-6">
