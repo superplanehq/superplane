@@ -50,7 +50,10 @@ function LeftHandle({ data }: BlockProps) {
     <Handle
       type="target"
       position={Position.Left}
-      style={{ ...HANDLE_STYLE, left: -10 }}
+      style={{
+        ...HANDLE_STYLE,
+        left: -10,
+      }}
     />
   );
 }
@@ -60,7 +63,10 @@ function RightHandle(_props: BlockProps) {
     <Handle
       type="source"
       position={Position.Right}
-      style={{ ...HANDLE_STYLE, right: -10 }}
+      style={{
+        ...HANDLE_STYLE,
+        right: -10,
+      }}
     />
   );
 }
