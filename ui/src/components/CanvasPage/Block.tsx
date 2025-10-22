@@ -1,7 +1,7 @@
-import "reactflow/dist/style.css";
+// No global CSS import here; keep node rendering isolated from library defaults.
 
 import { Trigger, type TriggerProps } from "@/components/trigger";
-import { Handle, Position } from "reactflow";
+import { Handle, Position } from "@xyflow/react";
 
 type BlockState = "pending" | "working";
 type BlockType = "trigger" | "composite";

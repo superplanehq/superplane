@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { Edge, Node } from "reactflow";
+import type { Edge, Node } from "@xyflow/react";
 
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { useCallback, useState } from "react";
-import { applyNodeChanges, type NodeChange } from "reactflow";
+import { applyNodeChanges, type NodeChange } from "@xyflow/react";
 import { CanvasPage } from "./index";
 
 const meta = {
