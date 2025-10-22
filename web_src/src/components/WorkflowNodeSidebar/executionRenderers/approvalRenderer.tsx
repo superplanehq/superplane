@@ -12,6 +12,16 @@ import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import { showSuccessToast, showErrorToast } from '../../../utils/toast'
 import { formatTimeAgo } from '../../../utils/date'
 
+interface ApprovalRecord {
+  approved_at?: string
+  comment?: string
+}
+
+interface ApprovalMetadata {
+  required_count?: number
+  approvals?: ApprovalRecord[]
+}
+
 const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId: string }) => {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
@@ -186,10 +196,9 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
   )
 }
 
-// Custom renderer for Approval component executions
 registerExecutionRenderer('approval', {
   renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
-    const metadata = execution.metadata || {}
+    const metadata = (execution.metadata || {}) as ApprovalMetadata
     const requiredCount = metadata.required_count || 0
     const approvals = metadata.approvals || []
     const isComplete = approvals.length >= requiredCount
@@ -247,7 +256,7 @@ registerExecutionRenderer('approval', {
   },
 
   renderExpanded: ({ execution, workflowId }: ExpandedViewProps) => {
-    const metadata = execution.metadata || {}
+    const metadata = (execution.metadata || {}) as ApprovalMetadata
     const approvals = metadata.approvals || []
 
     return (
@@ -276,7 +285,7 @@ registerExecutionRenderer('approval', {
               Approvals ({approvals.length})
             </div>
             <div className="space-y-2">
-              {approvals.map((approval: any, index: number) => (
+              {approvals.map((approval, index) => (
                 <div
                   key={index}
                   className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3 text-xs"
