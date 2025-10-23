@@ -44,7 +44,7 @@ import {
   WorkflowSwitchNode,
   WorkflowApprovalNode,
   WorkflowDefaultNode,
-  WorkflowManualTriggerNode,
+  WorkflowStartTriggerNode,
   WorkflowScheduledTriggerNode,
   WorkflowWebhookTriggerNode,
   WorkflowGithubTriggerNode,
@@ -58,7 +58,7 @@ const nodeTypes: NodeTypes = {
   filter: WorkflowFilterNode,
   switch: WorkflowSwitchNode,
   approval: WorkflowApprovalNode,
-  manual: WorkflowManualTriggerNode,
+  start: WorkflowStartTriggerNode,
   schedule: WorkflowScheduledTriggerNode,
   webhook: WorkflowWebhookTriggerNode,
   github: WorkflowGithubTriggerNode,
@@ -518,7 +518,7 @@ export const Workflow = () => {
                       const iconMap: Record<string, string> = {
                         webhook: 'webhook',
                         schedule: 'schedule',
-                        manual: 'play_circle',
+                        start: 'play_circle',
                       }
                       const icon = iconMap[block.name] || 'bolt'
 

@@ -1,0 +1,111 @@
+package workers
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"golang.org/x/sync/semaphore"
+	"gorm.io/gorm"
+
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
+)
+
+type WebhookCleanupWorker struct {
+	semaphore *semaphore.Weighted
+	registry  *registry.Registry
+}
+
+func NewWebhookCleanupWorker(registry *registry.Registry) *WebhookCleanupWorker {
+	return &WebhookCleanupWorker{
+		registry:  registry,
+		semaphore: semaphore.NewWeighted(25),
+	}
+}
+
+func (w *WebhookCleanupWorker) Start(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			webhooks, err := models.ListDeletedWebhooks()
+			if err != nil {
+				w.log("Error finding workflow nodes ready to be processed: %v", err)
+			}
+
+			w.log("Found %d deleted webhooks", len(webhooks))
+
+			for _, webhook := range webhooks {
+				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+					w.log("Error acquiring semaphore: %v", err)
+					continue
+				}
+
+				go func(webhook models.Webhook) {
+					defer w.semaphore.Release(1)
+
+					if err := w.LockAndProcessWebhook(webhook); err != nil {
+						w.log("Error processing webhook %s: %v", webhook.ID, err)
+					}
+				}(webhook)
+			}
+		}
+	}
+}
+
+func (w *WebhookCleanupWorker) LockAndProcessWebhook(webhook models.Webhook) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		r, err := models.LockWebhook(tx, webhook.ID)
+		if err != nil {
+			w.log("Webhook %s already being processed - skipping", webhook.ID)
+			return nil
+		}
+
+		w.log("Processing webhook %s", webhook.ID)
+		return w.processWebhook(tx, r)
+	})
+}
+
+func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, webhook *models.Webhook) error {
+	if webhook.IntegrationID == nil {
+		return tx.Unscoped().Delete(webhook).Error
+	}
+
+	integration, err := models.FindIntegrationByIDInTransaction(tx, *webhook.IntegrationID)
+	if err != nil {
+		return err
+	}
+
+	resourceManager, err := w.registry.NewResourceManager(context.Background(), integration)
+	if err != nil {
+		return err
+	}
+
+	resource, err := resourceManager.Get(webhook.ResourceType, webhook.ResourceID)
+	if err != nil {
+		return err
+	}
+
+	err = resourceManager.CleanupWebhookV2(integrations.WebhookOptionsV2{
+		Resource:      resource,
+		Configuration: webhook.Configuration.Data(),
+		Metadata:      webhook.Metadata.Data(),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Unscoped().Delete(webhook).Error
+}
+
+func (w *WebhookCleanupWorker) log(format string, v ...any) {
+	log.Printf("[WebhookCleanupWorker] "+format, v...)
+}

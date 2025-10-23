@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FuNbNe0F7Fk1HwRT2kXLM4swY0ljPaP0Mzu09dHoyicgOAgZZWNKMYzKhCdlBjF
+\restrict 8du3CBGktb6PVIe1bVu9hFub4JgydjhhsCPoynOVR35Q02jMPy2PmNxK6TKX2kD
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -544,7 +544,8 @@ CREATE TABLE public.webhooks (
     resource_type character varying(64) NOT NULL,
     resource_id character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    deleted_at timestamp without time zone
 );
 
 
@@ -1237,6 +1238,13 @@ CREATE INDEX idx_stages_deleted_at ON public.stages USING btree (deleted_at);
 
 
 --
+-- Name: idx_webhooks_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at);
+
+
+--
 -- Name: idx_workflow_events_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1619,13 +1627,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FuNbNe0F7Fk1HwRT2kXLM4swY0ljPaP0Mzu09dHoyicgOAgZZWNKMYzKhCdlBjF
+\unrestrict 8du3CBGktb6PVIe1bVu9hFub4JgydjhhsCPoynOVR35Q02jMPy2PmNxK6TKX2kD
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict DGcJIGXU7sk3gtjEEbhlLOqdTudXAE5HkxH7ocdKPJeN6njMsJOOKgQMRhZIUcs
+\restrict HgBBgeacNYxFFxPnd1YbhnqJ3TUsNxJPPeNigWL8hJQFIYZ1hwdhSjZOI1KADt0
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1655,5 +1663,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict DGcJIGXU7sk3gtjEEbhlLOqdTudXAE5HkxH7ocdKPJeN6njMsJOOKgQMRhZIUcs
+\unrestrict HgBBgeacNYxFFxPnd1YbhnqJ3TUsNxJPPeNigWL8hJQFIYZ1hwdhSjZOI1KADt0
 

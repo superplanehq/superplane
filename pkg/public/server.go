@@ -771,11 +771,12 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 		return http.StatusInternalServerError, fmt.Errorf("trigger not found: %w", err)
 	}
 
+	tx := database.Conn()
 	return trigger.HandleWebhook(triggers.WebhookRequestContext{
 		Body:           body,
 		Headers:        headers,
-		WebhookContext: contexts.NewWebhookContext(database.Conn(), ctx, s.encryptor, &node),
-		EventContext:   contexts.NewEventContext(database.Conn(), &node),
+		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
+		EventContext:   contexts.NewEventContext(tx, &node),
 	})
 }
 

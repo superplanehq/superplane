@@ -2,13 +2,13 @@ import { memo } from 'react'
 import { Handle, Position, NodeProps, Node } from '@xyflow/react'
 import { MaterialSymbol } from '../../../../components/MaterialSymbol/material-symbol'
 
-type ManualTriggerNodeData = Node<{
+type StartTriggerNodeData = Node<{
   label?: string
   channels?: string[]
   configuration?: Record<string, any>
 }>
 
-export const ManualTriggerNode = memo(({ data }: NodeProps<ManualTriggerNodeData>) => {
+export const StartTriggerNode = memo(({ data }: NodeProps<StartTriggerNodeData>) => {
   const channels = (data.channels as string[]) || ['default']
   const channel = channels[0]
 
@@ -24,11 +24,6 @@ export const ManualTriggerNode = memo(({ data }: NodeProps<ManualTriggerNodeData
         </div>
       </div>
 
-      {/* Info text */}
-      <div className="px-4 py-2 border-t border-purple-200 dark:border-purple-700/50 text-xs text-purple-600 dark:text-purple-400 text-left">
-        Manual trigger - click to emit
-      </div>
-
       {/* Output handle - centered on right edge */}
       <Handle
         type="source"
@@ -40,4 +35,4 @@ export const ManualTriggerNode = memo(({ data }: NodeProps<ManualTriggerNodeData
   )
 })
 
-ManualTriggerNode.displayName = 'ManualTriggerNode'
+StartTriggerNode.displayName = 'StartTriggerNode'

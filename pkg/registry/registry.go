@@ -20,10 +20,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/pkg/triggers"
 	ghtrigger "github.com/superplanehq/superplane/pkg/triggers/github"
-	"github.com/superplanehq/superplane/pkg/triggers/manual"
 	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	semtrigger "github.com/superplanehq/superplane/pkg/triggers/semaphore"
-	"github.com/superplanehq/superplane/pkg/triggers/webhook"
+	start "github.com/superplanehq/superplane/pkg/triggers/start"
 
 	"github.com/superplanehq/superplane/pkg/components/approval"
 	"github.com/superplanehq/superplane/pkg/components/filter"
@@ -102,9 +101,8 @@ func (r *Registry) Init() {
 	//
 	// Register the triggers
 	//
-	r.Triggers["webhook"] = &webhook.Webhook{}
 	r.Triggers["schedule"] = &schedule.Schedule{}
-	r.Triggers["manual"] = &manual.Manual{}
+	r.Triggers["start"] = &start.Start{}
 	r.Triggers["github"] = &ghtrigger.GitHub{}
 	r.Triggers["semaphore"] = &semtrigger.Semaphore{}
 }

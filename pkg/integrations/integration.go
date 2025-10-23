@@ -79,7 +79,13 @@ type ResourceManager interface {
 	// `any` type is used because the configuration and the metadata
 	// are integration-specific.
 	//
-	SetupWebhookV2(configuration WebhookOptionsV2) (any, error)
+	SetupWebhookV2(options WebhookOptionsV2) (any, error)
+
+	//
+	// Clean up a webhook for an integration resource.
+	// Used when a stage's integration or resource changes to clean up the old webhook.
+	//
+	CleanupWebhookV2(options WebhookOptionsV2) error
 }
 
 type WebhookOptionsV2 struct {
@@ -88,6 +94,7 @@ type WebhookOptionsV2 struct {
 	URL           string
 	Secret        []byte
 	Configuration any
+	Metadata      any
 }
 
 type Executor interface {

@@ -26,6 +26,7 @@ type Webhook struct {
 	ResourceID    string
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
 }
 
 func (w *Webhook) Ready(tx *gorm.DB) error {
@@ -84,10 +85,24 @@ func ListPendingWebhooks() ([]Webhook, error) {
 	return webhooks, nil
 }
 
+func ListDeletedWebhooks() ([]Webhook, error) {
+	var webhooks []Webhook
+	err := database.Conn().Unscoped().
+		Where("deleted_at IS NOT NULL").
+		Find(&webhooks).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return webhooks, nil
+}
+
 func LockWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
 	var webhook Webhook
 
-	err := tx.
+	err := tx.Unscoped().
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", ID).
 		First(&webhook).

@@ -48,6 +48,7 @@ services:
       START_WORKFLOW_NODE_QUEUE_WORKER: "yes"
       START_NODE_REQUEST_WORKER: "yes"
       START_WEBHOOK_PROVISIONER: "yes"
+      START_WEBHOOK_CLEANUP_WORKER: "yes"
       WEB_BASE_PATH: ""
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv

@@ -161,7 +161,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
 		IntegrationContext: contexts.NewIntegrationContext(registry),
 		EventContext:       contexts.NewEventContext(tx, &node),
-		WebhookContext:     contexts.NewWebhookContext(tx, ctx, encryptor, &node),
+		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node),
 	})
 
 	if err != nil {
@@ -175,6 +175,20 @@ func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []mo
 	for _, existingNode := range existingNodes {
 		if !slices.ContainsFunc(newNodes, func(n models.Node) bool { return n.ID == existingNode.NodeID }) {
 			err := models.DeleteWorkflowNode(tx, workflowID, existingNode.NodeID)
+			if err != nil {
+				return err
+			}
+
+			if existingNode.WebhookID == nil {
+				continue
+			}
+
+			webhook, err := models.FindWebhook(*existingNode.WebhookID)
+			if err != nil {
+				return err
+			}
+
+			err = tx.Delete(&webhook).Error
 			if err != nil {
 				return err
 			}

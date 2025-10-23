@@ -216,6 +216,26 @@ func (i *GitHubResourceManager) CleanupWebhook(parentResource integrations.Resou
 	return nil
 }
 
+func (i *GitHubResourceManager) CleanupWebhookV2(options integrations.WebhookOptionsV2) error {
+	webhook := &Webhook{}
+	err := mapstructure.Decode(options.Metadata, &webhook)
+	if err != nil {
+		return fmt.Errorf("error decoding webhook metadata: %v", err)
+	}
+
+	hookID, err := strconv.ParseInt(webhook.Id(), 10, 64)
+	if err != nil {
+		return fmt.Errorf("error parsing webhook ID: %v", err)
+	}
+
+	_, err = i.client.Repositories.DeleteHook(context.Background(), i.Owner, options.Resource.Name(), hookID)
+	if err != nil {
+		return fmt.Errorf("error deleting webhook: %v", err)
+	}
+
+	return nil
+}
+
 func (i *GitHubResourceManager) Get(resourceType, id string) (integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeRepository:

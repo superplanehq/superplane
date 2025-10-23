@@ -34,9 +34,9 @@ type Metadata struct {
 
 type Configuration struct {
 	Type    string  `json:"type"`
-	Minute  *int    `json:"minute"`   // 0-59
-	Time    *string `json:"time"`     // Format: "HH:MM" UTC
-	WeekDay *string `json:"week_day"` // Monday, Tuesday, etc.
+	Minute  *int    `json:"minute"`  // 0-59
+	Time    *string `json:"time"`    // Format: "HH:MM" UTC
+	WeekDay *string `json:"weekDay"` // Monday, Tuesday, etc.
 }
 
 func (s *Schedule) Name() string {
@@ -87,7 +87,7 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 			},
 		},
 		{
-			Name:  "week_day",
+			Name:  "weekDay",
 			Label: "Day of the week",
 			Type:  components.FieldTypeSelect,
 			VisibilityConditions: []components.VisibilityCondition{

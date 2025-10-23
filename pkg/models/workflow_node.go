@@ -127,10 +127,10 @@ func (w *WorkflowNode) FirstQueueItem(tx *gorm.DB) (*WorkflowNodeQueueItem, erro
 	return &queueItem, nil
 }
 
-func (e *WorkflowNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
+func (w *WorkflowNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecutionRequestSpec, runAt *time.Time) error {
 	return tx.Create(&WorkflowNodeRequest{
-		WorkflowID: e.WorkflowID,
-		NodeID:     e.NodeID,
+		WorkflowID: w.WorkflowID,
+		NodeID:     w.NodeID,
 		ID:         uuid.New(),
 		State:      NodeExecutionRequestStatePending,
 		Type:       reqType,

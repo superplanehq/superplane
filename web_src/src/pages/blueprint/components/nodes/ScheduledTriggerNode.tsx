@@ -19,7 +19,7 @@ export const ScheduledTriggerNode = memo(({ data }: NodeProps<ScheduledTriggerNo
   const scheduleType = config?.type as string | undefined
   const minute = config?.minute as number | undefined
   const time = config?.time as string | undefined
-  const weekDay = config?.week_day as string | undefined
+  const weekDay = config?.weekDay as string | undefined
   const nextTrigger = metadata?.nextTrigger as string | undefined
 
   // Format the schedule description

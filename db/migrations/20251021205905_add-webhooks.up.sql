@@ -11,6 +11,7 @@ CREATE TABLE webhooks (
   resource_id    CHARACTER VARYING(128) NOT NULL,
   created_at     TIMESTAMP NOT NULL,
   updated_at     TIMESTAMP NOT NULL,
+  deleted_at     TIMESTAMP,
 
   PRIMARY KEY (id),
   FOREIGN KEY (integration_id) REFERENCES integrations(id)
@@ -19,5 +20,7 @@ CREATE TABLE webhooks (
 ALTER TABLE workflow_nodes
   ADD COLUMN webhook_id uuid,
   ADD FOREIGN KEY (webhook_id) REFERENCES webhooks(id);
+
+CREATE INDEX idx_webhooks_deleted_at ON webhooks(deleted_at);
 
 commit;

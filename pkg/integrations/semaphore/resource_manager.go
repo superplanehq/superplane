@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
@@ -829,6 +830,31 @@ func (i *SemaphoreResourceManager) CleanupWebhook(parentResource integrations.Re
 		if err != nil {
 			return fmt.Errorf("error deleting secret: %v", err)
 		}
+	}
+
+	return nil
+}
+
+func (i *SemaphoreResourceManager) CleanupWebhookV2(options integrations.WebhookOptionsV2) error {
+	metadata := WebhookMetadata{}
+	err := mapstructure.Decode(options.Metadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("error decoding webhook metadata: %v", err)
+	}
+
+	// Delete notification
+	notificationURL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", i.URL, metadata.Notification.ID)
+	_, err = i.execRequest(http.MethodDelete, notificationURL, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting notification: %v", err)
+	}
+
+	// For secrets, we can attempt to delete them by name pattern
+	// Since we created secrets with a specific naming convention
+	secretURL := fmt.Sprintf("%s/api/v1beta/secrets/%s", i.URL, metadata.Secret.Name)
+	_, err = i.execRequest(http.MethodDelete, secretURL, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting secret: %v", err)
 	}
 
 	return nil
