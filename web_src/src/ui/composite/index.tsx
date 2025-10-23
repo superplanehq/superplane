@@ -123,22 +123,6 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
     return resolveIcon("corner-down-right")
   }, [])
 
-  if (collapsed) {
-    return (
-      <CollapsedComponent
-        iconSrc={iconSrc}
-        iconSlug={iconSlug}
-        iconColor={iconColor}
-        iconBackground={iconBackground}
-        title={title}
-        collapsedBackground={collapsedBackground}
-        shape="rounded"
-      />
-    )
-  }
-
-
-
   const ExpandChildEventsIcon = React.useMemo(() => {
     return resolveIcon("expand")
   }, [])
@@ -150,6 +134,27 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
   const hasWaitingInfos = React.useMemo(() => {
     return (lastRunItem?.childEventsInfo?.waitingInfos?.length || 0) > 0
   }, [lastRunItem])
+
+  if (collapsed) {
+    return (
+      <CollapsedComponent
+        iconSrc={iconSrc}
+        iconSlug={iconSlug}
+        iconColor={iconColor}
+        iconBackground={iconBackground}
+        title={title}
+        collapsedBackground={collapsedBackground}
+        shape="rounded"
+      >
+        {parameters.length > 0 && (
+          <div className="flex items-center gap-2 text-gray-500 mt-1">
+            <ParametersIcon size={16} />
+            <span className="text-sm font-mono">{parameters.join(", ")}</span>
+          </div>
+        )}
+      </CollapsedComponent>
+    )
+  }
 
   return (
     <div className="flex flex-col border border-border rounded-md w-[26rem] bg-white" >
