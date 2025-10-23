@@ -1,8 +1,10 @@
 import { Trigger, type TriggerProps } from "@/ui/trigger";
+import { Composite, type CompositeProps } from "@/ui/composite";
+import { Approval, type ApprovalProps } from "@/ui/approval";
 import { Handle, Position } from "@xyflow/react";
 
 type BlockState = "pending" | "working";
-type BlockType = "trigger" | "composite";
+type BlockType = "trigger" | "composite" | "approval";
 
 interface BlockData {
   label: string;
@@ -15,6 +17,12 @@ interface BlockData {
 
   // trigger node specific props
   trigger?: TriggerProps;
+
+  // composite node specific props
+  composite?: CompositeProps;
+
+  // approval node specific props
+  approval?: ApprovalProps;
 }
 
 interface BlockProps {
@@ -36,15 +44,19 @@ export function Block({ data }: BlockProps) {
 //
 
 const HANDLE_STYLE = {
-  width: 4,
-  height: 4,
+  width: 12,
+  height: 12,
   borderRadius: 100,
-  border: "1px solid black",
+  border: "3px solid #C9D5E1",
   background: "transparent",
 };
 
 function LeftHandle({ data }: BlockProps) {
   if (data.type === "trigger") return null;
+
+  const isCollapsed =
+    (data.type === "composite" && data.composite?.collapsed) ||
+    (data.type === "approval" && data.approval?.collapsed);
 
   return (
     <Handle
@@ -53,12 +65,19 @@ function LeftHandle({ data }: BlockProps) {
       style={{
         ...HANDLE_STYLE,
         left: -10,
+        top: isCollapsed ? "50%" : 30,
+        transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
     />
   );
 }
 
-function RightHandle(_props: BlockProps) {
+function RightHandle({ data }: BlockProps) {
+  const isCollapsed =
+    (data.type === "composite" && data.composite?.collapsed) ||
+    (data.type === "approval" && data.approval?.collapsed) ||
+    (data.type === "trigger" && data.trigger?.collapsed);
+
   return (
     <Handle
       type="source"
@@ -66,6 +85,8 @@ function RightHandle(_props: BlockProps) {
       style={{
         ...HANDLE_STYLE,
         right: -10,
+        top: isCollapsed ? "50%" : 30,
+        transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
     />
   );
@@ -80,36 +101,10 @@ function BlockContent({ data }: BlockProps) {
     case "trigger":
       return <Trigger {...(data.trigger as TriggerProps)} />;
     case "composite":
-      return <Composite data={data} />;
+      return <Composite {...(data.composite as CompositeProps)} />;
+    case "approval":
+      return <Approval {...(data.approval as ApprovalProps)} />;
     default:
       throw new Error(`Unknown block type: ${(data as any).type}`);
   }
-}
-
-function Composite({ data }: BlockProps) {
-  const style =
-    data.state === "working"
-      ? { background: "lightblue" }
-      : { background: "lightgray" };
-
-  return (
-    <div className="p-4 rounded" style={style}>
-      <div className="font-medium text-gray-800">
-        <div className="text-[10px]">{data?.label}</div>
-      </div>
-
-      <div className="text-[10px]">
-        {data.state === "working" ? "Brrrrr...." : ""}
-      </div>
-
-      {data.lastEvent !== undefined && (
-        <div className="text-[10px] text-gray-700 break-all px-1 py-0.5">
-          evt:{" "}
-          {typeof data.lastEvent === "string"
-            ? data.lastEvent
-            : JSON.stringify(data.lastEvent)}
-        </div>
-      )}
-    </div>
-  );
 }

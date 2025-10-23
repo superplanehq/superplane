@@ -1,7 +1,6 @@
 import {
   Background,
-  BackgroundVariant,
-  MarkerType,
+  EdgeMarker,
   ReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
@@ -21,14 +20,13 @@ namespace CanvasPage {
 }
 
 const EDGE_STYLE = {
-  type: "smoothstep" as const,
-  style: { stroke: "#9AA5B1", strokeWidth: 1 },
+  type: "bezier" as const,
+  style: { stroke: "#C9D5E1", strokeWidth: 3 },
   markerEnd: {
-    type: MarkerType.Arrow,
-    width: 0,
-    height: 0,
-    color: "#9AA5B1",
-  },
+    width: 20,
+    height: 20,
+    color: "#6B7280",
+  } as EdgeMarker,
 } as const;
 
 function CanvasPage(props: CanvasPage.Props) {
@@ -56,7 +54,7 @@ function CanvasPage(props: CanvasPage.Props) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
+        <Background bgColor="#F1F5F9" color="#F1F5F9" />
       </ReactFlow>
     </div>
   );
