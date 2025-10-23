@@ -44,10 +44,10 @@ export function Block({ data }: BlockProps) {
 //
 
 const HANDLE_STYLE = {
-  width: 4,
-  height: 4,
+  width: 12,
+  height: 12,
   borderRadius: 100,
-  border: "1px solid black",
+  border: "3px solid #C9D5E1",
   background: "transparent",
 };
 
@@ -61,6 +61,7 @@ function LeftHandle({ data }: BlockProps) {
       style={{
         ...HANDLE_STYLE,
         left: -10,
+        top: 30,
       }}
     />
   );
@@ -74,6 +75,7 @@ function RightHandle(_props: BlockProps) {
       style={{
         ...HANDLE_STYLE,
         right: -10,
+        top: 30,
       }}
     />
   );

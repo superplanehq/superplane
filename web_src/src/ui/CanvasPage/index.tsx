@@ -21,13 +21,12 @@ namespace CanvasPage {
 }
 
 const EDGE_STYLE = {
-  type: "smoothstep" as const,
-  style: { stroke: "#9AA5B1", strokeWidth: 1 },
+  type: "bezier" as const,
+  style: { stroke: "#C9D5E1", strokeWidth: 2 },
   markerEnd: {
-    type: MarkerType.Arrow,
-    width: 0,
-    height: 0,
-    color: "#9AA5B1",
+    width: 20,
+    height: 20,
+    color: "#6B7280",
   },
 } as const;
 
