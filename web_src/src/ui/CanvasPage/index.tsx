@@ -8,6 +8,7 @@ import {
 
 import { Block } from "./Block";
 import { useCanvasState } from "./useCanvasState";
+import { ViewToggle } from "../ViewToggle";
 
 namespace CanvasPage {
   export type Node = ReactFlowNode;
@@ -16,6 +17,7 @@ namespace CanvasPage {
   export interface Props {
     nodes?: Node[];
     edges?: Edge[];
+    startCollapsed?: boolean;
   }
 }
 
@@ -30,10 +32,15 @@ const EDGE_STYLE = {
 } as const;
 
 function CanvasPage(props: CanvasPage.Props) {
-  const { nodes, edges, onNodesChange, onEdgesChange } = useCanvasState(props);
+  const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse } = useCanvasState(props);
 
   return (
-    <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas">
+    <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
+      {/* Toggle button */}
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+        <ViewToggle isCollapsed={isCollapsed} onToggle={toggleCollapse} />
+      </div>
+
       <ReactFlow
         nodes={nodes}
         edges={edges?.map((e) => ({ ...e, ...EDGE_STYLE }))}
