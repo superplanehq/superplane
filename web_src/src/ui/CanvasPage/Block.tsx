@@ -54,6 +54,11 @@ const HANDLE_STYLE = {
 function LeftHandle({ data }: BlockProps) {
   if (data.type === "trigger") return null;
 
+  const isCollapsed =
+    (data.type === "composite" && data.composite?.collapsed) ||
+    (data.type === "approval" && data.approval?.collapsed) ||
+    (data.type === "trigger" && data.trigger?.collapsed);
+
   return (
     <Handle
       type="target"
@@ -61,13 +66,19 @@ function LeftHandle({ data }: BlockProps) {
       style={{
         ...HANDLE_STYLE,
         left: -10,
-        top: 30,
+        top: isCollapsed ? "50%" : 30,
+        transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
     />
   );
 }
 
-function RightHandle(_props: BlockProps) {
+function RightHandle({ data }: BlockProps) {
+  const isCollapsed =
+    (data.type === "composite" && data.composite?.collapsed) ||
+    (data.type === "approval" && data.approval?.collapsed) ||
+    (data.type === "trigger" && data.trigger?.collapsed);
+
   return (
     <Handle
       type="source"
@@ -75,7 +86,8 @@ function RightHandle(_props: BlockProps) {
       style={{
         ...HANDLE_STYLE,
         right: -10,
-        top: 30,
+        top: isCollapsed ? "50%" : 30,
+        transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
     />
   );

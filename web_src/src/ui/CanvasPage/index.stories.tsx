@@ -409,3 +409,65 @@ export const SimpleDeployment: Story = {
     );
   },
 };
+
+export const CollapsedDeployment: Story = {
+  args: {
+    nodes: sampleNodes.map(node => {
+      if (node.data.type === "composite") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            composite: {
+              ...node.data.composite!,
+              collapsed: true,
+              collapsedBackground: node.id === "build-stage" ? "bg-purple-100" : "bg-blue-500"
+            }
+          }
+        };
+      }
+      if (node.data.type === "approval") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            approval: {
+              ...node.data.approval!,
+              collapsed: true,
+              collapsedBackground: "bg-orange-100"
+            }
+          }
+        };
+      }
+      if (node.data.type === "trigger") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            trigger: {
+              ...node.data.trigger!,
+              collapsed: true,
+              collapsedBackground: node.id === "listen-code" ? "bg-black" : "bg-sky-100"
+            }
+          }
+        };
+      }
+      return node;
+    }),
+    edges: sampleEdges,
+  },
+  render: (args) => {
+    const [nodes, setNodes] = useState<Node[]>(args.nodes ?? []);
+    const [edges] = useState<Edge[]>(args.edges ?? []);
+
+    const onNodesChange = useCallback((changes: NodeChange[]) => {
+      setNodes((nds) => applyNodeChanges(changes, nds));
+    }, []);
+
+    return (
+      <div className="h-[100vh] w-full ">
+        <CanvasPage {...args} nodes={nodes} edges={edges} />
+      </div>
+    );
+  },
+};

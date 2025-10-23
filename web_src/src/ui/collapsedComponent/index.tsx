@@ -29,7 +29,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   const containerClass = shape === "circle" ? "rounded-full" : "rounded-md";
 
   return (
-    <div className="flex w-fit flex-col items-center">
+    <div className="relative w-20 h-20 mx-3">
       <div className={`flex h-20 w-20 items-center justify-center border border-border ${containerClass} ${collapsedBackground || ''}`}>
         {iconSrc ? (
           <div className={`w-16 h-16 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
@@ -39,9 +39,9 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
           <Icon size={30} className={iconColor} />
         )}
       </div>
-      <h2 className="text-base font-semibold text-neutral-900 pt-1">{title}</h2>
+      <h2 className="absolute top-full left-1/2 transform -translate-x-1/2 text-base font-semibold text-neutral-900 pt-1 whitespace-nowrap">{title}</h2>
       {children && (
-        <div className="mt-2">
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-8 text-center flex flex-col flex-wrap w-[400px] items-center justify-center">
           {children}
         </div>
       )}
