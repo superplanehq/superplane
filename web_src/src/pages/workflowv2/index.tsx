@@ -41,14 +41,18 @@ function prepareNode(node: ComponentsNode): CanvasPage.Node {
     id: node.id!,
     position: { x: -140, y: -80 },
     data: {
+      type: "composite",
       label: node.name!,
     },
   };
 }
 
 function prepareEdge(edge: ComponentsEdge): CanvasPage.Edge {
+  const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
+  console.log("Preparing edge with id:", id);
+
   return {
-    id: edge.channel!,
+    id: id,
     source: edge.sourceId!,
     target: edge.targetId!,
   };
