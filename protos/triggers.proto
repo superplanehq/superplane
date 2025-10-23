@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package Superplane.Triggers;
+
+import "components.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/triggers";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Triggers API";
+    version: "1.0";
+    description: "API for Superplane Triggers";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Triggers {
+  rpc ListTriggers(ListTriggersRequest) returns (ListTriggersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/triggers"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List triggers";
+      description: "Returns a list of all available triggers";
+      tags: "Trigger";
+    };
+  }
+
+  rpc DescribeTrigger(DescribeTriggerRequest) returns (DescribeTriggerResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/triggers/{name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe trigger";
+      description: "Returns a trigger by its name";
+      tags: "Trigger";
+    };
+  }
+}
+
+message ListTriggersRequest {}
+
+message ListTriggersResponse {
+  repeated Trigger triggers = 1;
+}
+
+message DescribeTriggerRequest {
+  string name = 1;
+}
+
+message DescribeTriggerResponse {
+  Trigger trigger = 1;
+}
+
+message Trigger {
+  string name = 1;
+  string label = 2;
+  string description = 3;
+  repeated Components.ConfigurationField configuration = 4;
+}

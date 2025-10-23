@@ -1,0 +1,206 @@
+package workers
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"golang.org/x/sync/semaphore"
+	"gorm.io/gorm"
+
+	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/triggers"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
+)
+
+type NodeRequestWorker struct {
+	semaphore *semaphore.Weighted
+	registry  *registry.Registry
+}
+
+func NewNodeRequestWorker(registry *registry.Registry) *NodeRequestWorker {
+	return &NodeRequestWorker{
+		registry:  registry,
+		semaphore: semaphore.NewWeighted(25),
+	}
+}
+
+func (w *NodeRequestWorker) Start(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			requests, err := models.ListNodeRequests()
+			if err != nil {
+				w.log("Error finding workflow nodes ready to be processed: %v", err)
+			}
+
+			for _, request := range requests {
+				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+					w.log("Error acquiring semaphore: %v", err)
+					continue
+				}
+
+				go func(request models.WorkflowNodeRequest) {
+					defer w.semaphore.Release(1)
+
+					if err := w.LockAndProcessRequest(request); err != nil {
+						w.log("Error processing request %s: %v", request.ID, err)
+					}
+				}(request)
+			}
+		}
+	}
+}
+
+func (w *NodeRequestWorker) LockAndProcessRequest(request models.WorkflowNodeRequest) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		r, err := models.LockNodeRequest(tx, request.ID)
+		if err != nil {
+			w.log("Request %s already being processed - skipping", request.ID)
+			return nil
+		}
+
+		return w.processRequest(tx, r)
+	})
+}
+
+func (w *NodeRequestWorker) processRequest(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
+	switch request.Type {
+	case models.NodeRequestTypeInvokeAction:
+		return w.invokeAction(tx, request)
+	}
+
+	return fmt.Errorf("unsupported node execution request type %s", request.Type)
+}
+
+func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
+	if request.ExecutionID == nil {
+		return w.invokeTriggerAction(tx, request)
+	}
+
+	return w.invokeComponentAction(tx, request)
+}
+
+func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
+	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, request.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("workflow %s not found: %w", request.WorkflowID, err)
+	}
+
+	node, err := workflow.FindNode(request.NodeID)
+	if err != nil {
+		return fmt.Errorf("node not found: %w", err)
+	}
+
+	trigger, err := w.registry.GetTrigger(node.Ref.Data().Trigger.Name)
+	if err != nil {
+		return fmt.Errorf("trigger not found: %w", err)
+	}
+
+	spec := request.Spec.Data()
+	if spec.InvokeAction == nil {
+		return fmt.Errorf("spec is not specified")
+	}
+
+	actionName := spec.InvokeAction.ActionName
+	actionDef := findAction(trigger.Actions(), actionName)
+	if actionDef == nil {
+		return fmt.Errorf("action '%s' not found for trigger '%s'", actionName, trigger.Name())
+	}
+
+	actionCtx := triggers.TriggerActionContext{
+		Name:            actionName,
+		Parameters:      spec.InvokeAction.Parameters,
+		Configuration:   node.Configuration.Data(),
+		MetadataContext: contexts.NewNodeMetadataContext(node),
+		EventContext:    contexts.NewEventContext(tx, node),
+		RequestContext:  contexts.NewNodeRequestContext(tx, node),
+	}
+
+	err = trigger.HandleAction(actionCtx)
+	if err != nil {
+		return fmt.Errorf("action execution failed: %w", err)
+	}
+
+	err = tx.Save(&node).Error
+	if err != nil {
+		return fmt.Errorf("error saving node after action handler: %v", err)
+	}
+
+	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
+	execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, *request.ExecutionID)
+	if err != nil {
+		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
+	}
+
+	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, execution.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("workflow %s not found: %w", execution.WorkflowID, err)
+	}
+
+	node, err := workflow.FindNode(execution.NodeID)
+	if err != nil {
+		return fmt.Errorf("node not found: %w", err)
+	}
+
+	component, err := w.registry.GetComponent(node.Ref.Data().Component.Name)
+	if err != nil {
+		return fmt.Errorf("component not found: %w", err)
+	}
+
+	spec := request.Spec.Data()
+	if spec.InvokeAction == nil {
+		return fmt.Errorf("spec is not specified")
+	}
+
+	actionName := spec.InvokeAction.ActionName
+	actionDef := findAction(component.Actions(), actionName)
+	if actionDef == nil {
+		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
+	}
+
+	actionCtx := components.ActionContext{
+		Name:                  actionName,
+		Parameters:            spec.InvokeAction.Parameters,
+		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
+		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
+	}
+
+	err = component.HandleAction(actionCtx)
+	if err != nil {
+		return fmt.Errorf("action execution failed: %w", err)
+	}
+
+	err = tx.Save(&execution).Error
+	if err != nil {
+		return fmt.Errorf("error saving execution after action handler: %v", err)
+	}
+
+	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) log(format string, v ...any) {
+	log.Printf("[NodeRequestWorker] "+format, v...)
+}
+
+func findAction(actions []components.Action, actionName string) *components.Action {
+	for _, action := range actions {
+		if action.Name == actionName {
+			return &action
+		}
+	}
+
+	return nil
+}

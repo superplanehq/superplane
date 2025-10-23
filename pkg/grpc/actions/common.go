@@ -719,6 +719,26 @@ func multiSelectTypeOptionsToProto(opts *components.MultiSelectTypeOptions) *com
 	return pbOpts
 }
 
+func integrationTypeOptionsToProto(opts *components.IntegrationTypeOptions) *componentpb.IntegrationTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &componentpb.IntegrationTypeOptions{
+		Type: opts.Type,
+	}
+}
+
+func resourceTypeOptionsToProto(opts *components.ResourceTypeOptions) *componentpb.ResourceTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	return &componentpb.ResourceTypeOptions{
+		Type: opts.Type,
+	}
+}
+
 func listTypeOptionsToProto(opts *components.ListTypeOptions) *componentpb.ListTypeOptions {
 	if opts == nil || opts.ItemDefinition == nil {
 		return nil
@@ -764,6 +784,8 @@ func typeOptionsToProto(opts *components.TypeOptions) *componentpb.TypeOptions {
 		Number:      numberTypeOptionsToProto(opts.Number),
 		Select:      selectTypeOptionsToProto(opts.Select),
 		MultiSelect: multiSelectTypeOptionsToProto(opts.MultiSelect),
+		Integration: integrationTypeOptionsToProto(opts.Integration),
+		Resource:    resourceTypeOptionsToProto(opts.Resource),
 		List:        listTypeOptionsToProto(opts.List),
 		Object:      objectTypeOptionsToProto(opts.Object),
 	}
@@ -814,7 +836,6 @@ func protoToNumberTypeOptions(pbOpts *componentpb.NumberTypeOptions) *components
 		max := int(*pbOpts.Max)
 		opts.Max = &max
 	}
-
 	return opts
 }
 
@@ -826,7 +847,6 @@ func protoToSelectTypeOptions(pbOpts *componentpb.SelectTypeOptions) *components
 	opts := &components.SelectTypeOptions{
 		Options: make([]components.FieldOption, len(pbOpts.Options)),
 	}
-
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = components.FieldOption{
 			Label: pbOpt.Label,
@@ -844,15 +864,33 @@ func protoToMultiSelectTypeOptions(pbOpts *componentpb.MultiSelectTypeOptions) *
 	opts := &components.MultiSelectTypeOptions{
 		Options: make([]components.FieldOption, len(pbOpts.Options)),
 	}
-
 	for i, pbOpt := range pbOpts.Options {
 		opts.Options[i] = components.FieldOption{
 			Label: pbOpt.Label,
 			Value: pbOpt.Value,
 		}
 	}
-
 	return opts
+}
+
+func protoToIntegrationTypeOptions(pbOpts *componentpb.IntegrationTypeOptions) *components.IntegrationTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &components.IntegrationTypeOptions{
+		Type: pbOpts.Type,
+	}
+}
+
+func protoToResourceTypeOptions(pbOpts *componentpb.ResourceTypeOptions) *components.ResourceTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	return &components.ResourceTypeOptions{
+		Type: pbOpts.Type,
+	}
 }
 
 func protoToListTypeOptions(pbOpts *componentpb.ListTypeOptions) *components.ListTypeOptions {
@@ -900,6 +938,8 @@ func protoToTypeOptions(pbOpts *componentpb.TypeOptions) *components.TypeOptions
 		Number:      protoToNumberTypeOptions(pbOpts.Number),
 		Select:      protoToSelectTypeOptions(pbOpts.Select),
 		MultiSelect: protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
+		Integration: protoToIntegrationTypeOptions(pbOpts.Integration),
+		Resource:    protoToResourceTypeOptions(pbOpts.Resource),
 		List:        protoToListTypeOptions(pbOpts.List),
 		Object:      protoToObjectTypeOptions(pbOpts.Object),
 	}
@@ -967,10 +1007,21 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			}
 		}
 
+		if node.Ref.Trigger != nil {
+			result[i].Trigger = &componentpb.Node_TriggerRef{
+				Name: node.Ref.Trigger.Name,
+			}
+		}
+
 		if node.Configuration != nil {
 			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
 		}
+
+		if node.Metadata != nil {
+			result[i].Metadata, _ = structpb.NewStruct(node.Metadata)
+		}
 	}
+
 	return result
 }
 
@@ -1004,6 +1055,8 @@ func ProtoToNodeType(nodeType componentpb.Node_Type) string {
 		return models.NodeTypeComponent
 	case componentpb.Node_TYPE_BLUEPRINT:
 		return models.NodeTypeBlueprint
+	case componentpb.Node_TYPE_TRIGGER:
+		return models.NodeTypeTrigger
 	default:
 		return ""
 	}
@@ -1013,6 +1066,8 @@ func NodeTypeToProto(nodeType string) componentpb.Node_Type {
 	switch nodeType {
 	case models.NodeTypeBlueprint:
 		return componentpb.Node_TYPE_BLUEPRINT
+	case models.NodeTypeTrigger:
+		return componentpb.Node_TYPE_TRIGGER
 	default:
 		return componentpb.Node_TYPE_COMPONENT
 	}
@@ -1032,6 +1087,12 @@ func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
 		if node.Blueprint != nil {
 			ref.Blueprint = &models.BlueprintRef{
 				ID: node.Blueprint.Id,
+			}
+		}
+	case componentpb.Node_TYPE_TRIGGER:
+		if node.Trigger != nil {
+			ref.Trigger = &models.TriggerRef{
+				Name: node.Trigger.Name,
 			}
 		}
 	}

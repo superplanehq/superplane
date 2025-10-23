@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v74/github"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"golang.org/x/oauth2"
 )
@@ -68,6 +69,7 @@ func parseOwnerFromURL(URL string) (string, error) {
 	return u.Path[1:], nil
 }
 
+// DEPRECATED: will be removed once old canvas infrastructure is removed.
 func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
 	//
 	// If a webhook already exists for this repository,
@@ -83,6 +85,39 @@ func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions
 
 	hook := options.Children[webhookIndex]
 	return i.updateRepositoryWebhook(hook, options)
+}
+
+type WebhookConfiguration struct {
+	Events []string `json:"events"`
+}
+
+func (i *GitHubResourceManager) SetupWebhookV2(options integrations.WebhookOptionsV2) (any, error) {
+	config := WebhookConfiguration{}
+	err := mapstructure.Decode(options.Configuration, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
+	}
+
+	hook := &github.Hook{
+		Active: github.Ptr(true),
+		Events: config.Events,
+		Config: &github.HookConfig{
+			URL:         &options.URL,
+			Secret:      github.Ptr(string(options.Secret)),
+			ContentType: github.Ptr("json"),
+		},
+	}
+
+	createdHook, _, err := i.client.Repositories.CreateHook(context.Background(), i.Owner, options.Resource.Name(), hook)
+	if err != nil {
+		return nil, fmt.Errorf("error creating webhook: %v", err)
+	}
+
+	return &Webhook{
+		ID:          createdHook.GetID(),
+		WebhookName: *createdHook.Name,
+		WebhookURL:  createdHook.GetURL(),
+	}, nil
 }
 
 func (i *GitHubResourceManager) getEventTypes(options integrations.WebhookOptions) []string {
@@ -133,6 +168,7 @@ func (i *GitHubResourceManager) createRepositoryWebhook(options integrations.Web
 		&Webhook{
 			ID:          createdHook.GetID(),
 			WebhookName: *createdHook.Name,
+			WebhookURL:  createdHook.GetURL(),
 		},
 	}, nil
 }
@@ -161,6 +197,7 @@ func (i *GitHubResourceManager) updateRepositoryWebhook(hook integrations.Resour
 		&Webhook{
 			ID:          updatedHook.GetID(),
 			WebhookName: *updatedHook.Name,
+			WebhookURL:  updatedHook.GetURL(),
 		},
 	}, nil
 }
@@ -172,6 +209,26 @@ func (i *GitHubResourceManager) CleanupWebhook(parentResource integrations.Resou
 	}
 
 	_, err = i.client.Repositories.DeleteHook(context.Background(), i.Owner, parentResource.Name(), hookID)
+	if err != nil {
+		return fmt.Errorf("error deleting webhook: %v", err)
+	}
+
+	return nil
+}
+
+func (i *GitHubResourceManager) CleanupWebhookV2(options integrations.WebhookOptionsV2) error {
+	webhook := &Webhook{}
+	err := mapstructure.Decode(options.Metadata, &webhook)
+	if err != nil {
+		return fmt.Errorf("error decoding webhook metadata: %v", err)
+	}
+
+	hookID, err := strconv.ParseInt(webhook.Id(), 10, 64)
+	if err != nil {
+		return fmt.Errorf("error parsing webhook ID: %v", err)
+	}
+
+	_, err = i.client.Repositories.DeleteHook(context.Background(), i.Owner, options.Resource.Name(), hookID)
 	if err != nil {
 		return fmt.Errorf("error deleting webhook: %v", err)
 	}
@@ -209,6 +266,7 @@ func (i *GitHubResourceManager) listRepositories() ([]integrations.Resource, err
 		resources = append(resources, &Repository{
 			ID:             repository.GetID(),
 			RepositoryName: repository.GetFullName(),
+			RepositoryURL:  repository.GetHTMLURL(),
 		})
 	}
 
@@ -250,8 +308,13 @@ func (i *GitHubResourceManager) stopWorkflowRun(parentResource integrations.Reso
 	return fmt.Errorf("Cancel request for %s received status code %d: %v", id, response.StatusCode, err)
 }
 
-func (i *GitHubResourceManager) getRepository(repoName string) (integrations.Resource, error) {
-	repository, _, err := i.client.Repositories.Get(context.Background(), i.Owner, repoName)
+func (i *GitHubResourceManager) getRepository(idOrName string) (integrations.Resource, error) {
+	id, err := strconv.ParseInt(idOrName, 10, 64)
+	if err == nil {
+		return i.getRepositoryByID(id)
+	}
+
+	repository, _, err := i.client.Repositories.Get(context.Background(), i.Owner, idOrName)
 	if err != nil {
 		return nil, fmt.Errorf("error getting repository: %v", err)
 	}
@@ -259,6 +322,20 @@ func (i *GitHubResourceManager) getRepository(repoName string) (integrations.Res
 	return &Repository{
 		ID:             repository.GetID(),
 		RepositoryName: repository.GetName(),
+		RepositoryURL:  repository.GetHTMLURL(),
+	}, nil
+}
+
+func (i *GitHubResourceManager) getRepositoryByID(id int64) (integrations.Resource, error) {
+	repository, _, err := i.client.Repositories.GetByID(context.Background(), id)
+	if err != nil {
+		return nil, fmt.Errorf("error getting repository: %v", err)
+	}
+
+	return &Repository{
+		ID:             repository.GetID(),
+		RepositoryName: repository.GetName(),
+		RepositoryURL:  repository.GetHTMLURL(),
 	}, nil
 }
 
@@ -283,6 +360,7 @@ func (i *GitHubResourceManager) getWorkflowRun(parentResource integrations.Resou
 type Repository struct {
 	ID             int64
 	RepositoryName string
+	RepositoryURL  string
 }
 
 func (r *Repository) Id() string {
@@ -295,6 +373,10 @@ func (r *Repository) Name() string {
 
 func (r *Repository) Type() string {
 	return ResourceTypeRepository
+}
+
+func (r *Repository) URL() string {
+	return r.RepositoryURL
 }
 
 type WorkflowRun struct {

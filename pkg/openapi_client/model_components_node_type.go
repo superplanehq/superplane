@@ -23,12 +23,14 @@ type ComponentsNodeType string
 const (
 	COMPONENTSNODETYPE_TYPE_COMPONENT ComponentsNodeType = "TYPE_COMPONENT"
 	COMPONENTSNODETYPE_TYPE_BLUEPRINT ComponentsNodeType = "TYPE_BLUEPRINT"
+	COMPONENTSNODETYPE_TYPE_TRIGGER ComponentsNodeType = "TYPE_TRIGGER"
 )
 
 // All allowed values of ComponentsNodeType enum
 var AllowedComponentsNodeTypeEnumValues = []ComponentsNodeType{
 	"TYPE_COMPONENT",
 	"TYPE_BLUEPRINT",
+	"TYPE_TRIGGER",
 }
 
 func (v *ComponentsNodeType) UnmarshalJSON(src []byte) error {

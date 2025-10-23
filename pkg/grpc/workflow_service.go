@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -13,11 +14,12 @@ import (
 )
 
 type WorkflowService struct {
-	registry *registry.Registry
+	registry  *registry.Registry
+	encryptor crypto.Encryptor
 }
 
-func NewWorkflowService(registry *registry.Registry) *WorkflowService {
-	return &WorkflowService{registry: registry}
+func NewWorkflowService(registry *registry.Registry, encryptor crypto.Encryptor) *WorkflowService {
+	return &WorkflowService{registry: registry, encryptor: encryptor}
 }
 
 func (s *WorkflowService) ListWorkflows(ctx context.Context, req *pb.ListWorkflowsRequest) (*pb.ListWorkflowsResponse, error) {
@@ -43,7 +45,7 @@ func (s *WorkflowService) UpdateWorkflow(ctx context.Context, req *pb.UpdateWork
 		return nil, status.Error(codes.InvalidArgument, "workflow is required")
 	}
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return workflows.UpdateWorkflow(ctx, s.registry, organizationID, req.Id, req.Workflow)
+	return workflows.UpdateWorkflow(ctx, s.encryptor, s.registry, organizationID, req.Id, req.Workflow)
 }
 
 func (s *WorkflowService) DeleteWorkflow(ctx context.Context, req *pb.DeleteWorkflowRequest) (*pb.DeleteWorkflowResponse, error) {

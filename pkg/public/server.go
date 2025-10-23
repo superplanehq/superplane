@@ -20,9 +20,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/triggers"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -36,6 +39,7 @@ import (
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -201,6 +205,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbTriggers.RegisterTriggersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	err = pbBlueprints.RegisterBlueprintsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
@@ -229,6 +238,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
@@ -339,6 +349,14 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
+
+	//
+	// Webhook endpoints for triggers
+	//
+	publicRoute.
+		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
+		Headers("Content-Type", "application/json").
+		Methods("POST")
 
 	//
 	// Webhook endpoints for integrations (they have their own authentication).
@@ -689,6 +707,78 @@ func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]a
 	}
 
 	return outputs, nil
+}
+
+func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	webhookIDFromRequest := vars["webhookID"]
+	webhookID, err := uuid.Parse(webhookIDFromRequest)
+	if err != nil {
+		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+
+	_, err = models.FindWebhook(webhookID)
+	if err != nil {
+		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		if _, ok := err.(*http.MaxBytesError); ok {
+			http.Error(
+				w,
+				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
+				http.StatusRequestEntityTooLarge,
+			)
+
+			return
+		}
+
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+
+	nodes, err := models.FindWebhookNodes(webhookID)
+	if err != nil {
+		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+
+	for _, node := range nodes {
+		code, err := s.executeWebhookNode(r.Context(), body, r.Header, node)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+	if node.Type != models.NodeTypeTrigger {
+		return http.StatusOK, nil
+	}
+
+	ref := node.Ref.Data()
+	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("trigger not found: %w", err)
+	}
+
+	tx := database.Conn()
+	return trigger.HandleWebhook(triggers.WebhookRequestContext{
+		Body:           body,
+		Headers:        headers,
+		Configuration:  node.Configuration.Data(),
+		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
+		EventContext:   contexts.NewEventContext(tx, &node),
+	})
 }
 
 func (s *Server) HandleCustomWebhook(w http.ResponseWriter, r *http.Request) {

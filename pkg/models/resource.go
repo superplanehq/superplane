@@ -30,6 +30,10 @@ func (r *Resource) Type() string {
 	return r.ResourceType
 }
 
+func (r *Resource) URL() string {
+	return ""
+}
+
 func (r *Resource) ListEventSources() ([]EventSource, error) {
 	var eventSources []EventSource
 	err := database.Conn().

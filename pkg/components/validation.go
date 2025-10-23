@@ -8,23 +8,19 @@ import (
 	"slices"
 )
 
-// ValidateConfiguration validates a configuration map against the field definitions
 func ValidateConfiguration(fields []ConfigurationField, config map[string]any) error {
 	for _, field := range fields {
 		value, exists := config[field.Name]
-
-		// Check required fields
 		if field.Required && (!exists || value == nil) {
 			return fmt.Errorf("field '%s' is required", field.Name)
 		}
 
-		// Skip validation if field is not present and not required
 		if !exists || value == nil {
 			continue
 		}
 
-		// Validate based on type
-		if err := validateFieldValue(field, value); err != nil {
+		err := validateFieldValue(field, value)
+		if err != nil {
 			return fmt.Errorf("field '%s': %w", field.Name, err)
 		}
 	}
@@ -56,8 +52,8 @@ func validateNumber(field ConfigurationField, value any) error {
 		return fmt.Errorf("must be at least %d", *options.Min)
 	}
 
-	if options.Max != nil && num > float64(*options.Min) {
-		return fmt.Errorf("must be at most %d", *options.Min)
+	if options.Max != nil && num > float64(*options.Max) {
+		return fmt.Errorf("must be at most %d", *options.Max)
 	}
 
 	return nil
@@ -222,6 +218,16 @@ func validateFieldValue(field ConfigurationField, value any) error {
 
 	case FieldTypeMultiSelect:
 		return validateMultiSelect(field, value)
+
+	case FieldTypeIntegration:
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("must be a string")
+		}
+
+	case FieldTypeIntegrationResource:
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("must be a string")
+		}
 
 	case FieldTypeList:
 		return validateList(field, value)

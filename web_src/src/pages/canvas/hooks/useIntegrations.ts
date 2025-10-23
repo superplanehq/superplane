@@ -4,6 +4,7 @@ import {
   integrationsCreateIntegration,
   integrationsDescribeIntegration,
   integrationsUpdateIntegration,
+  integrationsListResources,
 } from '../../../api-client/sdk.gen'
 import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import type { IntegrationsCreateIntegrationData, IntegrationsUpdateIntegrationData } from '../../../api-client/types.gen'
@@ -12,6 +13,7 @@ export const integrationKeys = {
   all: ['integrations'] as const,
   byDomain: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => [...integrationKeys.all, 'domain', domainId, domainType] as const,
   detail: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string) => [...integrationKeys.byDomain(domainId, domainType), 'detail', integrationId] as const,
+  resources: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string, resourceType: string) => [...integrationKeys.detail(domainId, domainType, integrationId), 'resources', resourceType] as const,
 }
 
 export const useIntegrations = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
@@ -163,16 +165,43 @@ export const useUpdateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_
 
 export const useDeleteIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async () => {
       await new Promise(resolve => setTimeout(resolve, 500))
       return { success: true, integrationId }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: integrationKeys.byDomain(domainId, domainType) 
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.byDomain(domainId, domainType)
       })
     }
+  })
+}
+
+export const useIntegrationResources = (
+  domainId: string,
+  domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION",
+  integrationId: string,
+  resourceType: string
+) => {
+  return useQuery({
+    queryKey: integrationKeys.resources(domainId, domainType, integrationId, resourceType),
+    queryFn: async () => {
+      const response = await integrationsListResources(withOrganizationHeader({
+        query: {
+          domainId: domainId,
+          domainType: domainType,
+          type: resourceType,
+        },
+        path: {
+          idOrName: integrationId
+        }
+      }))
+      return response.data?.resources || []
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!domainId && !!domainType && !!integrationId && !!resourceType,
   })
 }

@@ -38,6 +38,9 @@
       "name": "Components"
     },
     {
+      "name": "Triggers"
+    },
+    {
       "name": "Blueprints"
     },
     {
@@ -3081,6 +3084,62 @@
         ]
       }
     },
+    "/api/v1/triggers": {
+      "get": {
+        "summary": "List triggers",
+        "description": "Returns a list of all available triggers",
+        "operationId": "Triggers_ListTriggers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/TriggersListTriggersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Trigger"
+        ]
+      }
+    },
+    "/api/v1/triggers/{name}": {
+      "get": {
+        "summary": "Describe trigger",
+        "description": "Returns a trigger by its name",
+        "operationId": "Triggers_DescribeTrigger",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/TriggersDescribeTriggerResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Trigger"
+        ]
+      }
+    },
     "/api/v1/users": {
       "get": {
         "summary": "List users",
@@ -3430,7 +3489,7 @@
     "/api/v1/workflows/{workflowId}/events/{eventId}/executions": {
       "get": {
         "summary": "List event executions",
-        "description": "Returns a list of all node executions triggered by a specific root event",
+        "description": "Returns a list of all node executions triggered by a root event",
         "operationId": "Workflows_ListEventExecutions",
         "responses": {
           "200": {
@@ -4136,11 +4195,17 @@
         "configuration": {
           "type": "object"
         },
+        "metadata": {
+          "type": "object"
+        },
         "component": {
           "$ref": "#/definitions/NodeComponentRef"
         },
         "blueprint": {
           "$ref": "#/definitions/NodeBlueprintRef"
+        },
+        "trigger": {
+          "$ref": "#/definitions/NodeTriggerRef"
         }
       }
     },
@@ -4148,7 +4213,8 @@
       "type": "string",
       "enum": [
         "TYPE_COMPONENT",
-        "TYPE_BLUEPRINT"
+        "TYPE_BLUEPRINT",
+        "TYPE_TRIGGER"
       ],
       "default": "TYPE_COMPONENT"
     },
@@ -4724,6 +4790,14 @@
       }
     },
     "NodeComponentRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "NodeTriggerRef": {
       "type": "object",
       "properties": {
         "name": {
@@ -6636,6 +6710,47 @@
         },
         "key": {
           "type": "string"
+        }
+      }
+    },
+    "TriggersDescribeTriggerResponse": {
+      "type": "object",
+      "properties": {
+        "trigger": {
+          "$ref": "#/definitions/TriggersTrigger"
+        }
+      }
+    },
+    "TriggersListTriggersResponse": {
+      "type": "object",
+      "properties": {
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/TriggersTrigger"
+          }
+        }
+      }
+    },
+    "TriggersTrigger": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsConfigurationField"
+          }
         }
       }
     },

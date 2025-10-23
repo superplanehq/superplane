@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
@@ -162,6 +164,10 @@ type Secret struct {
 	Data       SecretSpecData `json:"data"`
 }
 
+func (p *Secret) URL() string {
+	return ""
+}
+
 func (p *Secret) Id() string {
 	return p.Metadata.ID
 }
@@ -238,6 +244,10 @@ type Notification struct {
 	Kind       string               `json:"kind"`
 	Metadata   NotificationMetadata `json:"metadata"`
 	Spec       NotificationSpec     `json:"spec"`
+}
+
+func (p *Notification) URL() string {
+	return ""
 }
 
 func (p *Notification) Id() string {
@@ -329,7 +339,10 @@ func (i *SemaphoreResourceManager) runTask(params any) (integrations.StatefulRes
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	return &Workflow{WfID: response.WorkflowID}, nil
+	return &Workflow{
+		WorkflowURL: fmt.Sprintf("%s/workflows/%s", i.URL, response.WorkflowID),
+		WfID:        response.WorkflowID,
+	}, nil
 }
 
 func (i *SemaphoreResourceManager) runWorkflow(params any) (integrations.StatefulResource, error) {
@@ -351,7 +364,10 @@ func (i *SemaphoreResourceManager) runWorkflow(params any) (integrations.Statefu
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	return &Workflow{WfID: response.WorkflowID}, nil
+	return &Workflow{
+		WfID:        response.WorkflowID,
+		WorkflowURL: fmt.Sprintf("%s/workflows/%s", i.URL, response.WorkflowID),
+	}, nil
 }
 
 func (i *SemaphoreResourceManager) listTasks(parentIDs ...string) ([]integrations.Resource, error) {
@@ -372,8 +388,9 @@ func (i *SemaphoreResourceManager) listTasks(parentIDs ...string) ([]integration
 	}
 
 	resources := make([]integrations.Resource, len(tasks))
-	for i := range tasks {
-		resources[i] = &tasks[i]
+	for idx, task := range tasks {
+		task.TaskURL = fmt.Sprintf("%s/projects/%s/tasks/%s", i.URL, parentIDs[0], task.ID)
+		resources[idx] = &tasks[idx]
 	}
 
 	return resources, nil
@@ -393,8 +410,9 @@ func (i *SemaphoreResourceManager) listProjects() ([]integrations.Resource, erro
 	}
 
 	resources := make([]integrations.Resource, len(projects))
-	for i := range projects {
-		resources[i] = &projects[i]
+	for idx, project := range projects {
+		projects[idx].ProjectURL = fmt.Sprintf("%s/projects/%s", i.URL, project.Id())
+		resources[idx] = &projects[idx]
 	}
 
 	return resources, nil
@@ -413,6 +431,7 @@ func (i *SemaphoreResourceManager) getWorkflow(id string) (integrations.Resource
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
+	workflow.Workflow.WorkflowURL = fmt.Sprintf("%s/workflows/%s", i.URL, id)
 	return workflow.Workflow, nil
 }
 
@@ -439,11 +458,32 @@ func (i *SemaphoreResourceManager) getPipeline(id string) (integrations.Resource
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
+	pipelineResponse.Pipeline.PipelineURL = fmt.Sprintf("%s/workflows/%s=pipeline_id=%s", i.URL, pipelineResponse.Pipeline.WorkflowID, id)
 	return pipelineResponse.Pipeline, nil
 }
 
-func (i *SemaphoreResourceManager) getProject(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", i.URL, id)
+func (i *SemaphoreResourceManager) getProject(idOrName string) (integrations.Resource, error) {
+	_, err := uuid.Parse(idOrName)
+	if err != nil {
+		return i.getProjectByName(idOrName)
+	}
+
+	projects, err := i.listProjects()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, project := range projects {
+		if project.Id() == idOrName {
+			return project, nil
+		}
+	}
+
+	return nil, fmt.Errorf("project %s not found", idOrName)
+}
+
+func (i *SemaphoreResourceManager) getProjectByName(name string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", i.URL, name)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
@@ -455,6 +495,7 @@ func (i *SemaphoreResourceManager) getProject(id string) (integrations.Resource,
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
+	project.ProjectURL = fmt.Sprintf("%s/projects/%s", i.URL, name)
 	return &project, nil
 }
 
@@ -479,6 +520,7 @@ func (i *SemaphoreResourceManager) getTask(id string, parentIDs ...string) (inte
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
+	task.Task.TaskURL = fmt.Sprintf("%s/projects/%s/tasks/%s", i.URL, parentIDs[0], id)
 	return task.Task, nil
 }
 
@@ -512,6 +554,7 @@ type WorkflowResponse struct {
 }
 
 type Workflow struct {
+	WorkflowURL  string    `json:"url"`
 	WfID         string    `json:"wf_id"`
 	InitialPplID string    `json:"initial_ppl_id"`
 	Pipeline     *Pipeline `json:"pipeline"`
@@ -529,6 +572,10 @@ func (w *Workflow) Type() string {
 	return ResourceTypeWorkflow
 }
 
+func (w *Workflow) URL() string {
+	return w.WorkflowURL
+}
+
 func (w *Workflow) Finished() bool {
 	return w.Pipeline != nil && w.Pipeline.Finished()
 }
@@ -538,7 +585,8 @@ func (w *Workflow) Successful() bool {
 }
 
 type Project struct {
-	Metadata *ProjectMetadata `json:"metadata"`
+	ProjectURL string           `json:"-"`
+	Metadata   *ProjectMetadata `json:"metadata"`
 }
 
 func (p *Project) Id() string {
@@ -553,6 +601,10 @@ func (p *Project) Type() string {
 	return ResourceTypeProject
 }
 
+func (p *Project) URL() string {
+	return p.ProjectURL
+}
+
 type ProjectMetadata struct {
 	ProjectName string `json:"name"`
 	ProjectID   string `json:"id"`
@@ -561,6 +613,11 @@ type ProjectMetadata struct {
 type Task struct {
 	ID       string `json:"id"`
 	TaskName string `json:"name"`
+	TaskURL  string `json:"-"`
+}
+
+func (t *Task) URL() string {
+	return t.TaskURL
 }
 
 func (t *Task) Id() string {
@@ -580,11 +637,16 @@ type PipelineResponse struct {
 }
 
 type Pipeline struct {
+	PipelineURL  string `json:"-"`
 	PipelineName string `json:"name"`
 	PipelineID   string `json:"ppl_id"`
 	WorkflowID   string `json:"wf_id"`
 	State        string `json:"state"`
 	Result       string `json:"result"`
+}
+
+func (p *Pipeline) URL() string {
+	return p.PipelineURL
 }
 
 func (p *Pipeline) Id() string {
@@ -628,12 +690,59 @@ func (i *SemaphoreResourceManager) SetupWebhook(options integrations.WebhookOpti
 	//
 	// Create a notification resource to receive events from Semaphore
 	//
-	notification, err := i.createSemaphoreNotification(resourceName, options)
+	notification, err := i.createSemaphoreNotification(resourceName, options.URL, options.Parent)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Semaphore notification: %v", err)
 	}
 
 	return []integrations.Resource{secret, notification}, nil
+}
+
+type WebhookMetadata struct {
+	Secret       WebhookSecretMetadata       `json:"secret"`
+	Notification WebhookNotificationMetadata `json:"notification"`
+}
+
+type WebhookSecretMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type WebhookNotificationMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func (i *SemaphoreResourceManager) SetupWebhookV2(options integrations.WebhookOptionsV2) (any, error) {
+	//
+	// Semaphore doesn't let us use UUIDs in secret names,
+	// so we sha256 the ID before creating the secret.
+	//
+	hash := sha256.New()
+	hash.Write([]byte(options.ID))
+	suffix := fmt.Sprintf("%x", hash.Sum(nil))
+	name := fmt.Sprintf("superplane-webhook-%x", suffix[:16])
+
+	//
+	// Create Semaphore secret to store the event source key.
+	//
+	secret, err := i.createSemaphoreSecret(name, options.Secret)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Semaphore secret: %v", err)
+	}
+
+	//
+	// Create a notification resource to receive events from Semaphore
+	//
+	notification, err := i.createSemaphoreNotification(name, options.URL, options.Resource)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Semaphore notification: %v", err)
+	}
+
+	return WebhookMetadata{
+		Secret:       WebhookSecretMetadata{ID: secret.Id(), Name: secret.Name()},
+		Notification: WebhookNotificationMetadata{ID: notification.Id(), Name: notification.Name()},
+	}, nil
 }
 
 func (i *SemaphoreResourceManager) createSemaphoreSecret(name string, key []byte) (integrations.Resource, error) {
@@ -656,7 +765,7 @@ func (i *SemaphoreResourceManager) createSemaphoreSecret(name string, key []byte
 	return secret, nil
 }
 
-func (i *SemaphoreResourceManager) createSemaphoreNotification(name string, options integrations.WebhookOptions) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) createSemaphoreNotification(name string, URL string, resource integrations.Resource) (integrations.Resource, error) {
 	//
 	// Check if notification already exists.
 	//
@@ -675,16 +784,16 @@ func (i *SemaphoreResourceManager) createSemaphoreNotification(name string, opti
 		Spec: NotificationSpec{
 			Rules: []NotificationRule{
 				{
-					Name: fmt.Sprintf("webhook-for-%s", options.Parent.Name()),
+					Name: fmt.Sprintf("webhook-for-%s", resource.Name()),
 					Filter: NotificationRuleFilter{
 						Branches:  []string{},
 						Pipelines: []string{},
-						Projects:  []string{options.Parent.Name()},
+						Projects:  []string{resource.Name()},
 						Results:   []string{},
 					},
 					Notify: NotificationRuleNotify{
 						Webhook: NotificationNotifyWebhook{
-							Endpoint: options.URL,
+							Endpoint: URL,
 							Secret:   name,
 						},
 					},
@@ -721,6 +830,31 @@ func (i *SemaphoreResourceManager) CleanupWebhook(parentResource integrations.Re
 		if err != nil {
 			return fmt.Errorf("error deleting secret: %v", err)
 		}
+	}
+
+	return nil
+}
+
+func (i *SemaphoreResourceManager) CleanupWebhookV2(options integrations.WebhookOptionsV2) error {
+	metadata := WebhookMetadata{}
+	err := mapstructure.Decode(options.Metadata, &metadata)
+	if err != nil {
+		return fmt.Errorf("error decoding webhook metadata: %v", err)
+	}
+
+	// Delete notification
+	notificationURL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", i.URL, metadata.Notification.ID)
+	_, err = i.execRequest(http.MethodDelete, notificationURL, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting notification: %v", err)
+	}
+
+	// For secrets, we can attempt to delete them by name pattern
+	// Since we created secrets with a specific naming convention
+	secretURL := fmt.Sprintf("%s/api/v1beta/secrets/%s", i.URL, metadata.Secret.Name)
+	_, err = i.execRequest(http.MethodDelete, secretURL, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting secret: %v", err)
 	}
 
 	return nil

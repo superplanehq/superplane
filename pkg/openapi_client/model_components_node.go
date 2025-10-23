@@ -24,8 +24,10 @@ type ComponentsNode struct {
 	Name *string `json:"name,omitempty"`
 	Type *ComponentsNodeType `json:"type,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	Component *NodeComponentRef `json:"component,omitempty"`
 	Blueprint *NodeBlueprintRef `json:"blueprint,omitempty"`
+	Trigger *NodeTriggerRef `json:"trigger,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -177,6 +179,38 @@ func (o *ComponentsNode) SetConfiguration(v map[string]interface{}) {
 	o.Configuration = v
 }
 
+// GetMetadata returns the Metadata field value if set, zero value otherwise.
+func (o *ComponentsNode) GetMetadata() map[string]interface{} {
+	if o == nil || IsNil(o.Metadata) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.Metadata
+}
+
+// GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetMetadataOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Metadata) {
+		return map[string]interface{}{}, false
+	}
+	return o.Metadata, true
+}
+
+// HasMetadata returns a boolean if a field has been set.
+func (o *ComponentsNode) HasMetadata() bool {
+	if o != nil && !IsNil(o.Metadata) {
+		return true
+	}
+
+	return false
+}
+
+// SetMetadata gets a reference to the given map[string]interface{} and assigns it to the Metadata field.
+func (o *ComponentsNode) SetMetadata(v map[string]interface{}) {
+	o.Metadata = v
+}
+
 // GetComponent returns the Component field value if set, zero value otherwise.
 func (o *ComponentsNode) GetComponent() NodeComponentRef {
 	if o == nil || IsNil(o.Component) {
@@ -241,6 +275,38 @@ func (o *ComponentsNode) SetBlueprint(v NodeBlueprintRef) {
 	o.Blueprint = &v
 }
 
+// GetTrigger returns the Trigger field value if set, zero value otherwise.
+func (o *ComponentsNode) GetTrigger() NodeTriggerRef {
+	if o == nil || IsNil(o.Trigger) {
+		var ret NodeTriggerRef
+		return ret
+	}
+	return *o.Trigger
+}
+
+// GetTriggerOk returns a tuple with the Trigger field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetTriggerOk() (*NodeTriggerRef, bool) {
+	if o == nil || IsNil(o.Trigger) {
+		return nil, false
+	}
+	return o.Trigger, true
+}
+
+// HasTrigger returns a boolean if a field has been set.
+func (o *ComponentsNode) HasTrigger() bool {
+	if o != nil && !IsNil(o.Trigger) {
+		return true
+	}
+
+	return false
+}
+
+// SetTrigger gets a reference to the given NodeTriggerRef and assigns it to the Trigger field.
+func (o *ComponentsNode) SetTrigger(v NodeTriggerRef) {
+	o.Trigger = &v
+}
+
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -263,11 +329,17 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
 	}
+	if !IsNil(o.Metadata) {
+		toSerialize["metadata"] = o.Metadata
+	}
 	if !IsNil(o.Component) {
 		toSerialize["component"] = o.Component
 	}
 	if !IsNil(o.Blueprint) {
 		toSerialize["blueprint"] = o.Blueprint
+	}
+	if !IsNil(o.Trigger) {
+		toSerialize["trigger"] = o.Trigger
 	}
 	return toSerialize, nil
 }

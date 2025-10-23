@@ -170,17 +170,31 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_NODE_EXECUTION_REQUEST_WORKER") == "yes" {
-		log.Println("Starting Node Execution Request Worker")
+	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
+		log.Println("Starting Node Request Worker")
 
-		w := workers.NewNodeExecutionRequestWorker(registry)
+		w := workers.NewNodeRequestWorker(registry)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Workflow Node Queue Worker")
 
-		w := workers.NewWorkflowNodeQueueWorker(registry)
+		w := workers.NewWorkflowNodeQueueWorker()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_WEBHOOK_PROVISIONER") == "yes" {
+		log.Println("Starting Webhook Provisioner")
+
+		w := workers.NewWebhookProvisioner(baseURL, registry)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_WEBHOOK_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Webhook Cleanup Worker")
+
+		w := workers.NewWebhookCleanupWorker(registry)
 		go w.Start(context.Background())
 	}
 }

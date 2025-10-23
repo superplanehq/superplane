@@ -128,14 +128,16 @@ type ActionContext struct {
 }
 
 const (
-	FieldTypeString      = "string"
-	FieldTypeNumber      = "number"
-	FieldTypeBool        = "boolean"
-	FieldTypeSelect      = "select"
-	FieldTypeMultiSelect = "multi_select"
-	FieldTypeURL         = "url"
-	FieldTypeList        = "list"
-	FieldTypeObject      = "object"
+	FieldTypeString              = "string"
+	FieldTypeNumber              = "number"
+	FieldTypeBool                = "boolean"
+	FieldTypeSelect              = "select"
+	FieldTypeMultiSelect         = "multi-select"
+	FieldTypeIntegration         = "integration"
+	FieldTypeIntegrationResource = "integration-resource"
+	FieldTypeURL                 = "url"
+	FieldTypeList                = "list"
+	FieldTypeObject              = "object"
 )
 
 type ConfigurationField struct {
@@ -156,6 +158,7 @@ type ConfigurationField struct {
 	 * - boolean
 	 * - select
 	 * - multi_select
+	 * - integration
 	 * - date
 	 * - url
 	 * - list
@@ -186,8 +189,17 @@ type TypeOptions struct {
 	Number      *NumberTypeOptions      `json:"number,omitempty"`
 	Select      *SelectTypeOptions      `json:"select,omitempty"`
 	MultiSelect *MultiSelectTypeOptions `json:"multi_select,omitempty"`
+	Integration *IntegrationTypeOptions `json:"integration,omitempty"`
+	Resource    *ResourceTypeOptions    `json:"resource,omitempty"`
 	List        *ListTypeOptions        `json:"list,omitempty"`
 	Object      *ObjectTypeOptions      `json:"object,omitempty"`
+}
+
+/*
+ * ResourceTypeOptions specifies which resource type to display
+ */
+type ResourceTypeOptions struct {
+	Type string `json:"type"`
 }
 
 /*
@@ -210,6 +222,13 @@ type SelectTypeOptions struct {
  */
 type MultiSelectTypeOptions struct {
 	Options []FieldOption `json:"options"`
+}
+
+/*
+ * IntegrationTypeOptions specifies which integration type to display
+ */
+type IntegrationTypeOptions struct {
+	Type string `json:"type"`
 }
 
 /*

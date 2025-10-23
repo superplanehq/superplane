@@ -14,7 +14,7 @@ import {
   NodeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useWorkflow, useUpdateWorkflow } from '../../hooks/useWorkflowData'
+import { useWorkflow, useUpdateWorkflow, useTriggers } from '../../hooks/useWorkflowData'
 import { useComponents, useBlueprints } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
 import { MaterialSymbol } from '../../components/MaterialSymbol/material-symbol'
@@ -43,7 +43,12 @@ import {
   WorkflowFilterNode,
   WorkflowSwitchNode,
   WorkflowApprovalNode,
-  WorkflowDefaultNode
+  WorkflowDefaultNode,
+  WorkflowStartTriggerNode,
+  WorkflowScheduledTriggerNode,
+  WorkflowWebhookTriggerNode,
+  WorkflowGithubTriggerNode,
+  WorkflowSemaphoreTriggerNode
 } from './components/nodes'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
@@ -53,6 +58,11 @@ const nodeTypes: NodeTypes = {
   filter: WorkflowFilterNode,
   switch: WorkflowSwitchNode,
   approval: WorkflowApprovalNode,
+  start: WorkflowStartTriggerNode,
+  schedule: WorkflowScheduledTriggerNode,
+  webhook: WorkflowWebhookTriggerNode,
+  github: WorkflowGithubTriggerNode,
+  semaphore: WorkflowSemaphoreTriggerNode,
   default: WorkflowDefaultNode,
 }
 
@@ -99,7 +109,7 @@ type BuildingBlock = {
   name: string
   label?: string
   description?: string
-  type: 'component' | 'blueprint'
+  type: 'trigger' | 'component' | 'blueprint'
   outputChannels?: { name: string }[]
   configuration?: any[]
 }
@@ -113,21 +123,23 @@ export const Workflow = () => {
   const [nodeName, setNodeName] = useState('')
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'components' | 'blueprints'>('components')
+  const [activeTab, setActiveTab] = useState<'triggers' | 'components' | 'blueprints'>('triggers')
   const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string; componentLabel?: string; blueprintId?: string } | null>(null)
   const [emitModalNode, setEmitModalNode] = useState<{ id: string; name: string; channels: string[] } | null>(null)
 
-  // Fetch workflow, components, and blueprints
+  // Fetch workflow, components, blueprints, and triggers
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!)
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!)
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!)
+  const { data: triggers = [], isLoading: triggersLoading } = useTriggers()
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!)
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
-  // Combine components and blueprints into building blocks
+  // Combine components, blueprints, and triggers into building blocks
   const buildingBlocks: BuildingBlock[] = [
+    ...triggers.map((t: any) => ({ ...t, type: 'trigger' as const })),
     ...components.map((p: any) => ({ ...p, type: 'component' as const })),
     ...blueprints.map((b: any) => ({ ...b, type: 'blueprint' as const }))
   ]
@@ -142,6 +154,8 @@ export const Workflow = () => {
       const block = buildingBlocks.find((b: BuildingBlock) => {
         if (node.data.blockType === 'component') {
           return b.name === node.data.blockName && b.type === 'component'
+        } else if (node.data.blockType === 'trigger') {
+          return b.name === node.data.blockName && b.type === 'trigger'
         } else {
           return (b as any).id === node.data.blockId && b.type === 'blueprint'
         }
@@ -179,21 +193,32 @@ export const Workflow = () => {
 
     const loadedNodes: Node[] = (workflow.nodes || []).map((node: any) => {
       const isComponent = node.type === 'TYPE_COMPONENT'
-      const blockName = isComponent ? node.component?.name : node.blueprint?.name
-      const blockId = isComponent ? node.component?.name : node.blueprint?.id
+      const isTrigger = node.type === 'TYPE_TRIGGER'
+      const isBlueprint = node.type === 'TYPE_BLUEPRINT'
+
+      const blockName = isComponent ? node.component?.name
+                      : isTrigger ? node.trigger?.name
+                      : node.blueprint?.name
+      const blockId = isComponent ? node.component?.name
+                    : isTrigger ? node.trigger?.name
+                    : node.blueprint?.id
+
       const block = buildingBlocks.find((b: BuildingBlock) => {
         if (isComponent) {
           return b.name === blockName && b.type === 'component'
-        } else {
+        } else if (isTrigger) {
+          return b.name === blockName && b.type === 'trigger'
+        } else if (isBlueprint) {
           // For blueprints, match by ID since blueprint nodes reference by ID, not name
           return (b as any).id === blockId && b.type === 'blueprint'
         }
+        return false
       })
 
       const channels = block?.outputChannels?.map((channel: any) => channel.name) || ['default']
 
-      // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
-      const nodeType = isComponent && blockName && nodeTypes[blockName as keyof typeof nodeTypes]
+      // Use component or trigger name as node type if it exists in nodeTypes, otherwise use 'default'
+      const nodeType = blockName && nodeTypes[blockName as keyof typeof nodeTypes]
         ? blockName
         : 'default'
 
@@ -204,9 +229,10 @@ export const Workflow = () => {
           label: node.name,
           blockName,
           blockId,
-          blockType: isComponent ? 'component' : 'blueprint',
+          blockType: isComponent ? 'component' : isTrigger ? 'trigger' : 'blueprint',
           channels,
           configuration: node.configuration || {},
+          metadata: node.metadata || {},
           onEdit: () => handleNodeEdit(node.id),
           onEmit: () => handleNodeEmit(node.id),
         },
@@ -255,6 +281,8 @@ export const Workflow = () => {
     const block = buildingBlocks.find((b: BuildingBlock) => {
       if (node.data.blockType === 'component') {
         return b.name === node.data.blockName && b.type === 'component'
+      } else if (node.data.blockType === 'trigger') {
+        return b.name === node.data.blockName && b.type === 'trigger'
       } else {
         // For blueprints, match by ID
         return (b as any).id === node.data.blockId && b.type === 'blueprint'
@@ -264,7 +292,7 @@ export const Workflow = () => {
       id: node.id,
       name: node.data.label as string,
       isBlueprintNode: node.data.blockType === 'blueprint',
-      nodeType: node.data.blockName as string,
+      nodeType: node.data.blockType as string,
       componentLabel: block?.label,
       blueprintId: node.data.blockType === 'blueprint' ? node.data.blockId as string : undefined
     })
@@ -311,10 +339,8 @@ export const Workflow = () => {
       const channels = selectedBlock?.outputChannels?.map((channel: any) => channel.name) || ['default']
       const newNodeId = generateNodeId(selectedBlock.name || 'node', nodeName.trim())
 
-      // Use block name as node type if it exists in nodeTypes and is a component
-      const nodeType = selectedBlock.type === 'component' &&
-                      selectedBlock.name &&
-                      nodeTypes[selectedBlock.name as keyof typeof nodeTypes]
+      // Use block name as node type if it exists in nodeTypes (works for both components and triggers)
+      const nodeType = selectedBlock.name && nodeTypes[selectedBlock.name as keyof typeof nodeTypes]
         ? selectedBlock.name
         : 'default'
 
@@ -357,13 +383,17 @@ export const Workflow = () => {
         const baseNode: any = {
           id: node.id,
           name: node.data.label,
-          type: node.data.blockType === 'component' ? 'TYPE_COMPONENT' : 'TYPE_BLUEPRINT',
+          type: node.data.blockType === 'component' ? 'TYPE_COMPONENT'
+              : node.data.blockType === 'trigger' ? 'TYPE_TRIGGER'
+              : 'TYPE_BLUEPRINT',
           configuration: node.data.configuration || {},
         }
 
-        // Add either component or blueprint reference directly on the node
+        // Add either component, blueprint, or trigger reference directly on the node
         if (node.data.blockType === 'component') {
           baseNode.component = { name: node.data.blockName }
+        } else if (node.data.blockType === 'trigger') {
+          baseNode.trigger = { name: node.data.blockName }
         } else {
           baseNode.blueprint = { id: node.data.blockId }
         }
@@ -391,7 +421,7 @@ export const Workflow = () => {
     }
   }
 
-  if (workflowLoading || componentsLoading || blueprintsLoading) {
+  if (workflowLoading || componentsLoading || blueprintsLoading || triggersLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -460,8 +490,11 @@ export const Workflow = () => {
               >
                 <MaterialSymbol name="menu_open" size="lg" />
               </Button>
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'components' | 'blueprints')} className="flex-1">
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'triggers' | 'components' | 'blueprints')} className="flex-1">
                 <TabsList className="w-full">
+                  <TabsTrigger value="triggers" className="flex-1">
+                    Triggers
+                  </TabsTrigger>
                   <TabsTrigger value="components" className="flex-1">
                     Components
                   </TabsTrigger>
@@ -474,7 +507,43 @@ export const Workflow = () => {
 
             {/* Tab Content */}
             <div className="flex-1 overflow-hidden px-4">
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'components' | 'blueprints')} className="flex-1 flex flex-col h-full">
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'triggers' | 'components' | 'blueprints')} className="flex-1 flex flex-col h-full">
+                <TabsContent value="triggers" className="flex-1 overflow-y-auto text-left mt-4 data-[state=inactive]:hidden">
+                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
+                    Click on a trigger to add it to your workflow
+                  </div>
+                  <ItemGroup>
+                    {buildingBlocks.filter(b => b.type === 'trigger').map((block: BuildingBlock) => {
+                      // Map trigger name to icon
+                      const iconMap: Record<string, string> = {
+                        webhook: 'webhook',
+                        schedule: 'schedule',
+                        start: 'play_circle',
+                      }
+                      const icon = iconMap[block.name] || 'bolt'
+
+                      return (
+                        <Item
+                          key={`${block.type}-${block.name}`}
+                          onClick={() => handleBlockClick(block)}
+                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                          size="sm"
+                        >
+                          <ItemMedia>
+                            <MaterialSymbol name={icon} size="lg" className="text-purple-600 dark:text-purple-400" />
+                          </ItemMedia>
+                          <ItemContent>
+                            <ItemTitle>{block.label || block.name}</ItemTitle>
+                            {block.description && (
+                              <ItemDescription>{block.description}</ItemDescription>
+                            )}
+                          </ItemContent>
+                        </Item>
+                      )
+                    })}
+                  </ItemGroup>
+                </TabsContent>
+
                 <TabsContent value="components" className="flex-1 overflow-y-auto text-left mt-4 data-[state=inactive]:hidden">
                   <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
                     Click on a component to add it to your workflow
@@ -634,6 +703,9 @@ export const Workflow = () => {
                         field={field}
                         value={nodeConfiguration[field.name]}
                         onChange={(value) => setNodeConfiguration({ ...nodeConfiguration, [field.name]: value })}
+                        allValues={nodeConfiguration}
+                        domainId={organizationId}
+                        domainType="DOMAIN_TYPE_ORGANIZATION"
                       />
                     ))}
                   </div>

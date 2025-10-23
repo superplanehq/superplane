@@ -6,6 +6,11 @@ import { FilterNode } from '../../../pages/blueprint/components/nodes/FilterNode
 import { SwitchNode } from '../../../pages/blueprint/components/nodes/SwitchNode'
 import { ApprovalNode } from '../../../pages/blueprint/components/nodes/ApprovalNode'
 import { DefaultNode } from '../../../pages/blueprint/components/nodes/DefaultNode'
+import { StartTriggerNode } from '../../blueprint/components/nodes/StartTriggerNode'
+import { ScheduledTriggerNode } from '../../../pages/blueprint/components/nodes/ScheduledTriggerNode'
+import { WebhookTriggerNode } from '../../../pages/blueprint/components/nodes/WebhookTriggerNode'
+import { GithubTriggerNode } from '../../../pages/blueprint/components/nodes/GithubTriggerNode'
+import { SemaphoreTriggerNode } from '../../../pages/blueprint/components/nodes/SemaphoreTriggerNode'
 
 export const WorkflowIfNode = (props: NodeProps) => (
   <WorkflowNodeWrapper
@@ -56,6 +61,51 @@ export const WorkflowDefaultNode = (props: NodeProps) => (
   <WorkflowNodeWrapper
     {...props}
     BaseNodeComponent={DefaultNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowStartTriggerNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={StartTriggerNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowScheduledTriggerNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={ScheduledTriggerNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowWebhookTriggerNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={WebhookTriggerNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowGithubTriggerNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={GithubTriggerNode}
+    onEdit={props.data.onEdit as (() => void) | undefined}
+    onEmit={props.data.onEmit as (() => void) | undefined}
+  />
+)
+
+export const WorkflowSemaphoreTriggerNode = (props: NodeProps) => (
+  <WorkflowNodeWrapper
+    {...props}
+    BaseNodeComponent={SemaphoreTriggerNode}
     onEdit={props.data.onEdit as (() => void) | undefined}
     onEmit={props.data.onEmit as (() => void) | undefined}
   />

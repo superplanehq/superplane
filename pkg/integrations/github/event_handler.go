@@ -86,9 +86,9 @@ func (i *GitHubEventHandler) Status(eventType string, eventPayload []byte) (inte
 }
 
 type Webhook struct {
-	ID          int64
-	WebhookName string
-	Repo        *Repository
+	ID          int64  `json:"id"`
+	WebhookName string `json:"name"`
+	WebhookURL  string `json:"-"`
 }
 
 func (h *Webhook) Id() string {
@@ -101,4 +101,8 @@ func (h *Webhook) Name() string {
 
 func (h *Webhook) Type() string {
 	return ResourceTypeWebHook
+}
+
+func (h *Webhook) URL() string {
+	return h.WebhookURL
 }

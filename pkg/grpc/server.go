@@ -18,6 +18,7 @@ import (
 	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	secretPb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	triggerPb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWorkflows "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -94,9 +95,14 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 
 	componentService := NewComponentService(registry)
 	pbComponents.RegisterComponentsServer(grpcServer, componentService)
+
+	triggerService := NewTriggerService(registry)
+	triggerPb.RegisterTriggersServer(grpcServer, triggerService)
+
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
-	workflowService := NewWorkflowService(registry)
+
+	workflowService := NewWorkflowService(registry, encryptor)
 	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
 
 	reflection.Register(grpcServer)

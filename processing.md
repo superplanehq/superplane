@@ -450,3 +450,73 @@ nodes:
     component:
       name: http
 ```
+
+## Triggers
+
+The difference between triggers and components is that triggers cannot be connected to.
+
+You can emit an event for any node in the workflow with:
+  /api/v1/workflows/{workflow_id}/nodes/{node_id}/events
+
+Trigger nodes may also have another endpoint, which uses different authentication than the one used by the API:
+  /api/v1/webhooks/{webhook_id}
+
+The handler for that endpoint will find the webhook and its handlers, and invoke the actions specified on them.
+
+
+
+How do I give the plain key back to the user?
+When I update the schedule configuration, the next_trigger should be updated too.
+
+I'm thinking of going back to the Setup() method instead of the Start() one.
+
+We also need a way to reset the secret for webhook triggers
+
+scheduled trigger
+
+1. PUT /workflows/{id} with trigger node with configuration
+2. WorkflowNode record in pending state is created
+3. Trigger.Init() is called, populating the node metadata with next_trigger
+4. WorkflowNodeProvisioner picks pending workflow_node record
+5. WorkflowNodeProvisioner calls Trigger.Setup() - nothing to be done
+6. workflow_node record is updated to ready state
+
+webhook trigger
+
+1. PUT /workflows/{id} with trigger node with configuration
+2. WorkflowNode record in pending state is created
+3. Trigger.Init() is called, populating the node metadata with webhook ID, and returning the key
+4. WorkflowNodeProvisioner picks pending workflow_node record
+5. WorkflowNodeProvisioner calls Trigger.Setup() - nothing to be done
+6. workflow_node record is updated to ready state
+
+github trigger
+
+1. PUT /workflows/{id} with trigger node with configuration
+2. WorkflowNode record in pending state is created
+3. Trigger.Init() is called, populating the node metadata with webhook ID
+4. WorkflowNodeProvisioner picks pending workflow_node record
+5. WorkflowNodeProvisioner calls Trigger.Setup() - webhook is created in github using values in webhook
+6. workflow_node record is updated to ready state
+
+a workflow node has none or one webhook
+a webhook can be shared between multiple workflow nodes
+each webhook has specific configuration
+
+
+workflow_nodes:
+```
+WF_ID NODE_ID  WEBHOOK METADATA              CONFIGURATION
+wf1   node1    hook1   {"repository": {...}} {"integration": "integration1", "repository": "repository1", "events": ["pull_request"]}
+wf1   node2    hook2   {}                    {"integration": "integration1", "repository": "repository1", "events": ["push"]}
+wf1   node3    hook3   {}                    {"integration": "integration1", "repository": "repository1"}
+wf1   node4    hook3   {}                    {"integration": "integration1", "repository": "repository1"}
+```
+
+webhooks:
+```
+ID        SECRET     STATE    CONFIGURATION                INTEGRATION_ID EXTERNAL_RESOURCE_ID
+webhook1  secret1    ready    {"events": ["pull_request"]} integration1   repository1
+webhook2  secret2    pending  {"events": ["push"]}         integration1   repository1
+webhook3  secret3    ready    {"events": ["workflow_run"]} integration1   repository1
+```

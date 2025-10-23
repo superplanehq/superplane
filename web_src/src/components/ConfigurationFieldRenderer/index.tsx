@@ -12,14 +12,21 @@ import { DateFieldRenderer } from './DateFieldRenderer'
 import { UrlFieldRenderer } from './UrlFieldRenderer'
 import { ListFieldRenderer } from './ListFieldRenderer'
 import { ObjectFieldRenderer } from './ObjectFieldRenderer'
+import { IntegrationFieldRenderer } from './IntegrationFieldRenderer'
+import { IntegrationResourceFieldRenderer } from './IntegrationResourceFieldRenderer'
 
-interface ConfigurationFieldRendererProps extends FieldRendererProps {}
+interface ConfigurationFieldRendererProps extends FieldRendererProps {
+  domainId?: string
+  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION"
+}
 
 export const ConfigurationFieldRenderer = ({
   field,
   value,
   onChange,
-  allValues = {}
+  allValues = {},
+  domainId,
+  domainType
 }: ConfigurationFieldRendererProps) => {
   // Check visibility conditions
   const isVisible = React.useMemo(() => {
@@ -71,7 +78,7 @@ export const ConfigurationFieldRenderer = ({
       case 'select':
         return <SelectFieldRenderer {...commonProps} />
 
-      case 'multi_select':
+      case 'multi-select':
         return <MultiSelectFieldRenderer {...commonProps} />
 
       case 'date':
@@ -79,6 +86,12 @@ export const ConfigurationFieldRenderer = ({
 
       case 'url':
         return <UrlFieldRenderer {...commonProps} />
+
+      case 'integration':
+        return <IntegrationFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} domainType={domainType} />
+
+      case 'integration-resource':
+        return <IntegrationResourceFieldRenderer field={field} value={value} onChange={onChange} allValues={allValues} domainId={domainId} domainType={domainType} />
 
       case 'list':
         return <ListFieldRenderer {...commonProps} />
