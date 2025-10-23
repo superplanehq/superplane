@@ -95,6 +95,7 @@ type TriggerActionContext struct {
 type WebhookRequestContext struct {
 	Body           []byte
 	Headers        http.Header
+	Configuration  any
 	WebhookContext WebhookContext
 	EventContext   EventContext
 }

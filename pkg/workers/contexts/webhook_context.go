@@ -91,8 +91,11 @@ func (c *WebhookContext) findOrCreateWebhook(options *triggers.WebhookSetupOptio
 	}
 
 	if options.Resource != nil {
-		webhook.ResourceType = options.Resource.Type()
-		webhook.ResourceID = options.Resource.Id()
+		webhook.Resource = datatypes.NewJSONType(models.WebhookResource{
+			ID:   options.Resource.Id(),
+			Name: options.Resource.Name(),
+			Type: options.Resource.Type(),
+		})
 	}
 
 	if options.Configuration != nil {

@@ -354,7 +354,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Webhook endpoints for triggers
 	//
 	publicRoute.
-		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleTriggerWebhook).
+		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
@@ -709,7 +709,7 @@ func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]a
 	return outputs, nil
 }
 
-func (s *Server) HandleTriggerWebhook(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	webhookIDFromRequest := vars["webhookID"]
 	webhookID, err := uuid.Parse(webhookIDFromRequest)
@@ -775,6 +775,7 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return trigger.HandleWebhook(triggers.WebhookRequestContext{
 		Body:           body,
 		Headers:        headers,
+		Configuration:  node.Configuration.Data(),
 		WebhookContext: contexts.NewWebhookContext(ctx, tx, s.encryptor, &node),
 		EventContext:   contexts.NewEventContext(tx, &node),
 	})

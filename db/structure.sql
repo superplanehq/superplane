@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8du3CBGktb6PVIe1bVu9hFub4JgydjhhsCPoynOVR35Q02jMPy2PmNxK6TKX2kD
+\restrict 8OZPDKRdl2soUHbcqTZB7hxrOirkQfnLqAqCcVfwJjddHQuwRtBXpQdnVhPiUT5
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -541,8 +541,7 @@ CREATE TABLE public.webhooks (
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     integration_id uuid,
-    resource_type character varying(64) NOT NULL,
-    resource_id character varying(128) NOT NULL,
+    resource jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     deleted_at timestamp without time zone
@@ -609,14 +608,14 @@ CREATE TABLE public.workflow_node_queue_items (
 CREATE TABLE public.workflow_node_requests (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
-    node_id character varying(128) NOT NULL,
     execution_id uuid,
     state character varying(32) NOT NULL,
     type character varying(32) NOT NULL,
     spec jsonb NOT NULL,
     run_at timestamp without time zone NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    node_id character varying(128) NOT NULL
 );
 
 
@@ -632,10 +631,10 @@ CREATE TABLE public.workflow_nodes (
     type character varying(32) NOT NULL,
     ref jsonb NOT NULL,
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
-    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    webhook_id uuid
+    webhook_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -1022,6 +1021,14 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
+-- Name: workflow_node_requests workflow_node_execution_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT workflow_node_execution_requests_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_node_executions workflow_node_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1035,14 +1042,6 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 ALTER TABLE ONLY public.workflow_node_queue_items
     ADD CONSTRAINT workflow_node_queue_items_pkey PRIMARY KEY (id);
-
-
---
--- Name: workflow_node_requests workflow_node_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_requests_pkey PRIMARY KEY (id);
 
 
 --
@@ -1520,6 +1519,22 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
+-- Name: workflow_node_requests workflow_node_execution_requests_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT workflow_node_execution_requests_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_requests workflow_node_execution_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_requests
+    ADD CONSTRAINT workflow_node_execution_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_node_executions workflow_node_executions_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1584,22 +1599,6 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 
 --
--- Name: workflow_node_requests workflow_node_requests_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_requests_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
-
-
---
--- Name: workflow_node_requests workflow_node_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_requests_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
-
-
---
 -- Name: workflow_node_requests workflow_node_requests_workflow_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1627,13 +1626,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8du3CBGktb6PVIe1bVu9hFub4JgydjhhsCPoynOVR35Q02jMPy2PmNxK6TKX2kD
+\unrestrict 8OZPDKRdl2soUHbcqTZB7hxrOirkQfnLqAqCcVfwJjddHQuwRtBXpQdnVhPiUT5
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict HgBBgeacNYxFFxPnd1YbhnqJ3TUsNxJPPeNigWL8hJQFIYZ1hwdhSjZOI1KADt0
+\restrict EGSNZ89atcoVf35JmhffVM7ZprJkNhdpFlU8WvAHUaihrQMoGscjIMQKfB5MCxa
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1655,7 +1654,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251021205905	f
+20251023214856	f
 \.
 
 
@@ -1663,5 +1662,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HgBBgeacNYxFFxPnd1YbhnqJ3TUsNxJPPeNigWL8hJQFIYZ1hwdhSjZOI1KADt0
+\unrestrict EGSNZ89atcoVf35JmhffVM7ZprJkNhdpFlU8WvAHUaihrQMoGscjIMQKfB5MCxa
 

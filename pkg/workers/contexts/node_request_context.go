@@ -20,8 +20,8 @@ func NewNodeRequestContext(tx *gorm.DB, node *models.WorkflowNode) components.Re
 }
 
 func (c *NodeRequestContext) ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error {
-	if interval < time.Minute {
-		return fmt.Errorf("interval must be at least 1 minute")
+	if interval < 10*time.Second {
+		return fmt.Errorf("interval must be bigger than 10s")
 	}
 
 	err := c.completeCurrentRequestForNode()

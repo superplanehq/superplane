@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -187,7 +188,20 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 		return http.StatusOK, nil
 	}
 
-	// TODO: check if event type is in list of chosen ones
+	config := Configuration{}
+	err := mapstructure.Decode(ctx.Configuration, &config)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	//
+	// If event is not in the list of chosen events, ignore it.
+	//
+	if !slices.ContainsFunc(config.Events, func(event string) bool {
+		return event == eventType
+	}) {
+		return http.StatusOK, nil
+	}
 
 	signature = strings.TrimPrefix(signature, "sha256=")
 	if signature == "" {

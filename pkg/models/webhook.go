@@ -22,11 +22,16 @@ type Webhook struct {
 	Configuration datatypes.JSONType[any]
 	Metadata      datatypes.JSONType[any]
 	IntegrationID *uuid.UUID
-	ResourceType  string
-	ResourceID    string
+	Resource      datatypes.JSONType[WebhookResource]
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`
+}
+
+type WebhookResource struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func (w *Webhook) Ready(tx *gorm.DB) error {

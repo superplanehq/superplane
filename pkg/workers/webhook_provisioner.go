@@ -88,7 +88,8 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 		return err
 	}
 
-	resource, err := resourceManager.Get(webhook.ResourceType, webhook.ResourceID)
+	webhookResource := webhook.Resource.Data()
+	resource, err := resourceManager.Get(webhookResource.Type, webhookResource.ID)
 	if err != nil {
 		return err
 	}

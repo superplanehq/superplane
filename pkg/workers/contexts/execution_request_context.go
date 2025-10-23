@@ -5,25 +5,26 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/components"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 type ExecutionRequestContext struct {
+	tx        *gorm.DB
 	execution *models.WorkflowNodeExecution
 }
 
-func NewExecutionRequestContext(execution *models.WorkflowNodeExecution) components.RequestContext {
-	return &ExecutionRequestContext{execution: execution}
+func NewExecutionRequestContext(tx *gorm.DB, execution *models.WorkflowNodeExecution) components.RequestContext {
+	return &ExecutionRequestContext{tx: tx, execution: execution}
 }
 
 func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error {
-	if interval < time.Minute {
-		return fmt.Errorf("interval must be at least 1 minute")
+	if interval < 10*time.Second {
+		return fmt.Errorf("interval must be bigger than 10s")
 	}
 
 	runAt := time.Now().Add(interval)
-	return c.execution.CreateRequest(database.Conn(), models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
+	return c.execution.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{
 			ActionName: actionName,
 			Parameters: parameters,

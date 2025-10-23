@@ -82,8 +82,9 @@ type ResourceManager interface {
 	SetupWebhookV2(options WebhookOptionsV2) (any, error)
 
 	//
-	// Clean up a webhook for an integration resource.
-	// Used when a stage's integration or resource changes to clean up the old webhook.
+	// New method cleaning up a webhook.
+	// `any` type is used because the configuration and the metadata
+	// are integration-specific.
 	//
 	CleanupWebhookV2(options WebhookOptionsV2) error
 }

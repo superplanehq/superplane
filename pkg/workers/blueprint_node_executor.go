@@ -116,7 +116,7 @@ func (w *BlueprintNodeExecutor) processExecution(tx *gorm.DB, execution *models.
 		Data:                  input,
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
-		RequestContext:        contexts.NewExecutionRequestContext(execution),
+		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
 	}
 
 	if err := component.Execute(ctx); err != nil {
