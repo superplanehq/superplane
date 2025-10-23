@@ -7,8 +7,7 @@ import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
-import { applyNodeChanges, type NodeChange } from "@xyflow/react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CanvasPage } from "./index";
 
 const meta = {
@@ -37,6 +36,7 @@ const sampleNodes: Node[] = [
         iconSrc: githubIcon,
         iconBackground: "bg-black",
         headerColor: "bg-gray-100",
+        collapsedBackground: "bg-black",
         metadata: [
           { icon: "book", label: "monarch-app" },
           { icon: "filter", label: "branch=main" },
@@ -61,6 +61,7 @@ const sampleNodes: Node[] = [
         title: "DockerHub",
         iconSrc: dockerIcon,
         headerColor: "bg-sky-100",
+        collapsedBackground: "bg-sky-100",
         metadata: [
           { icon: "box", label: "monarch-app-base-image" },
           { icon: "filter", label: "push" },
@@ -87,6 +88,7 @@ const sampleNodes: Node[] = [
         iconSlug: "git-branch",
         iconColor: "text-purple-700",
         headerColor: "bg-purple-100",
+        collapsedBackground: "bg-purple-100",
         parameters: [],
         parametersIcon: "map",
         lastRunItem: {
@@ -128,6 +130,7 @@ const sampleNodes: Node[] = [
         iconSlug: "hand",
         iconColor: "text-orange-500",
         headerColor: "bg-orange-100",
+        collapsedBackground: "bg-orange-100",
         approvals: [
           {
             title: "Security",
@@ -187,6 +190,7 @@ const sampleNodes: Node[] = [
         iconSrc: KubernetesIcon,
         headerColor: "bg-blue-100",
         iconBackground: "bg-blue-500",
+        collapsedBackground: "bg-blue-500",
         parameters: ["us-west-1", "us-east-1"],
         parametersIcon: "map",
         lastRunItem: {
@@ -225,6 +229,7 @@ const sampleNodes: Node[] = [
         iconSrc: KubernetesIcon,
         headerColor: "bg-blue-100",
         iconBackground: "bg-blue-500",
+        collapsedBackground: "bg-blue-500",
         parameters: ["eu-global-1", "eu-global-2"],
         parametersIcon: "map",
         lastRunItem: {
@@ -277,6 +282,7 @@ const sampleNodes: Node[] = [
         iconSrc: KubernetesIcon,
         headerColor: "bg-blue-100",
         iconBackground: "bg-blue-500",
+        collapsedBackground: "bg-blue-500",
         parameters: ["asia-east-1"],
         parametersIcon: "map",
         lastRunItem: {
@@ -313,26 +319,22 @@ export const SimpleDeployment: Story = {
     nodes: sampleNodes,
     edges: sampleEdges,
   },
-  render: (args) => {
-    const [nodes, setNodes] = useState<Node[]>(args.nodes ?? []);
-    const [edges] = useState<Edge[]>(args.edges ?? []);
-
-    const onNodesChange = useCallback((changes: NodeChange[]) => {
-      setNodes((nds) => applyNodeChanges(changes, nds));
-    }, []);
+  render: function SimpleDeploymentRender(args) {
+    const [simulationNodes, setSimulationNodes] = useState<Node[]>(args.nodes ?? []);
+    const simulationEdges = useMemo(() => args.edges ?? [], [args.edges]);
 
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
     const runSimulation = useCallback(async () => {
-      if (!nodes || nodes.length === 0) return;
+      if (!simulationNodes || simulationNodes.length === 0) return;
 
       const outgoing = new Map<string, string[]>();
-      edges?.forEach((e) => {
+      simulationEdges?.forEach((e) => {
         if (!outgoing.has(e.source)) outgoing.set(e.source, []);
         outgoing.get(e.source)!.push(e.target);
       });
 
-      const start = nodes.find((n) => n.type === "input") ?? nodes[0];
+      const start = simulationNodes.find((n) => n.type === "input") ?? simulationNodes[0];
       if (!start) return;
 
       const event = { at: Date.now(), msg: "run" } as const;
@@ -350,7 +352,7 @@ export const SimpleDeployment: Story = {
           frontier.map((f) => [f.id, f.value] as const)
         );
 
-        setNodes((prev) =>
+        setSimulationNodes((prev) =>
           prev.map((n) =>
             layerIds.includes(n.id)
               ? {
@@ -369,7 +371,7 @@ export const SimpleDeployment: Story = {
         await sleep(5000);
 
         // turn off working state for this layer
-        setNodes((prev) =>
+        setSimulationNodes((prev) =>
           prev.map((n) =>
             layerIds.includes(n.id)
               ? { ...n, data: { ...n.data, state: "pending" } }
@@ -384,7 +386,7 @@ export const SimpleDeployment: Story = {
           const nexts = outgoing.get(id) ?? [];
           nexts.forEach((nid) => {
             if (!visited.has(nid)) {
-              const transformed = { ...((value as any) ?? {}), via: id };
+              const transformed = { ...(value as Record<string, unknown> ?? {}), via: id };
               next.push({ id: nid, value: transformed });
             }
           });
@@ -392,7 +394,7 @@ export const SimpleDeployment: Story = {
 
         frontier = next;
       }
-    }, [nodes, edges]);
+    }, [simulationNodes, simulationEdges]);
 
     return (
       <div className="h-[100vh] w-full ">
@@ -404,7 +406,7 @@ export const SimpleDeployment: Story = {
             Run
           </button>
         </div>
-        <CanvasPage {...args} nodes={nodes} edges={edges} />
+        <CanvasPage {...args} nodes={simulationNodes} edges={simulationEdges} />
       </div>
     );
   },
@@ -412,61 +414,14 @@ export const SimpleDeployment: Story = {
 
 export const CollapsedDeployment: Story = {
   args: {
-    nodes: sampleNodes.map(node => {
-      if (node.data.type === "composite") {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            composite: {
-              ...node.data.composite!,
-              collapsed: true,
-              collapsedBackground: node.id === "build-stage" ? "bg-purple-100" : "bg-blue-500"
-            }
-          }
-        };
-      }
-      if (node.data.type === "approval") {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            approval: {
-              ...node.data.approval!,
-              collapsed: true,
-              collapsedBackground: "bg-orange-100"
-            }
-          }
-        };
-      }
-      if (node.data.type === "trigger") {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            trigger: {
-              ...node.data.trigger!,
-              collapsed: true,
-              collapsedBackground: node.id === "listen-code" ? "bg-black" : "bg-sky-100"
-            }
-          }
-        };
-      }
-      return node;
-    }),
+    nodes: sampleNodes,
     edges: sampleEdges,
+    startCollapsed: true,
   },
   render: (args) => {
-    const [nodes, setNodes] = useState<Node[]>(args.nodes ?? []);
-    const [edges] = useState<Edge[]>(args.edges ?? []);
-
-    const onNodesChange = useCallback((changes: NodeChange[]) => {
-      setNodes((nds) => applyNodeChanges(changes, nds));
-    }, []);
-
     return (
       <div className="h-[100vh] w-full ">
-        <CanvasPage {...args} nodes={nodes} edges={edges} />
+        <CanvasPage {...args} />
       </div>
     );
   },
