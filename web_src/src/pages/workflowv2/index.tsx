@@ -1,9 +1,11 @@
 import { useParams } from "react-router-dom";
+
 import {
   ComponentsEdge,
   ComponentsNode,
   WorkflowsWorkflow,
 } from "../../api-client";
+
 import { useWorkflow } from "../../hooks/useWorkflowData";
 import { CanvasPage } from "../../ui/CanvasPage";
 
@@ -46,8 +48,8 @@ function prepareNode(node: ComponentsNode): CanvasPage.Node {
 
 function prepareEdge(edge: ComponentsEdge): CanvasPage.Edge {
   return {
-    // id: edge.id!,
-    // source: edge.sourceNodeId!,
-    // target: edge.targetNodeId!,
+    id: edge.channel!,
+    source: edge.sourceId!,
+    target: edge.targetId!,
   };
 }
