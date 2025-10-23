@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react"
 import { Approval, type ApprovalProps } from "./index"
 
 const meta = {
-  title: "components/Approval",
+  title: "components/ApprovalLegacy",
   component: Approval,
   tags: ["autodocs"],
   parameters: {

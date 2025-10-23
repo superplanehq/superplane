@@ -63,15 +63,15 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
     <>
       <div className="flex items-center justify-center">
         {approved ? (
-          <div className="flex size-6 items-center justify-center rounded-full bg-emerald-500">
-            <Check className="size-4 text-white" />
+          <div className="flex size-5 items-center justify-center rounded-full bg-emerald-500">
+            <Check className="size-3 text-white" />
           </div>
         ) : rejected ? (
-          <div className="flex size-6 items-center justify-center rounded-full bg-red-500">
-            <X className="size-4 text-white" />
+          <div className="flex size-5 items-center justify-center rounded-full bg-red-500">
+            <X className="size-3 text-white" />
           </div>
         ) : (
-          <Circle className="size-6 text-muted-foreground" strokeDasharray="4 4" />
+          <Circle className="size-5 text-muted-foreground" strokeDasharray="4 4" />
         )}
       </div>
       <ItemContent>
@@ -130,7 +130,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            size="sm"
+            className="h-15 py-1 px-2"
             onClick={(e) => {
               e.preventDefault()
               setShowRejectionForm(true)
@@ -140,7 +140,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           </Button>
           <Button
             variant="default"
-            size="sm"
+            className="h-15 py-1 px-2"
             onClick={(e) => {
               e.preventDefault()
               if (requireArtifacts.length > 0) {
@@ -184,11 +184,11 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
   if (interactive) {
     return (
       <>
-        <Item variant="outline" size="sm" className={cn("w-full border-0 border-t border-border px-2 py-1.5", className)}>
+        <Item variant="outline" size="sm" className={cn("w-full border-0  border-border px-2 py-1.5", className)}>
           {content}
         </Item>
         {showRejectionForm && (
-          <div className="w-full border-0 border-t border-border bg-gray-50 p-6 rounded-lg">
+          <div className="w-full border bg-gray-50 px-3 py-2 my-2 rounded-lg">
             <div className="flex flex-col gap-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -203,12 +203,13 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 placeholder="Enter the reason for rejection..."
                 value={rejectionCommentInput}
                 onChange={(e) => setRejectionCommentInput(e.target.value)}
-                className="w-full"
+                className="w-full outline-none focus-visible:ring-0 focus-visible:ring-offset-0 "
               />
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   size="default"
+                  className="h-15 py-1 px-2"
                   onClick={() => {
                     setShowRejectionForm(false)
                     setRejectionCommentInput("")
@@ -219,6 +220,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <Button
                   variant="default"
                   size="default"
+                  className="h-15 py-1 px-2"
                   onClick={() => {
                     onReject?.(rejectionCommentInput)
                     setShowRejectionForm(false)
@@ -233,7 +235,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           </div>
         )}
         {showApprovalForm && (
-          <div className="w-full border-0 border-t border-border bg-gray-50 p-6 rounded-lg">
+          <div className="w-full border my-2 bg-gray-50 px-3 py-2 rounded-lg">
             <div className="flex flex-col gap-4">
               {requireArtifacts.map((artifact, index) => (
                 <div key={index} className="flex flex-col gap-2">
@@ -243,23 +245,23 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                         {artifact.label}
                       </Label>
                       <span className="ml-2 text-sm text-muted-foreground">
-                        {artifact.optional ? "Optional" : "Required"}
+                        {artifact.optional ? "Optional" : ""}
                       </span>
                     </div>
                   </div>
                   <Input
                     id={`artifact-${index}`}
-                    placeholder="Please provide link to the artifact"
+                    placeholder={"Enter " + artifact.label + "..."}
                     value={artifacts[artifact.label] || ""}
                     onChange={(e) => setArtifacts(prev => ({ ...prev, [artifact.label]: e.target.value }))}
-                    className="w-full"
+                    className="w-full outline-none  focus-visible:ring-0 focus-visible:ring-offset-0"
                   />
                 </div>
               ))}
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
-                  size="default"
+                  className="h-15 py-1 px-2"
                   onClick={() => {
                     setShowApprovalForm(false)
                     setArtifacts({})
@@ -269,7 +271,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </Button>
                 <Button
                   variant="default"
-                  size="default"
+                  className="h-15 py-1 px-2"
                   onClick={() => {
                     onApprove?.(artifacts)
                     setShowApprovalForm(false)

@@ -1,6 +1,7 @@
-import { BookMarked, type LucideIcon } from "lucide-react";
-import * as LucideIcons from "lucide-react"
+import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
+import { ComponentHeader } from "../componentHeader";
+import { CollapsedComponent } from "../collapsedComponent";
 
 interface TriggerMetadataItem {
   icon: string;
@@ -17,56 +18,24 @@ interface TriggerLastEventData {
 }
 
 export interface TriggerProps {
-  iconSrc: string;
+  iconSrc?: string;
+  iconSlug?: string;
+  iconColor?: string;
   iconBackground?: string;
   headerColor: string;
   title: string;
+  description?: string;
   metadata: TriggerMetadataItem[];
   lastEventData: TriggerLastEventData;
   collapsedBackground?: string;
   collapsed?: boolean;
 }
 
-export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconBackground, headerColor, title, metadata, lastEventData, collapsed = false, collapsedBackground }) => {
-  const resolveIcon = React.useCallback((slug?: string): LucideIcon => {
-    if (!slug) {
-      return BookMarked
-    }
-
-    const pascalCase = slug
-      .split("-")
-      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join("")
-
-    const candidate = (LucideIcons as Record<string, unknown>)[pascalCase]
-
-    if (
-      candidate &&
-      (typeof candidate === "function" ||
-        (typeof candidate === "object" && "render" in candidate))
-    ) {
-      return candidate as LucideIcon
-    }
-
-    return BookMarked
-  }, [])
-
+export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, lastEventData, collapsed = false, collapsedBackground }) => {
   const timeAgo = React.useMemo(() => {
     const now = new Date()
     const diff = now.getTime() - lastEventData.receivedAt.getTime()
-    const seconds = Math.floor(diff / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-    const days = Math.floor(hours / 24)
-    if (days > 0) {
-      return `${days}d`
-    } else if (hours > 0) {
-      return `${hours}h`
-    } else if (minutes > 0) {
-      return `${minutes}m`
-    } else {
-      return `${seconds}s`
-    }
+    return calcRelativeTimeFromDiff(diff)
   }, [lastEventData])
 
   const LastEventIcon = React.useMemo(() => {
@@ -93,14 +62,20 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconBackground, heade
     }
   }, [lastEventData])
 
+
+
   if (collapsed) {
     return (
-      <div className="flex w-fit flex-col items-center bg-white">
-        <div className={`flex h-20 w-20 items-center justify-center rounded-full border border-border ${collapsedBackground || ''}`}>
-          <img src={iconSrc} alt={title} className="h-12 w-12 object-contain" />
-        </div>
-        <h2 className="text-base font-semibold text-neutral-900 pt-1">{title}</h2>
-        <div className="flex flex-col items-center gap-1 mt-2">
+      <CollapsedComponent
+        iconSrc={iconSrc}
+        iconSlug={iconSlug}
+        iconColor={iconColor}
+        iconBackground={iconBackground}
+        title={title}
+        collapsedBackground={collapsedBackground}
+        shape="circle"
+      >
+        <div className="flex flex-col items-center gap-1">
           {metadata.map((item, index) => {
             const Icon = resolveIcon(item.icon)
             return (
@@ -111,18 +86,21 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconBackground, heade
             )
           })}
         </div>
-      </div>
+      </CollapsedComponent>
     )
   }
 
   return (
     <div className="flex flex-col border border-border rounded-md w-[23rem]" >
-      <div className={"px-2 flex border-b p-2 gap-2 rounded-t-md items-center " + headerColor}>
-        <div className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
-          <img src={iconSrc} alt={title} className="w-5 h-5 " />
-        </div>
-        <h2 className="text-md font-semibold">{title}</h2>
-      </div>
+      <ComponentHeader
+        iconSrc={iconSrc}
+        iconSlug={iconSlug}
+        iconBackground={iconBackground}
+        iconColor={iconColor}
+        headerColor={headerColor}
+        title={title}
+        description={description}
+      />
       <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
         {metadata.map((item, index) => {
           const Icon = resolveIcon(item.icon)
