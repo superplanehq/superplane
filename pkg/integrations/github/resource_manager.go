@@ -116,6 +116,7 @@ func (i *GitHubResourceManager) SetupWebhookV2(options integrations.WebhookOptio
 	return &Webhook{
 		ID:          createdHook.GetID(),
 		WebhookName: *createdHook.Name,
+		WebhookURL:  createdHook.GetURL(),
 	}, nil
 }
 
@@ -167,6 +168,7 @@ func (i *GitHubResourceManager) createRepositoryWebhook(options integrations.Web
 		&Webhook{
 			ID:          createdHook.GetID(),
 			WebhookName: *createdHook.Name,
+			WebhookURL:  createdHook.GetURL(),
 		},
 	}, nil
 }

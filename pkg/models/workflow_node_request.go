@@ -72,6 +72,24 @@ func ListNodeRequests() ([]WorkflowNodeRequest, error) {
 	return requests, nil
 }
 
+func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*WorkflowNodeRequest, error) {
+	var request WorkflowNodeRequest
+
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Where("execution_id IS NULL").
+		Where("state = ?", NodeExecutionRequestStatePending).
+		First(&request).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &request, nil
+}
+
 func (r *WorkflowNodeRequest) Complete(tx *gorm.DB) error {
 	return tx.Model(r).
 		Update("state", NodeExecutionRequestStateCompleted).

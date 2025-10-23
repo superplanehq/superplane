@@ -13,9 +13,9 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
 
   // Convert options to the format expected by MultiCombobox
   const comboboxOptions: SelectOption[] = multiSelectOptions.map((opt) => ({
-    id: opt.value,
-    label: opt.label,
-    value: opt.value,
+    id: opt.value!,
+    label: opt.label!,
+    value: opt.value!,
   }))
 
   // Get current selected values

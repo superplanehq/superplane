@@ -46,7 +46,9 @@ import {
   WorkflowDefaultNode,
   WorkflowManualTriggerNode,
   WorkflowScheduledTriggerNode,
-  WorkflowWebhookTriggerNode
+  WorkflowWebhookTriggerNode,
+  WorkflowGithubTriggerNode,
+  WorkflowSemaphoreTriggerNode
 } from './components/nodes'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
@@ -59,6 +61,8 @@ const nodeTypes: NodeTypes = {
   manual: WorkflowManualTriggerNode,
   schedule: WorkflowScheduledTriggerNode,
   webhook: WorkflowWebhookTriggerNode,
+  github: WorkflowGithubTriggerNode,
+  semaphore: WorkflowSemaphoreTriggerNode,
   default: WorkflowDefaultNode,
 }
 
@@ -204,10 +208,11 @@ export const Workflow = () => {
           return b.name === blockName && b.type === 'component'
         } else if (isTrigger) {
           return b.name === blockName && b.type === 'trigger'
-        } else {
+        } else if (isBlueprint) {
           // For blueprints, match by ID since blueprint nodes reference by ID, not name
           return (b as any).id === blockId && b.type === 'blueprint'
         }
+        return false
       })
 
       const channels = block?.outputChannels?.map((channel: any) => channel.name) || ['default']
@@ -416,7 +421,7 @@ export const Workflow = () => {
     }
   }
 
-  if (workflowLoading || componentsLoading || blueprintsLoading) {
+  if (workflowLoading || componentsLoading || blueprintsLoading || triggersLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

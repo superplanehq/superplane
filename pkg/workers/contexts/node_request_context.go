@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -23,6 +24,11 @@ func (c *NodeRequestContext) ScheduleActionCall(actionName string, parameters ma
 		return fmt.Errorf("interval must be at least 1 minute")
 	}
 
+	err := c.completeCurrentRequestForNode()
+	if err != nil {
+		return err
+	}
+
 	runAt := time.Now().Add(interval)
 	return c.node.CreateRequest(c.tx, models.NodeRequestTypeInvokeAction, models.NodeExecutionRequestSpec{
 		InvokeAction: &models.InvokeAction{
@@ -30,4 +36,17 @@ func (c *NodeRequestContext) ScheduleActionCall(actionName string, parameters ma
 			Parameters: parameters,
 		},
 	}, &runAt)
+}
+
+func (c *NodeRequestContext) completeCurrentRequestForNode() error {
+	request, err := models.FindPendingRequestForNode(c.tx, c.node.WorkflowID, c.node.NodeID)
+	if err == nil {
+		return request.Complete(c.tx)
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+
+	return err
 }

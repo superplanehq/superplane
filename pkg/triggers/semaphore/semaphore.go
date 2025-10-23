@@ -101,6 +101,11 @@ func (s *Semaphore) Setup(ctx triggers.TriggerContext) error {
 		return fmt.Errorf("integration is required")
 	}
 
+	integrationID, err := uuid.Parse(config.Integration)
+	if err != nil {
+		return fmt.Errorf("integration ID is invalid: %w", err)
+	}
+
 	if config.Project == "" {
 		return fmt.Errorf("project is required")
 	}
@@ -113,11 +118,6 @@ func (s *Semaphore) Setup(ctx triggers.TriggerContext) error {
 	resource, err := integration.Get("project", config.Project)
 	if err != nil {
 		return fmt.Errorf("failed to find project %s: %w", config.Project, err)
-	}
-
-	integrationID, err := uuid.Parse(config.Integration)
-	if err != nil {
-		return fmt.Errorf("integration ID is invalid: %w", err)
 	}
 
 	err = ctx.WebhookContext.Setup(&triggers.WebhookSetupOptions{
@@ -134,7 +134,7 @@ func (s *Semaphore) Setup(ctx triggers.TriggerContext) error {
 		Project: &Project{
 			ID:   resource.Id(),
 			Name: resource.Name(),
-			URL:  "",
+			URL:  resource.URL(),
 		},
 	})
 

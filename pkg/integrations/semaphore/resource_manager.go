@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
@@ -460,8 +461,28 @@ func (i *SemaphoreResourceManager) getPipeline(id string) (integrations.Resource
 	return pipelineResponse.Pipeline, nil
 }
 
-func (i *SemaphoreResourceManager) getProject(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", i.URL, id)
+func (i *SemaphoreResourceManager) getProject(idOrName string) (integrations.Resource, error) {
+	_, err := uuid.Parse(idOrName)
+	if err != nil {
+		return i.getProjectByName(idOrName)
+	}
+
+	projects, err := i.listProjects()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, project := range projects {
+		if project.Id() == idOrName {
+			return project, nil
+		}
+	}
+
+	return nil, fmt.Errorf("project %s not found", idOrName)
+}
+
+func (i *SemaphoreResourceManager) getProjectByName(name string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", i.URL, name)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
@@ -473,7 +494,7 @@ func (i *SemaphoreResourceManager) getProject(id string) (integrations.Resource,
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	project.ProjectURL = fmt.Sprintf("%s/projects/%s", i.URL, id)
+	project.ProjectURL = fmt.Sprintf("%s/projects/%s", i.URL, name)
 	return &project, nil
 }
 
@@ -676,6 +697,21 @@ func (i *SemaphoreResourceManager) SetupWebhook(options integrations.WebhookOpti
 	return []integrations.Resource{secret, notification}, nil
 }
 
+type WebhookMetadata struct {
+	Secret       WebhookSecretMetadata       `json:"secret"`
+	Notification WebhookNotificationMetadata `json:"notification"`
+}
+
+type WebhookSecretMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type WebhookNotificationMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 func (i *SemaphoreResourceManager) SetupWebhookV2(options integrations.WebhookOptionsV2) (any, error) {
 	//
 	// Semaphore doesn't let us use UUIDs in secret names,
@@ -702,7 +738,10 @@ func (i *SemaphoreResourceManager) SetupWebhookV2(options integrations.WebhookOp
 		return nil, fmt.Errorf("error creating Semaphore notification: %v", err)
 	}
 
-	return []integrations.Resource{secret, notification}, nil
+	return WebhookMetadata{
+		Secret:       WebhookSecretMetadata{ID: secret.Id(), Name: secret.Name()},
+		Notification: WebhookNotificationMetadata{ID: notification.Id(), Name: notification.Name()},
+	}, nil
 }
 
 func (i *SemaphoreResourceManager) createSemaphoreSecret(name string, key []byte) (integrations.Resource, error) {

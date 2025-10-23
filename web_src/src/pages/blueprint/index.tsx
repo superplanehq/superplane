@@ -39,6 +39,8 @@ import { SwitchNode } from './components/nodes/SwitchNode'
 import { DefaultNode } from './components/nodes/DefaultNode'
 import { ApprovalNode } from './components/nodes/ApprovalNode'
 import { OutputChannelNode } from './components/nodes/OutputChannelNode'
+import { GithubTriggerNode } from './components/nodes/GithubTriggerNode'
+import { SemaphoreTriggerNode } from './components/nodes/SemaphoreTriggerNode'
 import { ConfigurationFieldRenderer } from '../../components/ConfigurationFieldRenderer'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs'
@@ -53,6 +55,8 @@ const nodeTypes: NodeTypes = {
   approval: ApprovalNode,
   default: DefaultNode,
   outputChannel: OutputChannelNode,
+  github: GithubTriggerNode,
+  semaphore: SemaphoreTriggerNode,
 }
 
 const elk = new ELK()

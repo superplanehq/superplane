@@ -29,7 +29,7 @@ const (
 type Schedule struct{}
 
 type Metadata struct {
-	NextTrigger *time.Time `mapstructure:"next_trigger" json:"next_trigger"`
+	NextTrigger *string `json:"nextTrigger"`
 }
 
 type Configuration struct {
@@ -126,12 +126,30 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	var metadata Metadata
+	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata: %w", err)
+	}
+
 	nextTrigger, err := getNextTrigger(config, time.Now())
 	if err != nil {
 		return err
 	}
 
-	// TODO: cancel previously scheduled action if it exists
+	//
+	// If the configuration didn't change, don't schedule a new action.
+	//
+	if metadata.NextTrigger != nil {
+		currentTrigger, err := time.Parse(time.RFC3339, *metadata.NextTrigger)
+		if err != nil {
+			return fmt.Errorf("error parsing next trigger: %v", err)
+		}
+
+		if currentTrigger.Sub(*nextTrigger).Abs() < time.Second {
+			return nil
+		}
+	}
 
 	//
 	// Always schedule the next and save the next trigger in the metadata.
@@ -141,7 +159,8 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 		return err
 	}
 
-	ctx.MetadataContext.Set(Metadata{NextTrigger: nextTrigger})
+	formatted := nextTrigger.Format(time.RFC3339)
+	ctx.MetadataContext.Set(Metadata{NextTrigger: &formatted})
 	return nil
 }
 
@@ -186,7 +205,8 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 		return err
 	}
 
-	ctx.MetadataContext.Set(Metadata{NextTrigger: nextTrigger})
+	formatted := nextTrigger.Format(time.RFC3339)
+	ctx.MetadataContext.Set(Metadata{NextTrigger: &formatted})
 	return nil
 }
 
