@@ -53,6 +53,8 @@ export interface CompositeProps {
 
 export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, startLastValuesOpen = false }) => {
   const [showLastRunValues, setShowLastRunValues] = React.useState(startLastValuesOpen)
+  const [showWaitingInfo, setShowWaitingInfo] = React.useState(false)
+
   const timeAgo = React.useMemo(() => {
     const now = new Date()
     const diff = now.getTime() - lastRunItem.receivedAt.getTime()
@@ -121,6 +123,18 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
     return resolveIcon("corner-down-right")
   }, [])
 
+  const ExpandChildEventsIcon = React.useMemo(() => {
+    return resolveIcon("expand")
+  }, [])
+
+  const ReRunChildEventsIcon = React.useMemo(() => {
+    return resolveIcon("rotate-ccw")
+  }, [])
+
+  const hasWaitingInfos = React.useMemo(() => {
+    return (lastRunItem?.childEventsInfo?.waitingInfos?.length || 0) > 0
+  }, [lastRunItem])
+
   if (collapsed) {
     return (
       <CollapsedComponent
@@ -131,19 +145,16 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         title={title}
         collapsedBackground={collapsedBackground}
         shape="rounded"
-      />
+      >
+        {parameters.length > 0 && (
+          <div className="flex items-center gap-2 text-gray-500 mt-1">
+            <ParametersIcon size={16} />
+            <span className="text-sm font-mono">{parameters.join(", ")}</span>
+          </div>
+        )}
+      </CollapsedComponent>
     )
   }
-
-
-
-  const ExpandChildEventsIcon = React.useMemo(() => {
-    return resolveIcon("expand")
-  }, [])
-
-  const ReRunChildEventsIcon = React.useMemo(() => {
-    return resolveIcon("rotate-ccw")
-  }, [])
 
   return (
     <div className="flex flex-col border border-border rounded-md w-[26rem] bg-white" >
@@ -162,7 +173,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <ParametersIcon size={19} />
-            <span className="text-sm">{parameters.join(", ")}</span>
+            <span className="text-sm font-mono">{parameters.join(", ")}</span>
           </div>
         </div>
       }
@@ -199,7 +210,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         {lastRunItem.childEventsInfo && (
           <div className="mt-3 ml-3 text-gray-500">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 w-full">
+              <div onClick={() => hasWaitingInfos && setShowWaitingInfo(!showWaitingInfo)} className={"flex items-center gap-2 w-full " + (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")}>
                 <ChildEventsArrowIcon size={18} className="text-gray-500" />
                 <span className="text-sm">{lastRunItem.childEventsInfo.count} child event{lastRunItem.childEventsInfo.count === 1 ? "" : "s"} {lastRunItem.childEventsInfo.state || ""}</span>
               </div>
@@ -208,7 +219,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
                 <ReRunChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onReRunChildEvents} />
               </div>
             </div>
-            {lastRunItem.childEventsInfo.waitingInfos && (
+            {hasWaitingInfos && showWaitingInfo && (
               <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
                 {lastRunItem.childEventsInfo.waitingInfos.map((waitingInfo) => {
                   const Icon = resolveIcon(waitingInfo.icon)

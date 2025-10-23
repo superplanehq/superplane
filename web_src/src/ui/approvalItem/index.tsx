@@ -130,7 +130,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            className="h-15 py-1 px-2"
+            className="h-7 py-1 px-2"
             onClick={(e) => {
               e.preventDefault()
               setShowRejectionForm(true)
@@ -140,7 +140,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           </Button>
           <Button
             variant="default"
-            className="h-15 py-1 px-2"
+            className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
             onClick={(e) => {
               e.preventDefault()
               if (requireArtifacts.length > 0) {
@@ -209,7 +209,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <Button
                   variant="outline"
                   size="default"
-                  className="h-15 py-1 px-2"
+                  className="h-7 py-1 px-2"
                   onClick={() => {
                     setShowRejectionForm(false)
                     setRejectionCommentInput("")
@@ -220,7 +220,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <Button
                   variant="default"
                   size="default"
-                  className="h-15 py-1 px-2"
+                  className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
                   onClick={() => {
                     onReject?.(rejectionCommentInput)
                     setShowRejectionForm(false)
@@ -261,7 +261,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
-                  className="h-15 py-1 px-2"
+                  className="h-7 py-1 px-2"
                   onClick={() => {
                     setShowApprovalForm(false)
                     setArtifacts({})
@@ -271,7 +271,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </Button>
                 <Button
                   variant="default"
-                  className="h-15 py-1 px-2"
+                  className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
                   onClick={() => {
                     onApprove?.(artifacts)
                     setShowApprovalForm(false)
