@@ -2,7 +2,8 @@ import React from "react";
 import { ApprovalItem, type ApprovalItemProps } from "../approvalItem";
 import { ItemGroup, ItemSeparator } from "../item";
 import { CircleDashedIcon } from "lucide-react"
-import { resolveIcon } from "@/lib/utils";
+import { ComponentHeader } from "../componentHeader";
+import { CollapsedComponent } from "../collapsedComponent";
 
 export interface AwaitingEvent {
   title: string;
@@ -47,33 +48,33 @@ export const Approval: React.FC<ApprovalProps> = ({ iconSrc, iconSlug, iconBackg
     return calcRelativeTimeFromDiff(diff)
   }, [receivedAt])
 
-  const Icon = React.useMemo(() => {
-    return resolveIcon(iconSlug)
-  }, [iconSlug])
 
 
   if (collapsed) {
     return (
-      <div className="flex w-fit flex-col items-center">
-        <div className={`flex h-20 w-20 items-center justify-center rounded-md border border-border ${collapsedBackground || ''}`}>
-          {iconSrc ? <img src={iconSrc} alt={title} className="h-12 w-12 object-contain" /> : <Icon size={30} className={iconColor} />}
-        </div>
-        <h2 className="text-base font-semibold text-neutral-900 pt-1">{title}</h2>
-      </div>
+      <CollapsedComponent
+        iconSrc={iconSrc}
+        iconSlug={iconSlug}
+        iconColor={iconColor}
+        iconBackground={iconBackground}
+        title={title}
+        collapsedBackground={collapsedBackground}
+        shape="rounded"
+      />
     )
   }
 
   return (
     <div className="flex flex-col border border-border rounded-md w-[30rem] bg-white" >
-      <div className={"w-full px-2 flex flex-col border-b p-2 gap-2 rounded-t-md items-center " + headerColor}>
-        <div className="w-full flex items-center gap-2">
-          <div className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
-            {iconSrc ? <img src={iconSrc} alt={title} className="w-5 h-5 " /> : <Icon size={20} className={iconColor} />}
-          </div>
-          <h2 className="text-md font-semibold">{title}</h2>
-        </div>
-        {description && <p className="w-full text-md text-gray-500 pl-8">{description}</p>}
-      </div>
+      <ComponentHeader
+        iconSrc={iconSrc}
+        iconSlug={iconSlug}
+        iconBackground={iconBackground}
+        iconColor={iconColor}
+        headerColor={headerColor}
+        title={title}
+        description={description}
+      />
 
       <div className="px-4 py-3">
         <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">

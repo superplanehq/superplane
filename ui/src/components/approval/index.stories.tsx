@@ -67,3 +67,11 @@ type Story = StoryObj<typeof meta>;
 export const ApprovalExpanded: Story = {
   args: approveRelease,
 };
+
+export const ApprovalCollapsed: Story = {
+  args: {
+    ...approveRelease,
+    collapsed: true,
+    collapsedBackground: "bg-orange-100",
+  },
+};
