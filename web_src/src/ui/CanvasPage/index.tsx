@@ -1,7 +1,6 @@
 import {
   Background,
-  BackgroundVariant,
-  MarkerType,
+  EdgeMarker,
   ReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
@@ -27,7 +26,7 @@ const EDGE_STYLE = {
     width: 20,
     height: 20,
     color: "#6B7280",
-  },
+  } as EdgeMarker,
 } as const;
 
 function CanvasPage(props: CanvasPage.Props) {

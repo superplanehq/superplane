@@ -56,8 +56,7 @@ function LeftHandle({ data }: BlockProps) {
 
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "approval" && data.approval?.collapsed) ||
-    (data.type === "trigger" && data.trigger?.collapsed);
+    (data.type === "approval" && data.approval?.collapsed);
 
   return (
     <Handle
