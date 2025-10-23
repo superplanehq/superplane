@@ -3,10 +3,11 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/triggers"
@@ -15,6 +16,22 @@ import (
 const MaxEventSize = 64 * 1024
 
 type GitHub struct{}
+
+type Metadata struct {
+	Repository *Repository `json:"repository"`
+}
+
+type Repository struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type Configuration struct {
+	Integration string   `json:"integration"`
+	Repository  string   `json:"repository"`
+	Events      []string `json:"events"`
+}
 
 func (g *GitHub) Name() string {
 	return "github"
@@ -26,10 +43,6 @@ func (g *GitHub) Label() string {
 
 func (g *GitHub) Description() string {
 	return "Start a new execution chain when something happens in your GitHub repository"
-}
-
-func (g *GitHub) OutputChannels() []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
 func (g *GitHub) Configuration() []components.ConfigurationField {
@@ -62,86 +75,144 @@ func (g *GitHub) Configuration() []components.ConfigurationField {
 				},
 			},
 		},
-	}
-}
-
-func (g *GitHub) Start(ctx triggers.TriggerContext) error {
-	return ctx.WebhookContext.Setup("handleWebhook")
-}
-
-func (g *GitHub) Actions() []components.Action {
-	return []components.Action{
 		{
-			Name:           "handleWebhook",
-			UserAccessible: false,
+			Name:     "events",
+			Label:    "Events",
+			Type:     components.FieldTypeMultiSelect,
+			Required: true,
+			VisibilityConditions: []components.VisibilityCondition{
+				{
+					Field:  "repository",
+					Values: []string{"*"},
+				},
+			},
+			TypeOptions: &components.TypeOptions{
+				MultiSelect: &components.MultiSelectTypeOptions{
+					Options: []components.FieldOption{
+						{
+							Value: "push",
+							Label: "Push",
+						},
+						{
+							Value: "pull_request",
+							Label: "Pull Request",
+						},
+					},
+				},
+			},
 		},
 	}
 }
 
-func (g *GitHub) HandleAction(ctx triggers.TriggerActionContext) error {
-	switch ctx.Name {
-	case "handleWebhook":
-		return g.handleWebhook(ctx, ctx.HttpRequestContext.Request, ctx.HttpRequestContext.Response)
-	default:
-		return fmt.Errorf("unknown action: %s", ctx.Name)
+func (g *GitHub) Setup(ctx triggers.TriggerContext) error {
+	var metadata Metadata
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
+
+	//
+	// If metadata is set, it means the trigger was already setup
+	//
+	if metadata.Repository != nil {
+		return nil
+	}
+
+	config := Configuration{}
+	err = mapstructure.Decode(ctx.Configuration, &config)
+	if err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Integration == "" {
+		return fmt.Errorf("integration is required")
+	}
+
+	if config.Repository == "" {
+		return fmt.Errorf("repository is required")
+	}
+
+	integration, err := ctx.IntegrationContext.GetIntegration(config.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get integration: %w", err)
+	}
+
+	resource, err := integration.Get("repository", config.Repository)
+	if err != nil {
+		return fmt.Errorf("failed to find repository %s: %w", config.Repository, err)
+	}
+
+	integrationID, err := uuid.Parse(config.Integration)
+	if err != nil {
+		return fmt.Errorf("integration ID is invalid: %w", err)
+	}
+
+	err = ctx.WebhookContext.Setup(&triggers.WebhookSetupOptions{
+		IntegrationID: &integrationID,
+		Resource:      resource,
+		Configuration: config,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to setup webhook: %w", err)
+	}
+
+	ctx.MetadataContext.Set(Metadata{
+		Repository: &Repository{
+			ID:   resource.Id(),
+			Name: resource.Name(),
+			URL:  resource.URL(),
+		},
+	})
+
+	return nil
 }
 
-// TODO: not sure how to surface the errors to the HTTP server
-func (g *GitHub) handleWebhook(ctx triggers.TriggerActionContext, r *http.Request, w http.ResponseWriter) error {
-	signature := r.Header.Get("X-Hub-Signature-256")
+func (g *GitHub) Actions() []components.Action {
+	return []components.Action{}
+}
+
+func (g *GitHub) HandleAction(ctx triggers.TriggerActionContext) error {
+	return nil
+}
+
+func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+	signature := ctx.Headers.Get("X-Hub-Signature-256")
 	if signature == "" {
-		http.Error(w, "Invalid signature", http.StatusForbidden)
-		return nil
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
-	eventType := r.Header.Get("X-GitHub-Event")
+	eventType := ctx.Headers.Get("X-GitHub-Event")
 	if eventType == "" {
-		http.Error(w, "Invalid X-GitHub-Event", http.StatusForbidden)
-		return nil
+		return http.StatusOK, nil
 	}
+
+	// TODO: check if event type is in list of chosen ones
 
 	signature = strings.TrimPrefix(signature, "sha256=")
 	if signature == "" {
-		http.Error(w, "Invalid signature", http.StatusForbidden)
-		return nil
-	}
-
-	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
-	defer r.Body.Close()
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		if _, ok := err.(*http.MaxBytesError); ok {
-			http.Error(
-				w,
-				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
-				http.StatusRequestEntityTooLarge,
-			)
-
-			return nil
-		}
-
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
-		return nil
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
 	secret, err := ctx.WebhookContext.GetSecret()
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return nil
+		return http.StatusInternalServerError, fmt.Errorf("error authenticating request")
 	}
 
-	if err := crypto.VerifySignature(secret, body, signature); err != nil {
-		http.Error(w, "Invalid signature", http.StatusForbidden)
-		return nil
+	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
+		return http.StatusForbidden, fmt.Errorf("invalid signature")
 	}
 
 	data := map[string]any{}
-	err = json.Unmarshal(body, &data)
+	err = json.Unmarshal(ctx.Body, &data)
 	if err != nil {
-		return err
+		return http.StatusBadRequest, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	return ctx.EventContext.Emit(data)
+	err = ctx.EventContext.Emit(data)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error emitting event: %v", err)
+	}
+
+	return http.StatusOK, nil
 }

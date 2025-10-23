@@ -3,7 +3,7 @@ package contexts
 import (
 	"context"
 	"fmt"
-	"log"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -30,22 +30,11 @@ func NewWebhookContext(tx *gorm.DB, ctx context.Context, encryptor crypto.Encryp
 }
 
 func (c *WebhookContext) GetSecret() ([]byte, error) {
-	metadata := c.node.Metadata.Data()
-	webhookReference := metadata["webhook"].(string)
-
-	//
-	// If webhook already exists, just return it
-	//
-	if webhookReference == "" {
-		return []byte{}, fmt.Errorf("webhook not found")
+	if c.node.WebhookID == nil {
+		return nil, fmt.Errorf("node does not have a webhook")
 	}
 
-	webhookID, err := uuid.Parse(webhookReference)
-	if err != nil {
-		return nil, err
-	}
-
-	webhook, err := models.FindWebhook(webhookID)
+	webhook, err := models.FindWebhook(*c.node.WebhookID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,61 +42,61 @@ func (c *WebhookContext) GetSecret() ([]byte, error) {
 	return c.encryptor.Decrypt(c.ctx, webhook.Secret, []byte(webhook.ID.String()))
 }
 
-func (c *WebhookContext) Setup(actionName string) error {
-	webhook, err := c.findOrCreateWebhook()
+func (c *WebhookContext) Setup(options *triggers.WebhookSetupOptions) error {
+	webhook, err := c.findOrCreateWebhook(options)
 	if err != nil {
 		return fmt.Errorf("failed to find or create webhook: %w", err)
 	}
 
-	handlers, err := models.FindWebhookHandlers(webhook.ID.String())
-	if err != nil {
-		return fmt.Errorf("failed to find webhook handlers: %w", err)
-	}
-
-	//
-	// If handler already exists, no need to create it again
-	//
-	handler := c.findHandler(handlers, actionName)
-	if handler != nil {
-		return nil
-	}
-
-	return models.CreateWebhookHandler(c.tx, c.node.WorkflowID, c.node.NodeID, webhook.ID, models.WebhookHandlerSpec{
-		InvokeAction: &models.InvokeAction{
-			ActionName: actionName,
-		},
-	})
+	c.node.WebhookID = &webhook.ID
+	return nil
 }
 
-func (c *WebhookContext) findOrCreateWebhook() (*models.Webhook, error) {
-	metadata := c.node.Metadata.Data()
-	webhookReference, ok := metadata["webhook"].(string)
-
+func (c *WebhookContext) findOrCreateWebhook(options *triggers.WebhookSetupOptions) (*models.Webhook, error) {
 	//
 	// If webhook already exists, just return it
 	//
-	if ok && webhookReference != "" {
-		webhookID, err := uuid.Parse(webhookReference)
-		if err != nil {
-			return nil, err
-		}
-
-		return models.FindWebhook(webhookID)
+	if c.node.WebhookID != nil {
+		return models.FindWebhook(*c.node.WebhookID)
 	}
 
 	//
 	// Otherwise, create it.
-	// TODO: how do we give the plain key back to the user?
 	//
 	webhookID := uuid.New()
-	plainText, encryptedKey, err := crypto.NewRandomKey(c.ctx, c.encryptor, webhookID.String())
+	_, encryptedKey, err := crypto.NewRandomKey(c.ctx, c.encryptor, webhookID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error generating key for new webhook: %v", err)
 	}
 
+	now := time.Now()
 	webhook := models.Webhook{
-		ID:     webhookID,
-		Secret: encryptedKey,
+		ID:        webhookID,
+		State:     models.WebhookStatePending,
+		Secret:    encryptedKey,
+		CreatedAt: &now,
+	}
+
+	if options == nil {
+		err = c.tx.Create(&webhook).Error
+		if err != nil {
+			return nil, err
+		}
+
+		return &webhook, nil
+	}
+
+	if options.IntegrationID != nil {
+		webhook.IntegrationID = options.IntegrationID
+	}
+
+	if options.Resource != nil {
+		webhook.ResourceType = options.Resource.Type()
+		webhook.ResourceID = options.Resource.Id()
+	}
+
+	if options.Configuration != nil {
+		webhook.Configuration = datatypes.NewJSONType(options.Configuration)
 	}
 
 	err = c.tx.Create(&webhook).Error
@@ -115,27 +104,5 @@ func (c *WebhookContext) findOrCreateWebhook() (*models.Webhook, error) {
 		return nil, err
 	}
 
-	log.Printf("New webhook created: %s", webhookID.String())
-	log.Printf("New webhook key: %s", plainText)
-
-	//
-	// Save webhook reference in node metadata.
-	//
-	metadata = map[string]any{
-		"webhook": webhook.ID.String(),
-	}
-
-	c.node.Metadata = datatypes.NewJSONType(metadata)
 	return &webhook, nil
-}
-
-func (c *WebhookContext) findHandler(handlers []models.WebhookHandler, actionName string) *models.WebhookHandler {
-	for _, handler := range handlers {
-		spec := handler.Spec.Data()
-		if handler.NodeID == c.node.NodeID && spec.InvokeAction != nil && spec.InvokeAction.ActionName == actionName {
-			return &handler
-		}
-	}
-
-	return nil
 }

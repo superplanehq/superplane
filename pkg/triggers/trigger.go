@@ -3,7 +3,9 @@ package triggers
 import (
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
 type Trigger interface {
@@ -32,9 +34,14 @@ type Trigger interface {
 	Configuration() []components.ConfigurationField
 
 	/*
-	 * Starts the trigger
+	 * Handler for webhooks
 	 */
-	Start(ctx TriggerContext) error
+	HandleWebhook(ctx WebhookRequestContext) (int, error)
+
+	/*
+	 * Setup the trigger.
+	 */
+	Setup(ctx TriggerContext) error
 
 	/*
 	 * Allows triggers to define custom actions.
@@ -48,16 +55,27 @@ type Trigger interface {
 }
 
 type TriggerContext struct {
-	Configuration   any
-	MetadataContext components.MetadataContext
-	RequestContext  components.RequestContext
-	EventContext    EventContext
-	WebhookContext  WebhookContext
+	Configuration      any
+	MetadataContext    components.MetadataContext
+	RequestContext     components.RequestContext
+	EventContext       EventContext
+	WebhookContext     WebhookContext
+	IntegrationContext IntegrationContext
+}
+
+type IntegrationContext interface {
+	GetIntegration(ID string) (integrations.ResourceManager, error)
 }
 
 type WebhookContext interface {
-	Setup(actionName string) error
+	Setup(options *WebhookSetupOptions) error
 	GetSecret() ([]byte, error)
+}
+
+type WebhookSetupOptions struct {
+	IntegrationID *uuid.UUID
+	Resource      integrations.Resource
+	Configuration any
 }
 
 type EventContext interface {
@@ -65,17 +83,18 @@ type EventContext interface {
 }
 
 type TriggerActionContext struct {
-	Name               string
-	Parameters         map[string]any
-	Configuration      any
-	MetadataContext    components.MetadataContext
-	RequestContext     components.RequestContext
-	EventContext       EventContext
-	WebhookContext     WebhookContext
-	HttpRequestContext *HttpRequestContext
+	Name            string
+	Parameters      map[string]any
+	Configuration   any
+	MetadataContext components.MetadataContext
+	RequestContext  components.RequestContext
+	EventContext    EventContext
+	WebhookContext  WebhookContext
 }
 
-type HttpRequestContext struct {
-	Request  *http.Request
-	Response http.ResponseWriter
+type WebhookRequestContext struct {
+	Body           []byte
+	Headers        http.Header
+	WebhookContext WebhookContext
+	EventContext   EventContext
 }

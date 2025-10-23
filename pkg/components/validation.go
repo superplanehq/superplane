@@ -52,8 +52,8 @@ func validateNumber(field ConfigurationField, value any) error {
 		return fmt.Errorf("must be at least %d", *options.Min)
 	}
 
-	if options.Max != nil && num > float64(*options.Min) {
-		return fmt.Errorf("must be at most %d", *options.Min)
+	if options.Max != nil && num > float64(*options.Max) {
+		return fmt.Errorf("must be at most %d", *options.Max)
 	}
 
 	return nil

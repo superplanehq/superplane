@@ -724,42 +724,58 @@ func (s *Server) HandleTriggerWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handlers, err := models.FindWebhookHandlers(webhookID.String())
+	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		if _, ok := err.(*http.MaxBytesError); ok {
+			http.Error(
+				w,
+				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
+				http.StatusRequestEntityTooLarge,
+			)
+
+			return
+		}
+
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+
+	nodes, err := models.FindWebhookNodes(webhookID)
 	if err != nil {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}
 
-	for _, handler := range handlers {
-		err = s.executeWebhookHandler(w, r, handler)
+	for _, node := range nodes {
+		code, err := s.executeWebhookNode(r.Context(), body, r.Header, node)
 		if err != nil {
-			log.Errorf("Error executing webhook handler: %v", err)
+			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
+			return
 		}
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) executeWebhookHandler(w http.ResponseWriter, r *http.Request, handler models.WebhookHandler) error {
-	workflowNode, err := models.FindWorkflowNode(database.Conn(), handler.WorkflowID, handler.NodeID)
-	if err != nil {
-		return fmt.Errorf("workflow node not found: %w", err)
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.WorkflowNode) (int, error) {
+	if node.Type != models.NodeTypeTrigger {
+		return http.StatusOK, nil
 	}
 
-	ref := workflowNode.Ref.Data()
+	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
-		return fmt.Errorf("trigger not found: %w", err)
+		return http.StatusInternalServerError, fmt.Errorf("trigger not found: %w", err)
 	}
 
-	spec := handler.Spec.Data()
-	return trigger.HandleAction(triggers.TriggerActionContext{
-		Name:               spec.InvokeAction.ActionName,
-		Parameters:         spec.InvokeAction.Parameters,
-		Configuration:      workflowNode.Configuration.Data(),
-		MetadataContext:    contexts.NewNodeMetadataContext(workflowNode),
-		RequestContext:     contexts.NewNodeRequestContext(database.Conn(), workflowNode),
-		EventContext:       contexts.NewEventContext(database.Conn(), workflowNode),
-		WebhookContext:     contexts.NewWebhookContext(database.Conn(), r.Context(), s.encryptor, workflowNode),
-		HttpRequestContext: &triggers.HttpRequestContext{Request: r, Response: w},
+	return trigger.HandleWebhook(triggers.WebhookRequestContext{
+		Body:           body,
+		Headers:        headers,
+		WebhookContext: contexts.NewWebhookContext(database.Conn(), ctx, s.encryptor, &node),
+		EventContext:   contexts.NewEventContext(database.Conn(), &node),
 	})
 }
 

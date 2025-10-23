@@ -78,7 +78,7 @@ export const ConfigurationFieldRenderer = ({
       case 'select':
         return <SelectFieldRenderer {...commonProps} />
 
-      case 'multi_select':
+      case 'multi-select':
         return <MultiSelectFieldRenderer {...commonProps} />
 
       case 'date':

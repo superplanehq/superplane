@@ -2,6 +2,7 @@ package schedule
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -50,8 +51,8 @@ func (s *Schedule) Description() string {
 	return "Start a new execution chain on a schedule"
 }
 
-func (s *Schedule) OutputChannels() []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+func (s *Schedule) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
 }
 
 func (s *Schedule) Configuration() []components.ConfigurationField {
@@ -86,15 +87,6 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 			},
 		},
 		{
-			Name:        "time",
-			Label:       "Time",
-			Type:        components.FieldTypeString,
-			Description: "Time of the day, in HH:MM format",
-			VisibilityConditions: []components.VisibilityCondition{
-				{Field: "type", Values: []string{"daily", "weekly"}},
-			},
-		},
-		{
 			Name:  "week_day",
 			Label: "Day of the week",
 			Type:  components.FieldTypeSelect,
@@ -115,36 +107,31 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 				},
 			},
 		},
+		{
+			Name:        "time",
+			Label:       "Time",
+			Type:        components.FieldTypeString,
+			Description: "Time of the day, in HH:MM format",
+			VisibilityConditions: []components.VisibilityCondition{
+				{Field: "type", Values: []string{"daily", "weekly"}},
+			},
+		},
 	}
 }
 
-func (s *Schedule) Start(ctx triggers.TriggerContext) error {
+func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	var metadata Metadata
-	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
-	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
-	}
-
-	//
-	// If nextTrigger timestamp is before the current time, emit an event.
-	//
-	if metadata.NextTrigger != nil && metadata.NextTrigger.Before(time.Now()) {
-		err = ctx.EventContext.Emit(map[string]any{})
-		if err != nil {
-			return err
-		}
-	}
-
 	nextTrigger, err := getNextTrigger(config, time.Now())
 	if err != nil {
 		return err
 	}
+
+	// TODO: cancel previously scheduled action if it exists
 
 	//
 	// Always schedule the next and save the next trigger in the metadata.
@@ -154,8 +141,7 @@ func (s *Schedule) Start(ctx triggers.TriggerContext) error {
 		return err
 	}
 
-	metadata.NextTrigger = nextTrigger
-	ctx.MetadataContext.Set(metadata)
+	ctx.MetadataContext.Set(Metadata{NextTrigger: nextTrigger})
 	return nil
 }
 

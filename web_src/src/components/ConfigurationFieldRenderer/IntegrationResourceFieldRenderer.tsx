@@ -115,7 +115,7 @@ export const IntegrationResourceFieldRenderer = ({
       </SelectTrigger>
       <SelectContent>
         {resources.map((resource) => (
-          <SelectItem key={resource.name} value={resource.name}>
+          <SelectItem key={resource.id ?? resource.name} value={resource.id ?? resource.name ?? ''}>
             {resource.name}
           </SelectItem>
         ))}

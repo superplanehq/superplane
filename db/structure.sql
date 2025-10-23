@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CZhyonj4xk1moiQFPLIUwTW6QDUm6gUOl7J9mlUzexhqR6eQfQeFEefaaNI9ncc
+\restrict FuNbNe0F7Fk1HwRT2kXLM4swY0ljPaP0Mzu09dHoyicgOAgZZWNKMYzKhCdlBjF
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -531,25 +531,20 @@ CREATE TABLE public.users (
 
 
 --
--- Name: webhook_handlers; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.webhook_handlers (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    webhook_id uuid NOT NULL,
-    workflow_id uuid NOT NULL,
-    node_id character varying(128) NOT NULL,
-    spec jsonb NOT NULL
-);
-
-
---
 -- Name: webhooks; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.webhooks (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    secret bytea NOT NULL
+    state character varying(32) NOT NULL,
+    secret bytea NOT NULL,
+    configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    integration_id uuid,
+    resource_type character varying(64) NOT NULL,
+    resource_id character varying(128) NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
 );
 
 
@@ -638,7 +633,8 @@ CREATE TABLE public.workflow_nodes (
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    webhook_id uuid
 );
 
 
@@ -1006,14 +1002,6 @@ ALTER TABLE ONLY public.role_metadata
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
-
---
--- Name: webhook_handlers webhook_handlers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.webhook_handlers
-    ADD CONSTRAINT webhook_handlers_pkey PRIMARY KEY (id);
 
 
 --
@@ -1508,19 +1496,11 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: webhook_handlers webhook_handlers_webhook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: webhooks webhooks_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.webhook_handlers
-    ADD CONSTRAINT webhook_handlers_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.webhooks(id) ON DELETE CASCADE;
-
-
---
--- Name: webhook_handlers webhook_handlers_workflow_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.webhook_handlers
-    ADD CONSTRAINT webhook_handlers_workflow_id_node_id_fkey FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.webhooks
+    ADD CONSTRAINT webhooks_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.integrations(id);
 
 
 --
@@ -1620,6 +1600,14 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
+-- Name: workflow_nodes workflow_nodes_webhook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_nodes
+    ADD CONSTRAINT workflow_nodes_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.webhooks(id);
+
+
+--
 -- Name: workflow_nodes workflow_nodes_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1631,13 +1619,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CZhyonj4xk1moiQFPLIUwTW6QDUm6gUOl7J9mlUzexhqR6eQfQeFEefaaNI9ncc
+\unrestrict FuNbNe0F7Fk1HwRT2kXLM4swY0ljPaP0Mzu09dHoyicgOAgZZWNKMYzKhCdlBjF
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict V1o9vz9Sz9JuJUkfETGPIud0CG2B61we8O8fKWyUdk1ouCsvKSppvEV0i9lXIgO
+\restrict DGcJIGXU7sk3gtjEEbhlLOqdTudXAE5HkxH7ocdKPJeN6njMsJOOKgQMRhZIUcs
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1667,5 +1655,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict V1o9vz9Sz9JuJUkfETGPIud0CG2B61we8O8fKWyUdk1ouCsvKSppvEV0i9lXIgO
+\unrestrict DGcJIGXU7sk3gtjEEbhlLOqdTudXAE5HkxH7ocdKPJeN6njMsJOOKgQMRhZIUcs
 

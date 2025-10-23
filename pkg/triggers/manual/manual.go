@@ -1,6 +1,8 @@
 package manual
 
 import (
+	"net/http"
+
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/triggers"
 )
@@ -23,7 +25,11 @@ func (m *Manual) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{}
 }
 
-func (m *Manual) Start(ctx triggers.TriggerContext) error {
+func (m *Manual) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
+	return http.StatusOK, nil
+}
+
+func (m *Manual) Setup(ctx triggers.TriggerContext) error {
 	return nil
 }
 
