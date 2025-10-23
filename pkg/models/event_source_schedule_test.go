@@ -65,7 +65,7 @@ func Test__CalculateNextTrigger(t *testing.T) {
 	})
 
 	t.Run("weekly schedule - same day, time not passed", func(t *testing.T) {
-		now := time.Now()
+		now := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 12, 0, 0, 0, time.UTC)
 		weekdayStr := WeekdayToString(now.Weekday())
 		futureTime := now.Add(2 * time.Hour).Format("15:04")
 		schedule := Schedule{
