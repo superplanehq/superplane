@@ -3,18 +3,20 @@ import {
   BackgroundVariant,
   MarkerType,
   ReactFlow,
-  type Edge,
-  type Node,
+  type Edge as ReactFlowEdge,
+  type Node as ReactFlowNode,
 } from "@xyflow/react";
 
 import { Block } from "./Block";
 import { useCanvasState } from "./useCanvasState";
 
 namespace CanvasPage {
+  export type Node = ReactFlowNode;
+  export type Edge = ReactFlowEdge;
+
   export interface Props {
     nodes?: Node[];
     edges?: Edge[];
-    nodeTypes?: Record<string, React.ComponentType<any>>;
   }
 }
 
@@ -37,7 +39,7 @@ function CanvasPage(props: CanvasPage.Props) {
       <ReactFlow
         nodes={nodes}
         edges={edges?.map((e) => ({ ...e, ...EDGE_STYLE }))}
-        nodeTypes={props.nodeTypes ?? { default: Block }}
+        nodeTypes={{ default: Block }}
         fitView={true}
         minZoom={0.4}
         maxZoom={1.5}
