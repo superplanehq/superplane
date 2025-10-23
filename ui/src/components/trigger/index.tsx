@@ -1,5 +1,4 @@
-import { BookMarked, type LucideIcon } from "lucide-react";
-import * as LucideIcons from "lucide-react"
+import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
 
 interface TriggerMetadataItem {
@@ -28,45 +27,10 @@ export interface TriggerProps {
 }
 
 export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconBackground, headerColor, title, metadata, lastEventData, collapsed = false, collapsedBackground }) => {
-  const resolveIcon = React.useCallback((slug?: string): LucideIcon => {
-    if (!slug) {
-      return BookMarked
-    }
-
-    const pascalCase = slug
-      .split("-")
-      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join("")
-
-    const candidate = (LucideIcons as Record<string, unknown>)[pascalCase]
-
-    if (
-      candidate &&
-      (typeof candidate === "function" ||
-        (typeof candidate === "object" && "render" in candidate))
-    ) {
-      return candidate as LucideIcon
-    }
-
-    return BookMarked
-  }, [])
-
   const timeAgo = React.useMemo(() => {
     const now = new Date()
     const diff = now.getTime() - lastEventData.receivedAt.getTime()
-    const seconds = Math.floor(diff / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-    const days = Math.floor(hours / 24)
-    if (days > 0) {
-      return `${days}d`
-    } else if (hours > 0) {
-      return `${hours}h`
-    } else if (minutes > 0) {
-      return `${minutes}m`
-    } else {
-      return `${seconds}s`
-    }
+    return calcRelativeTimeFromDiff(diff)
   }, [lastEventData])
 
   const LastEventIcon = React.useMemo(() => {

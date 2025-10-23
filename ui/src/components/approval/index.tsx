@@ -1,111 +1,107 @@
-import * as React from "react"
+import React from "react";
+import { ApprovalItem, type ApprovalItemProps } from "../approvalItem";
+import { ItemGroup, ItemSeparator } from "../item";
+import { CircleDashedIcon } from "lucide-react"
+import { resolveIcon } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
-
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../card"
-import { ApprovalItem, type ApprovalItemProps } from "../approvalItem"
-import { ItemGroup, ItemSeparator } from "../item"
-import { Button } from "../button"
-import { Hand } from "lucide-react"
-
-export interface ApprovalProps {
-  title: string
-  status?: string
-  version?: string
-  approvals?: ApprovalItemProps[]
-  footerContent?: React.ReactNode
-  className?: string
-  selected?: boolean
-  collapsed?: boolean
+export interface AwaitingEvent {
+  title: string;
+  subtitle?: string;
 }
 
-export const Approval: React.FC<ApprovalProps> = ({
-  title,
-  status,
-  version,
-  approvals,
-  className,
-  selected = false,
-  collapsed = false,
-}) => {
-  if (collapsed) {
-    const pendingCount = approvals?.filter(approval => !approval.approved).length || 0
-    const totalCount = approvals?.length || 0
+export interface ApprovalProps {
+  iconSrc?: string;
+  iconSlug?: string;
+  iconBackground?: string;
+  iconColor?: string;
+  headerColor: string;
+  title: string;
+  description?: string;
+  approvals: ApprovalItemProps[];
+  awaitingEvent: AwaitingEvent;
+  collapsedBackground?: string;
+  receivedAt: Date;
+  collapsed?: boolean;
+}
 
+export const Approval: React.FC<ApprovalProps> = ({ iconSrc, iconSlug, iconBackground, iconColor, headerColor, title, description, collapsed = false, collapsedBackground, receivedAt, approvals, awaitingEvent }) => {
+  const calcRelativeTimeFromDiff = (diff: number) => {
+    const seconds = Math.floor(diff / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+    const days = Math.floor(hours / 24)
+    if (days > 0) {
+      return `${days}d`
+    } else if (hours > 0) {
+      return `${hours}h`
+    } else if (minutes > 0) {
+      return `${minutes}m`
+    } else {
+      return `${seconds}s`
+    }
+  }
+
+  const timeAgo = React.useMemo(() => {
+    const now = new Date()
+    const diff = now.getTime() - receivedAt.getTime()
+    return calcRelativeTimeFromDiff(diff)
+  }, [receivedAt])
+
+  const Icon = React.useMemo(() => {
+    return resolveIcon(iconSlug)
+  }, [iconSlug])
+
+
+  if (collapsed) {
     return (
-      <div className={cn("flex w-fit flex-col items-center", className)}>
-        <div
-          className={cn(
-            "flex h-20 w-20 items-center justify-center rounded-2xl text-gray-900 bg-yellow-300",
-            selected ? "border-[3px] border-black" : "border border-border",
-          )}
-        >
-          <Hand className="size-10" />
+      <div className="flex w-fit flex-col items-center">
+        <div className={`flex h-20 w-20 items-center justify-center rounded-md border border-border ${collapsedBackground || ''}`}>
+          {iconSrc ? <img src={iconSrc} alt={title} className="h-12 w-12 object-contain" /> : <Icon size={30} className={iconColor} />}
         </div>
-        <CardTitle className="text-base font-semibold text-neutral-900 pt-1">
-          {title}
-        </CardTitle>
-        <Button
-          variant="linkSubdued"
-          className="justify-center text-sm"
-          asChild
-        >
-          <a
-            href="#"
-            className="flex items-center"
-          >
-            {pendingCount}/{totalCount} pending
-          </a>
-        </Button>
+        <h2 className="text-base font-semibold text-neutral-900 pt-1">{title}</h2>
       </div>
     )
   }
 
   return (
-    <div className={cn("w-full min-w-[500px] max-w-6xl", className)}>
-      <Card
-        className={cn(
-          "flex h-full w-full flex-col overflow-hidden p-0 rounded-3xl",
-          selected
-            ? "border-[3px] border-black shadow-none"
-            : "border-none shadow-lg",
-        )}
-      >
-        <CardHeader
-          className="space-y-2 rounded-t-3xl px-8 py-6 text-base text-neutral-900 bg-yellow-300"
-        >
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6 rounded-none px-8 py-6 bg-white">
-          {status && (
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {status}
+    <div className="flex flex-col border border-border rounded-md w-[30rem] bg-white" >
+      <div className={"w-full px-2 flex flex-col border-b p-2 gap-2 rounded-t-md items-center " + headerColor}>
+        <div className="w-full flex items-center gap-2">
+          <div className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
+            {iconSrc ? <img src={iconSrc} alt={title} className="w-5 h-5 " /> : <Icon size={20} className={iconColor} />}
+          </div>
+          <h2 className="text-md font-semibold">{title}</h2>
+        </div>
+        {description && <p className="w-full text-md text-gray-500 pl-8">{description}</p>}
+      </div>
+
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+          <span className="uppercase text-sm font-medium">Awaiting Approval</span>
+          <span className="text-sm">{timeAgo}</span>
+        </div>
+
+        <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-orange-200 mb-4`}>
+          <div className="flex items-center gap-2 w-[80%] text-amber-800">
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center`}>
+              <CircleDashedIcon size={20} className="text-amber-800" />
             </div>
+            <span className="truncate text-sm">{awaitingEvent?.title}</span>
+          </div>
+          {awaitingEvent?.subtitle && (
+            <span className="text-sm no-wrap whitespace-nowrap w-[20%] text-amber-800">{awaitingEvent?.subtitle}</span>
           )}
-          {version && (
-            <div className="text-2xl font-bold text-neutral-900">
-              {version}
-            </div>
-          )}
-          {approvals && approvals.length > 0 ? (
-            <ItemGroup className="w-full">
-              {approvals.map((approval, index) => (
-                <React.Fragment key={`${approval.title}-${index}`}>
-                  <ApprovalItem {...approval} />
-                  {index < approvals.length - 1 && <ItemSeparator />}
-                </React.Fragment>
-              ))}
-            </ItemGroup>
-          ) : (
-            <p className="text-sm text-muted-foreground">No approvals yet.</p>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+
+
+        <ItemGroup className="w-full">
+          {approvals.map((approval, index) => (
+            <React.Fragment key={`${approval.title}-${index}`}>
+              <ApprovalItem {...approval} />
+            </React.Fragment>
+          ))}
+        </ItemGroup>
+      </div>
     </div>
   )
 }

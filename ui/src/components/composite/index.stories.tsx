@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { Composite, type CompositeProps } from './';
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
-import GitBranchIcon from "@/assets/icons/git-branch.svg";
 
 const BuildTestDeployStage: CompositeProps = {
   title: "Build/Test/Deploy Stage",
   description: "Build new release of the monarch app and runs all required tests",
-  iconSrc: GitBranchIcon,
+  iconSlug: "git-branch",
+  iconColor: "text-purple-700",
   headerColor: "bg-purple-100",
   parameters: [],
   parametersIcon: "map",

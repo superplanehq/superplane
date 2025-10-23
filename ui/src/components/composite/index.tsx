@@ -1,5 +1,4 @@
-import { BookMarked, type LucideIcon } from "lucide-react";
-import * as LucideIcons from "lucide-react"
+import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
 
 type LastRunState = "success" | "failed" | "running"
@@ -30,7 +29,9 @@ interface LastRunItem extends QueueItem {
 }
 
 export interface CompositeProps {
-  iconSrc: string;
+  iconSrc?: string;
+  iconSlug?: string;
+  iconColor?: string;
   iconBackground?: string;
   headerColor: string;
   title: string;
@@ -48,48 +49,8 @@ export interface CompositeProps {
   onReRunChildEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, headerColor, title, description, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, startLastValuesOpen = false }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, startLastValuesOpen = false }) => {
   const [showLastRunValues, setShowLastRunValues] = React.useState(startLastValuesOpen)
-
-  const resolveIcon = React.useCallback((slug?: string): LucideIcon => {
-    if (!slug) {
-      return BookMarked
-    }
-
-    const pascalCase = slug
-      .split("-")
-      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join("")
-
-    const candidate = (LucideIcons as Record<string, unknown>)[pascalCase]
-
-    if (
-      candidate &&
-      (typeof candidate === "function" ||
-        (typeof candidate === "object" && "render" in candidate))
-    ) {
-      return candidate as LucideIcon
-    }
-
-    return BookMarked
-  }, [])
-
-  const calcRelativeTimeFromDiff = (diff: number) => {
-    const seconds = Math.floor(diff / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-    const days = Math.floor(hours / 24)
-    if (days > 0) {
-      return `${days}d`
-    } else if (hours > 0) {
-      return `${hours}h`
-    } else if (minutes > 0) {
-      return `${minutes}m`
-    } else {
-      return `${seconds}s`
-    }
-  }
-
   const timeAgo = React.useMemo(() => {
     const now = new Date()
     const diff = now.getTime() - lastRunItem.receivedAt.getTime()
@@ -169,6 +130,11 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
     )
   }
 
+
+  const Icon = React.useMemo(() => {
+    return resolveIcon(iconSlug)
+  }, [iconSlug])
+
   const ExpandChildEventsIcon = React.useMemo(() => {
     return resolveIcon("expand")
   }, [])
@@ -182,12 +148,13 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconBackground, h
       <div className={"w-full px-2 flex flex-col border-b p-2 gap-2 rounded-t-md items-center " + headerColor}>
         <div className="w-full flex items-center gap-2">
           <div className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
-            <img src={iconSrc} alt={title} className="w-5 h-5 " />
+            {iconSrc ? <img src={iconSrc} alt={title} className="w-5 h-5 " /> : <Icon size={20} className={iconColor} />}
           </div>
           <h2 className="text-md font-semibold">{title}</h2>
         </div>
-        {description && <p className="w-full text-sm text-gray-500 pl-8">{description}</p>}
+        {description && <p className="w-full text-md text-gray-500 pl-8">{description}</p>}
       </div>
+
 
       {parameters.length > 0 &&
         <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
