@@ -168,7 +168,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <ParametersIcon size={19} />
-            <span className="text-sm">{parameters.join(", ")}</span>
+            <span className="text-sm font-mono">{parameters.join(", ")}</span>
           </div>
         </div>
       }
