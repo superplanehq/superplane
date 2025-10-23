@@ -188,14 +188,13 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           {content}
         </Item>
         {showRejectionForm && (
-          <div className="w-full border bg-gray-50 px-3 py-2 my-2 rounded-lg">
+          <div className="w-full border bg-gray-50 px-3 py-2 my-2 rounded-lg text-left">
             <div className="flex flex-col gap-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <Label htmlFor="rejection-comment" className="text-sm font-semibold text-neutral-900">
                     Comment
                   </Label>
-                  <span className="ml-2 text-sm text-muted-foreground">Required</span>
                 </div>
               </div>
               <Input
@@ -235,7 +234,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           </div>
         )}
         {showApprovalForm && (
-          <div className="w-full border my-2 bg-gray-50 px-3 py-2 rounded-lg">
+          <div className="w-full border my-2 bg-gray-50 px-3 py-2 rounded-lg text-left">
             <div className="flex flex-col gap-4">
               {requireArtifacts.map((artifact, index) => (
                 <div key={index} className="flex flex-col gap-2">

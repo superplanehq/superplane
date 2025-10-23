@@ -5,6 +5,7 @@ import "./canvas-reset.css";
 
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { applyNodeChanges, type NodeChange } from "@xyflow/react";
 import { useCallback, useState } from "react";
@@ -26,7 +27,7 @@ type Story = StoryObj<typeof CanvasPage>;
 const sampleNodes: Node[] = [
   {
     id: "listen-code",
-    position: { x: -140, y: -80 },
+    position: { x: -500, y: -200 },
     data: {
       label: "Listen to code changes",
       state: "working",
@@ -51,7 +52,7 @@ const sampleNodes: Node[] = [
   },
   {
     id: "listen-image",
-    position: { x: -140, y: 240 },
+    position: { x: -500, y: 200 },
     data: {
       label: "Listen to Docker image updates",
       state: "pending",
@@ -75,32 +76,226 @@ const sampleNodes: Node[] = [
   },
   {
     id: "build-stage",
-    position: { x: 320, y: 150 },
+    position: { x: 0, y: 0 },
     data: {
       label: "Build/Test/Deploy to Stage",
       state: "pending",
       type: "composite",
+      composite: {
+        title: "Build/Test/Deploy Stage",
+        description: "Build new release of the monarch app and runs all required tests",
+        iconSlug: "git-branch",
+        iconColor: "text-purple-700",
+        headerColor: "bg-purple-100",
+        parameters: [],
+        parametersIcon: "map",
+        lastRunItem: {
+          title: "fix: open rejected events tabs",
+          subtitle: "ef758d40",
+          receivedAt: new Date(),
+          childEventsInfo: {
+            count: 3,
+            waitingInfos: [],
+          },
+          state: "failed",
+          values: {
+            "Author": "Bart Willems",
+            "Commit": "FEAT-1234",
+            "Sha": "ef758d40",
+            "Image": "v3.18.217",
+            "Size": "971.5 MB"
+          },
+        },
+        nextInQueue: {
+          title: "FEAT-1234: New feature",
+          subtitle: "ef758d40",
+          receivedAt: new Date(),
+        },
+        collapsed: false
+      }
     },
   },
   {
     id: "approve",
-    position: { x: 620, y: 157 },
-    data: { label: "Approve release", state: "pending", type: "composite" },
+    position: { x: 500, y: 0 },
+    data: {
+      label: "Approve release",
+      state: "pending",
+      type: "approval",
+      approval: {
+        title: "Approve Release",
+        description: "New releases are deployed to staging for testing and require approvals.",
+        iconSlug: "hand",
+        iconColor: "text-orange-500",
+        headerColor: "bg-orange-100",
+        approvals: [
+          {
+            title: "Security",
+            approved: false,
+            interactive: true,
+            requireArtifacts: [
+              {
+                label: "CVE Report",
+              }
+            ],
+            onApprove: (artifacts) => console.log("Security approved with artifacts:", artifacts),
+            onReject: (comment) => console.log("Security rejected with comment:", comment),
+          },
+          {
+            title: "Compliance",
+            approved: true,
+            artifactCount: 1,
+            artifacts: {
+              "Security Audit Report": "https://example.com/audit-report.pdf",
+              "Compliance Certificate": "https://example.com/cert.pdf",
+            },
+            href: "#",
+          },
+          {
+            title: "Engineering",
+            rejected: true,
+            approverName: "Lucas Pinheiro",
+            rejectionComment: "Security vulnerabilities need to be addressed before approval",
+          },
+          {
+            title: "Josh Brown",
+            approved: true,
+          },
+          {
+            title: "Admin",
+            approved: false,
+          },
+        ],
+        awaitingEvent: {
+          title: "fix: open rejected events tab",
+          subtitle: "ef758d40",
+        },
+        receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
+        collapsed: false
+      }
+    },
   },
   {
     id: "deploy-us",
-    position: { x: 940, y: 40 },
-    data: { label: "Deploy to US", state: "pending", type: "composite" },
+    position: { x: 1250, y: -600 },
+    data: {
+      label: "Deploy to US",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Deploy to US",
+        iconSrc: KubernetesIcon,
+        headerColor: "bg-blue-100",
+        iconBackground: "bg-blue-500",
+        parameters: ["us-west-1", "us-east-1"],
+        parametersIcon: "map",
+        lastRunItem: {
+          title: "FEAT-984: Autocomplete",
+          subtitle: "ef758d40",
+          receivedAt: new Date(),
+          state: "success",
+          values: {
+            "Author": "Bart Willems",
+            "Commit": "FEAT-1234",
+            "Sha": "ef758d40",
+            "Image": "v3.18.217",
+            "Size": "971.5 MB"
+          },
+        },
+        nextInQueue: {
+          title: "FEAT-983: Better run names",
+          subtitle: "ef758d40",
+          receivedAt: new Date(),
+        },
+        startLastValuesOpen: true,
+        collapsed: false
+      }
+    },
   },
   {
     id: "deploy-eu",
-    position: { x: 940, y: 180 },
-    data: { label: "Deploy to EU", state: "pending", type: "composite" },
+    position: { x: 1250, y: 0 },
+    data: {
+      label: "Deploy to EU",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Deploy to EU",
+        description: "Deploy your application to the EU region",
+        iconSrc: KubernetesIcon,
+        headerColor: "bg-blue-100",
+        iconBackground: "bg-blue-500",
+        parameters: ["eu-global-1", "eu-global-2"],
+        parametersIcon: "map",
+        lastRunItem: {
+          title: "fix: open rejected events",
+          subtitle: "ef758d40",
+          receivedAt: new Date(),
+          childEventsInfo: {
+            count: 2,
+            state: "running",
+            waitingInfos: [
+              {
+                icon: "calendar",
+                info: "Wait if it's weekend",
+                futureTimeDate: new Date(new Date().getTime() + 200000000),
+              },
+              {
+                icon: "calendar",
+                info: "Halloween Holiday",
+                futureTimeDate: new Date(new Date().getTime() + 300000000),
+              },
+            ],
+          },
+          state: "running",
+          values: {
+            "Author": "Bart Willems",
+            "Commit": "FEAT-1234",
+            "Sha": "ef758d40",
+            "Image": "v3.18.217",
+            "Size": "971.5 MB"
+          },
+        },
+        nextInQueue: {
+          title: "Deploy to EU",
+          subtitle: "ef758d40",
+          receivedAt: new Date(),
+        },
+        collapsed: false
+      }
+    },
   },
   {
     id: "deploy-asia",
-    position: { x: 940, y: 320 },
-    data: { label: "Deploy to Asia", state: "pending", type: "composite" },
+    position: { x: 1250, y: 500 },
+    data: {
+      label: "Deploy to Asia",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Deploy to Asia",
+        iconSrc: KubernetesIcon,
+        headerColor: "bg-blue-100",
+        iconBackground: "bg-blue-500",
+        parameters: ["asia-east-1"],
+        parametersIcon: "map",
+        lastRunItem: {
+          title: "fix: open rejected events",
+          subtitle: "ef758d40",
+          receivedAt: new Date(),
+          state: "success",
+          values: {
+            "Author": "Bart Willems",
+            "Commit": "FEAT-1234",
+            "Sha": "ef758d40",
+            "Image": "v3.18.217",
+            "Size": "971.5 MB"
+          },
+        },
+        startLastValuesOpen: false,
+        collapsed: false
+      }
+    },
   },
 ];
 
