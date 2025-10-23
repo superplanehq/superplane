@@ -1,23 +1,24 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
-import './App.css'
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import "./App.css";
 
 // Import pages
-import HomePage from './pages/home'
-import { Canvas } from './pages/canvas'
-import { Blueprint } from './pages/blueprint'
-import { Workflow } from './pages/workflow'
-import { WorkflowEvents } from './pages/workflow/events'
-import { OrganizationSettings } from './pages/organization/settings'
-import Navigation from './components/Navigation'
-import AuthGuard from './components/AuthGuard'
-import OrganizationSelect from './pages/auth/OrganizationSelect'
-import OrganizationCreate from './pages/auth/OrganizationCreate'
-import { AccountProvider } from './contexts/AccountContext'
-import { useDarkMode } from './hooks/useDarkMode'
+import AuthGuard from "./components/AuthGuard";
+import Navigation from "./components/Navigation";
+import { AccountProvider } from "./contexts/AccountContext";
+import { useDarkMode } from "./hooks/useDarkMode";
+import OrganizationCreate from "./pages/auth/OrganizationCreate";
+import OrganizationSelect from "./pages/auth/OrganizationSelect";
+import { Blueprint } from "./pages/blueprint";
+import { Canvas } from "./pages/canvas";
+import HomePage from "./pages/home";
+import { OrganizationSettings } from "./pages/organization/settings";
+import { Workflow } from "./pages/workflow";
+import { WorkflowEvents } from "./pages/workflow/events";
+import { WorkflowPageV2 } from "./pages/workflowv2";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -28,7 +29,7 @@ const queryClient = new QueryClient({
       gcTime: 10 * 60 * 1000, // 10 minutes
     },
   },
-})
+});
 
 // Helper function to wrap components with Navigation and Auth Guard
 const withAuthAndNavigation = (Component: React.ComponentType) => (
@@ -36,32 +37,53 @@ const withAuthAndNavigation = (Component: React.ComponentType) => (
     <Navigation />
     <Component />
   </AuthGuard>
-)
+);
 
 const withAuthOnly = (Component: React.ComponentType) => (
   <AuthGuard>
     <Component />
   </AuthGuard>
-)
+);
 
 // Main App component with router
 function App() {
   // Initialize dark mode handling
-  useDarkMode()
+  useDarkMode();
 
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
         <BrowserRouter>
           <Routes>
-
             {/* Organization-scoped protected routes */}
-            <Route path=":organizationId" element={withAuthAndNavigation(HomePage)} />
-            <Route path=":organizationId/canvas/:canvasId" element={withAuthOnly(Canvas)} />
-            <Route path=":organizationId/blueprints/:blueprintId" element={withAuthOnly(Blueprint)} />
-            <Route path=":organizationId/workflows/:workflowId" element={withAuthOnly(Workflow)} />
-            <Route path=":organizationId/workflows/:workflowId/events" element={withAuthOnly(WorkflowEvents)} />
-            <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
+            <Route
+              path=":organizationId"
+              element={withAuthAndNavigation(HomePage)}
+            />
+            <Route
+              path=":organizationId/canvas/:canvasId"
+              element={withAuthOnly(Canvas)}
+            />
+            <Route
+              path=":organizationId/blueprints/:blueprintId"
+              element={withAuthOnly(Blueprint)}
+            />
+            <Route
+              path=":organizationId/workflows/:workflowId"
+              element={withAuthOnly(Workflow)}
+            />
+            <Route
+              path=":organizationId/workflows/:workflowId/v2"
+              element={withAuthOnly(WorkflowPageV2)}
+            />
+            <Route
+              path=":organizationId/workflows/:workflowId/events"
+              element={withAuthOnly(WorkflowEvents)}
+            />
+            <Route
+              path=":organizationId/settings/*"
+              element={withAuthAndNavigation(OrganizationSettings)}
+            />
 
             {/* Organization selection and creation */}
             <Route path="create" element={<OrganizationCreate />} />
@@ -83,7 +105,7 @@ function App() {
         />
       </AccountProvider>
     </QueryClientProvider>
-  )
+  );
 }
 
-export default App
+export default App;
