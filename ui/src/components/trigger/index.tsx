@@ -91,7 +91,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
   }
 
   return (
-    <div className="flex flex-col border border-border rounded-md w-[23rem]" >
+    <div className="flex flex-col border border-border rounded-md w-[23rem] bg-white" >
       <ComponentHeader
         iconSrc={iconSrc}
         iconSlug={iconSlug}
