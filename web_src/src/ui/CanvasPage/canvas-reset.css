@@ -1,0 +1,7 @@
+.sp-canvas .react-flow__node {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  width: auto !important;
+}
