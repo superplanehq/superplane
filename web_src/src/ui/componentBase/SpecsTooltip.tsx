@@ -16,8 +16,8 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle }: 
     <Tippy
       render={() => (
         <div className="bg-white border-2 border-gray-200 rounded-md max-w-[700px]">
-          <div className="flex items-center  border-b p-2">
-            <span className="font-medium text-gray-400 text-sm">{specValues.length} {tooltipTitle || specTitle}</span>
+          <div className="flex items-center  border-b-2 p-2">
+            <span className="font-medium text-gray-500 text-sm">{specValues.length} {tooltipTitle || specTitle}</span>
           </div>
           {
             specValues.map((value, index) => (
