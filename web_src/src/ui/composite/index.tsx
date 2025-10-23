@@ -157,7 +157,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
   }
 
   return (
-    <div className="flex flex-col border border-border rounded-md w-[26rem] bg-white" >
+    <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white" >
       <ComponentHeader
         iconSrc={iconSrc}
         iconSlug={iconSlug}

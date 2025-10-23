@@ -22,7 +22,7 @@ namespace CanvasPage {
 
 const EDGE_STYLE = {
   type: "bezier" as const,
-  style: { stroke: "#C9D5E1", strokeWidth: 2 },
+  style: { stroke: "#C9D5E1", strokeWidth: 3 },
   markerEnd: {
     width: 20,
     height: 20,
@@ -55,7 +55,7 @@ function CanvasPage(props: CanvasPage.Props) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
+        <Background bgColor="#F1F5F9" color="#F1F5F9" />
       </ReactFlow>
     </div>
   );

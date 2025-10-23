@@ -65,7 +65,7 @@ export const Approval: React.FC<ApprovalProps> = ({ iconSrc, iconSlug, iconBackg
   }
 
   return (
-    <div className="flex flex-col border border-border rounded-md w-[30rem] bg-white" >
+    <div className="flex flex-col border-2 border-border rounded-md w-[30rem] bg-white" >
       <ComponentHeader
         iconSrc={iconSrc}
         iconSlug={iconSlug}
