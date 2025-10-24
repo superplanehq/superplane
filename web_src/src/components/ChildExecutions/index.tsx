@@ -105,7 +105,7 @@ export const ChildExecutions = ({ workflowId, executionId, organizationId, bluep
                   isDarkMode={document.documentElement.classList.contains('dark')}
                   workflowId={workflowId}
                   isBlueprintNode={nodeInfo?.isBlueprint || false}
-                  nodeType={nodeInfo?.blockName}
+                  componentName={nodeInfo?.blockName}
                 />
               </div>
             </div>

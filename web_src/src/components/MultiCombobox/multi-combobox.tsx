@@ -297,7 +297,7 @@ export function MultiComboboxOption<T>({
   Headless.ComboboxOptionProps<'div', T>,
   'as' | 'className'
 >) {
-  let sharedClasses = clsx(
+  const sharedClasses = clsx(
     'flex min-w-0 items-center',
     '*:data-[slot=icon]:size-5 *:data-[slot=icon]:shrink-0 sm:*:data-[slot=icon]:size-4',
     '*:data-[slot=icon]:text-zinc-500 group-data-focus/option:*:data-[slot=icon]:text-white dark:*:data-[slot=icon]:text-zinc-400',

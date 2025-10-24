@@ -5,6 +5,7 @@
   text-align: center;
 
   --jetbrains-mono: 'JetBrains Mono', monospace;
+  --font-inter: 'Inter', sans-serif;
   --dark-gray:    #202B30;
   --dim-gray:     #495358;
   --gray:         #677278;
@@ -201,6 +202,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --font-family-mono: var(--jetbrains-mono);
+  --font-family-inter: var(--font-inter);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

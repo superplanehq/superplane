@@ -75,7 +75,7 @@ export function SidebarItem({
   children: React.ReactNode
   onClick?: () => void
 } & React.ComponentPropsWithoutRef<'button'>) {
-  let classes = clsx(
+  const classes = clsx(
     'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-base/6 font-medium text-zinc-950 sm:py-2 sm:text-sm/5',
     'hover:bg-zinc-950/5 hover:text-zinc-950',
     'active:bg-zinc-950/5 active:text-zinc-950',
