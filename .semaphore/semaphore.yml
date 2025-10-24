@@ -59,6 +59,21 @@ blocks:
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run test:run
 
+  - name: "🔗 Integration Tests"
+    dependencies: []
+    task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+      prologue:
+        commands:
+          - checkout
+      jobs:
+        - name: "Integration Tests"
+          commands:
+            - make e2e.setup
+            - make e2e
+
 after_pipeline:
   task:
     jobs:

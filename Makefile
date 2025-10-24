@@ -31,12 +31,15 @@ test:
 test.watch:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
+
 #
 # Browser integration tests (Playwright-Go)
 #
 
+e2e.setup:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -lc 'cd web_src && CI=1 npx playwright install --with-deps'
+
 e2e:
-	# Assumes the app is already running (e.g., via `make dev.start`)
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps -e BASE_URL=$${BASE_URL:-http://localhost:8000} app \
 		gotestsum --format short-verbose --packages=./test/integrations -- -p 1
 

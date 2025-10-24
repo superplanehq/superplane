@@ -15,12 +15,8 @@ var (
 )
 
 func TestMain(m *testing.M) {
-    // Ensure Playwright browsers are installed; fail if not available
-    if err := pw.Install(); err != nil {
-        panic(err)
-    }
-
     var err error
+    // Assume Playwright and browsers are preinstalled via `make e2e.setup`
     pwInst, err = pw.Run()
     if err != nil {
         panic(err)
