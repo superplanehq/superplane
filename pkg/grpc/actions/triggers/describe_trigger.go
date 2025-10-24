@@ -24,6 +24,10 @@ func DescribeTrigger(ctx context.Context, registry *registry.Registry, name stri
 	return &pb.DescribeTriggerResponse{
 		Trigger: &pb.Trigger{
 			Name:          trigger.Name(),
+			Label:         trigger.Label(),
+			Description:   trigger.Description(),
+			Icon:          trigger.Icon(),
+			Color:         trigger.Color(),
 			Configuration: configuration,
 		},
 	}, nil

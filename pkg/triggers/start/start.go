@@ -26,6 +26,14 @@ func (s *Start) Description() string {
 	return "Start a new execution chain manually"
 }
 
+func (s *Start) Icon() string {
+	return "start"
+}
+
+func (s *Start) Color() string {
+	return "red"
+}
+
 func (s *Start) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{}
 }

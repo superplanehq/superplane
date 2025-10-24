@@ -51,6 +51,14 @@ func (g *GitHub) Description() string {
 	return "Start a new execution chain when something happens in your GitHub repository"
 }
 
+func (g *GitHub) Icon() string {
+	return "graph_1"
+}
+
+func (g *GitHub) Color() string {
+	return "purple"
+}
+
 func (g *GitHub) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{

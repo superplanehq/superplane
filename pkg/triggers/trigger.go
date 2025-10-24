@@ -29,6 +29,16 @@ type Trigger interface {
 	Description() string
 
 	/*
+	 * The icon for the trigger.
+	 */
+	Icon() string
+
+	/*
+	 * The color for the trigger.
+	 */
+	Color() string
+
+	/*
 	 * The configuration fields exposed by the trigger.
 	 */
 	Configuration() []components.ConfigurationField

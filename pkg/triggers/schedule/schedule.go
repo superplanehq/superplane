@@ -56,6 +56,14 @@ func (s *Schedule) Description() string {
 	return "Start a new execution chain on a schedule"
 }
 
+func (s *Schedule) Icon() string {
+	return "schedule"
+}
+
+func (s *Schedule) Color() string {
+	return "yellow"
+}
+
 func (s *Schedule) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {
 	return http.StatusOK, nil
 }

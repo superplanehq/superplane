@@ -48,6 +48,8 @@ func UpdateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 	now := time.Now()
 	existing.Name = blueprint.Name
 	existing.Description = blueprint.Description
+	existing.Icon = blueprint.Icon
+	existing.Color = blueprint.Color
 	existing.Nodes = nodes
 	existing.Edges = edges
 	existing.Configuration = datatypes.NewJSONSlice(configuration)

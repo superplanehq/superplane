@@ -22,6 +22,8 @@ func SerializeBlueprint(in *models.Blueprint) *pb.Blueprint {
 		Description:    in.Description,
 		CreatedAt:      timestamppb.New(*in.CreatedAt),
 		UpdatedAt:      timestamppb.New(*in.UpdatedAt),
+		Icon:           in.Icon,
+		Color:          in.Color,
 		Nodes:          actions.NodesToProto(in.Nodes),
 		Edges:          actions.EdgesToProto(in.Edges),
 		Configuration:  ConfigurationToProto(in.Configuration),
@@ -49,7 +51,7 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 		}
 
 		nodeIDs[node.Id] = true
-		if err := validateNodeRef(registry, blueprint.Nodes, node); err != nil {
+		if err := validateNodeRef(registry, node); err != nil {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: %v", node.Id, err)
 		}
 	}
@@ -71,7 +73,7 @@ func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]mod
 	return actions.ProtoToNodes(blueprint.Nodes), actions.ProtoToEdges(blueprint.Edges), nil
 }
 
-func validateNodeRef(registry *registry.Registry, nodes []*componentpb.Node, node *componentpb.Node) error {
+func validateNodeRef(registry *registry.Registry, node *componentpb.Node) error {
 	switch node.Type {
 	case componentpb.Node_TYPE_COMPONENT:
 		if node.Component == nil {

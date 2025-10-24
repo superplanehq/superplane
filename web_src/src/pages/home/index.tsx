@@ -13,6 +13,7 @@ import { useBlueprints, useCreateBlueprint } from '../../hooks/useBlueprintData'
 import { useWorkflows, useCreateWorkflow } from '../../hooks/useWorkflowData'
 import { SuperplaneCanvas } from '../../api-client'
 import { useAccount } from '../../contexts/AccountContext'
+import { getColorClass } from '../../utils/colors'
 
 interface UserData {
   metadata?: {
@@ -50,6 +51,8 @@ interface BlueprintCardData {
   description?: string
   createdAt: string
   type: 'blueprint'
+  icon?: string
+  color?: string
 }
 
 interface WorkflowCardData {
@@ -113,7 +116,9 @@ const HomePage = () => {
     name: blueprint.name!,
     description: blueprint.description,
     createdAt: blueprint.createdAt ? new Date(blueprint.createdAt).toLocaleDateString() : 'Unknown',
-    type: 'blueprint' as const
+    type: 'blueprint' as const,
+    icon: blueprint.icon,
+    color: blueprint.color
   }))
 
   // Transform workflow data
@@ -376,8 +381,11 @@ const HomePage = () => {
                         <div key={blueprint.id} className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow">
                           <div className="p-6 flex flex-col justify-between h-full">
                             <div>
-                              <div className="flex items-start mb-4">
-                                <div className="flex items-start justify-between space-x-3 flex-1">
+                              <div className="flex items-center mb-4">
+                                <div className="flex items-center justify-between space-x-3 flex-1">
+                                  {blueprint.icon && (
+                                    <MaterialSymbol name={blueprint.icon} size="lg" className={getColorClass(blueprint.color)} />
+                                  )}
                                   <div className='flex flex-col flex-1 min-w-0'>
                                     <button
                                       onClick={() => navigate(`/${organizationId}/blueprints/${blueprint.id}`)}
@@ -417,15 +425,22 @@ const HomePage = () => {
                             onClick={() => navigate(`/${organizationId}/blueprints/${blueprint.id}`)}
                             className="block text-left w-full"
                           >
-                            <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1">
-                              {blueprint.name}
-                            </Heading>
-                            <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                              {blueprint.description || 'No description'}
-                            </Text>
-                            <Text className="text-xs text-zinc-500 mt-2">
-                              Created at {blueprint.createdAt}
-                            </Text>
+                            <div className="flex items-center gap-3">
+                              {blueprint.icon && (
+                                <MaterialSymbol name={blueprint.icon} size="lg" className={getColorClass(blueprint.color)} />
+                              )}
+                              <div className="flex-1">
+                                <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1">
+                                  {blueprint.name}
+                                </Heading>
+                                <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                                  {blueprint.description || 'No description'}
+                                </Text>
+                                <Text className="text-xs text-zinc-500 mt-2">
+                                  Created at {blueprint.createdAt}
+                                </Text>
+                              </div>
+                            </div>
                           </button>
                         </div>
                       ))}

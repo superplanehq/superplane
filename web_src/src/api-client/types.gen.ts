@@ -27,6 +27,8 @@ export type BlueprintsBlueprint = {
     edges?: Array<ComponentsEdge>;
     configuration?: Array<ComponentsConfigurationField>;
     outputChannels?: Array<SuperplaneBlueprintsOutputChannel>;
+    icon?: string;
+    color?: string;
 };
 
 export type BlueprintsCreateBlueprintRequest = {
@@ -59,6 +61,8 @@ export type ComponentsComponent = {
     description?: string;
     configuration?: Array<ComponentsConfigurationField>;
     outputChannels?: Array<SuperplaneComponentsOutputChannel>;
+    icon?: string;
+    color?: string;
 };
 
 export type ComponentsComponentAction = {
@@ -1169,6 +1173,8 @@ export type TriggersTrigger = {
     name?: string;
     label?: string;
     description?: string;
+    icon?: string;
+    color?: string;
     configuration?: Array<ComponentsConfigurationField>;
 };
 

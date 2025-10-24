@@ -3957,6 +3957,12 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneBlueprintsOutputChannel"
           }
+        },
+        "icon": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
         }
       }
     },
@@ -4037,6 +4043,12 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneComponentsOutputChannel"
           }
+        },
+        "icon": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
         }
       }
     },
@@ -6770,6 +6782,12 @@
           "type": "string"
         },
         "description": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "color": {
           "type": "string"
         },
         "configuration": {

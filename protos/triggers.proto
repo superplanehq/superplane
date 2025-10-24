@@ -66,5 +66,7 @@ message Trigger {
   string name = 1;
   string label = 2;
   string description = 3;
-  repeated Components.ConfigurationField configuration = 4;
+  string icon = 4;
+  string color = 5;
+  repeated Components.ConfigurationField configuration = 6;
 }

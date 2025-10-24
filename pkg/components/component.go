@@ -25,6 +25,18 @@ type Component interface {
 	Description() string
 
 	/*
+	 * The icon for the component.
+	 * This is used in the UI to represent the component.
+	 */
+	Icon() string
+
+	/*
+	 * The color for the component.
+	 * This is used in the UI to represent the component.
+	 */
+	Color() string
+
+	/*
 	 * The output channels used by the component.
 	 * If none is returned, the 'default' one is used.
 	 */

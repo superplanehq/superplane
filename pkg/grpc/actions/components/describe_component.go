@@ -31,6 +31,10 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 	return &pb.DescribeComponentResponse{
 		Component: &pb.Component{
 			Name:           component.Name(),
+			Label:          component.Label(),
+			Description:    component.Description(),
+			Icon:           component.Icon(),
+			Color:          component.Color(),
 			OutputChannels: channels,
 			Configuration:  configuration,
 		},

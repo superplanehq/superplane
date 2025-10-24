@@ -36,6 +36,14 @@ func (f *If) Description() string {
 	return "Route events based on expression"
 }
 
+func (f *If) Icon() string {
+	return "alt_route"
+}
+
+func (f *If) Color() string {
+	return "red"
+}
+
 func (f *If) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{
 		{Name: "true", Label: "True"},

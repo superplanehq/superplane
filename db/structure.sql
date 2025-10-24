@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ebCH5KIH7C8yp8CqVN5gEJMsefzl3A8MobNB8HczMcMvWFoiXzkvTAxuwESf7VH
+\restrict IRKNkaWVXOV6yvuBmDhR8lEBJFoIhi3slkKuFFb6gVnHeTwTTBK7Coic7WHSOOq
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -103,7 +103,9 @@ CREATE TABLE public.blueprints (
     nodes jsonb DEFAULT '[]'::jsonb NOT NULL,
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     configuration jsonb DEFAULT '[]'::jsonb NOT NULL,
-    output_channels jsonb DEFAULT '[]'::jsonb NOT NULL
+    output_channels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    icon character varying(32),
+    color character varying(32)
 );
 
 
@@ -1634,13 +1636,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ebCH5KIH7C8yp8CqVN5gEJMsefzl3A8MobNB8HczMcMvWFoiXzkvTAxuwESf7VH
+\unrestrict IRKNkaWVXOV6yvuBmDhR8lEBJFoIhi3slkKuFFb6gVnHeTwTTBK7Coic7WHSOOq
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict n0mmuFTA6FDsiKZfliPf3zX6DH1YA8cc38XJUubN14cWI5rmfcPe6bXwuFN5DCV
+\restrict MraW5qUzCWadwPJLhXdm0I7BoXl9UzCOlvJvM59FXEIzygcWcHfDhCo7vI0s17i
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1662,7 +1664,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251024012043	f
+20251024021411	f
 \.
 
 
@@ -1670,5 +1672,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict n0mmuFTA6FDsiKZfliPf3zX6DH1YA8cc38XJUubN14cWI5rmfcPe6bXwuFN5DCV
+\unrestrict MraW5qUzCWadwPJLhXdm0I7BoXl9UzCOlvJvM59FXEIzygcWcHfDhCo7vI0s17i
 

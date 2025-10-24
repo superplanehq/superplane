@@ -197,7 +197,9 @@ type Trigger struct {
 	Name          string                           `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Label         string                           `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
 	Description   string                           `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Configuration []*components.ConfigurationField `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
+	Icon          string                           `protobuf:"bytes,4,opt,name=icon,proto3" json:"icon,omitempty"`
+	Color         string                           `protobuf:"bytes,5,opt,name=color,proto3" json:"color,omitempty"`
+	Configuration []*components.ConfigurationField `protobuf:"bytes,6,rep,name=configuration,proto3" json:"configuration,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -253,6 +255,20 @@ func (x *Trigger) GetDescription() string {
 	return ""
 }
 
+func (x *Trigger) GetIcon() string {
+	if x != nil {
+		return x.Icon
+	}
+	return ""
+}
+
+func (x *Trigger) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
+}
+
 func (x *Trigger) GetConfiguration() []*components.ConfigurationField {
 	if x != nil {
 		return x.Configuration
@@ -271,12 +287,14 @@ const file_triggers_proto_rawDesc = "" +
 	"\x16DescribeTriggerRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"Q\n" +
 	"\x17DescribeTriggerResponse\x126\n" +
-	"\atrigger\x18\x01 \x01(\v2\x1c.Superplane.Triggers.TriggerR\atrigger\"\xa6\x01\n" +
+	"\atrigger\x18\x01 \x01(\v2\x1c.Superplane.Triggers.TriggerR\atrigger\"\xd0\x01\n" +
 	"\aTrigger\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12O\n" +
-	"\rconfiguration\x18\x04 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration2\x9c\x03\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x12\n" +
+	"\x04icon\x18\x04 \x01(\tR\x04icon\x12\x14\n" +
+	"\x05color\x18\x05 \x01(\tR\x05color\x12O\n" +
+	"\rconfiguration\x18\x06 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration2\x9c\x03\n" +
 	"\bTriggers\x12\xc2\x01\n" +
 	"\fListTriggers\x12(.Superplane.Triggers.ListTriggersRequest\x1a).Superplane.Triggers.ListTriggersResponse\"]\x92AB\n" +
 	"\aTrigger\x12\rList triggers\x1a(Returns a list of all available triggers\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/triggers\x12\xca\x01\n" +

@@ -42,6 +42,14 @@ func (e *HTTP) Description() string {
 	return "Make HTTP requests"
 }
 
+func (e *HTTP) Icon() string {
+	return "http"
+}
+
+func (e *HTTP) Color() string {
+	return "blue"
+}
+
 func (e *HTTP) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
