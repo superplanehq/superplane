@@ -168,7 +168,7 @@ const sampleNodes: Node[] = [
         collapsedBackground: "bg-black",
         metadata: [
           { icon: "book", label: "monarch-app" },
-          { icon: "filter", label: "branch=main" },
+          { icon: "filter", label: "push" },
         ],
         lastEventData: {
           title: "refactor: update README.md",
