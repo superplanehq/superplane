@@ -16,7 +16,11 @@ import { useCanvasState } from "./useCanvasState";
 
 export interface CanvasNode extends ReactFlowNode {
   // Used for simulations in storybooks
-  __run?: () => Promise<void>;
+  __run?: (
+    input: any,
+    update: (path: string, data: any) => void,
+    output: (data: any) => void
+  ) => Promise<void>;
 }
 
 export interface CanvasEdge extends ReactFlowEdge {}
