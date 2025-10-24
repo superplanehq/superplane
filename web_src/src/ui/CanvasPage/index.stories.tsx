@@ -10,6 +10,7 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 import { useCallback, useMemo, useState } from "react";
 import { CanvasPage } from "./index";
 import type { BreadcrumbItem } from "./Header";
+import { LastRunItem } from "../composite";
 
 const meta = {
   title: "Pages/CanvasPage",
@@ -348,7 +349,7 @@ const sampleEdges: Edge[] = [
 ];
 
 // Mock execution workflow for expanded nodes
-const createMockExecutionNodes = (title: string): Node[] => [
+const createMockExecutionNodes = (title: string, lastRunItem: LastRunItem): Node[] => [
   {
     id: "http-request",
     position: { x: 0, y: 0 },
@@ -365,23 +366,7 @@ const createMockExecutionNodes = (title: string): Node[] => [
         collapsedBackground: "bg-blue-100",
         parameters: ["POST", "/api/deploy"],
         parametersIcon: "code",
-        lastRunItem: {
-          title: "Deploy request initiated",
-          subtitle: "200 OK",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 10), // 10 minutes ago
-          childEventsInfo: {
-            count: 1,
-            state: "processed",
-            waitingInfos: [],
-          },
-          state: "success",
-          values: {
-            "Method": "POST",
-            "Status": "200 OK",
-            "Response Time": "245ms",
-            "Payload Size": "1.2 KB"
-          },
-        },
+        lastRunItem: lastRunItem,
         collapsed: false
       }
     },
@@ -400,7 +385,7 @@ export const SimpleDeployment: Story = {
     const [simulationNodes, setSimulationNodes] = useState<Node[]>(args.nodes ?? []);
     const simulationEdges = useMemo(() => args.edges ?? [], [args.edges]);
     const [currentView, setCurrentView] = useState<'main' | 'execution'>('main');
-    const [executionContext, setExecutionContext] = useState<{title: string, breadcrumbs: BreadcrumbItem[]} | null>(null);
+    const [executionContext, setExecutionContext] = useState<{ title: string, breadcrumbs: BreadcrumbItem[], lastRunItem?: LastRunItem } | null>(null);
 
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -477,21 +462,29 @@ export const SimpleDeployment: Story = {
 
     const handleNodeExpand = useCallback((nodeId: string, nodeData: any) => {
       const nodeTitle = nodeData.composite?.title || nodeData.label;
+      const composite = nodeData.composite;
+
       const breadcrumbs: BreadcrumbItem[] = [
         {
           label: "Workflows",
-          onClick: () => setCurrentView('main')
         },
         {
           label: args.title || "Simple Deployment",
           onClick: () => setCurrentView('main')
         },
-        { label: nodeTitle }
+        {
+          label: nodeTitle,
+          iconSrc: composite?.iconSrc,
+          iconSlug: composite?.iconSlug,
+          iconColor: composite?.iconColor,
+          iconBackground: composite?.iconBackground
+        }
       ];
 
       setExecutionContext({
         title: nodeTitle,
-        breadcrumbs
+        breadcrumbs,
+        lastRunItem: composite?.lastRunItem
       });
       setCurrentView('execution');
     }, [args.title]);
@@ -500,7 +493,7 @@ export const SimpleDeployment: Story = {
       if (currentView === 'execution' && executionContext) {
         return (
           <CanvasPage
-            nodes={createMockExecutionNodes(executionContext.title)}
+            nodes={createMockExecutionNodes(executionContext.title, executionContext.lastRunItem!)}
             edges={createMockExecutionEdges()}
             title={executionContext.title}
             breadcrumbs={executionContext.breadcrumbs}
