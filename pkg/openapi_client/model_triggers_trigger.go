@@ -23,6 +23,8 @@ type TriggersTrigger struct {
 	Name *string `json:"name,omitempty"`
 	Label *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
+	Icon *string `json:"icon,omitempty"`
+	Color *string `json:"color,omitempty"`
 	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
 }
 
@@ -139,6 +141,70 @@ func (o *TriggersTrigger) SetDescription(v string) {
 	o.Description = &v
 }
 
+// GetIcon returns the Icon field value if set, zero value otherwise.
+func (o *TriggersTrigger) GetIcon() string {
+	if o == nil || IsNil(o.Icon) {
+		var ret string
+		return ret
+	}
+	return *o.Icon
+}
+
+// GetIconOk returns a tuple with the Icon field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *TriggersTrigger) GetIconOk() (*string, bool) {
+	if o == nil || IsNil(o.Icon) {
+		return nil, false
+	}
+	return o.Icon, true
+}
+
+// HasIcon returns a boolean if a field has been set.
+func (o *TriggersTrigger) HasIcon() bool {
+	if o != nil && !IsNil(o.Icon) {
+		return true
+	}
+
+	return false
+}
+
+// SetIcon gets a reference to the given string and assigns it to the Icon field.
+func (o *TriggersTrigger) SetIcon(v string) {
+	o.Icon = &v
+}
+
+// GetColor returns the Color field value if set, zero value otherwise.
+func (o *TriggersTrigger) GetColor() string {
+	if o == nil || IsNil(o.Color) {
+		var ret string
+		return ret
+	}
+	return *o.Color
+}
+
+// GetColorOk returns a tuple with the Color field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *TriggersTrigger) GetColorOk() (*string, bool) {
+	if o == nil || IsNil(o.Color) {
+		return nil, false
+	}
+	return o.Color, true
+}
+
+// HasColor returns a boolean if a field has been set.
+func (o *TriggersTrigger) HasColor() bool {
+	if o != nil && !IsNil(o.Color) {
+		return true
+	}
+
+	return false
+}
+
+// SetColor gets a reference to the given string and assigns it to the Color field.
+func (o *TriggersTrigger) SetColor(v string) {
+	o.Color = &v
+}
+
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
 func (o *TriggersTrigger) GetConfiguration() []ComponentsConfigurationField {
 	if o == nil || IsNil(o.Configuration) {
@@ -189,6 +255,12 @@ func (o TriggersTrigger) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Description) {
 		toSerialize["description"] = o.Description
+	}
+	if !IsNil(o.Icon) {
+		toSerialize["icon"] = o.Icon
+	}
+	if !IsNil(o.Color) {
+		toSerialize["color"] = o.Color
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration

@@ -115,6 +115,8 @@ message Blueprint {
   repeated Components.Edge edges = 8;
   repeated Components.ConfigurationField configuration = 9;
   repeated OutputChannel output_channels = 10;
+  string icon = 11;
+  string color = 12;
 }
 
 message OutputChannel {

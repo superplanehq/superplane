@@ -19,7 +19,6 @@ import { useComponents } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
 import { MaterialSymbol } from '../../components/MaterialSymbol/material-symbol'
 import { Heading } from '../../components/Heading/heading'
-import { Text } from '../../components/Text/text'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
@@ -46,6 +45,7 @@ import { ScrollArea } from '../../components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs'
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from '../../components/ui/item'
 import ELK from 'elkjs/lib/elk.bundled.js'
+import { getColorClass } from '../../utils/colors'
 
 const nodeTypes: NodeTypes = {
   if: IfNode,
@@ -115,6 +115,10 @@ export const Blueprint = () => {
   const [isEditOutputChannelModalOpen, setIsEditOutputChannelModalOpen] = useState(false)
   const [editingOutputChannelIndex, setEditingOutputChannelIndex] = useState<number | null>(null)
   const [outputChannelForm, setOutputChannelForm] = useState<any>({})
+  const [blueprintName, setBlueprintName] = useState('')
+  const [blueprintDescription, setBlueprintDescription] = useState('')
+  const [blueprintIcon, setBlueprintIcon] = useState('')
+  const [blueprintColor, setBlueprintColor] = useState('')
 
   // Fetch blueprint and components
   const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId!, blueprintId!)
@@ -126,11 +130,17 @@ export const Blueprint = () => {
 
   // Update blueprint configuration and output channels when blueprint loads
   useEffect(() => {
-    if (blueprint?.configuration) {
-      setBlueprintConfiguration(blueprint.configuration)
-    }
-    if (blueprint?.outputChannels) {
-      setBlueprintOutputChannels(blueprint.outputChannels)
+    if (blueprint) {
+      if (blueprint.configuration) {
+        setBlueprintConfiguration(blueprint.configuration)
+      }
+      if (blueprint.outputChannels) {
+        setBlueprintOutputChannels(blueprint.outputChannels)
+      }
+      setBlueprintName(blueprint.name || '')
+      setBlueprintDescription(blueprint.description || '')
+      setBlueprintIcon(blueprint.icon || '')
+      setBlueprintColor(blueprint.color || '')
     }
   }, [blueprint])
 
@@ -167,6 +177,8 @@ export const Blueprint = () => {
           component: componentName,
           channels,
           configuration: node.configuration || {},
+          icon: component?.icon,
+          color: component?.color,
         },
         position: node.position || { x: 0, y: 0 },
       }
@@ -447,12 +459,14 @@ export const Blueprint = () => {
       }))
 
       await updateBlueprintMutation.mutateAsync({
-        name: blueprint?.name || '',
-        description: blueprint?.description,
+        name: blueprintName,
+        description: blueprintDescription,
         nodes: blueprintNodes,
         edges: blueprintEdges,
         configuration: blueprintConfiguration,
         outputChannels: blueprintOutputChannels,
+        icon: blueprintIcon,
+        color: blueprintColor,
       })
 
       showSuccessToast('Blueprint saved successfully')
@@ -493,9 +507,6 @@ export const Blueprint = () => {
           </Button>
           <div>
             <Heading level={2} className="!text-xl !mb-0">{blueprint.name}</Heading>
-            {blueprint.description && (
-              <Text className="text-sm text-zinc-600 dark:text-zinc-400">{blueprint.description}</Text>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -531,6 +542,62 @@ export const Blueprint = () => {
               </div>
             </div>
 
+            {/* Blueprint Settings */}
+            <div className="px-4 py-4 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="blueprint-name" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    Name
+                  </Label>
+                  <Input
+                    id="blueprint-name"
+                    value={blueprintName}
+                    onChange={(e) => setBlueprintName(e.target.value)}
+                    className="mt-1"
+                    placeholder="Blueprint name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="blueprint-description" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    Description
+                  </Label>
+                  <Input
+                    id="blueprint-description"
+                    value={blueprintDescription}
+                    onChange={(e) => setBlueprintDescription(e.target.value)}
+                    className="mt-1"
+                    placeholder="Blueprint description"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="blueprint-icon" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      Icon
+                    </Label>
+                    <Input
+                      id="blueprint-icon"
+                      value={blueprintIcon}
+                      onChange={(e) => setBlueprintIcon(e.target.value)}
+                      className="mt-1"
+                      placeholder="Icon name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="blueprint-color" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      Color
+                    </Label>
+                    <Input
+                      id="blueprint-color"
+                      value={blueprintColor}
+                      onChange={(e) => setBlueprintColor(e.target.value)}
+                      className="mt-1"
+                      placeholder="Color"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)} className="flex-1 flex flex-col">
               <TabsList className="mx-4 mt-4 grid w-auto grid-cols-3">
@@ -547,13 +614,8 @@ export const Blueprint = () => {
                   </div>
                   <ItemGroup>
                     {components.map((component: any) => {
-                      const iconMap: Record<string, string> = {
-                        if: 'alt_route',
-                        http: 'http',
-                        filter: 'filter_alt',
-                        switch: 'settings_input_component',
-                      }
-                      const icon = iconMap[component.name] || 'widgets'
+                      const icon = component.icon || 'widgets'
+                      const colorClass = getColorClass(component.color)
 
                       return (
                         <Item
@@ -563,7 +625,7 @@ export const Blueprint = () => {
                           size="sm"
                         >
                           <ItemMedia>
-                            <MaterialSymbol name={icon} size="lg" className="text-blue-600 dark:text-blue-400" />
+                            <MaterialSymbol name={icon} size="lg" className={colorClass} />
                           </ItemMedia>
                           <ItemContent>
                             <ItemTitle>{component.label || component.name}</ItemTitle>

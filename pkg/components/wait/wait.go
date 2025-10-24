@@ -31,6 +31,14 @@ func (w *Wait) Description() string {
 	return "Wait for a certain amount of time"
 }
 
+func (w *Wait) Icon() string {
+	return "alarm"
+}
+
+func (w *Wait) Color() string {
+	return "yellow"
+}
+
 func (w *Wait) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }

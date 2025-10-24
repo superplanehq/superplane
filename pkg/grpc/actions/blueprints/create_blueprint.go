@@ -42,6 +42,8 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		OrganizationID: orgID,
 		Name:           blueprint.Name,
 		Description:    blueprint.Description,
+		Icon:           blueprint.Icon,
+		Color:          blueprint.Color,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 		Nodes:          nodes,

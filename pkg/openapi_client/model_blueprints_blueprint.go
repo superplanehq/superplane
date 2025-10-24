@@ -31,6 +31,8 @@ type BlueprintsBlueprint struct {
 	Edges []ComponentsEdge `json:"edges,omitempty"`
 	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneBlueprintsOutputChannel `json:"outputChannels,omitempty"`
+	Icon *string `json:"icon,omitempty"`
+	Color *string `json:"color,omitempty"`
 }
 
 // NewBlueprintsBlueprint instantiates a new BlueprintsBlueprint object
@@ -370,6 +372,70 @@ func (o *BlueprintsBlueprint) SetOutputChannels(v []SuperplaneBlueprintsOutputCh
 	o.OutputChannels = v
 }
 
+// GetIcon returns the Icon field value if set, zero value otherwise.
+func (o *BlueprintsBlueprint) GetIcon() string {
+	if o == nil || IsNil(o.Icon) {
+		var ret string
+		return ret
+	}
+	return *o.Icon
+}
+
+// GetIconOk returns a tuple with the Icon field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *BlueprintsBlueprint) GetIconOk() (*string, bool) {
+	if o == nil || IsNil(o.Icon) {
+		return nil, false
+	}
+	return o.Icon, true
+}
+
+// HasIcon returns a boolean if a field has been set.
+func (o *BlueprintsBlueprint) HasIcon() bool {
+	if o != nil && !IsNil(o.Icon) {
+		return true
+	}
+
+	return false
+}
+
+// SetIcon gets a reference to the given string and assigns it to the Icon field.
+func (o *BlueprintsBlueprint) SetIcon(v string) {
+	o.Icon = &v
+}
+
+// GetColor returns the Color field value if set, zero value otherwise.
+func (o *BlueprintsBlueprint) GetColor() string {
+	if o == nil || IsNil(o.Color) {
+		var ret string
+		return ret
+	}
+	return *o.Color
+}
+
+// GetColorOk returns a tuple with the Color field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *BlueprintsBlueprint) GetColorOk() (*string, bool) {
+	if o == nil || IsNil(o.Color) {
+		return nil, false
+	}
+	return o.Color, true
+}
+
+// HasColor returns a boolean if a field has been set.
+func (o *BlueprintsBlueprint) HasColor() bool {
+	if o != nil && !IsNil(o.Color) {
+		return true
+	}
+
+	return false
+}
+
+// SetColor gets a reference to the given string and assigns it to the Color field.
+func (o *BlueprintsBlueprint) SetColor(v string) {
+	o.Color = &v
+}
+
 func (o BlueprintsBlueprint) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -409,6 +475,12 @@ func (o BlueprintsBlueprint) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.OutputChannels) {
 		toSerialize["outputChannels"] = o.OutputChannels
+	}
+	if !IsNil(o.Icon) {
+		toSerialize["icon"] = o.Icon
+	}
+	if !IsNil(o.Color) {
+		toSerialize["color"] = o.Color
 	}
 	return toSerialize, nil
 }

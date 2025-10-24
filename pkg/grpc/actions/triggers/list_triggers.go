@@ -29,6 +29,8 @@ func serializeTriggers(in []triggers.Trigger) []*pb.Trigger {
 			Name:          trigger.Name(),
 			Label:         trigger.Label(),
 			Description:   trigger.Description(),
+			Icon:          trigger.Icon(),
+			Color:         trigger.Color(),
 			Configuration: configuration,
 		}
 	}

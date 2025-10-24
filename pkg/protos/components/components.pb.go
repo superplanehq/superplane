@@ -248,6 +248,8 @@ type Component struct {
 	Description    string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	Configuration  []*ConfigurationField  `protobuf:"bytes,4,rep,name=configuration,proto3" json:"configuration,omitempty"`
 	OutputChannels []*OutputChannel       `protobuf:"bytes,5,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
+	Icon           string                 `protobuf:"bytes,6,opt,name=icon,proto3" json:"icon,omitempty"`
+	Color          string                 `protobuf:"bytes,7,opt,name=color,proto3" json:"color,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -315,6 +317,20 @@ func (x *Component) GetOutputChannels() []*OutputChannel {
 		return x.OutputChannels
 	}
 	return nil
+}
+
+func (x *Component) GetIcon() string {
+	if x != nil {
+		return x.Icon
+	}
+	return ""
+}
+
+func (x *Component) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
 }
 
 type ConfigurationField struct {
@@ -1606,13 +1622,15 @@ const file_components_proto_rawDesc = "" +
 	"\x18DescribeComponentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"[\n" +
 	"\x19DescribeComponentResponse\x12>\n" +
-	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xf7\x01\n" +
+	"\tcomponent\x18\x01 \x01(\v2 .Superplane.Components.ComponentR\tcomponent\"\xa1\x02\n" +
 	"\tComponent\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12O\n" +
 	"\rconfiguration\x18\x04 \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12M\n" +
-	"\x0foutput_channels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels\"\x8a\x03\n" +
+	"\x0foutput_channels\x18\x05 \x03(\v2$.Superplane.Components.OutputChannelR\x0eoutputChannels\x12\x12\n" +
+	"\x04icon\x18\x06 \x01(\tR\x04icon\x12\x14\n" +
+	"\x05color\x18\a \x01(\tR\x05color\"\x8a\x03\n" +
 	"\x12ConfigurationField\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +

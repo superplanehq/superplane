@@ -52,6 +52,7 @@ import {
   WorkflowSemaphoreTriggerNode
 } from './components/nodes'
 import ELK from 'elkjs/lib/elk.bundled.js'
+import { getColorClass } from '../../utils/colors'
 
 const nodeTypes: NodeTypes = {
   if: WorkflowIfNode,
@@ -113,6 +114,8 @@ type BuildingBlock = {
   type: 'trigger' | 'component' | 'blueprint'
   outputChannels?: { name: string }[]
   configuration?: any[]
+  icon?: string
+  color?: string
 }
 
 export const Workflow = () => {
@@ -219,9 +222,16 @@ export const Workflow = () => {
       const channels = block?.outputChannels?.map((channel: any) => channel.name) || ['default']
 
       // Use component or trigger name as node type if it exists in nodeTypes, otherwise use 'default'
-      const nodeType = blockName && nodeTypes[blockName as keyof typeof nodeTypes]
+      // For blueprints, always use 'default' since they don't have specific node types
+      const nodeType = isBlueprint
+        ? 'default'
+        : blockName && nodeTypes[blockName as keyof typeof nodeTypes]
         ? blockName
         : 'default'
+
+      // For blueprint nodes, use the blueprint's icon/color; for components/triggers, use from block
+      const icon = isBlueprint ? block?.icon : block?.icon
+      const color = isBlueprint ? block?.color : block?.color
 
       return {
         id: node.id,
@@ -236,6 +246,8 @@ export const Workflow = () => {
           metadata: node.metadata || {},
           onEdit: () => handleNodeEdit(node.id),
           onEmit: () => handleNodeEmit(node.id),
+          icon: icon || (isBlueprint ? 'account_tree' : 'widgets'),
+          color: color || 'blue',
         },
         position: node.position || { x: 0, y: 0 },
       }
@@ -534,13 +546,8 @@ export const Workflow = () => {
                   </div>
                   <ItemGroup>
                     {buildingBlocks.filter(b => b.type === 'trigger').map((block: BuildingBlock) => {
-                      // Map trigger name to icon
-                      const iconMap: Record<string, string> = {
-                        webhook: 'webhook',
-                        schedule: 'schedule',
-                        start: 'play_circle',
-                      }
-                      const icon = iconMap[block.name] || 'bolt'
+                      const icon = block.icon || 'bolt'
+                      const colorClass = getColorClass(block.color)
 
                       return (
                         <Item
@@ -550,7 +557,7 @@ export const Workflow = () => {
                           size="sm"
                         >
                           <ItemMedia>
-                            <MaterialSymbol name={icon} size="lg" className="text-purple-600 dark:text-purple-400" />
+                            <MaterialSymbol name={icon} size="lg" className={colorClass} />
                           </ItemMedia>
                           <ItemContent>
                             <ItemTitle>{block.label || block.name}</ItemTitle>
@@ -570,16 +577,8 @@ export const Workflow = () => {
                   </div>
                   <ItemGroup>
                     {buildingBlocks.filter(b => b.type === 'component').map((block: BuildingBlock) => {
-                      // Map block name to icon
-                      const iconMap: Record<string, string> = {
-                        if: 'alt_route',
-                        http: 'http',
-                        filter: 'filter_alt',
-                        switch: 'settings_input_component',
-                      }
-                      const icon = block.type === 'component'
-                        ? (iconMap[block.name] || 'widgets')
-                        : 'account_tree'
+                      const icon = block.icon || 'widgets'
+                      const colorClass = getColorClass(block.color)
 
                       return (
                         <Item
@@ -589,7 +588,7 @@ export const Workflow = () => {
                           size="sm"
                         >
                           <ItemMedia>
-                            <MaterialSymbol name={icon} size="lg" className="text-blue-600 dark:text-blue-400" />
+                            <MaterialSymbol name={icon} size="lg" className={colorClass} />
                           </ItemMedia>
                           <ItemContent>
                             <ItemTitle>{block.label || block.name}</ItemTitle>
@@ -609,7 +608,8 @@ export const Workflow = () => {
                   </div>
                   <ItemGroup>
                     {buildingBlocks.filter(b => b.type === 'blueprint').map((block: BuildingBlock) => {
-                      const icon = 'account_tree'
+                      const icon = block.icon || 'account_tree'
+                      const colorClass = getColorClass(block.color)
 
                       return (
                         <Item
@@ -619,7 +619,7 @@ export const Workflow = () => {
                           size="sm"
                         >
                           <ItemMedia>
-                            <MaterialSymbol name={icon} size="lg" className="text-blue-600 dark:text-blue-400" />
+                            <MaterialSymbol name={icon} size="lg" className={colorClass} />
                           </ItemMedia>
                           <ItemContent>
                             <ItemTitle>{block.label || block.name}</ItemTitle>

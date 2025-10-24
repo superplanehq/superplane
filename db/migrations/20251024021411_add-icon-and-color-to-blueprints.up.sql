@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE blueprints ADD COLUMN icon VARCHAR(32);
+ALTER TABLE blueprints ADD COLUMN color VARCHAR(32);
+
+COMMIT;

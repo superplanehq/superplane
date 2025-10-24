@@ -38,6 +38,14 @@ func (f *Filter) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
+func (f *Filter) Icon() string {
+	return "filter_alt"
+}
+
+func (f *Filter) Color() string {
+	return "red"
+}
+
 func (f *Filter) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{

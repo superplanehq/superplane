@@ -36,6 +36,8 @@ func serializeComponents(in []components.Component) []*pb.Component {
 			Name:           component.Name(),
 			Label:          component.Label(),
 			Description:    component.Description(),
+			Icon:           component.Icon(),
+			Color:          component.Color(),
 			OutputChannels: channels,
 			Configuration:  configuration,
 		}

@@ -16,6 +16,8 @@ type Blueprint struct {
 	OrganizationID uuid.UUID
 	Name           string
 	Description    string
+	Icon           string
+	Color          string
 	CreatedAt      *time.Time
 	UpdatedAt      *time.Time
 	Nodes          datatypes.JSONSlice[Node]

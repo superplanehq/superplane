@@ -1,13 +1,19 @@
 import { memo } from 'react'
 import { Handle, Position, NodeProps, Node } from '@xyflow/react'
 import { MaterialSymbol } from '../../../../components/MaterialSymbol/material-symbol'
+import { getColorClass } from '../../../../utils/colors'
 
 type ApprovalNodeData = Node<{
   label?: string
   configuration?: Record<string, any>
+  icon?: string
+  color?: string
 }>
 
 export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
+  const icon = (data.icon as string) || 'check'
+  const color = (data.color as string) || 'blue'
+
   return (
     <div className="bg-white dark:bg-zinc-800 border-2 border-zinc-400 dark:border-zinc-500 rounded-lg shadow-md min-w-[180px]">
       {/* Input handle */}
@@ -20,7 +26,7 @@ export const ApprovalNode = memo(({ data }: NodeProps<ApprovalNodeData>) => {
       {/* Node header */}
       <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-900/20">
         <div className="flex items-center gap-2">
-          <MaterialSymbol name="check" size="sm" className="text-blue-600 dark:text-blue-400" />
+          <MaterialSymbol name={icon} size="sm" className={getColorClass(color)} />
           <div className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
             {data.label}
           </div>

@@ -389,6 +389,8 @@ type Blueprint struct {
 	Edges          []*components.Edge               `protobuf:"bytes,8,rep,name=edges,proto3" json:"edges,omitempty"`
 	Configuration  []*components.ConfigurationField `protobuf:"bytes,9,rep,name=configuration,proto3" json:"configuration,omitempty"`
 	OutputChannels []*OutputChannel                 `protobuf:"bytes,10,rep,name=output_channels,json=outputChannels,proto3" json:"output_channels,omitempty"`
+	Icon           string                           `protobuf:"bytes,11,opt,name=icon,proto3" json:"icon,omitempty"`
+	Color          string                           `protobuf:"bytes,12,opt,name=color,proto3" json:"color,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -493,6 +495,20 @@ func (x *Blueprint) GetOutputChannels() []*OutputChannel {
 	return nil
 }
 
+func (x *Blueprint) GetIcon() string {
+	if x != nil {
+		return x.Icon
+	}
+	return ""
+}
+
+func (x *Blueprint) GetColor() string {
+	if x != nil {
+		return x.Color
+	}
+	return ""
+}
+
 type OutputChannel struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -575,7 +591,7 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12>\n" +
 	"\tblueprint\x18\x02 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"Y\n" +
 	"\x17UpdateBlueprintResponse\x12>\n" +
-	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"\xf6\x03\n" +
+	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"\xa0\x04\n" +
 	"\tBlueprint\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x12\n" +
@@ -589,7 +605,9 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x05edges\x18\b \x03(\v2\x1b.Superplane.Components.EdgeR\x05edges\x12O\n" +
 	"\rconfiguration\x18\t \x03(\v2).Superplane.Components.ConfigurationFieldR\rconfiguration\x12M\n" +
 	"\x0foutput_channels\x18\n" +
-	" \x03(\v2$.Superplane.Blueprints.OutputChannelR\x0eoutputChannels\"l\n" +
+	" \x03(\v2$.Superplane.Blueprints.OutputChannelR\x0eoutputChannels\x12\x12\n" +
+	"\x04icon\x18\v \x01(\tR\x04icon\x12\x14\n" +
+	"\x05color\x18\f \x01(\tR\x05color\"l\n" +
 	"\rOutputChannel\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12.\n" +

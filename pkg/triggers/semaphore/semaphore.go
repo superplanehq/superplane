@@ -49,6 +49,14 @@ func (s *Semaphore) Description() string {
 	return "Start a new execution chain when something happens in your Semaphore project"
 }
 
+func (s *Semaphore) Icon() string {
+	return "automation"
+}
+
+func (s *Semaphore) Color() string {
+	return "blue"
+}
+
 func (s *Semaphore) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{

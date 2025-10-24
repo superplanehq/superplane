@@ -27,6 +27,14 @@ func (c *NoOp) Description() string {
 	return "Just pass events through without any additional processing"
 }
 
+func (c *NoOp) Icon() string {
+	return "check"
+}
+
+func (c *NoOp) Color() string {
+	return "blue"
+}
+
 func (c *NoOp) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }

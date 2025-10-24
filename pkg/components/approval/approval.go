@@ -76,6 +76,14 @@ func (a *Approval) Description() string {
 	return "Collect approvals on events"
 }
 
+func (a *Approval) Icon() string {
+	return "check"
+}
+
+func (a *Approval) Color() string {
+	return "green"
+}
+
 func (a *Approval) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
