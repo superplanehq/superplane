@@ -12,7 +12,7 @@ type LastEventState = "processed" | "discarded"
 
 interface TriggerLastEventData {
   title: string;
-  sizeInMB?: number;
+  subtitle?: string;
   receivedAt: Date;
   state: LastEventState;
 }
@@ -124,8 +124,8 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
             </div>
             <span className="truncate text-sm">{lastEventData.title}</span>
           </div>
-          {lastEventData.sizeInMB && (
-            <span className="text-sm no-wrap whitespace-nowrap w-[20%]">{lastEventData.sizeInMB.toFixed(1)} MB</span>
+          {lastEventData.subtitle && (
+            <span className="text-sm no-wrap whitespace-nowrap w-[20%]">{lastEventData.subtitle}</span>
           )}
         </div>
       </div>

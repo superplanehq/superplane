@@ -114,7 +114,7 @@ const sampleNodes: Node[] = [
         ],
         lastEventData: {
           title: "refactor: update README.md",
-          sizeInMB: 1,
+          subtitle: "ef53adfa",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
           state: "processed",
         },
@@ -140,7 +140,7 @@ const sampleNodes: Node[] = [
         ],
         lastEventData: {
           title: "v3.18.217",
-          sizeInMB: 972.5,
+          subtitle: "972.5 MB",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 3), // 3 hours ago
           state: "processed",
         },

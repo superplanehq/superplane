@@ -20,7 +20,7 @@ const GithubProps: TriggerProps = {
   ],
   lastEventData: {
     title: "refactor: update README.md",
-    sizeInMB: 1,
+    subtitle: "ef53adfa",
     receivedAt: new Date(),
     state: "processed",
   },
@@ -54,7 +54,7 @@ const DockerHubProps: TriggerProps = {
   ],
   lastEventData: {
     title: "v3.18.217",
-    sizeInMB: 972.5,
+    subtitle: "978.3 MB",
     receivedAt: new Date(),
     state: "processed",
   },
