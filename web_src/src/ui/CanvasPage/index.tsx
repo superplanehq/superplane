@@ -2,27 +2,25 @@ import {
   Background,
   EdgeMarker,
   ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
+import { useEffect, useRef } from "react";
 
 import { Block } from "./Block";
 import { useCanvasState } from "./useCanvasState";
 import { ViewToggle } from "../ViewToggle";
 import { Header, type BreadcrumbItem } from "./Header";
 
-namespace CanvasPage {
-  export type Node = ReactFlowNode;
-  export type Edge = ReactFlowEdge;
-
-  export interface Props {
-    nodes?: Node[];
-    edges?: Edge[];
-    startCollapsed?: boolean;
-    title?: string;
-    breadcrumbs?: BreadcrumbItem[];
-    onNodeExpand?: (nodeId: string, nodeData: any) => void;
-  }
+export interface CanvasPageProps {
+  nodes?: ReactFlowNode[];
+  edges?: ReactFlowEdge[];
+  startCollapsed?: boolean;
+  title?: string;
+  breadcrumbs?: BreadcrumbItem[];
+  onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
 }
 
 const EDGE_STYLE = {
@@ -35,8 +33,10 @@ const EDGE_STYLE = {
   } as EdgeMarker,
 } as const;
 
-function CanvasPage(props: CanvasPage.Props) {
+function CanvasContent(props: CanvasPageProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } = useCanvasState(props);
+  const { fitView } = useReactFlow();
+  const prevNodesRef = useRef(nodes);
 
   const defaultBreadcrumbs: BreadcrumbItem[] = [
     { label: "Workflows" },
@@ -52,8 +52,16 @@ function CanvasPage(props: CanvasPage.Props) {
     }
   };
 
+  // Re-center view when nodes change (e.g., when navigating to a new canvas)
+  useEffect(() => {
+    if (nodes !== prevNodesRef.current) {
+      fitView({ duration: 0, padding: 0.1 });
+      prevNodesRef.current = nodes;
+    }
+  }, [nodes, fitView]);
+
   return (
-    <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
+    <>
       {/* Header */}
       <Header breadcrumbs={breadcrumbs} />
 
@@ -63,38 +71,50 @@ function CanvasPage(props: CanvasPage.Props) {
       </div>
 
       <div className="pt-12 h-full">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges?.map((e) => ({ ...e, ...EDGE_STYLE }))}
-          nodeTypes={{
-            default: (nodeProps) => (
-              <Block
-                data={nodeProps.data}
-                onExpand={handleNodeExpand}
-                nodeId={nodeProps.id}
-              />
-            )
-          }}
-          fitView={true}
-          minZoom={0.4}
-          maxZoom={1.5}
-          zoomOnScroll={true}
-          zoomOnPinch={true}
-          zoomOnDoubleClick={false}
-          panOnScroll={true}
-          panOnDrag={true}
-          selectionOnDrag={false}
-          panOnScrollSpeed={0.8}
-          nodesDraggable={true}
-          nodesConnectable={false}
-          elementsSelectable={true}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeDoubleClick={(_, node) => toggleNodeCollapse(node.id)}
-        >
-          <Background bgColor="#F1F5F9" color="#F1F5F9" />
-        </ReactFlow>
+        <div className="h-full w-full">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges?.map((e) => ({ ...e, ...EDGE_STYLE }))}
+            nodeTypes={{
+              default: (nodeProps) => (
+                <Block
+                  data={nodeProps.data}
+                  onExpand={handleNodeExpand}
+                  nodeId={nodeProps.id}
+                />
+              )
+            }}
+            fitView={true}
+            minZoom={0.4}
+            maxZoom={1.5}
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            zoomOnDoubleClick={false}
+            panOnScroll={true}
+            panOnDrag={true}
+            selectionOnDrag={false}
+            panOnScrollSpeed={0.8}
+            nodesDraggable={true}
+            nodesConnectable={false}
+            elementsSelectable={true}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeDoubleClick={(_, node) => toggleNodeCollapse(node.id)}
+          >
+            <Background bgColor="#F1F5F9" color="#F1F5F9" />
+          </ReactFlow>
+        </div>
       </div>
+    </>
+  );
+}
+
+function CanvasPage(props: CanvasPageProps) {
+  return (
+    <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
+      <ReactFlowProvider>
+        <CanvasContent {...props} />
+      </ReactFlowProvider>
     </div>
   );
 }
