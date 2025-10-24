@@ -62,6 +62,7 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 			Label:    "Schedule Type",
 			Type:     components.FieldTypeSelect,
 			Required: true,
+			Default:  TypeDaily,
 			TypeOptions: &components.TypeOptions{
 				Select: &components.SelectTypeOptions{
 					Options: []components.FieldOption{
@@ -73,9 +74,10 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 			},
 		},
 		{
-			Name:  "minute",
-			Label: "Minute of the hour",
-			Type:  components.FieldTypeNumber,
+			Name:    "minute",
+			Label:   "Minute of the hour",
+			Type:    components.FieldTypeNumber,
+			Default: intPtr(0),
 			VisibilityConditions: []components.VisibilityCondition{
 				{Field: "type", Values: []string{"hourly"}},
 			},
@@ -87,9 +89,10 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 			},
 		},
 		{
-			Name:  "weekDay",
-			Label: "Day of the week",
-			Type:  components.FieldTypeSelect,
+			Name:    "weekDay",
+			Label:   "Day of the week",
+			Type:    components.FieldTypeSelect,
+			Default: WeekDayMonday,
 			VisibilityConditions: []components.VisibilityCondition{
 				{Field: "type", Values: []string{"weekly"}},
 			},
@@ -110,10 +113,15 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 		{
 			Name:        "time",
 			Label:       "Time",
-			Type:        components.FieldTypeString,
-			Description: "Time of the day, in HH:MM format",
+			Type:        components.FieldTypeTime,
+			Description: "Time of the day in UTC",
 			VisibilityConditions: []components.VisibilityCondition{
 				{Field: "type", Values: []string{"daily", "weekly"}},
+			},
+			TypeOptions: &components.TypeOptions{
+				Time: &components.TimeTypeOptions{
+					Format: "HH:MM",
+				},
 			},
 		},
 	}

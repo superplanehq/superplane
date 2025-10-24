@@ -152,6 +152,10 @@ export type ComponentsSelectTypeOptions = {
     options?: Array<ComponentsSelectOption>;
 };
 
+export type ComponentsTimeTypeOptions = {
+    format?: string;
+};
+
 export type ComponentsTypeOptions = {
     number?: ComponentsNumberTypeOptions;
     select?: ComponentsSelectTypeOptions;
@@ -160,6 +164,7 @@ export type ComponentsTypeOptions = {
     list?: ComponentsListTypeOptions;
     object?: ComponentsObjectTypeOptions;
     resource?: ComponentsResourceTypeOptions;
+    time?: ComponentsTimeTypeOptions;
 };
 
 export type ComponentsVisibilityCondition = {

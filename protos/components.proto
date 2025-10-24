@@ -100,11 +100,16 @@ message TypeOptions {
   optional ListTypeOptions list = 5;
   optional ObjectTypeOptions object = 6;
   optional ResourceTypeOptions resource = 7;
+  optional TimeTypeOptions time = 8;
 }
 
 message NumberTypeOptions {
   optional int32 min = 1;
   optional int32 max = 2;
+}
+
+message TimeTypeOptions {
+  optional string format = 1;
 }
 
 message SelectTypeOptions {

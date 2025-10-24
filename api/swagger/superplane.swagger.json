@@ -4274,6 +4274,14 @@
         }
       }
     },
+    "ComponentsTimeTypeOptions": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        }
+      }
+    },
     "ComponentsTypeOptions": {
       "type": "object",
       "properties": {
@@ -4297,6 +4305,9 @@
         },
         "resource": {
           "$ref": "#/definitions/ComponentsResourceTypeOptions"
+        },
+        "time": {
+          "$ref": "#/definitions/ComponentsTimeTypeOptions"
         }
       }
     },
