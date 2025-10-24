@@ -2,21 +2,29 @@ import {
   Background,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
-import { useReactFlow } from "@xyflow/react";
-import { useMemo, useCallback } from "react";
 
-import { Block } from "./Block";
-import { useCanvasState } from "./useCanvasState";
+import { useCallback, useMemo } from "react";
+
 import { ViewToggle } from "../ViewToggle";
+import { Block, BlockData } from "./Block";
 import { Header, type BreadcrumbItem } from "./Header";
-import { BlockData } from "./Block";
+import { useCanvasState } from "./useCanvasState";
+
+export interface CanvasNode extends ReactFlowNode {
+  // Used for simulations in storybooks
+  __run?: () => Promise<void>;
+}
+
+export interface CanvasEdge extends ReactFlowEdge {}
 
 export interface CanvasPageProps {
-  nodes?: ReactFlowNode[];
-  edges?: ReactFlowEdge[];
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
+
   startCollapsed?: boolean;
   title?: string;
   breadcrumbs?: BreadcrumbItem[];
@@ -29,38 +37,56 @@ const EDGE_STYLE = {
 } as const;
 
 function CanvasContent(props: CanvasPageProps) {
-  const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } = useCanvasState(props);
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    isCollapsed,
+    toggleCollapse,
+    toggleNodeCollapse,
+  } = useCanvasState(props);
+
   const { fitView } = useReactFlow();
   const { onNodeExpand, title, breadcrumbs: propsBreadcrumbs } = props;
 
   const defaultBreadcrumbs: BreadcrumbItem[] = [
     { label: "Workflows" },
-    { label: title || "Untitled Workflow" }
+    { label: title || "Untitled Workflow" },
   ];
 
   const breadcrumbs = propsBreadcrumbs || defaultBreadcrumbs;
 
-  const handleNodeExpand = useCallback((nodeId: string) => {
-    const node = nodes?.find(n => n.id === nodeId);
-    if (node && onNodeExpand) {
-      onNodeExpand(nodeId, node.data);
-      fitView();
-    }
-  }, [nodes, onNodeExpand, fitView]);
+  const handleNodeExpand = useCallback(
+    (nodeId: string) => {
+      const node = nodes?.find((n) => n.id === nodeId);
+      if (node && onNodeExpand) {
+        onNodeExpand(nodeId, node.data);
+        fitView();
+      }
+    },
+    [nodes, onNodeExpand, fitView]
+  );
 
-  const nodeTypes = useMemo(() => ({
-    default: (nodeProps: { data: unknown; id: string }) => (
-      <Block
-        data={nodeProps.data as BlockData}
-        onExpand={handleNodeExpand}
-        nodeId={nodeProps.id}
-      />
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), []);
+  const nodeTypes = useMemo(
+    () => ({
+      default: (nodeProps: { data: unknown; id: string }) => (
+        <Block
+          data={nodeProps.data as BlockData}
+          onExpand={handleNodeExpand}
+          nodeId={nodeProps.id}
+        />
+      ),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }),
+    []
+  );
 
   const edgeTypes = useMemo(() => ({}), []);
-  const styledEdges = useMemo(() => edges?.map((e) => ({ ...e, ...EDGE_STYLE })), [edges]);
+  const styledEdges = useMemo(
+    () => edges?.map((e) => ({ ...e, ...EDGE_STYLE })),
+    [edges]
+  );
 
   return (
     <>
