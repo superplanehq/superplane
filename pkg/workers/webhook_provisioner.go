@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,13 +19,15 @@ import (
 type WebhookProvisioner struct {
 	semaphore *semaphore.Weighted
 	registry  *registry.Registry
+	encryptor crypto.Encryptor
 	baseURL   string
 }
 
-func NewWebhookProvisioner(baseURL string, registry *registry.Registry) *WebhookProvisioner {
+func NewWebhookProvisioner(baseURL string, encryptor crypto.Encryptor, registry *registry.Registry) *WebhookProvisioner {
 	return &WebhookProvisioner{
 		registry:  registry,
 		baseURL:   baseURL,
+		encryptor: encryptor,
 		semaphore: semaphore.NewWeighted(25),
 	}
 }
@@ -83,6 +86,11 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 		return err
 	}
 
+	secret, err := w.encryptor.Decrypt(context.Background(), webhook.Secret, []byte(webhook.ID.String()))
+	if err != nil {
+		return err
+	}
+
 	resourceManager, err := w.registry.NewResourceManager(context.Background(), integration)
 	if err != nil {
 		return err
@@ -98,7 +106,7 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 		Resource:      resource,
 		Configuration: webhook.Configuration,
 		URL:           fmt.Sprintf("%s/api/v1/webhooks/%s", w.baseURL, webhook.ID.String()),
-		Secret:        webhook.Secret,
+		Secret:        secret,
 	})
 
 	if err != nil {

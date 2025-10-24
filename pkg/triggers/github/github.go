@@ -214,7 +214,7 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 	}
 
 	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, fmt.Errorf("invalid signature")
+		return http.StatusForbidden, err
 	}
 
 	data := map[string]any{}
