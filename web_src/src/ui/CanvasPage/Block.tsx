@@ -27,13 +27,15 @@ interface BlockData {
 
 interface BlockProps {
   data: BlockData;
+  onExpand?: (nodeId: string, nodeData: any) => void;
+  nodeId?: string;
 }
 
-export function Block({ data }: BlockProps) {
+export function Block({ data, onExpand, nodeId }: BlockProps) {
   return (
     <div>
       <LeftHandle data={data} />
-      <BlockContent data={data} />
+      <BlockContent data={data} onExpand={onExpand} nodeId={nodeId} />
       <RightHandle data={data} />
     </div>
   );
@@ -96,12 +98,18 @@ function RightHandle({ data }: BlockProps) {
 // Block content is the inner area of the block.
 //
 
-function BlockContent({ data }: BlockProps) {
+function BlockContent({ data, onExpand, nodeId }: BlockProps) {
+  const handleExpand = () => {
+    if (onExpand && nodeId) {
+      onExpand(nodeId, data);
+    }
+  };
+
   switch (data.type) {
     case "trigger":
       return <Trigger {...(data.trigger as TriggerProps)} />;
     case "composite":
-      return <Composite {...(data.composite as CompositeProps)} />;
+      return <Composite {...(data.composite as CompositeProps)} onExpandChildEvents={handleExpand} />;
     case "approval":
       return <Approval {...(data.approval as ApprovalProps)} />;
     default:

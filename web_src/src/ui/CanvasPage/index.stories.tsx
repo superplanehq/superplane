@@ -9,6 +9,7 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { useCallback, useMemo, useState } from "react";
 import { CanvasPage } from "./index";
+import type { BreadcrumbItem } from "./Header";
 
 const meta = {
   title: "Pages/CanvasPage",
@@ -346,14 +347,60 @@ const sampleEdges: Edge[] = [
   { id: "e6", source: "approve", target: "deploy-asia" },
 ];
 
+// Mock execution workflow for expanded nodes
+const createMockExecutionNodes = (title: string): Node[] => [
+  {
+    id: "http-request",
+    position: { x: 0, y: 0 },
+    data: {
+      label: "HTTP Request",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "HTTP Request",
+        description: `Execute HTTP request for ${title}`,
+        iconSlug: "globe",
+        iconColor: "text-blue-600",
+        headerColor: "bg-blue-100",
+        collapsedBackground: "bg-blue-100",
+        parameters: ["POST", "/api/deploy"],
+        parametersIcon: "code",
+        lastRunItem: {
+          title: "Deploy request initiated",
+          subtitle: "200 OK",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 10), // 10 minutes ago
+          childEventsInfo: {
+            count: 1,
+            state: "processed",
+            waitingInfos: [],
+          },
+          state: "success",
+          values: {
+            "Method": "POST",
+            "Status": "200 OK",
+            "Response Time": "245ms",
+            "Payload Size": "1.2 KB"
+          },
+        },
+        collapsed: false
+      }
+    },
+  }
+];
+
+const createMockExecutionEdges = (): Edge[] => [];
+
 export const SimpleDeployment: Story = {
   args: {
     nodes: sampleNodes,
     edges: sampleEdges,
+    title: "Simple Deployment",
   },
   render: function SimpleDeploymentRender(args) {
     const [simulationNodes, setSimulationNodes] = useState<Node[]>(args.nodes ?? []);
     const simulationEdges = useMemo(() => args.edges ?? [], [args.edges]);
+    const [currentView, setCurrentView] = useState<'main' | 'execution'>('main');
+    const [executionContext, setExecutionContext] = useState<{title: string, breadcrumbs: BreadcrumbItem[]} | null>(null);
 
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -428,6 +475,49 @@ export const SimpleDeployment: Story = {
       }
     }, [simulationNodes, simulationEdges]);
 
+    const handleNodeExpand = useCallback((nodeId: string, nodeData: any) => {
+      const nodeTitle = nodeData.composite?.title || nodeData.label;
+      const breadcrumbs: BreadcrumbItem[] = [
+        {
+          label: "Workflows",
+          onClick: () => setCurrentView('main')
+        },
+        {
+          label: args.title || "Simple Deployment",
+          onClick: () => setCurrentView('main')
+        },
+        { label: nodeTitle }
+      ];
+
+      setExecutionContext({
+        title: nodeTitle,
+        breadcrumbs
+      });
+      setCurrentView('execution');
+    }, [args.title]);
+
+    const renderContent = () => {
+      if (currentView === 'execution' && executionContext) {
+        return (
+          <CanvasPage
+            nodes={createMockExecutionNodes(executionContext.title)}
+            edges={createMockExecutionEdges()}
+            title={executionContext.title}
+            breadcrumbs={executionContext.breadcrumbs}
+          />
+        );
+      }
+
+      return (
+        <CanvasPage
+          {...args}
+          nodes={simulationNodes}
+          edges={simulationEdges}
+          onNodeExpand={handleNodeExpand}
+        />
+      );
+    };
+
     return (
       <div className="h-[100vh] w-full ">
         <div className="absolute z-10 m-2">
@@ -438,7 +528,7 @@ export const SimpleDeployment: Story = {
             Run
           </button>
         </div>
-        <CanvasPage {...args} nodes={simulationNodes} edges={simulationEdges} />
+        {renderContent()}
       </div>
     );
   },
@@ -449,6 +539,7 @@ export const CollapsedDeployment: Story = {
     nodes: sampleNodes,
     edges: sampleEdges,
     startCollapsed: true,
+    title: "Simple Deployment",
   },
   render: (args) => {
     return (
