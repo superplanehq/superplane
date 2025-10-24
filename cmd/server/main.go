@@ -187,7 +187,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 	if os.Getenv("START_WEBHOOK_PROVISIONER") == "yes" {
 		log.Println("Starting Webhook Provisioner")
 
-		w := workers.NewWebhookProvisioner(baseURL, registry)
+		w := workers.NewWebhookProvisioner(baseURL, encryptor, registry)
 		go w.Start(context.Background())
 	}
 
