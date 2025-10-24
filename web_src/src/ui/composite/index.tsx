@@ -46,7 +46,7 @@ export interface CompositeProps {
   metadata?: MetadataItem[];
   parameters: string[];
   parametersIcon: string;
-  lastRunItem: LastRunItem;
+  lastRunItem?: LastRunItem;
   nextInQueue?: QueueItem;
   collapsedBackground?: string;
   collapsed?: boolean;
@@ -62,15 +62,17 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
   const [showWaitingInfo, setShowWaitingInfo] = React.useState(false)
 
   const timeAgo = React.useMemo(() => {
+    if (!lastRunItem?.receivedAt) return ""
+
     const now = new Date()
-    const diff = now.getTime() - lastRunItem.receivedAt.getTime()
+    const diff = now.getTime() - new Date(lastRunItem?.receivedAt).getTime()
     return calcRelativeTimeFromDiff(diff)
   }, [lastRunItem])
 
   const LastRunIcon = React.useMemo(() => {
-    if (lastRunItem.state === "success") {
+    if (lastRunItem?.state === "success") {
       return resolveIcon("check")
-    } else if (lastRunItem.state === "running") {
+    } else if (lastRunItem?.state === "running") {
       return resolveIcon("refresh-cw")
     } else {
       return resolveIcon("x")
@@ -78,9 +80,9 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
   }, [lastRunItem])
 
   const LastRunColor = React.useMemo(() => {
-    if (lastRunItem.state === "success") {
+    if (lastRunItem?.state === "success") {
       return "text-green-700"
-    } else if (lastRunItem.state === "running") {
+    } else if (lastRunItem?.state === "running") {
       return "text-blue-800"
     } else {
       return "text-red-700"
@@ -88,9 +90,9 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
   }, [lastRunItem])
 
   const LastRunBackground = React.useMemo(() => {
-    if (lastRunItem.state === "success") {
+    if (lastRunItem?.state === "success") {
       return "bg-green-200"
-    } else if (lastRunItem.state === "running") {
+    } else if (lastRunItem?.state === "running") {
       return "bg-sky-100"
     } else {
       return "bg-red-200"
@@ -98,9 +100,9 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
   }, [lastRunItem])
 
   const lastRunIconBackground = React.useMemo(() => {
-    if (lastRunItem.state === "success") {
+    if (lastRunItem?.state === "success") {
       return "bg-green-600"
-    } else if (lastRunItem.state === "running") {
+    } else if (lastRunItem?.state === "running") {
       return "bg-none animate-spin"
     } else {
       return "bg-red-600"
@@ -108,9 +110,9 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
   }, [lastRunItem])
 
   const lastRunIconColor = React.useMemo(() => {
-    if (lastRunItem.state === "success") {
+    if (lastRunItem?.state === "success") {
       return "text-white"
-    } else if (lastRunItem.state === "running") {
+    } else if (lastRunItem?.state === "running") {
       return "text-blue-800"
     } else {
       return "text-white"
@@ -207,17 +209,17 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           <div className="flex items-center gap-3 rounded-md w-full">
             <div className="w-full flex items-center gap-2 w-full">
               <div className={`w-5 h-5 rounded-full flex items-center justify-center ${lastRunIconBackground}`}>
-                <LastRunIcon size={lastRunItem.state === "running" ? 16 : 12} className={`${lastRunIconColor}`} />
+                <LastRunIcon size={lastRunItem?.state === "running" ? 16 : 12} className={`${lastRunIconColor}`} />
               </div>
-              <span className="truncate text-sm">{lastRunItem.title}</span>
+              <span className="truncate text-sm">{lastRunItem?.title}</span>
             </div>
-            {lastRunItem.subtitle && (
-              <span className="text-sm text-gray-500 no-wrap whitespace-nowrap w-[20%]">{lastRunItem.subtitle}</span>
+            {lastRunItem?.subtitle && (
+              <span className="text-sm text-gray-500 no-wrap whitespace-nowrap w-[20%]">{lastRunItem?.subtitle}</span>
             )}
           </div>
           {showLastRunValues && (
             <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
-              {Object.entries(lastRunItem.values).map(([key, value]) => (
+              {Object.entries(lastRunItem?.values || {}).map(([key, value]) => (
                 <div key={key} className="flex justify-between gap-3 px-2 py-1 rounded-md w-full">
                   <span className="text-sm w-[20%] text-right">{key}</span>
                   <span className="text-sm w-[80%]">{value}</span>
@@ -226,12 +228,17 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
             </div>
           )}
         </div>
-        {lastRunItem.childEventsInfo && (
+        {lastRunItem?.childEventsInfo && (
           <div className="mt-3 ml-3 text-gray-500">
             <div className="flex items-center justify-between gap-2">
-              <div onClick={() => hasWaitingInfos && setShowWaitingInfo(!showWaitingInfo)} className={"flex items-center gap-2 w-full " + (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")}>
+              <div onClick={(e) => {
+                e.stopPropagation()
+                if (hasWaitingInfos) {
+                  setShowWaitingInfo(!showWaitingInfo)
+                }
+              }} className={"flex items-center gap-2 w-full " + (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")}>
                 <ChildEventsArrowIcon size={18} className="text-gray-500" />
-                <span className="text-sm">{lastRunItem.childEventsInfo.count} child event{lastRunItem.childEventsInfo.count === 1 ? "" : "s"} {lastRunItem.childEventsInfo.state || ""}</span>
+                <span className="text-sm">{lastRunItem?.childEventsInfo.count} child event{lastRunItem?.childEventsInfo.count === 1 ? "" : "s"} {lastRunItem?.childEventsInfo.state || ""}</span>
               </div>
               <div className="flex items-center gap-2">
                 <ExpandChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onExpandChildEvents} />
@@ -240,7 +247,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
             </div>
             {hasWaitingInfos && showWaitingInfo && (
               <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
-                {lastRunItem.childEventsInfo.waitingInfos.map((waitingInfo) => {
+                {lastRunItem?.childEventsInfo.waitingInfos.map((waitingInfo) => {
                   const Icon = resolveIcon(waitingInfo.icon)
                   return (
                     <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
@@ -249,7 +256,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
                         {waitingInfo.info}
                       </span>
                       <span className="text-sm">
-                        {calcRelativeTimeFromDiff(waitingInfo.futureTimeDate.getTime() - new Date().getTime())}
+                        {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
                         &nbsp;left
                       </span>
                     </div>
