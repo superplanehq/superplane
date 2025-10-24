@@ -6,25 +6,25 @@ import { CollapsedComponent } from "../collapsedComponent";
 type LastRunState = "success" | "failed" | "running"
 type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
 
-interface WaitingInfo {
+export interface WaitingInfo {
   icon: string;
   info: string;
   futureTimeDate: Date;
 }
 
-interface ChildEventsInfo {
+export interface ChildEventsInfo {
   count: number;
   state?: ChildEventsState;
   waitingInfos: WaitingInfo[];
 }
 
-interface QueueItem {
+export interface QueueItem {
   title: string;
   subtitle: string;
   receivedAt: Date;
 }
 
-interface LastRunItem extends QueueItem {
+export interface LastRunItem extends QueueItem {
   childEventsInfo?: ChildEventsInfo;
   state: LastRunState;
   values: Record<string, string>;

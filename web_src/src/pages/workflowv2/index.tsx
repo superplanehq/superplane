@@ -8,6 +8,7 @@ import {
 
 import { useWorkflow } from "../../hooks/useWorkflowData";
 import { CanvasPage } from "../../ui/CanvasPage";
+import type { Edge as ReactFlowEdge, Node as ReactFlowNode } from "@xyflow/react";
 
 export function WorkflowPageV2() {
   const data = usePageData();
@@ -27,8 +28,8 @@ function usePageData() {
 }
 
 function prepareData(data: WorkflowsWorkflow): {
-  nodes: CanvasPage.Node[];
-  edges: CanvasPage.Edge[];
+  nodes: ReactFlowNode[];
+  edges: ReactFlowEdge[];
 } {
   const nodes = data?.nodes!.map(prepareNode);
   const edges = data?.edges!.map(prepareEdge);
@@ -36,7 +37,7 @@ function prepareData(data: WorkflowsWorkflow): {
   return { nodes, edges };
 }
 
-function prepareNode(node: ComponentsNode): CanvasPage.Node {
+function prepareNode(node: ComponentsNode): ReactFlowNode {
   return {
     id: node.id!,
     position: { x: -140, y: -80 },
@@ -47,7 +48,7 @@ function prepareNode(node: ComponentsNode): CanvasPage.Node {
   };
 }
 
-function prepareEdge(edge: ComponentsEdge): CanvasPage.Edge {
+function prepareEdge(edge: ComponentsEdge): ReactFlowEdge {
   const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
   console.log("Preparing edge with id:", id);
 
