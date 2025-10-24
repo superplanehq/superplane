@@ -184,7 +184,7 @@ export const WorkflowEvents = () => {
                           isDarkMode={document.documentElement.classList.contains('dark')}
                           workflowId={workflowId!}
                           isBlueprintNode={isBlueprint}
-                          nodeType={nodeInfo?.blockName}
+                          componentName={nodeInfo?.blockName}
                         />
                       </div>
 

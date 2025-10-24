@@ -16,18 +16,18 @@ interface ExecutionItemProps {
   isDarkMode: boolean
   workflowId: string
   isBlueprintNode?: boolean
-  nodeType?: string
+  componentName?: string
   organizationId?: string
   blueprintId?: string
   onToggleChildExecutions?: (executionId: string) => void
   isChildExpanded?: boolean
 }
 
-export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNode = false, nodeType, organizationId, blueprintId, onToggleChildExecutions, isChildExpanded }: ExecutionItemProps) => {
+export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNode = false, componentName, organizationId, blueprintId, onToggleChildExecutions, isChildExpanded }: ExecutionItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false)
 
   // Get custom renderer if available
-  const customRenderer = nodeType ? getExecutionRenderer(nodeType) : undefined
+  const customRenderer = componentName ? getExecutionRenderer(componentName) : undefined
 
   // If custom renderer provides full collapsed/expanded views, use them
   if (customRenderer?.renderCollapsed && customRenderer?.renderExpanded) {
@@ -185,11 +185,11 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
             </div>
 
             {/* Actions Section */}
-            {!isBlueprintNode && nodeType && (
+            {!isBlueprintNode && componentName && (
               <ComponentActions
                 workflowId={workflowId}
                 executionId={execution.id!}
-                componentName={nodeType}
+                componentName={componentName}
                 executionState={execution.state!}
               />
             )}
