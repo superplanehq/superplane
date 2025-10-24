@@ -97,7 +97,7 @@ export function useCanvasState({ nodes: initialNodes, edges: initialEdges, start
       nds.map((node) => {
         if (node.id !== nodeId) return node;
 
-        const nodeData = { ...node.data };
+        const nodeData = { ...node.data } as any;
 
         if (nodeData.type === "composite" && nodeData.composite) {
           nodeData.composite = {
