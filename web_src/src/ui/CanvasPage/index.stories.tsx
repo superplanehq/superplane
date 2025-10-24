@@ -8,9 +8,9 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { useCallback, useMemo, useState } from "react";
-import { CanvasPage } from "./index";
-import type { BreadcrumbItem } from "./Header";
 import { LastRunItem } from "../composite";
+import type { BreadcrumbItem } from "./Header";
+import { CanvasNode, CanvasPage } from "./index";
 
 const meta = {
   title: "Pages/CanvasPage",
@@ -25,7 +25,7 @@ export default meta;
 
 type Story = StoryObj<typeof CanvasPage>;
 
-const sampleNodes: Node[] = [
+const sampleNodes: CanvasNode[] = [
   {
     id: "listen-code",
     position: { x: -500, y: -200 },
@@ -51,6 +51,14 @@ const sampleNodes: Node[] = [
         },
         collapsed: true,
       },
+    },
+    _run: async () => {
+      return {
+        title: "refactor: commit 1234",
+        sizeInMB: 1,
+        receivedAt: new Date(),
+        state: "processed",
+      };
     },
   },
   {
@@ -78,6 +86,14 @@ const sampleNodes: Node[] = [
         collapsed: true,
       },
     },
+    _run: async () => {
+      return {
+        title: "v3.18.218",
+        sizeInMB: 973.1,
+        receivedAt: new Date(),
+        state: "processed",
+      };
+    },
   },
   {
     id: "build-stage",
@@ -88,7 +104,8 @@ const sampleNodes: Node[] = [
       type: "composite",
       composite: {
         title: "Build/Test/Deploy Stage",
-        description: "Build new release of the monarch app and runs all required tests",
+        description:
+          "Build new release of the monarch app and runs all required tests",
         iconSlug: "git-branch",
         iconColor: "text-purple-700",
         headerColor: "bg-purple-100",
@@ -105,11 +122,11 @@ const sampleNodes: Node[] = [
           },
           state: "failed",
           values: {
-            "Author": "Bart Willems",
-            "Commit": "FEAT-1234",
-            "Sha": "ef758d40",
-            "Image": "v3.18.217",
-            "Size": "971.5 MB"
+            Author: "Bart Willems",
+            Commit: "FEAT-1234",
+            Sha: "ef758d40",
+            Image: "v3.18.217",
+            Size: "971.5 MB",
           },
         },
         nextInQueue: {
@@ -117,8 +134,27 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30), // 30 minutes ago
         },
-        collapsed: true
-      }
+        collapsed: true,
+      },
+    },
+    _run: async () => {
+      return {
+        title: "FEAT-1234: New feature",
+        subtitle: "ef758d40",
+        receivedAt: new Date(),
+        childEventsInfo: {
+          count: 3,
+          waitingInfos: [],
+        },
+        state: "failed",
+        values: {
+          Author: "Bart Willems",
+          Commit: "FEAT-1234",
+          Sha: "ef758d40",
+          Image: "v3.18.217",
+          Size: "971.5 MB",
+        },
+      };
     },
   },
   {
@@ -130,7 +166,8 @@ const sampleNodes: Node[] = [
       type: "approval",
       approval: {
         title: "Approve Release",
-        description: "New releases are deployed to staging for testing and require approvals.",
+        description:
+          "New releases are deployed to staging for testing and require approvals.",
         iconSlug: "hand",
         iconColor: "text-orange-500",
         headerColor: "bg-orange-100",
@@ -143,10 +180,12 @@ const sampleNodes: Node[] = [
             requireArtifacts: [
               {
                 label: "CVE Report",
-              }
+              },
             ],
-            onApprove: (artifacts) => console.log("Security approved with artifacts:", artifacts),
-            onReject: (comment) => console.log("Security rejected with comment:", comment),
+            onApprove: (artifacts) =>
+              console.log("Security approved with artifacts:", artifacts),
+            onReject: (comment) =>
+              console.log("Security rejected with comment:", comment),
           },
           {
             title: "Compliance",
@@ -162,7 +201,8 @@ const sampleNodes: Node[] = [
             title: "Engineering",
             rejected: true,
             approverName: "Lucas Pinheiro",
-            rejectionComment: "Security vulnerabilities need to be addressed before approval",
+            rejectionComment:
+              "Security vulnerabilities need to be addressed before approval",
           },
           {
             title: "Josh Brown",
@@ -178,8 +218,8 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
         },
         receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -215,11 +255,11 @@ const sampleNodes: Node[] = [
           },
           state: "success",
           values: {
-            "Author": "Bart Willems",
-            "Commit": "FEAT-1234",
-            "Sha": "ef758d40",
-            "Image": "v3.18.217",
-            "Size": "971.5 MB"
+            Author: "Bart Willems",
+            Commit: "FEAT-1234",
+            Sha: "ef758d40",
+            Image: "v3.18.217",
+            Size: "971.5 MB",
           },
         },
         nextInQueue: {
@@ -227,8 +267,8 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60), // 1 hour ago
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -276,11 +316,11 @@ const sampleNodes: Node[] = [
           },
           state: "running",
           values: {
-            "Author": "Bart Willems",
-            "Commit": "FEAT-1234",
-            "Sha": "ef758d40",
-            "Image": "v3.18.217",
-            "Size": "971.5 MB"
+            Author: "Bart Willems",
+            Commit: "FEAT-1234",
+            Sha: "ef758d40",
+            Image: "v3.18.217",
+            Size: "971.5 MB",
           },
         },
         nextInQueue: {
@@ -288,8 +328,8 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 4), // 4 hours ago
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -325,16 +365,16 @@ const sampleNodes: Node[] = [
           },
           state: "fail",
           values: {
-            "Author": "Bart Willems",
-            "Commit": "FEAT-1234",
-            "Sha": "ef758d40",
-            "Image": "v3.18.217",
-            "Size": "971.5 MB"
+            Author: "Bart Willems",
+            Commit: "FEAT-1234",
+            Sha: "ef758d40",
+            Image: "v3.18.217",
+            Size: "971.5 MB",
           },
         },
         startLastValuesOpen: false,
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
 ];
@@ -349,7 +389,10 @@ const sampleEdges: Edge[] = [
 ];
 
 // Mock execution workflow for expanded nodes
-const createMockExecutionNodes = (title: string, lastRunItem: LastRunItem): Node[] => [
+const createMockExecutionNodes = (
+  title: string,
+  lastRunItem: LastRunItem
+): Node[] => [
   {
     id: "http-request",
     position: { x: 0, y: 0 },
@@ -367,13 +410,30 @@ const createMockExecutionNodes = (title: string, lastRunItem: LastRunItem): Node
         parameters: ["POST", "/api/deploy"],
         parametersIcon: "code",
         lastRunItem: lastRunItem,
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
-  }
+  },
 ];
 
 const createMockExecutionEdges = (): Edge[] => [];
+
+function useSimulator(
+  nodes: CanvasNode[],
+  edges: Edge[],
+  setNodes: (nodes: CanvasNode[]) => void
+) {
+  const run = useCallback(async () => {
+    const start = nodes[0];
+    const active = [];
+
+    active.push(start._run && start._run());
+
+    while (active.length > 0) {}
+  }, [nodes, edges]);
+
+  return run;
+}
 
 export const SimpleDeployment: Story = {
   args: {
@@ -382,118 +442,61 @@ export const SimpleDeployment: Story = {
     title: "Simple Deployment",
   },
   render: function SimpleDeploymentRender(args) {
-    const [simulationNodes, setSimulationNodes] = useState<Node[]>(args.nodes ?? []);
-    const simulationEdges = useMemo(() => args.edges ?? [], [args.edges]);
-    const [currentView, setCurrentView] = useState<'main' | 'execution'>('main');
-    const [executionContext, setExecutionContext] = useState<{ title: string, breadcrumbs: BreadcrumbItem[], lastRunItem?: LastRunItem } | null>(null);
+    const [nodes, setNodes] = useState<CanvasNode[]>(args.nodes!);
+    const edges = useMemo(() => args.edges!, [args.edges]);
 
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const [currentView, setCurrentView] = useState<"main" | "execution">(
+      "main"
+    );
 
-    const runSimulation = useCallback(async () => {
-      if (!simulationNodes || simulationNodes.length === 0) return;
+    const [executionContext, setExecutionContext] = useState<{
+      title: string;
+      breadcrumbs: BreadcrumbItem[];
+      lastRunItem?: LastRunItem;
+    } | null>(null);
 
-      const outgoing = new Map<string, string[]>();
-      simulationEdges?.forEach((e) => {
-        if (!outgoing.has(e.source)) outgoing.set(e.source, []);
-        outgoing.get(e.source)!.push(e.target);
-      });
+    const run = useSimulator(nodes, edges, setNodes);
 
-      const start = simulationNodes.find((n) => n.type === "input") ?? simulationNodes[0];
-      if (!start) return;
+    const handleNodeExpand = useCallback(
+      (nodeId: string, nodeData: any) => {
+        const nodeTitle = nodeData.composite?.title || nodeData.label;
+        const composite = nodeData.composite;
 
-      const event = { at: Date.now(), msg: "run" } as const;
+        const breadcrumbs: BreadcrumbItem[] = [
+          {
+            label: "Workflows",
+          },
+          {
+            label: args.title || "Simple Deployment",
+            onClick: () => setCurrentView("main"),
+          },
+          {
+            label: nodeTitle,
+            iconSrc: composite?.iconSrc,
+            iconSlug: composite?.iconSlug,
+            iconColor: composite?.iconColor,
+            iconBackground: composite?.iconBackground,
+          },
+        ];
 
-      // Walk the graph in topological-ish layers with delays.
-      const visited = new Set<string>();
-      let frontier: Array<{ id: string; value: unknown }> = [
-        { id: start.id, value: event },
-      ];
-
-      while (frontier.length) {
-        // mark nodes in this layer as working + set lastEvent
-        const layerIds = frontier.map((f) => f.id);
-        const valuesById = new Map(
-          frontier.map((f) => [f.id, f.value] as const)
-        );
-
-        setSimulationNodes((prev) =>
-          prev.map((n) =>
-            layerIds.includes(n.id)
-              ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  state: "working",
-                  lastEvent: valuesById.get(n.id),
-                },
-              }
-              : n
-          )
-        );
-
-        // wait 5 seconds to simulate processing
-        await sleep(5000);
-
-        // turn off working state for this layer
-        setSimulationNodes((prev) =>
-          prev.map((n) =>
-            layerIds.includes(n.id)
-              ? { ...n, data: { ...n.data, state: "pending" } }
-              : n
-          )
-        );
-
-        // build next layer
-        const next: Array<{ id: string; value: unknown }> = [];
-        frontier.forEach(({ id, value }) => {
-          visited.add(id);
-          const nexts = outgoing.get(id) ?? [];
-          nexts.forEach((nid) => {
-            if (!visited.has(nid)) {
-              const transformed = { ...(value as Record<string, unknown> ?? {}), via: id };
-              next.push({ id: nid, value: transformed });
-            }
-          });
+        setExecutionContext({
+          title: nodeTitle,
+          breadcrumbs,
+          lastRunItem: composite?.lastRunItem,
         });
-
-        frontier = next;
-      }
-    }, [simulationNodes, simulationEdges]);
-
-    const handleNodeExpand = useCallback((nodeId: string, nodeData: any) => {
-      const nodeTitle = nodeData.composite?.title || nodeData.label;
-      const composite = nodeData.composite;
-
-      const breadcrumbs: BreadcrumbItem[] = [
-        {
-          label: "Workflows",
-        },
-        {
-          label: args.title || "Simple Deployment",
-          onClick: () => setCurrentView('main')
-        },
-        {
-          label: nodeTitle,
-          iconSrc: composite?.iconSrc,
-          iconSlug: composite?.iconSlug,
-          iconColor: composite?.iconColor,
-          iconBackground: composite?.iconBackground
-        }
-      ];
-
-      setExecutionContext({
-        title: nodeTitle,
-        breadcrumbs,
-        lastRunItem: composite?.lastRunItem
-      });
-      setCurrentView('execution');
-    }, [args.title]);
+        setCurrentView("execution");
+      },
+      [args.title]
+    );
 
     const renderContent = () => {
-      if (currentView === 'execution' && executionContext) {
+      if (currentView === "execution" && executionContext) {
         return (
           <CanvasPage
-            nodes={createMockExecutionNodes(executionContext.title, executionContext.lastRunItem!)}
+            nodes={createMockExecutionNodes(
+              executionContext.title,
+              executionContext.lastRunItem!
+            )}
             edges={createMockExecutionEdges()}
             title={executionContext.title}
             breadcrumbs={executionContext.breadcrumbs}
@@ -504,18 +507,18 @@ export const SimpleDeployment: Story = {
       return (
         <CanvasPage
           {...args}
-          nodes={simulationNodes}
-          edges={simulationEdges}
+          nodes={nodes}
+          edges={edges}
           onNodeExpand={handleNodeExpand}
         />
       );
     };
 
     return (
-      <div className="h-[100vh] w-full ">
-        <div className="absolute z-10 m-2">
+      <div className="h-[100vh] w-full">
+        <div className="absolute z-[999] right-4 top-3">
           <button
-            onClick={runSimulation}
+            onClick={run}
             className="px-3 py-1 rounded bg-blue-600 text-white text-xs shadow hover:bg-blue-700"
           >
             Run

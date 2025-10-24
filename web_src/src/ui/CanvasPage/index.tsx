@@ -3,19 +3,26 @@ import {
   EdgeMarker,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
-import { useReactFlow } from "@xyflow/react";
 
-import { Block } from "./Block";
-import { useCanvasState } from "./useCanvasState";
 import { ViewToggle } from "../ViewToggle";
+import { Block } from "./Block";
 import { Header, type BreadcrumbItem } from "./Header";
+import { useCanvasState } from "./useCanvasState";
+
+export interface CanvasNode extends ReactFlowNode {
+  // used to simulate execution in stories
+  _run?: () => Promise<any>;
+}
+
+export interface CanvasEdge extends ReactFlowEdge {}
 
 export interface CanvasPageProps {
-  nodes?: ReactFlowNode[];
-  edges?: ReactFlowEdge[];
+  nodes?: CanvasNode[];
+  edges?: CanvasEdge[];
   startCollapsed?: boolean;
   title?: string;
   breadcrumbs?: BreadcrumbItem[];
@@ -33,18 +40,26 @@ const EDGE_STYLE = {
 } as const;
 
 function CanvasContent(props: CanvasPageProps) {
-  const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } = useCanvasState(props);
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    isCollapsed,
+    toggleCollapse,
+    toggleNodeCollapse,
+  } = useCanvasState(props);
   const { fitView } = useReactFlow();
 
   const defaultBreadcrumbs: BreadcrumbItem[] = [
     { label: "Workflows" },
-    { label: props.title || "Untitled Workflow" }
+    { label: props.title || "Untitled Workflow" },
   ];
 
   const breadcrumbs = props.breadcrumbs || defaultBreadcrumbs;
 
   const handleNodeExpand = (nodeId: string) => {
-    const node = nodes?.find(n => n.id === nodeId);
+    const node = nodes?.find((n) => n.id === nodeId);
     if (node && props.onNodeExpand) {
       props.onNodeExpand(nodeId, node.data);
       fitView();
@@ -73,7 +88,7 @@ function CanvasContent(props: CanvasPageProps) {
                   onExpand={handleNodeExpand}
                   nodeId={nodeProps.id}
                 />
-              )
+              ),
             }}
             fitView={true}
             minZoom={0.4}
