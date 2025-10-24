@@ -1,17 +1,18 @@
 import {
   Background,
-  EdgeMarker,
   ReactFlow,
   ReactFlowProvider,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 import { useReactFlow } from "@xyflow/react";
+import { useMemo, useCallback } from "react";
 
 import { Block } from "./Block";
 import { useCanvasState } from "./useCanvasState";
 import { ViewToggle } from "../ViewToggle";
 import { Header, type BreadcrumbItem } from "./Header";
+import { BlockData } from "./Block";
 
 export interface CanvasPageProps {
   nodes?: ReactFlowNode[];
@@ -23,33 +24,43 @@ export interface CanvasPageProps {
 }
 
 const EDGE_STYLE = {
-  type: "bezier" as const,
+  type: "default",
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
-  markerEnd: {
-    width: 20,
-    height: 20,
-    color: "#6B7280",
-  } as EdgeMarker,
 } as const;
 
 function CanvasContent(props: CanvasPageProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } = useCanvasState(props);
   const { fitView } = useReactFlow();
+  const { onNodeExpand, title, breadcrumbs: propsBreadcrumbs } = props;
 
   const defaultBreadcrumbs: BreadcrumbItem[] = [
     { label: "Workflows" },
-    { label: props.title || "Untitled Workflow" }
+    { label: title || "Untitled Workflow" }
   ];
 
-  const breadcrumbs = props.breadcrumbs || defaultBreadcrumbs;
+  const breadcrumbs = propsBreadcrumbs || defaultBreadcrumbs;
 
-  const handleNodeExpand = (nodeId: string) => {
+  const handleNodeExpand = useCallback((nodeId: string) => {
     const node = nodes?.find(n => n.id === nodeId);
-    if (node && props.onNodeExpand) {
-      props.onNodeExpand(nodeId, node.data);
+    if (node && onNodeExpand) {
+      onNodeExpand(nodeId, node.data);
       fitView();
     }
-  };
+  }, [nodes, onNodeExpand, fitView]);
+
+  const nodeTypes = useMemo(() => ({
+    default: (nodeProps: { data: unknown; id: string }) => (
+      <Block
+        data={nodeProps.data as BlockData}
+        onExpand={handleNodeExpand}
+        nodeId={nodeProps.id}
+      />
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
+  const edgeTypes = useMemo(() => ({}), []);
+  const styledEdges = useMemo(() => edges?.map((e) => ({ ...e, ...EDGE_STYLE })), [edges]);
 
   return (
     <>
@@ -65,16 +76,9 @@ function CanvasContent(props: CanvasPageProps) {
         <div className="h-full w-full">
           <ReactFlow
             nodes={nodes}
-            edges={edges?.map((e) => ({ ...e, ...EDGE_STYLE }))}
-            nodeTypes={{
-              default: (nodeProps) => (
-                <Block
-                  data={nodeProps.data}
-                  onExpand={handleNodeExpand}
-                  nodeId={nodeProps.id}
-                />
-              )
-            }}
+            edges={styledEdges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView={true}
             minZoom={0.4}
             maxZoom={1.5}

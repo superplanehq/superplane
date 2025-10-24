@@ -6,7 +6,7 @@ import { Handle, Position } from "@xyflow/react";
 type BlockState = "pending" | "working";
 type BlockType = "trigger" | "composite" | "approval";
 
-interface BlockData {
+export interface BlockData {
   label: string;
 
   state: BlockState;
@@ -27,7 +27,7 @@ interface BlockData {
 
 interface BlockProps {
   data: BlockData;
-  onExpand?: (nodeId: string, nodeData: any) => void;
+  onExpand?: (nodeId: string, nodeData: BlockData) => void;
   nodeId?: string;
 }
 
@@ -113,6 +113,6 @@ function BlockContent({ data, onExpand, nodeId }: BlockProps) {
     case "approval":
       return <Approval {...(data.approval as ApprovalProps)} />;
     default:
-      throw new Error(`Unknown block type: ${(data as any).type}`);
+      throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }
 }
