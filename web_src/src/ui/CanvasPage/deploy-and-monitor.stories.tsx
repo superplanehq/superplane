@@ -63,11 +63,6 @@ const sampleNodes: Node[] = [
             "Pool Usage": "45/100",
           },
         },
-        nextInQueue: {
-          title: "Scheduled DB check",
-          subtitle: "In 15min",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 2), // 2 minutes ago
-        },
         collapsed: false
       }
     },
@@ -90,31 +85,26 @@ const sampleNodes: Node[] = [
           { icon: "cpu", label: "CPU: 45%" },
           { icon: "hard-drive", label: "Memory: 12.3 GB available" },
           { icon: "hard-drive", label: "Disk: 85% used" },
-          { icon: "box", label: "Pods: 24/24 healthy" },
+          { icon: "box", label: "Pods: 11/24 healthy" },
         ],
         parameters: ["prod-cluster-1", "prod-cluster-2"],
         parametersIcon: "server",
         lastRunItem: {
           title: "Resource check",
-          subtitle: "CPU 45%",
+          subtitle: "11/24 pods",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 8), // 8 minutes ago
           childEventsInfo: {
             count: 2,
             state: "processed",
             waitingInfos: [],
           },
-          state: "success",
+          state: "failure",
           values: {
             "CPU Usage": "45%",
             "Memory": "12.3 GB available",
             "Disk": "85% used",
             "Pods": "24/24",
           },
-        },
-        nextInQueue: {
-          title: "Scheduled resource check",
-          subtitle: "In 20min",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
         },
         collapsed: false
       }
@@ -158,11 +148,6 @@ const sampleNodes: Node[] = [
             "Error Rate": "0.3%",
             "Status": "Healthy",
           },
-        },
-        nextInQueue: {
-          title: "Scheduled traffic check",
-          subtitle: "In 45min",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5), // 5 minutes ago
         },
         collapsed: false
       }

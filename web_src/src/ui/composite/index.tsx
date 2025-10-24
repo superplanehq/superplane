@@ -261,29 +261,24 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         )}
       </div>
 
-      <div className="px-4 pt-3 pb-6">
-        <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-          <span className="uppercase text-sm font-medium">Next In Queue</span>
+      {nextInQueue && (
+        <div className="px-4 pt-3 pb-6">
+          <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+            <span className="uppercase text-sm font-medium">Next In Queue</span>
+          </div>
+          <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100`}>
+            <div className="flex items-center gap-2 w-[80%] text-gray-500">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center`}>
+                <NextInQueueIcon size={20} className="text-gray-500" />
+              </div>
+              <span className="truncate text-sm">{nextInQueue.title}</span>
+            </div>
+            {nextInQueue.subtitle && (
+              <span className="text-sm no-wrap whitespace-nowrap w-[20%] text-gray-500">{nextInQueue.subtitle}</span>
+            )}
+          </div>
         </div>
-        {nextInQueue ? <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100`}>
-          <div className="flex items-center gap-2 w-[80%] text-gray-500">
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center`}>
-              <NextInQueueIcon size={20} className="text-gray-500" />
-            </div>
-            <span className="truncate text-sm">{nextInQueue?.title}</span>
-          </div>
-          {nextInQueue?.subtitle && (
-            <span className="text-sm no-wrap whitespace-nowrap w-[20%] text-gray-500">{nextInQueue?.subtitle}</span>
-          )}
-        </div> :
-          <div className="text-sm text-gray-500 bg-gray-100 px-2 py-2 rounded-md w-full">
-            <div className="flex items-center gap-2">
-              <NextInQueueIcon size={20} className="text-gray-500" />
-              No item in queue...
-            </div>
-          </div>
-        }
-      </div>
+      )}
     </div>
   )
 }
