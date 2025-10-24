@@ -7,26 +7,57 @@ import { Badge } from '../../ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../ui/dialog'
 import { Label } from '../../ui/label'
 import { Textarea } from '../../Textarea/textarea'
+import { ConfigurationFieldRenderer } from '../../ConfigurationFieldRenderer'
 import { workflowsInvokeNodeExecutionAction } from '../../../api-client/sdk.gen'
 import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import { showSuccessToast, showErrorToast } from '../../../utils/toast'
 import { formatTimeAgo } from '../../../utils/date'
+import { ComponentsConfigurationField } from '../../../api-client'
+
+interface ApprovalRequirement {
+  type: string
+  user?: string
+  role?: string
+  group?: string
+  parameters?: ComponentsConfigurationField[]
+}
 
 interface ApprovalRecord {
-  approved_at?: string
+  requirementIndex: number
+  approvedAt?: string
+  approvedBy?: string
   comment?: string
+  data?: Record<string, any>
 }
 
 interface ApprovalMetadata {
-  required_count?: number
   approvals?: ApprovalRecord[]
 }
 
-const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId: string }) => {
+interface ApprovalConfig {
+  approvals?: ApprovalRequirement[]
+}
+
+const ApprovalRequirementCard = ({
+  requirement,
+  requirementIndex,
+  approval,
+  execution,
+  workflowId,
+  organizationId
+}: {
+  requirement: ApprovalRequirement
+  requirementIndex: number
+  approval?: ApprovalRecord
+  execution: any
+  workflowId: string
+  organizationId: string
+}) => {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [comment, setComment] = useState('')
   const [reason, setReason] = useState('')
+  const [formData, setFormData] = useState<Record<string, any>>({})
   const queryClient = useQueryClient()
 
   const invokeActionMutation = useMutation({
@@ -45,22 +76,29 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
       )
     },
     onSuccess: (_, variables) => {
-      showSuccessToast(`Successfully ${variables.actionName === 'approve' ? 'approved' : 'rejected'}`)
+      const action = variables.actionName === 'approve' ? 'approved' : 'rejected'
+      showSuccessToast(`Successfully ${action}`)
       setIsApproveModalOpen(false)
       setIsRejectModalOpen(false)
       setComment('')
       setReason('')
+      setFormData({})
       queryClient.invalidateQueries({ queryKey: ['workflow-node-executions'] })
     },
-    onError: (error: any) => {
-      showErrorToast(`Failed to execute action: ${error.message}`)
+    onError: (error: any, variables) => {
+      const action = variables.actionName === 'approve' ? 'approve' : 'reject'
+      showErrorToast(`Failed to ${action}: ${error.message}`)
     },
   })
 
   const handleApprove = () => {
     invokeActionMutation.mutate({
       actionName: 'approve',
-      parameters: { comment: comment || undefined }
+      parameters: {
+        requirementIndex: requirementIndex,
+        data: Object.keys(formData).length > 0 ? formData : undefined,
+        comment: comment || undefined
+      }
     })
   }
 
@@ -71,57 +109,124 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
     }
     invokeActionMutation.mutate({
       actionName: 'reject',
-      parameters: { reason }
+      parameters: {
+        requirementIndex: requirementIndex,
+        reason: reason
+      }
     })
   }
 
-  // Only show actions for started executions
-  if (execution.state !== 'STATE_STARTED') {
-    return null
+  // Get the requirement label
+  const getRequirementLabel = () => {
+    if (requirement.type === 'user' && requirement.user) {
+      return `User: ${requirement.user}`
+    }
+    if (requirement.type === 'role' && requirement.role) {
+      return `Role: ${requirement.role}`
+    }
+    if (requirement.type === 'group' && requirement.group) {
+      return `Group: ${requirement.group}`
+    }
+    return `Requirement #${requirementIndex + 1}`
   }
+
+  const isApproved = !!approval
 
   return (
     <>
-      <div className="space-y-3">
-        <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-          Actions
+      <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {isApproved ? (
+              <MaterialSymbol name="check_circle" className="text-green-600 dark:text-green-400" />
+            ) : (
+              <MaterialSymbol name="pending" className="text-orange-600 dark:text-orange-400" />
+            )}
+            <div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
+                {getRequirementLabel()}
+              </div>
+              {isApproved && approval && (
+                <div className="text-xs text-gray-500 dark:text-zinc-400">
+                  Approved by {approval.approvedBy} {approval.approvedAt && `at ${new Date(approval.approvedAt).toLocaleString()}`}
+                </div>
+              )}
+            </div>
+          </div>
+          {!isApproved && execution.state === 'STATE_STARTED' && (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setIsApproveModalOpen(true)}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <MaterialSymbol name="check_circle" size="sm" />
+                Approve
+              </Button>
+              <Button
+                onClick={() => setIsRejectModalOpen(true)}
+                size="sm"
+                variant="destructive"
+              >
+                <MaterialSymbol name="cancel" size="sm" />
+                Reject
+              </Button>
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => setIsApproveModalOpen(true)}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-          >
-            <MaterialSymbol name="check_circle" size="sm" />
-            Approve
-          </Button>
-          <Button
-            onClick={() => setIsRejectModalOpen(true)}
-            variant="destructive"
-            className="flex-1"
-          >
-            <MaterialSymbol name="cancel" size="sm" />
-            Reject
-          </Button>
-        </div>
+        {isApproved && approval?.comment && (
+          <div className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
+            {approval.comment}
+          </div>
+        )}
+        {isApproved && approval?.data && Object.keys(approval.data).length > 0 && (
+          <div className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
+            <pre className="font-mono text-xs overflow-x-auto">
+              {JSON.stringify(approval.data, null, 2)}
+            </pre>
+          </div>
+        )}
       </div>
 
       {/* Approve Modal */}
       <Dialog open={isApproveModalOpen} onOpenChange={(open) => !open && setIsApproveModalOpen(false)}>
-        <DialogContent>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Approve Execution</DialogTitle>
+            <DialogTitle>Approve: {getRequirementLabel()}</DialogTitle>
             <DialogDescription>
-              Add an optional comment for this approval
+              {requirement.parameters && requirement.parameters.length > 0
+                ? 'Fill in the required information for this approval'
+                : 'Add an optional comment for this approval'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>Comment (optional)</Label>
-            <Textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Enter an optional comment"
-              rows={3}
-            />
+          <div className="space-y-4">
+            {/* Dynamic Parameters */}
+            {requirement.parameters && requirement.parameters.length > 0 && (
+              <div className="space-y-4">
+                {requirement.parameters.map((field) => (
+                  <ConfigurationFieldRenderer
+                    key={field.name}
+                    field={field}
+                    value={formData[field.name!]}
+                    onChange={(value) => setFormData({ ...formData, [field.name!]: value })}
+                    allValues={formData}
+                    domainId={organizationId}
+                    domainType="DOMAIN_TYPE_ORGANIZATION"
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Comment Field */}
+            <div className="space-y-2">
+              <Label>Comment (optional)</Label>
+              <Textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Enter an optional comment"
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsApproveModalOpen(false)}>
@@ -152,9 +257,9 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
       <Dialog open={isRejectModalOpen} onOpenChange={(open) => !open && setIsRejectModalOpen(false)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reject Execution</DialogTitle>
+            <DialogTitle>Reject: {getRequirementLabel()}</DialogTitle>
             <DialogDescription>
-              Provide a reason for rejecting this execution
+              Provide a reason for rejecting this approval requirement
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -199,9 +304,13 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
 registerExecutionRenderer('approval', {
   renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
     const metadata = (execution.metadata || {}) as ApprovalMetadata
-    const requiredCount = metadata.required_count || 0
+    const config = (execution.configuration || {}) as ApprovalConfig
+    const requirements = config.approvals || []
     const approvals = metadata.approvals || []
-    const isComplete = approvals.length >= requiredCount
+
+    const approvedCount = approvals.length
+    const requiredCount = requirements.length
+    const isComplete = approvedCount >= requiredCount && requiredCount > 0
     const isRejected = execution.state === 'STATE_FINISHED' && execution.result === 'RESULT_FAILED'
 
     // Determine label and styling
@@ -237,7 +346,7 @@ registerExecutionRenderer('approval', {
               {label}
             </Badge>
             <span className="font-semibold text-gray-700 dark:text-gray-300">
-              {approvals.length}/{requiredCount}
+              {approvedCount}/{requiredCount}
             </span>
           </div>
         </div>
@@ -255,9 +364,17 @@ registerExecutionRenderer('approval', {
     )
   },
 
-  renderExpanded: ({ execution, workflowId }: ExpandedViewProps) => {
+  renderExpanded: ({ execution, workflowId, organizationId }: ExpandedViewProps) => {
     const metadata = (execution.metadata || {}) as ApprovalMetadata
+    const config = (execution.configuration || {}) as ApprovalConfig
+    const requirements = config.approvals || []
     const approvals = metadata.approvals || []
+
+    // Create a map of approvals by requirement index
+    const approvalsByRequirement = new Map<number, ApprovalRecord>()
+    approvals.forEach((approval) => {
+      approvalsByRequirement.set(approval.requirementIndex, approval)
+    })
 
     return (
       <div className="space-y-4 text-left">
@@ -275,46 +392,20 @@ registerExecutionRenderer('approval', {
           </>
         )}
 
-        {/* Approval Actions */}
-        <ApprovalActions execution={execution} workflowId={workflowId} />
-
-        {/* Approvals List */}
-        {approvals.length > 0 && (
+        {/* Approval Requirements */}
+        {requirements.length > 0 && (
           <>
-            <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-              Approvals ({approvals.length})
-            </div>
             <div className="space-y-2">
-              {approvals.map((approval, index) => (
-                <div
+              {requirements.map((requirement, index) => (
+                <ApprovalRequirementCard
                   key={index}
-                  className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3 text-xs"
-                >
-                  <div className="flex items-start gap-2">
-                    <MaterialSymbol
-                      name="check_circle"
-                      size="md"
-                      className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-gray-900 dark:text-zinc-100">
-                          Approval #{index + 1}
-                        </span>
-                        {approval.approved_at && (
-                          <span className="text-gray-500 dark:text-zinc-400">
-                            {new Date(approval.approved_at).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                      {approval.comment && (
-                        <div className="text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
-                          {approval.comment}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  requirement={requirement}
+                  requirementIndex={index}
+                  approval={approvalsByRequirement.get(index)}
+                  execution={execution}
+                  workflowId={workflowId}
+                  organizationId={organizationId || ''}
+                />
               ))}
             </div>
           </>

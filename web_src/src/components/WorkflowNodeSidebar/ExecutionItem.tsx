@@ -51,7 +51,8 @@ export const ExecutionItem = ({ execution, isDarkMode, workflowId, isBlueprintNo
                 {customRenderer.renderExpanded({
                   execution,
                   isDarkMode,
-                  workflowId
+                  workflowId,
+                  organizationId
                 })}
               </div>
             </>

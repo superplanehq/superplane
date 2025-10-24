@@ -134,6 +134,7 @@ type Action struct {
  */
 type ActionContext struct {
 	Name                  string
+	Configuration         any
 	Parameters            map[string]any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
@@ -151,6 +152,9 @@ const (
 	FieldTypeList                = "list"
 	FieldTypeObject              = "object"
 	FieldTypeTime                = "time"
+	FieldTypeUser                = "user"
+	FieldTypeRole                = "role"
+	FieldTypeGroup               = "group"
 )
 
 type ConfigurationField struct {

@@ -520,3 +520,18 @@ webhook1  secret1    ready    {"events": ["pull_request"]} integration1   reposi
 webhook2  secret2    pending  {"events": ["push"]}         integration1   repository1
 webhook3  secret3    ready    {"events": ["workflow_run"]} integration1   repository1
 ```
+
+## Components can have dynamic configuration, output channels, ...
+
+- The OutputChannels() method of the switch component returns a list of output channels based on the configuration.
+- The Actions() exposed by a component could also change depending on the configuration. Not only that, but the parameters for the actions might also change depending on the configuration.
+
+Right now, these things are static. We use the /components/{name} and /triggers/{name} endpoint to get the configuration, output channels, and actions.
+
+But, it seems like we should only use that endpoint for the configuration, because the configuration is always static. The output channels and actions could change depending on the configuration, so we should probably expose them differently.
+
+Maybe in:
+  /workflows/{workflow_id}/nodes/{node_id}/output_channels
+  /workflows/{workflow_id}/nodes/{node_id}/actions
+
+Or maybe that information is returned as part of the WorkflowNode information given when describing the workflow, in the /workflows/{workflow_id} endpoint.

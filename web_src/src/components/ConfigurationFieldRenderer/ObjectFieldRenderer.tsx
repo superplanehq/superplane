@@ -3,7 +3,7 @@ import Editor from '@monaco-editor/react'
 import { FieldRendererProps } from './types'
 import { ConfigurationFieldRenderer } from './index'
 
-export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, domainId, domainType }) => {
   const objValue = value ?? {}
   const [isDarkMode, setIsDarkMode] = React.useState(false)
   const [jsonError, setJsonError] = React.useState<string | null>(null)
@@ -93,6 +93,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
             onChange(newValue)
           }}
           allValues={objValue}
+          domainId={domainId}
+          domainType={domainType}
         />
       ))}
     </div>

@@ -229,6 +229,21 @@ func validateFieldValue(field ConfigurationField, value any) error {
 			return fmt.Errorf("must be a string")
 		}
 
+	case FieldTypeUser:
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("must be a string")
+		}
+
+	case FieldTypeRole:
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("must be a string")
+		}
+
+	case FieldTypeGroup:
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("must be a string")
+		}
+
 	case FieldTypeList:
 		return validateList(field, value)
 

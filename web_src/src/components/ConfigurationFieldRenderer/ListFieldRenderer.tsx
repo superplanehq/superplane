@@ -5,7 +5,7 @@ import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import { FieldRendererProps } from './types'
 import { ConfigurationFieldRenderer } from './index'
 
-export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, domainId, domainType }) => {
   const items = Array.isArray(value) ? value : []
   const listOptions = field.typeOptions?.list
   const itemDefinition = listOptions?.itemDefinition
@@ -47,6 +47,8 @@ export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
                       updateItem(index, newItem)
                     }}
                     allValues={item}
+                    domainId={domainId}
+                    domainType={domainType}
                   />
                 ))}
               </div>

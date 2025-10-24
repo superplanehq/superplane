@@ -63,6 +63,7 @@ func InvokeNodeExecutionAction(
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
 		Parameters:            parameters,
+		Configuration:         node.Configuration.Data(),
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
 	}

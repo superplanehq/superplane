@@ -5,4 +5,6 @@ export interface FieldRendererProps {
   value: any
   onChange: (value: any) => void
   allValues?: Record<string, any>
+  domainId?: string
+  domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION"
 }
