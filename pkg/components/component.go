@@ -138,6 +138,7 @@ const (
 	FieldTypeURL                 = "url"
 	FieldTypeList                = "list"
 	FieldTypeObject              = "object"
+	FieldTypeTime                = "time"
 )
 
 type ConfigurationField struct {
@@ -193,6 +194,7 @@ type TypeOptions struct {
 	Resource    *ResourceTypeOptions    `json:"resource,omitempty"`
 	List        *ListTypeOptions        `json:"list,omitempty"`
 	Object      *ObjectTypeOptions      `json:"object,omitempty"`
+	Time        *TimeTypeOptions        `json:"time,omitempty"`
 }
 
 /*
@@ -208,6 +210,13 @@ type ResourceTypeOptions struct {
 type NumberTypeOptions struct {
 	Min *int `json:"min,omitempty"`
 	Max *int `json:"max,omitempty"`
+}
+
+/*
+ * TimeTypeOptions specifies format and constraints for time fields
+ */
+type TimeTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, e.g., "HH:MM", "HH:MM:SS"
 }
 
 /*

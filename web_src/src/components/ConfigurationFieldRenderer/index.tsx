@@ -14,6 +14,8 @@ import { ListFieldRenderer } from './ListFieldRenderer'
 import { ObjectFieldRenderer } from './ObjectFieldRenderer'
 import { IntegrationFieldRenderer } from './IntegrationFieldRenderer'
 import { IntegrationResourceFieldRenderer } from './IntegrationResourceFieldRenderer'
+import { TimeFieldRenderer } from './TimeFieldRenderer'
+import { isFieldVisible } from '../../utils/components'
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   domainId?: string
@@ -30,34 +32,8 @@ export const ConfigurationFieldRenderer = ({
 }: ConfigurationFieldRendererProps) => {
   // Check visibility conditions
   const isVisible = React.useMemo(() => {
-    if (!field.visibilityConditions || field.visibilityConditions.length === 0) {
-      return true
-    }
-
-    // All conditions must be satisfied (AND logic)
-    return field.visibilityConditions.every((condition) => {
-      if (!condition.field || !condition.values) {
-        return true
-      }
-
-      const fieldValue = allValues[condition.field]
-
-      // Convert field value to string for comparison
-      const fieldValueStr = fieldValue !== undefined && fieldValue !== null
-        ? String(fieldValue)
-        : ''
-
-      // Check if the field value matches any of the expected values
-      // Support wildcard "*" to match any non-empty value
-      return condition.values.some((expectedValue) => {
-        if (expectedValue === '*') {
-          // Wildcard matches any non-empty value
-          return fieldValueStr !== ''
-        }
-        return fieldValueStr === expectedValue
-      })
-    })
-  }, [field.visibilityConditions, allValues])
+    return isFieldVisible(field, allValues)
+  }, [field, allValues])
 
   if (!isVisible) {
     return null
@@ -86,6 +62,9 @@ export const ConfigurationFieldRenderer = ({
 
       case 'url':
         return <UrlFieldRenderer {...commonProps} />
+
+      case 'time':
+        return <TimeFieldRenderer {...commonProps} />
 
       case 'integration':
         return <IntegrationFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} domainType={domainType} />

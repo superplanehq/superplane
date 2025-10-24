@@ -32,6 +32,7 @@ import {
 } from '../../components/ui/dialog'
 import { VisuallyHidden } from '../../components/ui/visually-hidden'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
+import { filterVisibleConfiguration } from '../../utils/components'
 import { IfNode } from './components/nodes/IfNode'
 import { HttpNode } from './components/nodes/HttpNode'
 import { FilterNode } from './components/nodes/FilterNode'
@@ -229,6 +230,12 @@ export const Blueprint = () => {
   const handleAddNode = () => {
     if (!selectedComponent || !nodeName.trim()) return
 
+    // Filter configuration to only include visible fields
+    const filteredConfiguration = filterVisibleConfiguration(
+      nodeConfiguration,
+      selectedComponent.configuration || []
+    )
+
     if (editingNodeId) {
       // Update existing node
       setNodes((nds) =>
@@ -239,7 +246,7 @@ export const Blueprint = () => {
                 data: {
                   ...node.data,
                   label: nodeName.trim(),
-                  configuration: nodeConfiguration,
+                  configuration: filteredConfiguration,
                 },
               }
             : node
@@ -263,7 +270,7 @@ export const Blueprint = () => {
           label: nodeName.trim(),
           component: selectedComponent.name,
           channels,
-          configuration: nodeConfiguration,
+          configuration: filteredConfiguration,
         },
       }
       setNodes((nds) => [...nds, newNode])

@@ -30,6 +30,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs'
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from '../../components/ui/item'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
+import { filterVisibleConfiguration } from '../../utils/components'
 import { WorkflowNodeSidebar } from '../../components/WorkflowNodeSidebar'
 import { ConfigurationFieldRenderer } from '../../components/ConfigurationFieldRenderer'
 import { ScrollArea } from '../../components/ui/scroll-area'
@@ -318,6 +319,12 @@ export const Workflow = () => {
   const handleAddNode = () => {
     if (!selectedBlock || !nodeName.trim()) return
 
+    // Filter configuration to only include visible fields
+    const filteredConfiguration = filterVisibleConfiguration(
+      nodeConfiguration,
+      selectedBlock.configuration || []
+    )
+
     if (editingNodeId) {
       // Update existing node
       setNodes((nds) =>
@@ -328,7 +335,7 @@ export const Workflow = () => {
                 data: {
                   ...node.data,
                   label: nodeName.trim(),
-                  configuration: nodeConfiguration,
+                  configuration: filteredConfiguration,
                 },
               }
             : node
@@ -354,7 +361,7 @@ export const Workflow = () => {
           blockId: selectedBlock.type === 'blueprint' ? (selectedBlock as any).id : selectedBlock.name,
           blockType: selectedBlock.type,
           channels,
-          configuration: nodeConfiguration,
+          configuration: filteredConfiguration,
           onEdit: () => handleNodeEdit(newNodeId),
           onEmit: () => handleNodeEmit(newNodeId),
         } as Record<string, unknown>,
