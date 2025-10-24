@@ -6,6 +6,7 @@ import {
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
+import { useReactFlow } from "@xyflow/react";
 
 import { Block } from "./Block";
 import { useCanvasState } from "./useCanvasState";
@@ -33,6 +34,7 @@ const EDGE_STYLE = {
 
 function CanvasContent(props: CanvasPageProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } = useCanvasState(props);
+  const { fitView } = useReactFlow();
 
   const defaultBreadcrumbs: BreadcrumbItem[] = [
     { label: "Workflows" },
@@ -45,6 +47,7 @@ function CanvasContent(props: CanvasPageProps) {
     const node = nodes?.find(n => n.id === nodeId);
     if (node && props.onNodeExpand) {
       props.onNodeExpand(nodeId, node.data);
+      fitView();
     }
   };
 
