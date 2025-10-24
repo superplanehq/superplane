@@ -57,9 +57,11 @@ docs/ComponentsNode.md
 docs/ComponentsNodeType.md
 docs/ComponentsNumberTypeOptions.md
 docs/ComponentsObjectTypeOptions.md
+docs/ComponentsPosition.md
 docs/ComponentsResourceTypeOptions.md
 docs/ComponentsSelectOption.md
 docs/ComponentsSelectTypeOptions.md
+docs/ComponentsTimeTypeOptions.md
 docs/ComponentsTypeOptions.md
 docs/ComponentsVisibilityCondition.md
 docs/ConnectionGroupAPI.md
@@ -317,9 +319,11 @@ model_components_node.go
 model_components_node_type.go
 model_components_number_type_options.go
 model_components_object_type_options.go
+model_components_position.go
 model_components_resource_type_options.go
 model_components_select_option.go
 model_components_select_type_options.go
+model_components_time_type_options.go
 model_components_type_options.go
 model_components_visibility_condition.go
 model_event_rejection_rejection_reason.go

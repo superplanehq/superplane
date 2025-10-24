@@ -981,6 +981,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			Type:          ProtoToNodeType(node.Type),
 			Ref:           ProtoToNodeRef(node),
 			Configuration: node.Configuration.AsMap(),
+			Position:      ProtoToPosition(node.Position),
 		}
 	}
 	return result
@@ -990,9 +991,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 	result := make([]*componentpb.Node, len(nodes))
 	for i, node := range nodes {
 		result[i] = &componentpb.Node{
-			Id:   node.ID,
-			Name: node.Name,
-			Type: NodeTypeToProto(node.Type),
+			Id:       node.ID,
+			Name:     node.Name,
+			Type:     NodeTypeToProto(node.Type),
+			Position: PositionToProto(node.Position),
 		}
 
 		if node.Ref.Component != nil {
@@ -1098,6 +1100,23 @@ func ProtoToNodeRef(node *componentpb.Node) models.NodeRef {
 	}
 
 	return ref
+}
+
+func PositionToProto(position models.Position) *componentpb.Position {
+	return &componentpb.Position{
+		X: int32(position.X),
+		Y: int32(position.Y),
+	}
+}
+
+func ProtoToPosition(position *componentpb.Position) models.Position {
+	if position == nil {
+		return models.Position{X: 0, Y: 0}
+	}
+	return models.Position{
+		X: int(position.X),
+		Y: int(position.Y),
+	}
 }
 
 // Verify if the workflow is acyclic using

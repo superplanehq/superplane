@@ -168,7 +168,7 @@ export const Blueprint = () => {
           channels,
           configuration: node.configuration || {},
         },
-        position: { x: 0, y: 0 }, // Will be set by elk
+        position: node.position || { x: 0, y: 0 },
       }
     })
 
@@ -181,11 +181,20 @@ export const Blueprint = () => {
       style: { strokeWidth: 2, stroke: '#64748b' },
     }))
 
-    // Apply elk layout
-    getLayoutedElements(allNodes, loadedEdges).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
-      setNodes(layoutedNodes)
-      setEdges(layoutedEdges)
-    })
+    // Check if we have saved positions
+    const hasPositions = allNodes.some(node => node.position && (node.position.x !== 0 || node.position.y !== 0))
+
+    if (hasPositions) {
+      // Use saved positions
+      setNodes(allNodes)
+      setEdges(loadedEdges)
+    } else {
+      // Apply elk layout for blueprints without saved positions
+      getLayoutedElements(allNodes, loadedEdges).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+        setNodes(layoutedNodes)
+        setEdges(layoutedEdges)
+      })
+    }
   }, [blueprint, components, setNodes, setEdges])
 
   const onConnect = useCallback(
@@ -408,6 +417,10 @@ export const Blueprint = () => {
               name: (node.data as any).label as string,
             },
             configuration: {},
+            position: {
+              x: Math.round(node.position.x),
+              y: Math.round(node.position.y),
+            },
           }
         } else {
           // Component nodes
@@ -419,6 +432,10 @@ export const Blueprint = () => {
               name: (node.data as any).component as string,
             },
             configuration: (node.data as any).configuration || {},
+            position: {
+              x: Math.round(node.position.x),
+              y: Math.round(node.position.y),
+            },
           }
         }
       })

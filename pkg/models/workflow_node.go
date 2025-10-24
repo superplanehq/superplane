@@ -25,6 +25,7 @@ type WorkflowNode struct {
 	Name          string
 	State         string
 	Type          string
+	Position      datatypes.JSONType[Position]
 	Ref           datatypes.JSONType[NodeRef]
 	Configuration datatypes.JSONType[map[string]any]
 	Metadata      datatypes.JSONType[map[string]any]

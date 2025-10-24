@@ -27,6 +27,7 @@ type ComponentsTypeOptions struct {
 	List *ComponentsListTypeOptions `json:"list,omitempty"`
 	Object *ComponentsObjectTypeOptions `json:"object,omitempty"`
 	Resource *ComponentsResourceTypeOptions `json:"resource,omitempty"`
+	Time *ComponentsTimeTypeOptions `json:"time,omitempty"`
 }
 
 // NewComponentsTypeOptions instantiates a new ComponentsTypeOptions object
@@ -270,6 +271,38 @@ func (o *ComponentsTypeOptions) SetResource(v ComponentsResourceTypeOptions) {
 	o.Resource = &v
 }
 
+// GetTime returns the Time field value if set, zero value otherwise.
+func (o *ComponentsTypeOptions) GetTime() ComponentsTimeTypeOptions {
+	if o == nil || IsNil(o.Time) {
+		var ret ComponentsTimeTypeOptions
+		return ret
+	}
+	return *o.Time
+}
+
+// GetTimeOk returns a tuple with the Time field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsTypeOptions) GetTimeOk() (*ComponentsTimeTypeOptions, bool) {
+	if o == nil || IsNil(o.Time) {
+		return nil, false
+	}
+	return o.Time, true
+}
+
+// HasTime returns a boolean if a field has been set.
+func (o *ComponentsTypeOptions) HasTime() bool {
+	if o != nil && !IsNil(o.Time) {
+		return true
+	}
+
+	return false
+}
+
+// SetTime gets a reference to the given ComponentsTimeTypeOptions and assigns it to the Time field.
+func (o *ComponentsTypeOptions) SetTime(v ComponentsTimeTypeOptions) {
+	o.Time = &v
+}
+
 func (o ComponentsTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -300,6 +333,9 @@ func (o ComponentsTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Resource) {
 		toSerialize["resource"] = o.Resource
+	}
+	if !IsNil(o.Time) {
+		toSerialize["time"] = o.Time
 	}
 	return toSerialize, nil
 }
