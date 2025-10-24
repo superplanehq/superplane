@@ -28,7 +28,7 @@ export function Header({ breadcrumbs }: HeaderProps) {
         </div>
 
         {/* Breadcrumbs */}
-        <div className="flex items-center space-x-2 text-[15px] text-gray-500" style={{ fontFamily: "Inter" }}>
+        <div className="flex items-center space-x-2 text-[15px] text-gray-500">
           {breadcrumbs.map((item, index) => {
             const IconComponent = item.iconSlug ? resolveIcon(item.iconSlug) : null;
 
