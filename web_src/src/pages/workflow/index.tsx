@@ -314,7 +314,9 @@ export const Workflow = () => {
       id: node.id,
       name: node.data.label as string,
       isBlueprintNode: node.data.blockType === 'blueprint',
-      nodeType: node.data.blockType as string,
+      nodeType: (node.data.blockType === 'component' || node.data.blockType === 'trigger')
+        ? node.data.blockName as string
+        : node.data.blockType as string,
       componentLabel: block?.label,
       blueprintId: node.data.blockType === 'blueprint' ? node.data.blockId as string : undefined
     })
