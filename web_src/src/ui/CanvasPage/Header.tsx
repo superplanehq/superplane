@@ -1,4 +1,3 @@
-import { ChevronRight } from "lucide-react";
 import SuperplaneLogo from "@/assets/superplane.svg";
 
 export interface BreadcrumbItem {
