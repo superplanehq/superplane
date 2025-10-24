@@ -92,5 +92,38 @@ export function useCanvasState({ nodes: initialNodes, edges: initialEdges, start
     });
   }, []);
 
-  return { nodes, edges, setNodes, setEdges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse } as const;
+  const toggleNodeCollapse = useCallback((nodeId: string) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id !== nodeId) return node;
+
+        const nodeData = { ...node.data } as any;
+
+        if (nodeData.type === "composite" && nodeData.composite) {
+          nodeData.composite = {
+            ...nodeData.composite,
+            collapsed: !nodeData.composite.collapsed,
+          };
+        }
+
+        if (nodeData.type === "approval" && nodeData.approval) {
+          nodeData.approval = {
+            ...nodeData.approval,
+            collapsed: !nodeData.approval.collapsed,
+          };
+        }
+
+        if (nodeData.type === "trigger" && nodeData.trigger) {
+          nodeData.trigger = {
+            ...nodeData.trigger,
+            collapsed: !nodeData.trigger.collapsed,
+          };
+        }
+
+        return { ...node, data: nodeData };
+      })
+    );
+  }, []);
+
+  return { nodes, edges, setNodes, setEdges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } as const;
 }
