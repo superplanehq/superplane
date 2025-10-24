@@ -25,6 +25,150 @@ type Story = StoryObj<typeof CanvasPage>;
 
 const sampleNodes: Node[] = [
   {
+    id: "db-health",
+    position: { x: 500, y: -800 },
+    data: {
+      label: "Database Health Monitor",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Database Health Monitor",
+        description: "",
+        iconSlug: "database",
+        iconColor: "text-green-700",
+        headerColor: "bg-green-100",
+        collapsedBackground: "bg-green-100",
+        metadata: [
+          { icon: "check-circle", label: "Connection: Healthy" },
+          { icon: "clock", label: "Replication Lag: 45ms" },
+          { icon: "zap", label: "Query Time: 12ms avg" },
+          { icon: "activity", label: "Pool: 45/100 connections" },
+        ],
+        parameters: ["db-primary", "db-replica-1", "db-replica-2"],
+        parametersIcon: "database",
+        lastRunItem: {
+          title: "Database health check",
+          subtitle: "45ms lag",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 6), // 6 minutes ago
+          childEventsInfo: {
+            count: 3,
+            state: "processed",
+            waitingInfos: [],
+          },
+          state: "success",
+          values: {
+            "Connection": "Healthy",
+            "Replication Lag": "45ms",
+            "Avg Query Time": "12ms",
+            "Pool Usage": "45/100",
+          },
+        },
+        nextInQueue: {
+          title: "Scheduled DB check",
+          subtitle: "In 15min",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 2), // 2 minutes ago
+        },
+        collapsed: false
+      }
+    },
+  },
+  {
+    id: "infra-monitor",
+    position: { x: 0, y: -800 },
+    data: {
+      label: "Infrastructure Resource Monitor",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Infrastructure Resource Monitor",
+        description: "",
+        iconSlug: "cpu",
+        iconColor: "text-green-700",
+        headerColor: "bg-green-100",
+        collapsedBackground: "bg-green-100",
+        metadata: [
+          { icon: "cpu", label: "CPU: 45%" },
+          { icon: "hard-drive", label: "Memory: 12.3 GB available" },
+          { icon: "hard-drive", label: "Disk: 85% used" },
+          { icon: "box", label: "Pods: 24/24 healthy" },
+        ],
+        parameters: ["prod-cluster-1", "prod-cluster-2"],
+        parametersIcon: "server",
+        lastRunItem: {
+          title: "Resource check",
+          subtitle: "CPU 45%",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 8), // 8 minutes ago
+          childEventsInfo: {
+            count: 2,
+            state: "processed",
+            waitingInfos: [],
+          },
+          state: "success",
+          values: {
+            "CPU Usage": "45%",
+            "Memory": "12.3 GB available",
+            "Disk": "85% used",
+            "Pods": "24/24",
+          },
+        },
+        nextInQueue: {
+          title: "Scheduled resource check",
+          subtitle: "In 20min",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
+        },
+        collapsed: false
+      }
+    },
+  },
+  {
+    id: "deploy-test",
+    position: { x: -500, y: -800 },
+    data: {
+      label: "Traffic / Load Monitor",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Traffic / Load Monitor",
+        description: "",
+        iconSlug: "trending-up",
+        iconColor: "text-green-700",
+        headerColor: "bg-green-100",
+        collapsedBackground: "bg-green-100",
+        metadata: [
+          { icon: "activity", label: "Requests/sec: 1,247 req/s" },
+          { icon: "users", label: "Active Connections: 3,842" },
+          { icon: "alert-circle", label: "Error Rate: 0.3%" },
+          { icon: "server", label: "Load Balancer: Healthy" },
+        ],
+        parameters: ["us-west-1", "eu-global-1", "asia-east-1"],
+        parametersIcon: "map",
+        lastRunItem: {
+          title: "Traffic monitoring check",
+          subtitle: "1,247 req/s",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15), // 15 minutes ago
+          childEventsInfo: {
+            count: 3,
+            state: "processed",
+            waitingInfos: [],
+          },
+          state: "success",
+          values: {
+            "Requests/sec": "1,247",
+            "Connections": "3,842",
+            "Error Rate": "0.3%",
+            "Status": "Healthy",
+          },
+        },
+        nextInQueue: {
+          title: "Scheduled traffic check",
+          subtitle: "In 45min",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5), // 5 minutes ago
+        },
+        collapsed: false
+      }
+    },
+  },
+  {
     id: "listen-code",
     position: { x: -500, y: -200 },
     data: {
@@ -346,12 +490,12 @@ const sampleEdges: Edge[] = [
   { id: "e6", source: "approve", target: "deploy-asia" },
 ];
 
-export const SimpleDeployment: Story = {
+export const DeployAndMonitor: Story = {
   args: {
     nodes: sampleNodes,
     edges: sampleEdges,
   },
-  render: function SimpleDeploymentRender(args) {
+  render: function DeployAndMonitorRender(args) {
     const [simulationNodes, setSimulationNodes] = useState<Node[]>(args.nodes ?? []);
     const simulationEdges = useMemo(() => args.edges ?? [], [args.edges]);
 
@@ -439,21 +583,6 @@ export const SimpleDeployment: Story = {
           </button>
         </div>
         <CanvasPage {...args} nodes={simulationNodes} edges={simulationEdges} />
-      </div>
-    );
-  },
-};
-
-export const CollapsedDeployment: Story = {
-  args: {
-    nodes: sampleNodes,
-    edges: sampleEdges,
-    startCollapsed: true,
-  },
-  render: (args) => {
-    return (
-      <div className="h-[100vh] w-full ">
-        <CanvasPage {...args} />
       </div>
     );
   },
