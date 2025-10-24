@@ -30,6 +30,11 @@ interface LastRunItem extends QueueItem {
   values: Record<string, string>;
 }
 
+interface MetadataItem {
+  icon: string;
+  label: string;
+}
+
 export interface CompositeProps {
   iconSrc?: string;
   iconSlug?: string;
@@ -38,6 +43,7 @@ export interface CompositeProps {
   headerColor: string;
   title: string;
   description?: string;
+  metadata?: MetadataItem[];
   parameters: string[];
   parametersIcon: string;
   lastRunItem: LastRunItem;
@@ -51,7 +57,7 @@ export interface CompositeProps {
   onReRunChildEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, startLastValuesOpen = false }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, startLastValuesOpen = false }) => {
   const [showLastRunValues, setShowLastRunValues] = React.useState(startLastValuesOpen)
   const [showWaitingInfo, setShowWaitingInfo] = React.useState(false)
 
@@ -168,7 +174,6 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         description={description}
       />
 
-
       {parameters.length > 0 &&
         <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
           <div className="flex items-center gap-2">
@@ -177,6 +182,20 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           </div>
         </div>
       }
+
+      {metadata && metadata.length > 0 && (
+        <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
+          {metadata.map((item, index) => {
+            const Icon = resolveIcon(item.icon)
+            return (
+              <div key={index} className="flex items-center gap-2">
+                <Icon size={16} />
+                <span className="text-sm">{item.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <div className="px-4 py-3 border-b">
         <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">

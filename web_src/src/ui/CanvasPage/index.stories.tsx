@@ -25,6 +25,48 @@ type Story = StoryObj<typeof CanvasPage>;
 
 const sampleNodes: Node[] = [
   {
+    id: "deploy-test",
+    position: { x: 0, y: -600 },
+    data: {
+      label: "Check Network Health",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Network Health Checker",
+        description: "",
+        iconSlug: "cable",
+        iconColor: "text-green-700",
+        headerColor: "bg-green-100",
+        collapsedBackground: "bg-green-100",
+        metadata: [
+          { icon: "activity", label: "Latency: 67ms" },
+          { icon: "zap", label: "Uptime: 99.9%" },
+          { icon: "wifi", label: "Bandwidth: 1.2 Gbps" },
+          { icon: "server", label: "Active Nodes: 12/12" },
+        ],
+        parameters: ["us-west-1", "eu-global-1", "asia-east-1"],
+        parametersIcon: "map",
+        lastRunItem: {
+          title: "Network health check",
+          subtitle: "67ms",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15), // 15 minutes ago
+          state: "success",
+          values: {
+            "Status": "Healthy",
+            "Latency": "45ms",
+            "Uptime": "99.9%",
+          },
+        },
+        nextInQueue: {
+          title: "Scheduled health check",
+          subtitle: "In 45min",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5), // 5 minutes ago
+        },
+        collapsed: false
+      }
+    },
+  },
+  {
     id: "listen-code",
     position: { x: -500, y: -200 },
     data: {
@@ -44,9 +86,10 @@ const sampleNodes: Node[] = [
         lastEventData: {
           title: "refactor: update README.md",
           sizeInMB: 1,
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
           state: "processed",
         },
+        collapsed: true,
       },
     },
   },
@@ -69,9 +112,10 @@ const sampleNodes: Node[] = [
         lastEventData: {
           title: "v3.18.217",
           sizeInMB: 972.5,
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 3), // 3 hours ago
           state: "processed",
         },
+        collapsed: true,
       },
     },
   },
@@ -94,7 +138,7 @@ const sampleNodes: Node[] = [
         lastRunItem: {
           title: "fix: open rejected events tabs",
           subtitle: "ef758d40",
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 2), // 2 hours ago
           childEventsInfo: {
             count: 3,
             waitingInfos: [],
@@ -111,9 +155,9 @@ const sampleNodes: Node[] = [
         nextInQueue: {
           title: "FEAT-1234: New feature",
           subtitle: "ef758d40",
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30), // 30 minutes ago
         },
-        collapsed: false
+        collapsed: true
       }
     },
   },
@@ -196,7 +240,7 @@ const sampleNodes: Node[] = [
         lastRunItem: {
           title: "FEAT-984: Autocomplete",
           subtitle: "ef758d40",
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 5), // 5 hours ago
           state: "success",
           values: {
             "Author": "Bart Willems",
@@ -209,7 +253,7 @@ const sampleNodes: Node[] = [
         nextInQueue: {
           title: "FEAT-983: Better run names",
           subtitle: "ef758d40",
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60), // 1 hour ago
         },
         startLastValuesOpen: true,
         collapsed: false
@@ -235,7 +279,7 @@ const sampleNodes: Node[] = [
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 8), // 8 hours ago
           childEventsInfo: {
             count: 2,
             state: "running",
@@ -264,7 +308,7 @@ const sampleNodes: Node[] = [
         nextInQueue: {
           title: "Deploy to EU",
           subtitle: "ef758d40",
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 4), // 4 hours ago
         },
         collapsed: false
       }
@@ -288,7 +332,7 @@ const sampleNodes: Node[] = [
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
-          receivedAt: new Date(),
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 12), // 12 hours ago
           state: "success",
           values: {
             "Author": "Bart Willems",
