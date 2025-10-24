@@ -6,7 +6,12 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+func init() {
+	registry.RegisterComponent("wait", &Wait{})
+}
 
 type Wait struct{}
 

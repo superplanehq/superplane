@@ -9,8 +9,13 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 )
+
+func init() {
+	registry.RegisterTrigger("schedule", &Schedule{})
+}
 
 const (
 	TypeHourly = "hourly"

@@ -11,10 +11,15 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 )
 
 const MaxEventSize = 64 * 1024
+
+func init() {
+	registry.RegisterTrigger("github", &GitHub{})
+}
 
 type GitHub struct{}
 
