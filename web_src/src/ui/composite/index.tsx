@@ -219,7 +219,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           </div>
           {showLastRunValues && (
             <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
-              {Object.entries(lastRunItem?.values).map(([key, value]) => (
+              {Object.entries(lastRunItem?.values || {}).map(([key, value]) => (
                 <div key={key} className="flex justify-between gap-3 px-2 py-1 rounded-md w-full">
                   <span className="text-sm w-[20%] text-right">{key}</span>
                   <span className="text-sm w-[80%]">{value}</span>
