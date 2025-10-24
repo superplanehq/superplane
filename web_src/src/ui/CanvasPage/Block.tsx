@@ -1,6 +1,6 @@
-import { Trigger, type TriggerProps } from "@/ui/trigger";
-import { Composite, type CompositeProps } from "@/ui/composite";
 import { Approval, type ApprovalProps } from "@/ui/approval";
+import { Composite, type CompositeProps } from "@/ui/composite";
+import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 
 type BlockState = "pending" | "working";
@@ -11,9 +11,6 @@ interface BlockData {
 
   state: BlockState;
   type: BlockType;
-
-  // last input event received by this block (for simulation display)
-  lastEvent?: unknown;
 
   // trigger node specific props
   trigger?: TriggerProps;
@@ -109,7 +106,12 @@ function BlockContent({ data, onExpand, nodeId }: BlockProps) {
     case "trigger":
       return <Trigger {...(data.trigger as TriggerProps)} />;
     case "composite":
-      return <Composite {...(data.composite as CompositeProps)} onExpandChildEvents={handleExpand} />;
+      return (
+        <Composite
+          {...(data.composite as CompositeProps)}
+          onExpandChildEvents={handleExpand}
+        />
+      );
     case "approval":
       return <Approval {...(data.approval as ApprovalProps)} />;
     default:

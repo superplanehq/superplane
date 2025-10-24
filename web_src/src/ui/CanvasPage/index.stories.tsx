@@ -11,6 +11,7 @@ import { useCallback, useMemo, useState } from "react";
 import { LastRunItem } from "../composite";
 import type { BreadcrumbItem } from "./Header";
 import { CanvasNode, CanvasPage } from "./index";
+import { sleep, useSimulator } from "./storybooks/useSimulator";
 
 const meta = {
   title: "Pages/CanvasPage",
@@ -49,7 +50,6 @@ const sampleNodes: CanvasNode[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
           state: "processed",
         },
-        collapsed: true,
       },
     },
     _run: async () => {
@@ -83,7 +83,6 @@ const sampleNodes: CanvasNode[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 3), // 3 hours ago
           state: "processed",
         },
-        collapsed: true,
       },
     },
     _run: async () => {
@@ -134,10 +133,11 @@ const sampleNodes: CanvasNode[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30), // 30 minutes ago
         },
-        collapsed: true,
       },
     },
     _run: async () => {
+      await sleep(5000);
+
       return {
         title: "FEAT-1234: New feature",
         subtitle: "ef758d40",
@@ -418,23 +418,6 @@ const createMockExecutionNodes = (
 
 const createMockExecutionEdges = (): Edge[] => [];
 
-function useSimulator(
-  nodes: CanvasNode[],
-  edges: Edge[],
-  setNodes: (nodes: CanvasNode[]) => void
-) {
-  const run = useCallback(async () => {
-    const start = nodes[0];
-    const active = [];
-
-    active.push(start._run && start._run());
-
-    while (active.length > 0) {}
-  }, [nodes, edges]);
-
-  return run;
-}
-
 export const SimpleDeployment: Story = {
   args: {
     nodes: sampleNodes,
@@ -518,7 +501,7 @@ export const SimpleDeployment: Story = {
       <div className="h-[100vh] w-full">
         <div className="absolute z-[999] right-4 top-3">
           <button
-            onClick={run}
+            onClick={() => run("listen-code")}
             className="px-3 py-1 rounded bg-blue-600 text-white text-xs shadow hover:bg-blue-700"
           >
             Run
