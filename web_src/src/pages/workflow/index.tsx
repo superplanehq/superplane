@@ -237,7 +237,7 @@ export const Workflow = () => {
           onEdit: () => handleNodeEdit(node.id),
           onEmit: () => handleNodeEmit(node.id),
         },
-        position: { x: 0, y: 0 }, // Will be set by elk
+        position: node.position || { x: 0, y: 0 },
       }
     })
 
@@ -250,11 +250,20 @@ export const Workflow = () => {
       style: { strokeWidth: 2, stroke: '#64748b' },
     }))
 
-    // Apply elk layout
-    getLayoutedElements(loadedNodes, loadedEdges).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
-      setNodes(layoutedNodes)
-      setEdges(layoutedEdges)
-    })
+    // Check if we have saved positions
+    const hasPositions = loadedNodes.some(node => node.position && (node.position.x !== 0 || node.position.y !== 0))
+
+    if (hasPositions) {
+      // Use saved positions
+      setNodes(loadedNodes)
+      setEdges(loadedEdges)
+    } else {
+      // Apply elk layout for workflows without saved positions
+      getLayoutedElements(loadedNodes, loadedEdges).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+        setNodes(layoutedNodes)
+        setEdges(layoutedEdges)
+      })
+    }
   }, [workflow, buildingBlocks.length, setNodes, setEdges])
 
   const onConnect = useCallback(
@@ -394,6 +403,10 @@ export const Workflow = () => {
               : node.data.blockType === 'trigger' ? 'TYPE_TRIGGER'
               : 'TYPE_BLUEPRINT',
           configuration: node.data.configuration || {},
+          position: {
+            x: Math.round(node.position.x),
+            y: Math.round(node.position.y),
+          },
         }
 
         // Add either component, blueprint, or trigger reference directly on the node

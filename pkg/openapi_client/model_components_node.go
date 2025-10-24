@@ -25,6 +25,7 @@ type ComponentsNode struct {
 	Type *ComponentsNodeType `json:"type,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Position *ComponentsPosition `json:"position,omitempty"`
 	Component *NodeComponentRef `json:"component,omitempty"`
 	Blueprint *NodeBlueprintRef `json:"blueprint,omitempty"`
 	Trigger *NodeTriggerRef `json:"trigger,omitempty"`
@@ -211,6 +212,38 @@ func (o *ComponentsNode) SetMetadata(v map[string]interface{}) {
 	o.Metadata = v
 }
 
+// GetPosition returns the Position field value if set, zero value otherwise.
+func (o *ComponentsNode) GetPosition() ComponentsPosition {
+	if o == nil || IsNil(o.Position) {
+		var ret ComponentsPosition
+		return ret
+	}
+	return *o.Position
+}
+
+// GetPositionOk returns a tuple with the Position field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetPositionOk() (*ComponentsPosition, bool) {
+	if o == nil || IsNil(o.Position) {
+		return nil, false
+	}
+	return o.Position, true
+}
+
+// HasPosition returns a boolean if a field has been set.
+func (o *ComponentsNode) HasPosition() bool {
+	if o != nil && !IsNil(o.Position) {
+		return true
+	}
+
+	return false
+}
+
+// SetPosition gets a reference to the given ComponentsPosition and assigns it to the Position field.
+func (o *ComponentsNode) SetPosition(v ComponentsPosition) {
+	o.Position = &v
+}
+
 // GetComponent returns the Component field value if set, zero value otherwise.
 func (o *ComponentsNode) GetComponent() NodeComponentRef {
 	if o == nil || IsNil(o.Component) {
@@ -331,6 +364,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
+	}
+	if !IsNil(o.Position) {
+		toSerialize["position"] = o.Position
 	}
 	if !IsNil(o.Component) {
 		toSerialize["component"] = o.Component

@@ -195,9 +195,15 @@ message Node {
   Type type = 3;
   google.protobuf.Struct configuration = 4;
   google.protobuf.Struct metadata = 5;
-  ComponentRef component = 6;
-  BlueprintRef blueprint = 7;
-  TriggerRef trigger = 8;
+  Position position = 6;
+  ComponentRef component = 7;
+  BlueprintRef blueprint = 8;
+  TriggerRef trigger = 9;
+}
+
+message Position {
+  int32 x = 1;
+  int32 y = 2;
 }
 
 message Edge {

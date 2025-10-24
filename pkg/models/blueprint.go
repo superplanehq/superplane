@@ -108,6 +108,12 @@ type Node struct {
 	Ref           NodeRef        `json:"ref"`
 	Configuration map[string]any `json:"configuration"`
 	Metadata      map[string]any `json:"metadata"`
+	Position      Position       `json:"position"`
+}
+
+type Position struct {
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
 type NodeRef struct {

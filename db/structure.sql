@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8OZPDKRdl2soUHbcqTZB7hxrOirkQfnLqAqCcVfwJjddHQuwRtBXpQdnVhPiUT5
+\restrict ebCH5KIH7C8yp8CqVN5gEJMsefzl3A8MobNB8HczMcMvWFoiXzkvTAxuwESf7VH
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -634,7 +634,8 @@ CREATE TABLE public.workflow_nodes (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     webhook_id uuid,
-    metadata jsonb DEFAULT '{}'::jsonb NOT NULL
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "position" jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -1115,6 +1116,13 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 --
 
 CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1626,13 +1634,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8OZPDKRdl2soUHbcqTZB7hxrOirkQfnLqAqCcVfwJjddHQuwRtBXpQdnVhPiUT5
+\unrestrict ebCH5KIH7C8yp8CqVN5gEJMsefzl3A8MobNB8HczMcMvWFoiXzkvTAxuwESf7VH
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict EGSNZ89atcoVf35JmhffVM7ZprJkNhdpFlU8WvAHUaihrQMoGscjIMQKfB5MCxa
+\restrict n0mmuFTA6FDsiKZfliPf3zX6DH1YA8cc38XJUubN14cWI5rmfcPe6bXwuFN5DCV
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Debian 17.6-2.pgdg13+1)
@@ -1654,7 +1662,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251023214856	f
+20251024012043	f
 \.
 
 
@@ -1662,5 +1670,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EGSNZ89atcoVf35JmhffVM7ZprJkNhdpFlU8WvAHUaihrQMoGscjIMQKfB5MCxa
+\unrestrict n0mmuFTA6FDsiKZfliPf3zX6DH1YA8cc38XJUubN14cWI5rmfcPe6bXwuFN5DCV
 

@@ -123,6 +123,7 @@ export type ComponentsNode = {
     metadata?: {
         [key: string]: unknown;
     };
+    position?: ComponentsPosition;
     component?: NodeComponentRef;
     blueprint?: NodeBlueprintRef;
     trigger?: NodeTriggerRef;
@@ -137,6 +138,11 @@ export type ComponentsNumberTypeOptions = {
 
 export type ComponentsObjectTypeOptions = {
     schema?: Array<ComponentsConfigurationField>;
+};
+
+export type ComponentsPosition = {
+    x?: number;
+    y?: number;
 };
 
 export type ComponentsResourceTypeOptions = {
