@@ -3,11 +3,10 @@ import {
   EdgeMarker,
   ReactFlow,
   ReactFlowProvider,
-  useReactFlow,
   type Edge as ReactFlowEdge,
   type Node as ReactFlowNode,
 } from "@xyflow/react";
-import { useEffect, useRef } from "react";
+import { useReactFlow } from "@xyflow/react";
 
 import { Block } from "./Block";
 import { useCanvasState } from "./useCanvasState";
@@ -36,7 +35,6 @@ const EDGE_STYLE = {
 function CanvasContent(props: CanvasPageProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } = useCanvasState(props);
   const { fitView } = useReactFlow();
-  const prevNodesRef = useRef(nodes);
 
   const defaultBreadcrumbs: BreadcrumbItem[] = [
     { label: "Workflows" },
@@ -49,16 +47,9 @@ function CanvasContent(props: CanvasPageProps) {
     const node = nodes?.find(n => n.id === nodeId);
     if (node && props.onNodeExpand) {
       props.onNodeExpand(nodeId, node.data);
+      fitView();
     }
   };
-
-  // Re-center view when nodes change (e.g., when navigating to a new canvas)
-  useEffect(() => {
-    if (nodes !== prevNodesRef.current) {
-      fitView({ duration: 0, padding: 0.1 });
-      prevNodesRef.current = nodes;
-    }
-  }, [nodes, fitView]);
 
   return (
     <>
