@@ -10,8 +10,8 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LastRunItem } from "../composite";
 import type { BreadcrumbItem } from "./Header";
-import { CanvasPage } from "./index";
-import { useSimulationRunner } from "./storybooks/useSimulation";
+import { CanvasNode, CanvasPage } from "./index";
+import { sleep, useSimulationRunner } from "./storybooks/useSimulation";
 
 // Storybook-specific utility functions for data passing
 const isInStorybook = () => {
@@ -95,7 +95,7 @@ export default meta;
 
 type Story = StoryObj<typeof CanvasPage>;
 
-const sampleNodes: Node[] = [
+const sampleNodes: CanvasNode[] = [
   {
     id: "listen-code",
     position: { x: -500, y: -200 },
@@ -119,8 +119,18 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
           state: "processed",
         },
-        collapsed: true,
       },
+    },
+    __run: async (_input, update, output) => {
+      const event = {
+        title: "fix: AAAA",
+        subtitle: "ef758d40",
+        receivedAt: new Date(),
+        state: "processed",
+      };
+
+      update("data.trigger.lastEventData", event);
+      output(event);
     },
   },
   {
@@ -145,7 +155,6 @@ const sampleNodes: Node[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 3), // 3 hours ago
           state: "processed",
         },
-        collapsed: true,
       },
     },
   },
@@ -188,8 +197,18 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30), // 30 minutes ago
         },
-        collapsed: true,
       },
+    },
+    __run: async (input, update, output) => {
+      update("data.state", "working");
+      update("data.composite.lastRunItem.title", input.title);
+      update("data.composite.lastRunItem.receivedAt", input.subtitle);
+
+      update("data.composite.lastRunItem.state", "running");
+      await sleep(5000);
+      update("data.composite.lastRunItem.state", "success");
+
+      output(input);
     },
   },
   {
