@@ -460,13 +460,13 @@ export const SimpleDeployment: Story = {
     title: "Simple Deployment",
   },
   render: function SimpleDeploymentRender(args) {
-    const [simulationNodes, setSimulationNodes] = useState<Node[]>(
-      args.nodes ?? []
-    );
-    const simulationEdges = useMemo(() => args.edges ?? [], [args.edges]);
+    const [nodes, setNodes] = useState<Node[]>(args.nodes ?? []);
+    const edges = useMemo(() => args.edges ?? [], [args.edges]);
+
     const [currentView, setCurrentView] = useState<"main" | "execution">(
       "main"
     );
+
     const [executionContext, setExecutionContext] = useState<{
       title: string;
       breadcrumbs: BreadcrumbItem[];
@@ -545,18 +545,14 @@ export const SimpleDeployment: Story = {
       return (
         <CanvasPage
           {...args}
-          nodes={simulationNodes}
-          edges={simulationEdges}
+          nodes={nodes}
+          edges={edges}
           onNodeExpand={handleNodeExpand}
         />
       );
     };
 
-    const runSimulation = useSimulationRunner({
-      nodes: simulationNodes,
-      edges: setSimulationNodes,
-      setNodes: setSimulationNodes,
-    });
+    const runSimulation = useSimulationRunner({ nodes, edges, setNodes });
 
     return (
       <div className="h-[100vh] w-full ">
