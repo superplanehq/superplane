@@ -25,40 +25,142 @@ type Story = StoryObj<typeof CanvasPage>;
 
 const sampleNodes: Node[] = [
   {
-    id: "deploy-test",
-    position: { x: 0, y: -600 },
+    id: "db-health",
+    position: { x: 500, y: -800 },
     data: {
-      label: "Check Network Health",
+      label: "Database Health Monitor",
       state: "pending",
       type: "composite",
       composite: {
-        title: "Network Health Checker",
+        title: "Database Health Monitor",
         description: "",
-        iconSlug: "cable",
+        iconSlug: "database",
         iconColor: "text-green-700",
         headerColor: "bg-green-100",
         collapsedBackground: "bg-green-100",
         metadata: [
-          { icon: "activity", label: "Latency: 67ms" },
-          { icon: "zap", label: "Uptime: 99.9%" },
-          { icon: "wifi", label: "Bandwidth: 1.2 Gbps" },
-          { icon: "server", label: "Active Nodes: 12/12" },
+          { icon: "check-circle", label: "Connection: Healthy" },
+          { icon: "clock", label: "Replication Lag: 45ms" },
+          { icon: "zap", label: "Query Time: 12ms avg" },
+          { icon: "activity", label: "Pool: 45/100 connections" },
+        ],
+        parameters: ["db-primary", "db-replica-1", "db-replica-2"],
+        parametersIcon: "database",
+        lastRunItem: {
+          title: "Database health check",
+          subtitle: "45ms lag",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 6), // 6 minutes ago
+          childEventsInfo: {
+            count: 3,
+            state: "processed",
+            waitingInfos: [],
+          },
+          state: "success",
+          values: {
+            "Connection": "Healthy",
+            "Replication Lag": "45ms",
+            "Avg Query Time": "12ms",
+            "Pool Usage": "45/100",
+          },
+        },
+        nextInQueue: {
+          title: "Scheduled DB check",
+          subtitle: "In 15min",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 2), // 2 minutes ago
+        },
+        collapsed: false
+      }
+    },
+  },
+  {
+    id: "infra-monitor",
+    position: { x: 0, y: -800 },
+    data: {
+      label: "Infrastructure Resource Monitor",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Infrastructure Resource Monitor",
+        description: "",
+        iconSlug: "cpu",
+        iconColor: "text-green-700",
+        headerColor: "bg-green-100",
+        collapsedBackground: "bg-green-100",
+        metadata: [
+          { icon: "cpu", label: "CPU: 45%" },
+          { icon: "hard-drive", label: "Memory: 12.3 GB available" },
+          { icon: "hard-drive", label: "Disk: 85% used" },
+          { icon: "box", label: "Pods: 24/24 healthy" },
+        ],
+        parameters: ["prod-cluster-1", "prod-cluster-2"],
+        parametersIcon: "server",
+        lastRunItem: {
+          title: "Resource check",
+          subtitle: "CPU 45%",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 8), // 8 minutes ago
+          childEventsInfo: {
+            count: 2,
+            state: "processed",
+            waitingInfos: [],
+          },
+          state: "success",
+          values: {
+            "CPU Usage": "45%",
+            "Memory": "12.3 GB available",
+            "Disk": "85% used",
+            "Pods": "24/24",
+          },
+        },
+        nextInQueue: {
+          title: "Scheduled resource check",
+          subtitle: "In 20min",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
+        },
+        collapsed: false
+      }
+    },
+  },
+  {
+    id: "deploy-test",
+    position: { x: -500, y: -800 },
+    data: {
+      label: "Traffic / Load Monitor",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Traffic / Load Monitor",
+        description: "",
+        iconSlug: "trending-up",
+        iconColor: "text-green-700",
+        headerColor: "bg-green-100",
+        collapsedBackground: "bg-green-100",
+        metadata: [
+          { icon: "activity", label: "Requests/sec: 1,247 req/s" },
+          { icon: "users", label: "Active Connections: 3,842" },
+          { icon: "alert-circle", label: "Error Rate: 0.3%" },
+          { icon: "server", label: "Load Balancer: Healthy" },
         ],
         parameters: ["us-west-1", "eu-global-1", "asia-east-1"],
         parametersIcon: "map",
         lastRunItem: {
-          title: "Network health check",
-          subtitle: "67ms",
+          title: "Traffic monitoring check",
+          subtitle: "1,247 req/s",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15), // 15 minutes ago
+          childEventsInfo: {
+            count: 3,
+            state: "processed",
+            waitingInfos: [],
+          },
           state: "success",
           values: {
+            "Requests/sec": "1,247",
+            "Connections": "3,842",
+            "Error Rate": "0.3%",
             "Status": "Healthy",
-            "Latency": "45ms",
-            "Uptime": "99.9%",
           },
         },
         nextInQueue: {
-          title: "Scheduled health check",
+          title: "Scheduled traffic check",
           subtitle: "In 45min",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5), // 5 minutes ago
         },
@@ -235,12 +337,24 @@ const sampleNodes: Node[] = [
         headerColor: "bg-blue-100",
         iconBackground: "bg-blue-500",
         collapsedBackground: "bg-blue-500",
+        metadata: [
+          { icon: "user", label: "Author: Bart Willems" },
+          { icon: "git-commit", label: "Commit: FEAT-1234" },
+          { icon: "git-commit", label: "Sha: ef758d40" },
+          { icon: "package", label: "Image: v3.18.217" },
+          { icon: "package", label: "Size: 971.5 MB" },
+        ],
         parameters: ["us-west-1", "us-east-1"],
         parametersIcon: "map",
         lastRunItem: {
           title: "FEAT-984: Autocomplete",
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 5), // 5 hours ago
+          childEventsInfo: {
+            count: 2,
+            state: "processed",
+            waitingInfos: [],
+          },
           state: "success",
           values: {
             "Author": "Bart Willems",
@@ -255,7 +369,6 @@ const sampleNodes: Node[] = [
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60), // 1 hour ago
         },
-        startLastValuesOpen: true,
         collapsed: false
       }
     },
@@ -274,6 +387,13 @@ const sampleNodes: Node[] = [
         headerColor: "bg-blue-100",
         iconBackground: "bg-blue-500",
         collapsedBackground: "bg-blue-500",
+        metadata: [
+          { icon: "user", label: "Author: Bart Willems" },
+          { icon: "git-commit", label: "Commit: FEAT-1234" },
+          { icon: "git-commit", label: "Sha: ef758d40" },
+          { icon: "package", label: "Image: v3.18.217" },
+          { icon: "package", label: "Size: 971.5 MB" },
+        ],
         parameters: ["eu-global-1", "eu-global-2"],
         parametersIcon: "map",
         lastRunItem: {
@@ -316,7 +436,7 @@ const sampleNodes: Node[] = [
   },
   {
     id: "deploy-asia",
-    position: { x: 1250, y: 500 },
+    position: { x: 1250, y: 600 },
     data: {
       label: "Deploy to Asia",
       state: "pending",
@@ -327,13 +447,25 @@ const sampleNodes: Node[] = [
         headerColor: "bg-blue-100",
         iconBackground: "bg-blue-500",
         collapsedBackground: "bg-blue-500",
+        metadata: [
+          { icon: "user", label: "Author: Bart Willems" },
+          { icon: "git-commit", label: "Commit: FEAT-1234" },
+          { icon: "git-commit", label: "Sha: ef758d40" },
+          { icon: "package", label: "Image: v3.18.217" },
+          { icon: "package", label: "Size: 971.5 MB" },
+        ],
         parameters: ["asia-east-1"],
         parametersIcon: "map",
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 12), // 12 hours ago
-          state: "success",
+          childEventsInfo: {
+            count: 1,
+            state: "processed",
+            waitingInfos: [],
+          },
+          state: "fail",
           values: {
             "Author": "Bart Willems",
             "Commit": "FEAT-1234",

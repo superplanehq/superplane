@@ -32,7 +32,7 @@ const EDGE_STYLE = {
 } as const;
 
 function CanvasPage(props: CanvasPage.Props) {
-  const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse } = useCanvasState(props);
+  const { nodes, edges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } = useCanvasState(props);
 
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
@@ -50,7 +50,7 @@ function CanvasPage(props: CanvasPage.Props) {
         maxZoom={1.5}
         zoomOnScroll={true}
         zoomOnPinch={true}
-        zoomOnDoubleClick={true}
+        zoomOnDoubleClick={false}
         panOnScroll={true}
         panOnDrag={true}
         selectionOnDrag={false}
@@ -60,6 +60,7 @@ function CanvasPage(props: CanvasPage.Props) {
         elementsSelectable={true}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDoubleClick={(_, node) => toggleNodeCollapse(node.id)}
       >
         <Background bgColor="#F1F5F9" color="#F1F5F9" />
       </ReactFlow>
