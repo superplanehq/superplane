@@ -1,84 +1,131 @@
 import { CanvasEdge, CanvasNode } from "..";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+type SetNodesFn = React.Dispatch<React.SetStateAction<CanvasNode[]>>;
 
 interface SimulationProps {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
-  setNodes: React.Dispatch<React.SetStateAction<CanvasNode[]>>;
+  setNodes: SetNodesFn;
 }
 
 type RunSimulationFn = (startNodeId: string) => Promise<void>;
 
 export function useSimulationRunner(props: SimulationProps): RunSimulationFn {
   return async (startNodeId: string) => {
-    if (!props.nodes || props.nodes.length === 0) return;
+    const engine = new Engine(props.nodes, props.edges, props.setNodes);
+    await engine.run(startNodeId);
+  };
+}
 
-    const outgoing = new Map<string, string[]>();
-    props.edges?.forEach((e) => {
-      if (!outgoing.has(e.source)) outgoing.set(e.source, []);
-      outgoing.get(e.source)!.push(e.target);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const noOp = async (input: any) => input;
+
+type CanvasEvent = {
+  state: "pending" | "running" | "completed";
+  process?: Promise<void>;
+};
+
+class Engine {
+  private queues: Map<string, CanvasEvent[]>;
+
+  constructor(
+    private nodes: CanvasNode[],
+    private edges: CanvasEdge[],
+    private setNodes: SetNodesFn
+  ) {
+    console.log(this.setNodes);
+
+    this.queues = new Map();
+    this.prepareQueues();
+  }
+
+  async run(startNodeId: string) {
+    this.addToQueue(startNodeId, { state: "pending" });
+
+    await this.processingLoop();
+  }
+
+  private async processingLoop() {
+    this.queues.forEach((_queue, nodeId) => {
+      this.processNode(nodeId);
     });
 
-    const start = props.nodes.find((n) => n.id === startNodeId);
-    if (!start) throw new Error("Start node not found");
+    while (true) {
+      let activeProcesses = 0;
 
-    const event = { at: Date.now(), msg: "run" } as const;
+      for (const [_nodeId, queue] of this.queues.entries()) {
+        activeProcesses += queue.length;
+      }
 
-    // Walk the graph in topological-ish layers with delays.
-    const visited = new Set<string>();
-    let frontier: Array<{ id: string; value: unknown }> = [
-      { id: start.id, value: event },
-    ];
+      if (activeProcesses === 0) {
+        break;
+      }
 
-    while (frontier.length) {
-      // mark nodes in this layer as working + set lastEvent
-      const layerIds = frontier.map((f) => f.id);
-      const valuesById = new Map(frontier.map((f) => [f.id, f.value] as const));
+      console.log("Engine: processing loop tick", activeProcesses);
+      console.log(this.queues);
 
-      props.setNodes((prev) =>
-        prev.map((n) =>
-          layerIds.includes(n.id)
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  state: "working",
-                  lastEvent: valuesById.get(n.id),
-                },
-              }
-            : n
-        )
-      );
-
-      // wait 5 seconds to simulate processing
-      await sleep(5000);
-
-      // turn off working state for this layer
-      props.setNodes((prev) =>
-        prev.map((n) =>
-          layerIds.includes(n.id)
-            ? { ...n, data: { ...n.data, state: "pending" } }
-            : n
-        )
-      );
-
-      // build next layer
-      const next: Array<{ id: string; value: unknown }> = [];
-      frontier.forEach(({ id, value }) => {
-        visited.add(id);
-        const nexts = outgoing.get(id) ?? [];
-        nexts.forEach((nid) => {
-          if (!visited.has(nid)) {
-            const transformed = {
-              ...((value as Record<string, unknown>) ?? {}),
-              via: id,
-            };
-            next.push({ id: nid, value: transformed });
-          }
-        });
-      });
-      frontier = next;
+      await sleep(1000);
     }
-  };
+  }
+
+  private async processNode(nodeId: string) {
+    const node = this.findNodeById(nodeId);
+    const run = node.__run || noOp;
+    const queue = this.queues.get(nodeId);
+
+    if (!queue) return;
+    if (queue.length === 0) return;
+
+    const head = queue[0]!;
+
+    if (head.state === "pending") {
+      head.process = new Promise<void>(async () => {
+        console.log(`Node ${nodeId}: starting execution`);
+        head.state = "running";
+        await run("a");
+        head.state = "completed";
+        console.log(`Node ${nodeId}: completed execution`);
+      });
+
+      return;
+    }
+
+    if (head.state === "completed") {
+      queue.shift();
+
+      const outgoingEdges = this.edges.filter((e) => e.source === nodeId);
+
+      for (const edge of outgoingEdges) {
+        this.addToQueue(edge.target, { state: "pending" });
+      }
+
+      return;
+    }
+  }
+
+  private prepareQueues() {
+    for (const node of this.nodes) {
+      this.queues.set(node.id, []);
+    }
+  }
+
+  private addToQueue(nodeId: string, event: CanvasEvent) {
+    const q = this.queues.get(nodeId);
+
+    if (!q) {
+      throw new Error(`Queue for node ${nodeId} not found`);
+    }
+
+    q.push(event);
+  }
+
+  private findNodeById(nodeId: string): CanvasNode {
+    const node = this.nodes.find((n) => n.id === nodeId);
+
+    if (!node) {
+      throw new Error(`Node with id ${nodeId} not found`);
+    }
+
+    return node;
+  }
 }
