@@ -8,12 +8,12 @@ interface WorkflowNodeExecutionsTabProps {
   workflowId: string
   nodeId: string
   isBlueprintNode?: boolean
-  nodeType?: string
+  componentName?: string
   organizationId: string
   blueprintId?: string
 }
 
-export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode, nodeType, organizationId, blueprintId }: WorkflowNodeExecutionsTabProps) => {
+export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode, componentName, organizationId, blueprintId }: WorkflowNodeExecutionsTabProps) => {
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [expandedExecutionIds, setExpandedExecutionIds] = useState<Set<string>>(new Set())
 
@@ -96,7 +96,7 @@ export const WorkflowNodeExecutionsTab = ({ workflowId, nodeId, isBlueprintNode,
             isDarkMode={isDarkMode}
             workflowId={workflowId}
             isBlueprintNode={isBlueprintNode}
-            nodeType={nodeType}
+            componentName={componentName}
             organizationId={organizationId}
             blueprintId={blueprintId}
             onToggleChildExecutions={handleToggleChildExecutions}

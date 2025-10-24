@@ -128,7 +128,7 @@ export const Workflow = () => {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'triggers' | 'components' | 'blueprints'>('triggers')
-  const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: string; componentLabel?: string; blueprintId?: string } | null>(null)
+  const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; isBlueprintNode: boolean; nodeType: 'trigger' | 'component' | 'blueprint'; componentName?: string; componentLabel?: string; blueprintId?: string } | null>(null)
   const [emitModalNode, setEmitModalNode] = useState<{ id: string; name: string; channels: string[] } | null>(null)
 
   // Fetch workflow, components, blueprints, and triggers
@@ -314,9 +314,10 @@ export const Workflow = () => {
       id: node.id,
       name: node.data.label as string,
       isBlueprintNode: node.data.blockType === 'blueprint',
-      nodeType: (node.data.blockType === 'component' || node.data.blockType === 'trigger')
+      nodeType: node.data.blockType as 'trigger' | 'component' | 'blueprint',
+      componentName: (node.data.blockType === 'component' || node.data.blockType === 'trigger')
         ? node.data.blockName as string
-        : node.data.blockType as string,
+        : undefined,
       componentLabel: block?.label,
       blueprintId: node.data.blockType === 'blueprint' ? node.data.blockId as string : undefined
     })
@@ -687,6 +688,7 @@ export const Workflow = () => {
                   onClose={() => setSelectedNode(null)}
                   isBlueprintNode={selectedNode.isBlueprintNode}
                   nodeType={selectedNode.nodeType}
+                  componentName={selectedNode.componentName}
                   componentLabel={selectedNode.componentLabel}
                   organizationId={organizationId!}
                   blueprintId={selectedNode.blueprintId}

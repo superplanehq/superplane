@@ -14,13 +14,14 @@ interface WorkflowNodeSidebarProps {
   nodeName: string
   onClose: () => void
   isBlueprintNode?: boolean
-  nodeType?: string
+  nodeType?: 'trigger' | 'component' | 'blueprint'
+  componentName?: string
   componentLabel?: string
   organizationId: string
   blueprintId?: string
 }
 
-export const WorkflowNodeSidebar = ({ workflowId, nodeId, onClose, isBlueprintNode, nodeType, organizationId, blueprintId }: WorkflowNodeSidebarProps) => {
+export const WorkflowNodeSidebar = ({ workflowId, nodeId, onClose, isBlueprintNode, nodeType, componentName, organizationId, blueprintId }: WorkflowNodeSidebarProps) => {
   const isTriggerNode = nodeType === 'trigger'
   const [activeTab, setActiveTab] = useState<Tab>(isTriggerNode ? 'events' : 'queue')
 
@@ -68,7 +69,7 @@ export const WorkflowNodeSidebar = ({ workflowId, nodeId, onClose, isBlueprintNo
                   workflowId={workflowId}
                   nodeId={nodeId}
                   isBlueprintNode={isBlueprintNode}
-                  nodeType={nodeType}
+                  componentName={componentName}
                   organizationId={organizationId}
                   blueprintId={blueprintId}
                 />
