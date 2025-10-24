@@ -7,11 +7,16 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const ComponentName = "if"
 const ChannelNameTrue = "true"
 const ChannelNameFalse = "false"
+
+func init() {
+	registry.RegisterComponent(ComponentName, &If{})
+}
 
 type If struct{}
 

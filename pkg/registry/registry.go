@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/components"
@@ -19,19 +20,26 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/pkg/triggers"
-	ghtrigger "github.com/superplanehq/superplane/pkg/triggers/github"
-	"github.com/superplanehq/superplane/pkg/triggers/schedule"
-	semtrigger "github.com/superplanehq/superplane/pkg/triggers/semaphore"
-	start "github.com/superplanehq/superplane/pkg/triggers/start"
-
-	"github.com/superplanehq/superplane/pkg/components/approval"
-	"github.com/superplanehq/superplane/pkg/components/filter"
-	httpComponent "github.com/superplanehq/superplane/pkg/components/http"
-	ifp "github.com/superplanehq/superplane/pkg/components/if"
-	noopComponent "github.com/superplanehq/superplane/pkg/components/noop"
-	"github.com/superplanehq/superplane/pkg/components/wait"
 	"gorm.io/gorm"
 )
+
+var (
+	registeredComponents = make(map[string]components.Component)
+	registeredTriggers   = make(map[string]triggers.Trigger)
+	mu                   sync.RWMutex
+)
+
+func RegisterComponent(name string, c components.Component) {
+	mu.Lock()
+	defer mu.Unlock()
+	registeredComponents[name] = c
+}
+
+func RegisterTrigger(name string, t triggers.Trigger) {
+	mu.Lock()
+	defer mu.Unlock()
+	registeredTriggers[name] = t
+}
 
 type Integration struct {
 	EventHandler       integrations.EventHandler
@@ -89,22 +97,18 @@ func (r *Registry) Init() {
 	r.Executors[models.ExecutorTypeNoOp] = noop.NewNoOpExecutor()
 
 	//
-	// Register the components
+	// Copy registered components and triggers
 	//
-	r.Components["if"] = &ifp.If{}
-	r.Components["filter"] = &filter.Filter{}
-	r.Components["http"] = &httpComponent.HTTP{}
-	r.Components["approval"] = &approval.Approval{}
-	r.Components["noop"] = &noopComponent.NoOp{}
-	r.Components["wait"] = &wait.Wait{}
+	mu.RLock()
+	defer mu.RUnlock()
 
-	//
-	// Register the triggers
-	//
-	r.Triggers["schedule"] = &schedule.Schedule{}
-	r.Triggers["start"] = &start.Start{}
-	r.Triggers["github"] = &ghtrigger.GitHub{}
-	r.Triggers["semaphore"] = &semtrigger.Semaphore{}
+	for name, component := range registeredComponents {
+		r.Components[name] = component
+	}
+
+	for name, trigger := range registeredTriggers {
+		r.Triggers[name] = trigger
+	}
 }
 
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {

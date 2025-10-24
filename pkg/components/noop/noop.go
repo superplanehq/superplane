@@ -4,9 +4,14 @@ import (
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const ComponentName = "noop"
+
+func init() {
+	registry.RegisterComponent(ComponentName, &NoOp{})
+}
 
 type NoOp struct{}
 

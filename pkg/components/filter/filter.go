@@ -7,9 +7,14 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 const ComponentName = "filter"
+
+func init() {
+	registry.RegisterComponent(ComponentName, &Filter{})
+}
 
 type Spec struct {
 	Expression string `json:"expression"`

@@ -4,8 +4,13 @@ import (
 	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 )
+
+func init() {
+	registry.RegisterTrigger("start", &Start{})
+}
 
 type Start struct{}
 

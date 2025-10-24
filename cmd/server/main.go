@@ -16,6 +16,18 @@ import (
 	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/workers"
+
+	// Import components and triggers to register them via init()
+	_ "github.com/superplanehq/superplane/pkg/components/approval"
+	_ "github.com/superplanehq/superplane/pkg/components/filter"
+	_ "github.com/superplanehq/superplane/pkg/components/http"
+	_ "github.com/superplanehq/superplane/pkg/components/if"
+	_ "github.com/superplanehq/superplane/pkg/components/noop"
+	_ "github.com/superplanehq/superplane/pkg/components/wait"
+	_ "github.com/superplanehq/superplane/pkg/triggers/github"
+	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
+	_ "github.com/superplanehq/superplane/pkg/triggers/semaphore"
+	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 )
 
 func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, cleanupService *workers.ResourceCleanupService, baseURL string) {
