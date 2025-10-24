@@ -12,7 +12,7 @@ interface HeaderProps {
 
 export function Header({ breadcrumbs }: HeaderProps) {
   return (
-    <header className="absolute top-0 left-0 right-0 z-20 bg-white border-b border-gray-200 shadow-sm">
+    <header className="absolute top-0 left-0 right-0 z-20 bg-white border-b border-gray-200">
       <div className="flex items-center justify-between h-12 px-6">
         {/* Logo */}
         <div className="flex items-center">
