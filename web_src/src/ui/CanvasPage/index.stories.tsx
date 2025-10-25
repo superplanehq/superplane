@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { LastRunItem } from "../composite";
 import type { BreadcrumbItem } from "./Header";
 import { CanvasNode, CanvasPage } from "./index";
+import { genCommit } from "./storybooks/commits";
 import { sleep, useSimulationRunner } from "./storybooks/useSimulation";
 
 // Storybook-specific utility functions for data passing
@@ -122,9 +123,11 @@ const sampleNodes: CanvasNode[] = [
       },
     },
     __run: async (_input, update, output) => {
+      const commit = genCommit();
+
       const event = {
-        title: "fix: AAAA",
-        subtitle: "ef758d40",
+        title: commit.message,
+        subtitle: commit.sha,
         receivedAt: new Date(),
         state: "processed",
       };
