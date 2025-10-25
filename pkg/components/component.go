@@ -138,6 +138,17 @@ type ActionContext struct {
 	Parameters            map[string]any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
+	UserContext           UserContext
+}
+
+type UserContext interface {
+	Get() User
+}
+
+type User struct {
+	ID    string `mapstructure:"id" json:"id"`
+	Name  string `mapstructure:"name" json:"name"`
+	Email string `mapstructure:"email" json:"email"`
 }
 
 const (

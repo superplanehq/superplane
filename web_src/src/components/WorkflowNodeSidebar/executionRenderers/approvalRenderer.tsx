@@ -7,58 +7,52 @@ import { Badge } from '../../ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../ui/dialog'
 import { Label } from '../../ui/label'
 import { Textarea } from '../../Textarea/textarea'
-import { ConfigurationFieldRenderer } from '../../ConfigurationFieldRenderer'
 import { workflowsInvokeNodeExecutionAction } from '../../../api-client/sdk.gen'
 import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import { showSuccessToast, showErrorToast } from '../../../utils/toast'
 import { formatTimeAgo } from '../../../utils/date'
-import { ComponentsConfigurationField } from '../../../api-client'
 
-interface ApprovalRequirement {
+interface Item {
   type: string
   user?: string
   role?: string
   group?: string
-  parameters?: ComponentsConfigurationField[]
 }
 
-interface ApprovalRecord {
-  requirementIndex: number
-  approvedAt?: string
-  approvedBy?: string
+interface ItemRecord extends Item {
+  index: number
+  state: string
+  at?: string
+  by?: User
   comment?: string
-  data?: Record<string, any>
 }
 
-interface ApprovalMetadata {
-  approvals?: ApprovalRecord[]
+interface User {
+  id: string
+  name: string
 }
 
-interface ApprovalConfig {
-  approvals?: ApprovalRequirement[]
+interface Metadata {
+  records?: ItemRecord[]
 }
 
-const ApprovalRequirementCard = ({
-  requirement,
-  requirementIndex,
-  approval,
+const RecordItemCard = ({
+  record,
+  index,
   execution,
   workflowId,
-  organizationId
 }: {
-  requirement: ApprovalRequirement
-  requirementIndex: number
-  approval?: ApprovalRecord
+  record: ItemRecord
+  index: number
   execution: any
   workflowId: string
-  organizationId: string
 }) => {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [comment, setComment] = useState('')
   const [reason, setReason] = useState('')
-  const [formData, setFormData] = useState<Record<string, any>>({})
   const queryClient = useQueryClient()
+  const isApproved = record.state === 'approved'
 
   const invokeActionMutation = useMutation({
     mutationFn: async ({ actionName, parameters }: { actionName: string; parameters: any }) => {
@@ -82,7 +76,6 @@ const ApprovalRequirementCard = ({
       setIsRejectModalOpen(false)
       setComment('')
       setReason('')
-      setFormData({})
       queryClient.invalidateQueries({ queryKey: ['workflow-node-executions'] })
     },
     onError: (error: any, variables) => {
@@ -95,8 +88,7 @@ const ApprovalRequirementCard = ({
     invokeActionMutation.mutate({
       actionName: 'approve',
       parameters: {
-        requirementIndex: requirementIndex,
-        data: Object.keys(formData).length > 0 ? formData : undefined,
+        index: index,
         comment: comment || undefined
       }
     })
@@ -110,27 +102,25 @@ const ApprovalRequirementCard = ({
     invokeActionMutation.mutate({
       actionName: 'reject',
       parameters: {
-        requirementIndex: requirementIndex,
+        index: index,
         reason: reason
       }
     })
   }
 
-  // Get the requirement label
-  const getRequirementLabel = () => {
-    if (requirement.type === 'user' && requirement.user) {
-      return `User: ${requirement.user}`
+  const getRecordLabel = () => {
+    if (record.type === 'user' && record.user) {
+      return `User: ${record.user}`
     }
-    if (requirement.type === 'role' && requirement.role) {
-      return `Role: ${requirement.role}`
+    if (record.type === 'role' && record.role) {
+      return `Role: ${record.role}`
     }
-    if (requirement.type === 'group' && requirement.group) {
-      return `Group: ${requirement.group}`
+    if (record.type === 'group' && record.group) {
+      return `Group: ${record.group}`
     }
-    return `Requirement #${requirementIndex + 1}`
-  }
 
-  const isApproved = !!approval
+    return `Record #${index + 1}`
+  }
 
   return (
     <>
@@ -144,16 +134,16 @@ const ApprovalRequirementCard = ({
             )}
             <div>
               <div className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
-                {getRequirementLabel()}
+                {getRecordLabel()}
               </div>
-              {isApproved && approval && (
+              {record.state == 'approved' && (
                 <div className="text-xs text-gray-500 dark:text-zinc-400">
-                  Approved by {approval.approvedBy} {approval.approvedAt && `at ${new Date(approval.approvedAt).toLocaleString()}`}
+                  Approved by {record.by?.name} {record.at && `at ${new Date(record.at).toLocaleString()}`}
                 </div>
               )}
             </div>
           </div>
-          {!isApproved && execution.state === 'STATE_STARTED' && (
+          {record.state == "pending" && execution.state === 'STATE_STARTED' && (
             <div className="flex gap-2">
               <Button
                 onClick={() => setIsApproveModalOpen(true)}
@@ -174,16 +164,9 @@ const ApprovalRequirementCard = ({
             </div>
           )}
         </div>
-        {isApproved && approval?.comment && (
+        {record?.comment && (
           <div className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
-            {approval.comment}
-          </div>
-        )}
-        {isApproved && approval?.data && Object.keys(approval.data).length > 0 && (
-          <div className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
-            <pre className="font-mono text-xs overflow-x-auto">
-              {JSON.stringify(approval.data, null, 2)}
-            </pre>
+            {record.comment}
           </div>
         )}
       </div>
@@ -192,30 +175,12 @@ const ApprovalRequirementCard = ({
       <Dialog open={isApproveModalOpen} onOpenChange={(open) => !open && setIsApproveModalOpen(false)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Approve: {getRequirementLabel()}</DialogTitle>
+            <DialogTitle>Approve: {getRecordLabel()}</DialogTitle>
             <DialogDescription>
-              {requirement.parameters && requirement.parameters.length > 0
-                ? 'Fill in the required information for this approval'
-                : 'Add an optional comment for this approval'}
+              Add an optional comment for this approval
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Dynamic Parameters */}
-            {requirement.parameters && requirement.parameters.length > 0 && (
-              <div className="space-y-4">
-                {requirement.parameters.map((field) => (
-                  <ConfigurationFieldRenderer
-                    key={field.name}
-                    field={field}
-                    value={formData[field.name!]}
-                    onChange={(value) => setFormData({ ...formData, [field.name!]: value })}
-                    allValues={formData}
-                    domainId={organizationId}
-                    domainType="DOMAIN_TYPE_ORGANIZATION"
-                  />
-                ))}
-              </div>
-            )}
 
             {/* Comment Field */}
             <div className="space-y-2">
@@ -257,7 +222,7 @@ const ApprovalRequirementCard = ({
       <Dialog open={isRejectModalOpen} onOpenChange={(open) => !open && setIsRejectModalOpen(false)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reject: {getRequirementLabel()}</DialogTitle>
+            <DialogTitle>Reject: {getRecordLabel()}</DialogTitle>
             <DialogDescription>
               Provide a reason for rejecting this approval requirement
             </DialogDescription>
@@ -303,13 +268,17 @@ const ApprovalRequirementCard = ({
 
 registerExecutionRenderer('approval', {
   renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
-    const metadata = (execution.metadata || {}) as ApprovalMetadata
-    const config = (execution.configuration || {}) as ApprovalConfig
-    const requirements = config.approvals || []
-    const approvals = metadata.approvals || []
+    const metadata = (execution.metadata || {}) as Metadata
+    const records = metadata.records || []
 
-    const approvedCount = approvals.length
-    const requiredCount = requirements.length
+    const approvedCount = records.reduce((count, record) => {
+      if (record.state === 'approved') {
+        return count + 1
+      }
+      return count
+    }, 0)
+
+    const requiredCount = records.length
     const isComplete = approvedCount >= requiredCount && requiredCount > 0
     const isRejected = execution.state === 'STATE_FINISHED' && execution.result === 'RESULT_FAILED'
 
@@ -364,17 +333,9 @@ registerExecutionRenderer('approval', {
     )
   },
 
-  renderExpanded: ({ execution, workflowId, organizationId }: ExpandedViewProps) => {
-    const metadata = (execution.metadata || {}) as ApprovalMetadata
-    const config = (execution.configuration || {}) as ApprovalConfig
-    const requirements = config.approvals || []
-    const approvals = metadata.approvals || []
-
-    // Create a map of approvals by requirement index
-    const approvalsByRequirement = new Map<number, ApprovalRecord>()
-    approvals.forEach((approval) => {
-      approvalsByRequirement.set(approval.requirementIndex, approval)
-    })
+  renderExpanded: ({ execution, workflowId }: ExpandedViewProps) => {
+    const metadata = (execution.metadata || {}) as Metadata
+    const records = metadata.records || []
 
     return (
       <div className="space-y-4 text-left">
@@ -392,19 +353,17 @@ registerExecutionRenderer('approval', {
           </>
         )}
 
-        {/* Approval Requirements */}
-        {requirements.length > 0 && (
+        {/* Records */}
+        {records.length > 0 && (
           <>
             <div className="space-y-2">
-              {requirements.map((requirement, index) => (
-                <ApprovalRequirementCard
+              {records.map((record, index) => (
+                <RecordItemCard
                   key={index}
-                  requirement={requirement}
-                  requirementIndex={index}
-                  approval={approvalsByRequirement.get(index)}
+                  index={index}
+                  record={record}
                   execution={execution}
                   workflowId={workflowId}
-                  organizationId={organizationId || ''}
                 />
               ))}
             </div>
