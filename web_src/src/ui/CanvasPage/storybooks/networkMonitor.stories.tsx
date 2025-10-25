@@ -1,17 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { Edge, Node } from "@xyflow/react";
+
 import "@xyflow/react/dist/style.css";
-import "./canvas-reset.css";
+import "../canvas-reset.css";
 
-import dockerIcon from "@/assets/icons/integrations/docker.svg";
-import githubIcon from "@/assets/icons/integrations/github.svg";
-import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
-
-import { useCallback, useMemo, useState } from "react";
-import { CanvasPage } from "./index";
+import { useMemo, useState } from "react";
+import { CanvasPage } from "../index";
 
 const meta = {
-  title: "Pages/CanvasPage",
+  title: "Pages/CanvasPage/Examples",
   component: CanvasPage,
   parameters: {
     layout: "fullscreen",
@@ -57,14 +54,14 @@ const sampleNodes: Node[] = [
           },
           state: "success",
           values: {
-            "Connection": "Healthy",
+            Connection: "Healthy",
             "Replication Lag": "45ms",
             "Avg Query Time": "12ms",
             "Pool Usage": "45/100",
           },
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -101,13 +98,13 @@ const sampleNodes: Node[] = [
           state: "failure",
           values: {
             "CPU Usage": "45%",
-            "Memory": "12.3 GB available",
-            "Disk": "85% used",
-            "Pods": "24/24",
+            Memory: "12.3 GB available",
+            Disk: "85% used",
+            Pods: "24/24",
           },
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
   {
@@ -144,13 +141,13 @@ const sampleNodes: Node[] = [
           state: "success",
           values: {
             "Requests/sec": "1,247",
-            "Connections": "3,842",
+            Connections: "3,842",
             "Error Rate": "0.3%",
-            "Status": "Healthy",
+            Status: "Healthy",
           },
         },
-        collapsed: false
-      }
+        collapsed: false,
+      },
     },
   },
 ];
@@ -170,94 +167,15 @@ export const Monitor: Story = {
     edges: sampleEdges,
   },
   render: function MonitorRender(args) {
-    const [simulationNodes, setSimulationNodes] = useState<Node[]>(args.nodes ?? []);
-    const simulationEdges = useMemo(() => args.edges ?? [], [args.edges]);
-
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-    const runSimulation = useCallback(async () => {
-      if (!simulationNodes || simulationNodes.length === 0) return;
-
-      const outgoing = new Map<string, string[]>();
-      simulationEdges?.forEach((e) => {
-        if (!outgoing.has(e.source)) outgoing.set(e.source, []);
-        outgoing.get(e.source)!.push(e.target);
-      });
-
-      const start = simulationNodes.find((n) => n.type === "input") ?? simulationNodes[0];
-      if (!start) return;
-
-      const event = { at: Date.now(), msg: "run" } as const;
-
-      // Walk the graph in topological-ish layers with delays.
-      const visited = new Set<string>();
-      let frontier: Array<{ id: string; value: unknown }> = [
-        { id: start.id, value: event },
-      ];
-
-      while (frontier.length) {
-        // mark nodes in this layer as working + set lastEvent
-        const layerIds = frontier.map((f) => f.id);
-        const valuesById = new Map(
-          frontier.map((f) => [f.id, f.value] as const)
-        );
-
-        setSimulationNodes((prev) =>
-          prev.map((n) =>
-            layerIds.includes(n.id)
-              ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  state: "working",
-                  lastEvent: valuesById.get(n.id),
-                },
-              }
-              : n
-          )
-        );
-
-        // wait 5 seconds to simulate processing
-        await sleep(5000);
-
-        // turn off working state for this layer
-        setSimulationNodes((prev) =>
-          prev.map((n) =>
-            layerIds.includes(n.id)
-              ? { ...n, data: { ...n.data, state: "pending" } }
-              : n
-          )
-        );
-
-        // build next layer
-        const next: Array<{ id: string; value: unknown }> = [];
-        frontier.forEach(({ id, value }) => {
-          visited.add(id);
-          const nexts = outgoing.get(id) ?? [];
-          nexts.forEach((nid) => {
-            if (!visited.has(nid)) {
-              const transformed = { ...(value as Record<string, unknown> ?? {}), via: id };
-              next.push({ id: nid, value: transformed });
-            }
-          });
-        });
-
-        frontier = next;
-      }
-    }, [simulationNodes, simulationEdges]);
+    const [nodes, _setNodes] = useState<Node[]>(args.nodes ?? []);
+    const edges = useMemo(() => args.edges ?? [], [args.edges]);
 
     return (
       <div className="h-[100vh] w-full ">
-        <div className="absolute z-10 m-2">
-          <button
-            onClick={runSimulation}
-            className="px-3 py-1 rounded bg-blue-600 text-white text-xs shadow hover:bg-blue-700"
-          >
-            Run
-          </button>
-        </div>
-        <CanvasPage {...args} nodes={simulationNodes} edges={simulationEdges} />
+        <CanvasPage {...args} nodes={nodes} edges={edges} />
       </div>
     );
   },
 };
+
+Monitor.storyName = "02 - Inftrastructure Monitoring";

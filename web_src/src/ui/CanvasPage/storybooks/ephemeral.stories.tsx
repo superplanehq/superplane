@@ -1,14 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { Edge, Node } from "@xyflow/react";
+
 import "@xyflow/react/dist/style.css";
-import "./canvas-reset.css";
+import "./../canvas-reset.css";
 
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
-import { CanvasPage } from "./index";
+import { CanvasPage } from "./../index";
 
 const meta = {
-  title: "Pages/CanvasPage",
+  title: "Pages/CanvasPage/Examples",
   component: CanvasPage,
   parameters: {
     layout: "fullscreen",
@@ -61,7 +62,10 @@ const ephemeralNodes: Node[] = [
         headerColor: "bg-purple-100",
         collapsedBackground: "bg-purple-100",
         metadata: [
-          { icon: "chevrons-left-right-ellipsis", label: "Payload templates: 1" },
+          {
+            icon: "chevrons-left-right-ellipsis",
+            label: "Payload templates: 1",
+          },
         ],
         lastEventData: {
           title: "Manual deployment request",
@@ -103,17 +107,21 @@ const ephemeralNodes: Node[] = [
               {
                 icon: "clock",
                 info: "Waiting for DNS propagation",
-                futureTimeDate: new Date(new Date().getTime() + 1000 * 60 * 210), // 3h 30min = 210 minutes
+                futureTimeDate: new Date(
+                  new Date().getTime() + 1000 * 60 * 210
+                ), // 3h 30min = 210 minutes
               },
             ],
           },
           state: "running",
           values: {
             "Triggered by": "PR comment",
-            "User": "Sarah Chen",
+            User: "Sarah Chen",
             "Environment ID": "env-pr-4523",
-            "URL": "https://pr-4523.staging.app.com",
-            "Shutdown at": new Date(new Date().getTime() + 1000 * 60 * 60 * 12).toLocaleString(),
+            URL: "https://pr-4523.staging.app.com",
+            "Shutdown at": new Date(
+              new Date().getTime() + 1000 * 60 * 60 * 12
+            ).toLocaleString(),
           },
         },
         collapsed: false,
@@ -140,3 +148,5 @@ export const Ephemeral: Story = {
     );
   },
 };
+
+Ephemeral.storyName = "03 - Ephemeral Environments";
