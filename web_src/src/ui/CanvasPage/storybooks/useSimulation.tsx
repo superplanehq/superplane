@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { CanvasEdge, CanvasNode } from "..";
 
 type SetNodesFn = React.Dispatch<React.SetStateAction<CanvasNode[]>>;
@@ -8,12 +9,17 @@ interface SimulationProps {
   setNodes: SetNodesFn;
 }
 
-type RunSimulationFn = (startNodeId: string) => Promise<void>;
+export type RunSimulationFn = (startNodeId: string) => Promise<void>;
 
 export function useSimulationRunner(props: SimulationProps): RunSimulationFn {
+  const engine = useRef<Engine | null>(null);
+
   return async (startNodeId: string) => {
-    const engine = new Engine(props.nodes, props.edges, props.setNodes);
-    await engine.run(startNodeId);
+    if (!engine.current) {
+      engine.current = new Engine(props.nodes, props.edges, props.setNodes);
+    }
+
+    engine.current.run(startNodeId);
   };
 }
 
@@ -29,6 +35,7 @@ type CanvasEvent = {
 
 class Engine {
   private queues: Map<string, CanvasEvent[]>;
+  private state: "idle" | "running";
 
   constructor(
     private nodes: CanvasNode[],
@@ -37,15 +44,21 @@ class Engine {
   ) {
     this.queues = new Map();
     this.prepareQueues();
+    this.state = "idle";
   }
 
   async run(startNodeId: string) {
+    console.log(startNodeId);
     this.addToQueue(startNodeId, { state: "pending" });
-
-    await this.processingLoop();
+    this.processingLoop();
   }
 
   private async processingLoop() {
+    if (this.state === "running") {
+      return;
+    }
+
+    this.state = "running";
     console.log("Simulation started");
 
     while (true) {
@@ -63,9 +76,10 @@ class Engine {
         break;
       }
 
-      await sleep(1000);
+      await sleep(200);
     }
 
+    this.state = "idle";
     console.log("Simulation completed");
   }
 

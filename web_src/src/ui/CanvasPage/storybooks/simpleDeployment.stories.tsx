@@ -8,12 +8,13 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { useCallback, useMemo, useState } from "react";
+import { Button } from "../../button";
 import { LastRunItem } from "../../composite";
 import type { BreadcrumbItem } from "../Header";
 import { CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
 import { navigateToStoryWithData } from "./navigation";
-import { sleep, useSimulationRunner } from "./useSimulation";
+import { RunSimulationFn, sleep, useSimulationRunner } from "./useSimulation";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -510,14 +511,8 @@ export const SimpleDeployment: Story = {
 
     return (
       <div className="h-[100vh] w-full ">
-        <div className="absolute z-[999] top-3 right-4">
-          <button
-            onClick={() => runSimulation("listen-code")}
-            className="px-3 py-1 rounded bg-blue-600 text-white text-xs shadow hover:bg-blue-700"
-          >
-            Run
-          </button>
-        </div>
+        <SimulatorButtons run={runSimulation} />
+
         {renderContent()}
       </div>
     );
@@ -525,3 +520,17 @@ export const SimpleDeployment: Story = {
 };
 
 SimpleDeployment.storyName = "01 - Simple Deployment";
+
+function SimulatorButtons({ run }: { run: RunSimulationFn }) {
+  return (
+    <div className="absolute z-[999] bottom-3 left-3 flex gap-2">
+      <Button onClick={() => run("listen-code")} size="sm" variant="outline">
+        GitHub Push
+      </Button>
+
+      <Button onClick={() => run("listen-image")} size="sm" variant="outline">
+        Docker Image Push
+      </Button>
+    </div>
+  );
+}
