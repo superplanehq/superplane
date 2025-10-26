@@ -521,6 +521,71 @@ webhook2  secret2    pending  {"events": ["push"]}         integration1   reposi
 webhook3  secret3    ready    {"events": ["workflow_run"]} integration1   repository1
 ```
 
+## Approval component metadata
+
+Pending records:
+
+```
+records:
+  - index: 0
+    type: user
+    state: pending
+    user:
+      id: 7ff931d3-2ffd-4011-8103-c5aa426964e4
+      name: "Lucas Pinheiro"
+      email: lucas@superplane.com
+  
+  - type: role
+    role: org_admin
+    index: 1
+    state: pending
+
+  - type: group
+    group: Development
+    index: 2
+    state: pending
+```
+
+Finished:
+
+```
+records:
+  - index: 0
+    type: user
+    state: approved
+    approval:
+      at: "2025-10-26T00:00:00Z"
+      comment: ""
+    user:
+      id: 7ff931d3-2ffd-4011-8103-c5aa426964e4
+      name: "Lucas Pinheiro"
+      email: lucas@superplane.com
+
+  - type: role
+    role: org_admin
+    index: 1
+    state: approved
+    approval:
+      at: "2025-10-26T00:00:00Z"
+      comment: ""
+    user:
+      id: 7ff931d3-2ffd-4011-8103-c5aa426964e4
+      name: "Igor Sarcevic"
+      email: igor@superplane.com
+
+  - type: group
+    group: Development
+    index: 2
+    state: rejected
+    rejection:
+      at: "2025-10-26T00:00:00Z"
+      reason: ""
+    user:
+      id: 7ff931d3-2ffd-4011-8103-c5aa426964e4
+      name: "Pedro"
+      email: pedro@superplane.com
+```
+
 ## Components can have dynamic configuration, output channels, ...
 
 - The OutputChannels() method of the switch component returns a list of output channels based on the configuration.

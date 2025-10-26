@@ -14,7 +14,7 @@ import { formatTimeAgo } from '../../../utils/date'
 
 interface Item {
   type: string
-  user?: string
+  user?: User
   role?: string
   group?: string
 }
@@ -22,17 +22,28 @@ interface Item {
 interface ItemRecord extends Item {
   index: number
   state: string
-  at?: string
-  by?: User
-  comment?: string
+  approval?: ApprovalInfo
+  rejection?: RejectionInfo
+}
+
+interface ApprovalInfo {
+  approvedAt: string
+  comment: string
+}
+
+interface RejectionInfo {
+  rejectedAt: string
+  reason: string
 }
 
 interface User {
   id: string
   name: string
+  email: string
 }
 
 interface Metadata {
+  result?: string
   records?: ItemRecord[]
 }
 
@@ -52,7 +63,6 @@ const RecordItemCard = ({
   const [comment, setComment] = useState('')
   const [reason, setReason] = useState('')
   const queryClient = useQueryClient()
-  const isApproved = record.state === 'approved'
 
   const invokeActionMutation = useMutation({
     mutationFn: async ({ actionName, parameters }: { actionName: string; parameters: any }) => {
@@ -110,7 +120,7 @@ const RecordItemCard = ({
 
   const getRecordLabel = () => {
     if (record.type === 'user' && record.user) {
-      return `User: ${record.user}`
+      return `User: ${record.user.name}`
     }
     if (record.type === 'role' && record.role) {
       return `Role: ${record.role}`
@@ -127,8 +137,10 @@ const RecordItemCard = ({
       <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {isApproved ? (
+            {record.state === 'approved' ? (
               <MaterialSymbol name="check_circle" className="text-green-600 dark:text-green-400" />
+            ) : record.state == 'rejected' ? (
+              <MaterialSymbol name="close" className="text-red-600 dark:text-red-400" />
             ) : (
               <MaterialSymbol name="pending" className="text-orange-600 dark:text-orange-400" />
             )}
@@ -138,7 +150,12 @@ const RecordItemCard = ({
               </div>
               {record.state == 'approved' && (
                 <div className="text-xs text-gray-500 dark:text-zinc-400">
-                  Approved by {record.by?.name} {record.at && `at ${new Date(record.at).toLocaleString()}`}
+                  Approved by {record.user?.name} {record.approval?.approvedAt && `at ${new Date(record.approval?.approvedAt).toLocaleString()}`}
+                </div>
+              )}
+              {record.state == 'rejected' && (
+                <div className="text-xs text-gray-500 dark:text-zinc-400">
+                  Rejected by {record.user?.name} {record.rejection?.rejectedAt && `at ${new Date(record.rejection?.rejectedAt).toLocaleString()}`}
                 </div>
               )}
             </div>
@@ -164,9 +181,14 @@ const RecordItemCard = ({
             </div>
           )}
         </div>
-        {record?.comment && (
+        {record?.approval?.comment && (
           <div className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
-            {record.comment}
+            {record?.approval?.comment}
+          </div>
+        )}
+        {record?.rejection?.reason && (
+          <div className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
+            {record?.rejection?.reason}
           </div>
         )}
       </div>
@@ -279,8 +301,6 @@ registerExecutionRenderer('approval', {
     }, 0)
 
     const requiredCount = records.length
-    const isComplete = approvedCount >= requiredCount && requiredCount > 0
-    const isRejected = execution.state === 'STATE_FINISHED' && execution.result === 'RESULT_FAILED'
 
     // Determine label and styling
     let label = ''
@@ -288,12 +308,12 @@ registerExecutionRenderer('approval', {
     let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' = 'secondary'
     let badgeClassName = 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800'
 
-    if (isRejected) {
+    if (metadata.result === 'rejected') {
       label = 'Rejected'
       iconName = 'cancel'
       badgeVariant = 'destructive'
       badgeClassName = ''
-    } else if (isComplete) {
+    } else if (metadata.result == 'approved') {
       label = 'Approved'
       iconName = 'check_circle'
       badgeClassName = 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800'

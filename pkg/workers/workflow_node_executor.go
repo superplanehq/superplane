@@ -138,12 +138,18 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		return fmt.Errorf("failed to get execution inputs: %w", err)
 	}
 
+	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("failed to find workflow: %v", err)
+	}
+
 	ctx := components.ExecutionContext{
 		Configuration:         execution.Configuration.Data(),
 		Data:                  input,
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
+		AuthContext:           contexts.NewAuthContext(workflow.OrganizationID, nil),
 	}
 
 	if err := component.Execute(ctx); err != nil {

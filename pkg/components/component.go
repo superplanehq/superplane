@@ -1,6 +1,10 @@
 package components
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
 
@@ -87,6 +91,7 @@ type ExecutionContext struct {
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
 	RequestContext        RequestContext
+	AuthContext           AuthContext
 }
 
 /*
@@ -138,11 +143,12 @@ type ActionContext struct {
 	Parameters            map[string]any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
-	UserContext           UserContext
+	AuthContext           AuthContext
 }
 
-type UserContext interface {
-	Get() User
+type AuthContext interface {
+	AuthenticatedUser() *User
+	GetUser(id uuid.UUID) (*User, error)
 }
 
 type User struct {
