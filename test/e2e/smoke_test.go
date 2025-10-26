@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -52,4 +53,22 @@ func TestSmoke(t *testing.T) {
 	if status >= 500 {
 		t.Fatalf("server returned 5xx: %d", status)
 	}
+
+	takeScreenshot(t, page, "hello")
+}
+
+func takeScreenshot(t *testing.T, page pw.Page, name string) {
+	path := fmt.Sprintf("/app/tmp/screenshots/%s.png", name)
+
+	_, err := page.Screenshot(pw.PageScreenshotOptions{
+		Path:     pw.String(path),
+		FullPage: pw.Bool(true),
+		Type:     pw.ScreenshotTypePng,
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to take screenshot: %v", err)
+	}
+
+	t.Logf("Saved screenshot to %s", path)
 }

@@ -32,7 +32,8 @@ test.watch:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
 test.e2e:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test --no-deps app go test ./test/e2e -v
+	@mkdir -p tmp/screenshots
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test --no-deps -v $(PWD)/tmp/screenshots:/app/test/screenshots app go test ./test/e2e -v
 
 #
 # Targets for dev environment
