@@ -31,6 +31,9 @@ test:
 test.watch:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
+test.e2e:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app go test ./tests/e2e -v
+
 #
 # Targets for dev environment
 #
