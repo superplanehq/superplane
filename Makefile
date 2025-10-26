@@ -26,14 +26,14 @@ test.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
 test:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1 -skip="e2e"
 
 test.watch:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
 test.e2e:
 	@mkdir -p tmp/screenshots
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test --no-deps -v $(PWD)/tmp/screenshots:/app/test/screenshots app go test ./test/e2e -v
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test --no-deps -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short-verbose --junitfile junit-report.xml ./test/e2e -v
 
 #
 # Targets for dev environment
