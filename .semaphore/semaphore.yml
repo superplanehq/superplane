@@ -27,6 +27,25 @@ blocks:
           commands:
             - test-results publish junit-report.xml
 
+  - name: "\U0001F9EA E2E"
+    dependencies: []
+    task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+      prologue:
+        commands:
+          - checkout
+      jobs:
+        - name: "\U0001F9EA E2E Tests"
+          commands:
+            - make test.setup
+            - make test.e2e
+      epilogue:
+        always:
+          commands:
+            - test-results publish junit-report.xml
+
   - name: "🔨 Frontend Build"
     dependencies: []
     task:
