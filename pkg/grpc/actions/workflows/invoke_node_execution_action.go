@@ -5,12 +5,15 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func InvokeNodeExecutionAction(
@@ -22,6 +25,11 @@ func InvokeNodeExecutionAction(
 	actionName string,
 	parameters map[string]any,
 ) (*pb.InvokeNodeExecutionActionResponse, error) {
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
 	workflow, err := models.FindWorkflow(orgID, workflowID)
 	if err != nil {
 		return nil, fmt.Errorf("workflow not found: %w", err)
@@ -59,12 +67,18 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("action parameter validation failed: %w", err)
 	}
 
-	// TODO: pass user context
+	user, err := models.FindActiveUserByID(orgID.String(), userID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found: %w", err)
+	}
+
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
 		Parameters:            parameters,
+		Configuration:         node.Configuration.Data(),
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
+		AuthContext:           contexts.NewAuthContext(orgID, user),
 	}
 
 	err = component.HandleAction(actionCtx)

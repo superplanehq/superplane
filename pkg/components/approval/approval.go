@@ -4,9 +4,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/registry"
+)
+
+const (
+	StatePending  = "pending"
+	StateApproved = "approved"
+	StateRejected = "rejected"
+
+	ItemTypeUser  = "user"
+	ItemTypeRole  = "role"
+	ItemTypeGroup = "group"
 )
 
 func init() {
@@ -18,48 +29,189 @@ func init() {
  * Filled when the component is added to a blueprint/workflow.
  */
 type Config struct {
-	Count int `json:"count"`
+	Items []Item `json:"items" mapstructure:"items"`
+}
+
+type Item struct {
+	Type  string `mapstructure:"type" json:"type"`
+	User  string `mapstructure:"user" json:"user,omitempty"`
+	Role  string `mapstructure:"role" json:"role,omitempty"`
+	Group string `mapstructure:"group" json:"group,omitempty"`
 }
 
 /*
  * Metadata for the component.
  */
 type Metadata struct {
-	RequiredCount int              `mapstructure:"required_count" json:"required_count"`
-	Approvals     []ApprovalRecord `mapstructure:"approvals" json:"approvals"`
+	Result  string   `mapstructure:"result" json:"result"`
+	Records []Record `mapstructure:"records" json:"records"`
 }
 
-func NewMetadata(count int) Metadata {
-	return Metadata{
-		RequiredCount: count,
-		Approvals:     []ApprovalRecord{},
-	}
+type Record struct {
+	Index     int              `mapstructure:"index" json:"index"`
+	Type      string           `mapstructure:"type" json:"type"`
+	State     string           `mapstructure:"state" json:"state"`
+	User      *components.User `mapstructure:"user" json:"user,omitempty"`
+	Role      *string          `mapstructure:"role" json:"role,omitempty"`
+	Group     *string          `mapstructure:"group" json:"group,omitempty"`
+	Approval  *ApprovalInfo    `mapstructure:"approval" json:"approval,omitempty"`
+	Rejection *RejectionInfo   `mapstructure:"rejection" json:"rejection,omitempty"`
 }
 
-func (m *Metadata) addApproval(parameters map[string]any) {
-	record := ApprovalRecord{
-		ApprovedAt: time.Now().Format(time.RFC3339),
-	}
-
-	c, ok := parameters["comment"]
-	if !ok || c == nil {
-		m.Approvals = append(m.Approvals, record)
-		return
-	}
-
-	comment, ok := c.(string)
-	if !ok {
-		m.Approvals = append(m.Approvals, record)
-		return
-	}
-
-	record.Comment = comment
-	m.Approvals = append(m.Approvals, record)
-}
-
-type ApprovalRecord struct {
-	ApprovedAt string `mapstructure:"approved_at" json:"approved_at"`
+type ApprovalInfo struct {
+	ApprovedAt string `mapstructure:"approvedAt" json:"approvedAt"`
 	Comment    string `mapstructure:"comment" json:"comment"`
+}
+
+type RejectionInfo struct {
+	RejectedAt string `mapstructure:"rejectedAt" json:"rejectedAt"`
+	Reason     string `mapstructure:"reason" json:"reason"`
+}
+
+func (m *Metadata) Completed() bool {
+	for _, record := range m.Records {
+		if record.State == StatePending {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (m *Metadata) UpdateResult() {
+	for _, record := range m.Records {
+		if record.State == StateRejected {
+			m.Result = StateRejected
+			return
+		}
+	}
+
+	m.Result = StateApproved
+}
+
+func (m *Metadata) Approve(record *Record, index int, ctx components.ActionContext) error {
+	err := m.validateAction(record, ctx)
+	if err != nil {
+		return err
+	}
+
+	record.State = StateApproved
+	record.Approval = &ApprovalInfo{ApprovedAt: time.Now().Format(time.RFC3339)}
+	record.User = ctx.AuthContext.AuthenticatedUser()
+	comment, ok := ctx.Parameters["comment"].(string)
+	if ok {
+		record.Approval.Comment = comment
+	}
+
+	m.Records[index] = *record
+	return nil
+}
+
+func (m *Metadata) Reject(record *Record, index int, ctx components.ActionContext) error {
+	err := m.validateAction(record, ctx)
+	if err != nil {
+		return err
+	}
+
+	reason, ok := ctx.Parameters["reason"]
+	if !ok || reason == nil {
+		return fmt.Errorf("reason is required for rejection")
+	}
+
+	reasonStr, ok := reason.(string)
+	if !ok {
+		return fmt.Errorf("reason must be a string")
+	}
+
+	record.State = StateRejected
+	record.User = ctx.AuthContext.AuthenticatedUser()
+	record.Rejection = &RejectionInfo{
+		RejectedAt: time.Now().Format(time.RFC3339),
+		Reason:     reasonStr,
+	}
+
+	m.Records[index] = *record
+	return nil
+}
+
+func (m *Metadata) validateAction(record *Record, ctx components.ActionContext) error {
+	authenticatedUser := ctx.AuthContext.AuthenticatedUser()
+	switch record.Type {
+	case ItemTypeUser:
+		if record.User.ID != authenticatedUser.ID {
+			return fmt.Errorf("item must be approved by %s", authenticatedUser.ID)
+		}
+
+		return nil
+
+	case ItemTypeRole:
+		// TODO: verify that authenticated user has role
+		return nil
+
+	case ItemTypeGroup:
+		// TODO: verify that authenticated user is part of group
+		return nil
+	}
+
+	return fmt.Errorf("unknown record type: %s", record.Type)
+}
+
+func NewMetadata(ctx components.ExecutionContext, items []Item) (*Metadata, error) {
+	records := []Record{}
+
+	for i, item := range items {
+		record, err := approvalItemToRecord(ctx, item, i)
+		if err != nil {
+			return nil, err
+		}
+
+		records = append(records, *record)
+	}
+
+	return &Metadata{
+		Result:  StatePending,
+		Records: records,
+	}, nil
+}
+
+func approvalItemToRecord(ctx components.ExecutionContext, item Item, index int) (*Record, error) {
+	switch item.Type {
+	case ItemTypeUser:
+		userID, err := uuid.Parse(item.User)
+		if err != nil {
+			return nil, err
+		}
+
+		user, err := ctx.AuthContext.GetUser(userID)
+		if err != nil {
+			return nil, err
+		}
+
+		return &Record{
+			Type:  item.Type,
+			Index: index,
+			State: StatePending,
+			User:  user,
+		}, nil
+
+	case ItemTypeRole:
+		return &Record{
+			Type:  item.Type,
+			Index: index,
+			Role:  &item.Role,
+			State: StatePending,
+		}, nil
+
+	case ItemTypeGroup:
+		return &Record{
+			Type:  item.Type,
+			Index: index,
+			Group: &item.Group,
+			State: StatePending,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("unsupport item type: %s", item.Type)
 }
 
 type Approval struct{}
@@ -89,16 +241,67 @@ func (a *Approval) OutputChannels(configuration any) []components.OutputChannel 
 }
 
 func (a *Approval) Configuration() []components.ConfigurationField {
-	min := 1
 	return []components.ConfigurationField{
 		{
-			Name:        "count",
-			Label:       "Number of approvals",
-			Type:        components.FieldTypeNumber,
-			Description: "Number of approvals required before execution continues",
-			Required:    true,
+			Name:  "items",
+			Label: "Items",
+			Type:  components.FieldTypeList,
 			TypeOptions: &components.TypeOptions{
-				Number: &components.NumberTypeOptions{Min: &min},
+				List: &components.ListTypeOptions{
+					ItemDefinition: &components.ListItemDefinition{
+						Type: components.FieldTypeObject,
+						Schema: []components.ConfigurationField{
+							{
+								Name:     "type",
+								Label:    "Type",
+								Type:     components.FieldTypeSelect,
+								Required: true,
+								TypeOptions: &components.TypeOptions{
+									Select: &components.SelectTypeOptions{
+										Options: []components.FieldOption{
+											{Value: "user", Label: "User"},
+											{Value: "role", Label: "Role"},
+											{Value: "group", Label: "Group"},
+										},
+									},
+								},
+							},
+							{
+								Name:  "user",
+								Label: "User",
+								Type:  components.FieldTypeUser,
+								VisibilityConditions: []components.VisibilityCondition{
+									{
+										Field:  "type",
+										Values: []string{"user"},
+									},
+								},
+							},
+							{
+								Name:  "role",
+								Label: "Role",
+								Type:  components.FieldTypeRole,
+								VisibilityConditions: []components.VisibilityCondition{
+									{
+										Field:  "type",
+										Values: []string{"role"},
+									},
+								},
+							},
+							{
+								Name:  "group",
+								Label: "Group",
+								Type:  components.FieldTypeGroup,
+								VisibilityConditions: []components.VisibilityCondition{
+									{
+										Field:  "type",
+										Values: []string{"group"},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -111,10 +314,12 @@ func (a *Approval) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
-	//
-	// Initialize metadata for the execution.
-	//
-	ctx.MetadataContext.Set(NewMetadata(config.Count))
+	metadata, err := NewMetadata(ctx, config.Items)
+	if err != nil {
+		return err
+	}
+
+	ctx.MetadataContext.Set(metadata)
 	return nil
 }
 
@@ -126,6 +331,13 @@ func (a *Approval) Actions() []components.Action {
 			UserAccessible: true,
 			Parameters: []components.ConfigurationField{
 				{
+					Name:        "index",
+					Label:       "Item Index",
+					Type:        components.FieldTypeNumber,
+					Description: "Index of the item being fulfilled",
+					Required:    true,
+				},
+				{
 					Name:        "comment",
 					Label:       "Comment",
 					Type:        components.FieldTypeString,
@@ -136,9 +348,16 @@ func (a *Approval) Actions() []components.Action {
 		},
 		{
 			Name:           "reject",
-			Description:    "Reject this execution",
+			Description:    "Reject this approval requirement",
 			UserAccessible: true,
 			Parameters: []components.ConfigurationField{
+				{
+					Name:        "index",
+					Label:       "Item Index",
+					Type:        components.FieldTypeNumber,
+					Description: "Index of the item being rejected",
+					Required:    true,
+				},
 				{
 					Name:        "reason",
 					Label:       "Reason",
@@ -152,55 +371,99 @@ func (a *Approval) Actions() []components.Action {
 }
 
 func (a *Approval) HandleAction(ctx components.ActionContext) error {
+	var err error
+	var metadata *Metadata
 	switch ctx.Name {
 	case "approve":
-		return a.handleApprove(ctx)
+		metadata, err = a.handleApprove(ctx)
 	case "reject":
-		return a.handleReject(ctx)
+		metadata, err = a.handleReject(ctx)
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
-}
 
-func (a *Approval) handleApprove(ctx components.ActionContext) error {
-	//
-	// Add new approval to metadata
-	//
-	var metadata Metadata
-	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
-		return fmt.Errorf("failed to parse metadata: %w", err)
+		return err
 	}
 
-	metadata.addApproval(ctx.Parameters)
-	ctx.MetadataContext.Set(metadata)
-
 	//
-	// If the number of approvals is still below the required amount,
-	// do not finish the execution yet.
+	// If we have pending records yet, just update the metadata,
+	// without finishing the execution.
 	//
-	if len(metadata.Approvals) < metadata.RequiredCount {
+	if !metadata.Completed() {
+		ctx.MetadataContext.Set(metadata)
 		return nil
 	}
 
 	//
-	// Required amount of approvals reached - finish the execution.
+	// Here, no more pending records exist,
+	// so we update the metadata result.
+	// If a single item was rejected,
+	// the final state of the execution is rejected.
 	//
+	metadata.UpdateResult()
+	ctx.MetadataContext.Set(metadata)
+
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
 		components.DefaultOutputChannel.Name: {metadata},
 	})
 }
 
-func (a *Approval) handleReject(ctx components.ActionContext) error {
-	reason, ok := ctx.Parameters["reason"]
-	if !ok || reason == nil {
-		return fmt.Errorf("reason is required for rejection")
+func (a *Approval) handleApprove(ctx components.ActionContext) (*Metadata, error) {
+	var metadata Metadata
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	reasonStr, ok := reason.(string)
+	record, err := a.findPendingRecord(metadata, ctx.Parameters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find requirement: %w", err)
+	}
+
+	err = metadata.Approve(record, record.Index, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &metadata, nil
+}
+
+func (a *Approval) findPendingRecord(metadata Metadata, parameters map[string]any) (*Record, error) {
+	i, ok := parameters["index"].(float64)
 	if !ok {
-		return fmt.Errorf("reason must be a string")
+		return nil, fmt.Errorf("index is required")
 	}
 
-	return ctx.ExecutionStateContext.Fail(reasonStr, "")
+	index := int(i)
+	if index < 0 || index >= len(metadata.Records) {
+		return nil, fmt.Errorf("invalid index: %d", index)
+	}
+
+	record := metadata.Records[index]
+	if record.State != StatePending {
+		return nil, fmt.Errorf("record at index %d is not pending", index)
+	}
+
+	return &record, nil
+}
+
+func (a *Approval) handleReject(ctx components.ActionContext) (*Metadata, error) {
+	var metadata Metadata
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse metadata: %w", err)
+	}
+
+	record, err := a.findPendingRecord(metadata, ctx.Parameters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find requirement: %w", err)
+	}
+
+	err = metadata.Reject(record, record.Index, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &metadata, nil
 }

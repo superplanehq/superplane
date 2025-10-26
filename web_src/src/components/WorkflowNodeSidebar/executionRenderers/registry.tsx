@@ -17,6 +17,7 @@ export interface ExpandedViewProps {
   execution: WorkflowsWorkflowNodeExecution
   isDarkMode: boolean
   workflowId: string
+  organizationId?: string
 }
 
 export interface ExecutionRenderer {

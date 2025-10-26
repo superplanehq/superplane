@@ -834,6 +834,8 @@ export const Blueprint = () => {
                         value={nodeConfiguration[field.name]}
                         onChange={(value) => setNodeConfiguration({ ...nodeConfiguration, [field.name]: value })}
                         allValues={nodeConfiguration}
+                        domainId={organizationId}
+                        domainType="DOMAIN_TYPE_ORGANIZATION"
                       />
                     ))}
                   </div>

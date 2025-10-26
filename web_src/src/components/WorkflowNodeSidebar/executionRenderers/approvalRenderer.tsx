@@ -12,17 +12,52 @@ import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import { showSuccessToast, showErrorToast } from '../../../utils/toast'
 import { formatTimeAgo } from '../../../utils/date'
 
-interface ApprovalRecord {
-  approved_at?: string
-  comment?: string
+interface Item {
+  type: string
+  user?: User
+  role?: string
+  group?: string
 }
 
-interface ApprovalMetadata {
-  required_count?: number
-  approvals?: ApprovalRecord[]
+interface ItemRecord extends Item {
+  index: number
+  state: string
+  approval?: ApprovalInfo
+  rejection?: RejectionInfo
 }
 
-const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId: string }) => {
+interface ApprovalInfo {
+  approvedAt: string
+  comment: string
+}
+
+interface RejectionInfo {
+  rejectedAt: string
+  reason: string
+}
+
+interface User {
+  id: string
+  name: string
+  email: string
+}
+
+interface Metadata {
+  result?: string
+  records?: ItemRecord[]
+}
+
+const RecordItemCard = ({
+  record,
+  index,
+  execution,
+  workflowId,
+}: {
+  record: ItemRecord
+  index: number
+  execution: any
+  workflowId: string
+}) => {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [comment, setComment] = useState('')
@@ -45,22 +80,27 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
       )
     },
     onSuccess: (_, variables) => {
-      showSuccessToast(`Successfully ${variables.actionName === 'approve' ? 'approved' : 'rejected'}`)
+      const action = variables.actionName === 'approve' ? 'approved' : 'rejected'
+      showSuccessToast(`Successfully ${action}`)
       setIsApproveModalOpen(false)
       setIsRejectModalOpen(false)
       setComment('')
       setReason('')
       queryClient.invalidateQueries({ queryKey: ['workflow-node-executions'] })
     },
-    onError: (error: any) => {
-      showErrorToast(`Failed to execute action: ${error.message}`)
+    onError: (error: any, variables) => {
+      const action = variables.actionName === 'approve' ? 'approve' : 'reject'
+      showErrorToast(`Failed to ${action}: ${error.message}`)
     },
   })
 
   const handleApprove = () => {
     invokeActionMutation.mutate({
       actionName: 'approve',
-      parameters: { comment: comment || undefined }
+      parameters: {
+        index: index,
+        comment: comment || undefined
+      }
     })
   }
 
@@ -71,57 +111,109 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
     }
     invokeActionMutation.mutate({
       actionName: 'reject',
-      parameters: { reason }
+      parameters: {
+        index: index,
+        reason: reason
+      }
     })
   }
 
-  // Only show actions for started executions
-  if (execution.state !== 'STATE_STARTED') {
-    return null
+  const getRecordLabel = () => {
+    if (record.type === 'user' && record.user) {
+      return `User: ${record.user.name}`
+    }
+    if (record.type === 'role' && record.role) {
+      return `Role: ${record.role}`
+    }
+    if (record.type === 'group' && record.group) {
+      return `Group: ${record.group}`
+    }
+
+    return `Record #${index + 1}`
   }
 
   return (
     <>
-      <div className="space-y-3">
-        <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-          Actions
+      <div className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {record.state === 'approved' ? (
+              <MaterialSymbol name="check_circle" className="text-green-600 dark:text-green-400" />
+            ) : record.state == 'rejected' ? (
+              <MaterialSymbol name="close" className="text-red-600 dark:text-red-400" />
+            ) : (
+              <MaterialSymbol name="pending" className="text-orange-600 dark:text-orange-400" />
+            )}
+            <div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-zinc-100">
+                {getRecordLabel()}
+              </div>
+              {record.state == 'approved' && (
+                <div className="text-xs text-gray-500 dark:text-zinc-400">
+                  Approved by {record.user?.name} {record.approval?.approvedAt && `at ${new Date(record.approval?.approvedAt).toLocaleString()}`}
+                </div>
+              )}
+              {record.state == 'rejected' && (
+                <div className="text-xs text-gray-500 dark:text-zinc-400">
+                  Rejected by {record.user?.name} {record.rejection?.rejectedAt && `at ${new Date(record.rejection?.rejectedAt).toLocaleString()}`}
+                </div>
+              )}
+            </div>
+          </div>
+          {record.state == "pending" && execution.state === 'STATE_STARTED' && (
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setIsApproveModalOpen(true)}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <MaterialSymbol name="check_circle" size="sm" />
+                Approve
+              </Button>
+              <Button
+                onClick={() => setIsRejectModalOpen(true)}
+                size="sm"
+                variant="destructive"
+              >
+                <MaterialSymbol name="cancel" size="sm" />
+                Reject
+              </Button>
+            </div>
+          )}
         </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => setIsApproveModalOpen(true)}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-          >
-            <MaterialSymbol name="check_circle" size="sm" />
-            Approve
-          </Button>
-          <Button
-            onClick={() => setIsRejectModalOpen(true)}
-            variant="destructive"
-            className="flex-1"
-          >
-            <MaterialSymbol name="cancel" size="sm" />
-            Reject
-          </Button>
-        </div>
+        {record?.approval?.comment && (
+          <div className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
+            {record?.approval?.comment}
+          </div>
+        )}
+        {record?.rejection?.reason && (
+          <div className="text-xs text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
+            {record?.rejection?.reason}
+          </div>
+        )}
       </div>
 
       {/* Approve Modal */}
       <Dialog open={isApproveModalOpen} onOpenChange={(open) => !open && setIsApproveModalOpen(false)}>
-        <DialogContent>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Approve Execution</DialogTitle>
+            <DialogTitle>Approve: {getRecordLabel()}</DialogTitle>
             <DialogDescription>
               Add an optional comment for this approval
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>Comment (optional)</Label>
-            <Textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Enter an optional comment"
-              rows={3}
-            />
+          <div className="space-y-4">
+
+            {/* Comment Field */}
+            <div className="space-y-2">
+              <Label>Comment (optional)</Label>
+              <Textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Enter an optional comment"
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsApproveModalOpen(false)}>
@@ -152,9 +244,9 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
       <Dialog open={isRejectModalOpen} onOpenChange={(open) => !open && setIsRejectModalOpen(false)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reject Execution</DialogTitle>
+            <DialogTitle>Reject: {getRecordLabel()}</DialogTitle>
             <DialogDescription>
-              Provide a reason for rejecting this execution
+              Provide a reason for rejecting this approval requirement
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -198,11 +290,17 @@ const ApprovalActions = ({ execution, workflowId }: { execution: any; workflowId
 
 registerExecutionRenderer('approval', {
   renderCollapsed: ({ execution, onClick, isExpanded }: CollapsedViewProps) => {
-    const metadata = (execution.metadata || {}) as ApprovalMetadata
-    const requiredCount = metadata.required_count || 0
-    const approvals = metadata.approvals || []
-    const isComplete = approvals.length >= requiredCount
-    const isRejected = execution.state === 'STATE_FINISHED' && execution.result === 'RESULT_FAILED'
+    const metadata = (execution.metadata || {}) as Metadata
+    const records = metadata.records || []
+
+    const approvedCount = records.reduce((count, record) => {
+      if (record.state === 'approved') {
+        return count + 1
+      }
+      return count
+    }, 0)
+
+    const requiredCount = records.length
 
     // Determine label and styling
     let label = ''
@@ -210,12 +308,12 @@ registerExecutionRenderer('approval', {
     let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' = 'secondary'
     let badgeClassName = 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800'
 
-    if (isRejected) {
+    if (metadata.result === 'rejected') {
       label = 'Rejected'
       iconName = 'cancel'
       badgeVariant = 'destructive'
       badgeClassName = ''
-    } else if (isComplete) {
+    } else if (metadata.result == 'approved') {
       label = 'Approved'
       iconName = 'check_circle'
       badgeClassName = 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800'
@@ -237,7 +335,7 @@ registerExecutionRenderer('approval', {
               {label}
             </Badge>
             <span className="font-semibold text-gray-700 dark:text-gray-300">
-              {approvals.length}/{requiredCount}
+              {approvedCount}/{requiredCount}
             </span>
           </div>
         </div>
@@ -256,8 +354,8 @@ registerExecutionRenderer('approval', {
   },
 
   renderExpanded: ({ execution, workflowId }: ExpandedViewProps) => {
-    const metadata = (execution.metadata || {}) as ApprovalMetadata
-    const approvals = metadata.approvals || []
+    const metadata = (execution.metadata || {}) as Metadata
+    const records = metadata.records || []
 
     return (
       <div className="space-y-4 text-left">
@@ -275,46 +373,18 @@ registerExecutionRenderer('approval', {
           </>
         )}
 
-        {/* Approval Actions */}
-        <ApprovalActions execution={execution} workflowId={workflowId} />
-
-        {/* Approvals List */}
-        {approvals.length > 0 && (
+        {/* Records */}
+        {records.length > 0 && (
           <>
-            <div className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide border-b border-gray-200 dark:border-zinc-700 pb-1">
-              Approvals ({approvals.length})
-            </div>
             <div className="space-y-2">
-              {approvals.map((approval, index) => (
-                <div
+              {records.map((record, index) => (
+                <RecordItemCard
                   key={index}
-                  className="bg-zinc-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3 text-xs"
-                >
-                  <div className="flex items-start gap-2">
-                    <MaterialSymbol
-                      name="check_circle"
-                      size="md"
-                      className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-gray-900 dark:text-zinc-100">
-                          Approval #{index + 1}
-                        </span>
-                        {approval.approved_at && (
-                          <span className="text-gray-500 dark:text-zinc-400">
-                            {new Date(approval.approved_at).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                      {approval.comment && (
-                        <div className="text-gray-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 rounded px-2 py-1 mt-2">
-                          {approval.comment}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  index={index}
+                  record={record}
+                  execution={execution}
+                  workflowId={workflowId}
+                />
               ))}
             </div>
           </>

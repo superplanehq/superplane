@@ -15,6 +15,9 @@ import { ObjectFieldRenderer } from './ObjectFieldRenderer'
 import { IntegrationFieldRenderer } from './IntegrationFieldRenderer'
 import { IntegrationResourceFieldRenderer } from './IntegrationResourceFieldRenderer'
 import { TimeFieldRenderer } from './TimeFieldRenderer'
+import { UserFieldRenderer } from './UserFieldRenderer'
+import { RoleFieldRenderer } from './RoleFieldRenderer'
+import { GroupFieldRenderer } from './GroupFieldRenderer'
 import { isFieldVisible } from '../../utils/components'
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
@@ -72,11 +75,29 @@ export const ConfigurationFieldRenderer = ({
       case 'integration-resource':
         return <IntegrationResourceFieldRenderer field={field} value={value} onChange={onChange} allValues={allValues} domainId={domainId} domainType={domainType} />
 
+      case 'user':
+        if (!domainId) {
+          return <div className="text-sm text-red-500 dark:text-red-400">User field requires domainId prop</div>
+        }
+        return <UserFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} />
+
+      case 'role':
+        if (!domainId) {
+          return <div className="text-sm text-red-500 dark:text-red-400">Role field requires domainId prop</div>
+        }
+        return <RoleFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} />
+
+      case 'group':
+        if (!domainId) {
+          return <div className="text-sm text-red-500 dark:text-red-400">Group field requires domainId prop</div>
+        }
+        return <GroupFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} />
+
       case 'list':
-        return <ListFieldRenderer {...commonProps} />
+        return <ListFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />
 
       case 'object':
-        return <ObjectFieldRenderer {...commonProps} />
+        return <ObjectFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />
 
       default:
         // Fallback to text input
