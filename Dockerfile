@@ -1,51 +1,33 @@
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.25.3
 ARG UBUNTU_VERSION=22.04
-ARG BUILDER_IMAGE="golang:${GO_VERSION}"
+ARG BUILDER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Base stage with common dependencies.
+# Based on this, the dev and builder stages are created.
+# ----------------------------------------------------------------------------------------------------------------------
 
 FROM ${BUILDER_IMAGE} AS base
 
-# Add PostgreSQL repository for version 17.5
-RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates unzip curl gnupg lsb-release libc-bin libc6 \
-    && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
-    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
-    && apt-get update -y \
-    && apt-get install --no-install-recommends -y postgresql-client-17 \
-    && apt-get clean && rm -f /var/lib/apt/lists/*_*
-
-# Install Node.js 22.4.1 directly from NodeSource repository
-RUN apt-get update -y && apt-get install --no-install-recommends -y curl gnupg && \
-    mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
-    apt-get update -y && \
-    apt-get install -y nodejs && \
-    apt-get clean && rm -f /var/lib/apt/lists/*_* && \
-    node -v && \
-    npm -v
-
 WORKDIR /tmp
-RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "arm64" ]; then \
-    curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-arm64.tar.gz | tar xvz; \
-    else \
-    curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xvz; \
-    fi && \
-    mv /tmp/migrate /usr/bin/migrate && \
-    chmod +x /usr/bin/migrate
 
-# Install protoc for the appropriate architecture
-RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "arm64" ]; then \
-    curl -sL https://github.com/protocolbuffers/protobuf/releases/download/v3.15.8/protoc-3.15.8-linux-aarch_64.zip -o protoc.zip; \
-    else \
-    curl -sL https://github.com/protocolbuffers/protobuf/releases/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip -o protoc.zip; \
-    fi && \
-    unzip protoc.zip && \
-    mv bin/protoc /usr/local/bin/protoc && \
-    rm -rf protoc.zip
+COPY scripts/docker scripts
+
+ENV GO_VERSION=1.25.3
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV GOBIN="/go/bin"
+ENV PATH="${GOBIN}:${PATH}"
+
+RUN bash scripts/install-go.sh ${GO_VERSION}
+RUN bash scripts/install-nodejs.sh
+RUN bash scripts/install-postgresql-client.sh
+RUN bash scripts/install-gomigrate.sh
+RUN bash scripts/install-protoc.sh
 
 WORKDIR /app
+
 COPY pkg pkg
 COPY cmd cmd
 COPY go.mod go.mod
@@ -60,12 +42,15 @@ COPY templates templates
 
 WORKDIR /app
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Development stage with tools installed.
+# Used for local development and testing.
+# ----------------------------------------------------------------------------------------------------------------------
+
 FROM base AS dev
 
-COPY test test
-COPY docker-entrypoint.dev.sh /app/docker-entrypoint.dev.sh
-
 WORKDIR /app
+
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
@@ -74,7 +59,20 @@ RUN go install github.com/air-verse/air@latest
 RUN go install github.com/mgechev/revive@v1.8.0
 RUN go install gotest.tools/gotestsum@v1.12.3
 
+# Install Playwright
+RUN go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1
+RUN playwright install --with-deps
+
+# Inject test files and dev entrypoint
+COPY test test
+COPY docker-entrypoint.dev.sh /app/docker-entrypoint.dev.sh
+
 CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Builder stage to create production artifacts.
+# Used to build the final runner image.
+# ----------------------------------------------------------------------------------------------------------------------
 
 FROM base AS builder
 
@@ -87,17 +85,18 @@ WORKDIR /app/web_src
 RUN npm install
 RUN VITE_BASE_URL=$BASE_URL npm run build
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Runner stage to run the application.
+# Used as the final image.
+# ----------------------------------------------------------------------------------------------------------------------
+
 FROM ${RUNNER_IMAGE} AS runner
 
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.
 # Install PostgreSQL 17.5 client tools
-RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates curl gnupg lsb-release \
-    && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
-    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
-    && apt-get update -y \
-    && apt-get install --no-install-recommends -y postgresql-client-17 \
-    && apt-get clean && rm -f /var/lib/apt/lists/*_*
+COPY scripts/docker/install-postgresql-client.sh install-postgresql-client.sh
+RUN bash install-postgresql-client.sh
 
 # We don't need Docker health checks, since these containers
 # are intended to run in Kubernetes pods, which have probes.
