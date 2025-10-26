@@ -3,8 +3,21 @@
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 DOCKER_COMPOSE_OPTS=-f docker-compose.dev.yml
-TEST_PACKAGES := ./...
 BASE_URL?=https://app.superplane.com
+
+PKG_TEST_PACKAGES := ./pkg/...
+E2E_TEST_PACKAGES := ./test/e2e/...
+
+#
+# Long sausage command to run tests with gotestsum
+#
+# - starts a docker container
+# - sets DB_NAME=superplane_test
+# - mounts tmp/screenshots
+# - export junit report
+# - sets paralellism to 1
+#
+GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short-verbose --junitfile junit-report.xml 
 
 #
 # Targets for test environment
@@ -17,6 +30,7 @@ tidy:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
 
 test.setup:
+	@mkdir -p tmp/screenshots
 	docker compose $(DOCKER_COMPOSE_OPTS) build
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
 	$(MAKE) db.create DB_NAME=superplane_test
@@ -26,14 +40,13 @@ test.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
 test:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1 -skip="e2e"
+	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
 
 test.watch:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
+	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.e2e:
-	@mkdir -p tmp/screenshots
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test --no-deps -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short-verbose --junitfile junit-report.xml ./test/e2e -- -p 1
+	$(GOTESTSUM) --packages="$(E2E_TEST_PACKAGES)" -- -p 1
 
 #
 # Targets for dev environment
