@@ -1,33 +1,55 @@
 package e2e
 
 import (
-	"net/http"
 	"testing"
 	"time"
 
+	pw "github.com/playwright-community/playwright-go"
 	"github.com/superplanehq/superplane/pkg/server"
 )
 
+// TestSmoke starts the server and uses playwright-go to open the root page.
 func TestSmoke(t *testing.T) {
+	// Start the Go server in-process
 	go server.Start()
 
-	client := &http.Client{Timeout: 1 * time.Second}
-	deadline := time.Now().Add(20 * time.Second)
+	// Give the server a brief moment to bind
+	time.Sleep(500 * time.Millisecond)
 
-	var lastErr error
-	for time.Now().Before(deadline) {
-		resp, err := client.Get("http://127.0.0.1:8000/")
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
-				return
-			}
-		} else {
-			lastErr = err
-		}
+	// Launch a headless browser and navigate to the root
+	pwRunner, err := pw.Run()
+	if err != nil {
+		t.Fatalf("playwright run failed: %v", err)
+	}
+	defer pwRunner.Stop()
 
-		time.Sleep(200 * time.Millisecond)
+	browser, err := pwRunner.Chromium.Launch()
+	if err != nil {
+		t.Fatalf("browser launch failed: %v", err)
+	}
+	defer browser.Close()
+
+	context, err := browser.NewContext()
+	if err != nil {
+		t.Fatalf("context create failed: %v", err)
+	}
+	page, err := context.NewPage()
+	if err != nil {
+		t.Fatalf("page create failed: %v", err)
 	}
 
-	t.Fatalf("server did not come online in time: %v", lastErr)
+	resp, err := page.Goto("http://127.0.0.1:8000/", pw.PageGotoOptions{
+		WaitUntil: pw.WaitUntilStateDomcontentloaded,
+		Timeout:   pw.Float(20000),
+	})
+	if err != nil {
+		t.Fatalf("navigation error: %v", err)
+	}
+	if resp == nil {
+		t.Fatalf("no response from navigation")
+	}
+	status := resp.Status()
+	if status >= 500 {
+		t.Fatalf("server returned 5xx: %d", status)
+	}
 }
