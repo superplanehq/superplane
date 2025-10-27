@@ -51,6 +51,8 @@ export interface CompositeProps {
   metadata?: MetadataItem[];
   parameters?: ParameterGroup[];
   lastRunItem?: LastRunItem;
+  lastRunItems?: LastRunItem[];
+  lastRunTotalCount?: number;
   nextInQueue?: QueueItem;
   collapsedBackground?: string;
   collapsed?: boolean;
@@ -60,70 +62,10 @@ export interface CompositeProps {
   onExpandChildEvents?: () => void;
   onReRunChildEvents?: () => void;
   onToggleCollapse?: () => void;
+  onShowMoreLastRuns?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, startLastValuesOpen = false }) => {
-  const [showLastRunValues, setShowLastRunValues] = React.useState(startLastValuesOpen)
-  const [showWaitingInfo, setShowWaitingInfo] = React.useState(false)
-
-  const timeAgo = React.useMemo(() => {
-    if (!lastRunItem?.receivedAt) return ""
-
-    const now = new Date()
-    const diff = now.getTime() - new Date(lastRunItem?.receivedAt).getTime()
-    return calcRelativeTimeFromDiff(diff)
-  }, [lastRunItem])
-
-  const LastRunIcon = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
-      return resolveIcon("check")
-    } else if (lastRunItem?.state === "running") {
-      return resolveIcon("refresh-cw")
-    } else {
-      return resolveIcon("x")
-    }
-  }, [lastRunItem])
-
-  const LastRunColor = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
-      return "text-green-700"
-    } else if (lastRunItem?.state === "running") {
-      return "text-blue-800"
-    } else {
-      return "text-red-700"
-    }
-  }, [lastRunItem])
-
-  const LastRunBackground = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
-      return "bg-green-200"
-    } else if (lastRunItem?.state === "running") {
-      return "bg-sky-100"
-    } else {
-      return "bg-red-200"
-    }
-  }, [lastRunItem])
-
-  const lastRunIconBackground = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
-      return "bg-green-600"
-    } else if (lastRunItem?.state === "running") {
-      return "bg-none animate-spin"
-    } else {
-      return "bg-red-600"
-    }
-  }, [lastRunItem])
-
-  const lastRunIconColor = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
-      return "text-white"
-    } else if (lastRunItem?.state === "running") {
-      return "text-blue-800"
-    } else {
-      return "text-white"
-    }
-  }, [lastRunItem])
-
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, lastRunTotalCount, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onShowMoreLastRuns, startLastValuesOpen = false }) => {
   const NextInQueueIcon = React.useMemo(() => {
     return resolveIcon("circle-dashed")
   }, [])
@@ -140,9 +82,94 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
     return resolveIcon("rotate-ccw")
   }, [])
 
-  const hasWaitingInfos = React.useMemo(() => {
-    return (lastRunItem?.childEventsInfo?.waitingInfos?.length || 0) > 0
-  }, [lastRunItem])
+  const events: LastRunItem[] = React.useMemo(() => {
+    if (lastRunItems && lastRunItems.length > 0) {
+      return lastRunItems
+    }
+
+    if (lastRunItem) {
+      return [lastRunItem]
+    }
+
+    return []
+  }, [lastRunItem, lastRunItems])
+
+  const [eventExpansionState, setEventExpansionState] = React.useState<Record<string, { showValues: boolean; showWaiting: boolean }>>(() => {
+    if (startLastValuesOpen && events[0]) {
+      return {
+        [createEventKey(events[0], 0)]: { showValues: true, showWaiting: false },
+      }
+    }
+
+    return {}
+  })
+
+  React.useEffect(() => {
+    if (!startLastValuesOpen || !events[0]) {
+      return
+    }
+
+    const key = createEventKey(events[0], 0)
+
+    setEventExpansionState((prev) => {
+      if (prev[key]?.showValues) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [key]: { showValues: true, showWaiting: prev[key]?.showWaiting ?? false },
+      }
+    })
+  }, [events, startLastValuesOpen])
+
+  const latestTimeAgo = React.useMemo(() => {
+    if (!events[0]?.receivedAt) {
+      return ""
+    }
+
+    const now = new Date()
+    const diff = now.getTime() - new Date(events[0].receivedAt).getTime()
+    return calcRelativeTimeFromDiff(diff)
+  }, [events])
+
+  const totalEventsCount = React.useMemo(() => {
+    if (typeof lastRunTotalCount === "number") {
+      return lastRunTotalCount
+    }
+
+    return events.length
+  }, [events.length, lastRunTotalCount])
+
+  const remainingEventsCount = Math.max(0, totalEventsCount - events.length)
+
+  const toggleEventValues = (eventKey: string) => {
+    setEventExpansionState((prev) => {
+      const current = prev[eventKey]?.showValues ?? false
+
+      return {
+        ...prev,
+        [eventKey]: {
+          showValues: !current,
+          showWaiting: prev[eventKey]?.showWaiting ?? false,
+        },
+      }
+    })
+  }
+
+  const toggleWaitingInfos = (eventKey: string) => {
+    setEventExpansionState((prev) => {
+      const current = prev[eventKey]?.showWaiting ?? false
+
+      return {
+        ...prev,
+        [eventKey]: {
+          showValues: prev[eventKey]?.showValues ?? false,
+          showWaiting: !current,
+        },
+      }
+    })
+  }
 
   if (collapsed) {
     return (
@@ -217,72 +244,121 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
       <div className="px-4 py-3 border-b">
         <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
           <span className="uppercase text-sm font-medium">Last Run</span>
-          {lastRunItem && <span className="text-sm">{timeAgo}</span>}
+          {events.length > 0 && <span className="text-sm">{latestTimeAgo}</span>}
         </div>
 
-        {lastRunItem ? (
+        {events.length > 0 ? (
           <>
-            <div onClick={() => setShowLastRunValues(!showLastRunValues)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${LastRunBackground} ${LastRunColor}`}>
-              <div className="flex items-center gap-3 rounded-md w-full min-w-0">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastRunIconBackground}`}>
-                    <LastRunIcon size={lastRunItem?.state === "running" ? 16 : 12} className={`${lastRunIconColor}`} />
-                  </div>
-                  <span className="truncate text-sm">{lastRunItem?.title}</span>
-                </div>
-                {lastRunItem?.subtitle && (
-                  <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{lastRunItem?.subtitle}</span>
-                )}
-              </div>
-              {showLastRunValues && (
-                <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
-                  {Object.entries(lastRunItem?.values || {}).map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
-                      <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
-                      <span className="text-sm flex-1 truncate text-left">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {lastRunItem?.childEventsInfo && (
-              <div className="mt-3 ml-3 text-gray-500">
-                <div className="flex items-center justify-between gap-2">
-                  <div onClick={(e) => {
-                    e.stopPropagation()
-                    if (hasWaitingInfos) {
-                      setShowWaitingInfo(!showWaitingInfo)
-                    }
-                  }} className={"flex items-center gap-2 w-full " + (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")}>
-                    <ChildEventsArrowIcon size={18} className="text-gray-500" />
-                    <span className="text-sm">{lastRunItem?.childEventsInfo.count} child event{lastRunItem?.childEventsInfo.count === 1 ? "" : "s"} {lastRunItem?.childEventsInfo.state || ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ExpandChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onExpandChildEvents} />
-                    <ReRunChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onReRunChildEvents} />
-                  </div>
-                </div>
-                {hasWaitingInfos && showWaitingInfo && (
-                  <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
-                    {lastRunItem?.childEventsInfo.waitingInfos.map((waitingInfo) => {
-                      const Icon = resolveIcon(waitingInfo.icon)
-                      return (
-                        <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
-                          <span className="text-sm text-right flex items-center gap-2">
-                            <Icon size={18} className="text-gray-500" />
-                            {waitingInfo.info}
-                          </span>
-                          <span className="text-sm">
-                            {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
-                            &nbsp;left
-                          </span>
+            <div className="flex flex-col gap-3">
+              {events.map((event, index) => {
+                const key = createEventKey(event, index)
+                const expansion = eventExpansionState[key] || { showValues: false, showWaiting: false }
+                const { backgroundClass, textClass, iconBackgroundClass, iconColorClass, Icon: EventStateIcon, iconSize } = resolveLastRunState(event.state)
+                const hasWaitingInfos = (event.childEventsInfo?.waitingInfos?.length || 0) > 0
+                const relativeTime = event.receivedAt ? calcRelativeTimeFromDiff(new Date().getTime() - new Date(event.receivedAt).getTime()) : ""
+
+                return (
+                  <React.Fragment key={key}>
+                    <div
+                      onClick={() => toggleEventValues(key)}
+                      className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${backgroundClass} ${textClass}`}
+                    >
+                      <div className="flex items-center gap-3 rounded-md w-full min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${iconBackgroundClass}`}>
+                            <EventStateIcon size={iconSize} className={iconColorClass} />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate text-sm">{event.title}</span>
+                            {relativeTime && <span className="text-xs text-gray-700">{relativeTime}</span>}
+                          </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+                        {event.subtitle && (
+                          <span className="text-sm text-gray-600 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
+                        )}
+                      </div>
+                      {expansion.showValues && (
+                        <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-600 w-full">
+                          {Object.entries(event.values || {}).map(([key, value]) => (
+                            <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
+                              <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
+                              <span className="text-sm flex-1 truncate text-left">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {event.childEventsInfo && (
+                      <div className="mt-1 ml-3 text-gray-500">
+                        <div className="flex items-center justify-between gap-2">
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (hasWaitingInfos) {
+                                toggleWaitingInfos(key)
+                              }
+                            }}
+                            className={
+                              "flex items-center gap-2 w-full " +
+                              (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")
+                            }
+                          >
+                            <ChildEventsArrowIcon size={18} className="text-gray-500" />
+                            <span className="text-sm">
+                              {event.childEventsInfo.count} child event{event.childEventsInfo.count === 1 ? "" : "s"}{" "}
+                              {event.childEventsInfo.state || ""}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <ExpandChildEventsIcon
+                              size={18}
+                              className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
+                              onClick={onExpandChildEvents}
+                            />
+                            <ReRunChildEventsIcon
+                              size={18}
+                              className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
+                              onClick={onReRunChildEvents}
+                            />
+                          </div>
+                        </div>
+                        {hasWaitingInfos && expansion.showWaiting && (
+                          <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
+                            {event.childEventsInfo.waitingInfos.map((waitingInfo) => {
+                              const Icon = resolveIcon(waitingInfo.icon)
+                              return (
+                                <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
+                                  <span className="text-sm text-right flex items-center gap-2">
+                                    <Icon size={18} className="text-gray-500" />
+                                    {waitingInfo.info}
+                                  </span>
+                                  <span className="text-sm">
+                                    {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
+                                    &nbsp;left
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </React.Fragment>
+                )
+              })}
+            </div>
+            {remainingEventsCount > 0 &&
+              (onShowMoreLastRuns ? (
+                <button
+                  type="button"
+                  className="mt-3 text-sm text-blue-700 hover:underline"
+                  onClick={onShowMoreLastRuns}
+                >
+                  +{remainingEventsCount} more
+                </button>
+              ) : (
+                <span className="mt-3 block text-sm text-blue-700">+{remainingEventsCount} more</span>
+              ))}
           </>
         ) : (
           <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500">
@@ -314,4 +390,42 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
       )}
     </div>
   )
+}
+
+function resolveLastRunState(state: LastRunState | undefined) {
+  if (state === "success") {
+    return {
+      backgroundClass: "bg-green-200",
+      textClass: "text-green-700",
+      iconBackgroundClass: "bg-green-600",
+      iconColorClass: "text-white",
+      Icon: resolveIcon("check"),
+      iconSize: 12,
+    }
+  }
+
+  if (state === "running") {
+    return {
+      backgroundClass: "bg-sky-100",
+      textClass: "text-blue-800",
+      iconBackgroundClass: "bg-none animate-spin",
+      iconColorClass: "text-blue-800",
+      Icon: resolveIcon("refresh-cw"),
+      iconSize: 16,
+    }
+  }
+
+  return {
+    backgroundClass: "bg-red-200",
+    textClass: "text-red-700",
+    iconBackgroundClass: "bg-red-600",
+    iconColorClass: "text-white",
+    Icon: resolveIcon("x"),
+    iconSize: 12,
+  }
+}
+
+function createEventKey(event: LastRunItem, index: number) {
+  const receivedAt = event.receivedAt ? new Date(event.receivedAt).getTime() : index
+  return `${index}-${event.title}-${event.subtitle || ""}-${receivedAt}`
 }
