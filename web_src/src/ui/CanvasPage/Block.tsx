@@ -33,7 +33,7 @@ interface BlockProps {
 
 export function Block({ data, onExpand, nodeId }: BlockProps) {
   return (
-    <div>
+    <div className="relative w-fit">
       <LeftHandle data={data} />
       <BlockContent data={data} onExpand={onExpand} nodeId={nodeId} />
       <RightHandle data={data} />

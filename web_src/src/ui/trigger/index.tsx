@@ -79,7 +79,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
         shape="circle"
       >
         <div className="flex flex-col items-center gap-1">
-          {metadata.map((item, index) => {
+          {metadata && metadata.length > 0 && metadata.map((item, index) => {
             const Icon = resolveIcon(item.icon)
             return (
               <div key={index} className="flex items-center gap-1 text-xs text-gray-500">
@@ -105,7 +105,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
         description={description}
       />
       <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
-        {metadata.map((item, index) => {
+        {metadata && metadata.length > 0 && metadata.map((item, index) => {
           const Icon = resolveIcon(item.icon)
           return (
             <div key={index} className="flex items-center gap-2">
