@@ -64,3 +64,22 @@ export const getStorybookData = () => {
 
   return null;
 };
+
+export const handleNodeExpand =
+  (nodeId: string, nodeData: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodeTitle = (nodeData as any).label;
+
+    const executionData = {
+      title: nodeTitle,
+      parentWorkflow: 'Simple Deployment',
+      nodeId: nodeId,
+      timestamp: Date.now(),
+    };
+
+    navigateToStoryWithData(
+      "pages-canvaspage--blueprint-execution-page",
+      executionData
+    );
+    return;
+  }
