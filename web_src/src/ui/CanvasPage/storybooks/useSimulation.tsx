@@ -36,6 +36,7 @@ type CanvasEvent = {
   input?: any;
   process?: Promise<void>;
   output?: any;
+  approved?: boolean;
 };
 
 type Queue = {
@@ -71,6 +72,25 @@ export class SimulationEngine {
     }
   }
 
+  async onApprove(
+    nodeId: string,
+    _aproveId: string,
+    _artifacts?: Record<string, string>
+  ) {
+    const queue = this.queues.get(nodeId);
+    if (!queue) return;
+
+    const event = queue.events[0];
+    if (!event) return;
+
+    event.approved = true;
+
+    const update = this.updateNodeFn(nodeId);
+    update("data.approval.0.approved", true);
+  }
+
+  async onReject(_nodeId: string, _aproveId: string, _comment?: string) {}
+
   private async processNode(nodeId: string) {
     const node = this.findNodeById(nodeId);
     const run = node.__simulation?.run || noOp;
@@ -94,6 +114,13 @@ export class SimulationEngine {
         updateNode,
         (output: any) => (event.output = output)
       );
+
+      if (node.data.approval) {
+        while (!event.approved) {
+          console.log("Waiting for approval...");
+          await sleep(200);
+        }
+      }
 
       queue.state = "idle";
 
@@ -120,11 +147,25 @@ export class SimulationEngine {
           let current: any = updatedNode;
 
           for (let i = 0; i < pathParts.length - 1; i++) {
-            current[pathParts[i]] = { ...current[pathParts[i]] };
-            current = current[pathParts[i]];
+            const key = pathParts[i];
+            const isArrayIndex = /^\d+$/.test(key);
+
+            if (isArrayIndex) {
+              const index = parseInt(key, 10);
+              current[index] = Array.isArray(current[index])
+                ? [...current[index]]
+                : { ...current[index] };
+              current = current[index];
+            } else {
+              current[key] = Array.isArray(current[key])
+                ? [...current[key]]
+                : { ...current[key] };
+              current = current[key];
+            }
           }
 
-          current[pathParts[pathParts.length - 1]] = value;
+          const finalKey = pathParts[pathParts.length - 1];
+          current[finalKey] = value;
           return updatedNode;
         })
       );

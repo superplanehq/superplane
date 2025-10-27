@@ -177,8 +177,7 @@ const sampleNodes: CanvasNode[] = [
         approvals: [
           {
             title: "Security",
-            approved: false,
-            interactive: true,
+            approved: true,
             requireArtifacts: [
               {
                 label: "CVE Report",
@@ -197,30 +196,23 @@ const sampleNodes: CanvasNode[] = [
           },
           {
             title: "Engineering",
-            rejected: true,
+            approved: true,
             approverName: "Lucas Pinheiro",
-            rejectionComment:
-              "Security vulnerabilities need to be addressed before approval",
           },
           {
             title: "Josh Brown",
             approved: true,
           },
-          {
-            title: "Admin",
-            approved: false,
-          },
         ],
-        awaitingEvent: {
-          title: "fix: open rejected events tab",
-          subtitle: "ef758d40",
-        },
+        awaitingEvent: null,
         receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
         collapsed: false,
       },
     },
     __simulation: {
       run: async (input, update, output) => {
+        update("data.approval.approvals.0.approved", false);
+        update("data.approval.approvals.0.interactive", true);
         update("data.approval.awaitingEvent", {
           title: input.title,
           subtitle: input.subtitle,
@@ -576,22 +568,6 @@ export const SimpleDeployment: Story = {
 
     const simulation = useSimulationRunner({ nodes, edges, setNodes });
 
-    const handleAprove = (
-      nodeId: string,
-      approveId: string,
-      artifacts?: Record<string, string>
-    ) => {
-      console.log("Approved with artifacts:", artifacts);
-    };
-
-    const handleReject = (
-      nodeId: string,
-      approveId: string,
-      comment?: string
-    ) => {
-      console.log("Rejected with comment:", comment);
-    };
-
     const renderContent = () => {
       if (currentView === "execution" && executionContext) {
         return (
@@ -613,8 +589,8 @@ export const SimpleDeployment: Story = {
           nodes={nodes}
           edges={edges}
           onNodeExpand={handleNodeExpand}
-          onApprove={handleAprove}
-          onReject={handleReject}
+          onApprove={simulation.onApprove.bind(simulation)}
+          onReject={simulation.onReject.bind(simulation)}
         />
       );
     };
