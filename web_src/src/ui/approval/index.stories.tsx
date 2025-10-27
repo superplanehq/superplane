@@ -75,3 +75,15 @@ export const ApprovalCollapsed: Story = {
     collapsedBackground: "bg-orange-100",
   },
 };
+
+export const ApprovalZeroState: Story = {
+  args: {
+    title: "Approve Release",
+    description: "New releases are deployed to staging for testing and require approvals.",
+    iconSlug: "hand",
+    iconColor: "text-orange-500",
+    headerColor: "bg-orange-100",
+    approvals: [],
+    zeroStateText: "Waiting for events to require approval...",
+  },
+};
