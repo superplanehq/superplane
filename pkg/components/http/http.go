@@ -43,7 +43,7 @@ func (e *HTTP) Description() string {
 }
 
 func (e *HTTP) Icon() string {
-	return "http"
+	return "globe"
 }
 
 func (e *HTTP) Color() string {
