@@ -12,8 +12,7 @@ import { Button } from "../../button";
 import { CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
 import { handleNodeExpand } from "./navigation";
-import { sleep, useSimulationRunner } from "./useSimulation";
-import { SimulationEngine } from "./useSimulation";
+import { SimulationEngine, sleep, useSimulationRunner } from "./useSimulation";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -132,7 +131,7 @@ const sampleNodes: CanvasNode[] = [
       },
     },
     __simulation: {
-      onQueueChange: (next, update) => {
+      onQueueChange: (_current, next, update) => {
         if (next) {
           update("data.composite.nextInQueue", {
             title: next.title,
@@ -209,14 +208,19 @@ const sampleNodes: CanvasNode[] = [
       },
     },
     __simulation: {
-      run: async (input, update, output) => {
-        update("data.approval.approvals.0.approved", false);
-        update("data.approval.approvals.0.interactive", true);
-        update("data.approval.awaitingEvent", {
-          title: input.title,
-          subtitle: input.subtitle,
-        });
-
+      onQueueChange: (current, _next, update) => {
+        if (current) {
+          update("data.approval.approvals.0.approved", false);
+          update("data.approval.approvals.0.interactive", true);
+          update("data.approval.awaitingEvent", {
+            title: current.title,
+            subtitle: current.subtitle,
+          });
+        } else {
+          update("data.approval.awaitingEvent", null);
+        }
+      },
+      run: async (input, _update, output) => {
         output(input);
       },
     },
@@ -269,7 +273,7 @@ const sampleNodes: CanvasNode[] = [
       },
     },
     __simulation: {
-      onQueueChange: (next, update) => {
+      onQueueChange: (current, next, update) => {
         if (next) {
           update("data.composite.nextInQueue", {
             title: next.title,
@@ -355,7 +359,7 @@ const sampleNodes: CanvasNode[] = [
       },
     },
     __simulation: {
-      onQueueChange: (next, update) => {
+      onQueueChange: (current, next, update) => {
         if (next) {
           update("data.composite.nextInQueue", {
             title: next.title,
@@ -425,7 +429,7 @@ const sampleNodes: CanvasNode[] = [
       },
     },
     __simulation: {
-      onQueueChange: (next, update) => {
+      onQueueChange: (_current, next, update) => {
         if (next) {
           update("data.composite.nextInQueue", {
             title: next.title,

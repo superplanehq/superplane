@@ -6,7 +6,7 @@ export type OutputFn = (data: any) => void;
 
 export interface Simulation {
   // Function that runs when there is any change to the queue
-  onQueueChange?: (next: any, update: UpdateDataFn) => void;
+  onQueueChange?: (current: any, next: any, update: UpdateDataFn) => void;
 
   // Function that runs when the node is executed in a simulation
   run: (input: any, update: UpdateDataFn, output: OutputFn) => Promise<void>;
@@ -110,6 +110,7 @@ export class SimulationEngine {
       console.log(`Simulation: Running node ${node.id}`);
       queue.state = "running";
       queue.active = event;
+      this.sendOnQueueChange(nodeId);
 
       await run(
         event.input,
@@ -130,6 +131,9 @@ export class SimulationEngine {
       for (const edge of outgoingEdges) {
         this.addToQueue(edge.target, { input: event.output });
       }
+
+      queue.active = null;
+      this.sendOnQueueChange(nodeId);
 
       console.log(`Simulation: Completed node ${node.id}`);
     });
@@ -205,7 +209,7 @@ export class SimulationEngine {
     if (!queue) return;
 
     const next = queue.events[0] || null;
-    onQueueChange(next?.input, updatedNode);
+    onQueueChange(queue.active?.input, next?.input, updatedNode);
   }
 
   private findNodeById(nodeId: string): CanvasNode {
