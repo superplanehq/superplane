@@ -3,8 +3,8 @@ import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { CollapsedComponent } from "../collapsedComponent";
 
-type LastRunState = "success" | "failed" | "running"
-type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
+export type LastRunState = "success" | "failed" | "running"
+export type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
 
 export interface WaitingInfo {
   icon: string;
