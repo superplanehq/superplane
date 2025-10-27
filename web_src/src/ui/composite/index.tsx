@@ -221,15 +221,15 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         </div>
 
         <div onClick={() => setShowLastRunValues(!showLastRunValues)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${LastRunBackground} ${LastRunColor}`}>
-          <div className="flex items-center gap-3 rounded-md w-full">
-            <div className="w-full flex items-center gap-2 w-full">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${lastRunIconBackground}`}>
+          <div className="flex items-center gap-3 rounded-md w-full min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastRunIconBackground}`}>
                 <LastRunIcon size={lastRunItem?.state === "running" ? 16 : 12} className={`${lastRunIconColor}`} />
               </div>
               <span className="truncate text-sm">{lastRunItem?.title}</span>
             </div>
             {lastRunItem?.subtitle && (
-              <span className="text-sm text-gray-500 no-wrap whitespace-nowrap w-[20%]">{lastRunItem?.subtitle}</span>
+              <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{lastRunItem?.subtitle}</span>
             )}
           </div>
           {showLastRunValues && (
@@ -288,15 +288,15 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
             <span className="uppercase text-sm font-medium">Next In Queue</span>
           </div>
-          <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100`}>
-            <div className="flex items-center gap-2 w-[80%] text-gray-500">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center`}>
+          <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 min-w-0`}>
+            <div className="flex items-center gap-2 text-gray-500 min-w-0 flex-1">
+              <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center`}>
                 <NextInQueueIcon size={20} className="text-gray-500" />
               </div>
               <span className="truncate text-sm">{nextInQueue.title}</span>
             </div>
             {nextInQueue.subtitle && (
-              <span className="text-sm no-wrap whitespace-nowrap w-[20%] text-gray-500">{nextInQueue.subtitle}</span>
+              <span className="text-sm truncate text-gray-500 flex-shrink-0 max-w-[40%]">{nextInQueue.subtitle}</span>
             )}
           </div>
         </div>
