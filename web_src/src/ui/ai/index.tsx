@@ -1,5 +1,6 @@
 import { BugIcon, CogIcon, RabbitIcon, ScanEye } from "lucide-react";
 import { useState } from "react";
+import { sleep } from "../CanvasPage/storybooks/useSimulation";
 import { Conversations } from "./Conversations";
 import { FloatingActionButton } from "./FloatingActionButton";
 
@@ -43,14 +44,25 @@ function useAiSidebarState() {
     setIsOpen(false);
   }
 
-  function createConvo(action: Conversations.ContextAction) {
+  async function createConvo(action: Conversations.ContextAction | null) {
+    if (!action) return;
+
     const id = `convo-${conversations.length + 1}`;
 
     setConversations((prev) => {
       const newConvo: Conversations.Conversation = {
         id: id,
         title: action.label,
-        messages: [],
+        messages: [
+          {
+            id: `msg-1`,
+            content: `Reviewing your workflow and preparing suggestions...`,
+            timestamp: new Date(),
+            sender: "ai",
+            status: "done",
+            actions: [],
+          },
+        ],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -59,6 +71,67 @@ function useAiSidebarState() {
     });
 
     setActiveConversationId(id);
+
+    await sleep(3000);
+
+    setConversations((prev) =>
+      prev.map((convo) => {
+        if (convo.id === id) {
+          return {
+            ...convo,
+            messages: [
+              ...convo.messages,
+              {
+                id: `msg-2`,
+                timestamp: new Date(),
+                content: "",
+                sender: "ai",
+                status: "done",
+                actions: [],
+              },
+            ],
+            updatedAt: new Date(),
+          };
+        }
+        return convo;
+      })
+    );
+
+    const msg = [
+      "Here are some suggestions to improve your workflow:",
+      "",
+      "1. Set a filter on the GitHub trigger to select only pushes from the main branch. This will reduce unnecessary workflow runs.",
+      "2. Add a caching step for dependencies in the CI job to speed up build times.",
+      "3. Include error handling in the deployment step to manage potential failures gracefully.",
+      "4. Optimize the order of steps to run tests before building the application, saving resources if tests fail.",
+      "",
+      "Let me know if you'd like help implementing any of these!",
+    ].join("\n");
+
+    // Simulate typing the message word by word
+    const words = msg.split(" ");
+    for (let i = 0; i < words.length; i++) {
+      await sleep(50);
+      const partialMessage = words.slice(0, i + 1).join(" ");
+
+      setConversations((prev) =>
+        prev.map((convo) => {
+          if (convo.id === id) {
+            const updatedMessages = [...convo.messages];
+            updatedMessages[updatedMessages.length - 1] = {
+              ...updatedMessages[updatedMessages.length - 1],
+              content: partialMessage,
+            };
+            return {
+              ...convo,
+              messages: updatedMessages,
+              updatedAt: new Date(),
+            };
+          }
+          return convo;
+        })
+      );
+    }
   }
 
   function sendMessage(
