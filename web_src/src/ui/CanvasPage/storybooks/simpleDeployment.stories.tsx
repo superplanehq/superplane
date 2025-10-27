@@ -135,8 +135,6 @@ const sampleNodes: CanvasNode[] = [
     __simulation: {
       onQueueChange: (next, update) => {
         if (next) {
-          console.log("Build stage next in queue:", next);
-
           update("data.composite.nextInQueue", {
             title: next.title,
             subtitle: next.subtitle,
@@ -221,6 +219,16 @@ const sampleNodes: CanvasNode[] = [
         collapsed: false,
       },
     },
+    __simulation: {
+      run: async (input, update, output) => {
+        update("data.approval.awaitingEvent", {
+          title: input.title,
+          subtitle: input.subtitle,
+        });
+
+        output(input);
+      },
+    },
   },
   {
     id: "deploy-us",
@@ -267,6 +275,32 @@ const sampleNodes: CanvasNode[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60), // 1 hour ago
         },
         collapsed: false,
+      },
+    },
+    __simulation: {
+      onQueueChange: (next, update) => {
+        if (next) {
+          update("data.composite.nextInQueue", {
+            title: next.title,
+            subtitle: next.subtitle,
+            receivedAt: new Date(),
+          });
+        } else {
+          update("data.composite.nextInQueue", null);
+        }
+      },
+
+      run: async (input, update, output) => {
+        update("data.state", "working");
+        update("data.composite.lastRunItem.title", input.title);
+        update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.receivedAt", new Date());
+
+        update("data.composite.lastRunItem.state", "running");
+        await sleep(5000);
+        update("data.composite.lastRunItem.state", "success");
+
+        output(input);
       },
     },
   },
@@ -329,6 +363,32 @@ const sampleNodes: CanvasNode[] = [
         collapsed: false,
       },
     },
+    __simulation: {
+      onQueueChange: (next, update) => {
+        if (next) {
+          update("data.composite.nextInQueue", {
+            title: next.title,
+            subtitle: next.subtitle,
+            receivedAt: new Date(),
+          });
+        } else {
+          update("data.composite.nextInQueue", null);
+        }
+      },
+
+      run: async (input, update, output) => {
+        update("data.state", "working");
+        update("data.composite.lastRunItem.title", input.title);
+        update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.receivedAt", new Date());
+
+        update("data.composite.lastRunItem.state", "running");
+        await sleep(5000);
+        update("data.composite.lastRunItem.state", "success");
+
+        output(input);
+      },
+    },
   },
   {
     id: "deploy-asia",
@@ -371,6 +431,32 @@ const sampleNodes: CanvasNode[] = [
         },
         startLastValuesOpen: false,
         collapsed: false,
+      },
+    },
+    __simulation: {
+      onQueueChange: (next, update) => {
+        if (next) {
+          update("data.composite.nextInQueue", {
+            title: next.title,
+            subtitle: next.subtitle,
+            receivedAt: new Date(),
+          });
+        } else {
+          update("data.composite.nextInQueue", null);
+        }
+      },
+
+      run: async (input, update, output) => {
+        update("data.state", "working");
+        update("data.composite.lastRunItem.title", input.title);
+        update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.receivedAt", new Date());
+
+        update("data.composite.lastRunItem.state", "running");
+        await sleep(5000);
+        update("data.composite.lastRunItem.state", "success");
+
+        output(input);
       },
     },
   },
