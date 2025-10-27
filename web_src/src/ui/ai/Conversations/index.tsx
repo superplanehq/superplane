@@ -1,5 +1,4 @@
 import {
-  ArrowRightIcon,
   BotIcon,
   CheckIcon,
   CopyIcon,
@@ -12,6 +11,7 @@ import {
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "../../button";
 
 export namespace Conversations {
   export interface Message {
@@ -147,7 +147,7 @@ function CopyButton({ text }: { text: string }) {
       aria-label={copied ? "Copied!" : "Copy message"}
     >
       {copied ? (
-        <CheckIcon size={14} className="text-green-600" />
+        <CheckIcon size={14} className="text-green-900" />
       ) : (
         <CopyIcon size={14} className="text-content-dimmed" />
       )}
@@ -530,9 +530,10 @@ export function Conversations({
                   {/* Avatar */}
                   <div className="flex-shrink-0">
                     {message.sender === "ai" ? (
-                      <div className="w-8 h-8 bg-accent-base rounded-full flex items-center justify-center">
-                        <BotIcon size={16} className="text-white" />
-                      </div>
+                      <BotIcon
+                        size={32}
+                        className="text-white bg-black rounded p-1.5 mt-3"
+                      />
                     ) : (
                       <BotIcon size={32} className="text-content-dimmed" />
                     )}
@@ -540,10 +541,10 @@ export function Conversations({
 
                   <div className={`max-w-[75%] space-y-2`}>
                     <div
-                      className={`rounded-lg px-3 py-2 relative ${
+                      className={`rounded-lg px-3 py-2 relative pr-10 ${
                         message.sender === "user"
-                          ? "bg-callout-info-content text-callout-info-bg shadow-sm"
-                          : "bg-surface-highlight text-content-base"
+                          ? "bg-sky-500 text-callout-info-bg shadow-sm"
+                          : "bg-sky-200 text-content-base"
                       }`}
                     >
                       <div className="text-sm whitespace-pre-wrap">
@@ -601,7 +602,7 @@ export function Conversations({
                     <div className="flex items-center gap-2">
                       <BounceLoader size={16} color="#6B7280" />
                       <span className="text-sm text-content-dimmed">
-                        Alfred is typing...
+                        Reviewing...
                       </span>
                     </div>
                   </div>
@@ -631,16 +632,9 @@ export function Conversations({
                 maxHeight: "120px",
               }}
             />
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim()}
-              className="px-3 py-2 bg-accent-base text-white rounded hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ArrowRightIcon size={16} />
-            </button>
-          </div>
-          <div className="text-[10px] text-content-dimmed mt-1">
-            Press Enter to send, Shift+Enter for new line
+            <Button onClick={handleSendMessage} disabled={!inputMessage.trim()}>
+              Send
+            </Button>
           </div>
         </div>
       )}
