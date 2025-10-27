@@ -1,3 +1,4 @@
+import { BugIcon, CogIcon, RabbitIcon, ScanEye } from "lucide-react";
 import { useState } from "react";
 import { Conversations } from "./Conversations";
 import { FloatingActionButton } from "./FloatingActionButton";
@@ -26,7 +27,7 @@ export function AiSidebar() {
 }
 
 function useAiSidebarState() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<
     string | undefined
   >(undefined);
@@ -53,7 +54,33 @@ function useAiSidebarState() {
     return Promise.resolve();
   }
 
-  const actions: Conversations.ContextAction[] = []; // Define context actions
+  const actions: Conversations.ContextAction[] = [
+    {
+      id: "review-workflow",
+      icon: <ScanEye size={24} className="text-sky-500" />,
+      label: "Review this workflow",
+      description: "Get AI to review your workflow for potential issues.",
+    },
+    {
+      id: "optimize-steps",
+      icon: <CogIcon size={24} className="text-green-500" />,
+      label: "Optimize steps",
+      description: "Suggest optimizations for the steps in this workflow.",
+    },
+    {
+      id: "improve-performance",
+      icon: <RabbitIcon size={24} className="text-purple-500" />,
+      label: "Improve performance",
+      description: "Get recommendations to enhance workflow performance.",
+    },
+    {
+      id: "add-error-handling",
+      icon: <BugIcon size={24} className="text-red-500" />,
+      label: "Add error handling",
+      description: "Suggest error handling mechanisms for this workflow.",
+    },
+  ];
+
   const conversationContext = null; // Define conversation context
 
   return {

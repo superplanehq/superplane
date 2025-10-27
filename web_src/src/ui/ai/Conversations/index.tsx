@@ -39,8 +39,9 @@ export namespace Conversations {
 
   export interface ContextAction {
     id: string;
+    icon: React.ReactNode;
     label: string;
-    experimental?: boolean;
+    description: string;
   }
 
   export interface Conversation {
@@ -358,7 +359,7 @@ export function Conversations({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-outline bg-surface-base">
         <div className="flex items-center gap-2 flex-1 min-w-0 text-sm">
-          <h2 className=" text-content-accent">New Chat</h2>
+          <h2 className=" text-content-accent">AI Assistant</h2>
         </div>
         <div className="flex items-center gap-1">
           {/* Conversations List Toggle */}
@@ -469,8 +470,8 @@ export function Conversations({
 
       {/* Context Actions */}
       {contextActions.length > 0 && !activeConversation && (
-        <div className="px-4 py-3 border-b border-surface-outline bg-surface-base">
-          <div className="text-xs text-content-dimmed mb-2 uppercase tracking-wide font-medium">
+        <div className="px-4 py-4 bg-surface-base">
+          <div className="text-xs text-content-dimmed mb-3 uppercase tracking-wide font-medium">
             Available Actions
           </div>
           <div className="flex flex-col gap-2">
@@ -478,36 +479,17 @@ export function Conversations({
               <button
                 key={action.id}
                 onClick={() => handleContextAction(action)}
-                className="px-3 py-2 rounded text-sm font-medium transition-colors bg-surface-highlight text-content-base hover:text-white-1 hover:bg-brand-1 border border-surface-outline text-left"
+                className="px-3 py-2 rounded text-sm font-medium transition-colors bg-surface-highlight text-content-base hover:text-white-1 hover:border-black border border-surface-outline text-left flex items-center gap-3"
               >
-                <div className="flex items-center justify-between">
+                {action.icon}
+                <div className="">
                   <span>{action.label}</span>
+                  <div className="text-xs text-stone-500">
+                    {action.description}
+                  </div>
                 </div>
               </button>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Alfred Welcome */}
-      {!activeConversation && (
-        <div className="px-4 py-4 border-b border-surface-outline bg-surface-base">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-accent-base rounded-full flex items-center justify-center flex-shrink-0">
-              <BotIcon size={20} className="text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-content-dimmed">
-                {contextAttachment ? (
-                  <>
-                    Ready to help with <em>{contextAttachment.title}</em>.
-                    Select an action to get started.
-                  </>
-                ) : (
-                  "How can I assist you today?"
-                )}
-              </p>
-            </div>
           </div>
         </div>
       )}
