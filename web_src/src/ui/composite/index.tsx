@@ -2,20 +2,15 @@ import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { CollapsedComponent } from "../collapsedComponent";
+import { MetadataList, type MetadataItem } from "../metadataList";
+import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 
 type LastRunState = "success" | "failed" | "running"
-type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
 
 export interface WaitingInfo {
   icon: string;
   info: string;
   futureTimeDate: Date;
-}
-
-export interface ChildEventsInfo {
-  count: number;
-  state?: ChildEventsState;
-  waitingInfos: WaitingInfo[];
 }
 
 export interface QueueItem {
@@ -30,10 +25,6 @@ export interface LastRunItem extends QueueItem {
   values: Record<string, string>;
 }
 
-interface MetadataItem {
-  icon: string;
-  label: string;
-}
 
 export interface ParameterGroup {
   icon: string;
@@ -70,17 +61,6 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
     return resolveIcon("circle-dashed")
   }, [])
 
-  const ChildEventsArrowIcon = React.useMemo(() => {
-    return resolveIcon("corner-down-right")
-  }, [])
-
-  const ExpandChildEventsIcon = React.useMemo(() => {
-    return resolveIcon("expand")
-  }, [])
-
-  const ReRunChildEventsIcon = React.useMemo(() => {
-    return resolveIcon("rotate-ccw")
-  }, [])
 
   const events: LastRunItem[] = React.useMemo(() => {
     if (lastRunItems && lastRunItems.length > 0) {
@@ -94,10 +74,10 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
     return []
   }, [lastRunItem, lastRunItems])
 
-  const [eventExpansionState, setEventExpansionState] = React.useState<Record<string, { showValues: boolean; showWaiting: boolean }>>(() => {
+  const [eventExpansionState, setEventExpansionState] = React.useState<Record<string, { showValues: boolean }>>(() => {
     if (startLastValuesOpen && events[0]) {
       return {
-        [createEventKey(events[0], 0)]: { showValues: true, showWaiting: false },
+        [createEventKey(events[0], 0)]: { showValues: true },
       }
     }
 
@@ -118,7 +98,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
 
       return {
         ...prev,
-        [key]: { showValues: true, showWaiting: prev[key]?.showWaiting ?? false },
+        [key]: { showValues: true },
       }
     })
   }, [events, startLastValuesOpen])
@@ -151,21 +131,6 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         ...prev,
         [eventKey]: {
           showValues: !current,
-          showWaiting: prev[eventKey]?.showWaiting ?? false,
-        },
-      }
-    })
-  }
-
-  const toggleWaitingInfos = (eventKey: string) => {
-    setEventExpansionState((prev) => {
-      const current = prev[eventKey]?.showWaiting ?? false
-
-      return {
-        ...prev,
-        [eventKey]: {
-          showValues: prev[eventKey]?.showValues ?? false,
-          showWaiting: !current,
         },
       }
     })
@@ -184,17 +149,14 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         onDoubleClick={onToggleCollapse}
       >
         {parameters.length > 0 && (
-          <div className="flex flex-col gap-1 text-gray-500 mt-1">
-            {parameters.map((group, index) => {
-              const Icon = resolveIcon(group.icon)
-              return (
-                <div key={index} className="flex items-center gap-2">
-                  <Icon size={16} />
-                  <span className="text-sm font-mono">{group.items.join(", ")}</span>
-                </div>
-              )
-            })}
-          </div>
+          <MetadataList
+            items={parameters.map(group => ({
+              icon: group.icon,
+              label: group.items.join(", ")
+            }))}
+            className="flex flex-col gap-1 text-gray-500 mt-1"
+            iconSize={16}
+          />
         )}
       </CollapsedComponent>
     )
@@ -213,32 +175,22 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         onDoubleClick={onToggleCollapse}
       />
 
-      {parameters.length > 0 &&
-        <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
-          {parameters.map((group, index) => {
-            const Icon = resolveIcon(group.icon)
-            return (
-              <div key={index} className="flex items-center gap-2">
-                <Icon size={19} />
-                <span className="text-sm font-mono">{group.items.join(", ")}</span>
-              </div>
-            )
-          })}
-        </div>
-      }
+      {parameters.length > 0 && (
+        <MetadataList
+          items={parameters.map(group => ({
+            icon: group.icon,
+            label: group.items.join(", ")
+          }))}
+          className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
+        />
+      )}
 
       {metadata && metadata.length > 0 && (
-        <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
-          {metadata.map((item, index) => {
-            const Icon = resolveIcon(item.icon)
-            return (
-              <div key={index} className="flex items-center gap-2">
-                <Icon size={16} />
-                <span className="text-sm">{item.label}</span>
-              </div>
-            )
-          })}
-        </div>
+        <MetadataList
+          items={metadata}
+          className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
+          iconSize={16}
+        />
       )}
 
       <div className="px-4 py-3 border-b">
@@ -252,9 +204,8 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
             <div className="flex flex-col gap-3">
               {events.map((event, index) => {
                 const key = createEventKey(event, index)
-                const expansion = eventExpansionState[key] || { showValues: false, showWaiting: false }
+                const expansion = eventExpansionState[key] || { showValues: false }
                 const { backgroundClass, textClass, iconBackgroundClass, iconColorClass, Icon: EventStateIcon, iconSize } = resolveLastRunState(event.state)
-                const hasWaitingInfos = (event.childEventsInfo?.waitingInfos?.length || 0) > 0
                 const relativeTime = event.receivedAt ? calcRelativeTimeFromDiff(new Date().getTime() - new Date(event.receivedAt).getTime()) : ""
 
                 return (
@@ -289,59 +240,11 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
                       )}
                     </div>
                     {event.childEventsInfo && (
-                      <div className="mt-1 ml-3 text-gray-500">
-                        <div className="flex items-center justify-between gap-2">
-                          <div
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (hasWaitingInfos) {
-                                toggleWaitingInfos(key)
-                              }
-                            }}
-                            className={
-                              "flex items-center gap-2 w-full " +
-                              (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")
-                            }
-                          >
-                            <ChildEventsArrowIcon size={18} className="text-gray-500" />
-                            <span className="text-sm">
-                              {event.childEventsInfo.count} child event{event.childEventsInfo.count === 1 ? "" : "s"}{" "}
-                              {event.childEventsInfo.state || ""}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <ExpandChildEventsIcon
-                              size={18}
-                              className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
-                              onClick={onExpandChildEvents}
-                            />
-                            <ReRunChildEventsIcon
-                              size={18}
-                              className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
-                              onClick={onReRunChildEvents}
-                            />
-                          </div>
-                        </div>
-                        {hasWaitingInfos && expansion.showWaiting && (
-                          <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
-                            {event.childEventsInfo.waitingInfos.map((waitingInfo) => {
-                              const Icon = resolveIcon(waitingInfo.icon)
-                              return (
-                                <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
-                                  <span className="text-sm text-right flex items-center gap-2">
-                                    <Icon size={18} className="text-gray-500" />
-                                    {waitingInfo.info}
-                                  </span>
-                                  <span className="text-sm">
-                                    {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
-                                    &nbsp;left
-                                  </span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
+                      <ChildEvents
+                        childEventsInfo={event.childEventsInfo}
+                        onExpandChildEvents={onExpandChildEvents}
+                        onReRunChildEvents={onReRunChildEvents}
+                      />
                     )}
                   </React.Fragment>
                 )
