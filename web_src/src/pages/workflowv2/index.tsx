@@ -218,7 +218,10 @@ function prepareCompositeNode(
       //
       // TODO: what is ChildEventsInfo.waitingInfos supposed to be???
       //
-      childEventsInfo: {},
+      childEventsInfo: {
+        count: 3,
+        waitingInfos: []
+      },
 
       //
       // TODO: from the storybook pages, it seems like this comes from the root event.
