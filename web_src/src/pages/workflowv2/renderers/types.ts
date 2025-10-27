@@ -1,5 +1,5 @@
 import { ComponentsNode, TriggersTrigger } from "@/api-client";
-import { TriggerProps, TriggerMetadataItem } from "@/ui/trigger";
+import { TriggerProps } from "@/ui/trigger";
 
 /**
  * A trigger renderer converts backend data into UI props for a specific trigger type.
@@ -11,6 +11,13 @@ import { TriggerProps, TriggerMetadataItem } from "@/ui/trigger";
  * 3. Export it from index.ts and add it to the registry
  */
 export interface TriggerRenderer {
-  /** Converts node and trigger metadata into props for the Trigger component */
+
+  /**
+   * Converts node and trigger metadata from the backend into props for the Trigger UI component.
+   *
+   * @param node The node from the backend
+   * @param trigger The trigger metadata from the backend
+   * @returns the props needed to render the Trigger UI component
+   */
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger) => TriggerProps;
 }
