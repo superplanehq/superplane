@@ -1,6 +1,17 @@
 import { useRef } from "react";
 import { CanvasEdge, CanvasNode } from "..";
 
+export type UpdateDataFn = (path: string, data: any) => void;
+export type OutputFn = (data: any) => void;
+
+export interface Simulation {
+  // Function that runs when there is any change to the queue
+  onQueueChange?: (next: any, update: UpdateDataFn) => void;
+
+  // Function that runs when the node is executed in a simulation
+  run: (input: any, update: UpdateDataFn, output: OutputFn) => Promise<void>;
+}
+
 type SetNodesFn = React.Dispatch<React.SetStateAction<CanvasNode[]>>;
 
 interface SimulationProps {
@@ -27,15 +38,19 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const noOp = async (input: any) => input;
 
 type CanvasEvent = {
-  state: "pending" | "running" | "completed";
   input?: any;
   process?: Promise<void>;
   output?: any;
 };
 
+type Queue = {
+  events: CanvasEvent[];
+  active: CanvasEvent | null;
+  state: "idle" | "running";
+};
+
 class Engine {
-  private queues: Map<string, CanvasEvent[]>;
-  private state: "idle" | "running";
+  private queues: Map<string, Queue>;
 
   constructor(
     private nodes: CanvasNode[],
@@ -44,56 +59,63 @@ class Engine {
   ) {
     this.queues = new Map();
     this.prepareQueues();
-    this.state = "idle";
-  }
-
-  async run(startNodeId: string) {
-    console.log(startNodeId);
-    this.addToQueue(startNodeId, { state: "pending" });
     this.processingLoop();
   }
 
+  async run(startNodeId: string) {
+    this.addToQueue(startNodeId, {});
+  }
+
   private async processingLoop() {
-    if (this.state === "running") {
-      return;
-    }
-
-    this.state = "running";
-    console.log("Simulation started");
-
     while (true) {
       this.queues.forEach((_queue, nodeId) => {
         this.processNode(nodeId);
       });
 
-      let activeProcesses = 0;
-
-      for (const [_nodeId, queue] of this.queues.entries()) {
-        activeProcesses += queue.length;
-      }
-
-      if (activeProcesses === 0) {
-        break;
-      }
-
       await sleep(200);
     }
-
-    this.state = "idle";
-    console.log("Simulation completed");
   }
 
   private async processNode(nodeId: string) {
     const node = this.findNodeById(nodeId);
-    const run = node.__run || noOp;
+    const run = node.__simulation?.run || noOp;
     const queue = this.queues.get(nodeId);
 
     if (!queue) return;
-    if (queue.length === 0) return;
+    if (queue.events.length === 0) return;
+    if (queue.state === "running") return;
 
-    const head = queue[0]!;
+    const event = queue.events.shift()!;
+    this.sendOnQueueChange(nodeId);
 
-    const updateNode = (path: string, value: any) => {
+    const updateNode = this.updateNodeFn(nodeId);
+
+    event.process = new Promise<void>(async () => {
+      console.log(`Simulation: Running node ${node.id}`);
+      queue.state = "running";
+
+      await run(
+        event.input,
+        updateNode,
+        (output: any) => (event.output = output)
+      );
+
+      queue.state = "idle";
+
+      const outgoingEdges = this.edges.filter((e) => e.source === nodeId);
+
+      for (const edge of outgoingEdges) {
+        this.addToQueue(edge.target, { input: event.output });
+      }
+
+      console.log(`Simulation: Completed node ${node.id}`);
+    });
+  }
+
+  private updateNodeFn(nodeId: string): UpdateDataFn {
+    const node = this.findNodeById(nodeId);
+
+    return (path: string, value: any) => {
       this.setNodes((prevNodes) =>
         prevNodes.map((n) => {
           if (n.id !== node.id) return n;
@@ -112,39 +134,15 @@ class Engine {
         })
       );
     };
-
-    const setOutput = (output: any) => {
-      head.output = output;
-    };
-
-    if (head.state === "pending") {
-      head.process = new Promise<void>(async () => {
-        console.log(`Simulation: Running node ${node.id}`);
-        head.state = "running";
-        await run(head.input, updateNode, setOutput);
-        head.state = "completed";
-        console.log(`Simulation: Completed node ${node.id}`);
-      });
-
-      return;
-    }
-
-    if (head.state === "completed") {
-      queue.shift();
-
-      const outgoingEdges = this.edges.filter((e) => e.source === nodeId);
-
-      for (const edge of outgoingEdges) {
-        this.addToQueue(edge.target, { state: "pending", input: head.output });
-      }
-
-      return;
-    }
   }
 
   private prepareQueues() {
     for (const node of this.nodes) {
-      this.queues.set(node.id, []);
+      this.queues.set(node.id, {
+        events: [],
+        active: null,
+        state: "idle",
+      });
     }
   }
 
@@ -155,7 +153,22 @@ class Engine {
       throw new Error(`Queue for node ${nodeId} not found`);
     }
 
-    q.push(event);
+    q.events.push(event);
+    this.sendOnQueueChange(nodeId);
+  }
+
+  private sendOnQueueChange(nodeId: string) {
+    const node = this.findNodeById(nodeId);
+    const onQueueChange = node.__simulation?.onQueueChange;
+    const updatedNode = this.updateNodeFn(nodeId);
+
+    if (!onQueueChange) return;
+
+    const queue = this.queues.get(nodeId);
+    if (!queue) return;
+
+    const next = queue.events[0] || null;
+    onQueueChange(next?.input, updatedNode);
   }
 
   private findNodeById(nodeId: string): CanvasNode {

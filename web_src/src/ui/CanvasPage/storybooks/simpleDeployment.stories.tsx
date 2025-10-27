@@ -55,18 +55,20 @@ const sampleNodes: CanvasNode[] = [
         },
       },
     },
-    __run: async (_input, update, output) => {
-      const commit = genCommit();
+    __simulation: {
+      run: async (_input, update, output) => {
+        const commit = genCommit();
 
-      const event = {
-        title: commit.message,
-        subtitle: commit.sha,
-        receivedAt: new Date(),
-        state: "processed",
-      };
+        const event = {
+          title: commit.message,
+          subtitle: commit.sha,
+          receivedAt: new Date(),
+          state: "processed",
+        };
 
-      update("data.trigger.lastEventData", event);
-      output(event);
+        update("data.trigger.lastEventData", event);
+        output(event);
+      },
     },
   },
   {
@@ -128,23 +130,36 @@ const sampleNodes: CanvasNode[] = [
             Size: "971.5 MB",
           },
         },
-        nextInQueue: {
-          title: "FEAT-1234: New feature",
-          subtitle: "ef758d40",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30), // 30 minutes ago
-        },
+        nextInQueue: null,
       },
     },
-    __run: async (input, update, output) => {
-      update("data.state", "working");
-      update("data.composite.lastRunItem.title", input.title);
-      update("data.composite.lastRunItem.receivedAt", input.subtitle);
+    __simulation: {
+      onQueueChange: (next, update) => {
+        if (next) {
+          console.log("Build stage next in queue:", next);
 
-      update("data.composite.lastRunItem.state", "running");
-      await sleep(5000);
-      update("data.composite.lastRunItem.state", "success");
+          update("data.composite.nextInQueue", {
+            title: next.title,
+            subtitle: next.subtitle,
+            receivedAt: new Date(),
+          });
+        } else {
+          update("data.composite.nextInQueue", null);
+        }
+      },
 
-      output(input);
+      run: async (input, update, output) => {
+        update("data.state", "working");
+        update("data.composite.lastRunItem.title", input.title);
+        update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.receivedAt", new Date());
+
+        update("data.composite.lastRunItem.state", "running");
+        await sleep(5000);
+        update("data.composite.lastRunItem.state", "success");
+
+        output(input);
+      },
     },
   },
   {
