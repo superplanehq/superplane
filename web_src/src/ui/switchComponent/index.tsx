@@ -1,3 +1,4 @@
+import { Handle, Position } from "@xyflow/react";
 import { ComponentBase, type EventSection } from "../componentBase";
 
 export interface SwitchStage {
@@ -15,6 +16,13 @@ export interface SwitchComponentProps {
   stages: SwitchStage[];
   collapsed?: boolean;
 }
+
+const HANDLE_STYLE = {
+  width: 12,
+  height: 12,
+  border: "2px solid #555",
+  background: "#fff",
+};
 
 export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   title = "Branch processed events",
@@ -38,7 +46,20 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
     title: stage.pathName,
     receivedAt: stage.receivedAt,
     eventState: stage.eventState,
-    eventTitle: stage.eventTitle
+    eventTitle: stage.eventTitle,
+    handleComponent: (
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={stage.pathName}
+        style={{
+          ...HANDLE_STYLE,
+          right: -10,
+          top: "50%",
+          transform: "translateY(-50%)",
+        }}
+      />
+    )
   }));
 
   return (

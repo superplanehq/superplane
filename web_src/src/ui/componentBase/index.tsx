@@ -95,19 +95,20 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
         const LastEventIconColor = section.eventState === "success" ? "text-green-600 bg-green-600" : "text-red-600 bg-red-600"
 
         return (
-          <div key={index} className={"px-4 pt-2 pb-6" + (index < eventSections.length - 1 ? " border-b" : "")}>
+          <div key={index} className={"px-4 pt-2 pb-6 relative" + (index < eventSections.length - 1 ? " border-b" : "")}>
             <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
               <span className="uppercase text-sm font-medium">{section.title}</span>
               <span className="text-sm">{timeAgo}</span>
             </div>
             <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}>
-              <div className="flex items-center gap-2 w-[80%]">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${LastEventIconColor}`}>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${LastEventIconColor}`}>
                   <LastEventIcon size={12} className="text-white" />
                 </div>
                 <span className="truncate text-sm">{section.eventTitle}</span>
               </div>
             </div>
+            {section.handleComponent}
           </div>
         )
       })}

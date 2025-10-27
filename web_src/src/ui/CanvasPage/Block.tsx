@@ -1,11 +1,12 @@
 import { Approval, type ApprovalProps } from "@/ui/approval";
+import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Composite, type CompositeProps } from "@/ui/composite";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 import { OnApproveFn, OnRejectFn } from ".";
 
 type BlockState = "pending" | "working";
-type BlockType = "trigger" | "composite" | "approval";
+type BlockType = "trigger" | "composite" | "approval" | "switch";
 
 export interface BlockData {
   label: string;
@@ -24,6 +25,9 @@ export interface BlockData {
 
   // approval node specific props
   approval?: ApprovalProps;
+
+  // switch node specific props
+  switch?: SwitchComponentProps;
 }
 
 interface BlockProps {
@@ -64,7 +68,8 @@ function LeftHandle({ data }: BlockProps) {
 
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "approval" && data.approval?.collapsed);
+    (data.type === "approval" && data.approval?.collapsed) ||
+    (data.type === "switch" && data.switch?.collapsed);
 
   return (
     <Handle
@@ -84,7 +89,8 @@ function RightHandle({ data }: BlockProps) {
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
-    (data.type === "trigger" && data.trigger?.collapsed);
+    (data.type === "trigger" && data.trigger?.collapsed) ||
+    (data.type === "switch" && data.switch?.collapsed);
 
   return (
     <Handle
@@ -133,6 +139,8 @@ function BlockContent({
           {...prepApprovalData({ data, nodeId, onApprove, onReject })}
         />
       );
+    case "switch":
+      return <SwitchComponent {...(data.switch as SwitchComponentProps)} />;
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }

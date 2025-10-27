@@ -123,14 +123,14 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
               <span className="text-sm">{timeAgo}</span>
             </div>
             <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}>
-              <div className="flex items-center gap-2 w-[73%] min-w-0">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${lastEventData.state === "processed" ? "bg-green-600" : "bg-red-600"}`}>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastEventData.state === "processed" ? "bg-green-600" : "bg-red-600"}`}>
                   {LastEventIcon && <LastEventIcon size={12} className="text-white" />}
                 </div>
                 <span className="truncate text-sm min-w-0">{lastEventData.title}</span>
               </div>
               {lastEventData.subtitle && (
-                <span className="text-sm whitespace-nowrap w-[27%] truncate text-right">{lastEventData.subtitle}</span>
+                <span className="text-sm truncate flex-shrink-0 max-w-[40%]">{lastEventData.subtitle}</span>
               )}
             </div>
           </>
@@ -139,7 +139,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
             <span className="text-sm text-gray-400">{zeroStateText}</span>
           </div>
         )}
-      </div >
-    </div >
+      </div>
+    </div>
   )
 }
