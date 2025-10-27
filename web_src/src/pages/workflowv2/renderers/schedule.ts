@@ -2,6 +2,7 @@ import { ComponentsNode, TriggersTrigger } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { convertUTCToLocalTime, formatTimestampInUserTimezone } from "@/utils/timezone";
 import { TriggerRenderer } from "./types";
+import { TriggerProps } from "@/ui/trigger";
 
 type ScheduleConfigurationType = "hourly" | "daily" | "weekly";
 
@@ -63,22 +64,35 @@ function formatNextTrigger(timestamp: string | undefined): string {
  * Renderer for the "schedule" trigger type
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger) => ({
-    title: node.name!,
-    iconSlug: trigger.icon,
-    iconColor: getColorClass(trigger.color),
-    headerColor: getBackgroundColorClass(trigger.color),
-    collapsedBackground: getBackgroundColorClass(trigger.color),
-    metadata: [
-      {
-        icon: "calendar-cog",
-        label: formatScheduleDescription(node.configuration as unknown as ScheduleConfiguration),
-      },
-      {
-        icon: "arrow-big-right",
-        label: formatNextTrigger(node.metadata?.nextTrigger as string),
-      }
-    ],
-    zeroStateText: "This schedule has not been triggered yet.",
-  }),
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
+    let props: TriggerProps = {
+      title: node.name!,
+      iconSlug: trigger.icon,
+      iconColor: getColorClass(trigger.color),
+      headerColor: getBackgroundColorClass(trigger.color),
+      collapsedBackground: getBackgroundColorClass(trigger.color),
+      metadata: [
+        {
+          icon: "calendar-cog",
+          label: formatScheduleDescription(node.configuration as unknown as ScheduleConfiguration),
+        },
+        {
+          icon: "arrow-big-right",
+          label: formatNextTrigger(node.metadata?.nextTrigger as string),
+        }
+      ],
+      zeroStateText: "This schedule has not been triggered yet.",
+    }
+
+    if (lastEvent) {
+      props.lastEventData = {
+        title: "Event emitted by schedule",
+        subtitle: lastEvent.id,
+        receivedAt: new Date(lastEvent.createdAt!),
+        state: "processed",
+      };
+    }
+
+    return props;
+  },
 };
