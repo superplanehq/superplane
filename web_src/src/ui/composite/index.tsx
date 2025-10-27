@@ -35,6 +35,11 @@ interface MetadataItem {
   label: string;
 }
 
+export interface ParameterGroup {
+  icon: string;
+  items: string[];
+}
+
 export interface CompositeProps {
   iconSrc?: string;
   iconSlug?: string;
@@ -44,8 +49,7 @@ export interface CompositeProps {
   title: string;
   description?: string;
   metadata?: MetadataItem[];
-  parameters: string[];
-  parametersIcon: string;
+  parameters?: ParameterGroup[];
   lastRunItem?: LastRunItem;
   nextInQueue?: QueueItem;
   collapsedBackground?: string;
@@ -55,9 +59,10 @@ export interface CompositeProps {
 
   onExpandChildEvents?: () => void;
   onReRunChildEvents?: () => void;
+  onToggleCollapse?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters, parametersIcon, lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, startLastValuesOpen = false }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, startLastValuesOpen = false }) => {
   const [showLastRunValues, setShowLastRunValues] = React.useState(startLastValuesOpen)
   const [showWaitingInfo, setShowWaitingInfo] = React.useState(false)
 
@@ -123,10 +128,6 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
     return resolveIcon("circle-dashed")
   }, [])
 
-  const ParametersIcon = React.useMemo(() => {
-    return resolveIcon(parametersIcon)
-  }, [parametersIcon])
-
   const ChildEventsArrowIcon = React.useMemo(() => {
     return resolveIcon("corner-down-right")
   }, [])
@@ -153,11 +154,19 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         title={title}
         collapsedBackground={collapsedBackground}
         shape="rounded"
+        onDoubleClick={onToggleCollapse}
       >
         {parameters.length > 0 && (
-          <div className="flex items-center gap-2 text-gray-500 mt-1">
-            <ParametersIcon size={16} />
-            <span className="text-sm font-mono">{parameters.join(", ")}</span>
+          <div className="flex flex-col gap-1 text-gray-500 mt-1">
+            {parameters.map((group, index) => {
+              const Icon = resolveIcon(group.icon)
+              return (
+                <div key={index} className="flex items-center gap-2">
+                  <Icon size={16} />
+                  <span className="text-sm font-mono">{group.items.join(", ")}</span>
+                </div>
+              )
+            })}
           </div>
         )}
       </CollapsedComponent>
@@ -174,14 +183,20 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         headerColor={headerColor}
         title={title}
         description={description}
+        onDoubleClick={onToggleCollapse}
       />
 
       {parameters.length > 0 &&
         <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <ParametersIcon size={19} />
-            <span className="text-sm font-mono">{parameters.join(", ")}</span>
-          </div>
+          {parameters.map((group, index) => {
+            const Icon = resolveIcon(group.icon)
+            return (
+              <div key={index} className="flex items-center gap-2">
+                <Icon size={19} />
+                <span className="text-sm font-mono">{group.items.join(", ")}</span>
+              </div>
+            )
+          })}
         </div>
       }
 
@@ -220,9 +235,9 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           {showLastRunValues && (
             <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
               {Object.entries(lastRunItem?.values || {}).map(([key, value]) => (
-                <div key={key} className="flex justify-between gap-3 px-2 py-1 rounded-md w-full">
-                  <span className="text-sm w-[20%] text-right">{key}</span>
-                  <span className="text-sm w-[80%]">{value}</span>
+                <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
+                  <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
+                  <span className="text-sm flex-1 truncate text-left">{value}</span>
                 </div>
               ))}
             </div>

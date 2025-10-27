@@ -50,13 +50,13 @@ const ephemeralNodes: Node[] = [
   },
   {
     id: "manual-trigger",
-    position: { x: 0, y: 300 },
+    position: { x: 0, y: 400 },
     data: {
       label: "Manual run trigger",
       state: "pending",
       type: "trigger",
       trigger: {
-        title: "Provision Environment",
+        title: "Provision/Deprovision Environment",
         iconSlug: "play",
         iconColor: "text-purple-700",
         headerColor: "bg-purple-100",
@@ -64,11 +64,11 @@ const ephemeralNodes: Node[] = [
         metadata: [
           {
             icon: "chevrons-left-right-ellipsis",
-            label: "Payload templates: 1",
+            label: "Payload templates: 2",
           },
         ],
         lastEventData: {
-          title: "Manual deployment request",
+          title: "Deprovision env-pr-4498",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
           state: "processed",
         },
@@ -84,21 +84,22 @@ const ephemeralNodes: Node[] = [
       state: "pending",
       type: "composite",
       composite: {
-        title: "Ephemeral Environments Provisioner",
-        description: "Provision and manage temporary test environments",
+        title: "Provisioner",
         iconSlug: "boxes",
         iconColor: "text-blue-700",
         headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
+        parameters: [
+          { icon: "settings", items: ["TTL: 2d 15h"] },
+          { icon: "settings", items: ["Max Envs: 50"] }
+        ],
         metadata: [
           { icon: "server", label: "Active: 7/50 environments" },
           { icon: "triangle-alert", label: "Failed: 2" },
         ],
-        parameters: ["TTL: 12 hours", "Max Envs: 50"],
-        parametersIcon: "settings",
         lastRunItem: {
           title: "Environment: env-4523",
-          subtitle: "pr-213",
+          subtitle: "2d 14h left",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
           childEventsInfo: {
             count: 1,
@@ -124,6 +125,50 @@ const ephemeralNodes: Node[] = [
             ).toLocaleString(),
           },
         },
+        startLastValuesOpen: true,
+        collapsed: false,
+      },
+    },
+  },
+  {
+    id: "ephemeral-deprovisioner",
+    position: { x: 1200, y: 0 },
+    data: {
+      label: "Ephemeral Environments Deprovisioner",
+      state: "pending",
+      type: "composite",
+      composite: {
+        title: "Deprovisioner",
+        iconSlug: "trash-2",
+        iconColor: "text-red-700",
+        headerColor: "bg-red-100",
+        collapsedBackground: "bg-red-100",
+        metadata: [
+          { icon: "trash", label: "Cleaned: 127 environments" },
+          { icon: "check-circle", label: "Success: 98%" },
+          { icon: "clock", label: "Avg time: 2m 45s" },
+          { icon: "calendar", label: "Last: 2h ago" },
+        ],
+        lastRunItem: {
+          title: "Environment: env-pr-4501",
+          subtitle: "Expired",
+          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 120), // 2 hours ago
+          childEventsInfo: {
+            count: 2,
+            state: "processed",
+            waitingInfos: [],
+          },
+          state: "success",
+          values: {
+            "Environment ID": "env-pr-4501",
+            "Triggered by": "System",
+            "Resources removed": "Database, Storage, DNS, Network",
+            "Duration": "2m 37s",
+            "Completed at": new Date(
+              new Date().getTime() - 1000 * 60 * 118
+            ).toLocaleString(),
+          },
+        },
         collapsed: false,
       },
     },
@@ -133,6 +178,8 @@ const ephemeralNodes: Node[] = [
 const ephemeralEdges: Edge[] = [
   { id: "e1", source: "github-trigger", target: "ephemeral-provisioner" },
   { id: "e2", source: "manual-trigger", target: "ephemeral-provisioner" },
+  { id: "e3", source: "ephemeral-provisioner", target: "ephemeral-deprovisioner" },
+  { id: "e4", source: "manual-trigger", target: "ephemeral-deprovisioner" },
 ];
 
 export const Ephemeral: Story = {

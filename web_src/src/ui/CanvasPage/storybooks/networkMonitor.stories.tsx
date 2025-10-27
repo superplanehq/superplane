@@ -41,8 +41,9 @@ const sampleNodes: Node[] = [
           { icon: "zap", label: "Query Time: 12ms avg" },
           { icon: "activity", label: "Pool: 45/100 connections" },
         ],
-        parameters: ["db-primary", "db-replica-1", "db-replica-2"],
-        parametersIcon: "database",
+        parameters: [
+          { icon: "database", items: ["db-primary", "db-replica-1", "db-replica-2"] }
+        ],
         lastRunItem: {
           title: "Database health check",
           subtitle: "45ms lag",
@@ -84,8 +85,9 @@ const sampleNodes: Node[] = [
           { icon: "hard-drive", label: "Disk: 85% used" },
           { icon: "box", label: "Pods: 11/24 healthy" },
         ],
-        parameters: ["prod-cluster-1", "prod-cluster-2"],
-        parametersIcon: "server",
+        parameters: [
+          { icon: "server", items: ["prod-cluster-1", "prod-cluster-2"] }
+        ],
         lastRunItem: {
           title: "Resource check",
           subtitle: "11/24 pods",
@@ -127,8 +129,9 @@ const sampleNodes: Node[] = [
           { icon: "alert-circle", label: "Error Rate: 0.3%" },
           { icon: "server", label: "Load Balancer: Healthy" },
         ],
-        parameters: ["us-west-1", "eu-global-1", "asia-east-1"],
-        parametersIcon: "map",
+        parameters: [
+          { icon: "map", items: ["us-west-1", "eu-global-1", "asia-east-1"] }
+        ],
         lastRunItem: {
           title: "Traffic monitoring check",
           subtitle: "1,247 req/s",

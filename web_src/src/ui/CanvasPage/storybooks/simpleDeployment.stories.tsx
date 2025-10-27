@@ -110,7 +110,6 @@ const sampleNodes: CanvasNode[] = [
         headerColor: "bg-purple-100",
         collapsedBackground: "bg-purple-100",
         parameters: [],
-        parametersIcon: "map",
         lastRunItem: {
           title: "fix: open rejected events tabs",
           subtitle: "ef758d40",
@@ -232,8 +231,9 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: ["us-west-1", "us-east-1"],
-        parametersIcon: "map",
+        parameters: [
+          { icon: "map", items: ["us-west-1", "us-east-1"] }
+        ],
         lastRunItem: {
           title: "FEAT-984: Autocomplete",
           subtitle: "ef758d40",
@@ -282,8 +282,9 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: ["eu-global-1", "eu-global-2"],
-        parametersIcon: "map",
+        parameters: [
+          { icon: "map", items: ["eu-global-1", "eu-global-2"] }
+        ],
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
@@ -314,7 +315,7 @@ const sampleNodes: CanvasNode[] = [
           },
         },
         nextInQueue: {
-          title: "Deploy to EU",
+          title: "FEAT-892: Organization level integrations page",
           subtitle: "ef758d40",
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 4), // 4 hours ago
         },
@@ -342,8 +343,9 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: ["asia-east-1"],
-        parametersIcon: "map",
+        parameters: [
+          { icon: "map", items: ["asia-east-1"] }
+        ],
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
@@ -397,8 +399,9 @@ const createMockExecutionNodes = (
         iconColor: "text-blue-600",
         headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
-        parameters: ["POST", "/api/deploy"],
-        parametersIcon: "code",
+        parameters: [
+          { icon: "code", items: ["POST", "/api/deploy"] }
+        ],
         lastRunItem: lastRunItem,
         collapsed: false,
       },

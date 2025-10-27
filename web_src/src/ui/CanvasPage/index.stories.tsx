@@ -40,8 +40,9 @@ export const BlueprintExecutionPage: Story = {
             iconColor: "text-blue-600",
             headerColor: "bg-blue-100",
             collapsedBackground: "bg-blue-100",
-            parameters: ["POST", "/api/deploy"],
-            parametersIcon: "code",
+            parameters: [
+              { icon: "code", items: ["POST", "/api/deploy"] }
+            ],
             lastRunItem: {
               title: "Deploy to US West",
               subtitle: "ef758d40",
@@ -77,8 +78,9 @@ export const BlueprintExecutionPage: Story = {
             iconColor: "text-green-600",
             headerColor: "bg-green-100",
             collapsedBackground: "bg-green-100",
-            parameters: ["health-check", "smoke-test"],
-            parametersIcon: "list-checks",
+            parameters: [
+              { icon: "list-checks", items: ["health-check", "smoke-test"] }
+            ],
             lastRunItem: {
               title: "Validation Suite",
               subtitle: "ef758d40",
@@ -119,8 +121,9 @@ export const BlueprintExecutionPage: Story = {
             iconColor: "text-red-600",
             headerColor: "bg-red-100",
             collapsedBackground: "bg-red-100",
-            parameters: ["temp-storage", "build-cache"],
-            parametersIcon: "server",
+            parameters: [
+              { icon: "server", items: ["temp-storage", "build-cache"] }
+            ],
             lastRunItem: {
               title: "Resource Cleanup",
               subtitle: "ef758d40",
@@ -155,8 +158,9 @@ export const BlueprintExecutionPage: Story = {
             iconColor: "text-yellow-600",
             headerColor: "bg-yellow-100",
             collapsedBackground: "bg-yellow-100",
-            parameters: ["slack", "email"],
-            parametersIcon: "mail",
+            parameters: [
+              { icon: "mail", items: ["slack", "email"] }
+            ],
             lastRunItem: {
               title: "Deployment Notifications",
               subtitle: "ef758d40",
@@ -239,7 +243,7 @@ export const BlueprintExecutionPage: Story = {
           {
             label: parentWorkflow,
             onClick: () =>
-              navigateToStory("pages-canvaspage--simple-deployment"),
+              navigateToStory("pages-canvaspage-examples--simple-deployment"),
           },
           {
             ...lastBreadCump,
@@ -266,8 +270,9 @@ export const BlueprintExecutionPage: Story = {
               iconColor: "text-blue-600",
               headerColor: "bg-blue-100",
               collapsedBackground: "bg-blue-100",
-              parameters: ["health", "permissions", "resources"],
-              parametersIcon: "check",
+              parameters: [
+                { icon: "check", items: ["health", "permissions", "resources"] }
+              ],
               collapsed: false,
               lastRunItem: {
                 title: "Pre-deployment Checks",
@@ -301,7 +306,6 @@ export const BlueprintExecutionPage: Story = {
               collapsedBackground:
                 executionData?.composite?.collapsedBackground,
               parameters: executionData?.composite?.parameters || [],
-              parametersIcon: "map",
               lastRunItem: executionData?.composite?.lastRunItem || {
                 title: `Deploy ${dynamicTitle.replace("Deploy to ", "")}`,
                 subtitle: "default",
@@ -327,8 +331,9 @@ export const BlueprintExecutionPage: Story = {
               iconColor: "text-green-600",
               headerColor: "bg-green-100",
               collapsedBackground: "bg-green-100",
-              parameters: ["health-check", "smoke-test", "monitoring"],
-              parametersIcon: "activity",
+              parameters: [
+                { icon: "activity", items: ["health-check", "smoke-test", "monitoring"] }
+              ],
               collapsed: false,
               lastRunItem: {
                 title: "Post-deployment Verification",

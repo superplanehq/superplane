@@ -9,7 +9,6 @@ const BuildTestDeployStage: CompositeProps = {
   iconColor: "text-purple-700",
   headerColor: "bg-purple-100",
   parameters: [],
-  parametersIcon: "map",
   lastRunItem: {
     title: "fix: open rejected events tabs",
     subtitle: "ef758d40",
@@ -41,8 +40,9 @@ const DeployToEu: CompositeProps = {
   iconSrc: KubernetesIcon,
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
-  parameters: ["eu-global-1", "eu-global-2"],
-  parametersIcon: "map",
+  parameters: [
+    { icon: "map", items: ["eu-global-1", "eu-global-2"] }
+  ],
   lastRunItem: {
     title: "fix: open rejected events",
     subtitle: "ef758d40",
@@ -85,8 +85,9 @@ const DeployToUS: CompositeProps = {
   iconSrc: KubernetesIcon,
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
-  parameters: ["us-west-1", "us-east-1"],
-  parametersIcon: "map",
+  parameters: [
+    { icon: "map", items: ["us-west-1", "us-east-1"] }
+  ],
   lastRunItem: {
     title: "FEAT-984: Autocomplete",
     subtitle: "ef758d40",
@@ -114,8 +115,9 @@ const DeployToAsia: CompositeProps = {
   iconSrc: KubernetesIcon,
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
-  parameters: ["asia-east-1"],
-  parametersIcon: "map",
+  parameters: [
+    { icon: "map", items: ["asia-east-1"] }
+  ],
   lastRunItem: {
     title: "fix: open rejected events",
     subtitle: "ef758d40",

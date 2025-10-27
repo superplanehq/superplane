@@ -10,6 +10,7 @@ export interface CollapsedComponentProps {
   collapsedBackground?: string;
   shape?: "rounded" | "circle";
   children?: React.ReactNode;
+  onDoubleClick?: () => void;
 }
 
 export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
@@ -21,6 +22,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   collapsedBackground,
   shape = "rounded",
   children,
+  onDoubleClick,
 }) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -29,7 +31,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   const containerClass = shape === "circle" ? "rounded-full" : "rounded-md";
 
   return (
-    <div className="relative w-20 h-20 mx-3">
+    <div className="relative w-20 h-20 mx-3" onDoubleClick={onDoubleClick}>
       <div className={`flex h-20 w-20 items-center justify-center border border-border ${containerClass} ${collapsedBackground || ''}`}>
         {iconSrc ? (
           <div className={`w-16 h-16 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
