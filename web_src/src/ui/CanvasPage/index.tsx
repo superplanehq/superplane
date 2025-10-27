@@ -90,7 +90,8 @@ function CanvasContent(props: CanvasPageProps) {
         <Block
           data={nodeProps.data as BlockData}
           onExpand={handleNodeExpand}
-          onApprovalChange={props.onApprovalChange}
+          onApprove={props.onApprove}
+          onReject={props.onReject}
           nodeId={nodeProps.id}
         />
       ),
