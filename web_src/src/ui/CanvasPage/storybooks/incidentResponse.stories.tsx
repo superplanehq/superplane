@@ -8,6 +8,7 @@ import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 
 import { CanvasPage } from "./../index";
+import { handleNodeExpand, navigateToStory } from "./navigation";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -195,7 +196,7 @@ const incidentResponseNodes: Node[] = [
     id: "policy-router",
     position: { x: 1250, y: 450 },
     data: {
-      label: "Policy Router",
+      label: "Route to Policy",
       state: "working",
       type: "switch",
       switch: {
@@ -414,6 +415,16 @@ export const IncidentResponse: Story = {
   args: {
     nodes: incidentResponseNodes,
     edges: incidentResponseEdges,
+    onNodeExpand: handleNodeExpand,
+    breadcrumbs: [
+      {
+        label: "Workflows",
+      },
+      {
+        label: "Incident Response",
+        onClick: () => navigateToStory("pages-canvaspage-examples--incident-response"),
+      },
+    ],
   },
   render: (args) => {
     return (
