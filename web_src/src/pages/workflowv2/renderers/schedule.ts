@@ -30,6 +30,35 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
   }
 }
 
+function formatNextTrigger(timestamp: string | undefined): string {
+  if (!timestamp) {
+    return "-"
+  }
+
+  try {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffMs = date.getTime() - now.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+
+    if (diffMins < 0) {
+      return 'Triggering soon...'
+    }
+
+    if (diffMins < 60) {
+      return `Next: in ${diffMins}m`
+    }
+
+    if (diffMins < 1440) {
+      return `Next: in ${Math.floor(diffMins / 60)}h`
+    }
+
+    return formatTimestampInUserTimezone(timestamp)
+  } catch (e) {
+    return ""
+  }
+}
+
 /**
  * Renderer for the "schedule" trigger type
  */
@@ -47,7 +76,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
       },
       {
         icon: "arrow-big-right",
-        label: formatTimestampInUserTimezone(node.metadata?.nextTrigger as string),
+        label: formatNextTrigger(node.metadata?.nextTrigger as string),
       }
     ],
     zeroStateText: "This schedule has not been triggered yet.",

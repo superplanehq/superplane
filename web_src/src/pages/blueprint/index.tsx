@@ -35,7 +35,6 @@ import { filterVisibleConfiguration } from '../../utils/components'
 import { IfNode } from './components/nodes/IfNode'
 import { HttpNode } from './components/nodes/HttpNode'
 import { FilterNode } from './components/nodes/FilterNode'
-import { SwitchNode } from './components/nodes/SwitchNode'
 import { DefaultNode } from './components/nodes/DefaultNode'
 import { ApprovalNode } from './components/nodes/ApprovalNode'
 import { GithubTriggerNode } from './components/nodes/GithubTriggerNode'
@@ -51,7 +50,6 @@ const nodeTypes: NodeTypes = {
   if: IfNode,
   http: HttpNode,
   filter: FilterNode,
-  switch: SwitchNode,
   approval: ApprovalNode,
   default: DefaultNode,
   github: GithubTriggerNode,

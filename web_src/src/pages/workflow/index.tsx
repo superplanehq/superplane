@@ -17,7 +17,7 @@ import '@xyflow/react/dist/style.css'
 import { useWorkflow, useUpdateWorkflow, useTriggers } from '../../hooks/useWorkflowData'
 import { useComponents, useBlueprints } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
-import { MaterialSymbol } from '../../components/MaterialSymbol/material-symbol'
+import { AlertCircle, ArrowLeft, Activity, Save, PanelLeftClose, Menu } from 'lucide-react'
 import { Heading } from '../../components/Heading/heading'
 import { Text } from '../../components/Text/text'
 import { Input } from '../../components/ui/input'
@@ -42,7 +42,6 @@ import {
   WorkflowIfNode,
   WorkflowHttpNode,
   WorkflowFilterNode,
-  WorkflowSwitchNode,
   WorkflowApprovalNode,
   WorkflowDefaultNode,
   WorkflowStartTriggerNode,
@@ -53,12 +52,12 @@ import {
 } from './components/nodes'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import { getColorClass } from '../../utils/colors'
+import { resolveIcon } from '../../lib/utils'
 
 const nodeTypes: NodeTypes = {
   if: WorkflowIfNode,
   http: WorkflowHttpNode,
   filter: WorkflowFilterNode,
-  switch: WorkflowSwitchNode,
   approval: WorkflowApprovalNode,
   start: WorkflowStartTriggerNode,
   schedule: WorkflowScheduledTriggerNode,
@@ -468,7 +467,7 @@ export const Workflow = () => {
   if (!workflow) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <MaterialSymbol name="error" className="text-red-500 mb-4" size="xl" />
+        <AlertCircle className="text-red-500 mb-4" size={32} />
         <Heading level={2}>Workflow not found</Heading>
         <Button variant="outline" onClick={() => navigate(`/${organizationId}`)} className="mt-4">
           Go back to home
@@ -483,7 +482,7 @@ export const Workflow = () => {
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(`/${organizationId}`)}>
-            <MaterialSymbol name="arrow_back" />
+            <ArrowLeft />
           </Button>
           <div>
             <Heading level={2} className="!text-xl !mb-0">{workflow.name}</Heading>
@@ -497,14 +496,14 @@ export const Workflow = () => {
             variant="outline"
             onClick={() => navigate(`/${organizationId}/workflows/${workflowId}/events`)}
           >
-            <MaterialSymbol name="timeline" />
+            <Activity />
             Event Execution Chains
           </Button>
           <Button
             onClick={handleSave}
             disabled={updateWorkflowMutation.isPending}
           >
-            <MaterialSymbol name="save" />
+            <Save />
             {updateWorkflowMutation.isPending ? 'Saving...' : 'Save'}
           </Button>
         </div>
@@ -523,7 +522,7 @@ export const Workflow = () => {
                 onClick={() => setIsSidebarOpen(false)}
                 aria-label="Close sidebar"
               >
-                <MaterialSymbol name="menu_open" size="lg" />
+                <PanelLeftClose size={24} />
               </Button>
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'triggers' | 'components' | 'blueprints')} className="flex-1">
                 <TabsList className="w-full">
@@ -549,7 +548,7 @@ export const Workflow = () => {
                   </div>
                   <ItemGroup>
                     {buildingBlocks.filter(b => b.type === 'trigger').map((block: BuildingBlock) => {
-                      const icon = block.icon || 'bolt'
+                      const IconComponent = resolveIcon(block.icon || 'zap')
                       const colorClass = getColorClass(block.color)
 
                       return (
@@ -560,7 +559,7 @@ export const Workflow = () => {
                           size="sm"
                         >
                           <ItemMedia>
-                            <MaterialSymbol name={icon} size="lg" className={colorClass} />
+                            <IconComponent size={24} className={colorClass} />
                           </ItemMedia>
                           <ItemContent>
                             <ItemTitle>{block.label || block.name}</ItemTitle>
@@ -580,7 +579,7 @@ export const Workflow = () => {
                   </div>
                   <ItemGroup>
                     {buildingBlocks.filter(b => b.type === 'component').map((block: BuildingBlock) => {
-                      const icon = block.icon || 'widgets'
+                      const IconComponent = resolveIcon(block.icon || 'boxes')
                       const colorClass = getColorClass(block.color)
 
                       return (
@@ -591,7 +590,7 @@ export const Workflow = () => {
                           size="sm"
                         >
                           <ItemMedia>
-                            <MaterialSymbol name={icon} size="lg" className={colorClass} />
+                            <IconComponent size={24} className={colorClass} />
                           </ItemMedia>
                           <ItemContent>
                             <ItemTitle>{block.label || block.name}</ItemTitle>
@@ -611,7 +610,7 @@ export const Workflow = () => {
                   </div>
                   <ItemGroup>
                     {buildingBlocks.filter(b => b.type === 'blueprint').map((block: BuildingBlock) => {
-                      const icon = block.icon || 'account_tree'
+                      const IconComponent = resolveIcon(block.icon || 'git-branch')
                       const colorClass = getColorClass(block.color)
 
                       return (
@@ -622,7 +621,7 @@ export const Workflow = () => {
                           size="sm"
                         >
                           <ItemMedia>
-                            <MaterialSymbol name={icon} size="lg" className={colorClass} />
+                            <IconComponent size={24} className={colorClass} />
                           </ItemMedia>
                           <ItemContent>
                             <ItemTitle>{block.label || block.name}</ItemTitle>
@@ -652,7 +651,7 @@ export const Workflow = () => {
                   aria-label="Open sidebar"
                   className="absolute top-4 left-4 z-10 shadow-md"
                 >
-                  <MaterialSymbol name="menu" size="lg" />
+                  <Menu size={24} />
                 </Button>
               )}
               <ReactFlow

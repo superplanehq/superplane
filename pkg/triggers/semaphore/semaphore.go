@@ -50,7 +50,7 @@ func (s *Semaphore) Description() string {
 }
 
 func (s *Semaphore) Icon() string {
-	return "automation"
+	return "workflow"
 }
 
 func (s *Semaphore) Color() string {

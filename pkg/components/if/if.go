@@ -37,7 +37,7 @@ func (f *If) Description() string {
 }
 
 func (f *If) Icon() string {
-	return "alt_route"
+	return "split"
 }
 
 func (f *If) Color() string {
