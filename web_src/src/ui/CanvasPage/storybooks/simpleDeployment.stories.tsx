@@ -14,7 +14,7 @@ import type { BreadcrumbItem } from "../Header";
 import { CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
 import { navigateToStoryWithData } from "./navigation";
-import { RunSimulationFn, sleep, useSimulationRunner } from "./useSimulation";
+import { SimulationEngine, sleep, useSimulationRunner } from "./useSimulation";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -574,7 +574,7 @@ export const SimpleDeployment: Story = {
       [args.title]
     );
 
-    const runSimulation = useSimulationRunner({ nodes, edges, setNodes });
+    const simulation = useSimulationRunner({ nodes, edges, setNodes });
 
     const handleAprove = (
       nodeId: string,
@@ -621,7 +621,7 @@ export const SimpleDeployment: Story = {
 
     return (
       <div className="h-[100vh] w-full ">
-        <SimulatorButtons run={runSimulation} />
+        <SimulatorButtons simulation={simulation} />
 
         {renderContent()}
       </div>
@@ -631,14 +631,22 @@ export const SimpleDeployment: Story = {
 
 SimpleDeployment.storyName = "01 - Simple Deployment";
 
-function SimulatorButtons({ run }: { run: RunSimulationFn }) {
+function SimulatorButtons({ simulation }: { simulation: SimulationEngine }) {
   return (
     <div className="absolute z-[999] bottom-3 left-3 flex gap-2">
-      <Button onClick={() => run("listen-code")} size="sm" variant="outline">
+      <Button
+        onClick={() => simulation.run("listen-code")}
+        size="sm"
+        variant="outline"
+      >
         GitHub Push
       </Button>
 
-      <Button onClick={() => run("listen-image")} size="sm" variant="outline">
+      <Button
+        onClick={() => simulation.run("listen-image")}
+        size="sm"
+        variant="outline"
+      >
         Docker Image Push
       </Button>
     </div>

@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo } from "react";
 import { CanvasEdge, CanvasNode } from "..";
 
 export type UpdateDataFn = (path: string, data: any) => void;
@@ -22,16 +22,11 @@ interface SimulationProps {
 
 export type RunSimulationFn = (startNodeId: string) => Promise<void>;
 
-export function useSimulationRunner(props: SimulationProps): RunSimulationFn {
-  const engine = useRef<Engine | null>(null);
-
-  return async (startNodeId: string) => {
-    if (!engine.current) {
-      engine.current = new Engine(props.nodes, props.edges, props.setNodes);
-    }
-
-    engine.current.run(startNodeId);
-  };
+export function useSimulationRunner(props: SimulationProps): SimulationEngine {
+  return useMemo(
+    () => new SimulationEngine(props.nodes, props.edges, props.setNodes),
+    []
+  );
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -49,7 +44,7 @@ type Queue = {
   state: "idle" | "running";
 };
 
-class Engine {
+export class SimulationEngine {
   private queues: Map<string, Queue>;
 
   constructor(
