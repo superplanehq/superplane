@@ -1,17 +1,17 @@
 import { FloatingActionButton } from "./FloatingActionButton";
 
 export function AiSidebar() {
-  <>
-    <FloatingActionButton
-      icon={null}
-      text="AI Assist"
-      onClick={() => {}}
-      label={""}
-      variant="primary"
-      position="bottom-right"
-    />
+  return (
+    <>
+      <FloatingActionButton
+        text="AI Assistant"
+        onClick={() => {}}
+        label={""}
+        variant="primary"
+        position="bottom-right"
+      />
 
-    <Conversations
+      {/* <Conversations
       isOpen={state.isOpen}
       onClose={state.closeSidebar}
       conversations={state.conversations}
@@ -23,6 +23,7 @@ export function AiSidebar() {
       contextAttachment={state.conversationContext!}
       me={me!}
       maxWidth={1000}
-    />
-  </>;
+    /> */}
+    </>
+  );
 }

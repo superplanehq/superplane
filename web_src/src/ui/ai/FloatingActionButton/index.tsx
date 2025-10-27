@@ -1,5 +1,5 @@
-import React from "react";
-import classNames from "../utils/classnames";
+import { BotMessageSquare } from "lucide-react";
+import { cn } from "../../../lib/utils";
 
 // Hoist static objects outside component to avoid re-creation on every render
 const POSITION_CLASSES = {
@@ -10,19 +10,12 @@ const POSITION_CLASSES = {
 } as const;
 
 const VARIANT_CLASSES = {
-  primary:
-    "bg-accent-base hover:bg-accent-hover text-white shadow-xl border-2 border-white/20 hover:shadow-2xl hover:border-white/30",
-  secondary:
-    "bg-surface-base hover:bg-surface-highlight text-content-base border-2 border-surface-outline shadow-xl hover:shadow-2xl",
+  primary: "bg-stone-900",
+  secondary: "border border-stone-300 bg-white/70 shadow-md",
 } as const;
 
 export namespace FloatingActionButton {
   export interface Props {
-    /**
-     * Icon component to display in the button
-     */
-    icon: React.ReactNode;
-
     /**
      * Click handler
      */
@@ -76,7 +69,6 @@ export namespace FloatingActionButton {
 }
 
 export function FloatingActionButton({
-  icon,
   onClick,
   label,
   text,
@@ -88,30 +80,16 @@ export function FloatingActionButton({
   showTooltip = true,
   zIndex = 50,
 }: FloatingActionButton.Props) {
-  const sizeClasses = text
-    ? {
-        normal: "h-14 px-6",
-        large: "h-16 px-8",
-      }
-    : {
-        normal: "w-14 h-14",
-        large: "w-16 h-16",
-      };
-
-  const buttonClasses = classNames(
+  const buttonClasses = cn(
     "fixed flex items-center justify-center transition-all duration-200 ease-in-out",
-    "focus:outline-none focus:ring-4 focus:ring-accent-base/50 focus:ring-offset-2 focus:ring-offset-white",
+    "focus:outline-none",
     "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md",
-    "backdrop-blur-sm", // Add backdrop blur for better contrast
-    "rounded-full",
-    text ? "gap-3" : "",
+    "rounded-lg p-2 px-4",
+    "gap-2 hover:gap-3",
     POSITION_CLASSES[position],
-    sizeClasses[size],
     VARIANT_CLASSES[variant],
-    className,
+    className
   );
-
-  const iconSize = size === "large" ? 24 : 20;
 
   return (
     <button
@@ -122,10 +100,11 @@ export function FloatingActionButton({
       title={showTooltip ? label : undefined}
       style={{ zIndex }}
     >
-      <div style={{ width: iconSize, height: iconSize }}>{icon}</div>
-      {text && (
-        <span className={`font-medium whitespace-nowrap ${size === "large" ? "text-base" : "text-sm"}`}>{text}</span>
-      )}
+      <BotMessageSquare className="text-white" size={16} />
+
+      <span className="font-medium whitespace-nowrap text-white text-sm">
+        AI Assistant
+      </span>
     </button>
   );
 }
