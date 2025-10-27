@@ -264,6 +264,55 @@ export const nodeEventsQueryOptions = (
   enabled: !!workflowId && !!nodeId,
 })
 
+export const nodeExecutionsQueryOptions = (
+  workflowId: string,
+  nodeId: string,
+  options?: {
+    states?: string[]
+    limit?: number
+  }
+) => ({
+  queryKey: workflowKeys.nodeExecution(workflowId, nodeId, options?.states),
+  queryFn: async () => {
+    const response = await workflowsListNodeExecutions(
+      withOrganizationHeader({
+        path: {
+          workflowId,
+          nodeId,
+        },
+        query: options?.states ? {
+          states: options.states,
+        } : undefined,
+      })
+    )
+    return response.data
+  },
+  staleTime: 30 * 1000, // 30 seconds
+  gcTime: 5 * 60 * 1000, // 5 minutes
+  enabled: !!workflowId && !!nodeId,
+})
+
+export const nodeQueueItemsQueryOptions = (
+  workflowId: string,
+  nodeId: string
+) => ({
+  queryKey: workflowKeys.nodeQueueItem(workflowId, nodeId),
+  queryFn: async () => {
+    const response = await workflowsListNodeQueueItems(
+      withOrganizationHeader({
+        path: {
+          workflowId,
+          nodeId,
+        },
+      })
+    )
+    return response.data
+  },
+  staleTime: 30 * 1000, // 30 seconds
+  gcTime: 5 * 60 * 1000, // 5 minutes
+  enabled: !!workflowId && !!nodeId,
+})
+
 export const useNodeEvents = (workflowId: string, nodeId: string) => {
   return useQuery(nodeEventsQueryOptions(workflowId, nodeId))
 }

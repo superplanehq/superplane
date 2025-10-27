@@ -17,7 +17,7 @@ import '@xyflow/react/dist/style.css'
 import { useBlueprint, useUpdateBlueprint } from '../../hooks/useBlueprintData'
 import { useComponents } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
-import { MaterialSymbol } from '../../components/MaterialSymbol/material-symbol'
+import { AlertCircle, ArrowLeft, Save, PanelLeftClose, Menu, Plus, Trash2, ArrowUpRight } from 'lucide-react'
 import { Heading } from '../../components/Heading/heading'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
@@ -45,6 +45,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/ta
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from '../../components/ui/item'
 import ELK from 'elkjs/lib/elk.bundled.js'
 import { getColorClass } from '../../utils/colors'
+import { resolveIcon } from '../../lib/utils'
 
 const nodeTypes: NodeTypes = {
   if: IfNode,
@@ -322,7 +323,7 @@ export const Blueprint = () => {
         type: 'string',
         description: '',
         required: false,
-        options: [],
+        typeOptions: {},
       })
     }
     setIsEditConfigFieldModalOpen(true)
@@ -341,14 +342,28 @@ export const Blueprint = () => {
     }
 
     // Validate options for select/multi_select types
-    if (configFieldForm.type === 'select' || configFieldForm.type === 'multi_select') {
-      if (!configFieldForm.options || configFieldForm.options.length === 0) {
-        showErrorToast('At least one option is required for select/multi-select fields')
+    if (configFieldForm.type === 'select') {
+      const options = configFieldForm.typeOptions?.select?.options || []
+      if (options.length === 0) {
+        showErrorToast('At least one option is required for select fields')
         return
       }
 
       // Validate that all options have both label and value
-      const hasInvalidOption = configFieldForm.options.some((opt: any) => !opt.label.trim() || !opt.value.trim())
+      const hasInvalidOption = options.some((opt: any) => !opt.label?.trim() || !opt.value?.trim())
+      if (hasInvalidOption) {
+        showErrorToast('All options must have both label and value')
+        return
+      }
+    } else if (configFieldForm.type === 'multi_select') {
+      const options = configFieldForm.typeOptions?.multiSelect?.options || []
+      if (options.length === 0) {
+        showErrorToast('At least one option is required for multi-select fields')
+        return
+      }
+
+      // Validate that all options have both label and value
+      const hasInvalidOption = options.some((opt: any) => !opt.label?.trim() || !opt.value?.trim())
       if (hasInvalidOption) {
         showErrorToast('All options must have both label and value')
         return
@@ -486,7 +501,7 @@ export const Blueprint = () => {
   if (!blueprint) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <MaterialSymbol name="error" className="text-red-500 mb-4" size="xl" />
+        <AlertCircle className="text-red-500 mb-4" size={32} />
         <Heading level={2}>Blueprint not found</Heading>
         <Button variant="outline" onClick={() => navigate(`/${organizationId}`)} className="mt-4">
           Go back to home
@@ -501,7 +516,7 @@ export const Blueprint = () => {
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(`/${organizationId}`)}>
-            <MaterialSymbol name="arrow_back" />
+            <ArrowLeft />
           </Button>
           <div>
             <Heading level={2} className="!text-xl !mb-0">{blueprint.name}</Heading>
@@ -512,7 +527,7 @@ export const Blueprint = () => {
             onClick={handleSave}
             disabled={updateBlueprintMutation.isPending}
           >
-            <MaterialSymbol name="save" />
+            <Save />
             {updateBlueprintMutation.isPending ? 'Saving...' : 'Save'}
           </Button>
         </div>
@@ -532,7 +547,7 @@ export const Blueprint = () => {
                   onClick={() => setIsSidebarOpen(false)}
                   aria-label="Close sidebar"
                 >
-                  <MaterialSymbol name="menu_open" size="lg" />
+                  <PanelLeftClose size={24} />
                 </Button>
                 <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">
                   Blueprint Builder
@@ -612,7 +627,7 @@ export const Blueprint = () => {
                   </div>
                   <ItemGroup>
                     {components.map((component: any) => {
-                      const icon = component.icon || 'widgets'
+                      const IconComponent = resolveIcon(component.icon || 'boxes')
                       const colorClass = getColorClass(component.color)
 
                       return (
@@ -623,7 +638,7 @@ export const Blueprint = () => {
                           size="sm"
                         >
                           <ItemMedia>
-                            <MaterialSymbol name={icon} size="lg" className={colorClass} />
+                            <IconComponent size={24} className={colorClass} />
                           </ItemMedia>
                           <ItemContent>
                             <ItemTitle>{component.label || component.name}</ItemTitle>
@@ -667,9 +682,14 @@ export const Blueprint = () => {
                                   {field.description}
                                 </p>
                               )}
-                              {(field.type === 'select' || field.type === 'multi_select') && field.options && field.options.length > 0 && (
+                              {field.type === 'select' && field.typeOptions?.select?.options && field.typeOptions.select.options.length > 0 && (
                                 <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
-                                  Options: {field.options.map((opt: any) => opt.label).join(', ')}
+                                  Options: {field.typeOptions.select.options.map((opt: any) => opt.label).join(', ')}
+                                </p>
+                              )}
+                              {field.type === 'multi_select' && field.typeOptions?.multiSelect?.options && field.typeOptions.multiSelect.options.length > 0 && (
+                                <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+                                  Options: {field.typeOptions.multiSelect.options.map((opt: any) => opt.label).join(', ')}
                                 </p>
                               )}
                             </div>
@@ -682,7 +702,7 @@ export const Blueprint = () => {
                                 setBlueprintConfiguration(newConfig)
                               }}
                             >
-                              <MaterialSymbol name="delete" className="text-red-500" />
+                              <Trash2 className="text-red-500" />
                             </Button>
                           </div>
                         </div>
@@ -696,7 +716,7 @@ export const Blueprint = () => {
                     onClick={() => handleOpenConfigFieldModal()}
                     className="w-full"
                   >
-                    <MaterialSymbol name="add" />
+                    <Plus />
                     Add Configuration Field
                   </Button>
                 </div>
@@ -721,7 +741,7 @@ export const Blueprint = () => {
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <MaterialSymbol name="output" className="text-green-600 dark:text-green-400" />
+                                <ArrowUpRight className="text-green-600 dark:text-green-400" />
                                 <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">
                                   {outputChannel.name}
                                 </p>
@@ -742,7 +762,7 @@ export const Blueprint = () => {
                                 setBlueprintOutputChannels(newOutputChannels)
                               }}
                             >
-                              <MaterialSymbol name="delete" className="text-red-500" />
+                              <Trash2 className="text-red-500" />
                             </Button>
                           </div>
                         </div>
@@ -756,7 +776,7 @@ export const Blueprint = () => {
                     onClick={() => handleOpenOutputChannelModal()}
                     className="w-full"
                   >
-                    <MaterialSymbol name="add" />
+                    <Plus />
                     Add Output Channel
                   </Button>
                 </div>
@@ -775,7 +795,7 @@ export const Blueprint = () => {
               aria-label="Open sidebar"
               className="absolute top-4 left-4 z-10 shadow-md"
             >
-              <MaterialSymbol name="menu" size="lg" />
+              <Menu size={24} />
             </Button>
           )}
           <ReactFlow
@@ -924,72 +944,95 @@ export const Blueprint = () => {
               </div>
 
               {/* Options Section (for select and multi_select types) */}
-              {(configFieldForm.type === 'select' || configFieldForm.type === 'multi_select') && (
-                <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="block text-sm font-medium">Options *</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const currentOptions = configFieldForm.options || []
-                        setConfigFieldForm({
-                          ...configFieldForm,
-                          options: [...currentOptions, { label: '', value: '' }]
-                        })
-                      }}
-                    >
-                      <MaterialSymbol name="add" />
-                      Add Option
-                    </Button>
-                  </div>
+              {(configFieldForm.type === 'select' || configFieldForm.type === 'multi_select') && (() => {
+                const isSelect = configFieldForm.type === 'select'
+                const currentOptions = isSelect
+                  ? (configFieldForm.typeOptions?.select?.options || [])
+                  : (configFieldForm.typeOptions?.multiSelect?.options || [])
 
-                  {configFieldForm.options && configFieldForm.options.length > 0 ? (
-                    <div className="space-y-2">
-                      {configFieldForm.options.map((option: any, index: number) => (
-                        <div key={index} className="flex gap-2 items-start">
-                          <div className="flex-1 grid grid-cols-2 gap-2">
-                            <Input
-                              type="text"
-                              value={option.label || ''}
-                              onChange={(e) => {
-                                const newOptions = [...configFieldForm.options]
-                                newOptions[index] = { ...option, label: e.target.value }
-                                setConfigFieldForm({ ...configFieldForm, options: newOptions })
-                              }}
-                              placeholder="Label (e.g., Low)"
-                            />
-                            <Input
-                              type="text"
-                              value={option.value || ''}
-                              onChange={(e) => {
-                                const newOptions = [...configFieldForm.options]
-                                newOptions[index] = { ...option, value: e.target.value }
-                                setConfigFieldForm({ ...configFieldForm, options: newOptions })
-                              }}
-                              placeholder="Value (e.g., low)"
-                            />
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => {
-                              const newOptions = configFieldForm.options.filter((_: any, i: number) => i !== index)
-                              setConfigFieldForm({ ...configFieldForm, options: newOptions })
-                            }}
-                          >
-                            <MaterialSymbol name="delete" className="text-red-500" />
-                          </Button>
-                        </div>
-                      ))}
+                const updateOptions = (newOptions: any[]) => {
+                  if (isSelect) {
+                    setConfigFieldForm({
+                      ...configFieldForm,
+                      typeOptions: {
+                        ...configFieldForm.typeOptions,
+                        select: { options: newOptions }
+                      }
+                    })
+                  } else {
+                    setConfigFieldForm({
+                      ...configFieldForm,
+                      typeOptions: {
+                        ...configFieldForm.typeOptions,
+                        multiSelect: { options: newOptions }
+                      }
+                    })
+                  }
+                }
+
+                return (
+                  <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="block text-sm font-medium">Options *</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          updateOptions([...currentOptions, { label: '', value: '' }])
+                        }}
+                      >
+                        <Plus />
+                        Add Option
+                      </Button>
                     </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 dark:text-zinc-400">
-                      No options added yet. Click "Add Option" to add options.
-                    </p>
-                  )}
-                </div>
-              )}
+
+                    {currentOptions.length > 0 ? (
+                      <div className="space-y-2">
+                        {currentOptions.map((option: any, index: number) => (
+                          <div key={index} className="flex gap-2 items-start">
+                            <div className="flex-1 grid grid-cols-2 gap-2">
+                              <Input
+                                type="text"
+                                value={option.label || ''}
+                                onChange={(e) => {
+                                  const newOptions = [...currentOptions]
+                                  newOptions[index] = { ...option, label: e.target.value }
+                                  updateOptions(newOptions)
+                                }}
+                                placeholder="Label (e.g., Low)"
+                              />
+                              <Input
+                                type="text"
+                                value={option.value || ''}
+                                onChange={(e) => {
+                                  const newOptions = [...currentOptions]
+                                  newOptions[index] = { ...option, value: e.target.value }
+                                  updateOptions(newOptions)
+                                }}
+                                placeholder="Value (e.g., low)"
+                              />
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => {
+                                const newOptions = currentOptions.filter((_: any, i: number) => i !== index)
+                                updateOptions(newOptions)
+                              }}
+                            >
+                              <Trash2 className="text-red-500" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 dark:text-zinc-400">
+                        No options added yet. Click "Add Option" to add options.
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Field Description */}
               <div>
