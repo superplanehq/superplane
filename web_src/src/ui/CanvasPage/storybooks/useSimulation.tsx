@@ -121,7 +121,7 @@ class Engine {
       head.process = new Promise<void>(async () => {
         console.log(`Simulation: Running node ${node.id}`);
         head.state = "running";
-        await run(head.input, updateNode, setOutput);
+        await run(head.input, updateNode, setOutput, queue[1]?.input);
         head.state = "completed";
         console.log(`Simulation: Completed node ${node.id}`);
       });

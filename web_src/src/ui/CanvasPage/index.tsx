@@ -19,7 +19,8 @@ export interface CanvasNode extends ReactFlowNode {
   __run?: (
     input: any,
     update: (path: string, data: any) => void,
-    output: (data: any) => void
+    output: (data: any) => void,
+    next: any
   ) => Promise<void>;
 }
 

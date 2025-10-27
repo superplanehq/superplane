@@ -128,17 +128,23 @@ const sampleNodes: CanvasNode[] = [
             Size: "971.5 MB",
           },
         },
-        nextInQueue: {
-          title: "FEAT-1234: New feature",
-          subtitle: "ef758d40",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30), // 30 minutes ago
-        },
+        nextInQueue: null,
       },
     },
-    __run: async (input, update, output) => {
+    __run: async (input, update, output, next) => {
+      if (next) {
+        console.log("Setting next in queue:", next);
+
+        update("data.nextInQueue", {
+          title: next.title,
+          subtitle: next.subtitle,
+          receivedAt: new Date(),
+        });
+      }
+
       update("data.state", "working");
       update("data.composite.lastRunItem.title", input.title);
-      update("data.composite.lastRunItem.receivedAt", input.subtitle);
+      update("data.composite.lastRunItem.subtitle", input.subtitle);
 
       update("data.composite.lastRunItem.state", "running");
       await sleep(5000);
