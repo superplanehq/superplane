@@ -9,17 +9,31 @@ import {
 
 import { useCallback, useMemo } from "react";
 
+import { AiSidebar } from "../ai";
 import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { useCanvasState } from "./useCanvasState";
+import "./canvas-reset.css";
 
 export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
 }
 
 export interface CanvasEdge extends ReactFlowEdge {}
+
+export type OnApproveFn = (
+  nodeId: string,
+  approveId: string,
+  artifact?: Record<string, string>
+) => void;
+
+export type OnRejectFn = (
+  nodeId: string,
+  rejectId: string,
+  comment?: string
+) => void;
 
 export interface CanvasPageProps {
   nodes: CanvasNode[];
@@ -28,7 +42,10 @@ export interface CanvasPageProps {
   startCollapsed?: boolean;
   title?: string;
   breadcrumbs?: BreadcrumbItem[];
+
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
+  onApprove?: OnApproveFn;
+  onReject?: OnRejectFn;
 }
 
 const EDGE_STYLE = {
@@ -74,6 +91,8 @@ function CanvasContent(props: CanvasPageProps) {
         <Block
           data={nodeProps.data as BlockData}
           onExpand={handleNodeExpand}
+          onApprove={props.onApprove}
+          onReject={props.onReject}
           nodeId={nodeProps.id}
         />
       ),
@@ -136,6 +155,8 @@ function CanvasPage(props: CanvasPageProps) {
       <ReactFlowProvider>
         <CanvasContent {...props} />
       </ReactFlowProvider>
+
+      <AiSidebar />
     </div>
   );
 }

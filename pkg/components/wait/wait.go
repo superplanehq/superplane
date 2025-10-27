@@ -32,7 +32,7 @@ func (w *Wait) Description() string {
 }
 
 func (w *Wait) Icon() string {
-	return "alarm"
+	return "alarm-clock"
 }
 
 func (w *Wait) Color() string {

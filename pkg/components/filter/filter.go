@@ -39,7 +39,7 @@ func (f *Filter) OutputChannels(configuration any) []components.OutputChannel {
 }
 
 func (f *Filter) Icon() string {
-	return "filter_alt"
+	return "funnel"
 }
 
 func (f *Filter) Color() string {

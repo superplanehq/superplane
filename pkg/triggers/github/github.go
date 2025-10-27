@@ -52,11 +52,11 @@ func (g *GitHub) Description() string {
 }
 
 func (g *GitHub) Icon() string {
-	return "graph_1"
+	return "github"
 }
 
 func (g *GitHub) Color() string {
-	return "purple"
+	return "gray"
 }
 
 func (g *GitHub) Configuration() []components.ConfigurationField {

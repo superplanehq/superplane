@@ -20,3 +20,30 @@ export const getColorClass = (color?: string): string => {
       return 'text-blue-600 dark:text-blue-400'
   }
 }
+
+export const getBackgroundColorClass = (color?: string): string => {
+  switch (color) {
+    case 'blue':
+      return 'bg-blue-100'
+    case 'green':
+      return 'bg-green-100'
+    case 'red':
+      return 'bg-red-100'
+    case 'yellow':
+      return 'bg-yellow-100'
+    case 'purple':
+      return 'bg-purple-100'
+    case 'orange':
+      return 'bg-orange-100'
+    case 'pink':
+      return 'bg-pink-100'
+    case 'indigo':
+      return 'bg-indigo-100'
+    case 'sky':
+      return 'bg-sky-100'
+    case 'gray':
+      return 'bg-gray-100'
+    default:
+      return 'bg-gray-100'
+  }
+}
