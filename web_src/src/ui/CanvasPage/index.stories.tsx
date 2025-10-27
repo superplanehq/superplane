@@ -634,6 +634,231 @@ export const CollapsedDeployment: Story = {
   },
 };
 
+export const SimpleComponentsWorkflow: Story = {
+  args: {
+    nodes: [
+      // Trigger node
+      {
+        id: "github-trigger",
+        position: { x: -600, y: 0 },
+        data: {
+          label: "Listen to GitHub events",
+          state: "working",
+          type: "trigger",
+          trigger: {
+            title: "GitHub",
+            iconSrc: githubIcon,
+            iconBackground: "bg-black",
+            headerColor: "bg-gray-100",
+            collapsedBackground: "bg-black",
+            metadata: [
+              { icon: "book", label: "superplane-app" },
+              { icon: "filter", label: "push to main" },
+            ],
+            lastEventData: {
+              title: "feat: add new API endpoint",
+              subtitle: "a1b2c3d4",
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30), // 30 minutes ago
+              state: "processed",
+            },
+            collapsed: false,
+          },
+        },
+      },
+      // Filter component
+      {
+        id: "filter-events",
+        position: { x: -300, y: 0 },
+        data: {
+          label: "Filter events based on branch",
+          state: "success",
+          type: "filter",
+          filter: {
+            title: "Filter events based on branch",
+            filters: [
+              {
+                field: "$.branch",
+                operator: "is",
+                value: "\"main\"",
+                logicalOperator: "AND"
+              },
+              {
+                field: "$.author",
+                operator: "contains",
+                value: "\"pedro\""
+              }
+            ],
+            lastEvent: {
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 25), // 25 minutes ago
+              eventState: "success",
+              eventTitle: "Event passed filter conditions"
+            }
+          },
+        },
+      },
+      // If component
+      {
+        id: "if-processed",
+        position: { x: 0, y: 0 },
+        data: {
+          label: "If processed events",
+          state: "success",
+          type: "if",
+          if: {
+            title: "If processed events",
+            conditions: [
+              {
+                field: "$.title",
+                operator: "contains",
+                value: "\"feat\"",
+                logicalOperator: "OR"
+              },
+              {
+                field: "$.author",
+                operator: "contains",
+                value: "\"pedro\""
+              }
+            ],
+            trueEvent: {
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 20), // 20 minutes ago
+              eventState: "success",
+              eventTitle: "Feature branch detected"
+            },
+            falseEvent: {
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60), // 1 hour ago
+              eventState: "failed",
+              eventTitle: "Not a feature branch"
+            },
+            trueSectionLabel: "TRUE",
+            falseSectionLabel: "FALSE"
+          },
+        },
+      },
+      // Switch component
+      {
+        id: "branch-events",
+        position: { x: 300, y: -200 },
+        data: {
+          label: "Branch processed events",
+          state: "success",
+          type: "switch",
+          switch: {
+            title: "Branch processed events",
+            stages: [
+              {
+                pathName: "MAIN",
+                field: "$.branch",
+                operator: "is",
+                value: "\"main\"",
+                receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15), // 15 minutes ago
+                eventState: "success",
+                eventTitle: "Main branch deployment"
+              },
+              {
+                pathName: "DEV",
+                field: "$.branch",
+                operator: "contains",
+                value: "\"dev\"",
+                receivedAt: new Date(new Date().getTime() - 1000 * 60 * 10), // 10 minutes ago
+                eventState: "success",
+                eventTitle: "Development branch build"
+              },
+              {
+                pathName: "FEATURE",
+                field: "$.branch",
+                operator: "starts with",
+                value: "\"feat/\"",
+                receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5), // 5 minutes ago
+                eventState: "running",
+                eventTitle: "Feature branch testing"
+              }
+            ]
+          },
+        },
+      },
+      // Noop component
+      {
+        id: "noop-wait",
+        position: { x: 300, y: 200 },
+        data: {
+          label: "Don't do anything",
+          state: "success",
+          type: "noop",
+          noop: {
+            title: "Don't do anything",
+            lastEvent: {
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 8), // 8 minutes ago
+              eventState: "success",
+              eventTitle: "Waiting period completed"
+            }
+          },
+        },
+      },
+      // HTTP Request composite component at the end
+      {
+        id: "http-deploy",
+        position: { x: 600, y: 0 },
+        data: {
+          label: "Deploy via HTTP API",
+          state: "working",
+          type: "composite",
+          composite: {
+            title: "Deploy via HTTP API",
+            description: "Execute deployment through REST API endpoint",
+            iconSlug: "globe",
+            iconColor: "text-blue-600",
+            headerColor: "bg-blue-100",
+            collapsedBackground: "bg-blue-100",
+            parameters: ["POST", "/api/v1/deploy"],
+            parametersIcon: "code",
+            lastRunItem: {
+              title: "API Deployment",
+              subtitle: "a1b2c3d4",
+              receivedAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
+              childEventsInfo: {
+                count: 2,
+                state: "running",
+                waitingInfos: [
+                  {
+                    icon: "clock",
+                    info: "Deployment in progress",
+                    futureTimeDate: new Date(new Date().getTime() + 120000), // 2 minutes from now
+                  }
+                ],
+              },
+              state: "running",
+              values: {
+                "Method": "POST",
+                "Endpoint": "/api/v1/deploy",
+                "Branch": "main",
+                "Author": "pedro",
+                "Status": "In Progress"
+              },
+            },
+            collapsed: false
+          }
+        },
+      }
+    ],
+    edges: [
+      { id: "e1", source: "github-trigger", target: "filter-events" },
+      { id: "e2", source: "filter-events", target: "if-processed" },
+      { id: "e3", source: "if-processed", target: "branch-events" },
+      { id: "e4", source: "if-processed", target: "noop-wait" },
+      { id: "e5", source: "branch-events", target: "http-deploy" },
+      { id: "e6", source: "noop-wait", target: "http-deploy" },
+    ],
+    title: "Simple Components Workflow",
+  },
+  render: (args) => {
+    return (
+      <div className="h-[100vh] w-full ">
+        <CanvasPage {...args} />
+      </div>
+    );
+  },
+};
+
 export const BlueprintExecutionPage: Story = {
   args: {
     nodes: [
