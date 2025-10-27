@@ -1,7 +1,8 @@
-import { Trigger, type TriggerProps } from "@/ui/trigger";
-import { Composite, type CompositeProps } from "@/ui/composite";
 import { Approval, type ApprovalProps } from "@/ui/approval";
+import { Composite, type CompositeProps } from "@/ui/composite";
+import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
+import { OnApproveFn, OnRejectFn } from ".";
 
 type BlockState = "pending" | "working";
 type BlockType = "trigger" | "composite" | "approval";
@@ -27,15 +28,20 @@ export interface BlockData {
 
 interface BlockProps {
   data: BlockData;
-  onExpand?: (nodeId: string, nodeData: BlockData) => void;
   nodeId?: string;
+
+  onExpand?: (nodeId: string, nodeData: BlockData) => void;
+  onApprove?: OnApproveFn;
+  onReject?: OnRejectFn;
 }
 
-export function Block({ data, onExpand, nodeId }: BlockProps) {
+export function Block(props: BlockProps) {
+  const data = props.data;
+
   return (
     <div>
       <LeftHandle data={data} />
-      <BlockContent data={data} onExpand={onExpand} nodeId={nodeId} />
+      <BlockContent {...props} />
       <RightHandle data={data} />
     </div>
   );
@@ -98,7 +104,13 @@ function RightHandle({ data }: BlockProps) {
 // Block content is the inner area of the block.
 //
 
-function BlockContent({ data, onExpand, nodeId }: BlockProps) {
+function BlockContent({
+  data,
+  onExpand,
+  onApprove,
+  onReject,
+  nodeId,
+}: BlockProps) {
   const handleExpand = () => {
     if (onExpand && nodeId) {
       onExpand(nodeId, data);
@@ -109,10 +121,53 @@ function BlockContent({ data, onExpand, nodeId }: BlockProps) {
     case "trigger":
       return <Trigger {...(data.trigger as TriggerProps)} />;
     case "composite":
-      return <Composite {...(data.composite as CompositeProps)} onExpandChildEvents={handleExpand} />;
+      return (
+        <Composite
+          {...(data.composite as CompositeProps)}
+          onExpandChildEvents={handleExpand}
+        />
+      );
     case "approval":
-      return <Approval {...(data.approval as ApprovalProps)} />;
+      return (
+        <Approval
+          {...prepApprovalData({ data, nodeId, onApprove, onReject })}
+        />
+      );
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }
+}
+
+function prepApprovalData({
+  data,
+  nodeId,
+  onApprove,
+  onReject,
+}: BlockProps): ApprovalProps {
+  const createApproveFn = (approveId: string) => {
+    return (artifact?: Record<string, string>) => {
+      if (onApprove && nodeId) {
+        onApprove(nodeId, approveId, artifact);
+      }
+    };
+  };
+
+  const createRejectFn = (rejectId: string) => {
+    return (comment?: string) => {
+      if (onReject && nodeId) {
+        onReject(nodeId, rejectId, comment);
+      }
+    };
+  };
+
+  const approvals = data.approval?.approvals || [];
+
+  return {
+    ...data.approval!,
+    approvals: approvals.map((a) => ({
+      ...a,
+      onApprove: createApproveFn(a.id),
+      onReject: createRejectFn(a.id),
+    })),
+  };
 }

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { Edge, Node } from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "../canvas-reset.css";
 
@@ -186,10 +186,6 @@ const sampleNodes: CanvasNode[] = [
                 label: "CVE Report",
               },
             ],
-            onApprove: (artifacts) =>
-              console.log("Security approved with artifacts:", artifacts),
-            onReject: (comment) =>
-              console.log("Security rejected with comment:", comment),
           },
           {
             title: "Compliance",
@@ -246,9 +242,7 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [
-          { icon: "map", items: ["us-west-1", "us-east-1"] }
-        ],
+        parameters: [{ icon: "map", items: ["us-west-1", "us-east-1"] }],
         lastRunItem: {
           title: "FEAT-984: Autocomplete",
           subtitle: "ef758d40",
@@ -297,9 +291,7 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [
-          { icon: "map", items: ["eu-global-1", "eu-global-2"] }
-        ],
+        parameters: [{ icon: "map", items: ["eu-global-1", "eu-global-2"] }],
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
@@ -358,9 +350,7 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [
-          { icon: "map", items: ["asia-east-1"] }
-        ],
+        parameters: [{ icon: "map", items: ["asia-east-1"] }],
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
@@ -414,9 +404,7 @@ const createMockExecutionNodes = (
         iconColor: "text-blue-600",
         headerColor: "bg-blue-100",
         collapsedBackground: "bg-blue-100",
-        parameters: [
-          { icon: "code", items: ["POST", "/api/deploy"] }
-        ],
+        parameters: [{ icon: "code", items: ["POST", "/api/deploy"] }],
         lastRunItem: lastRunItem,
         collapsed: false,
       },
@@ -500,6 +488,24 @@ export const SimpleDeployment: Story = {
       [args.title]
     );
 
+    const runSimulation = useSimulationRunner({ nodes, edges, setNodes });
+
+    const handleAprove = (
+      nodeId: string,
+      approveId: string,
+      artifacts?: Record<string, string>
+    ) => {
+      console.log("Approved with artifacts:", artifacts);
+    };
+
+    const handleReject = (
+      nodeId: string,
+      approveId: string,
+      comment?: string
+    ) => {
+      console.log("Rejected with comment:", comment);
+    };
+
     const renderContent = () => {
       if (currentView === "execution" && executionContext) {
         return (
@@ -521,11 +527,11 @@ export const SimpleDeployment: Story = {
           nodes={nodes}
           edges={edges}
           onNodeExpand={handleNodeExpand}
+          onApprove={handleAprove}
+          onReject={handleReject}
         />
       );
     };
-
-    const runSimulation = useSimulationRunner({ nodes, edges, setNodes });
 
     return (
       <div className="h-[100vh] w-full ">
