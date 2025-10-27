@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 
 import {
   BlueprintsBlueprint,
@@ -15,7 +15,7 @@ import {
   workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
 
-import { useWorkflow, useTriggers, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions } from "@/hooks/useWorkflowData";
+import { useWorkflow, useTriggers, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
@@ -29,6 +29,7 @@ export function WorkflowPageV2() {
     workflowId: string;
   }>();
 
+  const queryClient = useQueryClient();
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
@@ -65,9 +66,9 @@ export function WorkflowPageV2() {
   const { nodes, edges } = useMemo(
     () => {
       if (!workflow) return { nodes: [], edges: [] };
-      return prepareData(workflow, triggers, blueprints, components, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareData(workflow, triggers, blueprints, components, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId!, queryClient);
     },
-    [workflow, triggers, blueprints, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap]
+    [workflow, triggers, blueprints, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient]
   );
 
   // Show loading indicator while data is being fetched
@@ -154,7 +155,9 @@ function prepareData(
   components: ComponentsComponent[],
   nodeEventsMap: Record<string, any>,
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem>
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem>,
+  workflowId: string,
+  queryClient: any
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -169,7 +172,8 @@ function prepareData(
       nodeEventsMap,
       nodeExecutionsMap,
       nodeQueueItemsMap,
-      data.id!
+      workflowId,
+      queryClient
     )
   });
 
@@ -291,7 +295,8 @@ function prepareNode(
   nodeEventsMap: Record<string, any>,
   nodeExecutionsMap: Record<string, any>,
   nodeQueueItemsMap: Record<string, any>,
-  workflowId: string
+  workflowId: string,
+  queryClient: any
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -299,7 +304,7 @@ function prepareNode(
     case "TYPE_BLUEPRINT":
       return prepareCompositeNode(node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
     default:
-      return prepareComponentNode(node, components, nodeExecutionsMap, workflowId);
+      return prepareComponentNode(node, components, nodeExecutionsMap, workflowId, queryClient);
   }
 }
 
@@ -307,11 +312,12 @@ function prepareComponentNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, any>,
-  workflowId: string
+  workflowId: string,
+  queryClient: any
 ): CanvasNode {
   switch (node.component?.name) {
     case "approval":
-      return prepareApprovalNode(node, components, nodeExecutionsMap, workflowId);
+      return prepareApprovalNode(node, components, nodeExecutionsMap, workflowId, queryClient);
   }
 
   return {
@@ -329,17 +335,21 @@ function prepareApprovalNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  workflowId: string
+  workflowId: string,
+  queryClient: any
 ): CanvasNode {
   const metadata = components.find((c) => c.name === "approval");
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
-  const executionMetadata = execution?.metadata;
+  const executionMetadata = execution?.metadata as any;
 
   // Map backend records to approval items
   const approvals = (executionMetadata?.records || []).map((record: any) => {
     const isPending = record.state === 'pending';
     const isExecutionActive = execution?.state === 'STATE_STARTED';
+
+    const approvalComment = record.approval?.comment;
+    const hasApprovalArtifacts = record.state === 'approved' && approvalComment;
 
     return {
       id: `${record.index}`,
@@ -352,6 +362,16 @@ function prepareApprovalNode(
       approverAvatar: record.user?.avatarUrl,
       rejectionComment: record.rejection?.reason,
       interactive: isPending && isExecutionActive,
+      requireArtifacts: isPending && isExecutionActive ? [
+        {
+          label: "comment",
+          optional: true,
+        }
+      ] : undefined,
+      artifacts: hasApprovalArtifacts ? {
+        "Comment": approvalComment,
+      } : undefined,
+      artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
         if (!execution?.id) return;
 
@@ -372,10 +392,9 @@ function prepareApprovalNode(
             })
           );
 
-          // TODO: Refresh execution data to show updated state
-        } catch (error) {
+          queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(workflowId, node.id!) });
+        } catch (error: any) {
           console.error('Failed to approve:', error);
-          // TODO: Show error toast/notification
         }
       },
       onReject: async (comment?: string) => {
@@ -398,10 +417,9 @@ function prepareApprovalNode(
             })
           );
 
-          // TODO: Refresh execution data to show updated state
-        } catch (error) {
+          queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(workflowId, node.id!) });
+        } catch (error: any) {
           console.error('Failed to reject:', error);
-          // TODO: Show error toast/notification
         }
       },
     };
