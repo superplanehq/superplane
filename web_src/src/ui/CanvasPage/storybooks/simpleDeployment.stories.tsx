@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { Button } from "../../button";
 import { CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
+import { genDockerImage } from "./dockerImages";
 import { handleNodeExpand } from "./navigation";
 import { SimulationEngine, sleep, useSimulationRunner } from "./useSimulation";
 
@@ -91,6 +92,21 @@ const sampleNodes: CanvasNode[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 3), // 3 hours ago
           state: "processed",
         },
+      },
+    },
+    __simulation: {
+      run: async (_input, update, output) => {
+        const commit = genDockerImage();
+
+        const event = {
+          title: commit.message,
+          subtitle: commit.size,
+          receivedAt: new Date(),
+          state: "processed",
+        };
+
+        update("data.trigger.lastEventData", event);
+        output(event);
       },
     },
   },
