@@ -1,21 +1,17 @@
+import {
+  ArrowRightIcon,
+  BotIcon,
+  CheckIcon,
+  CopyIcon,
+  FileIcon,
+  ListIcon,
+  PaperclipIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react";
+
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BounceLoader } from "react-spinners";
-
-import type { AvatarPerson } from "../Avatar";
-import { Avatar } from "../Avatar";
-import {
-  IconArrowRight,
-  IconCheck,
-  IconCopy,
-  IconHistory,
-  IconPaperclip,
-  IconPlus,
-  IconRobotFace,
-  IconX,
-} from "../icons";
-import { TextField } from "../TextField";
-import { StatusBadge } from "../StatusBadge";
 
 export namespace Conversations {
   export interface Message {
@@ -95,7 +91,10 @@ export namespace Conversations {
     /**
      * Called when a conversation title is updated
      */
-    onUpdateConversationTitle?: (conversationId: string, newTitle: string) => void;
+    onUpdateConversationTitle?: (
+      conversationId: string,
+      newTitle: string
+    ) => void;
 
     /**
      * Context-aware actions available for current page
@@ -106,11 +105,6 @@ export namespace Conversations {
      * Current context attachment (goal, project, etc.)
      */
     contextAttachment?: ContextAttachment;
-
-    /**
-     * Current user for displaying avatar instead of "You"
-     */
-    me: AvatarPerson;
 
     /**
      * Initial width of the panel in pixels
@@ -152,9 +146,9 @@ function CopyButton({ text }: { text: string }) {
       aria-label={copied ? "Copied!" : "Copy message"}
     >
       {copied ? (
-        <IconCheck size={14} className="text-green-600" />
+        <CheckIcon size={14} className="text-green-600" />
       ) : (
-        <IconCopy size={14} className="text-content-dimmed" />
+        <CopyIcon size={14} className="text-content-dimmed" />
       )}
     </button>
   );
@@ -168,10 +162,8 @@ export function Conversations({
   activeConversationId,
   onSelectConversation,
   onCreateConversation,
-  onUpdateConversationTitle,
   contextActions = [],
   contextAttachment,
-  me,
   initialWidth = 448, // (w-md equivalent)
   minWidth = 320, // Minimum usable width
   maxWidth = 600, // Maximum width
@@ -186,7 +178,9 @@ export function Conversations({
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Get the active conversation
-  const activeConversation = conversations.find((c) => c.id === activeConversationId);
+  const activeConversation = conversations.find(
+    (c) => c.id === activeConversationId
+  );
 
   // Handle mounting
   useEffect(() => {
@@ -276,7 +270,9 @@ export function Conversations({
     }
   };
 
-  const groupConversationsByTime = (conversations: Conversations.Conversation[]) => {
+  const groupConversationsByTime = (
+    conversations: Conversations.Conversation[]
+  ) => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(today);
@@ -338,13 +334,15 @@ export function Conversations({
   const panelContent = (
     <div
       ref={panelRef}
-      className="fixed inset-y-0 right-0 z-50 bg-surface-base border-l border-surface-outline shadow-xl flex flex-col"
+      className="fixed inset-y-0 right-0 z-[999] bg-white border-l border-surface-outline shadow-xl flex flex-col"
       style={{ width: `${panelWidth}px` }}
     >
       {/* Resize Handle */}
       <div
         className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize transition-all ${
-          isResizing ? "bg-accent-base" : "hover:bg-accent-base/50 bg-surface-outline/50"
+          isResizing
+            ? "bg-accent-base"
+            : "hover:bg-accent-base/50 bg-surface-outline/50"
         }`}
         onMouseDown={handleResizeStart}
         title="Drag to resize"
@@ -360,20 +358,7 @@ export function Conversations({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-outline bg-surface-base">
         <div className="flex items-center gap-2 flex-1 min-w-0 text-sm">
-          {activeConversation ? (
-            <TextField
-              text={activeConversation.title || "New Chat"}
-              onChange={(newTitle) => {
-                if (onUpdateConversationTitle) {
-                  onUpdateConversationTitle(activeConversation.id, newTitle);
-                }
-              }}
-              variant="inline"
-              placeholder="New Chat"
-            />
-          ) : (
-            <h2 className=" text-content-accent">New Chat</h2>
-          )}
+          <h2 className=" text-content-accent">New Chat</h2>
         </div>
         <div className="flex items-center gap-1">
           {/* Conversations List Toggle */}
@@ -382,7 +367,7 @@ export function Conversations({
             className="p-2 text-content-dimmed hover:text-content-base hover:bg-surface-highlight rounded transition-colors"
             title="View past conversations"
           >
-            <IconHistory size={16} />
+            <ListIcon size={16} />
           </button>
 
           {/* New Conversation */}
@@ -391,7 +376,7 @@ export function Conversations({
             className="p-2 text-content-dimmed hover:text-content-base hover:bg-surface-highlight rounded transition-colors"
             title="New conversation"
           >
-            <IconPlus size={16} />
+            <PlusIcon size={16} />
           </button>
 
           {/* Close */}
@@ -400,7 +385,7 @@ export function Conversations({
             className="p-2 text-content-dimmed hover:text-content-base hover:bg-surface-highlight rounded transition-colors"
             title="Close"
           >
-            <IconX size={16} />
+            <XIcon size={16} />
           </button>
         </div>
       </div>
@@ -414,42 +399,48 @@ export function Conversations({
               onClick={() => setShowConversationsList(false)}
               className="p-1 text-content-subtle hover:text-content-base hover:bg-surface-highlight rounded transition-colors"
             >
-              <IconX size={16} />
+              <XIcon size={16} />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {conversations.length === 0 ? (
               <div className="p-4 text-center text-content-dimmed">
-                <IconHistory size={32} className="mx-auto mb-2 opacity-50" />
+                <FileIcon size={32} className="mx-auto mb-2 opacity-50" />
                 <p>No conversations yet</p>
                 <p className="text-sm">Start a new conversation to begin</p>
               </div>
             ) : (
               <div className="py-2">
-                {groupConversationsByTime(conversations).map(([groupName, groupConversations]) => (
-                  <div key={groupName} className="mb-4">
-                    <div className="px-4 py-1 text-xs font-medium text-content-dimmed uppercase tracking-wide">
-                      {groupName}
+                {groupConversationsByTime(conversations).map(
+                  ([groupName, groupConversations]) => (
+                    <div key={groupName} className="mb-4">
+                      <div className="px-4 py-1 text-xs font-medium text-content-dimmed uppercase tracking-wide">
+                        {groupName}
+                      </div>
+                      <div className="space-y-0.5">
+                        {groupConversations.map((conversation) => (
+                          <button
+                            key={conversation.id}
+                            onClick={() => {
+                              onSelectConversation?.(conversation.id);
+                              setShowConversationsList(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 hover:bg-surface-highlight transition-colors ${
+                              activeConversationId === conversation.id
+                                ? "bg-surface-highlight"
+                                : ""
+                            }`}
+                          >
+                            <div className="text-sm text-content-base truncate">
+                              {conversation.title}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-0.5">
-                      {groupConversations.map((conversation) => (
-                        <button
-                          key={conversation.id}
-                          onClick={() => {
-                            onSelectConversation?.(conversation.id);
-                            setShowConversationsList(false);
-                          }}
-                          className={`w-full text-left px-4 py-2 hover:bg-surface-highlight transition-colors ${
-                            activeConversationId === conversation.id ? "bg-surface-highlight" : ""
-                          }`}
-                        >
-                          <div className="text-sm text-content-base truncate">{conversation.title}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             )}
           </div>
@@ -459,9 +450,14 @@ export function Conversations({
       {/* Context Attachment */}
       {(activeConversation?.context || contextAttachment) && (
         <div className="px-4 py-3 border-b border-surface-outline bg-surface-base">
-          <div className="text-xs text-content-dimmed mb-2 uppercase tracking-wide font-medium">Context</div>
+          <div className="text-xs text-content-dimmed mb-2 uppercase tracking-wide font-medium">
+            Context
+          </div>
           <div className="flex items-center gap-2">
-            <IconPaperclip size={14} className="text-content-base flex-shrink-0" />
+            <PaperclipIcon
+              size={14}
+              className="text-content-base flex-shrink-0"
+            />
             <div className="min-w-0 flex-1">
               <div className="text-sm text-content-base truncate">
                 {(activeConversation?.context || contextAttachment)?.title}
@@ -474,7 +470,9 @@ export function Conversations({
       {/* Context Actions */}
       {contextActions.length > 0 && !activeConversation && (
         <div className="px-4 py-3 border-b border-surface-outline bg-surface-base">
-          <div className="text-xs text-content-dimmed mb-2 uppercase tracking-wide font-medium">Available Actions</div>
+          <div className="text-xs text-content-dimmed mb-2 uppercase tracking-wide font-medium">
+            Available Actions
+          </div>
           <div className="flex flex-col gap-2">
             {contextActions.map((action) => (
               <button
@@ -484,9 +482,6 @@ export function Conversations({
               >
                 <div className="flex items-center justify-between">
                   <span>{action.label}</span>
-                  {action.experimental && (
-                    <StatusBadge status="pending" customLabel="Experimental" className="ml-2 text-xs" />
-                  )}
                 </div>
               </button>
             ))}
@@ -499,13 +494,14 @@ export function Conversations({
         <div className="px-4 py-4 border-b border-surface-outline bg-surface-base">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-accent-base rounded-full flex items-center justify-center flex-shrink-0">
-              <IconRobotFace size={20} className="text-white" />
+              <BotIcon size={20} className="text-white" />
             </div>
             <div className="flex-1">
               <p className="text-sm text-content-dimmed">
                 {contextAttachment ? (
                   <>
-                    Ready to help with <em>{contextAttachment.title}</em>. Select an action to get started.
+                    Ready to help with <em>{contextAttachment.title}</em>.
+                    Select an action to get started.
                   </>
                 ) : (
                   "How can I assist you today?"
@@ -523,10 +519,12 @@ export function Conversations({
             {contextActions.length === 0 && (
               <>
                 <div className="w-16 h-16 bg-accent-base rounded-full flex items-center justify-center mb-4">
-                  <IconRobotFace size={32} className="text-white" />
+                  <BotIcon size={32} className="text-white" />
                 </div>
                 <h3 className="font-medium mb-2">Welcome to Alfred</h3>
-                <p className="text-sm mb-4">Start a conversation to get AI assistance with your work.</p>
+                <p className="text-sm mb-4">
+                  Start a conversation to get AI assistance with your work.
+                </p>
                 <button
                   onClick={() => onCreateConversation?.(null)}
                   className="px-4 py-2 bg-accent-base text-white rounded hover:bg-accent-hover transition-colors"
@@ -541,15 +539,20 @@ export function Conversations({
             {activeConversation.messages
               .filter((message) => message.status !== "pending")
               .map((message) => (
-                <div key={message.id} className={`flex gap-3 ${message.sender === "user" ? "flex-row-reverse" : ""}`}>
+                <div
+                  key={message.id}
+                  className={`flex gap-3 ${
+                    message.sender === "user" ? "flex-row-reverse" : ""
+                  }`}
+                >
                   {/* Avatar */}
                   <div className="flex-shrink-0">
                     {message.sender === "ai" ? (
                       <div className="w-8 h-8 bg-accent-base rounded-full flex items-center justify-center">
-                        <IconRobotFace size={16} className="text-white" />
+                        <BotIcon size={16} className="text-white" />
                       </div>
                     ) : (
-                      <Avatar person={me} size={32} />
+                      <BotIcon size={32} className="text-content-dimmed" />
                     )}
                   </div>
 
@@ -561,17 +564,23 @@ export function Conversations({
                           : "bg-surface-highlight text-content-base"
                       }`}
                     >
-                      <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                      <div className="text-sm whitespace-pre-wrap">
+                        {message.content}
+                      </div>
                       <div
                         className={`text-xs mt-1 ${
-                          message.sender === "user" ? "text-white/70" : "text-content-dimmed"
+                          message.sender === "user"
+                            ? "text-white/70"
+                            : "text-content-dimmed"
                         }`}
                       >
                         {formatTime(message.timestamp)}
                       </div>
 
                       {/* Copy button for AI messages */}
-                      {message.sender === "ai" && <CopyButton text={message.content} />}
+                      {message.sender === "ai" && (
+                        <CopyButton text={message.content} />
+                      )}
                     </div>
 
                     {/* Message Actions */}
@@ -593,12 +602,15 @@ export function Conversations({
               ))}
 
             {/* Typing indicator for pending AI messages */}
-            {activeConversation.messages.some((message) => message.sender === "ai" && message.status === "pending") && (
+            {activeConversation.messages.some(
+              (message) =>
+                message.sender === "ai" && message.status === "pending"
+            ) && (
               <div className="flex gap-3">
                 {/* AI Avatar */}
                 <div className="flex-shrink-0">
                   <div className="w-8 h-8 bg-accent-base rounded-full flex items-center justify-center">
-                    <IconRobotFace size={16} className="text-white" />
+                    <BotIcon size={16} className="text-white" />
                   </div>
                 </div>
 
@@ -606,7 +618,9 @@ export function Conversations({
                   <div className="rounded-lg px-3 py-2 bg-surface-highlight text-content-base">
                     <div className="flex items-center gap-2">
                       <BounceLoader size={16} color="#6B7280" />
-                      <span className="text-sm text-content-dimmed">Alfred is typing...</span>
+                      <span className="text-sm text-content-dimmed">
+                        Alfred is typing...
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -640,10 +654,12 @@ export function Conversations({
               disabled={!inputMessage.trim()}
               className="px-3 py-2 bg-accent-base text-white rounded hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <IconArrowRight size={16} />
+              <ArrowRightIcon size={16} />
             </button>
           </div>
-          <div className="text-[10px] text-content-dimmed mt-1">Press Enter to send, Shift+Enter for new line</div>
+          <div className="text-[10px] text-content-dimmed mt-1">
+            Press Enter to send, Shift+Enter for new line
+          </div>
         </div>
       )}
     </div>
@@ -652,8 +668,39 @@ export function Conversations({
   return createPortal(panelContent, document.body);
 }
 
+function BounceLoader({
+  size = 16,
+  color = "#000",
+}: {
+  size?: number;
+  color?: string;
+}) {
+  return (
+    <div
+      className="flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
+      <div
+        className="w-2 h-2 bg-current rounded-full animate-bounce"
+        style={{ backgroundColor: color, animationDelay: "0s" }}
+      ></div>
+      <div
+        className="w-2 h-2 bg-current rounded-full animate-bounce mx-1"
+        style={{ backgroundColor: color, animationDelay: "0.2s" }}
+      ></div>
+      <div
+        className="w-2 h-2 bg-current rounded-full animate-bounce"
+        style={{ backgroundColor: color, animationDelay: "0.4s" }}
+      ></div>
+    </div>
+  );
+}
+
 export default Conversations;
 
 // Re-export the hook and types
 export { useConversations } from "./useConversations";
-export type { UseConversationsOptions, UseConversationsReturn } from "./useConversations";
+export type {
+  UseConversationsOptions,
+  UseConversationsReturn,
+} from "./useConversations";
