@@ -7,13 +7,11 @@ import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "../../button";
-import { LastRunItem } from "../../composite";
-import type { BreadcrumbItem } from "../Header";
 import { CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
-import { navigateToStoryWithData } from "./navigation";
+import { handleNodeExpand, navigateToStoryWithData } from "./navigation";
 import { RunSimulationFn, sleep, useSimulationRunner } from "./useSimulation";
 
 const meta = {
@@ -385,35 +383,6 @@ const sampleEdges: Edge[] = [
   { id: "e6", source: "approve", target: "deploy-asia" },
 ];
 
-// Mock execution workflow for expanded nodes
-const createMockExecutionNodes = (
-  title: string,
-  lastRunItem: LastRunItem
-): Node[] => [
-  {
-    id: "http-request",
-    position: { x: 0, y: 0 },
-    data: {
-      label: "HTTP Request",
-      state: "pending",
-      type: "composite",
-      composite: {
-        title: "HTTP Request",
-        description: `Execute HTTP request for ${title}`,
-        iconSlug: "globe",
-        iconColor: "text-blue-600",
-        headerColor: "bg-blue-100",
-        collapsedBackground: "bg-blue-100",
-        parameters: [{ icon: "code", items: ["POST", "/api/deploy"] }],
-        lastRunItem: lastRunItem,
-        collapsed: false,
-      },
-    },
-  },
-];
-
-const createMockExecutionEdges = (): Edge[] => [];
-
 export const SimpleDeployment: Story = {
   args: {
     nodes: sampleNodes,
@@ -423,71 +392,6 @@ export const SimpleDeployment: Story = {
   render: function SimpleDeploymentRender(args) {
     const [nodes, setNodes] = useState<Node[]>(args.nodes ?? []);
     const edges = useMemo(() => args.edges ?? [], [args.edges]);
-
-    const [currentView, setCurrentView] = useState<"main" | "execution">(
-      "main"
-    );
-
-    const [executionContext, setExecutionContext] = useState<{
-      title: string;
-      breadcrumbs: BreadcrumbItem[];
-      lastRunItem?: LastRunItem;
-    } | null>(null);
-
-    const handleNodeExpand = useCallback(
-      (nodeId: string, nodeData: any) => {
-        const nodeTitle = nodeData.composite?.title || nodeData.label;
-        const composite = nodeData.composite;
-
-        // Navigate to BlueprintExecutionPage story with data for specific nodes
-        if (
-          nodeTitle === "Build/Test/Deploy Stage" ||
-          nodeTitle === "Deploy to US" ||
-          nodeTitle === "Deploy to EU" ||
-          nodeTitle === "Deploy to Asia"
-        ) {
-          const executionData = {
-            title: nodeTitle,
-            composite: composite,
-            parentWorkflow: args.title || "Simple Deployment",
-            nodeId: nodeId,
-            timestamp: Date.now(),
-          };
-
-          navigateToStoryWithData(
-            "pages-canvaspage--blueprint-execution-page",
-            executionData
-          );
-          return;
-        }
-
-        const breadcrumbs: BreadcrumbItem[] = [
-          {
-            label: "Workflows",
-          },
-          {
-            label: args.title || "Simple Deployment",
-            onClick: () => setCurrentView("main"),
-          },
-          {
-            label: nodeTitle,
-            iconSrc: composite?.iconSrc,
-            iconSlug: composite?.iconSlug,
-            iconColor: composite?.iconColor,
-            iconBackground: composite?.iconBackground,
-          },
-        ];
-
-        setExecutionContext({
-          title: nodeTitle,
-          breadcrumbs,
-          lastRunItem: composite?.lastRunItem,
-        });
-        setCurrentView("execution");
-      },
-      [args.title]
-    );
-
     const runSimulation = useSimulationRunner({ nodes, edges, setNodes });
 
     const handleAprove = (
@@ -507,20 +411,6 @@ export const SimpleDeployment: Story = {
     };
 
     const renderContent = () => {
-      if (currentView === "execution" && executionContext) {
-        return (
-          <CanvasPage
-            nodes={createMockExecutionNodes(
-              executionContext.title,
-              executionContext.lastRunItem!
-            )}
-            edges={createMockExecutionEdges()}
-            title={executionContext.title}
-            breadcrumbs={executionContext.breadcrumbs}
-          />
-        );
-      }
-
       return (
         <CanvasPage
           {...args}

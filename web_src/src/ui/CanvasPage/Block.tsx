@@ -3,9 +3,13 @@ import { Composite, type CompositeProps } from "@/ui/composite";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 import { OnApproveFn, OnRejectFn } from ".";
+import { Filter, FilterProps } from "../filter";
+import { If, IfProps } from "../if";
+import { Noop, NoopProps } from "../noop";
+import { SwitchComponent, SwitchComponentProps } from "../switchComponent";
 
-type BlockState = "pending" | "working";
-type BlockType = "trigger" | "composite" | "approval";
+type BlockState = "pending" | "working" | "success" | "failed" | "running";
+type BlockType = "trigger" | "composite" | "approval" | "filter" | "if" | "noop" | "switch";
 
 export interface BlockData {
   label: string;
@@ -24,6 +28,18 @@ export interface BlockData {
 
   // approval node specific props
   approval?: ApprovalProps;
+
+  // filter node specific props
+  filter?: FilterProps;
+
+  // if node specific props
+  if?: IfProps;
+
+  // noop node specific props
+  noop?: NoopProps;
+
+  // switch node specific props
+  switch?: SwitchComponentProps;
 }
 
 interface BlockProps {
@@ -64,7 +80,11 @@ function LeftHandle({ data }: BlockProps) {
 
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
-    (data.type === "approval" && data.approval?.collapsed);
+    (data.type === "approval" && data.approval?.collapsed) ||
+    (data.type === "filter" && data.filter?.collapsed) ||
+    (data.type === "if" && data.if?.collapsed) ||
+    (data.type === "noop" && data.noop?.collapsed) ||
+    (data.type === "switch" && data.switch?.collapsed);
 
   return (
     <Handle
@@ -84,7 +104,11 @@ function RightHandle({ data }: BlockProps) {
   const isCollapsed =
     (data.type === "composite" && data.composite?.collapsed) ||
     (data.type === "approval" && data.approval?.collapsed) ||
-    (data.type === "trigger" && data.trigger?.collapsed);
+    (data.type === "trigger" && data.trigger?.collapsed) ||
+    (data.type === "filter" && data.filter?.collapsed) ||
+    (data.type === "if" && data.if?.collapsed) ||
+    (data.type === "noop" && data.noop?.collapsed) ||
+    (data.type === "switch" && data.switch?.collapsed);
 
   return (
     <Handle
@@ -133,6 +157,14 @@ function BlockContent({
           {...prepApprovalData({ data, nodeId, onApprove, onReject })}
         />
       );
+    case "filter":
+      return <Filter {...(data.filter as FilterProps)} />;
+    case "if":
+      return <If {...(data.if as IfProps)} />;
+    case "noop":
+      return <Noop {...(data.noop as NoopProps)} />;
+    case "switch":
+      return <SwitchComponent {...(data.switch as SwitchComponentProps)} />;
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }

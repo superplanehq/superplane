@@ -7,6 +7,7 @@ import "./../canvas-reset.css";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { CanvasPage } from "./../index";
+import { handleNodeExpand } from "./navigation";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -80,7 +81,7 @@ const ephemeralNodes: Node[] = [
     id: "ephemeral-provisioner",
     position: { x: 600, y: 0 },
     data: {
-      label: "Ephemeral Environments Provisioner",
+      label: "Provisioner",
       state: "pending",
       type: "composite",
       composite: {
@@ -134,7 +135,7 @@ const ephemeralNodes: Node[] = [
     id: "ephemeral-deprovisioner",
     position: { x: 1200, y: 0 },
     data: {
-      label: "Ephemeral Environments Deprovisioner",
+      label: "Desprovisioner",
       state: "pending",
       type: "composite",
       composite: {
@@ -186,6 +187,15 @@ export const Ephemeral: Story = {
   args: {
     nodes: ephemeralNodes,
     edges: ephemeralEdges,
+    onNodeExpand: handleNodeExpand,
+    breadcrumbs: [
+      {
+        label: "Workflows",
+      },
+      {
+        label: "Ephemeral Environments",
+      },
+    ]
   },
   render: (args) => {
     return (
