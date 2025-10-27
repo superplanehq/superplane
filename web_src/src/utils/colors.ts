@@ -16,8 +16,10 @@ export const getColorClass = (color?: string): string => {
       return 'text-pink-600 dark:text-pink-400'
     case 'indigo':
       return 'text-indigo-600 dark:text-indigo-400'
+    case 'white':
+      return 'text-white-600 dark:text-white-400'
     default:
-      return 'text-blue-600 dark:text-blue-400'
+      return 'text-gray-600 dark:text-gray-400'
   }
 }
 

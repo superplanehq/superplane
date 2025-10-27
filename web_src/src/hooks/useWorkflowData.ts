@@ -37,8 +37,8 @@ export const workflowKeys = {
   nodeQueueItem: (workflowId: string, nodeId: string) =>
     [...workflowKeys.nodeQueueItems(), workflowId, nodeId] as const,
   nodeEvents: () => [...workflowKeys.all, 'nodeEvents'] as const,
-  nodeEvent: (workflowId: string, nodeId: string) =>
-    [...workflowKeys.nodeEvents(), workflowId, nodeId] as const,
+  nodeEvent: (workflowId: string, nodeId: string, limit?: number) =>
+    [...workflowKeys.nodeEvents(), workflowId, nodeId, limit] as const,
 }
 
 export const triggerKeys = {
@@ -237,24 +237,35 @@ export const useNodeQueueItems = (workflowId: string, nodeId: string) => {
   })
 }
 
+export const nodeEventsQueryOptions = (
+  workflowId: string,
+  nodeId: string,
+  options?: {
+    limit?: number
+  }
+) => ({
+  queryKey: workflowKeys.nodeEvent(workflowId, nodeId, options?.limit),
+  queryFn: async () => {
+    const response = await workflowsListNodeEvents(
+      withOrganizationHeader({
+        path: {
+          workflowId,
+          nodeId,
+        },
+        query: options?.limit ? {
+          limit: options.limit,
+        } : undefined,
+      })
+    )
+    return response.data
+  },
+  staleTime: 30 * 1000, // 30 seconds
+  gcTime: 5 * 60 * 1000, // 5 minutes
+  enabled: !!workflowId && !!nodeId,
+})
+
 export const useNodeEvents = (workflowId: string, nodeId: string) => {
-  return useQuery({
-    queryKey: workflowKeys.nodeEvent(workflowId, nodeId),
-    queryFn: async () => {
-      const response = await workflowsListNodeEvents(
-        withOrganizationHeader({
-          path: {
-            workflowId,
-            nodeId,
-          },
-        })
-      )
-      return response.data
-    },
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!workflowId && !!nodeId,
-  })
+  return useQuery(nodeEventsQueryOptions(workflowId, nodeId))
 }
 
 // Hooks for fetching triggers

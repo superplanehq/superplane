@@ -19,5 +19,5 @@ export interface TriggerRenderer {
    * @param trigger The trigger metadata from the backend
    * @returns the props needed to render the Trigger UI component
    */
-  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger) => TriggerProps;
+  getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => TriggerProps;
 }
