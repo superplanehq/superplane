@@ -57,7 +57,7 @@ func (s *Schedule) Description() string {
 }
 
 func (s *Schedule) Icon() string {
-	return "schedule"
+	return "alarm-clock"
 }
 
 func (s *Schedule) Color() string {

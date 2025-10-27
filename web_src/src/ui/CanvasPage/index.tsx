@@ -15,6 +15,7 @@ import { Block, BlockData } from "./Block";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { useCanvasState } from "./useCanvasState";
+import "./canvas-reset.css";
 
 export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;

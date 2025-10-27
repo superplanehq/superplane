@@ -39,7 +39,7 @@ export function Block(props: BlockProps) {
   const data = props.data;
 
   return (
-    <div>
+    <div className="relative w-fit">
       <LeftHandle data={data} />
       <BlockContent {...props} />
       <RightHandle data={data} />

@@ -27,7 +27,7 @@ func (s *Start) Description() string {
 }
 
 func (s *Start) Icon() string {
-	return "start"
+	return "play"
 }
 
 func (s *Start) Color() string {
