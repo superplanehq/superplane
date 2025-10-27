@@ -1,6 +1,17 @@
 import { useRef } from "react";
 import { CanvasEdge, CanvasNode } from "..";
 
+export type UpdateDataFn = (path: string, data: any) => void;
+export type OutputFn = (data: any) => void;
+
+export interface Simulation {
+  // Function that runs when there is any change to the queue
+  onQueueChange?: (next: any, update: UpdateDataFn) => void;
+
+  // Function that runs when the node is executed in a simulation
+  run: (input: any, update: UpdateDataFn, output: OutputFn) => Promise<void>;
+}
+
 type SetNodesFn = React.Dispatch<React.SetStateAction<CanvasNode[]>>;
 
 interface SimulationProps {
@@ -85,13 +96,15 @@ class Engine {
 
   private async processNode(nodeId: string) {
     const node = this.findNodeById(nodeId);
-    const run = node.__run || noOp;
+    const run = node.__simulation?.run || noOp;
+    const onQueueChange = node.__simulation?.onQueueChange || (() => {});
     const queue = this.queues.get(nodeId);
 
     if (!queue) return;
     if (queue.length === 0) return;
 
     const head = queue[0]!;
+    const next = queue[1];
 
     const updateNode = (path: string, value: any) => {
       this.setNodes((prevNodes) =>
@@ -120,9 +133,11 @@ class Engine {
     if (head.state === "pending") {
       head.process = new Promise<void>(async () => {
         console.log(`Simulation: Running node ${node.id}`);
+        onQueueChange(next, updateNode);
         head.state = "running";
-        await run(head.input, updateNode, setOutput, queue[1]?.input);
+        await run(head.input, updateNode, setOutput);
         head.state = "completed";
+        onQueueChange(next, updateNode);
         console.log(`Simulation: Completed node ${node.id}`);
       });
 

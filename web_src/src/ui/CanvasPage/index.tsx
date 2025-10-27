@@ -12,16 +12,11 @@ import { useCallback, useMemo } from "react";
 import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
 import { Header, type BreadcrumbItem } from "./Header";
+import { Simulation } from "./storybooks/useSimulation";
 import { useCanvasState } from "./useCanvasState";
 
 export interface CanvasNode extends ReactFlowNode {
-  // Used for simulations in storybooks
-  __run?: (
-    input: any,
-    update: (path: string, data: any) => void,
-    output: (data: any) => void,
-    next: any
-  ) => Promise<void>;
+  __simulation?: Simulation;
 }
 
 export interface CanvasEdge extends ReactFlowEdge {}

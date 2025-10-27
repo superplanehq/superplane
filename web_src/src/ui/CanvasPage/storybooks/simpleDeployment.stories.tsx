@@ -55,18 +55,20 @@ const sampleNodes: CanvasNode[] = [
         },
       },
     },
-    __run: async (_input, update, output) => {
-      const commit = genCommit();
+    __simulation: {
+      run: async (_input, update, output) => {
+        const commit = genCommit();
 
-      const event = {
-        title: commit.message,
-        subtitle: commit.sha,
-        receivedAt: new Date(),
-        state: "processed",
-      };
+        const event = {
+          title: commit.message,
+          subtitle: commit.sha,
+          receivedAt: new Date(),
+          state: "processed",
+        };
 
-      update("data.trigger.lastEventData", event);
-      output(event);
+        update("data.trigger.lastEventData", event);
+        output(event);
+      },
     },
   },
   {
@@ -131,26 +133,30 @@ const sampleNodes: CanvasNode[] = [
         nextInQueue: null,
       },
     },
-    __run: async (input, update, output, next) => {
-      if (next) {
-        console.log("Setting next in queue:", next);
+    __simulation: {
+      onQueueChange: (next, update) => {
+        if (next) {
+          update("data.composite.nextInQueue", {
+            title: next.title,
+            subtitle: next.subtitle,
+            receivedAt: new Date(),
+          });
+        } else {
+          update("data.composite.nextInQueue", null);
+        }
+      },
 
-        update("data.nextInQueue", {
-          title: next.title,
-          subtitle: next.subtitle,
-          receivedAt: new Date(),
-        });
-      }
+      run: async (input, update, output) => {
+        update("data.state", "working");
+        update("data.composite.lastRunItem.title", input.title);
+        update("data.composite.lastRunItem.subtitle", input.subtitle);
 
-      update("data.state", "working");
-      update("data.composite.lastRunItem.title", input.title);
-      update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.state", "running");
+        await sleep(5000);
+        update("data.composite.lastRunItem.state", "success");
 
-      update("data.composite.lastRunItem.state", "running");
-      await sleep(5000);
-      update("data.composite.lastRunItem.state", "success");
-
-      output(input);
+        output(input);
+      },
     },
   },
   {
