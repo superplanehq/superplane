@@ -9,6 +9,7 @@ import {
 
 import { useCallback, useMemo } from "react";
 
+import { AiSidebar } from "../ai";
 import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
 import { Header, type BreadcrumbItem } from "./Header";
@@ -136,6 +137,8 @@ function CanvasPage(props: CanvasPageProps) {
       <ReactFlowProvider>
         <CanvasContent {...props} />
       </ReactFlowProvider>
+
+      <AiSidebar />
     </div>
   );
 }
