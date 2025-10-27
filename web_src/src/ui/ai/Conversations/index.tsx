@@ -1,5 +1,4 @@
 import {
-  ArrowRightIcon,
   BotIcon,
   CheckIcon,
   CopyIcon,
@@ -12,6 +11,7 @@ import {
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "../../button";
 
 export namespace Conversations {
   export interface Message {
@@ -631,16 +631,9 @@ export function Conversations({
                 maxHeight: "120px",
               }}
             />
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim()}
-              className="px-3 py-2 bg-accent-base text-white rounded hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ArrowRightIcon size={16} />
-            </button>
-          </div>
-          <div className="text-[10px] text-content-dimmed mt-1">
-            Press Enter to send, Shift+Enter for new line
+            <Button onClick={handleSendMessage} disabled={!inputMessage.trim()}>
+              Send
+            </Button>
           </div>
         </div>
       )}

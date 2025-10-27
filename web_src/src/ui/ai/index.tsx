@@ -31,7 +31,9 @@ function useAiSidebarState() {
   const [activeConversationId, setActiveConversationId] = useState<
     string | undefined
   >(undefined);
-  const conversations: Conversations.Conversation[] = []; // Replace with actual conversations state
+  const [conversations, setConversations] = useState<
+    Conversations.Conversation[]
+  >([]);
 
   function openSidebar() {
     setIsOpen(true);
@@ -41,8 +43,22 @@ function useAiSidebarState() {
     setIsOpen(false);
   }
 
-  function createConvo() {
-    // Implementation for creating a new conversation
+  function createConvo(action: Conversations.ContextAction) {
+    const id = `convo-${conversations.length + 1}`;
+
+    setConversations((prev) => {
+      const newConvo: Conversations.Conversation = {
+        id: id,
+        title: action.label,
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      return [...prev, newConvo];
+    });
+
+    setActiveConversationId(id);
   }
 
   function sendMessage(
@@ -50,7 +66,6 @@ function useAiSidebarState() {
     conversationId?: string | undefined
   ): Promise<void> {
     console.log("Sending message to conversation", conversationId, message);
-    // Implementation for sending a message
     return Promise.resolve();
   }
 
