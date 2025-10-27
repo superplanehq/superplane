@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo } from "react";
 import { CanvasEdge, CanvasNode } from "..";
 
 export type UpdateDataFn = (path: string, data: any) => void;
@@ -22,16 +22,11 @@ interface SimulationProps {
 
 export type RunSimulationFn = (startNodeId: string) => Promise<void>;
 
-export function useSimulationRunner(props: SimulationProps): RunSimulationFn {
-  const engine = useRef<Engine | null>(null);
-
-  return async (startNodeId: string) => {
-    if (!engine.current) {
-      engine.current = new Engine(props.nodes, props.edges, props.setNodes);
-    }
-
-    engine.current.run(startNodeId);
-  };
+export function useSimulationRunner(props: SimulationProps): SimulationEngine {
+  return useMemo(
+    () => new SimulationEngine(props.nodes, props.edges, props.setNodes),
+    []
+  );
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -41,6 +36,7 @@ type CanvasEvent = {
   input?: any;
   process?: Promise<void>;
   output?: any;
+  approved?: boolean;
 };
 
 type Queue = {
@@ -49,7 +45,7 @@ type Queue = {
   state: "idle" | "running";
 };
 
-class Engine {
+export class SimulationEngine {
   private queues: Map<string, Queue>;
 
   constructor(
@@ -76,6 +72,25 @@ class Engine {
     }
   }
 
+  async onApprove(
+    nodeId: string,
+    _aproveId: string,
+    _artifacts?: Record<string, string>
+  ) {
+    const queue = this.queues.get(nodeId);
+    if (!queue) return;
+
+    const event = queue.events[0];
+    if (!event) return;
+
+    event.approved = true;
+
+    const update = this.updateNodeFn(nodeId);
+    update("data.approval.0.approved", true);
+  }
+
+  async onReject(_nodeId: string, _aproveId: string, _comment?: string) {}
+
   private async processNode(nodeId: string) {
     const node = this.findNodeById(nodeId);
     const run = node.__simulation?.run || noOp;
@@ -99,6 +114,13 @@ class Engine {
         updateNode,
         (output: any) => (event.output = output)
       );
+
+      if (node.data.approval) {
+        while (!event.approved) {
+          console.log("Waiting for approval...");
+          await sleep(200);
+        }
+      }
 
       queue.state = "idle";
 
@@ -125,11 +147,25 @@ class Engine {
           let current: any = updatedNode;
 
           for (let i = 0; i < pathParts.length - 1; i++) {
-            current[pathParts[i]] = { ...current[pathParts[i]] };
-            current = current[pathParts[i]];
+            const key = pathParts[i];
+            const isArrayIndex = /^\d+$/.test(key);
+
+            if (isArrayIndex) {
+              const index = parseInt(key, 10);
+              current[index] = Array.isArray(current[index])
+                ? [...current[index]]
+                : { ...current[index] };
+              current = current[index];
+            } else {
+              current[key] = Array.isArray(current[key])
+                ? [...current[key]]
+                : { ...current[key] };
+              current = current[key];
+            }
           }
 
-          current[pathParts[pathParts.length - 1]] = value;
+          const finalKey = pathParts[pathParts.length - 1];
+          current[finalKey] = value;
           return updatedNode;
         })
       );

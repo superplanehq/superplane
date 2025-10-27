@@ -52,7 +52,7 @@ func (g *GitHub) Description() string {
 }
 
 func (g *GitHub) Icon() string {
-	return "graph_1"
+	return "github"
 }
 
 func (g *GitHub) Color() string {

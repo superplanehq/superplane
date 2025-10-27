@@ -11,8 +11,9 @@ import { useMemo, useState } from "react";
 import { Button } from "../../button";
 import { CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
-import { handleNodeExpand, navigateToStoryWithData } from "./navigation";
-import { RunSimulationFn, sleep, useSimulationRunner } from "./useSimulation";
+import { handleNodeExpand } from "./navigation";
+import { sleep, useSimulationRunner } from "./useSimulation";
+import { SimulationEngine } from "./useSimulation";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -133,8 +134,6 @@ const sampleNodes: CanvasNode[] = [
     __simulation: {
       onQueueChange: (next, update) => {
         if (next) {
-          console.log("Build stage next in queue:", next);
-
           update("data.composite.nextInQueue", {
             title: next.title,
             subtitle: next.subtitle,
@@ -177,8 +176,7 @@ const sampleNodes: CanvasNode[] = [
         approvals: [
           {
             title: "Security",
-            approved: false,
-            interactive: true,
+            approved: true,
             requireArtifacts: [
               {
                 label: "CVE Report",
@@ -197,26 +195,29 @@ const sampleNodes: CanvasNode[] = [
           },
           {
             title: "Engineering",
-            rejected: true,
+            approved: true,
             approverName: "Lucas Pinheiro",
-            rejectionComment:
-              "Security vulnerabilities need to be addressed before approval",
           },
           {
             title: "Josh Brown",
             approved: true,
           },
-          {
-            title: "Admin",
-            approved: false,
-          },
         ],
-        awaitingEvent: {
-          title: "fix: open rejected events tab",
-          subtitle: "ef758d40",
-        },
+        awaitingEvent: null,
         receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
         collapsed: false,
+      },
+    },
+    __simulation: {
+      run: async (input, update, output) => {
+        update("data.approval.approvals.0.approved", false);
+        update("data.approval.approvals.0.interactive", true);
+        update("data.approval.awaitingEvent", {
+          title: input.title,
+          subtitle: input.subtitle,
+        });
+
+        output(input);
       },
     },
   },
@@ -265,6 +266,32 @@ const sampleNodes: CanvasNode[] = [
           receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60), // 1 hour ago
         },
         collapsed: false,
+      },
+    },
+    __simulation: {
+      onQueueChange: (next, update) => {
+        if (next) {
+          update("data.composite.nextInQueue", {
+            title: next.title,
+            subtitle: next.subtitle,
+            receivedAt: new Date(),
+          });
+        } else {
+          update("data.composite.nextInQueue", null);
+        }
+      },
+
+      run: async (input, update, output) => {
+        update("data.state", "working");
+        update("data.composite.lastRunItem.title", input.title);
+        update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.receivedAt", new Date());
+
+        update("data.composite.lastRunItem.state", "running");
+        await sleep(5000);
+        update("data.composite.lastRunItem.state", "success");
+
+        output(input);
       },
     },
   },
@@ -327,6 +354,32 @@ const sampleNodes: CanvasNode[] = [
         collapsed: false,
       },
     },
+    __simulation: {
+      onQueueChange: (next, update) => {
+        if (next) {
+          update("data.composite.nextInQueue", {
+            title: next.title,
+            subtitle: next.subtitle,
+            receivedAt: new Date(),
+          });
+        } else {
+          update("data.composite.nextInQueue", null);
+        }
+      },
+
+      run: async (input, update, output) => {
+        update("data.state", "working");
+        update("data.composite.lastRunItem.title", input.title);
+        update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.receivedAt", new Date());
+
+        update("data.composite.lastRunItem.state", "running");
+        await sleep(5000);
+        update("data.composite.lastRunItem.state", "success");
+
+        output(input);
+      },
+    },
   },
   {
     id: "deploy-asia",
@@ -371,6 +424,32 @@ const sampleNodes: CanvasNode[] = [
         collapsed: false,
       },
     },
+    __simulation: {
+      onQueueChange: (next, update) => {
+        if (next) {
+          update("data.composite.nextInQueue", {
+            title: next.title,
+            subtitle: next.subtitle,
+            receivedAt: new Date(),
+          });
+        } else {
+          update("data.composite.nextInQueue", null);
+        }
+      },
+
+      run: async (input, update, output) => {
+        update("data.state", "working");
+        update("data.composite.lastRunItem.title", input.title);
+        update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.receivedAt", new Date());
+
+        update("data.composite.lastRunItem.state", "running");
+        await sleep(5000);
+        update("data.composite.lastRunItem.state", "success");
+
+        output(input);
+      },
+    },
   },
 ];
 
@@ -392,23 +471,7 @@ export const SimpleDeployment: Story = {
   render: function SimpleDeploymentRender(args) {
     const [nodes, setNodes] = useState<Node[]>(args.nodes ?? []);
     const edges = useMemo(() => args.edges ?? [], [args.edges]);
-    const runSimulation = useSimulationRunner({ nodes, edges, setNodes });
-
-    const handleAprove = (
-      nodeId: string,
-      approveId: string,
-      artifacts?: Record<string, string>
-    ) => {
-      console.log("Approved with artifacts:", artifacts);
-    };
-
-    const handleReject = (
-      nodeId: string,
-      approveId: string,
-      comment?: string
-    ) => {
-      console.log("Rejected with comment:", comment);
-    };
+    const simulation = useSimulationRunner({ nodes, edges, setNodes });
 
     const renderContent = () => {
       return (
@@ -417,15 +480,15 @@ export const SimpleDeployment: Story = {
           nodes={nodes}
           edges={edges}
           onNodeExpand={handleNodeExpand}
-          onApprove={handleAprove}
-          onReject={handleReject}
+          onApprove={simulation.onApprove.bind(simulation)}
+          onReject={simulation.onReject.bind(simulation)}
         />
       );
     };
 
     return (
       <div className="h-[100vh] w-full ">
-        <SimulatorButtons run={runSimulation} />
+        <SimulatorButtons simulation={simulation} />
 
         {renderContent()}
       </div>
@@ -435,14 +498,22 @@ export const SimpleDeployment: Story = {
 
 SimpleDeployment.storyName = "01 - Simple Deployment";
 
-function SimulatorButtons({ run }: { run: RunSimulationFn }) {
+function SimulatorButtons({ simulation }: { simulation: SimulationEngine }) {
   return (
     <div className="absolute z-[999] bottom-3 left-3 flex gap-2">
-      <Button onClick={() => run("listen-code")} size="sm" variant="outline">
+      <Button
+        onClick={() => simulation.run("listen-code")}
+        size="sm"
+        variant="outline"
+      >
         GitHub Push
       </Button>
 
-      <Button onClick={() => run("listen-image")} size="sm" variant="outline">
+      <Button
+        onClick={() => simulation.run("listen-image")}
+        size="sm"
+        variant="outline"
+      >
         Docker Image Push
       </Button>
     </div>

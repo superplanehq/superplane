@@ -1,4 +1,5 @@
 import { Approval, type ApprovalProps } from "@/ui/approval";
+import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Composite, type CompositeProps } from "@/ui/composite";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
@@ -6,7 +7,6 @@ import { OnApproveFn, OnRejectFn } from ".";
 import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
-import { SwitchComponent, SwitchComponentProps } from "../switchComponent";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
 type BlockType = "trigger" | "composite" | "approval" | "filter" | "if" | "noop" | "switch";
