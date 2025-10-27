@@ -217,68 +217,79 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
       <div className="px-4 py-3 border-b">
         <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
           <span className="uppercase text-sm font-medium">Last Run</span>
-          <span className="text-sm">{timeAgo}</span>
+          {lastRunItem && <span className="text-sm">{timeAgo}</span>}
         </div>
 
-        <div onClick={() => setShowLastRunValues(!showLastRunValues)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${LastRunBackground} ${LastRunColor}`}>
-          <div className="flex items-center gap-3 rounded-md w-full">
-            <div className="w-full flex items-center gap-2 w-full">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center ${lastRunIconBackground}`}>
-                <LastRunIcon size={lastRunItem?.state === "running" ? 16 : 12} className={`${lastRunIconColor}`} />
-              </div>
-              <span className="truncate text-sm">{lastRunItem?.title}</span>
-            </div>
-            {lastRunItem?.subtitle && (
-              <span className="text-sm text-gray-500 no-wrap whitespace-nowrap w-[20%]">{lastRunItem?.subtitle}</span>
-            )}
-          </div>
-          {showLastRunValues && (
-            <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
-              {Object.entries(lastRunItem?.values || {}).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
-                  <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
-                  <span className="text-sm flex-1 truncate text-left">{value}</span>
+        {lastRunItem ? (
+          <>
+            <div onClick={() => setShowLastRunValues(!showLastRunValues)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${LastRunBackground} ${LastRunColor}`}>
+              <div className="flex items-center gap-3 rounded-md w-full">
+                <div className="w-full flex items-center gap-2 w-full">
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center ${lastRunIconBackground}`}>
+                    <LastRunIcon size={lastRunItem?.state === "running" ? 16 : 12} className={`${lastRunIconColor}`} />
+                  </div>
+                  <span className="truncate text-sm">{lastRunItem?.title}</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-        {lastRunItem?.childEventsInfo && (
-          <div className="mt-3 ml-3 text-gray-500">
-            <div className="flex items-center justify-between gap-2">
-              <div onClick={(e) => {
-                e.stopPropagation()
-                if (hasWaitingInfos) {
-                  setShowWaitingInfo(!showWaitingInfo)
-                }
-              }} className={"flex items-center gap-2 w-full " + (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")}>
-                <ChildEventsArrowIcon size={18} className="text-gray-500" />
-                <span className="text-sm">{lastRunItem?.childEventsInfo.count} child event{lastRunItem?.childEventsInfo.count === 1 ? "" : "s"} {lastRunItem?.childEventsInfo.state || ""}</span>
+                {lastRunItem?.subtitle && (
+                  <span className="text-sm text-gray-500 no-wrap whitespace-nowrap w-[20%]">{lastRunItem?.subtitle}</span>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <ExpandChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onExpandChildEvents} />
-                <ReRunChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onReRunChildEvents} />
-              </div>
-            </div>
-            {hasWaitingInfos && showWaitingInfo && (
-              <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
-                {lastRunItem?.childEventsInfo.waitingInfos.map((waitingInfo) => {
-                  const Icon = resolveIcon(waitingInfo.icon)
-                  return (
-                    <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
-                      <span className="text-sm text-right flex items-center gap-2">
-                        <Icon size={18} className="text-gray-500" />
-                        {waitingInfo.info}
-                      </span>
-                      <span className="text-sm">
-                        {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
-                        &nbsp;left
-                      </span>
+              {showLastRunValues && (
+                <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
+                  {Object.entries(lastRunItem?.values || {}).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
+                      <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
+                      <span className="text-sm flex-1 truncate text-left">{value}</span>
                     </div>
-                  )
-                })}
+                  ))}
+                </div>
+              )}
+            </div>
+            {lastRunItem?.childEventsInfo && (
+              <div className="mt-3 ml-3 text-gray-500">
+                <div className="flex items-center justify-between gap-2">
+                  <div onClick={(e) => {
+                    e.stopPropagation()
+                    if (hasWaitingInfos) {
+                      setShowWaitingInfo(!showWaitingInfo)
+                    }
+                  }} className={"flex items-center gap-2 w-full " + (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")}>
+                    <ChildEventsArrowIcon size={18} className="text-gray-500" />
+                    <span className="text-sm">{lastRunItem?.childEventsInfo.count} child event{lastRunItem?.childEventsInfo.count === 1 ? "" : "s"} {lastRunItem?.childEventsInfo.state || ""}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ExpandChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onExpandChildEvents} />
+                    <ReRunChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onReRunChildEvents} />
+                  </div>
+                </div>
+                {hasWaitingInfos && showWaitingInfo && (
+                  <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
+                    {lastRunItem?.childEventsInfo.waitingInfos.map((waitingInfo) => {
+                      const Icon = resolveIcon(waitingInfo.icon)
+                      return (
+                        <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
+                          <span className="text-sm text-right flex items-center gap-2">
+                            <Icon size={18} className="text-gray-500" />
+                            {waitingInfo.info}
+                          </span>
+                          <span className="text-sm">
+                            {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
+                            &nbsp;left
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
+          </>
+        ) : (
+          <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500">
+            <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-400">
+              <div className="w-2 h-2 rounded-full bg-white"></div>
+            </div>
+            <span className="text-sm">No executions received yet</span>
           </div>
         )}
       </div>

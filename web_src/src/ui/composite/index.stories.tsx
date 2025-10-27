@@ -135,6 +135,18 @@ const DeployToAsia: CompositeProps = {
   collapsed: false
 }
 
+const NoExecutionsZeroState: CompositeProps = {
+  title: "New Pipeline Stage",
+  description: "A freshly created pipeline stage awaiting its first execution",
+  iconSlug: "play-circle",
+  iconColor: "text-gray-600",
+  headerColor: "bg-gray-100",
+  parameters: [
+    { icon: "settings", items: ["production"] }
+  ],
+  collapsed: false
+}
+
 const meta: Meta<typeof Composite> = {
   title: 'ui/Composite',
   component: Composite,
@@ -169,4 +181,8 @@ export const DeployToEUCollapsed: Story = {
     collapsed: true,
     collapsedBackground: "bg-blue-500",
   },
+};
+
+export const NoExecutionsZeroStateExpanded: Story = {
+  args: NoExecutionsZeroState,
 };
