@@ -136,6 +136,8 @@ const sampleNodes: CanvasNode[] = [
     __simulation: {
       onQueueChange: (next, update) => {
         if (next) {
+          console.log("Build stage next in queue:", next);
+
           update("data.composite.nextInQueue", {
             title: next.title,
             subtitle: next.subtitle,
@@ -150,6 +152,7 @@ const sampleNodes: CanvasNode[] = [
         update("data.state", "working");
         update("data.composite.lastRunItem.title", input.title);
         update("data.composite.lastRunItem.subtitle", input.subtitle);
+        update("data.composite.lastRunItem.receivedAt", new Date());
 
         update("data.composite.lastRunItem.state", "running");
         await sleep(5000);
