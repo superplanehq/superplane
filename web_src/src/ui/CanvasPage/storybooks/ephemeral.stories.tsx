@@ -97,34 +97,80 @@ const ephemeralNodes: Node[] = [
           { icon: "server", label: "Active: 7/50 environments" },
           { icon: "triangle-alert", label: "Failed: 2" },
         ],
-        lastRunItem: {
-          title: "Environment: env-4523",
-          subtitle: "2d 14h left",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
-          childEventsInfo: {
-            count: 1,
+        lastRunItems: [
+          {
+            title: "Environment: env-4523",
+            subtitle: "2d 14h left",
+            childEventsInfo: {
+              count: 1,
+              state: "running",
+              waitingInfos: [
+                {
+                  icon: "clock",
+                  info: "Waiting for DNS propagation",
+                  futureTimeDate: new Date(
+                    new Date().getTime() + 1000 * 60 * 210
+                  ), // 3h 30min = 210 minutes
+                },
+              ],
+            },
             state: "running",
-            waitingInfos: [
-              {
-                icon: "clock",
-                info: "Waiting for DNS propagation",
-                futureTimeDate: new Date(
-                  new Date().getTime() + 1000 * 60 * 210
-                ), // 3h 30min = 210 minutes
-              },
-            ],
+            values: {
+              "Triggered by": "PR comment",
+              User: "Sarah Chen",
+              "Environment ID": "env-pr-4523",
+              URL: "https://pr-4523.staging.app.com",
+              "Shutdown at": new Date(
+                new Date().getTime() + 1000 * 60 * 60 * 12
+              ).toLocaleString(),
+            },
           },
-          state: "running",
-          values: {
-            "Triggered by": "PR comment",
-            User: "Sarah Chen",
-            "Environment ID": "env-pr-4523",
-            URL: "https://pr-4523.staging.app.com",
-            "Shutdown at": new Date(
-              new Date().getTime() + 1000 * 60 * 60 * 12
-            ).toLocaleString(),
+          {
+            title: "Environment: env-4522",
+            subtitle: "2d 2h left",
+            state: "running",
+            values: {
+              "Triggered by": "PR comment",
+              User: "Diego Morales",
+              "Environment ID": "env-pr-4522",
+              URL: "https://pr-4522.staging.app.com",
+            },
           },
-        },
+          {
+            title: "Environment: env-4521",
+            subtitle: "1d 19h left",
+            state: "running",
+            values: {
+              "Triggered by": "PR comment",
+              User: "Liam Patel",
+              "Environment ID": "env-pr-4521",
+              URL: "https://pr-4521.staging.app.com",
+            },
+          },
+          {
+            title: "Environment: env-4520",
+            subtitle: "failed to start",
+            state: "1d 12h left",
+            values: {
+              "Triggered by": "PR comment",
+              User: "Ava Singh",
+              "Environment ID": "env-pr-4520",
+              "Failure reason": "Build artifact missing",
+            },
+          },
+          {
+            title: "Environment: env-4519",
+            subtitle: "21h left",
+            state: "running",
+            values: {
+              "Triggered by": "Pipeline",
+              User: "System",
+              "Environment ID": "env-pr-4519",
+              URL: "https://pr-4519.staging.app.com",
+            },
+          },
+        ],
+        lastRunTotalCount: 7,
         startLastValuesOpen: true,
         collapsed: false,
       },
@@ -152,7 +198,6 @@ const ephemeralNodes: Node[] = [
         lastRunItem: {
           title: "Environment: env-pr-4501",
           subtitle: "Expired",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 120), // 2 hours ago
           childEventsInfo: {
             count: 2,
             state: "processed",
