@@ -80,7 +80,7 @@ export interface CanvasPageProps {
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
-  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>) => void;
+  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
 
   ai?: AiProps;
@@ -104,9 +104,9 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }, [props]);
 
-  const handleSaveConfiguration = useCallback((configuration: Record<string, any>) => {
+  const handleSaveConfiguration = useCallback((configuration: Record<string, any>, nodeName: string) => {
     if (editingNodeData && props.onNodeConfigurationSave) {
-      props.onNodeConfigurationSave(editingNodeData.nodeId, configuration);
+      props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName);
     }
     setEditingNodeData(null);
   }, [editingNodeData, props]);

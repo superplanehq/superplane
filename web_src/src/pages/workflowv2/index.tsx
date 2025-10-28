@@ -114,13 +114,13 @@ export function WorkflowPageV2() {
     };
   }, [workflow, blueprints, components, triggers]);
 
-  const handleNodeConfigurationSave = useCallback((nodeId: string, updatedConfiguration: Record<string, any>) => {
+  const handleNodeConfigurationSave = useCallback((nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string) => {
     if (!workflow || !organizationId || !workflowId) return;
 
-    // Update the node's configuration in local cache only
+    // Update the node's configuration and name in local cache only
     const updatedNodes = workflow.nodes?.map((node) =>
       node.id === nodeId
-        ? { ...node, configuration: updatedConfiguration }
+        ? { ...node, configuration: updatedConfiguration, name: updatedNodeName }
         : node
     );
 
