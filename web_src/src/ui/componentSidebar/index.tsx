@@ -40,10 +40,9 @@ interface ComponentSidebarProps {
   // Action handlers
   onRun?: () => void;
   onDuplicate?: () => void;
+  onDocs?: () => void;
   onDeactivate?: () => void;
-  onToggleView?: () => void;
   onDelete?: () => void;
-  isCompactView?: boolean;
 }
 
 export const ComponentSidebar = ({
@@ -65,10 +64,9 @@ export const ComponentSidebar = ({
   onSeeFullHistory,
   onRun,
   onDuplicate,
+  onDocs,
   onDeactivate,
-  onToggleView,
   onDelete,
-  isCompactView = false,
 }: ComponentSidebarProps) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -215,10 +213,9 @@ export const ComponentSidebar = ({
             <SidebarActionsDropdown
               onRun={onRun}
               onDuplicate={onDuplicate}
+              onDocs={onDocs}
               onDeactivate={onDeactivate}
-              onToggleView={onToggleView}
               onDelete={onDelete}
-              isCompactView={isCompactView}
             />
           </div>
           <div

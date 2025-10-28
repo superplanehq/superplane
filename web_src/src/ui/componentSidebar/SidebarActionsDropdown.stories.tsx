@@ -29,10 +29,9 @@ export const Default: Story = {
   args: {
     onRun: () => alert("Run action triggered!"),
     onDuplicate: () => alert("Duplicate action triggered!"),
+    onDocs: () => alert("Documentation action triggered!"),
     onDeactivate: () => alert("Deactivate action triggered!"),
-    onToggleView: () => alert("Toggle view action triggered!"),
     onDelete: () => alert("Delete action triggered!"),
-    isCompactView: false,
   },
 };
 
@@ -49,6 +48,7 @@ export const LimitedActions: Story = {
   },
   args: {
     onRun: () => console.log("Run action"),
+    onDocs: () => console.log("Documentation action"),
     onDelete: () => console.log("Delete action"),
   },
 };
@@ -84,8 +84,7 @@ export const InteractiveToggle: Story = {
           <div>
             <h3 className="text-lg font-semibold">Interactive Component</h3>
             <p className="text-sm text-gray-600">
-              Status: {isActive ? 'Active' : 'Inactive'} |
-              View: {isCompactView ? 'Compact' : 'Detailed'}
+              Status: {isActive ? 'Active' : 'Inactive'}
             </p>
           </div>
           <SidebarActionsDropdown
@@ -97,9 +96,9 @@ export const InteractiveToggle: Story = {
               setIsActive(!isActive);
               console.log(`Component ${isActive ? 'deactivated' : 'activated'}`);
             } : undefined}
-            onToggleView={() => {
-              setIsCompactView(!isCompactView);
-              console.log(`Switched to ${!isCompactView ? 'compact' : 'detailed'} view`);
+            onDocs={() => {
+              console.log("Documentation action triggered");
+              alert("Opening documentation!");
             }}
             onDuplicate={() => {
               console.log("Duplicate action triggered");
@@ -111,11 +110,10 @@ export const InteractiveToggle: Story = {
                 alert("Component deleted!");
               }
             }}
-            isCompactView={isCompactView}
           />
         </div>
         <div className="text-sm text-gray-500">
-          Try the different actions to see how the labels and icons change dynamically.
+          Try the different actions to see the interactive behavior.
         </div>
       </div>
     );
@@ -147,6 +145,7 @@ export const InContext: Story = {
   args: {
     onRun: () => console.log("Run service"),
     onDuplicate: () => console.log("Duplicate service"),
+    onDocs: () => console.log("Documentation service"),
     onDeactivate: () => console.log("Deactivate service"),
     onDelete: () => console.log("Delete service"),
   },

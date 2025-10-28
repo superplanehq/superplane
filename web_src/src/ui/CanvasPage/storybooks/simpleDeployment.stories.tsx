@@ -538,6 +538,28 @@ export const SimpleDeployment: Story = {
           edges={edges}
           onNodeExpand={handleNodeExpand}
           getSidebarData={getSidebarData}
+          onRun={(nodeId) => {
+            console.log("Run action for node:", nodeId);
+            alert(`Running node: ${nodeId}`);
+          }}
+          onDuplicate={(nodeId) => {
+            console.log("Duplicate action for node:", nodeId);
+            alert(`Duplicating node: ${nodeId}`);
+          }}
+          onDocs={(nodeId) => {
+            console.log("Documentation action for node:", nodeId);
+            alert(`Opening documentation for node: ${nodeId}`);
+          }}
+          onDeactivate={(nodeId) => {
+            console.log("Deactivate action for node:", nodeId);
+            alert(`Deactivating node: ${nodeId}`);
+          }}
+          onDelete={(nodeId) => {
+            console.log("Delete action for node:", nodeId);
+            if (confirm(`Are you sure you want to delete node: ${nodeId}?`)) {
+              alert(`Deleted node: ${nodeId}`);
+            }
+          }}
           aiSidebar={{
             showNotifications: false,
             notificationMessage: "Found 4 improvements",

@@ -60,6 +60,13 @@ export interface CanvasPageProps {
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
 
+  // Sidebar action handlers
+  onRun?: (nodeId: string) => void;
+  onDuplicate?: (nodeId: string) => void;
+  onDocs?: (nodeId: string) => void;
+  onDeactivate?: (nodeId: string) => void;
+  onDelete?: (nodeId: string) => void;
+
   aiSidebar?: {
     showNotifications: boolean;
     notificationMessage?: string;
@@ -85,7 +92,15 @@ function CanvasPage(props: CanvasPageProps) {
         notificationMessage={state.aiSidebar.notificationMessage}
       />
 
-      <Sidebar state={state} getSidebarData={props.getSidebarData} />
+      <Sidebar
+        state={state}
+        getSidebarData={props.getSidebarData}
+        onRun={props.onRun}
+        onDuplicate={props.onDuplicate}
+        onDocs={props.onDocs}
+        onDeactivate={props.onDeactivate}
+        onDelete={props.onDelete}
+      />
     </div>
   );
 }
@@ -93,9 +108,19 @@ function CanvasPage(props: CanvasPageProps) {
 function Sidebar({
   state,
   getSidebarData,
+  onRun,
+  onDuplicate,
+  onDocs,
+  onDeactivate,
+  onDelete,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  onRun?: (nodeId: string) => void;
+  onDuplicate?: (nodeId: string) => void;
+  onDocs?: (nodeId: string) => void;
+  onDeactivate?: (nodeId: string) => void;
+  onDelete?: (nodeId: string) => void;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -156,6 +181,11 @@ function Sidebar({
           });
         });
       }}
+      onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
+      onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
+      onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
+      onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
+      onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
     />
   );
 }

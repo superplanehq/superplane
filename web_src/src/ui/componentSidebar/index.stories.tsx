@@ -145,10 +145,9 @@ export const Default: Story = {
     onClose: () => console.log("Close sidebar"),
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
+    onDocs: () => console.log("Documentation action"),
     onDeactivate: () => console.log("Deactivate action"),
-    onToggleView: () => console.log("Toggle view action"),
     onDelete: () => console.log("Delete action"),
-    isCompactView: false,
   },
 };
 
@@ -199,8 +198,7 @@ export const WithInteractiveEvents: Story = {
     onClose: () => console.log("Close sidebar"),
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
-    onToggleView: () => console.log("Toggle view action"),
-    isCompactView: true,
+    onDocs: () => console.log("Documentation action"),
   },
 };
 
@@ -326,10 +324,9 @@ export const ExtendedMetadata: Story = {
     onClose: () => console.log("Close sidebar"),
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
+    onDocs: () => console.log("Documentation action"),
     onDeactivate: () => console.log("Deactivate action"),
-    onToggleView: () => console.log("Toggle view action"),
     onDelete: () => console.log("Delete action"),
-    isCompactView: false,
   },
 };
 
@@ -363,8 +360,6 @@ export const ZeroState: Story = {
 
 export const WithActionsDropdown: Story = {
   render: (args) => {
-    const [isCompactView, setIsCompactView] = useState(false);
-
     return (
       <div className="relative w-[32rem] h-[40rem]">
         <ComponentSidebar
@@ -375,8 +370,6 @@ export const WithActionsDropdown: Story = {
           onEventClick={() => console.log("Event clicked")}
           moreInQueueCount={3}
           onSeeFullHistory={() => console.log("See full history")}
-          isCompactView={isCompactView}
-          onToggleView={() => setIsCompactView(!isCompactView)}
         />
       </div>
     );
@@ -396,6 +389,10 @@ export const WithActionsDropdown: Story = {
     onDuplicate: () => {
       console.log("Duplicate action triggered");
       alert("Duplicate action triggered!");
+    },
+    onDocs: () => {
+      console.log("Documentation action triggered");
+      alert("Documentation action triggered!");
     },
     onDeactivate: () => {
       console.log("Deactivate action triggered");

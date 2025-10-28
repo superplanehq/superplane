@@ -181,7 +181,34 @@ export const Monitor: Story = {
 
     return (
       <div className="h-[100vh] w-full ">
-        <CanvasPage {...args} nodes={nodes} edges={edges} getSidebarData={getSidebarData} />
+        <CanvasPage
+          {...args}
+          nodes={nodes}
+          edges={edges}
+          getSidebarData={getSidebarData}
+          onRun={(nodeId) => {
+            console.log("Run action for node:", nodeId);
+            alert(`Running node: ${nodeId}`);
+          }}
+          onDuplicate={(nodeId) => {
+            console.log("Duplicate action for node:", nodeId);
+            alert(`Duplicating node: ${nodeId}`);
+          }}
+          onDocs={(nodeId) => {
+            console.log("Documentation action for node:", nodeId);
+            alert(`Opening documentation for node: ${nodeId}`);
+          }}
+          onDeactivate={(nodeId) => {
+            console.log("Deactivate action for node:", nodeId);
+            alert(`Deactivating node: ${nodeId}`);
+          }}
+          onDelete={(nodeId) => {
+            console.log("Delete action for node:", nodeId);
+            if (confirm(`Are you sure you want to delete node: ${nodeId}?`)) {
+              alert(`Deleted node: ${nodeId}`);
+            }
+          }}
+        />
       </div>
     );
   },

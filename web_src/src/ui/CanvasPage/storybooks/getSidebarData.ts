@@ -99,7 +99,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       const latestEvents: SidebarEvent[] = [];
       const nextInQueueEvents: SidebarEvent[] = [];
 
-      const genFunction: () => DockerImage = isGitSha(composite.lastRunItem.subtitle) ? genCommit as () => DockerImage : genDockerImage;
+      const genFunction: () => DockerImage = isGitSha(composite?.lastRunItem?.subtitle) ? genCommit as () => DockerImage : genDockerImage;
 
       const conversionStateMap: Record<string, string> = {
         success: "processed",
@@ -107,7 +107,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
         running: "running",
       };
 
-      if (composite.lastRunItem) {
+      if (composite?.lastRunItem) {
         latestEvents.push({
           title: composite.lastRunItem.title,
           subtitle: composite.lastRunItem.subtitle,
