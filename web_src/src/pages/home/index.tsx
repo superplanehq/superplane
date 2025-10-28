@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Heading } from '../../components/Heading/heading'
 import { Text } from '../../components/Text/text'
 import { Button } from '../../components/Button/button'
-import { MaterialSymbol } from '../../components/MaterialSymbol/material-symbol'
+import { Plus, Search, LayoutGrid, List, Bot, Box, GitBranch } from 'lucide-react'
 import { CreateCanvasModal } from '../../components/CreateCanvasModal'
 import { CreateBlueprintModal } from '../../components/CreateBlueprintModal'
 import { CreateWorkflowModal } from '../../components/CreateWorkflowModal'
@@ -14,6 +14,7 @@ import { useWorkflows, useCreateWorkflow } from '../../hooks/useWorkflowData'
 import { SuperplaneCanvas } from '../../api-client'
 import { useAccount } from '../../contexts/AccountContext'
 import { getColorClass } from '../../utils/colors'
+import { resolveIcon } from '../../lib/utils'
 
 interface UserData {
   metadata?: {
@@ -261,7 +262,7 @@ const HomePage = () => {
                 className='flex items-center bg-blue-700 text-white hover:bg-blue-600'
                 onClick={activeTab === 'canvases' ? handleCreateCanvasClick : activeTab === 'blueprints' ? handleCreateBlueprintClick : handleCreateWorkflowClick}
               >
-                <MaterialSymbol name="add" className="mr-2" />
+                <Plus className="mr-2" size={20} />
                 New {activeTab === 'canvases' ? 'Canvas' : activeTab === 'blueprints' ? 'Blueprint' : 'Workflow'}
               </Button>
             </div>
@@ -306,7 +307,7 @@ const HomePage = () => {
               <div className='flex items-center gap-2'>
                 <div className="flex-1 w-100">
                   <div className="relative">
-                    <MaterialSymbol name="search" className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" size={18} />
                     <input
                       type="text"
                       placeholder={`Search ${activeTab}...`}
@@ -325,14 +326,14 @@ const HomePage = () => {
                   onClick={() => setViewMode('grid')}
                   title="Grid view"
                 >
-                  <MaterialSymbol name="grid_view" />
+                  <LayoutGrid size={18} />
                 </Button>
                 <Button
                   {...(viewMode === 'list' ? { color: 'light' as const } : { plain: true })}
                   onClick={() => setViewMode('list')}
                   title="List view"
                 >
-                  <MaterialSymbol name="view_list" />
+                  <List size={18} />
                 </Button>
               </div>
             </div>
@@ -377,27 +378,27 @@ const HomePage = () => {
                   // Blueprints
                   viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                      {filteredBlueprints.map((blueprint) => (
-                        <div key={blueprint.id} className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow">
-                          <div className="p-6 flex flex-col justify-between h-full">
-                            <div>
-                              <div className="flex items-center mb-4">
-                                <div className="flex items-center justify-between space-x-3 flex-1">
-                                  {blueprint.icon && (
-                                    <MaterialSymbol name={blueprint.icon} size="lg" className={getColorClass(blueprint.color)} />
-                                  )}
-                                  <div className='flex flex-col flex-1 min-w-0'>
-                                    <button
-                                      onClick={() => navigate(`/${organizationId}/blueprints/${blueprint.id}`)}
-                                      className="block text-left w-full"
-                                    >
-                                      <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate">
-                                        {blueprint.name}
-                                      </Heading>
-                                    </button>
+                      {filteredBlueprints.map((blueprint) => {
+                        const IconComponent = resolveIcon(blueprint.icon)
+                        return (
+                          <div key={blueprint.id} className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow">
+                            <div className="p-6 flex flex-col justify-between h-full">
+                              <div>
+                                <div className="flex items-center mb-4">
+                                  <div className="flex items-center justify-between space-x-3 flex-1">
+                                    <IconComponent size={24} className={getColorClass(blueprint.color)} />
+                                    <div className='flex flex-col flex-1 min-w-0'>
+                                      <button
+                                        onClick={() => navigate(`/${organizationId}/blueprints/${blueprint.id}`)}
+                                        className="block text-left w-full"
+                                      >
+                                        <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate">
+                                          {blueprint.name}
+                                        </Heading>
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
 
                               <div className="mb-4">
                                 <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
@@ -415,35 +416,37 @@ const HomePage = () => {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {filteredBlueprints.map((blueprint) => (
-                        <div key={blueprint.id} className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4">
-                          <button
-                            onClick={() => navigate(`/${organizationId}/blueprints/${blueprint.id}`)}
-                            className="block text-left w-full"
-                          >
-                            <div className="flex items-center gap-3">
-                              {blueprint.icon && (
-                                <MaterialSymbol name={blueprint.icon} size="lg" className={getColorClass(blueprint.color)} />
-                              )}
-                              <div className="flex-1">
-                                <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1">
-                                  {blueprint.name}
-                                </Heading>
-                                <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                                  {blueprint.description || 'No description'}
-                                </Text>
-                                <Text className="text-xs text-zinc-500 mt-2">
-                                  Created at {blueprint.createdAt}
-                                </Text>
+                      {filteredBlueprints.map((blueprint) => {
+                        const IconComponent = resolveIcon(blueprint.icon)
+                        return (
+                          <div key={blueprint.id} className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4">
+                            <button
+                              onClick={() => navigate(`/${organizationId}/blueprints/${blueprint.id}`)}
+                              className="block text-left w-full"
+                            >
+                              <div className="flex items-center gap-3">
+                                <IconComponent size={24} className={getColorClass(blueprint.color)} />
+                                <div className="flex-1">
+                                  <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1">
+                                    {blueprint.name}
+                                  </Heading>
+                                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                                    {blueprint.description || 'No description'}
+                                  </Text>
+                                  <Text className="text-xs text-zinc-500 mt-2">
+                                    Created at {blueprint.createdAt}
+                                  </Text>
+                                </div>
                               </div>
-                            </div>
-                          </button>
-                        </div>
-                      ))}
+                            </button>
+                          </div>
+                        )
+                      })}
                     </div>
                   )
                 ) : (
@@ -514,7 +517,9 @@ const HomePage = () => {
                 {/* Empty State */}
                 {currentItems.length === 0 && (
                   <div className="text-center py-12">
-                    <MaterialSymbol name={activeTab === 'canvases' ? 'automation' : activeTab === 'blueprints' ? 'architecture' : 'account_tree'} className="mx-auto text-zinc-400 mb-4" size="xl" />
+                    {activeTab === 'canvases' && <Bot className="mx-auto text-zinc-400 mb-4" size={48} />}
+                    {activeTab === 'blueprints' && <Box className="mx-auto text-zinc-400 mb-4" size={48} />}
+                    {activeTab === 'workflows' && <GitBranch className="mx-auto text-zinc-400 mb-4" size={48} />}
                     <Heading level={3} className="text-lg text-zinc-900 dark:text-white mb-2">
                       {searchQuery ? `No ${activeTab} found` : `No ${activeTab} yet`}
                     </Heading>
