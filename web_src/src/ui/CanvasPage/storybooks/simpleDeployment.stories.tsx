@@ -597,6 +597,10 @@ export const SimpleDeployment: Story = {
             console.log("Documentation action for node:", nodeId);
             alert(`Opening documentation for node: ${nodeId}`);
           }}
+          onEdit={(nodeId) => {
+            console.log("Edit action for node:", nodeId);
+            alert(`Editing node: ${nodeId}`);
+          }}
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
             console.log("Current nodes before toggle:", nodesWithHandlers.length);

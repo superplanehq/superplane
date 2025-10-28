@@ -1,5 +1,6 @@
 import { Handle, Position } from "@xyflow/react";
 import { ComponentBase, type EventSection } from "../componentBase";
+import { ComponentActionsProps } from "../types/componentActions";
 
 export interface SwitchStage {
   pathName: string;
@@ -11,7 +12,7 @@ export interface SwitchStage {
   eventTitle?: string;
 }
 
-export interface SwitchComponentProps {
+export interface SwitchComponentProps extends ComponentActionsProps {
   title?: string;
   stages: SwitchStage[];
   collapsed?: boolean;
@@ -30,6 +31,13 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   stages,
   collapsed = false,
   selected = false,
+  onRun,
+  onEdit,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
 }) => {
   const spec = stages.length > 0 ? {
     title: "path",
@@ -73,6 +81,13 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
       eventSections={eventSections}
       collapsed={collapsed}
       selected={selected}
+      onRun={onRun}
+      onEdit={onEdit}
+      onDuplicate={onDuplicate}
+      onDeactivate={onDeactivate}
+      onToggleView={onToggleView}
+      onDelete={onDelete}
+      isCompactView={isCompactView}
     />
   );
 };

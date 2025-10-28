@@ -420,6 +420,9 @@ export const Ephemeral: Story = {
           onDocs={(nodeId) => {
             console.log("Documentation action for node:", nodeId);
           }}
+          onEdit={(nodeId) => {
+            console.log("Edit action for node:", nodeId);
+          }}
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
             console.log("Current nodes before toggle:", nodes.length);

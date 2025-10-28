@@ -3,7 +3,17 @@ import { Trigger, type TriggerProps } from './';
 import githubIcon from '@/assets/icons/integrations/github.svg';
 import dockerIcon from '@/assets/icons/integrations/docker.svg';
 
-const GithubProps: TriggerProps = {
+const createTriggerProps = (baseProps: Omit<TriggerProps, keyof import('../types/componentActions').ComponentActionsProps>): TriggerProps => ({
+  ...baseProps,
+  onRun: () => console.log('Run clicked!'),
+  onDuplicate: () => console.log('Duplicate clicked!'),
+  onEdit: () => console.log('Edit clicked!'),
+  onDeactivate: () => console.log('Deactivate clicked!'),
+  onToggleView: () => console.log('Toggle view clicked!'),
+  onDelete: () => console.log('Delete clicked!'),
+});
+
+const GithubProps: TriggerProps = createTriggerProps({
   title: "GitHub",
   iconSrc: githubIcon,
   iconBackground: "bg-black",
@@ -24,7 +34,7 @@ const GithubProps: TriggerProps = {
     receivedAt: new Date(),
     state: "processed",
   },
-}
+});
 
 const meta: Meta<typeof Trigger> = {
   title: 'ui/Trigger',
@@ -38,7 +48,7 @@ const meta: Meta<typeof Trigger> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const DockerHubProps: TriggerProps = {
+const DockerHubProps: TriggerProps = createTriggerProps({
   title: "DockerHub",
   iconSrc: dockerIcon,
   headerColor: "bg-sky-100",
@@ -58,7 +68,7 @@ const DockerHubProps: TriggerProps = {
     receivedAt: new Date(),
     state: "processed",
   },
-}
+});
 
 export const GitHub: Story = {
   args: GithubProps,

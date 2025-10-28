@@ -16,6 +16,7 @@ interface SidebarActionsDropdownProps {
   onRun?: () => void;
   onDuplicate?: () => void;
   onDocs?: () => void;
+  onEdit?: () => void;
   onDeactivate?: () => void;
   onToggleView?: () => void;
   onDelete?: () => void;
@@ -26,6 +27,7 @@ export const SidebarActionsDropdown = ({
   onRun,
   onDuplicate,
   onDocs,
+  onEdit,
   onDeactivate,
   onToggleView,
   onDelete,
@@ -52,6 +54,12 @@ export const SidebarActionsDropdown = ({
       label: "Docs",
       icon: "book-text",
       onAction: onDocs,
+    },
+    {
+      id: "edit",
+      label: "Edit",
+      icon: "pencil",
+      onAction: onEdit,
     },
     {
       id: "deactivate",

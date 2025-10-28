@@ -2,7 +2,17 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { Composite, type CompositeProps } from './';
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
-const BuildTestDeployStage: CompositeProps = {
+const createCompositeProps = (baseProps: Omit<CompositeProps, keyof import('../types/componentActions').ComponentActionsProps>): CompositeProps => ({
+  ...baseProps,
+  onRun: () => console.log('Run clicked!'),
+  onDuplicate: () => console.log('Duplicate clicked!'),
+  onEdit: () => console.log('Edit clicked!'),
+  onDeactivate: () => console.log('Deactivate clicked!'),
+  onToggleView: () => console.log('Toggle view clicked!'),
+  onDelete: () => console.log('Delete clicked!'),
+});
+
+const BuildTestDeployStage: CompositeProps = createCompositeProps({
   title: "Build/Test/Deploy Stage",
   description: "Build new release of the monarch app and runs all required tests",
   iconSlug: "git-branch",
@@ -32,9 +42,9 @@ const BuildTestDeployStage: CompositeProps = {
     receivedAt: new Date(),
   },
   collapsed: false
-}
+});
 
-const DeployToEu: CompositeProps = {
+const DeployToEu: CompositeProps = createCompositeProps({
   title: "Deploy to EU",
   description: "Deploy your application to the EU region",
   iconSrc: KubernetesIcon,
@@ -78,9 +88,9 @@ const DeployToEu: CompositeProps = {
     receivedAt: new Date(),
   },
   collapsed: false
-}
+});
 
-const DeployToUS: CompositeProps = {
+const DeployToUS: CompositeProps = createCompositeProps({
   title: "Deploy to US",
   iconSrc: KubernetesIcon,
   headerColor: "bg-blue-100",
@@ -108,9 +118,9 @@ const DeployToUS: CompositeProps = {
   },
   startLastValuesOpen: true,
   collapsed: false
-}
+});
 
-const DeployToAsia: CompositeProps = {
+const DeployToAsia: CompositeProps = createCompositeProps({
   title: "Deploy to Asia",
   iconSrc: KubernetesIcon,
   headerColor: "bg-blue-100",
@@ -133,9 +143,9 @@ const DeployToAsia: CompositeProps = {
   },
   startLastValuesOpen: false,
   collapsed: false
-}
+});
 
-const NoExecutionsZeroState: CompositeProps = {
+const NoExecutionsZeroState: CompositeProps = createCompositeProps({
   title: "New Pipeline Stage",
   description: "A freshly created pipeline stage awaiting its first execution",
   iconSlug: "play-circle",
@@ -145,7 +155,7 @@ const NoExecutionsZeroState: CompositeProps = {
     { icon: "settings", items: ["production"] }
   ],
   collapsed: false
-}
+});
 
 const meta: Meta<typeof Composite> = {
   title: 'ui/Composite',

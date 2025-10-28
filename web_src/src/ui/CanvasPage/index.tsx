@@ -86,6 +86,7 @@ export interface CanvasPageProps {
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
+  onEdit?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
@@ -103,11 +104,18 @@ function CanvasPage(props: CanvasPageProps) {
   const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
 
   const handleNodeEdit = useCallback((nodeId: string) => {
+    // Try the modal-based edit first (for node configuration)
     if (props.getNodeEditData) {
       const editData = props.getNodeEditData(nodeId);
       if (editData) {
         setEditingNodeData(editData);
+        return;
       }
+    }
+
+    // Fall back to the simple onEdit callback
+    if (props.onEdit) {
+      props.onEdit(nodeId);
     }
   }, [props]);
 
@@ -285,7 +293,7 @@ function CanvasContent({ state, props, onSave, onNodeEdit }: { state: CanvasPage
           onExpand={handleNodeExpand}
           nodeId={nodeProps.id}
           onClick={() => handleNodeClick(nodeProps.id)}
-          onEdit={onNodeEdit}
+          onEdit={() => onNodeEdit(nodeProps.id)}
           selected={nodeProps.selected}
           onRun={props.onRun ? () => props.onRun!(nodeProps.id) : undefined}
           onDuplicate={props.onDuplicate ? () => props.onDuplicate!(nodeProps.id) : undefined}

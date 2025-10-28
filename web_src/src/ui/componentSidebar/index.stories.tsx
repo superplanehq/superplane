@@ -146,6 +146,7 @@ export const Default: Story = {
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
+    onEdit: () => console.log("Edit action"),
     onToggleView: () => console.log("Toggle view action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
@@ -327,6 +328,7 @@ export const ExtendedMetadata: Story = {
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
+    onEdit: () => console.log("Edit action"),
     onToggleView: () => console.log("Toggle view action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
@@ -393,6 +395,9 @@ export const WithActionsDropdown: Story = {
     },
     onDocs: () => {
       console.log("Documentation action triggered");
+    },
+    onEdit: () => {
+      console.log("Edit action triggered");
     },
     onToggleView: () => {
       console.log("Toggle view action triggered");

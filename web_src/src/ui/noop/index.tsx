@@ -1,6 +1,7 @@
 import { ComponentBase, type EventSection } from "../componentBase";
+import { ComponentActionsProps } from "../types/componentActions";
 
-export interface NoopProps {
+export interface NoopProps extends ComponentActionsProps {
   title?: string;
   lastEvent?: Omit<EventSection, "title">;
   collapsed?: boolean;
@@ -12,6 +13,13 @@ export const Noop: React.FC<NoopProps> = ({
   lastEvent,
   collapsed = false,
   selected = false,
+  onRun,
+  onEdit,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
 }) => {
   const eventSections: EventSection[] = [];
   if (lastEvent) {
@@ -29,6 +37,13 @@ export const Noop: React.FC<NoopProps> = ({
       eventSections={eventSections}
       collapsed={collapsed}
       selected={selected}
+      onRun={onRun}
+      onEdit={onEdit}
+      onDuplicate={onDuplicate}
+      onDeactivate={onDeactivate}
+      onToggleView={onToggleView}
+      onDelete={onDelete}
+      isCompactView={isCompactView}
     />
   );
 };

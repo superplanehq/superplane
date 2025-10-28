@@ -1,7 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { Approval, type ApprovalProps } from './';
 
-const approveRelease: ApprovalProps = {
+const createApprovalProps = (baseProps: Omit<ApprovalProps, keyof import('../types/componentActions').ComponentActionsProps>): ApprovalProps => ({
+  ...baseProps,
+  onRun: () => console.log('Run clicked!'),
+  onDuplicate: () => console.log('Duplicate clicked!'),
+  onEdit: () => console.log('Edit clicked!'),
+  onDeactivate: () => console.log('Deactivate clicked!'),
+  onToggleView: () => console.log('Toggle view clicked!'),
+  onDelete: () => console.log('Delete clicked!'),
+});
+
+const approveRelease: ApprovalProps = createApprovalProps({
   title: "Approve Release",
   description: "New releases are deployed to staging for testing and require approvals.",
   iconSlug: "hand",
@@ -50,7 +60,7 @@ const approveRelease: ApprovalProps = {
     subtitle: "ef758d40",
   },
   receivedAt: new Date(new Date().getTime() - 1000 * 60 * 60 * 24),
-}
+});
 
 const meta: Meta<typeof Approval> = {
   title: 'ui/Approval',

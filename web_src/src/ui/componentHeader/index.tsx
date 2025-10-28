@@ -25,6 +25,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   onDoubleClick,
   onRun,
   onDuplicate,
+  onEdit,
   onDeactivate,
   onToggleView,
   onDelete,
@@ -45,6 +46,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
           <SidebarActionsDropdown
             onRun={onRun}
             onDuplicate={onDuplicate}
+            onEdit={onEdit}
             onDeactivate={onDeactivate}
             onToggleView={onToggleView}
             onDelete={onDelete}

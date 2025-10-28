@@ -59,7 +59,7 @@ export interface CompositeProps extends ComponentActionsProps {
   onViewMoreEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false, onRun, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false, onRun, onEdit, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
   // All hooks must be called before any early returns
   const [showLastRunValues, setShowLastRunValues] = React.useState<Record<number, boolean>>(
     startLastValuesOpen ? { 0: true } : {}
@@ -158,6 +158,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           shape="rounded"
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
+          onEdit={onEdit}
           onDuplicate={onDuplicate}
           onDeactivate={onDeactivate}
           onToggleView={onToggleView}
@@ -183,132 +184,133 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
     <SelectionWrapper selected={selected}>
       <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white" >
         <ComponentHeader
-        iconSrc={iconSrc}
-        iconSlug={iconSlug}
-        iconBackground={iconBackground}
-        iconColor={iconColor}
-        headerColor={headerColor}
-        title={title}
-        description={description}
-        onDoubleClick={onToggleCollapse}
-        onRun={onRun}
-        onDuplicate={onDuplicate}
-        onDeactivate={onDeactivate}
-        onToggleView={onToggleView}
-        onDelete={onDelete}
-        isCompactView={isCompactView}
-      />
-
-      {parameters.length > 0 && (
-        <MetadataList
-          items={parameters.map(group => ({
-            icon: group.icon,
-            label: group.items.join(", ")
-          }))}
-          className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
+          iconSrc={iconSrc}
+          iconSlug={iconSlug}
+          iconBackground={iconBackground}
+          iconColor={iconColor}
+          headerColor={headerColor}
+          title={title}
+          description={description}
+          onDoubleClick={onToggleCollapse}
+          onRun={onRun}
+          onEdit={onEdit}
+          onDuplicate={onDuplicate}
+          onDeactivate={onDeactivate}
+          onToggleView={onToggleView}
+          onDelete={onDelete}
+          isCompactView={isCompactView}
         />
-      )}
 
-      {metadata && metadata.length > 0 && (
-        <MetadataList
-          items={metadata}
-          className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
-          iconSize={16}
-        />
-      )}
+        {parameters.length > 0 && (
+          <MetadataList
+            items={parameters.map(group => ({
+              icon: group.icon,
+              label: group.items.join(", ")
+            }))}
+            className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
+          />
+        )}
 
-      <div className="px-4 py-3 border-b">
-        <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-          <span className="uppercase text-sm font-medium">Last Run</span>
-        </div>
+        {metadata && metadata.length > 0 && (
+          <MetadataList
+            items={metadata}
+            className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
+            iconSize={16}
+          />
+        )}
 
-        {eventsToDisplay.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {visibleEvents.map((event, index) => {
-              const EventIcon = getEventIcon(event.state)
-              const eventColor = getEventColor(event.state)
-              const eventBackground = getEventBackground(event.state)
-              const eventIconBackground = getEventIconBackground(event.state)
-              const eventIconColor = getEventIconColor(event.state)
-              const now = new Date()
-              const diff = now.getTime() - new Date(event.receivedAt).getTime()
-              const timeAgo = calcRelativeTimeFromDiff(diff)
+        <div className="px-4 py-3 border-b">
+          <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+            <span className="uppercase text-sm font-medium">Last Run</span>
+          </div>
 
-              return (
-                <div key={index}>
-                  <div onClick={() => toggleEventValues(index)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${eventBackground} ${eventColor}`}>
-                    <div className="flex items-center gap-3 rounded-md w-full min-w-0">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}>
-                          <EventIcon size={event.state === "running" ? 16 : 12} className={`${eventIconColor}`} />
-                        </div>
-                        <span className="truncate text-sm">{event.title}</span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {event.subtitle && (
-                          <span className="text-sm text-gray-500 truncate max-w-[100px]">{event.subtitle}</span>
-                        )}
-                        <span className="text-xs text-gray-500">{timeAgo}</span>
-                      </div>
-                    </div>
-                    {showLastRunValues[index] && (
-                      <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
-                        {Object.entries(event.values || {}).map(([key, value]) => (
-                          <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
-                            <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
-                            <span className="text-sm flex-1 truncate text-left">{value}</span>
+          {eventsToDisplay.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {visibleEvents.map((event, index) => {
+                const EventIcon = getEventIcon(event.state)
+                const eventColor = getEventColor(event.state)
+                const eventBackground = getEventBackground(event.state)
+                const eventIconBackground = getEventIconBackground(event.state)
+                const eventIconColor = getEventIconColor(event.state)
+                const now = new Date()
+                const diff = now.getTime() - new Date(event.receivedAt).getTime()
+                const timeAgo = calcRelativeTimeFromDiff(diff)
+
+                return (
+                  <div key={index}>
+                    <div onClick={() => toggleEventValues(index)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${eventBackground} ${eventColor}`}>
+                      <div className="flex items-center gap-3 rounded-md w-full min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}>
+                            <EventIcon size={event.state === "running" ? 16 : 12} className={`${eventIconColor}`} />
                           </div>
-                        ))}
+                          <span className="truncate text-sm">{event.title}</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {event.subtitle && (
+                            <span className="text-sm text-gray-500 truncate max-w-[100px]">{event.subtitle}</span>
+                          )}
+                          <span className="text-xs text-gray-500">{timeAgo}</span>
+                        </div>
                       </div>
+                      {showLastRunValues[index] && (
+                        <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
+                          {Object.entries(event.values || {}).map(([key, value]) => (
+                            <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
+                              <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
+                              <span className="text-sm flex-1 truncate text-left">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {event.childEventsInfo && (
+                      <ChildEvents
+                        childEventsInfo={event.childEventsInfo}
+                        onExpandChildEvents={onExpandChildEvents}
+                        onReRunChildEvents={onReRunChildEvents}
+                      />
                     )}
                   </div>
-                  {event.childEventsInfo && (
-                    <ChildEvents
-                      childEventsInfo={event.childEventsInfo}
-                      onExpandChildEvents={onExpandChildEvents}
-                      onReRunChildEvents={onReRunChildEvents}
-                    />
-                  )}
+                )
+              })}
+              {hiddenEventsCount > 0 && (
+                <div
+                  onClick={onViewMoreEvents}
+                  className="flex items-center justify-center px-2 py-2 rounded-md bg-gray-100 text-gray-600 cursor-pointer hover:bg-gray-200 transition-colors"
+                >
+                  <span className="text-sm font-medium">+{hiddenEventsCount} more</span>
                 </div>
-              )
-            })}
-            {hiddenEventsCount > 0 && (
-              <div
-                onClick={onViewMoreEvents}
-                className="flex items-center justify-center px-2 py-2 rounded-md bg-gray-100 text-gray-600 cursor-pointer hover:bg-gray-200 transition-colors"
-              >
-                <span className="text-sm font-medium">+{hiddenEventsCount} more</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500">
-            <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-400">
-              <div className="w-2 h-2 rounded-full bg-white"></div>
+              )}
             </div>
-            <span className="text-sm">No executions received yet</span>
+          ) : (
+            <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-400">
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+              </div>
+              <span className="text-sm">No executions received yet</span>
+            </div>
+          )}
+        </div>
+
+        {nextInQueue && (
+          <div className="px-4 pt-3 pb-6">
+            <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+              <span className="uppercase text-sm font-medium">Next In Queue</span>
+            </div>
+            <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 min-w-0`}>
+              <div className="flex items-center gap-2 text-gray-500 min-w-0 flex-1">
+                <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center`}>
+                  <NextInQueueIcon size={20} className="text-gray-500" />
+                </div>
+                <span className="truncate text-sm">{nextInQueue.title}</span>
+              </div>
+              {nextInQueue.subtitle && (
+                <span className="text-sm truncate text-gray-500 flex-shrink-0 max-w-[40%]">{nextInQueue.subtitle}</span>
+              )}
+            </div>
           </div>
         )}
-      </div>
-
-      {nextInQueue && (
-        <div className="px-4 pt-3 pb-6">
-          <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-            <span className="uppercase text-sm font-medium">Next In Queue</span>
-          </div>
-          <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 min-w-0`}>
-            <div className="flex items-center gap-2 text-gray-500 min-w-0 flex-1">
-              <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center`}>
-                <NextInQueueIcon size={20} className="text-gray-500" />
-              </div>
-              <span className="truncate text-sm">{nextInQueue.title}</span>
-            </div>
-            {nextInQueue.subtitle && (
-              <span className="text-sm truncate text-gray-500 flex-shrink-0 max-w-[40%]">{nextInQueue.subtitle}</span>
-            )}
-          </div>
-        </div>
-      )}
       </div>
     </SelectionWrapper>
   )

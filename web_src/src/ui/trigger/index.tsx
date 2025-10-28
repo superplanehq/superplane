@@ -32,7 +32,7 @@ export interface TriggerProps extends ComponentActionsProps {
   selected?: boolean;
 }
 
-export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, lastEventData, zeroStateText = "No events yet", collapsed = false, collapsedBackground, selected = false, onRun, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
+export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, lastEventData, zeroStateText = "No events yet", collapsed = false, collapsedBackground, selected = false, onRun, onEdit, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
   const timeAgo = React.useMemo(() => {
     if (!lastEventData) return null;
     const now = new Date()
@@ -79,6 +79,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
           collapsedBackground={collapsedBackground}
           shape="circle"
           onRun={onRun}
+          onEdit={onEdit}
           onDuplicate={onDuplicate}
           onDeactivate={onDeactivate}
           onToggleView={onToggleView}
@@ -109,6 +110,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
           title={title}
           description={description}
           onRun={onRun}
+          onEdit={onEdit}
           onDuplicate={onDuplicate}
           onDeactivate={onDeactivate}
           onToggleView={onToggleView}

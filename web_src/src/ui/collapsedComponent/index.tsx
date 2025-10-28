@@ -27,6 +27,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   onDoubleClick,
   onRun,
   onDuplicate,
+  onEdit,
   onDeactivate,
   onToggleView,
   onDelete,
@@ -52,6 +53,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
         <SidebarActionsDropdown
           onRun={onRun}
           onDuplicate={onDuplicate}
+          onEdit={onEdit}
           onDeactivate={onDeactivate}
           onToggleView={onToggleView}
           onDelete={onDelete}

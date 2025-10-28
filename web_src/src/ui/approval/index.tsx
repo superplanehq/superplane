@@ -49,6 +49,7 @@ export const Approval: React.FC<ApprovalProps> = ({
   onDeactivate,
   onToggleView,
   onDelete,
+  onEdit,
   isCompactView,
 }) => {
   const calcRelativeTimeFromDiff = (diff: number) => {
@@ -90,6 +91,7 @@ export const Approval: React.FC<ApprovalProps> = ({
           onDeactivate={onDeactivate}
           onToggleView={onToggleView}
           onDelete={onDelete}
+          onEdit={onEdit}
           isCompactView={isCompactView}
         />
       </SelectionWrapper>
@@ -100,63 +102,64 @@ export const Approval: React.FC<ApprovalProps> = ({
     <SelectionWrapper selected={selected}>
       <div className="flex flex-col border-2 border-border rounded-md w-[30rem] bg-white">
         <ComponentHeader
-        iconSrc={iconSrc}
-        iconSlug={iconSlug}
-        iconBackground={iconBackground}
-        iconColor={iconColor}
-        headerColor={headerColor}
-        title={title}
-        description={description}
-        onRun={onRun}
-        onDuplicate={onDuplicate}
-        onDeactivate={onDeactivate}
-        onToggleView={onToggleView}
-        onDelete={onDelete}
-        isCompactView={isCompactView}
-      />
+          iconSrc={iconSrc}
+          iconSlug={iconSlug}
+          iconBackground={iconBackground}
+          iconColor={iconColor}
+          headerColor={headerColor}
+          title={title}
+          description={description}
+          onRun={onRun}
+          onDuplicate={onDuplicate}
+          onDeactivate={onDeactivate}
+          onToggleView={onToggleView}
+          onDelete={onDelete}
+          onEdit={onEdit}
+          isCompactView={isCompactView}
+        />
 
-      <div className="px-4 py-3">
-        {awaitingEvent ? (
-          <>
-            <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-              <span className="uppercase text-sm font-medium">
-                Awaiting Approval
-              </span>
-              <span className="text-sm">{timeAgo}</span>
-            </div>
-
-            <div
-              className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-orange-200 mb-4`}
-            >
-              <div className="flex items-center gap-2 w-[80%] text-amber-800">
-                <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center`}
-                >
-                  <CircleDashedIcon size={20} className="text-amber-800" />
-                </div>
-                <span className="truncate text-sm">{awaitingEvent.title}</span>
-              </div>
-              {awaitingEvent.subtitle && (
-                <span className="text-sm no-wrap whitespace-nowrap w-[20%] text-amber-800">
-                  {awaitingEvent.subtitle}
+        <div className="px-4 py-3">
+          {awaitingEvent ? (
+            <>
+              <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+                <span className="uppercase text-sm font-medium">
+                  Awaiting Approval
                 </span>
-              )}
-            </div>
+                <span className="text-sm">{timeAgo}</span>
+              </div>
 
-            <ItemGroup className="w-full">
-              {approvals.map((approval, index) => (
-                <React.Fragment key={`${approval.title}-${index}`}>
-                  <ApprovalItem {...approval} />
-                </React.Fragment>
-              ))}
-            </ItemGroup>
-          </>
-        ) : (
-          <div className="flex items-center justify-center px-2 py-4 rounded-md bg-gray-50 border border-dashed border-gray-300">
-            <span className="text-sm text-gray-400">{zeroStateText}</span>
-          </div>
-        )}
-      </div>
+              <div
+                className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-orange-200 mb-4`}
+              >
+                <div className="flex items-center gap-2 w-[80%] text-amber-800">
+                  <div
+                    className={`w-5 h-5 rounded-full flex items-center justify-center`}
+                  >
+                    <CircleDashedIcon size={20} className="text-amber-800" />
+                  </div>
+                  <span className="truncate text-sm">{awaitingEvent.title}</span>
+                </div>
+                {awaitingEvent.subtitle && (
+                  <span className="text-sm no-wrap whitespace-nowrap w-[20%] text-amber-800">
+                    {awaitingEvent.subtitle}
+                  </span>
+                )}
+              </div>
+
+              <ItemGroup className="w-full">
+                {approvals.map((approval, index) => (
+                  <React.Fragment key={`${approval.title}-${index}`}>
+                    <ApprovalItem {...approval} />
+                  </React.Fragment>
+                ))}
+              </ItemGroup>
+            </>
+          ) : (
+            <div className="flex items-center justify-center px-2 py-4 rounded-md bg-gray-50 border border-dashed border-gray-300">
+              <span className="text-sm text-gray-400">{zeroStateText}</span>
+            </div>
+          )}
+        </div>
       </div>
     </SelectionWrapper>
   );
