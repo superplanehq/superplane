@@ -12,6 +12,7 @@ export interface FilterProps {
   filters: FilterCondition[];
   lastEvent?: Omit<EventSection, "title">;
   collapsed?: boolean;
+  selected?: boolean;
 }
 
 export const Filter: React.FC<FilterProps> = ({
@@ -19,6 +20,7 @@ export const Filter: React.FC<FilterProps> = ({
   filters,
   lastEvent,
   collapsed = false,
+  selected = false,
 }) => {
   const spec = filters.length > 0 ? {
     title: "filter",
@@ -49,6 +51,7 @@ export const Filter: React.FC<FilterProps> = ({
       spec={spec}
       eventSections={eventSections}
       collapsed={collapsed}
+      selected={selected}
     />
   );
 };

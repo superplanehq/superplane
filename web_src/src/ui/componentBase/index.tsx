@@ -3,6 +3,7 @@ import { CollapsedComponent } from "../collapsedComponent";
 import { ComponentHeader } from "../componentHeader";
 import { ListFilter } from "lucide-react";
 import { SpecsTooltip } from "./SpecsTooltip";
+import { SelectionWrapper } from "../selectionWrapper";
 
 export interface SpecBadge {
   label: string;
@@ -38,33 +39,37 @@ export interface ComponentBaseProps {
   collapsed?: boolean;
   collapsedBackground?: string;
   eventSections?: EventSection[];
+  selected?: boolean;
 }
 
-export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, spec, collapsed = false, collapsedBackground, eventSections }) => {
+export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, spec, collapsed = false, collapsedBackground, eventSections, selected = false }) => {
   if (collapsed) {
     return (
-      <CollapsedComponent
-        iconSrc={iconSrc}
-        iconSlug={iconSlug}
-        iconColor={iconColor}
-        iconBackground={iconBackground}
-        title={title}
-        collapsedBackground={collapsedBackground}
-        shape="circle"
-      >
-        <div className="flex flex-col items-center gap-1">
-          {spec?.title && spec?.values?.length > 0 && <div className="flex items-center gap-1 text-xs text-gray-500">
-            <ListFilter size={12} />
-            <span>{spec.values.length} {spec.title + (spec.values.length > 1 ? "s" : "")}</span>
-          </div>}
-        </div>
-      </CollapsedComponent>
+      <SelectionWrapper selected={selected}>
+        <CollapsedComponent
+          iconSrc={iconSrc}
+          iconSlug={iconSlug}
+          iconColor={iconColor}
+          iconBackground={iconBackground}
+          title={title}
+          collapsedBackground={collapsedBackground}
+          shape="circle"
+        >
+          <div className="flex flex-col items-center gap-1">
+            {spec?.title && spec?.values?.length > 0 && <div className="flex items-center gap-1 text-xs text-gray-500">
+              <ListFilter size={12} />
+              <span>{spec.values.length} {spec.title + (spec.values.length > 1 ? "s" : "")}</span>
+            </div>}
+          </div>
+        </CollapsedComponent>
+      </SelectionWrapper>
     )
   }
 
   return (
-    <div className="flex flex-col border-2 border-border rounded-md w-[23rem] bg-white" >
-      <ComponentHeader
+    <SelectionWrapper selected={selected}>
+      <div className="flex flex-col border-2 border-border rounded-md w-[23rem] bg-white" >
+        <ComponentHeader
         iconSrc={iconSrc}
         iconSlug={iconSlug}
         iconBackground={iconBackground}
@@ -112,6 +117,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
           </div>
         )
       })}
-    </div>
+      </div>
+    </SelectionWrapper>
   )
 }

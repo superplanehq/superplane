@@ -15,6 +15,7 @@ export interface IfProps {
   trueSectionLabel?: string;
   falseSectionLabel?: string;
   collapsed?: boolean;
+  selected?: boolean;
 }
 
 export const If: React.FC<IfProps> = ({
@@ -25,6 +26,7 @@ export const If: React.FC<IfProps> = ({
   trueSectionLabel = "TRUE",
   falseSectionLabel = "FALSE",
   collapsed = false,
+  selected = false,
 }) => {
   const spec = conditions.length > 0 ? {
     title: "condition",
@@ -61,6 +63,7 @@ export const If: React.FC<IfProps> = ({
       spec={spec}
       eventSections={eventSections}
       collapsed={collapsed}
+      selected={selected}
     />
   );
 };

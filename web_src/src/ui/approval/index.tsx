@@ -4,6 +4,7 @@ import { ApprovalItem, type ApprovalItemProps } from "../approvalItem";
 import { CollapsedComponent } from "../collapsedComponent";
 import { ComponentHeader } from "../componentHeader";
 import { ItemGroup } from "../item";
+import { SelectionWrapper } from "../selectionWrapper";
 
 export interface AwaitingEvent {
   title: string;
@@ -24,6 +25,7 @@ export interface ApprovalProps {
   receivedAt?: Date;
   zeroStateText?: string;
   collapsed?: boolean;
+  selected?: boolean;
 }
 
 export const Approval: React.FC<ApprovalProps> = ({
@@ -40,6 +42,7 @@ export const Approval: React.FC<ApprovalProps> = ({
   approvals,
   awaitingEvent,
   zeroStateText = "No events yet",
+  selected = false,
 }) => {
   const calcRelativeTimeFromDiff = (diff: number) => {
     const seconds = Math.floor(diff / 1000);
@@ -66,21 +69,24 @@ export const Approval: React.FC<ApprovalProps> = ({
 
   if (collapsed) {
     return (
-      <CollapsedComponent
-        iconSrc={iconSrc}
-        iconSlug={iconSlug}
-        iconColor={iconColor}
-        iconBackground={iconBackground}
-        title={title}
-        collapsedBackground={collapsedBackground}
-        shape="rounded"
-      />
+      <SelectionWrapper selected={selected}>
+        <CollapsedComponent
+          iconSrc={iconSrc}
+          iconSlug={iconSlug}
+          iconColor={iconColor}
+          iconBackground={iconBackground}
+          title={title}
+          collapsedBackground={collapsedBackground}
+          shape="rounded"
+        />
+      </SelectionWrapper>
     );
   }
 
   return (
-    <div className="flex flex-col border-2 border-border rounded-md w-[30rem] bg-white">
-      <ComponentHeader
+    <SelectionWrapper selected={selected}>
+      <div className="flex flex-col border-2 border-border rounded-md w-[30rem] bg-white">
+        <ComponentHeader
         iconSrc={iconSrc}
         iconSlug={iconSlug}
         iconBackground={iconBackground}
@@ -132,6 +138,7 @@ export const Approval: React.FC<ApprovalProps> = ({
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </SelectionWrapper>
   );
 };

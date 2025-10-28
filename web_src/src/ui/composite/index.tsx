@@ -4,6 +4,7 @@ import { ComponentHeader } from "../componentHeader";
 import { CollapsedComponent } from "../collapsedComponent";
 import { MetadataList, type MetadataItem } from "../metadataList";
 import { ChildEvents, type ChildEventsInfo } from "../childEvents";
+import { SelectionWrapper } from "../selectionWrapper";
 
 export type LastRunState = "success" | "failed" | "running"
 export type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
@@ -47,6 +48,7 @@ export interface CompositeProps {
   nextInQueue?: QueueItem;
   collapsedBackground?: string;
   collapsed?: boolean;
+  selected?: boolean;
 
   startLastValuesOpen?: boolean;
 
@@ -56,7 +58,7 @@ export interface CompositeProps {
   onViewMoreEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false }) => {
   // All hooks must be called before any early returns
   const [showLastRunValues, setShowLastRunValues] = React.useState<Record<number, boolean>>(
     startLastValuesOpen ? { 0: true } : {}
@@ -144,33 +146,36 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
   // Now safe to do early return after all hooks are called
   if (collapsed) {
     return (
-      <CollapsedComponent
-        iconSrc={iconSrc}
-        iconSlug={iconSlug}
-        iconColor={iconColor}
-        iconBackground={iconBackground}
-        title={title}
-        collapsedBackground={collapsedBackground}
-        shape="rounded"
-        onDoubleClick={onToggleCollapse}
-      >
-        {parameters.length > 0 && (
-          <MetadataList
-            items={parameters.map(group => ({
-              icon: group.icon,
-              label: group.items.join(", ")
-            }))}
-            className="flex flex-col gap-1 text-gray-500 mt-1"
-            iconSize={16}
-          />
-        )}
-      </CollapsedComponent>
+      <SelectionWrapper selected={selected}>
+        <CollapsedComponent
+          iconSrc={iconSrc}
+          iconSlug={iconSlug}
+          iconColor={iconColor}
+          iconBackground={iconBackground}
+          title={title}
+          collapsedBackground={collapsedBackground}
+          shape="rounded"
+          onDoubleClick={onToggleCollapse}
+        >
+          {parameters.length > 0 && (
+            <MetadataList
+              items={parameters.map(group => ({
+                icon: group.icon,
+                label: group.items.join(", ")
+              }))}
+              className="flex flex-col gap-1 text-gray-500 mt-1"
+              iconSize={16}
+            />
+          )}
+        </CollapsedComponent>
+      </SelectionWrapper>
     )
   }
 
   return (
-    <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white" >
-      <ComponentHeader
+    <SelectionWrapper selected={selected}>
+      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white" >
+        <ComponentHeader
         iconSrc={iconSrc}
         iconSlug={iconSlug}
         iconBackground={iconBackground}
@@ -291,6 +296,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </SelectionWrapper>
   )
 }

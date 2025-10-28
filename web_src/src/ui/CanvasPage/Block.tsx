@@ -54,6 +54,7 @@ export interface BlockData {
 interface BlockProps {
   data: BlockData;
   nodeId?: string;
+  selected?: boolean;
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
@@ -100,7 +101,7 @@ function LeftHandle({ data }: BlockProps) {
       position={Position.Left}
       style={{
         ...HANDLE_STYLE,
-        left: -10,
+        left: -15,
         top: isCollapsed ? "50%" : 30,
         transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
@@ -124,7 +125,7 @@ function RightHandle({ data }: BlockProps) {
       position={Position.Right}
       style={{
         ...HANDLE_STYLE,
-        right: -10,
+        right: -15,
         top: isCollapsed ? "50%" : 30,
         transform: isCollapsed ? "translateY(-50%)" : undefined,
       }}
@@ -140,6 +141,7 @@ function BlockContent({
   data,
   onExpand,
   nodeId,
+  selected = false,
 }: BlockProps) {
   const handleExpand = () => {
     if (onExpand && nodeId) {
@@ -149,24 +151,25 @@ function BlockContent({
 
   switch (data.type) {
     case "trigger":
-      return <Trigger {...(data.trigger as TriggerProps)} />;
+      return <Trigger {...(data.trigger as TriggerProps)} selected={selected} />;
     case "composite":
       return (
         <Composite
           {...(data.composite as CompositeProps)}
           onExpandChildEvents={handleExpand}
+          selected={selected}
         />
       );
     case "approval":
-      return <Approval {...(data.approval as ApprovalProps)} />;
+      return <Approval {...(data.approval as ApprovalProps)} selected={selected} />;
     case "filter":
-      return <Filter {...(data.filter as FilterProps)} />;
+      return <Filter {...(data.filter as FilterProps)} selected={selected} />;
     case "if":
-      return <If {...(data.if as IfProps)} />;
+      return <If {...(data.if as IfProps)} selected={selected} />;
     case "noop":
-      return <Noop {...(data.noop as NoopProps)} />;
+      return <Noop {...(data.noop as NoopProps)} selected={selected} />;
     case "switch":
-      return <SwitchComponent {...(data.switch as SwitchComponentProps)} />;
+      return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} />;
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }
