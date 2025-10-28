@@ -1,6 +1,7 @@
 import { useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { showSuccessToast } from "@/utils/toast";
 
 import {
   BlueprintsBlueprint,
@@ -85,6 +86,10 @@ export function WorkflowPageV2() {
     );
   }, [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap]);
 
+  const handleSave = useCallback(() => {
+    showSuccessToast("Workflow saved successfully");
+  }, []);
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return null;
@@ -94,7 +99,7 @@ export function WorkflowPageV2() {
     return null;
   }
 
-  return <CanvasPage title={workflow.name!} nodes={nodes} edges={edges} getSidebarData={getSidebarData} />;
+  return <CanvasPage title={workflow.name!} nodes={nodes} edges={edges} getSidebarData={getSidebarData} onSave={handleSave} />;
 }
 
 function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]) {

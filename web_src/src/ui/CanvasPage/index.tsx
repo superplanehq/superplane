@@ -59,6 +59,7 @@ export interface CanvasPageProps {
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  onSave?: () => void;
 
   aiSidebar?: {
     showNotifications: boolean;
@@ -77,7 +78,7 @@ function CanvasPage(props: CanvasPageProps) {
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
       <ReactFlowProvider>
-        <CanvasContent state={state} />
+        <CanvasContent state={state} onSave={props.onSave} />
       </ReactFlowProvider>
 
       <AiSidebar
@@ -160,7 +161,7 @@ function Sidebar({
   );
 }
 
-function CanvasContent({ state }: { state: CanvasPageState }) {
+function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: () => void }) {
   const { fitView } = useReactFlow();
 
   // Use refs to avoid recreating callbacks when state changes
@@ -210,7 +211,7 @@ function CanvasContent({ state }: { state: CanvasPageState }) {
   return (
     <>
       {/* Header */}
-      <Header breadcrumbs={state.breadcrumbs} />
+      <Header breadcrumbs={state.breadcrumbs} onSave={onSave} />
 
       {/* Toggle button */}
       <div className="absolute top-14 left-1/2 transform -translate-x-1/2 z-10">
