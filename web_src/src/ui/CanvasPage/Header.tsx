@@ -1,5 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { resolveIcon } from "@/lib/utils";
+import { Button } from "../button";
+import { Save } from "lucide-react";
 
 export interface BreadcrumbItem {
   label: string;
@@ -12,9 +14,10 @@ export interface BreadcrumbItem {
 
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
+  onSave?: () => void;
 }
 
-export function Header({ breadcrumbs }: HeaderProps) {
+export function Header({ breadcrumbs, onSave }: HeaderProps) {
   return (
     <header className="absolute top-0 left-0 right-0 z-20 bg-white border-b border-gray-200">
       <div className="flex items-center justify-between h-12 px-6">
@@ -74,8 +77,15 @@ export function Header({ breadcrumbs }: HeaderProps) {
           })}
         </div>
 
-        {/* Right side - placeholder for future actions */}
-        <div className="w-8"></div>
+        {/* Right side - Save button */}
+        {onSave ? (
+          <Button onClick={onSave} size="sm" variant="outline">
+            <Save />
+            Save
+          </Button>
+        ) : (
+          <div className="w-8"></div>
+        )}
       </div>
     </header>
   );

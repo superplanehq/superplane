@@ -1,6 +1,7 @@
 import { useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { showSuccessToast, showErrorToast } from "@/utils/toast";
 
 import {
   BlueprintsBlueprint,
@@ -15,7 +16,7 @@ import {
   workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
 
-import { useWorkflow, useTriggers, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
+import { useWorkflow, useTriggers, useUpdateWorkflow, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { CanvasEdge, CanvasNode, CanvasPage, SidebarData } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
@@ -31,6 +32,7 @@ export function WorkflowPageV2() {
   }>();
 
   const queryClient = useQueryClient();
+  const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
@@ -85,6 +87,63 @@ export function WorkflowPageV2() {
     );
   }, [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap]);
 
+  const handleSave = useCallback(async (canvasNodes: CanvasNode[]) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Map canvas nodes back to ComponentsNode format with updated positions
+    const updatedNodes = workflow.nodes?.map((node) => {
+      const canvasNode = canvasNodes.find((cn) => cn.id === node.id);
+      if (canvasNode) {
+        return {
+          ...node,
+          position: {
+            x: Math.round(canvasNode.position.x),
+            y: Math.round(canvasNode.position.y),
+          },
+        };
+      }
+      return node;
+    });
+
+    // Save previous state for rollback
+    const previousWorkflow = queryClient.getQueryData(
+      workflowKeys.detail(organizationId, workflowId)
+    );
+
+    // Optimistically update the cache to prevent flicker
+    const updatedWorkflow = {
+      ...workflow,
+      nodes: updatedNodes,
+    };
+
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+
+    try {
+      await updateWorkflowMutation.mutateAsync({
+        name: workflow.name!,
+        description: workflow.description,
+        nodes: updatedNodes,
+        edges: workflow.edges,
+      });
+
+      showSuccessToast("Workflow saved successfully");
+    } catch (error) {
+      console.error("Failed to save workflow:", error);
+      showErrorToast("Failed to save workflow");
+
+      // Rollback to previous state on error
+      if (previousWorkflow) {
+        queryClient.setQueryData(
+          workflowKeys.detail(organizationId, workflowId),
+          previousWorkflow
+        );
+      }
+    }
+  }, [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient]);
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return null;
@@ -94,7 +153,7 @@ export function WorkflowPageV2() {
     return null;
   }
 
-  return <CanvasPage title={workflow.name!} nodes={nodes} edges={edges} getSidebarData={getSidebarData} />;
+  return <CanvasPage title={workflow.name!} nodes={nodes} edges={edges} getSidebarData={getSidebarData} onSave={handleSave} />;
 }
 
 function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]) {
