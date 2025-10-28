@@ -28,6 +28,7 @@ interface ComponentSidebarProps {
   iconColor?: string;
   iconBackground?: string;
   moreInQueueCount: number;
+  hideQueueEvents?: boolean;
 
   onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
@@ -51,6 +52,7 @@ export const ComponentSidebar = ({
   latestEvents,
   nextInQueueEvents,
   moreInQueueCount = 0,
+  hideQueueEvents = false,
   onSeeFullHistory,
 }: ComponentSidebarProps) => {
   const Icon = React.useMemo(() => {
@@ -146,11 +148,10 @@ export const ComponentSidebar = ({
 
               {event.childEventsInfo && event.childEventsInfo.count > 0 && (
                 <div
-                  className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${
-                    event.values && Object.entries(event.values).length > 0
-                      ? "border-t-1 border-gray-400"
-                      : " rounded-t-sm"
-                  }`}
+                  className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${event.values && Object.entries(event.values).length > 0
+                    ? "border-t-1 border-gray-400"
+                    : " rounded-t-sm"
+                    }`}
                 >
                   <ChildEvents
                     childEventsInfo={event.childEventsInfo}
@@ -173,9 +174,8 @@ export const ComponentSidebar = ({
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-2 border-gray-400 bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
           <div
-            className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${
-              iconBackground || ""
-            }`}
+            className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""
+              }`}
           >
             {iconSrc ? (
               <img src={iconSrc} alt={title} className="w-7 h-7" />
@@ -198,12 +198,12 @@ export const ComponentSidebar = ({
           </div>
         </div>
       </div>
-      <div className="px-3 py-1 border-b-2 border-gray-400">
+      {metadata.length > 0 && <div className="px-3 py-1 border-b-2 border-gray-400">
         <MetadataList
           items={metadata}
           className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
         />
-      </div>
+      </div>}
       <div className="px-3 py-1 border-b-2 border-gray-400 pb-3">
         <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">
           Latest events
@@ -231,33 +231,34 @@ export const ComponentSidebar = ({
           )}
         </div>
       </div>
-      <div className="px-3 py-1 pb-3">
-        <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">
-          Next in queue
-        </h2>
-        <div className="flex flex-col gap-2">
-          {nextInQueueEvents.length === 0 ? (
-            <div className="text-center py-4 text-gray-500 text-sm">
-              Queue is empty
-            </div>
-          ) : (
-            <>
-              {nextInQueueEvents.slice(0, 5).map((event, index) => {
-                return createEventItem(event, index);
-              })}
-              {moreInQueueCount > 0 && (
-                <button
-                  onClick={() => onSeeFullHistory?.()}
-                  className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
-                >
-                  <TextAlignStart size={16} />
-                  {moreInQueueCount} more in the queue
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      {!hideQueueEvents &&
+        <div className="px-3 py-1 pb-3">
+          <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">
+            Next in queue
+          </h2>
+          <div className="flex flex-col gap-2">
+            {nextInQueueEvents.length === 0 ? (
+              <div className="text-center py-4 text-gray-500 text-sm">
+                Queue is empty
+              </div>
+            ) : (
+              <>
+                {nextInQueueEvents.slice(0, 5).map((event, index) => {
+                  return createEventItem(event, index);
+                })}
+                {moreInQueueCount > 0 && (
+                  <button
+                    onClick={() => onSeeFullHistory?.()}
+                    className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1"
+                  >
+                    <TextAlignStart size={16} />
+                    {moreInQueueCount} more in the queue
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>}
     </div>
   );
 };

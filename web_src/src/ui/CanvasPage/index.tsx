@@ -7,7 +7,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AiSidebar } from "../ai";
 import { ComponentSidebar } from "../componentSidebar";
@@ -40,13 +40,14 @@ export interface SidebarData {
   iconColor?: string;
   iconBackground?: string;
   moreInQueueCount: number;
+  hideQueueEvents?: boolean;
 }
 
 export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
 }
 
-export interface CanvasEdge extends ReactFlowEdge {}
+export interface CanvasEdge extends ReactFlowEdge { }
 
 export interface CanvasPageProps {
   nodes: CanvasNode[];
@@ -94,6 +95,18 @@ function Sidebar({
     return getSidebarData(state.componentSidebar.selectedNodeId);
   }, [state.componentSidebar.selectedNodeId, getSidebarData]);
 
+  const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
+  const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
+
+  useEffect(() => {
+    if (sidebarData?.latestEvents) {
+      setLatestEvents(sidebarData.latestEvents);
+    }
+    if (sidebarData?.nextInQueueEvents) {
+      setNextInQueueEvents(sidebarData.nextInQueueEvents);
+    }
+  }, [sidebarData?.latestEvents, sidebarData?.nextInQueueEvents]);
+
   if (!sidebarData) {
     return null;
   }
@@ -102,8 +115,8 @@ function Sidebar({
     <ComponentSidebar
       isOpen={state.componentSidebar.isOpen}
       onClose={state.componentSidebar.close}
-      latestEvents={sidebarData.latestEvents}
-      nextInQueueEvents={sidebarData.nextInQueueEvents}
+      latestEvents={latestEvents}
+      nextInQueueEvents={nextInQueueEvents}
       metadata={sidebarData.metadata}
       title={sidebarData.title}
       iconSrc={sidebarData.iconSrc}
@@ -111,6 +124,25 @@ function Sidebar({
       iconColor={sidebarData.iconColor}
       iconBackground={sidebarData.iconBackground}
       moreInQueueCount={sidebarData.moreInQueueCount}
+      hideQueueEvents={sidebarData.hideQueueEvents}
+      onEventClick={(event) => {
+        setLatestEvents((prev) => {
+          return prev.map((e) => {
+            if (e.title === event.title) {
+              return { ...e, isOpen: !e.isOpen };
+            }
+            return e;
+          });
+        });
+        setNextInQueueEvents((prev) => {
+          return prev.map((e) => {
+            if (e.title === event.title) {
+              return { ...e, isOpen: !e.isOpen };
+            }
+            return e;
+          });
+        });
+      }}
     />
   );
 }
