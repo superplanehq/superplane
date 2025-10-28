@@ -1,6 +1,9 @@
 import { Approval, type ApprovalProps } from "@/ui/approval";
-import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Composite, type CompositeProps } from "@/ui/composite";
+import {
+  SwitchComponent,
+  type SwitchComponentProps,
+} from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 import { OnApproveFn, OnRejectFn } from ".";
@@ -9,7 +12,14 @@ import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "composite" | "approval" | "filter" | "if" | "noop" | "switch";
+type BlockType =
+  | "trigger"
+  | "composite"
+  | "approval"
+  | "filter"
+  | "if"
+  | "noop"
+  | "switch";
 
 export interface BlockData {
   label: string;
@@ -49,13 +59,14 @@ interface BlockProps {
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onApprove?: OnApproveFn;
   onReject?: OnRejectFn;
+  onClick?: () => void;
 }
 
 export function Block(props: BlockProps) {
   const data = props.data;
 
   return (
-    <div className="relative w-fit">
+    <div className="relative w-fit" onClick={props.onClick}>
       <LeftHandle data={data} />
       <BlockContent {...props} />
       <RightHandle data={data} />
