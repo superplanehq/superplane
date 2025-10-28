@@ -217,7 +217,7 @@ function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: (no
   return (
     <>
       {/* Header */}
-      <Header breadcrumbs={state.breadcrumbs} onSave={handleSave} />
+      <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} />
 
       {/* Toggle button */}
       <div className="absolute top-14 left-1/2 transform -translate-x-1/2 z-10">
