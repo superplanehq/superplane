@@ -10,12 +10,14 @@ import {
 import { useCallback, useMemo } from "react";
 
 import { AiSidebar } from "../ai";
+import { ComponentSidebar } from "../componentSidebar";
 import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
-import { Header, type BreadcrumbItem } from "./Header";
-import { Simulation } from "./storybooks/useSimulation";
-import { useCanvasState } from "./useCanvasState";
 import "./canvas-reset.css";
+import { Header, type BreadcrumbItem } from "./Header";
+import { genCommit } from "./storybooks/commits";
+import { Simulation } from "./storybooks/useSimulation";
+import { CanvasPageState, useCanvasState } from "./useCanvasState";
 
 export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
@@ -53,36 +55,126 @@ const EDGE_STYLE = {
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
 } as const;
 
-function CanvasContent(props: CanvasPageProps) {
-  const {
-    nodes,
-    edges,
-    onNodesChange,
-    onEdgesChange,
-    isCollapsed,
-    toggleCollapse,
-    toggleNodeCollapse,
-  } = useCanvasState(props);
+function CanvasPage(props: CanvasPageProps) {
+  const state = useCanvasState(props);
 
+  return (
+    <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
+      <ReactFlowProvider>
+        <CanvasContent state={state} />
+      </ReactFlowProvider>
+
+      <AiSidebar />
+      <Sidebar state={state} />
+    </div>
+  );
+}
+
+function Sidebar({ state }: { state: CanvasPageState }) {
+  return (
+    <ComponentSidebar
+      isOpen={state.componentSidebar.isOpen}
+      onClose={state.componentSidebar.close}
+      latestEvents={[
+        {
+          title: genCommit().message,
+          subtitle: "4m",
+          state: "processed" as const,
+          isOpen: false,
+          receivedAt: new Date(),
+          childEventsInfo: {
+            count: 1,
+            state: "processed" as const,
+            waitingInfos: [],
+          },
+        },
+        {
+          title: genCommit().message,
+          subtitle: "3h",
+          state: "discarded" as const,
+          isOpen: false,
+          receivedAt: new Date(Date.now() - 1000 * 60 * 30),
+          values: {
+            Author: "Pedro Forestileao",
+            Commit: "feat: update component sidebar",
+            Branch: "feature/ui-update",
+            Type: "merge",
+            "Event ID": "abc123-def456-ghi789",
+          },
+          childEventsInfo: {
+            count: 3,
+            state: "processed" as const,
+            waitingInfos: [
+              {
+                icon: "check",
+                info: "Tests passed",
+              },
+              {
+                icon: "check",
+                info: "Deploy completed",
+              },
+            ],
+          },
+        },
+      ]}
+      nextInQueueEvents={[
+        {
+          title: genCommit().message,
+          state: "waiting" as const,
+          isOpen: false,
+          receivedAt: new Date(Date.now() + 1000 * 60 * 5),
+          childEventsInfo: {
+            count: 2,
+            state: "waiting" as const,
+            waitingInfos: [
+              {
+                icon: "clock",
+                info: "Waiting for approval",
+                futureTimeDate: new Date(Date.now() + 1000 * 60 * 15),
+              },
+            ],
+          },
+        },
+        {
+          title: genCommit().message,
+          state: "waiting" as const,
+          isOpen: false,
+          receivedAt: new Date(Date.now() + 1000 * 60 * 10),
+          childEventsInfo: {
+            count: 1,
+            state: "waiting" as const,
+            waitingInfos: [],
+          },
+        },
+      ]}
+      metadata={[
+        {
+          icon: "book",
+          label: "monarch-app",
+        },
+        {
+          icon: "filter",
+          label: "branch=main",
+        },
+      ]}
+      title={"Build/Test/Deploy Stage"}
+      moreInQueueCount={0}
+    />
+  );
+}
+
+function CanvasContent({ state }: { state: CanvasPageState }) {
   const { fitView } = useReactFlow();
-  const { onNodeExpand, title, breadcrumbs: propsBreadcrumbs } = props;
-
-  const defaultBreadcrumbs: BreadcrumbItem[] = [
-    { label: "Workflows" },
-    { label: title || "Untitled Workflow" },
-  ];
-
-  const breadcrumbs = propsBreadcrumbs || defaultBreadcrumbs;
 
   const handleNodeExpand = useCallback(
     (nodeId: string) => {
-      const node = nodes?.find((n) => n.id === nodeId);
-      if (node && onNodeExpand) {
-        onNodeExpand(nodeId, node.data);
+      const node = state.nodes?.find((n) => n.id === nodeId);
+      if (node && state.onNodeExpand) {
+        state.onNodeExpand(nodeId, node.data);
         fitView();
       }
     },
-    [nodes, onNodeExpand, fitView]
+    [state.nodes, state.onNodeExpand, fitView]
   );
 
   const nodeTypes = useMemo(
@@ -91,9 +183,10 @@ function CanvasContent(props: CanvasPageProps) {
         <Block
           data={nodeProps.data as BlockData}
           onExpand={handleNodeExpand}
-          onApprove={props.onApprove}
-          onReject={props.onReject}
+          onApprove={state.onApprove}
+          onReject={state.onReject}
           nodeId={nodeProps.id}
+          onClick={state.componentSidebar.open}
         />
       ),
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,24 +196,27 @@ function CanvasContent(props: CanvasPageProps) {
 
   const edgeTypes = useMemo(() => ({}), []);
   const styledEdges = useMemo(
-    () => edges?.map((e) => ({ ...e, ...EDGE_STYLE })),
-    [edges]
+    () => state.edges?.map((e) => ({ ...e, ...EDGE_STYLE })),
+    [state.edges]
   );
 
   return (
     <>
       {/* Header */}
-      <Header breadcrumbs={breadcrumbs} />
+      <Header breadcrumbs={state.breadcrumbs} />
 
       {/* Toggle button */}
       <div className="absolute top-14 left-1/2 transform -translate-x-1/2 z-10">
-        <ViewToggle isCollapsed={isCollapsed} onToggle={toggleCollapse} />
+        <ViewToggle
+          isCollapsed={state.isCollapsed}
+          onToggle={state.toggleCollapse}
+        />
       </div>
 
       <div className="pt-12 h-full">
         <div className="h-full w-full">
           <ReactFlow
-            nodes={nodes}
+            nodes={state.nodes}
             edges={styledEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -137,27 +233,15 @@ function CanvasContent(props: CanvasPageProps) {
             nodesDraggable={true}
             nodesConnectable={false}
             elementsSelectable={true}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeDoubleClick={(_, node) => toggleNodeCollapse(node.id)}
+            onNodesChange={state.onNodesChange}
+            onEdgesChange={state.onEdgesChange}
+            onNodeDoubleClick={(_, node) => state.toggleNodeCollapse(node.id)}
           >
             <Background bgColor="#F1F5F9" color="#F1F5F9" />
           </ReactFlow>
         </div>
       </div>
     </>
-  );
-}
-
-function CanvasPage(props: CanvasPageProps) {
-  return (
-    <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
-      <ReactFlowProvider>
-        <CanvasContent {...props} />
-      </ReactFlowProvider>
-
-      <AiSidebar />
-    </div>
   );
 }
 
