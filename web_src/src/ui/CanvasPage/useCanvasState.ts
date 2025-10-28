@@ -1,8 +1,40 @@
-import { useCallback, useEffect, useState } from "react";
 import type { Edge, EdgeChange, Node, NodeChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
+import { useCallback, useEffect, useState } from "react";
+import { CanvasPageProps, OnApproveFn, OnRejectFn } from ".";
+import { BreadcrumbItem } from "../../components/Breadcrumbs";
 
-export function useCanvasState({ nodes: initialNodes, edges: initialEdges, startCollapsed }: { nodes?: Node[]; edges?: Edge[]; startCollapsed?: boolean }) {
+export interface CanvasPageState {
+  title: string;
+  breadcrumbs: BreadcrumbItem[];
+
+  nodes: Node[];
+  edges: Edge[];
+
+  setNodes: (nodes: Node[]) => void;
+  setEdges: (edges: Edge[]) => void;
+
+  onNodesChange: (changes: NodeChange[]) => void;
+  onEdgesChange: (changes: EdgeChange[]) => void;
+
+  isCollapsed: boolean;
+  toggleCollapse: () => void;
+  toggleNodeCollapse: (nodeId: string) => void;
+
+  componentSidebar: {
+    isOpen: boolean;
+    close: () => void;
+    open: () => void;
+  };
+
+  onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
+  onApprove?: OnApproveFn;
+  onReject?: OnRejectFn;
+}
+
+export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
+  const { nodes: initialNodes, edges: initialEdges, startCollapsed } = props;
+
   const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(startCollapsed ?? false);
@@ -125,5 +157,39 @@ export function useCanvasState({ nodes: initialNodes, edges: initialEdges, start
     );
   }, []);
 
-  return { nodes, edges, setNodes, setEdges, onNodesChange, onEdgesChange, isCollapsed, toggleCollapse, toggleNodeCollapse } as const;
+  const componentSidebar = useComponentSidebarState();
+
+  return { 
+    title: props.title || "Untitled Workflow", 
+    breadcrumbs: props.breadcrumbs || [
+      { label: "Workflows" },
+      { label: props.title || "Untitled Workflow" },
+    ],
+    nodes, 
+    componentSidebar,
+    edges, 
+    setNodes, 
+    setEdges, 
+    onNodesChange, 
+    onEdgesChange, 
+    onNodeExpand: props.onNodeExpand,
+    isCollapsed, 
+    toggleCollapse, 
+    toggleNodeCollapse,
+    onApprove: props.onApprove,
+    onReject: props.onReject,
+  };
+}
+
+function useComponentSidebarState() : CanvasPageState["componentSidebar"] {
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+
+  const close = () => setIsOpen(false);
+  const open = () => setIsOpen(true);
+
+  return {
+    isOpen,
+    close,
+    open
+  };
 }
