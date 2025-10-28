@@ -1,7 +1,7 @@
 import React from "react";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { resolveIcon } from "@/lib/utils";
-import { EllipsisVertical, X } from "lucide-react"
+import { EllipsisVertical, X, TextAlignStart } from "lucide-react"
 import { ChildEvents, ChildEventsInfo } from "../childEvents";
 import { ChildEventsState } from "../composite";
 import { JSX } from "react";
@@ -25,11 +25,13 @@ interface ComponentSidebarProps {
   iconSlug?: string;
   iconColor?: string;
   iconBackground?: string;
+  moreInQueueCount: number;
 
   onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onEventClick?: (event: SidebarEvent) => void;
   onClose?: () => void;
+  onSeeFullHistory?: () => void;
 }
 
 export const ComponentSidebar = ({
@@ -45,6 +47,8 @@ export const ComponentSidebar = ({
   onClose,
   latestEvents,
   nextInQueueEvents,
+  moreInQueueCount = 0,
+  onSeeFullHistory,
 }: ComponentSidebarProps) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -102,7 +106,7 @@ export const ComponentSidebar = ({
         {event.isOpen && (
           (event.values && Object.entries(event.values).length > 0) ||
           (event.childEventsInfo && event.childEventsInfo.count > 0)
-        ) && <div className="rounded-sm bg-white border-2 border-gray-300 text-gray-500 w-full">
+        ) && <div className="rounded-sm bg-white border-1 border-gray-400 text-gray-500 w-full">
 
             {event.values && Object.entries(event.values).length > 0 && (
               <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
@@ -116,7 +120,7 @@ export const ComponentSidebar = ({
             )}
 
             {event.childEventsInfo && event.childEventsInfo.count > 0 && (
-              <div className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${event.values && Object.entries(event.values).length > 0 ? "border-t-2 border-gray-300" : " rounded-t-sm"}`}>
+              <div className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${event.values && Object.entries(event.values).length > 0 ? "border-t-1 border-gray-400" : " rounded-t-sm"}`}>
                 <ChildEvents
                   childEventsInfo={event.childEventsInfo}
                   onExpandChildEvents={onExpandChildEvents}
@@ -158,6 +162,12 @@ export const ComponentSidebar = ({
           {latestEvents.slice(0, 5).map((event, index) => {
             return createEventItem(event, index)
           })}
+          {moreInQueueCount > 0 && (
+            <button onClick={() => onSeeFullHistory?.()} className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1">
+              <TextAlignStart size={16} />
+              See full history
+            </button>
+          )}
         </div>
       </div>
       <div className="px-3 py-1 pb-3">
@@ -166,6 +176,12 @@ export const ComponentSidebar = ({
           {nextInQueueEvents.slice(0, 5).map((event, index) => {
             return createEventItem(event, index)
           })}
+          {moreInQueueCount > 0 && (
+            <button onClick={() => onSeeFullHistory?.()} className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1 px-2 py-1">
+              <TextAlignStart size={16} />
+              {moreInQueueCount} more in the queue
+            </button>
+          )}
         </div>
       </div>
     </div>

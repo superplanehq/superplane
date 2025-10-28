@@ -29,7 +29,7 @@ const mockMetadata = [
 const mockLatestEvents = [
   {
     title: "New commit",
-    subtitle: "main",
+    subtitle: "4m",
     state: "processed" as const,
     isOpen: false,
     receivedAt: new Date(),
@@ -41,7 +41,7 @@ const mockLatestEvents = [
   },
   {
     title: "Pull request merged",
-    subtitle: "feature/ui-update",
+    subtitle: "3h",
     state: "discarded" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() - 1000 * 60 * 30),
@@ -72,7 +72,6 @@ const mockLatestEvents = [
 const mockNextInQueueEvents = [
   {
     title: "Deploy to staging",
-    subtitle: "staging",
     state: "waiting" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() + 1000 * 60 * 5),
@@ -90,7 +89,6 @@ const mockNextInQueueEvents = [
   },
   {
     title: "Security scan",
-    subtitle: "main",
     state: "waiting" as const,
     isOpen: false,
     receivedAt: new Date(Date.now() + 1000 * 60 * 10),
@@ -129,6 +127,8 @@ export const Default: Story = {
         latestEvents={latestEvents}
         nextInQueueEvents={nextEvents}
         onEventClick={handleEventClick}
+        moreInQueueCount={2}
+        onSeeFullHistory={() => console.log("See full history")}
       />
     );
   },
@@ -172,6 +172,8 @@ export const WithInteractiveEvents: Story = {
         latestEvents={latestEvents}
         nextInQueueEvents={nextEvents}
         onEventClick={handleEventClick}
+        moreInQueueCount={2}
+        onSeeFullHistory={() => console.log("See full history")}
       />
     );
   },
@@ -213,6 +215,8 @@ export const WithDifferentIcon: Story = {
         latestEvents={latestEvents}
         nextInQueueEvents={nextEvents}
         onEventClick={handleEventClick}
+        moreInQueueCount={2}
+        onSeeFullHistory={() => console.log("See full history")}
       />
     );
   },
@@ -264,6 +268,8 @@ export const ExtendedMetadata: Story = {
         latestEvents={latestEvents}
         nextInQueueEvents={nextEvents}
         onEventClick={handleEventClick}
+        moreInQueueCount={2}
+        onSeeFullHistory={() => console.log("See full history")}
       />
     );
   },
