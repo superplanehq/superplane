@@ -89,7 +89,6 @@ export function Block(props: BlockProps) {
         <LeftHandle data={data} />
         <BlockContent {...props} onClick={props.onClick} />
         <RightHandle data={data} />
-
       </div>
     </>
   );

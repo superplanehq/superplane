@@ -201,7 +201,7 @@ export const ComponentSidebar = ({
   if (!isOpen) return null;
 
   return (
-    <div className="min-w-[27rem] border-l-2 border-gray-400 border-border flex-1 absolute right-0 top-[48px] h-full z-20 overflow-y-auto bg-white">
+    <div className="min-w-[27rem] border-l-2 border-gray-400 border-border flex-1 absolute right-0 top-0 h-full z-20 overflow-y-auto bg-white">
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-2 border-gray-400 bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
           <div

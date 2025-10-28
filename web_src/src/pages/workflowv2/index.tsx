@@ -19,12 +19,13 @@ import {
 
 import { useWorkflow, useTriggers, useUpdateWorkflow, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
-import { CanvasEdge, CanvasNode, CanvasPage, SidebarData, NodeEditData } from "@/ui/CanvasPage";
+import { CanvasEdge, CanvasNode, CanvasPage, SidebarData, NodeEditData, BuildingBlock, NewNodeData } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getTriggerRenderer } from "./renderers";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { formatTimeAgo } from "@/utils/date";
+import { filterVisibleConfiguration } from "@/utils/components";
 
 export function WorkflowPageV2() {
   const { organizationId, workflowId } = useParams<{
@@ -67,12 +68,45 @@ export function WorkflowPageV2() {
   const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(workflowId!, triggerNodes);
   const { nodeExecutionsMap, nodeQueueItemsMap, isLoading: nodeDataLoading } = useCompositeNodeData(workflowId!, nodesWithExecutions);
 
+  // Prepare building blocks for the sidebar
+  const buildingBlocks = useMemo(() => ({
+    triggers: triggers.map((t): BuildingBlock => ({
+      name: t.name!,
+      label: t.label,
+      description: t.description,
+      type: 'trigger',
+      configuration: t.configuration,
+      icon: t.icon,
+      color: t.color,
+    })),
+    components: components.map((c): BuildingBlock => ({
+      name: c.name!,
+      label: c.label,
+      description: c.description,
+      type: 'component',
+      outputChannels: c.outputChannels,
+      configuration: c.configuration,
+      icon: c.icon,
+      color: c.color,
+    })),
+    blueprints: blueprints.map((b): BuildingBlock => ({
+      id: b.id,
+      name: b.name!,
+      description: b.description,
+      type: 'blueprint',
+      outputChannels: b.outputChannels,
+      configuration: b.configuration,
+      icon: b.icon,
+      color: b.color,
+    })),
+  }), [triggers, components, blueprints]);
+
   const { nodes, edges } = useMemo(
     () => {
       if (!workflow) return { nodes: [], edges: [] };
       return prepareData(workflow, triggers, blueprints, components, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId!, queryClient);
     },
-    [workflow, triggers, blueprints, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient]
+    [workflow, triggers, blueprints, components, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient]
   );
 
   const getSidebarData = useCallback((nodeId: string): SidebarData | null => {
@@ -114,13 +148,13 @@ export function WorkflowPageV2() {
     };
   }, [workflow, blueprints, components, triggers]);
 
-  const handleNodeConfigurationSave = useCallback((nodeId: string, updatedConfiguration: Record<string, any>) => {
+  const handleNodeConfigurationSave = useCallback((nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string) => {
     if (!workflow || !organizationId || !workflowId) return;
 
-    // Update the node's configuration in local cache only
+    // Update the node's configuration and name in local cache only
     const updatedNodes = workflow.nodes?.map((node) =>
       node.id === nodeId
-        ? { ...node, configuration: updatedConfiguration }
+        ? { ...node, configuration: updatedConfiguration, name: updatedNodeName }
         : node
     );
 
@@ -130,6 +164,150 @@ export function WorkflowPageV2() {
     };
 
     // Update local cache without triggering API call
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
+  const generateNodeId = (blockName: string, nodeName: string) => {
+    const randomChars = Math.random().toString(36).substring(2, 8);
+    const sanitizedBlock = blockName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const sanitizedName = nodeName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    return `${sanitizedBlock}-${sanitizedName}-${randomChars}`;
+  };
+
+  const handleNodeAdd = useCallback((newNodeData: NewNodeData) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    const { buildingBlock, nodeName, configuration } = newNodeData;
+
+    // Filter configuration to only include visible fields
+    const filteredConfiguration = filterVisibleConfiguration(
+      configuration,
+      buildingBlock.configuration || []
+    );
+
+    // Generate a unique node ID
+    const newNodeId = generateNodeId(buildingBlock.name || 'node', nodeName.trim());
+
+    // Create the new node
+    const newNode: ComponentsNode = {
+      id: newNodeId,
+      name: nodeName.trim(),
+      type: buildingBlock.type === 'trigger' ? 'TYPE_TRIGGER'
+          : buildingBlock.type === 'blueprint' ? 'TYPE_BLUEPRINT'
+          : 'TYPE_COMPONENT',
+      configuration: filteredConfiguration,
+      position: {
+        x: (workflow.nodes?.length || 0) * 250,
+        y: 100,
+      },
+    };
+
+    // Add type-specific reference
+    if (buildingBlock.type === 'component') {
+      newNode.component = { name: buildingBlock.name };
+    } else if (buildingBlock.type === 'trigger') {
+      newNode.trigger = { name: buildingBlock.name };
+    } else if (buildingBlock.type === 'blueprint') {
+      newNode.blueprint = { id: buildingBlock.id };
+    }
+
+    // Add the new node to the workflow
+    const updatedNodes = [...(workflow.nodes || []), newNode];
+
+    const updatedWorkflow = {
+      ...workflow,
+      nodes: updatedNodes,
+    };
+
+    // Update local cache
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
+  const handleEdgeCreate = useCallback((sourceId: string, targetId: string, sourceHandle?: string | null) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Create the new edge
+    const newEdge: ComponentsEdge = {
+      sourceId,
+      targetId,
+      channel: sourceHandle || 'default',
+    };
+
+    // Add the new edge to the workflow
+    const updatedEdges = [...(workflow.edges || []), newEdge];
+
+    const updatedWorkflow = {
+      ...workflow,
+      edges: updatedEdges,
+    };
+
+    // Update local cache
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Remove the node from the workflow
+    const updatedNodes = workflow.nodes?.filter((node) => node.id !== nodeId);
+
+    // Remove any edges connected to this node
+    const updatedEdges = workflow.edges?.filter(
+      (edge) => edge.sourceId !== nodeId && edge.targetId !== nodeId
+    );
+
+    const updatedWorkflow = {
+      ...workflow,
+      nodes: updatedNodes,
+      edges: updatedEdges,
+    };
+
+    // Update local cache
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
+  const handleEdgeDelete = useCallback((edgeIds: string[]) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Parse edge IDs to extract sourceId, targetId, and channel
+    // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
+    const edgesToRemove = edgeIds.map((edgeId) => {
+      const parts = edgeId.split('--');
+      return {
+        sourceId: parts[0],
+        targetId: parts[1],
+        channel: parts[2],
+      };
+    });
+
+    // Remove the edges from the workflow
+    const updatedEdges = workflow.edges?.filter((edge) => {
+      return !edgesToRemove.some(
+        (toRemove) =>
+          edge.sourceId === toRemove.sourceId &&
+          edge.targetId === toRemove.targetId &&
+          edge.channel === toRemove.channel
+      );
+    });
+
+    const updatedWorkflow = {
+      ...workflow,
+      edges: updatedEdges,
+    };
+
+    // Update local cache
     queryClient.setQueryData(
       workflowKeys.detail(organizationId, workflowId),
       updatedWorkflow
@@ -219,6 +397,13 @@ export function WorkflowPageV2() {
       getNodeEditData={getNodeEditData}
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onSave={handleSave}
+      onEdgeCreate={handleEdgeCreate}
+      onNodeDelete={handleNodeDelete}
+      onEdgeDelete={handleEdgeDelete}
+      triggers={buildingBlocks.triggers}
+      components={buildingBlocks.components}
+      blueprints={buildingBlocks.blueprints}
+      onNodeAdd={handleNodeAdd}
     />
   );
 }
@@ -658,7 +843,7 @@ function prepareSidebarData(
       state,
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      values: execution.input as Record<string, string> || {},
+      values: {},
       childEventsInfo: {
         count: 0,
         waitingInfos: []
