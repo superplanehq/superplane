@@ -5,12 +5,19 @@ import { Conversations } from "./Conversations";
 import { FloatingActionButton } from "./FloatingActionButton";
 
 interface AiSidebarState {
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
   showNotifications: boolean;
   notificationMessage?: string;
 }
 
 export function AiSidebar(props: AiSidebarState) {
-  const state = useAiSidebarState();
+  const state = useAiSidebarState({
+    isOpen: props.isOpen,
+    setIsOpen: props.setIsOpen,
+  });
+
+  console.log("AI Sidebar state:", props);
 
   return (
     <>
@@ -36,8 +43,13 @@ export function AiSidebar(props: AiSidebarState) {
   );
 }
 
-function useAiSidebarState() {
-  const [isOpen, setIsOpen] = useState(false);
+function useAiSidebarState({
+  isOpen,
+  setIsOpen,
+}: {
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
+}) {
   const [activeConversationId, setActiveConversationId] = useState<
     string | undefined
   >(undefined);

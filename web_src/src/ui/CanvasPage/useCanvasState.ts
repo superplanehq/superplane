@@ -1,13 +1,14 @@
 import type { Edge, EdgeChange, Node, NodeChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { CanvasPageProps } from ".";
+import { AiProps, CanvasPageProps } from ".";
 import { BreadcrumbItem } from "../../components/Breadcrumbs";
 
 export interface CanvasPageState {
   title: string;
   breadcrumbs: BreadcrumbItem[];
 
+  ai: AiProps;
   nodes: Node[];
   edges: Edge[];
 
@@ -27,11 +28,6 @@ export interface CanvasPageState {
     close: () => void;
     open: (nodeId: string) => void;
   };
-
-  aiSidebar: {
-    showNotifications: boolean;
-    notificationMessage?: string;
-  }
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
 }
@@ -171,8 +167,14 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
     ],
     nodes,
     componentSidebar,
-    aiSidebar: props.aiSidebar || {
+    ai: props.ai || {
+      sidebarOpen: false,
+      setSidebarOpen: () => {},
       showNotifications: false,
+      notificationMessage: undefined,
+      suggestions: {},
+      onApply: () => {},
+      onDismiss: () => {},
     },
     edges,
     setNodes,

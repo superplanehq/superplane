@@ -9,7 +9,7 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { useMemo, useState } from "react";
 import { Button } from "../../button";
-import { CanvasNode, CanvasPage } from "../index";
+import { AiProps, CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
 import { genDockerImage } from "./dockerImages";
 import { createGetSidebarData } from "./getSidebarData";
@@ -530,6 +530,8 @@ export const SimpleDeployment: Story = {
       [nodesWithHandlers]
     );
 
+    const ai = useAi();
+
     const renderContent = () => {
       return (
         <CanvasPage
@@ -538,10 +540,7 @@ export const SimpleDeployment: Story = {
           edges={edges}
           onNodeExpand={handleNodeExpand}
           getSidebarData={getSidebarData}
-          aiSidebar={{
-            showNotifications: false,
-            notificationMessage: "Found 4 improvements",
-          }}
+          ai={ai}
         />
       );
     };
@@ -578,4 +577,43 @@ function SimulatorButtons({ simulation }: { simulation: SimulationEngine }) {
       </Button>
     </div>
   );
+}
+
+function useAi(): AiProps {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({
+    "listen-code":
+      "Filter out non-release branches to avoid unintended deployments when processing push events.",
+    approve:
+      "Add the QA team to the approval step to ensure proper testing before deployment.",
+  });
+
+  const onApply = (nodeId: string) => {
+    setAiSuggestions((prev) => {
+      const newSuggestions = { ...prev };
+      delete newSuggestions[nodeId];
+      return newSuggestions;
+    });
+  };
+
+  const onDissmiss = (nodeId: string) => {
+    setAiSuggestions((prev) => {
+      const newSuggestions = { ...prev };
+      delete newSuggestions[nodeId];
+      return newSuggestions;
+    });
+  };
+
+  const suggestionCount = Object.keys(aiSuggestions).length;
+
+  return {
+    sidebarOpen: isSidebarOpen,
+    setSidebarOpen: setIsSidebarOpen,
+    showNotifications: suggestionCount > 0,
+    notificationMessage: "Found " + suggestionCount + " improvements",
+    suggestions: aiSuggestions,
+    onApply: onApply,
+    onDismiss: onDissmiss,
+  };
 }

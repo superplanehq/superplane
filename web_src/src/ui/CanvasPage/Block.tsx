@@ -6,6 +6,8 @@ import {
 } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
+import { SparklesIcon } from "lucide-react";
+import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
@@ -19,6 +21,13 @@ type BlockType =
   | "if"
   | "noop"
   | "switch";
+
+interface BlockAi {
+  show: boolean;
+  suggestion: string | null;
+  onApply: () => void;
+  onDismiss: () => void;
+}
 
 export interface BlockData {
   label: string;
@@ -58,17 +67,29 @@ interface BlockProps {
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
+
+  ai?: BlockAi;
 }
 
 export function Block(props: BlockProps) {
   const data = props.data;
+  const ai = props.ai || {
+    show: false,
+    suggestion: null,
+    onApply: () => {},
+    onDismiss: () => {},
+  };
 
   return (
-    <div className="relative w-fit" onClick={props.onClick}>
-      <LeftHandle data={data} />
-      <BlockContent {...props} />
-      <RightHandle data={data} />
-    </div>
+    <>
+      <AiPopup {...ai} />
+
+      <div className="relative w-fit" onClick={props.onClick}>
+        <LeftHandle data={data} />
+        <BlockContent {...props} onClick={props.onClick} />
+        <RightHandle data={data} />
+      </div>
+    </>
   );
 }
 
@@ -133,6 +154,54 @@ function RightHandle({ data }: BlockProps) {
   );
 }
 
+function AiPopup({ show, suggestion, onApply, onDismiss }: BlockAi) {
+  if (!show) return null;
+  if (!suggestion) return null;
+
+  const handleApply = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onApply();
+  };
+
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDismiss();
+  };
+
+  return (
+    <div className="absolute left-0 -translate-y-[100%] text-left text-base">
+      <div className="bg-white rounded-lg shadow p-3 relative mb-2 border-blue-500 border-2">
+        <div className="flex items-center gap-1 mb-2">
+          <SparklesIcon className="inline-block text-blue-500" size={14} />
+          <div className="text-gray-800 font-bold">Improvements</div>
+        </div>
+
+        <div className="text-sm">{suggestion}</div>
+
+        <div className="flex gap-2 mt-2">
+          <Button
+            size="sm"
+            variant="default"
+            className="mt-2"
+            onClick={handleApply}
+          >
+            Apply
+          </Button>
+
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-2"
+            onClick={handleDismiss}
+          >
+            Dismiss
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 //
 // Block content is the inner area of the block.
 //
@@ -151,7 +220,9 @@ function BlockContent({
 
   switch (data.type) {
     case "trigger":
-      return <Trigger {...(data.trigger as TriggerProps)} selected={selected} />;
+      return (
+        <Trigger {...(data.trigger as TriggerProps)} selected={selected} />
+      );
     case "composite":
       return (
         <Composite
@@ -161,7 +232,9 @@ function BlockContent({
         />
       );
     case "approval":
-      return <Approval {...(data.approval as ApprovalProps)} selected={selected} />;
+      return (
+        <Approval {...(data.approval as ApprovalProps)} selected={selected} />
+      );
     case "filter":
       return <Filter {...(data.filter as FilterProps)} selected={selected} />;
     case "if":
@@ -169,9 +242,13 @@ function BlockContent({
     case "noop":
       return <Noop {...(data.noop as NoopProps)} selected={selected} />;
     case "switch":
-      return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} />;
+      return (
+        <SwitchComponent
+          {...(data.switch as SwitchComponentProps)}
+          selected={selected}
+        />
+      );
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }
 }
-
