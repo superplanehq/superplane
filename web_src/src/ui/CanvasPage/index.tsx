@@ -89,6 +89,7 @@ export interface CanvasPageProps {
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
   onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
+  onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
 
   ai?: AiProps;
 
@@ -174,6 +175,7 @@ function CanvasPage(props: CanvasPageProps) {
               state={state}
               onSave={props.onSave}
               onNodeEdit={handleNodeEdit}
+              onEdgeCreate={props.onEdgeCreate}
               hideHeader={true}
             />
           </ReactFlowProvider>
@@ -303,7 +305,19 @@ function CanvasContentHeader({ state, onSave }: { state: CanvasPageState; onSave
   return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} />;
 }
 
-function CanvasContent({ state, onSave, onNodeEdit, hideHeader }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; onNodeEdit: (nodeId: string) => void; hideHeader?: boolean }) {
+function CanvasContent({
+  state,
+  onSave,
+  onNodeEdit,
+  onEdgeCreate,
+  hideHeader
+}: {
+  state: CanvasPageState;
+  onSave?: (nodes: CanvasNode[]) => void;
+  onNodeEdit: (nodeId: string) => void;
+  onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
+  hideHeader?: boolean
+}) {
   const { fitView } = useReactFlow();
 
   // Use refs to avoid recreating callbacks when state changes
@@ -330,6 +344,15 @@ function CanvasContent({ state, onSave, onNodeEdit, hideHeader }: { state: Canva
       onSave(stateRef.current.nodes);
     }
   }, [onSave]);
+
+  const handleConnect = useCallback(
+    (connection: any) => {
+      if (onEdgeCreate && connection.source && connection.target) {
+        onEdgeCreate(connection.source, connection.target, connection.sourceHandle);
+      }
+    },
+    [onEdgeCreate]
+  );
 
   const nodeTypes = useMemo(
     () => ({
@@ -402,10 +425,11 @@ function CanvasContent({ state, onSave, onNodeEdit, hideHeader }: { state: Canva
             selectionOnDrag={false}
             panOnScrollSpeed={0.8}
             nodesDraggable={true}
-            nodesConnectable={false}
+            nodesConnectable={!!onEdgeCreate}
             elementsSelectable={true}
             onNodesChange={state.onNodesChange}
             onEdgesChange={state.onEdgesChange}
+            onConnect={handleConnect}
             onNodeDoubleClick={(_, node) => state.toggleNodeCollapse(node.id)}
           >
             <Background bgColor="#F1F5F9" color="#F1F5F9" />

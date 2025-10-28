@@ -231,6 +231,31 @@ export function WorkflowPageV2() {
     );
   }, [workflow, organizationId, workflowId, queryClient]);
 
+  const handleEdgeCreate = useCallback((sourceId: string, targetId: string, sourceHandle?: string | null) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Create the new edge
+    const newEdge: ComponentsEdge = {
+      sourceId,
+      targetId,
+      channel: sourceHandle || 'default',
+    };
+
+    // Add the new edge to the workflow
+    const updatedEdges = [...(workflow.edges || []), newEdge];
+
+    const updatedWorkflow = {
+      ...workflow,
+      edges: updatedEdges,
+    };
+
+    // Update local cache
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
   const handleSave = useCallback(async (canvasNodes: CanvasNode[]) => {
     if (!workflow || !organizationId || !workflowId) return;
 
@@ -314,6 +339,7 @@ export function WorkflowPageV2() {
       getNodeEditData={getNodeEditData}
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onSave={handleSave}
+      onEdgeCreate={handleEdgeCreate}
       triggers={buildingBlocks.triggers}
       components={buildingBlocks.components}
       blueprints={buildingBlocks.blueprints}
