@@ -168,6 +168,8 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
     nodes,
     componentSidebar,
     ai: props.ai || {
+      sidebarOpen: false,
+      setSidebarOpen: () => {},
       showNotifications: false,
       notificationMessage: undefined,
       suggestions: {},
