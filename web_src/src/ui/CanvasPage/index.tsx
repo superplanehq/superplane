@@ -9,6 +9,7 @@ import {
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ComponentsConfigurationField } from "@/api-client";
 import { AiSidebar } from "../ai";
 import type { ChildEventsInfo } from "../childEvents";
 import { ComponentSidebar } from "../componentSidebar";
@@ -17,6 +18,7 @@ import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { Header, type BreadcrumbItem } from "./Header";
+import { NodeConfigurationModal } from "./NodeConfigurationModal";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 
@@ -59,6 +61,13 @@ export interface AiProps {
   onDismiss: (suggestionId: string) => void;
 }
 
+export interface NodeEditData {
+  nodeId: string;
+  nodeName: string;
+  configuration: Record<string, any>;
+  configurationFields: ComponentsConfigurationField[];
+}
+
 export interface CanvasPageProps {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -66,9 +75,12 @@ export interface CanvasPageProps {
   startCollapsed?: boolean;
   title?: string;
   breadcrumbs?: BreadcrumbItem[];
+  organizationId?: string;
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  getNodeEditData?: (nodeId: string) => NodeEditData | null;
+  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>) => void;
   onSave?: (nodes: CanvasNode[]) => void;
 
   ai?: AiProps;
@@ -81,11 +93,28 @@ const EDGE_STYLE = {
 
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
+  const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
+
+  const handleNodeEdit = useCallback((nodeId: string) => {
+    if (props.getNodeEditData) {
+      const editData = props.getNodeEditData(nodeId);
+      if (editData) {
+        setEditingNodeData(editData);
+      }
+    }
+  }, [props]);
+
+  const handleSaveConfiguration = useCallback((configuration: Record<string, any>) => {
+    if (editingNodeData && props.onNodeConfigurationSave) {
+      props.onNodeConfigurationSave(editingNodeData.nodeId, configuration);
+    }
+    setEditingNodeData(null);
+  }, [editingNodeData, props]);
 
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
       <ReactFlowProvider>
-        <CanvasContent state={state} onSave={props.onSave} />
+        <CanvasContent state={state} onSave={props.onSave} onNodeEdit={handleNodeEdit} />
       </ReactFlowProvider>
 
       <AiSidebar
@@ -96,6 +125,19 @@ function CanvasPage(props: CanvasPageProps) {
       />
 
       <Sidebar state={state} getSidebarData={props.getSidebarData} />
+
+      {editingNodeData && (
+        <NodeConfigurationModal
+          isOpen={true}
+          onClose={() => setEditingNodeData(null)}
+          nodeName={editingNodeData.nodeName}
+          configuration={editingNodeData.configuration}
+          configurationFields={editingNodeData.configurationFields}
+          onSave={handleSaveConfiguration}
+          domainId={props.organizationId}
+          domainType="DOMAIN_TYPE_ORGANIZATION"
+        />
+      )}
     </div>
   );
 }
@@ -170,7 +212,7 @@ function Sidebar({
   );
 }
 
-function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void }) {
+function CanvasContent({ state, onSave, onNodeEdit }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; onNodeEdit: (nodeId: string) => void }) {
   const { fitView } = useReactFlow();
 
   // Use refs to avoid recreating callbacks when state changes
@@ -210,6 +252,7 @@ function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: (no
           onExpand={handleNodeExpand}
           nodeId={nodeProps.id}
           onClick={() => handleNodeClick(nodeProps.id)}
+          onEdit={onNodeEdit}
           selected={nodeProps.selected}
           ai={{
             show: state.ai.sidebarOpen,
@@ -223,6 +266,7 @@ function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: (no
     [
       handleNodeExpand,
       handleNodeClick,
+      onNodeEdit,
       state.ai.suggestions,
       state.ai.sidebarOpen,
       state.ai.onApply,
