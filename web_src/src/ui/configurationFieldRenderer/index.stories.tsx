@@ -14,7 +14,7 @@ const meta: Meta<typeof ConfigurationFieldRenderer> = {
   },
   decorators: [
     (Story) => (
-      <TooltipProvider>
+      <TooltipProvider delayDuration={150}>
         <div className="max-w-2xl">
           <Story />
         </div>
