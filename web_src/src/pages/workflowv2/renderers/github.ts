@@ -30,7 +30,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const metadata = node.metadata as unknown as GitHubMetadata;
 
-    let props: TriggerProps = {
+    const props: TriggerProps = {
       title: node.name!,
       iconSrc: githubIcon,
       iconBackground: "bg-black",

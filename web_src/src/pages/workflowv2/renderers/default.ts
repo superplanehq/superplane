@@ -9,7 +9,7 @@ import { TriggerProps } from "@/ui/trigger";
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
-    let props: TriggerProps = {
+    const props: TriggerProps = {
       title: node.name!,
       iconSlug: trigger.icon || "bolt",
       iconColor: getColorClass(trigger.color),

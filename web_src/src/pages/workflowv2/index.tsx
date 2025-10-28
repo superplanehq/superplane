@@ -360,7 +360,7 @@ function prepareCompositeNode(
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
 
-  let canvasNode: CanvasNode = {
+  const canvasNode: CanvasNode = {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
     data: {
@@ -622,7 +622,7 @@ function prepareSidebarData(
 
   // Get metadata based on node type
   let metadata: any;
-  let nodeTitle = node.name || "Unknown";
+  const nodeTitle = node.name || "Unknown";
   let iconSlug = "boxes";
   let color = "indigo";
 
