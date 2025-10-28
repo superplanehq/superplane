@@ -42,6 +42,8 @@ export interface CompositeProps {
   metadata?: MetadataItem[];
   parameters?: ParameterGroup[];
   lastRunItem?: LastRunItem;
+  lastRunItems?: LastRunItem[];
+  maxVisibleEvents?: number;
   nextInQueue?: QueueItem;
   collapsedBackground?: string;
   collapsed?: boolean;
@@ -51,73 +53,95 @@ export interface CompositeProps {
   onExpandChildEvents?: () => void;
   onReRunChildEvents?: () => void;
   onToggleCollapse?: () => void;
+  onViewMoreEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, startLastValuesOpen = false }) => {
-  const [showLastRunValues, setShowLastRunValues] = React.useState(startLastValuesOpen)
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false }) => {
+  // All hooks must be called before any early returns
+  const [showLastRunValues, setShowLastRunValues] = React.useState<Record<number, boolean>>(
+    startLastValuesOpen ? { 0: true } : {}
+  )
 
-  const timeAgo = React.useMemo(() => {
-    if (!lastRunItem?.receivedAt) return ""
+  // Use lastRunItems if provided, otherwise fall back to single lastRunItem
+  const eventsToDisplay = React.useMemo(() => {
+    if (lastRunItems && lastRunItems.length > 0) {
+      return lastRunItems
+    } else if (lastRunItem) {
+      return [lastRunItem]
+    }
+    return []
+  }, [lastRunItem, lastRunItems])
 
-    const now = new Date()
-    const diff = now.getTime() - new Date(lastRunItem?.receivedAt).getTime()
-    return calcRelativeTimeFromDiff(diff)
-  }, [lastRunItem])
+  const visibleEvents = React.useMemo(() => {
+    return eventsToDisplay.slice(0, maxVisibleEvents)
+  }, [eventsToDisplay, maxVisibleEvents])
 
-  const LastRunIcon = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
+  const hiddenEventsCount = React.useMemo(() => {
+    return Math.max(0, eventsToDisplay.length - maxVisibleEvents)
+  }, [eventsToDisplay.length, maxVisibleEvents])
+
+  const toggleEventValues = React.useCallback((index: number) => {
+    setShowLastRunValues(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }))
+  }, [])
+
+  const getEventIcon = React.useCallback((state: LastRunState) => {
+    if (state === "success") {
       return resolveIcon("check")
-    } else if (lastRunItem?.state === "running") {
+    } else if (state === "running") {
       return resolveIcon("refresh-cw")
     } else {
       return resolveIcon("x")
     }
-  }, [lastRunItem])
+  }, [])
 
-  const LastRunColor = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
+  const getEventColor = React.useCallback((state: LastRunState) => {
+    if (state === "success") {
       return "text-green-700"
-    } else if (lastRunItem?.state === "running") {
+    } else if (state === "running") {
       return "text-blue-800"
     } else {
       return "text-red-700"
     }
-  }, [lastRunItem])
+  }, [])
 
-  const LastRunBackground = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
+  const getEventBackground = React.useCallback((state: LastRunState) => {
+    if (state === "success") {
       return "bg-green-200"
-    } else if (lastRunItem?.state === "running") {
+    } else if (state === "running") {
       return "bg-sky-100"
     } else {
       return "bg-red-200"
     }
-  }, [lastRunItem])
+  }, [])
 
-  const lastRunIconBackground = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
+  const getEventIconBackground = React.useCallback((state: LastRunState) => {
+    if (state === "success") {
       return "bg-green-600"
-    } else if (lastRunItem?.state === "running") {
+    } else if (state === "running") {
       return "bg-none animate-spin"
     } else {
       return "bg-red-600"
     }
-  }, [lastRunItem])
+  }, [])
 
-  const lastRunIconColor = React.useMemo(() => {
-    if (lastRunItem?.state === "success") {
+  const getEventIconColor = React.useCallback((state: LastRunState) => {
+    if (state === "success") {
       return "text-white"
-    } else if (lastRunItem?.state === "running") {
+    } else if (state === "running") {
       return "text-blue-800"
     } else {
       return "text-white"
     }
-  }, [lastRunItem])
+  }, [])
 
   const NextInQueueIcon = React.useMemo(() => {
     return resolveIcon("circle-dashed")
   }, [])
 
+  // Now safe to do early return after all hooks are called
   if (collapsed) {
     return (
       <CollapsedComponent
@@ -178,42 +202,67 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
       <div className="px-4 py-3 border-b">
         <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
           <span className="uppercase text-sm font-medium">Last Run</span>
-          {lastRunItem && <span className="text-sm">{timeAgo}</span>}
         </div>
 
-        {lastRunItem ? (
-          <>
-            <div onClick={() => setShowLastRunValues(!showLastRunValues)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${LastRunBackground} ${LastRunColor}`}>
-              <div className="flex items-center gap-3 rounded-md w-full min-w-0">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastRunIconBackground}`}>
-                    <LastRunIcon size={lastRunItem?.state === "running" ? 16 : 12} className={`${lastRunIconColor}`} />
-                  </div>
-                  <span className="truncate text-sm">{lastRunItem?.title}</span>
-                </div>
-                {lastRunItem?.subtitle && (
-                  <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{lastRunItem?.subtitle}</span>
-                )}
-              </div>
-              {showLastRunValues && (
-                <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
-                  {Object.entries(lastRunItem?.values || {}).map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
-                      <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
-                      <span className="text-sm flex-1 truncate text-left">{value}</span>
+        {eventsToDisplay.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {visibleEvents.map((event, index) => {
+              const EventIcon = getEventIcon(event.state)
+              const eventColor = getEventColor(event.state)
+              const eventBackground = getEventBackground(event.state)
+              const eventIconBackground = getEventIconBackground(event.state)
+              const eventIconColor = getEventIconColor(event.state)
+              const now = new Date()
+              const diff = now.getTime() - new Date(event.receivedAt).getTime()
+              const timeAgo = calcRelativeTimeFromDiff(diff)
+
+              return (
+                <div key={index}>
+                  <div onClick={() => toggleEventValues(index)} className={`flex flex-col items-center justify-between gap-1 px-2 py-2 rounded-md cursor-pointer ${eventBackground} ${eventColor}`}>
+                    <div className="flex items-center gap-3 rounded-md w-full min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${eventIconBackground}`}>
+                          <EventIcon size={event.state === "running" ? 16 : 12} className={`${eventIconColor}`} />
+                        </div>
+                        <span className="truncate text-sm">{event.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {event.subtitle && (
+                          <span className="text-sm text-gray-500 truncate max-w-[100px]">{event.subtitle}</span>
+                        )}
+                        <span className="text-xs text-gray-500">{timeAgo}</span>
+                      </div>
                     </div>
-                  ))}
+                    {showLastRunValues[index] && (
+                      <div className="flex flex-col items-center justify-between mt-1 px-2 py-2 rounded-md bg-white text-gray-500 w-full">
+                        {Object.entries(event.values || {}).map(([key, value]) => (
+                          <div key={key} className="flex items-center gap-1 px-2 py-1 rounded-md w-full min-w-0">
+                            <span className="text-sm font-bold flex-shrink-0 text-right">{key}:</span>
+                            <span className="text-sm flex-1 truncate text-left">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {event.childEventsInfo && (
+                    <ChildEvents
+                      childEventsInfo={event.childEventsInfo}
+                      onExpandChildEvents={onExpandChildEvents}
+                      onReRunChildEvents={onReRunChildEvents}
+                    />
+                  )}
                 </div>
-              )}
-            </div>
-            {lastRunItem?.childEventsInfo && (
-              <ChildEvents
-                childEventsInfo={lastRunItem.childEventsInfo}
-                onExpandChildEvents={onExpandChildEvents}
-                onReRunChildEvents={onReRunChildEvents}
-              />
+              )
+            })}
+            {hiddenEventsCount > 0 && (
+              <div
+                onClick={onViewMoreEvents}
+                className="flex items-center justify-center px-2 py-2 rounded-md bg-gray-100 text-gray-600 cursor-pointer hover:bg-gray-200 transition-colors"
+              >
+                <span className="text-sm font-medium">+{hiddenEventsCount} more</span>
+              </div>
             )}
-          </>
+          </div>
         ) : (
           <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500">
             <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-400">

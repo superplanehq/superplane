@@ -98,34 +98,187 @@ const ephemeralNodes: Node[] = [
           { icon: "server", label: "Active: 7/50 environments" },
           { icon: "triangle-alert", label: "Failed: 2" },
         ],
-        lastRunItem: {
-          title: "Environment: env-4523",
-          subtitle: "2d 14h left",
-          receivedAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
-          childEventsInfo: {
-            count: 1,
+        lastRunItems: [
+          {
+            title: "Environment: env-4523",
+            subtitle: "2d 14h left",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 3), // 3 minutes ago
+            childEventsInfo: {
+              count: 1,
+              state: "running",
+              waitingInfos: [
+                {
+                  icon: "clock",
+                  info: "Waiting for DNS propagation",
+                  futureTimeDate: new Date(
+                    new Date().getTime() + 1000 * 60 * 210
+                  ), // 3h 30min = 210 minutes
+                },
+              ],
+            },
             state: "running",
-            waitingInfos: [
-              {
-                icon: "clock",
-                info: "Waiting for DNS propagation",
-                futureTimeDate: new Date(
-                  new Date().getTime() + 1000 * 60 * 210
-                ), // 3h 30min = 210 minutes
-              },
-            ],
+            values: {
+              "Triggered by": "PR comment",
+              User: "Sarah Chen",
+              "Environment ID": "env-pr-4523",
+              URL: "https://pr-4523.staging.app.com",
+              "Shutdown at": new Date(
+                new Date().getTime() + 1000 * 60 * 60 * 12
+              ).toLocaleString(),
+            },
           },
-          state: "running",
-          values: {
-            "Triggered by": "PR comment",
-            User: "Sarah Chen",
-            "Environment ID": "env-pr-4523",
-            URL: "https://pr-4523.staging.app.com",
-            "Shutdown at": new Date(
-              new Date().getTime() + 1000 * 60 * 60 * 12
-            ).toLocaleString(),
+          {
+            title: "Environment: env-4522",
+            subtitle: "1d 8h left",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 45), // 45 minutes ago
+            childEventsInfo: {
+              count: 1,
+              state: "running",
+              waitingInfos: [
+                {
+                  icon: "clock",
+                  info: "Waiting for health check",
+                  futureTimeDate: new Date(
+                    new Date().getTime() + 1000 * 60 * 180
+                  ), // 3 hours
+                },
+              ],
+            },
+            state: "running",
+            values: {
+              "Triggered by": "PR comment",
+              User: "Alex Johnson",
+              "Environment ID": "env-pr-4522",
+              URL: "https://pr-4522.staging.app.com",
+            },
           },
-        },
+          {
+            title: "Environment: env-4521",
+            subtitle: "18h left",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 90), // 1.5 hours ago
+            childEventsInfo: {
+              count: 1,
+              state: "running",
+              waitingInfos: [
+                {
+                  icon: "clock",
+                  info: "Waiting for SSL certificate",
+                  futureTimeDate: new Date(
+                    new Date().getTime() + 1000 * 60 * 150
+                  ), // 2.5 hours
+                },
+              ],
+            },
+            state: "running",
+            values: {
+              "Triggered by": "PR comment",
+              User: "Maria Garcia",
+              "Environment ID": "env-pr-4521",
+              URL: "https://pr-4521.staging.app.com",
+            },
+          },
+          {
+            title: "Environment: env-4520",
+            subtitle: "12h left",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 180), // 3 hours ago
+            childEventsInfo: {
+              count: 1,
+              state: "running",
+              waitingInfos: [
+                {
+                  icon: "clock",
+                  info: "Waiting for database migration",
+                  futureTimeDate: new Date(
+                    new Date().getTime() + 1000 * 60 * 120
+                  ), // 2 hours
+                },
+              ],
+            },
+            state: "running",
+            values: {
+              "Triggered by": "PR comment",
+              User: "John Smith",
+              "Environment ID": "env-pr-4520",
+              URL: "https://pr-4520.staging.app.com",
+            },
+          },
+          {
+            title: "Environment: env-4519",
+            subtitle: "6h left",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 240), // 4 hours ago
+            childEventsInfo: {
+              count: 1,
+              state: "running",
+              waitingInfos: [
+                {
+                  icon: "clock",
+                  info: "Waiting for container startup",
+                  futureTimeDate: new Date(
+                    new Date().getTime() + 1000 * 60 * 90
+                  ), // 1.5 hours
+                },
+              ],
+            },
+            state: "running",
+            values: {
+              "Triggered by": "PR comment",
+              User: "Emma Wilson",
+              "Environment ID": "env-pr-4519",
+              URL: "https://pr-4519.staging.app.com",
+            },
+          },
+          {
+            title: "Environment: env-4518",
+            subtitle: "3h left",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 300), // 5 hours ago
+            childEventsInfo: {
+              count: 1,
+              state: "running",
+              waitingInfos: [
+                {
+                  icon: "clock",
+                  info: "Waiting for load balancer",
+                  futureTimeDate: new Date(
+                    new Date().getTime() + 1000 * 60 * 60
+                  ), // 1 hour
+                },
+              ],
+            },
+            state: "running",
+            values: {
+              "Triggered by": "PR comment",
+              User: "David Lee",
+              "Environment ID": "env-pr-4518",
+              URL: "https://pr-4518.staging.app.com",
+            },
+          },
+          {
+            title: "Environment: env-4517",
+            subtitle: "1h left",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 360), // 6 hours ago
+            childEventsInfo: {
+              count: 1,
+              state: "running",
+              waitingInfos: [
+                {
+                  icon: "clock",
+                  info: "Waiting for network setup",
+                  futureTimeDate: new Date(
+                    new Date().getTime() + 1000 * 60 * 30
+                  ), // 30 minutes
+                },
+              ],
+            },
+            state: "running",
+            values: {
+              "Triggered by": "PR comment",
+              User: "Lisa Brown",
+              "Environment ID": "env-pr-4517",
+              URL: "https://pr-4517.staging.app.com",
+            },
+          },
+        ],
+        maxVisibleEvents: 5,
         startLastValuesOpen: true,
         collapsed: false,
       },
