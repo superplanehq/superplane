@@ -6,8 +6,14 @@ import {
 } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
-import { SparklesIcon } from "lucide-react";
+import { MoreVertical, PencilIcon, SparklesIcon } from "lucide-react";
 import { Button } from "../button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../dropdownMenu";
 import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
@@ -67,6 +73,7 @@ interface BlockProps {
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
+  onEdit?: (nodeId: string) => void;
 
   ai?: BlockAi;
 }
@@ -80,6 +87,12 @@ export function Block(props: BlockProps) {
     onDismiss: () => {},
   };
 
+  const handleEdit = () => {
+    if (props.onEdit && props.nodeId) {
+      props.onEdit(props.nodeId);
+    }
+  };
+
   return (
     <>
       <AiPopup {...ai} />
@@ -88,6 +101,30 @@ export function Block(props: BlockProps) {
         <LeftHandle data={data} />
         <BlockContent {...props} onClick={props.onClick} />
         <RightHandle data={data} />
+
+        {/* Three-dots menu at top right */}
+        {props.onEdit && (
+          <div className="absolute top-2 right-2 z-50">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-zinc-700"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={handleEdit}>
+                  <PencilIcon size={14} className="mr-2" />
+                  Edit
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
     </>
   );

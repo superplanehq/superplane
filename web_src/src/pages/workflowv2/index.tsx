@@ -18,7 +18,7 @@ import {
 
 import { useWorkflow, useTriggers, useUpdateWorkflow, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
-import { CanvasEdge, CanvasNode, CanvasPage, SidebarData } from "@/ui/CanvasPage";
+import { CanvasEdge, CanvasNode, CanvasPage, SidebarData, NodeEditData } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getTriggerRenderer } from "./renderers";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
@@ -87,6 +87,54 @@ export function WorkflowPageV2() {
     );
   }, [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap]);
 
+  const getNodeEditData = useCallback((nodeId: string): NodeEditData | null => {
+    const node = workflow?.nodes?.find((n) => n.id === nodeId);
+    if (!node) return null;
+
+    // Get configuration fields from metadata based on node type
+    let configurationFields: ComponentsComponent['configuration'] = [];
+
+    if (node.type === "TYPE_BLUEPRINT") {
+      const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
+      configurationFields = blueprintMetadata?.configuration || [];
+    } else if (node.type === "TYPE_COMPONENT") {
+      const componentMetadata = components.find((c) => c.name === node.component?.name);
+      configurationFields = componentMetadata?.configuration || [];
+    } else if (node.type === "TYPE_TRIGGER") {
+      const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
+      configurationFields = triggerMetadata?.configuration || [];
+    }
+
+    return {
+      nodeId: node.id!,
+      nodeName: node.name!,
+      configuration: node.configuration || {},
+      configurationFields,
+    };
+  }, [workflow, blueprints, components, triggers]);
+
+  const handleNodeConfigurationSave = useCallback((nodeId: string, updatedConfiguration: Record<string, any>) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Update the node's configuration in local cache only
+    const updatedNodes = workflow.nodes?.map((node) =>
+      node.id === nodeId
+        ? { ...node, configuration: updatedConfiguration }
+        : node
+    );
+
+    const updatedWorkflow = {
+      ...workflow,
+      nodes: updatedNodes,
+    };
+
+    // Update local cache without triggering API call
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
   const handleSave = useCallback(async (canvasNodes: CanvasNode[]) => {
     if (!workflow || !organizationId || !workflowId) return;
 
@@ -153,7 +201,18 @@ export function WorkflowPageV2() {
     return null;
   }
 
-  return <CanvasPage title={workflow.name!} nodes={nodes} edges={edges} getSidebarData={getSidebarData} onSave={handleSave} />;
+  return (
+    <CanvasPage
+      title={workflow.name!}
+      nodes={nodes}
+      edges={edges}
+      organizationId={organizationId}
+      getSidebarData={getSidebarData}
+      getNodeEditData={getNodeEditData}
+      onNodeConfigurationSave={handleNodeConfigurationSave}
+      onSave={handleSave}
+    />
+  );
 }
 
 function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]) {
