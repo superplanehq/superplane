@@ -2,11 +2,8 @@ import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { CollapsedComponent } from "../collapsedComponent";
+import { MetadataList, type MetadataItem } from "../metadataList";
 
-export interface TriggerMetadataItem {
-  icon: string;
-  label: string;
-}
 
 type LastEventState = "processed" | "discarded"
 
@@ -25,7 +22,7 @@ export interface TriggerProps {
   headerColor: string;
   title: string;
   description?: string;
-  metadata: TriggerMetadataItem[];
+  metadata: MetadataItem[];
   lastEventData?: TriggerLastEventData;
   zeroStateText?: string;
   collapsedBackground?: string;
@@ -79,15 +76,11 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
         shape="circle"
       >
         <div className="flex flex-col items-center gap-1">
-          {metadata && metadata.length > 0 && metadata.map((item, index) => {
-            const Icon = resolveIcon(item.icon)
-            return (
-              <div key={index} className="flex items-center gap-1 text-xs text-gray-500">
-                <Icon size={12} />
-                <span>{item.label}</span>
-              </div>
-            )
-          })}
+          <MetadataList
+            items={metadata}
+            className="flex flex-col gap-1 text-gray-500"
+            iconSize={12}
+          />
         </div>
       </CollapsedComponent>
     )
@@ -104,17 +97,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
         title={title}
         description={description}
       />
-      <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
-        {metadata && metadata.length > 0 && metadata.map((item, index) => {
-          const Icon = resolveIcon(item.icon)
-          return (
-            <div key={index} className="flex items-center gap-2">
-              <Icon size={19} />
-              <span className="text-sm">{item.label}</span>
-            </div>
-          )
-        })}
-      </div>
+      <MetadataList items={metadata} />
       <div className="px-4 pt-3 pb-6">
         {lastEventData ? (
           <>

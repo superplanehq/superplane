@@ -2,6 +2,8 @@ import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { CollapsedComponent } from "../collapsedComponent";
+import { MetadataList, type MetadataItem } from "../metadataList";
+import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 
 export type LastRunState = "success" | "failed" | "running"
 export type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
@@ -10,12 +12,6 @@ export interface WaitingInfo {
   icon: string;
   info: string;
   futureTimeDate: Date;
-}
-
-export interface ChildEventsInfo {
-  count: number;
-  state?: ChildEventsState;
-  waitingInfos: WaitingInfo[];
 }
 
 export interface QueueItem {
@@ -28,11 +24,6 @@ export interface LastRunItem extends QueueItem {
   childEventsInfo?: ChildEventsInfo;
   state: LastRunState;
   values: Record<string, string>;
-}
-
-interface MetadataItem {
-  icon: string;
-  label: string;
 }
 
 export interface ParameterGroup {
@@ -64,7 +55,6 @@ export interface CompositeProps {
 
 export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, startLastValuesOpen = false }) => {
   const [showLastRunValues, setShowLastRunValues] = React.useState(startLastValuesOpen)
-  const [showWaitingInfo, setShowWaitingInfo] = React.useState(false)
 
   const timeAgo = React.useMemo(() => {
     if (!lastRunItem?.receivedAt) return ""
@@ -128,22 +118,6 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
     return resolveIcon("circle-dashed")
   }, [])
 
-  const ChildEventsArrowIcon = React.useMemo(() => {
-    return resolveIcon("corner-down-right")
-  }, [])
-
-  const ExpandChildEventsIcon = React.useMemo(() => {
-    return resolveIcon("expand")
-  }, [])
-
-  const ReRunChildEventsIcon = React.useMemo(() => {
-    return resolveIcon("rotate-ccw")
-  }, [])
-
-  const hasWaitingInfos = React.useMemo(() => {
-    return (lastRunItem?.childEventsInfo?.waitingInfos?.length || 0) > 0
-  }, [lastRunItem])
-
   if (collapsed) {
     return (
       <CollapsedComponent
@@ -157,17 +131,14 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         onDoubleClick={onToggleCollapse}
       >
         {parameters.length > 0 && (
-          <div className="flex flex-col gap-1 text-gray-500 mt-1">
-            {parameters.map((group, index) => {
-              const Icon = resolveIcon(group.icon)
-              return (
-                <div key={index} className="flex items-center gap-2">
-                  <Icon size={16} />
-                  <span className="text-sm font-mono">{group.items.join(", ")}</span>
-                </div>
-              )
-            })}
-          </div>
+          <MetadataList
+            items={parameters.map(group => ({
+              icon: group.icon,
+              label: group.items.join(", ")
+            }))}
+            className="flex flex-col gap-1 text-gray-500 mt-1"
+            iconSize={16}
+          />
         )}
       </CollapsedComponent>
     )
@@ -186,32 +157,22 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         onDoubleClick={onToggleCollapse}
       />
 
-      {parameters.length > 0 &&
-        <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
-          {parameters.map((group, index) => {
-            const Icon = resolveIcon(group.icon)
-            return (
-              <div key={index} className="flex items-center gap-2">
-                <Icon size={19} />
-                <span className="text-sm font-mono">{group.items.join(", ")}</span>
-              </div>
-            )
-          })}
-        </div>
-      }
+      {parameters.length > 0 && (
+        <MetadataList
+          items={parameters.map(group => ({
+            icon: group.icon,
+            label: group.items.join(", ")
+          }))}
+          className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
+        />
+      )}
 
       {metadata && metadata.length > 0 && (
-        <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
-          {metadata.map((item, index) => {
-            const Icon = resolveIcon(item.icon)
-            return (
-              <div key={index} className="flex items-center gap-2">
-                <Icon size={16} />
-                <span className="text-sm">{item.label}</span>
-              </div>
-            )
-          })}
-        </div>
+        <MetadataList
+          items={metadata}
+          className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
+          iconSize={16}
+        />
       )}
 
       <div className="px-4 py-3 border-b">
@@ -246,42 +207,11 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
               )}
             </div>
             {lastRunItem?.childEventsInfo && (
-              <div className="mt-3 ml-3 text-gray-500">
-                <div className="flex items-center justify-between gap-2">
-                  <div onClick={(e) => {
-                    e.stopPropagation()
-                    if (hasWaitingInfos) {
-                      setShowWaitingInfo(!showWaitingInfo)
-                    }
-                  }} className={"flex items-center gap-2 w-full " + (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")}>
-                    <ChildEventsArrowIcon size={18} className="text-gray-500" />
-                    <span className="text-sm">{lastRunItem?.childEventsInfo.count} child event{lastRunItem?.childEventsInfo.count === 1 ? "" : "s"} {lastRunItem?.childEventsInfo.state || ""}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ExpandChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onExpandChildEvents} />
-                    <ReRunChildEventsIcon size={18} className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer" onClick={onReRunChildEvents} />
-                  </div>
-                </div>
-                {hasWaitingInfos && showWaitingInfo && (
-                  <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
-                    {lastRunItem?.childEventsInfo.waitingInfos.map((waitingInfo) => {
-                      const Icon = resolveIcon(waitingInfo.icon)
-                      return (
-                        <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
-                          <span className="text-sm text-right flex items-center gap-2">
-                            <Icon size={18} className="text-gray-500" />
-                            {waitingInfo.info}
-                          </span>
-                          <span className="text-sm">
-                            {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
-                            &nbsp;left
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              <ChildEvents
+                childEventsInfo={lastRunItem.childEventsInfo}
+                onExpandChildEvents={onExpandChildEvents}
+                onReRunChildEvents={onReRunChildEvents}
+              />
             )}
           </>
         ) : (
