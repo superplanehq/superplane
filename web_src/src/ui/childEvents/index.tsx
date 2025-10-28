@@ -6,7 +6,7 @@ type ChildEventsState = "processed" | "discarded" | "waiting" | "running";
 export interface WaitingInfo {
   icon: string;
   info: string;
-  futureTimeDate: Date;
+  futureTimeDate?: Date;
 }
 
 export interface ChildEventsInfo {
@@ -82,7 +82,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
         </div>
       </div>
       {hasWaitingInfos && showWaiting && (
-        <div className="flex flex-col items-center justify-between pl-2 py-1 rounded-md bg-white text-gray-500 w-full">
+        <div className="flex flex-col items-center justify-between pl-2 py-1 text-gray-500 w-full">
           {childEventsInfo.waitingInfos.map((waitingInfo) => {
             const Icon = resolveIcon(waitingInfo.icon);
             return (
@@ -91,10 +91,10 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
                   <Icon size={18} className="text-gray-500" />
                   {waitingInfo.info}
                 </span>
-                <span className="text-sm">
+                {waitingInfo.futureTimeDate && <span className="text-sm">
                   {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
                   &nbsp;left
-                </span>
+                </span>}
               </div>
             );
           })}
