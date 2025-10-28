@@ -1,4 +1,4 @@
-interface DockerImage {
+export interface DockerImage {
   message: string;
   sha: string;
   size: string;

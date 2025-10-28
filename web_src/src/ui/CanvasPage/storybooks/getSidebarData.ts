@@ -1,4 +1,8 @@
 import { CanvasNode, SidebarData, SidebarEvent } from "../index";
+import { genCommit } from "./commits";
+import { DockerImage, genDockerImage } from "./dockerImages";
+
+const isGitSha = (subtitle: string) => (subtitle?.length || 0) === 8;
 
 /**
  * Helper function to create fake sidebar data from node data for Storybook stories.
@@ -14,7 +18,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
     // Handle trigger nodes
     if (data.type === "trigger" && data.trigger) {
       const trigger = data.trigger;
-      const latestEvents: SidebarEvent[] = [];
+      const latestEvents: SidebarEvent[] = data.trigger.latestEvents || [];
 
       if (trigger.lastEventData) {
         latestEvents.push({
@@ -28,27 +32,29 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
         });
       }
 
+      const genFunction: () => DockerImage = isGitSha(trigger.lastEventData.subtitle) ? genCommit as () => DockerImage : genDockerImage;
+
       // Add 3 random latest events
       latestEvents.push(
         {
-          title: trigger.lastEventData.title + " 1",
-          subtitle: trigger.lastEventData.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
           isOpen: false,
           receivedAt: new Date(Date.now() - 5 * 60 * 1000),
           values: { email: "john@example.com", userId: "u_123" },
         },
         {
-          title: trigger.lastEventData.title + " 2",
-          subtitle: trigger.lastEventData.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
           isOpen: false,
           receivedAt: new Date(Date.now() - 15 * 60 * 1000),
           values: { amount: "49.99", currency: "USD" },
         },
         {
-          title: trigger.lastEventData.title + " 3",
-          subtitle: trigger.lastEventData.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "discarded",
           isOpen: false,
           receivedAt: new Date(Date.now() - 30 * 60 * 1000),
@@ -58,15 +64,15 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 2 queue events
       const nextInQueueEvents: SidebarEvent[] = [
         {
-          title: "Email verification",
-          subtitle: "pending",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 5 * 60 * 1000),
         },
         {
-          title: "Data sync",
-          subtitle: "scheduled",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 10 * 60 * 1000),
@@ -93,6 +99,8 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       const latestEvents: SidebarEvent[] = [];
       const nextInQueueEvents: SidebarEvent[] = [];
 
+      const genFunction: () => DockerImage = isGitSha(composite.lastRunItem.subtitle) ? genCommit as () => DockerImage : genDockerImage;
+
       const conversionStateMap: Record<string, string> = {
         success: "processed",
         fail: "discarded",
@@ -114,16 +122,16 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 3 random latest events
       latestEvents.push(
         {
-          title: composite.lastRunItem.title + " 1",
-          subtitle: composite.lastRunItem.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
           isOpen: false,
           receivedAt: new Date(Date.now() - 2 * 60 * 1000),
           values: { duration: "1.2s", steps: "5" },
         },
         {
-          title: composite.lastRunItem.title + " 2",
-          subtitle: composite.lastRunItem.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
           isOpen: false,
           receivedAt: new Date(Date.now() - 8 * 60 * 1000),
@@ -139,8 +147,8 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           }
         },
         {
-          title: composite.lastRunItem.title + " 3",
-          subtitle: composite.lastRunItem.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "discarded",
           isOpen: false,
           receivedAt: new Date(Date.now() - 20 * 60 * 1000),
@@ -149,8 +157,8 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
 
       if (composite.nextInQueue) {
         nextInQueueEvents.push({
-          title: composite.nextInQueue.title,
-          subtitle: composite.nextInQueue.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: composite.nextInQueue.receivedAt,
@@ -160,15 +168,15 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 2 additional queue events
       nextInQueueEvents.push(
         {
-          title: composite.lastRunItem.title + " 1",
-          subtitle: composite.lastRunItem.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 15 * 60 * 1000),
         },
         {
-          title: composite.lastRunItem.title + " 2",
-          subtitle: composite.lastRunItem.subtitle,
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 25 * 60 * 1000),
@@ -193,7 +201,9 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       const approval = data.approval;
       const latestEvents: SidebarEvent[] = [];
 
-      if (approval.awaitingEvent) {
+      const genFunction: () => DockerImage = isGitSha(approval?.awaitingEvent?.subtitle) ? genCommit as () => DockerImage : genDockerImage;
+
+      if (approval?.awaitingEvent) {
         latestEvents.push({
           title: approval.awaitingEvent.title,
           subtitle: approval.awaitingEvent.subtitle,
@@ -206,24 +216,24 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 3 random latest events
       latestEvents.push(
         {
-          title: "FEAT: Add new feature",
-          subtitle: "PR #142 approved",
-          state: "waiting",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
+          state: "processed",
           isOpen: false,
           receivedAt: new Date(Date.now() - 1 * 60 * 1000),
           values: { amount: "2500", department: "Marketing" },
         },
         {
-          title: "FIX: Fix bug",
-          subtitle: "PR #142 approved",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
           isOpen: false,
           receivedAt: new Date(Date.now() - 10 * 60 * 1000),
           values: { pullRequest: "142", reviewer: "alice" },
         },
         {
-          title: "REF: Fix bug",
-          subtitle: "denied",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "discarded",
           isOpen: false,
           receivedAt: new Date(Date.now() - 35 * 60 * 1000),
@@ -233,15 +243,15 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 2 queue events
       const nextInQueueEvents: SidebarEvent[] = [
         {
-          title: "FEAT: Add new feature",
-          subtitle: "pending legal review",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 3 * 60 * 1000),
         },
         {
-          title: "FIX: Fix bug",
-          subtitle: "pending legal review",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 8 * 60 * 1000),
@@ -262,6 +272,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
 
     // Handle switch nodes
     if (data.type === "switch" && data.switch) {
+      const genFunction: () => DockerImage = isGitSha(data.switch.subtitle) ? genCommit as () => DockerImage : genDockerImage;
       const switchData = data.switch;
       const latestEvents: SidebarEvent[] = [];
 
@@ -289,24 +300,23 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 3 additional random events
       latestEvents.push(
         {
-          title: "Route A executed",
-          subtitle: "premium_users",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
           isOpen: false,
           receivedAt: new Date(Date.now() - 3 * 60 * 1000),
           values: { path: "premium", users: "45" },
         },
         {
-          title: "Route B executed",
-          subtitle: "basic_users",
+          title: genFunction().message,
           state: "processed",
           isOpen: false,
           receivedAt: new Date(Date.now() - 12 * 60 * 1000),
           values: { path: "basic", users: "127" },
         },
         {
-          title: "Route validation failed",
-          subtitle: "unknown_path",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "discarded",
           isOpen: false,
           receivedAt: new Date(Date.now() - 25 * 60 * 1000),
@@ -316,15 +326,15 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 2 queue events
       const nextInQueueEvents: SidebarEvent[] = [
         {
-          title: "Batch route processing",
-          subtitle: "enterprise_users",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 7 * 60 * 1000),
         },
         {
-          title: "Analytics routing",
-          subtitle: "data_pipeline",
+          title: genFunction().message,
+          subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
           isOpen: false,
           receivedAt: new Date(Date.now() + 12 * 60 * 1000),
