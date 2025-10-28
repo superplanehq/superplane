@@ -15,6 +15,7 @@ export interface SwitchComponentProps {
   title?: string;
   stages: SwitchStage[];
   collapsed?: boolean;
+  selected?: boolean;
 }
 
 const HANDLE_STYLE = {
@@ -28,6 +29,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   title = "Branch processed events",
   stages,
   collapsed = false,
+  selected = false,
 }) => {
   const spec = stages.length > 0 ? {
     title: "path",
@@ -70,6 +72,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
       spec={spec}
       eventSections={eventSections}
       collapsed={collapsed}
+      selected={selected}
     />
   );
 };

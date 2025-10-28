@@ -139,12 +139,13 @@ function CanvasContent({ state }: { state: CanvasPageState }) {
 
   const nodeTypes = useMemo(
     () => ({
-      default: (nodeProps: { data: unknown; id: string }) => (
+      default: (nodeProps: { data: unknown; id: string; selected?: boolean }) => (
         <Block
           data={nodeProps.data as BlockData}
           onExpand={handleNodeExpand}
           nodeId={nodeProps.id}
           onClick={() => handleNodeClick(nodeProps.id)}
+          selected={nodeProps.selected}
         />
       ),
     }),

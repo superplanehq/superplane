@@ -4,12 +4,14 @@ export interface NoopProps {
   title?: string;
   lastEvent?: Omit<EventSection, "title">;
   collapsed?: boolean;
+  selected?: boolean;
 }
 
 export const Noop: React.FC<NoopProps> = ({
   title = "Don't do anything",
   lastEvent,
   collapsed = false,
+  selected = false,
 }) => {
   const eventSections: EventSection[] = [];
   if (lastEvent) {
@@ -26,6 +28,7 @@ export const Noop: React.FC<NoopProps> = ({
       headerColor="bg-gray-50"
       eventSections={eventSections}
       collapsed={collapsed}
+      selected={selected}
     />
   );
 };

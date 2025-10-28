@@ -31,7 +31,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   const containerClass = shape === "circle" ? "rounded-full" : "rounded-md";
 
   return (
-    <div className="relative w-20 h-20 mx-3" onDoubleClick={onDoubleClick}>
+    <div className="relative w-20 h-20" onDoubleClick={onDoubleClick}>
       <div className={`flex h-20 w-20 items-center justify-center border border-border ${containerClass} ${collapsedBackground || ''}`}>
         {iconSrc ? (
           <div className={`w-16 h-16 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
