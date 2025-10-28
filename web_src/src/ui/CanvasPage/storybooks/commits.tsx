@@ -1,4 +1,4 @@
-interface Commit {
+export interface Commit {
   message: string;
   sha: string;
 }
