@@ -446,10 +446,10 @@ function prepareApprovalNode(
         //
         // TODO: this also comes from the input event
         //
-        awaitingEvent: {
+        awaitingEvent: execution?.state === 'STATE_STARTED' ? {
           title: "",
           subtitle: "",
-        },
+        } : undefined,
       }
     },
   };
