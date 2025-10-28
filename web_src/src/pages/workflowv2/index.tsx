@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 
@@ -17,11 +17,12 @@ import {
 
 import { useWorkflow, useTriggers, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
-import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
+import { CanvasEdge, CanvasNode, CanvasPage, SidebarData } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getTriggerRenderer } from "./renderers";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { formatTimeAgo } from "@/utils/date";
 
 export function WorkflowPageV2() {
   const { organizationId, workflowId } = useParams<{
@@ -71,6 +72,19 @@ export function WorkflowPageV2() {
     [workflow, triggers, blueprints, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient]
   );
 
+  const getSidebarData = useCallback((nodeId: string): SidebarData | null => {
+    const node = workflow?.nodes?.find((n) => n.id === nodeId);
+    if (!node) return null;
+
+    return prepareSidebarData(
+      node,
+      blueprints,
+      components,
+      nodeExecutionsMap,
+      nodeQueueItemsMap
+    );
+  }, [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap]);
+
   // Show loading indicator while data is being fetched
   if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return null;
@@ -80,7 +94,7 @@ export function WorkflowPageV2() {
     return null;
   }
 
-  return <CanvasPage title={workflow.name!} nodes={nodes} edges={edges} />;
+  return <CanvasPage title={workflow.name!} nodes={nodes} edges={edges} getSidebarData={getSidebarData} />;
 }
 
 function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]) {
@@ -459,5 +473,120 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
     id: id,
     source: edge.sourceId!,
     target: edge.targetId!,
+  };
+}
+
+function prepareSidebarData(
+  node: ComponentsNode,
+  blueprints: BlueprintsBlueprint[],
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>
+): SidebarData {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const queueItems = nodeQueueItemsMap[node.id!] || [];
+
+  // Get metadata based on node type
+  let metadata: any;
+  let nodeTitle = node.name || "Unknown";
+  let iconSlug = "boxes";
+  let color = "indigo";
+
+  if (node.type === "TYPE_BLUEPRINT") {
+    metadata = blueprints.find((b) => b.id === node.blueprint?.id);
+    if (metadata) {
+      iconSlug = metadata.icon || "boxes";
+      color = metadata.color || "indigo";
+    }
+  } else if (node.type === "TYPE_COMPONENT") {
+    metadata = components.find((c) => c.name === node.component?.name);
+    if (metadata) {
+      iconSlug = metadata.icon || "boxes";
+      color = metadata.color || "indigo";
+    }
+  }
+
+  // Convert executions to sidebar events (latest events)
+  const latestEvents = executions.slice(0, 5).map((execution) => {
+    const state = execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
+      ? "processed" as const
+      : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
+      ? "discarded" as const
+      : "waiting" as const;
+
+    const timestamp = execution.createdAt
+      ? formatTimeAgo(new Date(execution.createdAt)).replace(' ago', '')
+      : '';
+
+    return {
+      title: execution.id || "Execution",
+      subtitle: timestamp,
+      state,
+      isOpen: false,
+      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
+      values: execution.input as Record<string, string> || {},
+      childEventsInfo: {
+        count: 0,
+        waitingInfos: []
+      }
+    };
+  });
+
+  // Convert queue items to sidebar events (next in queue)
+  const nextInQueueEvents = queueItems.slice(0, 5).map((item) => {
+    const timestamp = item.createdAt
+      ? formatTimeAgo(new Date(item.createdAt)).replace(' ago', '')
+      : '';
+
+    return {
+      title: item.id || "Queued",
+      subtitle: timestamp,
+      state: "waiting" as const,
+      isOpen: false,
+      receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
+      childEventsInfo: {
+        count: 0,
+        waitingInfos: []
+      }
+    };
+  });
+
+  // Build metadata from node configuration
+  const metadataItems = [
+    {
+      icon: "cog",
+      label: `Node ID: ${node.id}`,
+    },
+  ];
+
+  // Add configuration fields to metadata (only simple types)
+  if (node.configuration) {
+    Object.entries(node.configuration).forEach(([key, value]) => {
+      // Only include simple types (string, number, boolean)
+      // Exclude objects, arrays, null, undefined
+      const valueType = typeof value;
+      const isSimpleType =
+        valueType === 'string' ||
+        valueType === 'number' ||
+        valueType === 'boolean';
+
+      if (isSimpleType) {
+        metadataItems.push({
+          icon: "settings",
+          label: `${key}: ${value}`,
+        });
+      }
+    });
+  }
+
+  return {
+    latestEvents,
+    nextInQueueEvents,
+    metadata: metadataItems,
+    title: nodeTitle,
+    iconSlug,
+    iconColor: getColorClass(color),
+    iconBackground: getBackgroundColorClass(color),
+    moreInQueueCount: Math.max(0, queueItems.length - 5),
   };
 }

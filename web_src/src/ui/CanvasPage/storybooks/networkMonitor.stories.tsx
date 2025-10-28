@@ -6,6 +6,7 @@ import "../canvas-reset.css";
 
 import { useMemo, useState } from "react";
 import { CanvasPage } from "../index";
+import { createGetSidebarData } from "./getSidebarData";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -173,9 +174,14 @@ export const Monitor: Story = {
     const [nodes, _setNodes] = useState<Node[]>(args.nodes ?? []);
     const edges = useMemo(() => args.edges ?? [], [args.edges]);
 
+    const getSidebarData = useMemo(
+      () => createGetSidebarData(nodes ?? []),
+      [nodes]
+    );
+
     return (
       <div className="h-[100vh] w-full ">
-        <CanvasPage {...args} nodes={nodes} edges={edges} />
+        <CanvasPage {...args} nodes={nodes} edges={edges} getSidebarData={getSidebarData} />
       </div>
     );
   },

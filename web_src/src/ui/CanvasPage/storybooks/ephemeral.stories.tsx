@@ -6,7 +6,9 @@ import "./../canvas-reset.css";
 
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
+import { useMemo } from "react";
 import { CanvasPage } from "./../index";
+import { createGetSidebarData } from "./getSidebarData";
 import { handleNodeExpand } from "./navigation";
 
 const meta = {
@@ -351,9 +353,14 @@ export const Ephemeral: Story = {
     ]
   },
   render: (args) => {
+    const getSidebarData = useMemo(
+      () => createGetSidebarData(args.nodes ?? []),
+      [args.nodes]
+    );
+
     return (
       <div className="h-[100vh] w-full ">
-        <CanvasPage {...args} />
+        <CanvasPage {...args} getSidebarData={getSidebarData} />
       </div>
     );
   },

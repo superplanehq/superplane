@@ -7,7 +7,7 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 import { AiSidebar } from "../ai";
 import { ComponentSidebar } from "../componentSidebar";
@@ -15,9 +15,32 @@ import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { Header, type BreadcrumbItem } from "./Header";
-import { genCommit } from "./storybooks/commits";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
+import type { ChildEventsInfo } from "../childEvents";
+import type { MetadataItem } from "../metadataList";
+
+export interface SidebarEvent {
+  title: string;
+  subtitle?: string;
+  state: "processed" | "discarded" | "waiting";
+  isOpen: boolean;
+  receivedAt?: Date;
+  values?: Record<string, string>;
+  childEventsInfo?: ChildEventsInfo;
+}
+
+export interface SidebarData {
+  latestEvents: SidebarEvent[];
+  nextInQueueEvents: SidebarEvent[];
+  metadata: MetadataItem[];
+  title: string;
+  iconSrc?: string;
+  iconSlug?: string;
+  iconColor?: string;
+  iconBackground?: string;
+  moreInQueueCount: number;
+}
 
 export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
@@ -34,6 +57,7 @@ export interface CanvasPageProps {
   breadcrumbs?: BreadcrumbItem[];
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
+  getSidebarData?: (nodeId: string) => SidebarData | null;
 }
 
 const EDGE_STYLE = {
@@ -51,110 +75,42 @@ function CanvasPage(props: CanvasPageProps) {
       </ReactFlowProvider>
 
       <AiSidebar />
-      <Sidebar state={state} />
+      <Sidebar state={state} getSidebarData={props.getSidebarData} />
     </div>
   );
 }
 
-function Sidebar({ state }: { state: CanvasPageState }) {
-  const latestEvents = useMemo(
-    () => [
-      {
-        title: genCommit().message,
-        subtitle: "4m",
-        state: "processed" as const,
-        isOpen: false,
-        receivedAt: new Date(),
-        childEventsInfo: {
-          count: 1,
-          state: "processed" as const,
-          waitingInfos: [],
-        },
-      },
-      {
-        title: genCommit().message,
-        subtitle: "3h",
-        state: "discarded" as const,
-        isOpen: false,
-        receivedAt: new Date(Date.now() - 1000 * 60 * 30),
-        values: {
-          Author: "Pedro Forestileao",
-          Commit: "feat: update component sidebar",
-          Branch: "feature/ui-update",
-          Type: "merge",
-          "Event ID": "abc123-def456-ghi789",
-        },
-        childEventsInfo: {
-          count: 3,
-          state: "processed" as const,
-          waitingInfos: [
-            {
-              icon: "check",
-              info: "Tests passed",
-            },
-            {
-              icon: "check",
-              info: "Deploy completed",
-            },
-          ],
-        },
-      },
-    ],
-    []
-  );
+function Sidebar({
+  state,
+  getSidebarData
+}: {
+  state: CanvasPageState;
+  getSidebarData?: (nodeId: string) => SidebarData | null;
+}) {
+  const sidebarData = useMemo(() => {
+    if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
+      return null;
+    }
+    return getSidebarData(state.componentSidebar.selectedNodeId);
+  }, [state.componentSidebar.selectedNodeId, getSidebarData]);
 
-  const nextInQueueEvents = useMemo(
-    () => [
-      {
-        title: genCommit().message,
-        state: "waiting" as const,
-        isOpen: false,
-        receivedAt: new Date(Date.now() + 1000 * 60 * 5),
-        childEventsInfo: {
-          count: 2,
-          state: "waiting" as const,
-          waitingInfos: [
-            {
-              icon: "clock",
-              info: "Waiting for approval",
-              futureTimeDate: new Date(Date.now() + 1000 * 60 * 15),
-            },
-          ],
-        },
-      },
-      {
-        title: genCommit().message,
-        state: "waiting" as const,
-        isOpen: false,
-        receivedAt: new Date(Date.now() + 1000 * 60 * 10),
-        childEventsInfo: {
-          count: 1,
-          state: "waiting" as const,
-          waitingInfos: [],
-        },
-      },
-    ],
-    []
-  );
+  if (!sidebarData) {
+    return null;
+  }
 
   return (
     <ComponentSidebar
       isOpen={state.componentSidebar.isOpen}
       onClose={state.componentSidebar.close}
-      latestEvents={latestEvents}
-      nextInQueueEvents={nextInQueueEvents}
-      metadata={[
-        {
-          icon: "book",
-          label: "monarch-app",
-        },
-        {
-          icon: "filter",
-          label: "branch=main",
-        },
-      ]}
-      title={"Build/Test/Deploy Stage"}
-      moreInQueueCount={0}
+      latestEvents={sidebarData.latestEvents}
+      nextInQueueEvents={sidebarData.nextInQueueEvents}
+      metadata={sidebarData.metadata}
+      title={sidebarData.title}
+      iconSrc={sidebarData.iconSrc}
+      iconSlug={sidebarData.iconSlug}
+      iconColor={sidebarData.iconColor}
+      iconBackground={sidebarData.iconBackground}
+      moreInQueueCount={sidebarData.moreInQueueCount}
     />
   );
 }
@@ -162,16 +118,24 @@ function Sidebar({ state }: { state: CanvasPageState }) {
 function CanvasContent({ state }: { state: CanvasPageState }) {
   const { fitView } = useReactFlow();
 
+  // Use refs to avoid recreating callbacks when state changes
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const handleNodeExpand = useCallback(
     (nodeId: string) => {
-      const node = state.nodes?.find((n) => n.id === nodeId);
-      if (node && state.onNodeExpand) {
-        state.onNodeExpand(nodeId, node.data);
+      const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
+      if (node && stateRef.current.onNodeExpand) {
+        stateRef.current.onNodeExpand(nodeId, node.data);
         fitView();
       }
     },
-    [state.nodes, state.onNodeExpand, fitView]
+    [fitView]
   );
+
+  const handleNodeClick = useCallback((nodeId: string) => {
+    stateRef.current.componentSidebar.open(nodeId);
+  }, []);
 
   const nodeTypes = useMemo(
     () => ({
@@ -180,12 +144,11 @@ function CanvasContent({ state }: { state: CanvasPageState }) {
           data={nodeProps.data as BlockData}
           onExpand={handleNodeExpand}
           nodeId={nodeProps.id}
-          onClick={state.componentSidebar.open}
+          onClick={() => handleNodeClick(nodeProps.id)}
         />
       ),
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }),
-    []
+    [handleNodeExpand, handleNodeClick]
   );
 
   const edgeTypes = useMemo(() => ({}), []);

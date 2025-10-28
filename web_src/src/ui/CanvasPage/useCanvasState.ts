@@ -23,8 +23,9 @@ export interface CanvasPageState {
 
   componentSidebar: {
     isOpen: boolean;
+    selectedNodeId: string | null;
     close: () => void;
-    open: () => void;
+    open: (nodeId: string) => void;
   };
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
@@ -179,12 +180,23 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
 
 function useComponentSidebarState() : CanvasPageState["componentSidebar"] {
   const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  const close = () => setIsOpen(false);
-  const open = () => setIsOpen(true);
+  const close = useCallback(() => {
+    setIsOpen(false);
+    setSelectedNodeId(null);
+  }, []);
 
+  const open = useCallback((nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setIsOpen(true);
+  }, []);
+
+  // Don't memoize the object itself - let it be a new reference each render
+  // But the callbacks (open, close) are stable thanks to useCallback
   return {
     isOpen,
+    selectedNodeId,
     close,
     open
   };
