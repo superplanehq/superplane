@@ -69,3 +69,29 @@ export const WithoutDescription: Story = {
     headerColor: "bg-gray-100",
   },
 };
+
+export const WithActionsDropdown: Story = {
+  args: {
+    title: "Header with Actions",
+    description: "This header includes action dropdown functionality",
+    iconSlug: "cog",
+    iconColor: "text-blue-700",
+    headerColor: "bg-blue-100",
+    onRun: () => {
+      console.log("Run action triggered");
+    },
+    onDuplicate: () => {
+      console.log("Duplicate action triggered");
+    },
+    onDeactivate: () => {
+      console.log("Deactivate action triggered");
+    },
+    onToggleView: () => {
+      console.log("Toggle view action triggered");
+    },
+    onDelete: () => {
+      console.log("Delete action triggered");
+    },
+    isCompactView: false,
+  },
+};

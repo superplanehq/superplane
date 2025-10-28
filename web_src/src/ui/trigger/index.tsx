@@ -4,6 +4,7 @@ import { ComponentHeader } from "../componentHeader";
 import { CollapsedComponent } from "../collapsedComponent";
 import { MetadataList, type MetadataItem } from "../metadataList";
 import { SelectionWrapper } from "../selectionWrapper";
+import { ComponentActionsProps } from "../types/componentActions";
 
 
 type LastEventState = "processed" | "discarded"
@@ -15,7 +16,7 @@ interface TriggerLastEventData {
   state: LastEventState;
 }
 
-export interface TriggerProps {
+export interface TriggerProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
@@ -31,7 +32,7 @@ export interface TriggerProps {
   selected?: boolean;
 }
 
-export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, lastEventData, zeroStateText = "No events yet", collapsed = false, collapsedBackground, selected = false }) => {
+export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, lastEventData, zeroStateText = "No events yet", collapsed = false, collapsedBackground, selected = false, onRun, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
   const timeAgo = React.useMemo(() => {
     if (!lastEventData) return null;
     const now = new Date()
@@ -77,6 +78,12 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
           title={title}
           collapsedBackground={collapsedBackground}
           shape="circle"
+          onRun={onRun}
+          onDuplicate={onDuplicate}
+          onDeactivate={onDeactivate}
+          onToggleView={onToggleView}
+          onDelete={onDelete}
+          isCompactView={isCompactView}
         >
           <div className="flex flex-col items-center gap-1">
             <MetadataList
@@ -101,6 +108,12 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
           headerColor={headerColor}
           title={title}
           description={description}
+          onRun={onRun}
+          onDuplicate={onDuplicate}
+          onDeactivate={onDeactivate}
+          onToggleView={onToggleView}
+          onDelete={onDelete}
+          isCompactView={isCompactView}
         />
         <MetadataList items={metadata} />
         <div className="px-4 pt-3 pb-6">

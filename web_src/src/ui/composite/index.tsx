@@ -5,6 +5,7 @@ import { CollapsedComponent } from "../collapsedComponent";
 import { MetadataList, type MetadataItem } from "../metadataList";
 import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 import { SelectionWrapper } from "../selectionWrapper";
+import { ComponentActionsProps } from "../types/componentActions";
 
 export type LastRunState = "success" | "failed" | "running"
 export type ChildEventsState = "processed" | "discarded" | "waiting" | "running"
@@ -32,7 +33,7 @@ export interface ParameterGroup {
   items: string[];
 }
 
-export interface CompositeProps {
+export interface CompositeProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
@@ -58,7 +59,7 @@ export interface CompositeProps {
   onViewMoreEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false, onRun, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
   // All hooks must be called before any early returns
   const [showLastRunValues, setShowLastRunValues] = React.useState<Record<number, boolean>>(
     startLastValuesOpen ? { 0: true } : {}
@@ -156,6 +157,12 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           collapsedBackground={collapsedBackground}
           shape="rounded"
           onDoubleClick={onToggleCollapse}
+          onRun={onRun}
+          onDuplicate={onDuplicate}
+          onDeactivate={onDeactivate}
+          onToggleView={onToggleView}
+          onDelete={onDelete}
+          isCompactView={isCompactView}
         >
           {parameters.length > 0 && (
             <MetadataList
@@ -184,6 +191,12 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         title={title}
         description={description}
         onDoubleClick={onToggleCollapse}
+        onRun={onRun}
+        onDuplicate={onDuplicate}
+        onDeactivate={onDeactivate}
+        onToggleView={onToggleView}
+        onDelete={onDelete}
+        isCompactView={isCompactView}
       />
 
       {parameters.length > 0 && (

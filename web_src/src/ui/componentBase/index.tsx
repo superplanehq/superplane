@@ -4,6 +4,7 @@ import { ComponentHeader } from "../componentHeader";
 import { ListFilter } from "lucide-react";
 import { SpecsTooltip } from "./SpecsTooltip";
 import { SelectionWrapper } from "../selectionWrapper";
+import { ComponentActionsProps } from "../types/componentActions";
 
 export interface SpecBadge {
   label: string;
@@ -23,7 +24,7 @@ export interface EventSection {
   handleComponent?: React.ReactNode;
 }
 
-export interface ComponentBaseProps {
+export interface ComponentBaseProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
@@ -42,7 +43,7 @@ export interface ComponentBaseProps {
   selected?: boolean;
 }
 
-export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, spec, collapsed = false, collapsedBackground, eventSections, selected = false }) => {
+export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, spec, collapsed = false, collapsedBackground, eventSections, selected = false, onRun, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected}>
@@ -54,6 +55,12 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
           title={title}
           collapsedBackground={collapsedBackground}
           shape="circle"
+          onRun={onRun}
+          onDuplicate={onDuplicate}
+          onDeactivate={onDeactivate}
+          onToggleView={onToggleView}
+          onDelete={onDelete}
+          isCompactView={isCompactView}
         >
           <div className="flex flex-col items-center gap-1">
             {spec?.title && spec?.values?.length > 0 && <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -77,6 +84,12 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
         headerColor={headerColor}
         title={title}
         description={description}
+        onRun={onRun}
+        onDuplicate={onDuplicate}
+        onDeactivate={onDeactivate}
+        onToggleView={onToggleView}
+        onDelete={onDelete}
+        isCompactView={isCompactView}
       />
 
       {spec && spec.title && spec.values?.length > 0 &&

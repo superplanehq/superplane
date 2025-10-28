@@ -146,6 +146,7 @@ export const Default: Story = {
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
+    onToggleView: () => console.log("Toggle view action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
   },
@@ -199,6 +200,7 @@ export const WithInteractiveEvents: Story = {
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
+    onToggleView: () => console.log("Toggle view action"),
   },
 };
 
@@ -325,6 +327,7 @@ export const ExtendedMetadata: Story = {
     onRun: () => console.log("Run action"),
     onDuplicate: () => console.log("Duplicate action"),
     onDocs: () => console.log("Documentation action"),
+    onToggleView: () => console.log("Toggle view action"),
     onDeactivate: () => console.log("Deactivate action"),
     onDelete: () => console.log("Delete action"),
   },
@@ -384,23 +387,21 @@ export const WithActionsDropdown: Story = {
     onClose: () => console.log("Close sidebar"),
     onRun: () => {
       console.log("Run action triggered");
-      alert("Run action triggered!");
     },
     onDuplicate: () => {
       console.log("Duplicate action triggered");
-      alert("Duplicate action triggered!");
     },
     onDocs: () => {
       console.log("Documentation action triggered");
-      alert("Documentation action triggered!");
+    },
+    onToggleView: () => {
+      console.log("Toggle view action triggered");
     },
     onDeactivate: () => {
       console.log("Deactivate action triggered");
-      alert("Deactivate action triggered!");
     },
     onDelete: () => {
       console.log("Delete action triggered");
-      alert("Delete action triggered!");
     },
   },
 };

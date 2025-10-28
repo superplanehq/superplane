@@ -5,13 +5,14 @@ import { CollapsedComponent } from "../collapsedComponent";
 import { ComponentHeader } from "../componentHeader";
 import { ItemGroup } from "../item";
 import { SelectionWrapper } from "../selectionWrapper";
+import { ComponentActionsProps } from "../types/componentActions";
 
 export interface AwaitingEvent {
   title: string;
   subtitle?: string;
 }
 
-export interface ApprovalProps {
+export interface ApprovalProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconBackground?: string;
@@ -43,6 +44,12 @@ export const Approval: React.FC<ApprovalProps> = ({
   awaitingEvent,
   zeroStateText = "No events yet",
   selected = false,
+  onRun,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
 }) => {
   const calcRelativeTimeFromDiff = (diff: number) => {
     const seconds = Math.floor(diff / 1000);
@@ -78,6 +85,12 @@ export const Approval: React.FC<ApprovalProps> = ({
           title={title}
           collapsedBackground={collapsedBackground}
           shape="rounded"
+          onRun={onRun}
+          onDuplicate={onDuplicate}
+          onDeactivate={onDeactivate}
+          onToggleView={onToggleView}
+          onDelete={onDelete}
+          isCompactView={isCompactView}
         />
       </SelectionWrapper>
     );
@@ -94,6 +107,12 @@ export const Approval: React.FC<ApprovalProps> = ({
         headerColor={headerColor}
         title={title}
         description={description}
+        onRun={onRun}
+        onDuplicate={onDuplicate}
+        onDeactivate={onDeactivate}
+        onToggleView={onToggleView}
+        onDelete={onDelete}
+        isCompactView={isCompactView}
       />
 
       <div className="px-4 py-3">

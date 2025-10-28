@@ -62,7 +62,7 @@ export const SidebarActionsDropdown = ({
     {
       id: "toggle-view",
       label: isCompactView ? "Detailed view" : "Compact view",
-      icon: isCompactView ? "list-chevrons-up-down" : "list-chevrons-down-up",
+      icon: isCompactView ? "expand" : "minimize",
       onAction: onToggleView,
       hasBorder: true,
     },
@@ -95,7 +95,10 @@ export const SidebarActionsDropdown = ({
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
         className="ml-auto"
         aria-label="More actions"
       >

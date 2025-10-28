@@ -1,37 +1,46 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { CollapsedComponent, type CollapsedComponentProps } from './';
 import { resolveIcon } from "@/lib/utils";
+import React from 'react';
 
-const triggerCollapsed: CollapsedComponentProps = {
+const createCollapsedProps = (baseProps: Omit<CollapsedComponentProps, keyof import('../types/componentActions').ComponentActionsProps>): CollapsedComponentProps => ({
+  ...baseProps,
+  onRun: () => console.log('Run clicked!'),
+  onDuplicate: () => console.log('Duplicate clicked!'),
+  onDeactivate: () => console.log('Deactivate clicked!'),
+  onDelete: () => console.log('Delete clicked!'),
+});
+
+const triggerCollapsed: CollapsedComponentProps = createCollapsedProps({
   title: "Deploy to Production",
   iconSlug: "rocket",
   iconColor: "text-green-700",
   collapsedBackground: "bg-green-100",
   shape: "circle",
-};
+});
 
-const approvalCollapsed: CollapsedComponentProps = {
+const approvalCollapsed: CollapsedComponentProps = createCollapsedProps({
   title: "Approve Release",
   iconSlug: "hand",
   iconColor: "text-orange-500",
   collapsedBackground: "bg-orange-100",
-};
+});
 
-const compositeCollapsed: CollapsedComponentProps = {
+const compositeCollapsed: CollapsedComponentProps = createCollapsedProps({
   title: "Build/Test/Deploy",
   iconSlug: "git-branch",
   iconColor: "text-purple-700",
   collapsedBackground: "bg-purple-100",
-};
+});
 
-const withImageIcon: CollapsedComponentProps = {
+const withImageIcon: CollapsedComponentProps = createCollapsedProps({
   title: "Kubernetes",
   iconSrc: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kubernetes/kubernetes-plain.svg",
   iconBackground: "bg-blue-500",
   collapsedBackground: "bg-blue-100",
-};
+});
 
-const triggerWithMetadata: CollapsedComponentProps = {
+const triggerWithMetadata: CollapsedComponentProps = createCollapsedProps({
   title: "Deploy Trigger",
   iconSlug: "rocket",
   iconColor: "text-green-700",
@@ -54,7 +63,7 @@ const triggerWithMetadata: CollapsedComponentProps = {
       })}
     </div>
   ),
-};
+});
 
 const meta: Meta<typeof CollapsedComponent> = {
   title: 'ui/CollapsedComponent',
@@ -100,4 +109,58 @@ export const RoundedShape: Story = {
 
 export const WithChildren: Story = {
   args: triggerWithMetadata,
+};
+
+const ToggleableCollapsedComponent = (args: CollapsedComponentProps) => {
+  const [isCollapsed, setIsCollapsed] = React.useState(true);
+  const [isCompactView, setIsCompactView] = React.useState(false);
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="text-sm text-gray-600">
+        Current state: {isCollapsed ? 'Collapsed' : 'Expanded'} | View: {isCompactView ? 'Compact' : 'Detailed'}
+      </div>
+      <CollapsedComponent
+        {...args}
+        isCompactView={isCompactView}
+        onToggleView={() => {
+          setIsCompactView(!isCompactView);
+          console.log(`Toggled to ${!isCompactView ? 'Compact' : 'Detailed'} view!`);
+        }}
+        onRun={() => console.log('Run action triggered!')}
+        onDuplicate={() => console.log('Duplicate action triggered!')}
+        onDeactivate={() => console.log('Deactivate action triggered!')}
+        onDelete={() => console.log('Delete action triggered!')}
+      />
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="px-3 py-1 bg-blue-500 text-white rounded text-sm"
+      >
+        {isCollapsed ? 'Expand' : 'Collapse'} Component
+      </button>
+    </div>
+  );
+};
+
+export const WithToggleActions: Story = {
+  render: (args) => <ToggleableCollapsedComponent {...args} />,
+  args: {
+    title: "Toggleable Component",
+    iconSlug: "settings",
+    iconColor: "text-blue-700",
+    collapsedBackground: "bg-blue-100",
+    shape: "rounded",
+  },
+};
+
+export const WithActionsOnly: Story = {
+  args: {
+    ...triggerCollapsed,
+    title: "Component with Actions",
+    onRun: () => console.log('Run clicked!'),
+    onDuplicate: () => console.log('Duplicate clicked!'),
+    onDeactivate: () => console.log('Deactivate clicked!'),
+    onToggleView: () => console.log('Toggle view clicked!'),
+    onDelete: () => console.log('Delete clicked!'),
+  },
 };

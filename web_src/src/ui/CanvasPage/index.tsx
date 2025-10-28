@@ -47,7 +47,7 @@ export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
 }
 
-export interface CanvasEdge extends ReactFlowEdge {}
+export interface CanvasEdge extends ReactFlowEdge { }
 
 export interface CanvasPageProps {
   nodes: CanvasNode[];
@@ -65,6 +65,7 @@ export interface CanvasPageProps {
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
+  onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
 
   aiSidebar?: {
@@ -84,7 +85,7 @@ function CanvasPage(props: CanvasPageProps) {
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
       <ReactFlowProvider>
-        <CanvasContent state={state} />
+        <CanvasContent state={state} props={props} />
       </ReactFlowProvider>
 
       <AiSidebar
@@ -112,6 +113,7 @@ function Sidebar({
   onDuplicate,
   onDocs,
   onDeactivate,
+  onToggleView,
   onDelete,
 }: {
   state: CanvasPageState;
@@ -120,6 +122,7 @@ function Sidebar({
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
+  onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
 }) {
   const sidebarData = useMemo(() => {
@@ -185,12 +188,13 @@ function Sidebar({
       onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
       onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
       onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
+      onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
       onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
     />
   );
 }
 
-function CanvasContent({ state }: { state: CanvasPageState }) {
+function CanvasContent({ state, props }: { state: CanvasPageState; props: CanvasPageProps }) {
   const { fitView } = useReactFlow();
 
   // Use refs to avoid recreating callbacks when state changes
@@ -225,6 +229,11 @@ function CanvasContent({ state }: { state: CanvasPageState }) {
           nodeId={nodeProps.id}
           onClick={() => handleNodeClick(nodeProps.id)}
           selected={nodeProps.selected}
+          onRun={props.onRun ? () => props.onRun!(nodeProps.id) : undefined}
+          onDuplicate={props.onDuplicate ? () => props.onDuplicate!(nodeProps.id) : undefined}
+          onDeactivate={props.onDeactivate ? () => props.onDeactivate!(nodeProps.id) : undefined}
+          onToggleView={props.onToggleView ? () => props.onToggleView!(nodeProps.id) : undefined}
+          onDelete={props.onDelete ? () => props.onDelete!(nodeProps.id) : undefined}
         />
       ),
     }),

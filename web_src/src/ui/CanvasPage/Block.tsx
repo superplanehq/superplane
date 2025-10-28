@@ -9,6 +9,7 @@ import { Handle, Position } from "@xyflow/react";
 import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
+import { ComponentActionsProps } from "../types/componentActions";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
 type BlockType =
@@ -51,7 +52,7 @@ export interface BlockData {
   switch?: SwitchComponentProps;
 }
 
-interface BlockProps {
+interface BlockProps extends ComponentActionsProps {
   data: BlockData;
   nodeId?: string;
   selected?: boolean;
@@ -142,6 +143,12 @@ function BlockContent({
   onExpand,
   nodeId,
   selected = false,
+  onRun,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
 }: BlockProps) {
   const handleExpand = () => {
     if (onExpand && nodeId) {
@@ -149,19 +156,29 @@ function BlockContent({
     }
   };
 
+  const actionProps = {
+    onRun,
+    onDuplicate,
+    onDeactivate,
+    onToggleView,
+    onDelete,
+    isCompactView,
+  };
+
   switch (data.type) {
     case "trigger":
-      return <Trigger {...(data.trigger as TriggerProps)} selected={selected} />;
+      return <Trigger {...(data.trigger as TriggerProps)} selected={selected} {...actionProps} />;
     case "composite":
       return (
         <Composite
           {...(data.composite as CompositeProps)}
           onExpandChildEvents={handleExpand}
           selected={selected}
+          {...actionProps}
         />
       );
     case "approval":
-      return <Approval {...(data.approval as ApprovalProps)} selected={selected} />;
+      return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
     case "filter":
       return <Filter {...(data.filter as FilterProps)} selected={selected} />;
     case "if":

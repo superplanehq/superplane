@@ -27,11 +27,13 @@ export const Default: Story = {
     );
   },
   args: {
-    onRun: () => alert("Run action triggered!"),
-    onDuplicate: () => alert("Duplicate action triggered!"),
-    onDocs: () => alert("Documentation action triggered!"),
-    onDeactivate: () => alert("Deactivate action triggered!"),
-    onDelete: () => alert("Delete action triggered!"),
+    onRun: () => console.log("Run action triggered"),
+    onDuplicate: () => console.log("Duplicate action triggered"),
+    onDocs: () => console.log("Documentation action triggered"),
+    onDeactivate: () => console.log("Deactivate action triggered"),
+    onToggleView: () => console.log("Toggle view action triggered"),
+    onDelete: () => console.log("Delete action triggered"),
+    isCompactView: false,
   },
 };
 
@@ -49,6 +51,7 @@ export const LimitedActions: Story = {
   args: {
     onRun: () => console.log("Run action"),
     onDocs: () => console.log("Documentation action"),
+    onToggleView: () => console.log("Toggle view action"),
     onDelete: () => console.log("Delete action"),
   },
 };
@@ -73,8 +76,7 @@ export const NoActions: Story = {
 };
 
 export const InteractiveToggle: Story = {
-  render: (args) => {
-    const [isCompactView, setIsCompactView] = useState(false);
+  render: () => {
     const [isActive, setIsActive] = useState(true);
 
 
@@ -90,7 +92,6 @@ export const InteractiveToggle: Story = {
           <SidebarActionsDropdown
             onRun={() => {
               console.log("Run action triggered");
-              alert("Component started running!");
             }}
             onDeactivate={isActive ? () => {
               setIsActive(!isActive);
@@ -98,17 +99,15 @@ export const InteractiveToggle: Story = {
             } : undefined}
             onDocs={() => {
               console.log("Documentation action triggered");
-              alert("Opening documentation!");
+            }}
+            onToggleView={() => {
+              console.log("Toggle view action triggered");
             }}
             onDuplicate={() => {
               console.log("Duplicate action triggered");
-              alert("Component duplicated!");
             }}
             onDelete={() => {
               console.log("Delete action triggered");
-              if (confirm("Are you sure you want to delete this component?")) {
-                alert("Component deleted!");
-              }
             }}
           />
         </div>
@@ -146,6 +145,7 @@ export const InContext: Story = {
     onRun: () => console.log("Run service"),
     onDuplicate: () => console.log("Duplicate service"),
     onDocs: () => console.log("Documentation service"),
+    onToggleView: () => console.log("Toggle view service"),
     onDeactivate: () => console.log("Deactivate service"),
     onDelete: () => console.log("Delete service"),
   },

@@ -4,8 +4,9 @@ import type { Edge, Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "../canvas-reset.css";
 
-import { useMemo, useState } from "react";
-import { CanvasPage } from "../index";
+import { useMemo, useState, useCallback } from "react";
+import { CanvasPage, type CanvasNode } from "../index";
+import type { BlockData } from "../Block";
 import { createGetSidebarData } from "./getSidebarData";
 
 const meta = {
@@ -171,8 +172,52 @@ export const Monitor: Story = {
     edges: sampleEdges,
   },
   render: function MonitorRender(args) {
-    const [nodes, _setNodes] = useState<Node[]>(args.nodes ?? []);
+    const [nodes, setNodes] = useState<CanvasNode[]>(args.nodes ?? []);
     const edges = useMemo(() => args.edges ?? [], [args.edges]);
+
+    const toggleNodeCollapse = useCallback((nodeId: string) => {
+      console.log('toggleNodeCollapse called for nodeId:', nodeId);
+      setNodes(prevNodes => {
+        console.log('Current nodes:', prevNodes.length);
+        const newNodes = prevNodes.map(node => {
+          if (node.id !== nodeId) return node;
+
+          console.log('Found node to toggle:', nodeId, node.data);
+          const nodeData = { ...node.data } as unknown as BlockData;
+
+          // Toggle collapse state based on node type
+          if (nodeData.type === "composite" && nodeData.composite) {
+            console.log('Toggling composite from', nodeData.composite.collapsed, 'to', !nodeData.composite.collapsed);
+            nodeData.composite = {
+              ...nodeData.composite,
+              collapsed: !nodeData.composite.collapsed,
+            };
+          }
+
+          if (nodeData.type === "approval" && nodeData.approval) {
+            console.log('Toggling approval from', nodeData.approval.collapsed, 'to', !nodeData.approval.collapsed);
+            nodeData.approval = {
+              ...nodeData.approval,
+              collapsed: !nodeData.approval.collapsed,
+            };
+          }
+
+          if (nodeData.type === "trigger" && nodeData.trigger) {
+            console.log('Toggling trigger from', nodeData.trigger.collapsed, 'to', !nodeData.trigger.collapsed);
+            nodeData.trigger = {
+              ...nodeData.trigger,
+              collapsed: !nodeData.trigger.collapsed,
+            };
+          }
+
+          const updatedNode: CanvasNode = { ...node, data: nodeData as unknown as Record<string, unknown> };
+          console.log('Updated node:', updatedNode);
+          return updatedNode;
+        });
+        console.log('Returning new nodes:', newNodes.length);
+        return newNodes;
+      });
+    }, []);
 
     const getSidebarData = useMemo(
       () => createGetSidebarData(nodes ?? []),
@@ -188,25 +233,24 @@ export const Monitor: Story = {
           getSidebarData={getSidebarData}
           onRun={(nodeId) => {
             console.log("Run action for node:", nodeId);
-            alert(`Running node: ${nodeId}`);
           }}
           onDuplicate={(nodeId) => {
             console.log("Duplicate action for node:", nodeId);
-            alert(`Duplicating node: ${nodeId}`);
           }}
           onDocs={(nodeId) => {
             console.log("Documentation action for node:", nodeId);
-            alert(`Opening documentation for node: ${nodeId}`);
+          }}
+          onToggleView={(nodeId) => {
+            console.log("Toggle view action for node:", nodeId);
+            console.log("Current nodes before toggle:", nodes.length);
+            console.log("Node data before toggle:", nodes.find(n => n.id === nodeId)?.data);
+            toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {
             console.log("Deactivate action for node:", nodeId);
-            alert(`Deactivating node: ${nodeId}`);
           }}
           onDelete={(nodeId) => {
             console.log("Delete action for node:", nodeId);
-            if (confirm(`Are you sure you want to delete node: ${nodeId}?`)) {
-              alert(`Deleted node: ${nodeId}`);
-            }
           }}
         />
       </div>
