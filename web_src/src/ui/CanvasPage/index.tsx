@@ -59,7 +59,7 @@ export interface CanvasPageProps {
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
-  onSave?: () => void;
+  onSave?: (nodes: CanvasNode[]) => void;
 
   aiSidebar?: {
     showNotifications: boolean;
@@ -161,7 +161,7 @@ function Sidebar({
   );
 }
 
-function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: () => void }) {
+function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void }) {
   const { fitView } = useReactFlow();
 
   // Use refs to avoid recreating callbacks when state changes
@@ -182,6 +182,12 @@ function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: () 
   const handleNodeClick = useCallback((nodeId: string) => {
     stateRef.current.componentSidebar.open(nodeId);
   }, []);
+
+  const handleSave = useCallback(() => {
+    if (onSave) {
+      onSave(stateRef.current.nodes);
+    }
+  }, [onSave]);
 
   const nodeTypes = useMemo(
     () => ({
@@ -211,7 +217,7 @@ function CanvasContent({ state, onSave }: { state: CanvasPageState; onSave?: () 
   return (
     <>
       {/* Header */}
-      <Header breadcrumbs={state.breadcrumbs} onSave={onSave} />
+      <Header breadcrumbs={state.breadcrumbs} onSave={handleSave} />
 
       {/* Toggle button */}
       <div className="absolute top-14 left-1/2 transform -translate-x-1/2 z-10">
