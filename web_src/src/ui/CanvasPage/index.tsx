@@ -10,15 +10,15 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AiSidebar } from "../ai";
+import type { ChildEventsInfo } from "../childEvents";
 import { ComponentSidebar } from "../componentSidebar";
+import type { MetadataItem } from "../metadataList";
 import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import type { ChildEventsInfo } from "../childEvents";
-import type { MetadataItem } from "../metadataList";
 
 export interface SidebarEvent {
   title: string;
@@ -47,7 +47,7 @@ export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
 }
 
-export interface CanvasEdge extends ReactFlowEdge { }
+export interface CanvasEdge extends ReactFlowEdge {}
 
 export interface CanvasPageProps {
   nodes: CanvasNode[];
@@ -59,6 +59,11 @@ export interface CanvasPageProps {
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+
+  aiSidebar?: {
+    showNotifications: boolean;
+    notificationMessage?: string;
+  };
 }
 
 const EDGE_STYLE = {
@@ -75,7 +80,11 @@ function CanvasPage(props: CanvasPageProps) {
         <CanvasContent state={state} />
       </ReactFlowProvider>
 
-      <AiSidebar />
+      <AiSidebar
+        showNotifications={state.aiSidebar.showNotifications}
+        notificationMessage={state.aiSidebar.notificationMessage}
+      />
+
       <Sidebar state={state} getSidebarData={props.getSidebarData} />
     </div>
   );
@@ -83,7 +92,7 @@ function CanvasPage(props: CanvasPageProps) {
 
 function Sidebar({
   state,
-  getSidebarData
+  getSidebarData,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -95,8 +104,12 @@ function Sidebar({
     return getSidebarData(state.componentSidebar.selectedNodeId);
   }, [state.componentSidebar.selectedNodeId, getSidebarData]);
 
-  const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
-  const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
+  const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(
+    sidebarData?.latestEvents || []
+  );
+  const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(
+    sidebarData?.nextInQueueEvents || []
+  );
 
   useEffect(() => {
     if (sidebarData?.latestEvents) {
@@ -171,7 +184,11 @@ function CanvasContent({ state }: { state: CanvasPageState }) {
 
   const nodeTypes = useMemo(
     () => ({
-      default: (nodeProps: { data: unknown; id: string; selected?: boolean }) => (
+      default: (nodeProps: {
+        data: unknown;
+        id: string;
+        selected?: boolean;
+      }) => (
         <Block
           data={nodeProps.data as BlockData}
           onExpand={handleNodeExpand}

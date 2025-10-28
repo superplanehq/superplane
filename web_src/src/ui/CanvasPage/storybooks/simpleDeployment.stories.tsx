@@ -496,23 +496,29 @@ export const SimpleDeployment: Story = {
 
     // Set up approval handlers for the approval node
     const nodesWithHandlers = useMemo(() => {
-      return nodes.map(node => {
-        if (node.data.type === 'approval' && node.data.approval) {
+      return nodes.map((node) => {
+        if (node.data.type === "approval" && node.data.approval) {
           return {
             ...node,
             data: {
               ...node.data,
               approval: {
                 ...node.data.approval,
-                approvals: node.data.approval.approvals.map((approval: any) => ({
-                  ...approval,
-                  onApprove: (artifacts?: Record<string, string>) =>
-                    simulation.onApprove(node.id, approval.id || '0', artifacts),
-                  onReject: (comment?: string) =>
-                    simulation.onReject(node.id, approval.id || '0', comment),
-                }))
-              }
-            }
+                approvals: node.data.approval.approvals.map(
+                  (approval: any) => ({
+                    ...approval,
+                    onApprove: (artifacts?: Record<string, string>) =>
+                      simulation.onApprove(
+                        node.id,
+                        approval.id || "0",
+                        artifacts
+                      ),
+                    onReject: (comment?: string) =>
+                      simulation.onReject(node.id, approval.id || "0", comment),
+                  })
+                ),
+              },
+            },
           };
         }
         return node;
@@ -532,6 +538,10 @@ export const SimpleDeployment: Story = {
           edges={edges}
           onNodeExpand={handleNodeExpand}
           getSidebarData={getSidebarData}
+          aiSidebar={{
+            showNotifications: false,
+            notificationMessage: "Found 4 improvements",
+          }}
         />
       );
     };
