@@ -1,6 +1,8 @@
 import { useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
+import { showSuccessToast, showErrorToast } from "@/utils/toast";
 
 import {
   BlueprintsBlueprint,
@@ -15,9 +17,9 @@ import {
   workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
 
-import { useWorkflow, useTriggers, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
+import { useWorkflow, useTriggers, useUpdateWorkflow, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
-import { CanvasEdge, CanvasNode, CanvasPage, SidebarData } from "@/ui/CanvasPage";
+import { CanvasEdge, CanvasNode, CanvasPage, SidebarData, NodeEditData } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getTriggerRenderer } from "./renderers";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
@@ -31,6 +33,7 @@ export function WorkflowPageV2() {
   }>();
 
   const queryClient = useQueryClient();
+  const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
@@ -61,8 +64,8 @@ export function WorkflowPageV2() {
     [compositeNodes, componentNodes]
   );
 
-  const nodeEventsMap = useTriggerNodeEvents(workflowId!, triggerNodes);
-  const { nodeExecutionsMap, nodeQueueItemsMap } = useCompositeNodeData(workflowId!, nodesWithExecutions);
+  const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(workflowId!, triggerNodes);
+  const { nodeExecutionsMap, nodeQueueItemsMap, isLoading: nodeDataLoading } = useCompositeNodeData(workflowId!, nodesWithExecutions);
 
   const { nodes, edges } = useMemo(
     () => {
@@ -85,16 +88,139 @@ export function WorkflowPageV2() {
     );
   }, [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap]);
 
+  const getNodeEditData = useCallback((nodeId: string): NodeEditData | null => {
+    const node = workflow?.nodes?.find((n) => n.id === nodeId);
+    if (!node) return null;
+
+    // Get configuration fields from metadata based on node type
+    let configurationFields: ComponentsComponent['configuration'] = [];
+
+    if (node.type === "TYPE_BLUEPRINT") {
+      const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
+      configurationFields = blueprintMetadata?.configuration || [];
+    } else if (node.type === "TYPE_COMPONENT") {
+      const componentMetadata = components.find((c) => c.name === node.component?.name);
+      configurationFields = componentMetadata?.configuration || [];
+    } else if (node.type === "TYPE_TRIGGER") {
+      const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
+      configurationFields = triggerMetadata?.configuration || [];
+    }
+
+    return {
+      nodeId: node.id!,
+      nodeName: node.name!,
+      configuration: node.configuration || {},
+      configurationFields,
+    };
+  }, [workflow, blueprints, components, triggers]);
+
+  const handleNodeConfigurationSave = useCallback((nodeId: string, updatedConfiguration: Record<string, any>) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Update the node's configuration in local cache only
+    const updatedNodes = workflow.nodes?.map((node) =>
+      node.id === nodeId
+        ? { ...node, configuration: updatedConfiguration }
+        : node
+    );
+
+    const updatedWorkflow = {
+      ...workflow,
+      nodes: updatedNodes,
+    };
+
+    // Update local cache without triggering API call
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
+  const handleSave = useCallback(async (canvasNodes: CanvasNode[]) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Map canvas nodes back to ComponentsNode format with updated positions
+    const updatedNodes = workflow.nodes?.map((node) => {
+      const canvasNode = canvasNodes.find((cn) => cn.id === node.id);
+      if (canvasNode) {
+        return {
+          ...node,
+          position: {
+            x: Math.round(canvasNode.position.x),
+            y: Math.round(canvasNode.position.y),
+          },
+        };
+      }
+      return node;
+    });
+
+    // Save previous state for rollback
+    const previousWorkflow = queryClient.getQueryData(
+      workflowKeys.detail(organizationId, workflowId)
+    );
+
+    // Optimistically update the cache to prevent flicker
+    const updatedWorkflow = {
+      ...workflow,
+      nodes: updatedNodes,
+    };
+
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+
+    try {
+      await updateWorkflowMutation.mutateAsync({
+        name: workflow.name!,
+        description: workflow.description,
+        nodes: updatedNodes,
+        edges: workflow.edges,
+      });
+
+      showSuccessToast("Workflow saved successfully");
+    } catch (error) {
+      console.error("Failed to save workflow:", error);
+      showErrorToast("Failed to save workflow");
+
+      // Rollback to previous state on error
+      if (previousWorkflow) {
+        queryClient.setQueryData(
+          workflowKeys.detail(organizationId, workflowId),
+          previousWorkflow
+        );
+      }
+    }
+  }, [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient]);
+
   // Show loading indicator while data is being fetched
-  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
-    return null;
+  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || nodeEventsLoading || nodeDataLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <p className="text-sm text-gray-500">Loading workflow...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!workflow) {
     return null;
   }
 
-  return <CanvasPage title={workflow.name!} nodes={nodes} edges={edges} getSidebarData={getSidebarData} />;
+  return (
+    <CanvasPage
+      title={workflow.name!}
+      nodes={nodes}
+      edges={edges}
+      organizationId={organizationId}
+      getSidebarData={getSidebarData}
+      getNodeEditData={getNodeEditData}
+      onNodeConfigurationSave={handleNodeConfigurationSave}
+      onSave={handleSave}
+    />
+  );
 }
 
 function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]) {
@@ -103,6 +229,9 @@ function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]
       nodeEventsQueryOptions(workflowId, node.id!, { limit: 1 })
     ),
   });
+
+  // Check if any queries are still loading
+  const isLoading = results.some((result) => result.isLoading);
 
   // Build a map of nodeId -> last event
   // Memoize to prevent unnecessary re-renders downstream
@@ -117,7 +246,7 @@ function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]
     return map;
   }, [results, triggerNodes]);
 
-  return eventsMap;
+  return { eventsMap, isLoading };
 }
 
 function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode[]) {
@@ -134,6 +263,11 @@ function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode
       nodeQueueItemsQueryOptions(workflowId, node.id!)
     ),
   });
+
+  // Check if any queries are still loading
+  const isLoading =
+    executionResults.some((result) => result.isLoading) ||
+    queueItemResults.some((result) => result.isLoading);
 
   // Build maps of nodeId -> data
   // Memoize to prevent unnecessary re-renders downstream
@@ -159,7 +293,7 @@ function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode
     return map;
   }, [queueItemResults, compositeNodes]);
 
-  return { nodeExecutionsMap, nodeQueueItemsMap };
+  return { nodeExecutionsMap, nodeQueueItemsMap, isLoading };
 }
 
 function prepareData(

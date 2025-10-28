@@ -9,7 +9,7 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { useMemo, useState, useCallback } from "react";
 import { Button } from "../../button";
-import { CanvasNode, CanvasPage } from "../index";
+import { AiProps, CanvasNode, CanvasPage } from "../index";
 import type { BlockData } from "../Block";
 import { genCommit } from "./commits";
 import { genDockerImage } from "./dockerImages";
@@ -575,6 +575,8 @@ export const SimpleDeployment: Story = {
       [nodesWithHandlers]
     );
 
+    const ai = useAi();
+
     const renderContent = () => {
       return (
         <CanvasPage
@@ -585,12 +587,15 @@ export const SimpleDeployment: Story = {
           getSidebarData={getSidebarData}
           onRun={(nodeId) => {
             console.log("Run action for node:", nodeId);
+            alert(`Running node: ${nodeId}`);
           }}
           onDuplicate={(nodeId) => {
             console.log("Duplicate action for node:", nodeId);
+            alert(`Duplicating node: ${nodeId}`);
           }}
           onDocs={(nodeId) => {
             console.log("Documentation action for node:", nodeId);
+            alert(`Opening documentation for node: ${nodeId}`);
           }}
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
@@ -600,14 +605,15 @@ export const SimpleDeployment: Story = {
           }}
           onDeactivate={(nodeId) => {
             console.log("Deactivate action for node:", nodeId);
+            alert(`Deactivating node: ${nodeId}`);
           }}
           onDelete={(nodeId) => {
             console.log("Delete action for node:", nodeId);
+            if (confirm(`Are you sure you want to delete node: ${nodeId}?`)) {
+              alert(`Deleted node: ${nodeId}`);
+            }
           }}
-          aiSidebar={{
-            showNotifications: false,
-            notificationMessage: "Found 4 improvements",
-          }}
+          ai={ai}
         />
       );
     };
@@ -644,4 +650,43 @@ function SimulatorButtons({ simulation }: { simulation: SimulationEngine }) {
       </Button>
     </div>
   );
+}
+
+function useAi(): AiProps {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({
+    "listen-code":
+      "Filter out non-release branches to avoid unintended deployments when processing push events.",
+    approve:
+      "Add the QA team to the approval step to ensure proper testing before deployment.",
+  });
+
+  const onApply = (nodeId: string) => {
+    setAiSuggestions((prev) => {
+      const newSuggestions = { ...prev };
+      delete newSuggestions[nodeId];
+      return newSuggestions;
+    });
+  };
+
+  const onDissmiss = (nodeId: string) => {
+    setAiSuggestions((prev) => {
+      const newSuggestions = { ...prev };
+      delete newSuggestions[nodeId];
+      return newSuggestions;
+    });
+  };
+
+  const suggestionCount = Object.keys(aiSuggestions).length;
+
+  return {
+    sidebarOpen: isSidebarOpen,
+    setSidebarOpen: setIsSidebarOpen,
+    showNotifications: suggestionCount > 0,
+    notificationMessage: "Found " + suggestionCount + " improvements",
+    suggestions: aiSuggestions,
+    onApply: onApply,
+    onDismiss: onDissmiss,
+  };
 }

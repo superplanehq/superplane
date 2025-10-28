@@ -9,6 +9,7 @@ import {
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ComponentsConfigurationField } from "@/api-client";
 import { AiSidebar } from "../ai";
 import type { ChildEventsInfo } from "../childEvents";
 import { ComponentSidebar } from "../componentSidebar";
@@ -17,6 +18,7 @@ import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { Header, type BreadcrumbItem } from "./Header";
+import { NodeConfigurationModal } from "./NodeConfigurationModal";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 
@@ -49,6 +51,23 @@ export interface CanvasNode extends ReactFlowNode {
 
 export interface CanvasEdge extends ReactFlowEdge { }
 
+export interface AiProps {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  showNotifications: boolean;
+  notificationMessage?: string;
+  suggestions: Record<string, string>;
+  onApply: (suggestionId: string) => void;
+  onDismiss: (suggestionId: string) => void;
+}
+
+export interface NodeEditData {
+  nodeId: string;
+  nodeName: string;
+  configuration: Record<string, any>;
+  configurationFields: ComponentsConfigurationField[];
+}
+
 export interface CanvasPageProps {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -56,11 +75,14 @@ export interface CanvasPageProps {
   startCollapsed?: boolean;
   title?: string;
   breadcrumbs?: BreadcrumbItem[];
+  organizationId?: string;
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  getNodeEditData?: (nodeId: string) => NodeEditData | null;
+  onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>) => void;
+  onSave?: (nodes: CanvasNode[]) => void;
 
-  // Sidebar action handlers
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
@@ -68,10 +90,7 @@ export interface CanvasPageProps {
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
 
-  aiSidebar?: {
-    showNotifications: boolean;
-    notificationMessage?: string;
-  };
+  ai?: AiProps;
 }
 
 const EDGE_STYLE = {
@@ -81,16 +100,35 @@ const EDGE_STYLE = {
 
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
+  const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
+
+  const handleNodeEdit = useCallback((nodeId: string) => {
+    if (props.getNodeEditData) {
+      const editData = props.getNodeEditData(nodeId);
+      if (editData) {
+        setEditingNodeData(editData);
+      }
+    }
+  }, [props]);
+
+  const handleSaveConfiguration = useCallback((configuration: Record<string, any>) => {
+    if (editingNodeData && props.onNodeConfigurationSave) {
+      props.onNodeConfigurationSave(editingNodeData.nodeId, configuration);
+    }
+    setEditingNodeData(null);
+  }, [editingNodeData, props]);
 
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative">
       <ReactFlowProvider>
-        <CanvasContent state={state} props={props} />
-      </ReactFlowProvider>
+        <CanvasContent state={state} props={props} onSave={props.onSave} onNodeEdit={handleNodeEdit} />
+      </ReactFlowProvider >
 
       <AiSidebar
-        showNotifications={state.aiSidebar.showNotifications}
-        notificationMessage={state.aiSidebar.notificationMessage}
+        isOpen={state.ai.sidebarOpen}
+        setIsOpen={state.ai.setSidebarOpen}
+        showNotifications={state.ai.showNotifications}
+        notificationMessage={state.ai.notificationMessage}
       />
 
       <Sidebar
@@ -102,7 +140,20 @@ function CanvasPage(props: CanvasPageProps) {
         onDeactivate={props.onDeactivate}
         onDelete={props.onDelete}
       />
-    </div>
+
+      {editingNodeData && (
+        <NodeConfigurationModal
+          isOpen={true}
+          onClose={() => setEditingNodeData(null)}
+          nodeName={editingNodeData.nodeName}
+          configuration={editingNodeData.configuration}
+          configurationFields={editingNodeData.configurationFields}
+          onSave={handleSaveConfiguration}
+          domainId={props.organizationId}
+          domainType="DOMAIN_TYPE_ORGANIZATION"
+        />
+      )}
+    </div >
   );
 }
 
@@ -194,7 +245,7 @@ function Sidebar({
   );
 }
 
-function CanvasContent({ state, props }: { state: CanvasPageState; props: CanvasPageProps }) {
+function CanvasContent({ state, props, onSave, onNodeEdit }: { state: CanvasPageState; props: CanvasPageProps; onSave?: (nodes: CanvasNode[]) => void; onNodeEdit: (nodeId: string) => void }) {
   const { fitView } = useReactFlow();
 
   // Use refs to avoid recreating callbacks when state changes
@@ -216,6 +267,12 @@ function CanvasContent({ state, props }: { state: CanvasPageState; props: Canvas
     stateRef.current.componentSidebar.open(nodeId);
   }, []);
 
+  const handleSave = useCallback(() => {
+    if (onSave) {
+      onSave(stateRef.current.nodes);
+    }
+  }, [onSave]);
+
   const nodeTypes = useMemo(
     () => ({
       default: (nodeProps: {
@@ -228,16 +285,33 @@ function CanvasContent({ state, props }: { state: CanvasPageState; props: Canvas
           onExpand={handleNodeExpand}
           nodeId={nodeProps.id}
           onClick={() => handleNodeClick(nodeProps.id)}
+          onEdit={onNodeEdit}
           selected={nodeProps.selected}
           onRun={props.onRun ? () => props.onRun!(nodeProps.id) : undefined}
           onDuplicate={props.onDuplicate ? () => props.onDuplicate!(nodeProps.id) : undefined}
           onDeactivate={props.onDeactivate ? () => props.onDeactivate!(nodeProps.id) : undefined}
           onToggleView={props.onToggleView ? () => props.onToggleView!(nodeProps.id) : undefined}
           onDelete={props.onDelete ? () => props.onDelete!(nodeProps.id) : undefined}
+          ai={{
+            show: state.ai.sidebarOpen,
+            suggestion: state.ai.suggestions[nodeProps.id] || null,
+            onApply: () => state.ai.onApply(nodeProps.id),
+            onDismiss: () => state.ai.onDismiss(nodeProps.id),
+          }}
         />
       ),
     }),
-    [handleNodeExpand, handleNodeClick]
+    [
+      handleNodeExpand,
+      handleNodeClick,
+      onNodeEdit,
+      state.ai,
+      props.onRun,
+      props.onDuplicate,
+      props.onDeactivate,
+      props.onToggleView,
+      props.onDelete,
+    ]
   );
 
   const edgeTypes = useMemo(() => ({}), []);
@@ -249,7 +323,7 @@ function CanvasContent({ state, props }: { state: CanvasPageState; props: Canvas
   return (
     <>
       {/* Header */}
-      <Header breadcrumbs={state.breadcrumbs} />
+      <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} />
 
       {/* Toggle button */}
       <div className="absolute top-14 left-1/2 transform -translate-x-1/2 z-10">

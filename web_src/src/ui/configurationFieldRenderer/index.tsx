@@ -1,7 +1,7 @@
 import React from 'react'
-import { Label } from '../ui/label'
-import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
-import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip'
+import { Info } from 'lucide-react'
+import { Label } from '../label'
+import { Tooltip, TooltipTrigger, TooltipContent } from '../tooltip'
 import { FieldRendererProps } from './types'
 import { StringFieldRenderer } from './StringFieldRenderer'
 import { NumberFieldRenderer } from './NumberFieldRenderer'
@@ -118,7 +118,7 @@ export const ConfigurationFieldRenderer = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <button type="button" className="text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300">
-                <MaterialSymbol name="info" />
+                <Info className="h-4 w-4" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top">

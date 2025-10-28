@@ -6,6 +6,14 @@ import {
 } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
+import { MoreVertical, PencilIcon, SparklesIcon } from "lucide-react";
+import { Button } from "../button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../dropdownMenu";
 import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
@@ -20,6 +28,13 @@ type BlockType =
   | "if"
   | "noop"
   | "switch";
+
+interface BlockAi {
+  show: boolean;
+  suggestion: string | null;
+  onApply: () => void;
+  onDismiss: () => void;
+}
 
 export interface BlockData {
   label: string;
@@ -59,17 +74,60 @@ interface BlockProps extends ComponentActionsProps {
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
+  onEdit?: (nodeId: string) => void;
+
+  ai?: BlockAi;
 }
 
 export function Block(props: BlockProps) {
   const data = props.data;
+  const ai = props.ai || {
+    show: false,
+    suggestion: null,
+    onApply: () => { },
+    onDismiss: () => { },
+  };
+
+  const handleEdit = () => {
+    if (props.onEdit && props.nodeId) {
+      props.onEdit(props.nodeId);
+    }
+  };
 
   return (
-    <div className="relative w-fit" onClick={props.onClick}>
-      <LeftHandle data={data} />
-      <BlockContent {...props} />
-      <RightHandle data={data} />
-    </div>
+    <>
+      <AiPopup {...ai} />
+
+      <div className="relative w-fit" onClick={props.onClick}>
+        <LeftHandle data={data} />
+        <BlockContent {...props} onClick={props.onClick} />
+        <RightHandle data={data} />
+
+        {/* Three-dots menu at top right */}
+        {props.onEdit && (
+          <div className="absolute top-2 right-2 z-50">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-zinc-700"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem onClick={handleEdit}>
+                  <PencilIcon size={14} className="mr-2" />
+                  Edit
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -134,6 +192,54 @@ function RightHandle({ data }: BlockProps) {
   );
 }
 
+function AiPopup({ show, suggestion, onApply, onDismiss }: BlockAi) {
+  if (!show) return null;
+  if (!suggestion) return null;
+
+  const handleApply = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onApply();
+  };
+
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDismiss();
+  };
+
+  return (
+    <div className="absolute left-0 -translate-y-[100%] text-left text-base">
+      <div className="bg-white rounded-lg shadow p-3 relative mb-2 border-blue-500 border-2">
+        <div className="flex items-center gap-1 mb-2">
+          <SparklesIcon className="inline-block text-blue-500" size={14} />
+          <div className="text-gray-800 font-bold">Improvements</div>
+        </div>
+
+        <div className="text-sm">{suggestion}</div>
+
+        <div className="flex gap-2 mt-2">
+          <Button
+            size="sm"
+            variant="default"
+            className="mt-2"
+            onClick={handleApply}
+          >
+            Apply
+          </Button>
+
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-2"
+            onClick={handleDismiss}
+          >
+            Dismiss
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 //
 // Block content is the inner area of the block.
 //
@@ -186,9 +292,13 @@ function BlockContent({
     case "noop":
       return <Noop {...(data.noop as NoopProps)} selected={selected} />;
     case "switch":
-      return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} />;
+      return (
+        <SwitchComponent
+          {...(data.switch as SwitchComponentProps)}
+          selected={selected}
+        />
+      );
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }
 }
-

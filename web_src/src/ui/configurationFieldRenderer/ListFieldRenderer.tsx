@@ -1,7 +1,7 @@
 import React from 'react'
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
+import { Plus, Trash2 } from 'lucide-react'
+import { Button } from '../button'
+import { Input } from '../input'
 import { FieldRendererProps } from './types'
 import { ConfigurationFieldRenderer } from './index'
 
@@ -67,11 +67,11 @@ export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
           </div>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             onClick={() => removeItem(index)}
             className="mt-1"
           >
-            <MaterialSymbol name="delete" className="text-red-500" />
+            <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
         </div>
       ))}
@@ -80,7 +80,7 @@ export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
         onClick={addItem}
         className="w-full mt-3"
       >
-        <MaterialSymbol name="add" />
+        <Plus className="h-4 w-4 mr-2" />
         Add Item
       </Button>
     </div>

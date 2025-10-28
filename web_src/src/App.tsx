@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./App.css";
+import { TooltipProvider } from "@/ui/tooltip";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
@@ -53,8 +54,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AccountProvider>
-        <BrowserRouter>
-          <Routes>
+        <TooltipProvider delayDuration={150}>
+          <BrowserRouter>
+            <Routes>
             {/* Organization-scoped protected routes */}
             <Route
               path=":organizationId"
@@ -88,8 +90,9 @@ function App() {
             {/* Organization selection and creation */}
             <Route path="create" element={<OrganizationCreate />} />
             <Route path="" element={<OrganizationSelect />} />
-          </Routes>
-        </BrowserRouter>
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
         <ToastContainer
           position="bottom-center"
           autoClose={5000}
