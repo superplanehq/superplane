@@ -4,12 +4,21 @@ import { sleep } from "../CanvasPage/storybooks/useSimulation";
 import { Conversations } from "./Conversations";
 import { FloatingActionButton } from "./FloatingActionButton";
 
-export function AiSidebar() {
+interface AiSidebarState {
+  showNotifications: boolean;
+  notificationMessage?: string;
+}
+
+export function AiSidebar(props: AiSidebarState) {
   const state = useAiSidebarState();
 
   return (
     <>
-      <FloatingActionButton onClick={state.openSidebar} />
+      <FloatingActionButton
+        onClick={state.openSidebar}
+        showNotification={props.showNotifications}
+        notificationMessage={props.notificationMessage}
+      />
 
       <Conversations
         isOpen={state.isOpen}

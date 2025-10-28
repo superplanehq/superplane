@@ -28,6 +28,11 @@ export interface CanvasPageState {
     open: (nodeId: string) => void;
   };
 
+  aiSidebar: {
+    showNotifications: boolean;
+    notificationMessage?: string;
+  }
+
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
 }
 
@@ -166,6 +171,9 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
     ],
     nodes,
     componentSidebar,
+    aiSidebar: props.aiSidebar || {
+      showNotifications: false,
+    },
     edges,
     setNodes,
     setEdges,
