@@ -67,7 +67,7 @@ export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
           </div>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             onClick={() => removeItem(index)}
             className="mt-1"
           >
