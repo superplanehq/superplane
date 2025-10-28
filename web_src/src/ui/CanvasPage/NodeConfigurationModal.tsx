@@ -63,22 +63,26 @@ export function NodeConfigurationModal({
               {/* Configuration section */}
               {configurationFields && configurationFields.length > 0 ? (
                 <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
-                  {configurationFields.map((field) => (
-                    <ConfigurationFieldRenderer
-                      key={field.name}
-                      field={field}
-                      value={nodeConfiguration[field.name]}
-                      onChange={(value) =>
-                        setNodeConfiguration({
-                          ...nodeConfiguration,
-                          [field.name]: value,
-                        })
-                      }
-                      allValues={nodeConfiguration}
-                      domainId={domainId}
-                      domainType={domainType}
-                    />
-                  ))}
+                  {configurationFields.map((field) => {
+                    if (!field.name) return null;
+                    const fieldName = field.name;
+                    return (
+                      <ConfigurationFieldRenderer
+                        key={fieldName}
+                        field={field}
+                        value={nodeConfiguration[fieldName]}
+                        onChange={(value) =>
+                          setNodeConfiguration({
+                            ...nodeConfiguration,
+                            [fieldName]: value,
+                          })
+                        }
+                        allValues={nodeConfiguration}
+                        domainId={domainId}
+                        domainType={domainType}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="border-t border-gray-200 dark:border-zinc-700 pt-6">
