@@ -185,27 +185,139 @@ export const MainSubWorkflow = {
 export const DeployToUS = {
   nodes: [
     {
-      id: "deploy-action",
-      position: { x: 100, y: -100 },
+      id: "drain-traffic",
+      position: { x: 0, y: 0 },
       data: {
-        label: `Deploy to US`,
+        label: `Drain Traffic`,
+        state: "success",
+        type: "composite",
+        composite: {
+          title: `Drain Traffic`,
+          description: `Reduce traffic to 0; wait to drain`,
+          iconSlug: "traffic-cone",
+          iconColor: "text-amber-600",
+          headerColor: "bg-amber-100",
+          collapsedBackground: 'bg-amber-100',
+          parameters: [
+            { icon: "globe", items: ["us.example.com", "weight: 0%"] }
+          ],
+          lastRunItem: {
+            title: `Drain complete`,
+            subtitle: "ingress/us",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 25),
+            state: "success",
+            values: { Drained: "OK", Connections: "0" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "argo-rollout",
+      position: { x: 480, y: 0 },
+      data: {
+        label: `Rollout with Argo`,
         state: "working",
         type: "composite",
         composite: {
-          title: `Deploy to US`,
-          description: `Execute deployment to US region`,
-          iconSrc: KubernetesIcon,
+          title: `Rollout with Argo`,
+          description: `Sync and roll out application`,
+          iconSlug: "git-branch",
+          iconColor: "text-blue-700",
           headerColor: "bg-blue-100",
-          iconBackground: 'bg-blue-500',
           collapsedBackground: 'bg-blue-100',
           parameters: [
-            { icon: "globe", items: ["/api/us", "200 OK"] }
+            { icon: "boxes", items: ["app: us-api", "strategy: canary"] }
           ],
           lastRunItem: {
-            title: `Deploy to US`,
-            subtitle: "default",
-            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
+            title: `Argo sync`,
+            subtitle: "rollout/us-api",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 20),
             state: "success",
+            values: { Revision: "12", Status: "Healthy" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "run-migrations",
+      position: { x: 960, y: 0 },
+      data: {
+        label: `Run Migrations`,
+        state: "success",
+        type: "composite",
+        composite: {
+          title: `Run Migrations`,
+          description: `Apply DB migrations safely`,
+          iconSlug: "database",
+          iconColor: "text-emerald-700",
+          headerColor: "bg-emerald-100",
+          collapsedBackground: 'bg-emerald-100',
+          parameters: [
+            { icon: "server-cog", items: ["job: migrate", "concurrency: 1"] }
+          ],
+          lastRunItem: {
+            title: `Migrations applied`,
+            subtitle: "db/main",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15),
+            state: "success",
+            values: { Steps: "3", Status: "OK" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "health-check",
+      position: { x: 1440, y: 0 },
+      data: {
+        label: `Health Check`,
+        state: "working",
+        type: "composite",
+        composite: {
+          title: `Health Check`,
+          description: `Probe readiness and SLOs`,
+          iconSlug: "heartbeat",
+          iconColor: "text-green-700",
+          headerColor: "bg-green-100",
+          collapsedBackground: 'bg-green-100',
+          parameters: [
+            { icon: "stethoscope", items: ["/healthz", "p95<250ms"] }
+          ],
+          lastRunItem: {
+            title: `Probes`,
+            subtitle: "readiness/liveness",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 10),
+            state: "running",
+            values: { Readiness: "OK", Latency: "210ms" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "enable-traffic",
+      position: { x: 1920, y: 0 },
+      data: {
+        label: `Enable Live Traffic`,
+        state: "pending",
+        type: "composite",
+        composite: {
+          title: `Enable Live Traffic`,
+          description: `Restore weight to 100%`,
+          iconSlug: "toggle-right",
+          iconColor: "text-purple-700",
+          headerColor: "bg-purple-100",
+          collapsedBackground: 'bg-purple-100',
+          parameters: [
+            { icon: "globe", items: ["us.example.com", "weight: 100%"] }
+          ],
+          lastRunItem: {
+            title: `Cutover pending`,
+            subtitle: "promotion",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5),
+            state: "pending",
             values: {},
           },
           collapsed: false,
@@ -213,7 +325,12 @@ export const DeployToUS = {
       },
     }
   ],
-  edges: [],
+  edges: [
+    { id: "us-e1", source: "drain-traffic", target: "argo-rollout" },
+    { id: "us-e2", source: "argo-rollout", target: "run-migrations" },
+    { id: "us-e3", source: "run-migrations", target: "health-check" },
+    { id: "us-e4", source: "health-check", target: "enable-traffic" },
+  ],
   title: "Deploy to US",
   breadcrumbs: [
     {
@@ -234,27 +351,139 @@ export const DeployToUS = {
 export const DeployToEU = {
   nodes: [
     {
-      id: "deploy-action",
-      position: { x: 100, y: -100 },
+      id: "eu-drain-traffic",
+      position: { x: 0, y: 0 },
       data: {
-        label: `Deploy to EU`,
+        label: `Drain Traffic`,
+        state: "success",
+        type: "composite",
+        composite: {
+          title: `Drain Traffic`,
+          description: `Reduce traffic to 0; wait to drain`,
+          iconSlug: "traffic-cone",
+          iconColor: "text-amber-600",
+          headerColor: "bg-amber-100",
+          collapsedBackground: 'bg-amber-100',
+          parameters: [
+            { icon: "globe", items: ["eu.example.com", "weight: 0%"] }
+          ],
+          lastRunItem: {
+            title: `Drain complete`,
+            subtitle: "ingress/eu",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 25),
+            state: "success",
+            values: { Drained: "OK", Connections: "0" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "eu-argo-rollout",
+      position: { x: 480, y: 0 },
+      data: {
+        label: `Rollout with Argo`,
         state: "working",
         type: "composite",
         composite: {
-          title: `Deploy to EU`,
-          description: `Execute deployment to EU region`,
-          iconSrc: KubernetesIcon,
+          title: `Rollout with Argo`,
+          description: `Sync and roll out application`,
+          iconSlug: "git-branch",
+          iconColor: "text-blue-700",
           headerColor: "bg-blue-100",
-          iconBackground: 'bg-blue-500',
           collapsedBackground: 'bg-blue-100',
           parameters: [
-            { icon: "globe", items: ["/api/eu", "200 OK"] }
+            { icon: "boxes", items: ["app: eu-api", "strategy: canary"] }
           ],
           lastRunItem: {
-            title: `Deploy to EU`,
-            subtitle: "default",
-            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
+            title: `Argo sync`,
+            subtitle: "rollout/eu-api",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 20),
             state: "success",
+            values: { Revision: "8", Status: "Healthy" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "eu-run-migrations",
+      position: { x: 960, y: 0 },
+      data: {
+        label: `Run Migrations`,
+        state: "success",
+        type: "composite",
+        composite: {
+          title: `Run Migrations`,
+          description: `Apply DB migrations safely`,
+          iconSlug: "database",
+          iconColor: "text-emerald-700",
+          headerColor: "bg-emerald-100",
+          collapsedBackground: 'bg-emerald-100',
+          parameters: [
+            { icon: "server-cog", items: ["job: migrate", "concurrency: 1"] }
+          ],
+          lastRunItem: {
+            title: `Migrations applied`,
+            subtitle: "db/main",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15),
+            state: "success",
+            values: { Steps: "2", Status: "OK" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "eu-health-check",
+      position: { x: 1440, y: 0 },
+      data: {
+        label: `Health Check`,
+        state: "working",
+        type: "composite",
+        composite: {
+          title: `Health Check`,
+          description: `Probe readiness and SLOs`,
+          iconSlug: "heartbeat",
+          iconColor: "text-green-700",
+          headerColor: "bg-green-100",
+          collapsedBackground: 'bg-green-100',
+          parameters: [
+            { icon: "stethoscope", items: ["/healthz", "p95<250ms"] }
+          ],
+          lastRunItem: {
+            title: `Probes`,
+            subtitle: "readiness/liveness",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 10),
+            state: "running",
+            values: { Readiness: "OK", Latency: "230ms" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "eu-enable-traffic",
+      position: { x: 1920, y: 0 },
+      data: {
+        label: `Enable Live Traffic`,
+        state: "pending",
+        type: "composite",
+        composite: {
+          title: `Enable Live Traffic`,
+          description: `Restore weight to 100%`,
+          iconSlug: "toggle-right",
+          iconColor: "text-purple-700",
+          headerColor: "bg-purple-100",
+          collapsedBackground: 'bg-purple-100',
+          parameters: [
+            { icon: "globe", items: ["eu.example.com", "weight: 100%"] }
+          ],
+          lastRunItem: {
+            title: "Cutover pending",
+            subtitle: "promotion",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5),
+            state: "pending",
             values: {},
           },
           collapsed: false,
@@ -262,7 +491,12 @@ export const DeployToEU = {
       },
     }
   ],
-  edges: [],
+  edges: [
+    { id: "eu-e1", source: "eu-drain-traffic", target: "eu-argo-rollout" },
+    { id: "eu-e2", source: "eu-argo-rollout", target: "eu-run-migrations" },
+    { id: "eu-e3", source: "eu-run-migrations", target: "eu-health-check" },
+    { id: "eu-e4", source: "eu-health-check", target: "eu-enable-traffic" },
+  ],
   title: "Deploy to EU",
   breadcrumbs: [
     {
@@ -283,27 +517,139 @@ export const DeployToEU = {
 export const DeployToAsia = {
   nodes: [
     {
-      id: "deploy-action",
-      position: { x: 100, y: -100 },
+      id: "asia-drain-traffic",
+      position: { x: 0, y: 0 },
       data: {
-        label: `Deploy to Asia`,
+        label: `Drain Traffic`,
+        state: "success",
+        type: "composite",
+        composite: {
+          title: `Drain Traffic`,
+          description: `Reduce traffic to 0; wait to drain`,
+          iconSlug: "traffic-cone",
+          iconColor: "text-amber-600",
+          headerColor: "bg-amber-100",
+          collapsedBackground: 'bg-amber-100',
+          parameters: [
+            { icon: "globe", items: ["asia.example.com", "weight: 0%"] }
+          ],
+          lastRunItem: {
+            title: `Drain complete`,
+            subtitle: "ingress/asia",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 25),
+            state: "success",
+            values: { Drained: "OK", Connections: "0" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "asia-argo-rollout",
+      position: { x: 480, y: 0 },
+      data: {
+        label: `Rollout with Argo`,
         state: "working",
         type: "composite",
         composite: {
-          title: `Deploy to Asia`,
-          description: `Execute deployment to Asia region`,
-          iconSrc: KubernetesIcon,
+          title: `Rollout with Argo`,
+          description: `Sync and roll out application`,
+          iconSlug: "git-branch",
+          iconColor: "text-blue-700",
           headerColor: "bg-blue-100",
-          iconBackground: 'bg-blue-500',
           collapsedBackground: 'bg-blue-100',
           parameters: [
-            { icon: "globe", items: ["/api/asia", "200 OK"] }
+            { icon: "boxes", items: ["app: asia-api", "strategy: canary"] }
           ],
           lastRunItem: {
-            title: `Deploy to Asia`,
-            subtitle: "default",
-            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
+            title: `Argo sync`,
+            subtitle: "rollout/asia-api",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 20),
             state: "success",
+            values: { Revision: "5", Status: "Healthy" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "asia-run-migrations",
+      position: { x: 960, y: 0 },
+      data: {
+        label: `Run Migrations`,
+        state: "success",
+        type: "composite",
+        composite: {
+          title: `Run Migrations`,
+          description: `Apply DB migrations safely`,
+          iconSlug: "database",
+          iconColor: "text-emerald-700",
+          headerColor: "bg-emerald-100",
+          collapsedBackground: 'bg-emerald-100',
+          parameters: [
+            { icon: "server-cog", items: ["job: migrate", "concurrency: 1"] }
+          ],
+          lastRunItem: {
+            title: `Migrations applied`,
+            subtitle: "db/main",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15),
+            state: "success",
+            values: { Steps: "3", Status: "OK" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "asia-health-check",
+      position: { x: 1440, y: 0 },
+      data: {
+        label: `Health Check`,
+        state: "working",
+        type: "composite",
+        composite: {
+          title: `Health Check`,
+          description: `Probe readiness and SLOs`,
+          iconSlug: "heartbeat",
+          iconColor: "text-green-700",
+          headerColor: "bg-green-100",
+          collapsedBackground: 'bg-green-100',
+          parameters: [
+            { icon: "stethoscope", items: ["/healthz", "p95<250ms"] }
+          ],
+          lastRunItem: {
+            title: `Probes`,
+            subtitle: "readiness/liveness",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 10),
+            state: "running",
+            values: { Readiness: "OK", Latency: "220ms" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "asia-enable-traffic",
+      position: { x: 1920, y: 0 },
+      data: {
+        label: `Enable Live Traffic`,
+        state: "pending",
+        type: "composite",
+        composite: {
+          title: `Enable Live Traffic`,
+          description: `Restore weight to 100%`,
+          iconSlug: "toggle-right",
+          iconColor: "text-purple-700",
+          headerColor: "bg-purple-100",
+          collapsedBackground: 'bg-purple-100',
+          parameters: [
+            { icon: "globe", items: ["asia.example.com", "weight: 100%"] }
+          ],
+          lastRunItem: {
+            title: "Cutover pending",
+            subtitle: "promotion",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5),
+            state: "pending",
             values: {},
           },
           collapsed: false,
@@ -311,7 +657,12 @@ export const DeployToAsia = {
       },
     }
   ],
-  edges: [],
+  edges: [
+    { id: "asia-e1", source: "asia-drain-traffic", target: "asia-argo-rollout" },
+    { id: "asia-e2", source: "asia-argo-rollout", target: "asia-run-migrations" },
+    { id: "asia-e3", source: "asia-run-migrations", target: "asia-health-check" },
+    { id: "asia-e4", source: "asia-health-check", target: "asia-enable-traffic" },
+  ],
   title: "Deploy to Asia",
   breadcrumbs: [
     {
