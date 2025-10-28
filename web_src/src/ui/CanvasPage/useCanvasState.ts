@@ -86,8 +86,17 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   }, []);
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    // Check for edge removals and notify parent
+    const removedEdgeIds = changes
+      .filter((change) => change.type === 'remove')
+      .map((change) => (change as any).id);
+
+    if (removedEdgeIds.length > 0 && props.onEdgeDelete) {
+      props.onEdgeDelete(removedEdgeIds);
+    }
+
     setEdges((eds) => applyEdgeChanges(changes, eds));
-  }, []);
+  }, [props]);
 
   const toggleCollapse = useCallback(() => {
     setIsCollapsed((prev) => {
