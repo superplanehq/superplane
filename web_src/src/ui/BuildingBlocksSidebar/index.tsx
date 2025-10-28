@@ -5,13 +5,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from '@/components/ui/item'
 import { resolveIcon } from '@/lib/utils'
 import { getColorClass } from '@/utils/colors'
+import type { SuperplaneComponentsOutputChannel, SuperplaneBlueprintsOutputChannel } from '@/api-client'
 
 export interface BuildingBlock {
   name: string
   label?: string
   description?: string
   type: 'trigger' | 'component' | 'blueprint'
-  outputChannels?: { name: string }[]
+  outputChannels?: Array<SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel>
   configuration?: any[]
   icon?: string
   color?: string

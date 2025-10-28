@@ -75,7 +75,6 @@ export function WorkflowPageV2() {
       label: t.label,
       description: t.description,
       type: 'trigger',
-      outputChannels: t.outputChannels,
       configuration: t.configuration,
       icon: t.icon,
       color: t.color,
@@ -92,8 +91,7 @@ export function WorkflowPageV2() {
     })),
     blueprints: blueprints.map((b): BuildingBlock => ({
       id: b.id,
-      name: b.name,
-      label: b.label,
+      name: b.name!,
       description: b.description,
       type: 'blueprint',
       outputChannels: b.outputChannels,
@@ -256,6 +254,66 @@ export function WorkflowPageV2() {
     );
   }, [workflow, organizationId, workflowId, queryClient]);
 
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Remove the node from the workflow
+    const updatedNodes = workflow.nodes?.filter((node) => node.id !== nodeId);
+
+    // Remove any edges connected to this node
+    const updatedEdges = workflow.edges?.filter(
+      (edge) => edge.sourceId !== nodeId && edge.targetId !== nodeId
+    );
+
+    const updatedWorkflow = {
+      ...workflow,
+      nodes: updatedNodes,
+      edges: updatedEdges,
+    };
+
+    // Update local cache
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
+  const handleEdgeDelete = useCallback((edgeIds: string[]) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    // Parse edge IDs to extract sourceId, targetId, and channel
+    // Edge IDs are formatted as: `${sourceId}--${targetId}--${channel}`
+    const edgesToRemove = edgeIds.map((edgeId) => {
+      const parts = edgeId.split('--');
+      return {
+        sourceId: parts[0],
+        targetId: parts[1],
+        channel: parts[2],
+      };
+    });
+
+    // Remove the edges from the workflow
+    const updatedEdges = workflow.edges?.filter((edge) => {
+      return !edgesToRemove.some(
+        (toRemove) =>
+          edge.sourceId === toRemove.sourceId &&
+          edge.targetId === toRemove.targetId &&
+          edge.channel === toRemove.channel
+      );
+    });
+
+    const updatedWorkflow = {
+      ...workflow,
+      edges: updatedEdges,
+    };
+
+    // Update local cache
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
   const handleSave = useCallback(async (canvasNodes: CanvasNode[]) => {
     if (!workflow || !organizationId || !workflowId) return;
 
@@ -340,6 +398,8 @@ export function WorkflowPageV2() {
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onSave={handleSave}
       onEdgeCreate={handleEdgeCreate}
+      onNodeDelete={handleNodeDelete}
+      onEdgeDelete={handleEdgeDelete}
       triggers={buildingBlocks.triggers}
       components={buildingBlocks.components}
       blueprints={buildingBlocks.blueprints}

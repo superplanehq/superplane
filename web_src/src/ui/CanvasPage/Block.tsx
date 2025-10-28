@@ -6,7 +6,7 @@ import {
 } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
-import { MoreVertical, PencilIcon, SparklesIcon } from "lucide-react";
+import { MoreVertical, PencilIcon, SparklesIcon, Trash2 } from "lucide-react";
 import { Button } from "../button";
 import {
   DropdownMenu,
@@ -74,6 +74,7 @@ interface BlockProps {
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
   onEdit?: (nodeId: string) => void;
+  onDelete?: (nodeId: string) => void;
 
   ai?: BlockAi;
 }
@@ -93,6 +94,12 @@ export function Block(props: BlockProps) {
     }
   };
 
+  const handleDelete = () => {
+    if (props.onDelete && props.nodeId) {
+      props.onDelete(props.nodeId);
+    }
+  };
+
   return (
     <>
       <AiPopup {...ai} />
@@ -103,7 +110,7 @@ export function Block(props: BlockProps) {
         <RightHandle data={data} />
 
         {/* Three-dots menu at top right */}
-        {props.onEdit && (
+        {(props.onEdit || props.onDelete) && (
           <div className="absolute top-2 right-2 z-50">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -117,10 +124,18 @@ export function Block(props: BlockProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenuItem onClick={handleEdit}>
-                  <PencilIcon size={14} className="mr-2" />
-                  Edit
-                </DropdownMenuItem>
+                {props.onEdit && (
+                  <DropdownMenuItem onClick={handleEdit}>
+                    <PencilIcon size={14} className="mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {props.onDelete && (
+                  <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
+                    <Trash2 size={14} className="mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

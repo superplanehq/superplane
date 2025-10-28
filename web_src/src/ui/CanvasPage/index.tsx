@@ -90,6 +90,8 @@ export interface CanvasPageProps {
   onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
+  onNodeDelete?: (nodeId: string) => void;
+  onEdgeDelete?: (edgeIds: string[]) => void;
 
   ai?: AiProps;
 
@@ -175,6 +177,7 @@ function CanvasPage(props: CanvasPageProps) {
               state={state}
               onSave={props.onSave}
               onNodeEdit={handleNodeEdit}
+              onNodeDelete={props.onNodeDelete}
               onEdgeCreate={props.onEdgeCreate}
               hideHeader={true}
             />
@@ -309,12 +312,14 @@ function CanvasContent({
   state,
   onSave,
   onNodeEdit,
+  onNodeDelete,
   onEdgeCreate,
   hideHeader
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
   onNodeEdit: (nodeId: string) => void;
+  onNodeDelete?: (nodeId: string) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   hideHeader?: boolean
 }) {
@@ -367,6 +372,7 @@ function CanvasContent({
           nodeId={nodeProps.id}
           onClick={() => handleNodeClick(nodeProps.id)}
           onEdit={onNodeEdit}
+          onDelete={onNodeDelete}
           selected={nodeProps.selected}
           ai={{
             show: state.ai.sidebarOpen,
@@ -381,6 +387,7 @@ function CanvasContent({
       handleNodeExpand,
       handleNodeClick,
       onNodeEdit,
+      onNodeDelete,
       state.ai.suggestions,
       state.ai.sidebarOpen,
       state.ai.onApply,
@@ -442,4 +449,3 @@ function CanvasContent({
 
 export { CanvasPage };
 export type { BuildingBlock } from "../BuildingBlocksSidebar";
-export type { NewNodeData, NodeEditData, CanvasNode, CanvasEdge, SidebarData, SidebarEvent };
