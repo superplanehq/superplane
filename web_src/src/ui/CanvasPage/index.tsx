@@ -71,82 +71,92 @@ function CanvasPage(props: CanvasPageProps) {
 }
 
 function Sidebar({ state }: { state: CanvasPageState }) {
+  const latestEvents = useMemo(
+    () => [
+      {
+        title: genCommit().message,
+        subtitle: "4m",
+        state: "processed" as const,
+        isOpen: false,
+        receivedAt: new Date(),
+        childEventsInfo: {
+          count: 1,
+          state: "processed" as const,
+          waitingInfos: [],
+        },
+      },
+      {
+        title: genCommit().message,
+        subtitle: "3h",
+        state: "discarded" as const,
+        isOpen: false,
+        receivedAt: new Date(Date.now() - 1000 * 60 * 30),
+        values: {
+          Author: "Pedro Forestileao",
+          Commit: "feat: update component sidebar",
+          Branch: "feature/ui-update",
+          Type: "merge",
+          "Event ID": "abc123-def456-ghi789",
+        },
+        childEventsInfo: {
+          count: 3,
+          state: "processed" as const,
+          waitingInfos: [
+            {
+              icon: "check",
+              info: "Tests passed",
+            },
+            {
+              icon: "check",
+              info: "Deploy completed",
+            },
+          ],
+        },
+      },
+    ],
+    []
+  );
+
+  const nextInQueueEvents = useMemo(
+    () => [
+      {
+        title: genCommit().message,
+        state: "waiting" as const,
+        isOpen: false,
+        receivedAt: new Date(Date.now() + 1000 * 60 * 5),
+        childEventsInfo: {
+          count: 2,
+          state: "waiting" as const,
+          waitingInfos: [
+            {
+              icon: "clock",
+              info: "Waiting for approval",
+              futureTimeDate: new Date(Date.now() + 1000 * 60 * 15),
+            },
+          ],
+        },
+      },
+      {
+        title: genCommit().message,
+        state: "waiting" as const,
+        isOpen: false,
+        receivedAt: new Date(Date.now() + 1000 * 60 * 10),
+        childEventsInfo: {
+          count: 1,
+          state: "waiting" as const,
+          waitingInfos: [],
+        },
+      },
+    ],
+    []
+  );
+
   return (
     <ComponentSidebar
       isOpen={state.componentSidebar.isOpen}
       onClose={state.componentSidebar.close}
-      latestEvents={[
-        {
-          title: genCommit().message,
-          subtitle: "4m",
-          state: "processed" as const,
-          isOpen: false,
-          receivedAt: new Date(),
-          childEventsInfo: {
-            count: 1,
-            state: "processed" as const,
-            waitingInfos: [],
-          },
-        },
-        {
-          title: genCommit().message,
-          subtitle: "3h",
-          state: "discarded" as const,
-          isOpen: false,
-          receivedAt: new Date(Date.now() - 1000 * 60 * 30),
-          values: {
-            Author: "Pedro Forestileao",
-            Commit: "feat: update component sidebar",
-            Branch: "feature/ui-update",
-            Type: "merge",
-            "Event ID": "abc123-def456-ghi789",
-          },
-          childEventsInfo: {
-            count: 3,
-            state: "processed" as const,
-            waitingInfos: [
-              {
-                icon: "check",
-                info: "Tests passed",
-              },
-              {
-                icon: "check",
-                info: "Deploy completed",
-              },
-            ],
-          },
-        },
-      ]}
-      nextInQueueEvents={[
-        {
-          title: genCommit().message,
-          state: "waiting" as const,
-          isOpen: false,
-          receivedAt: new Date(Date.now() + 1000 * 60 * 5),
-          childEventsInfo: {
-            count: 2,
-            state: "waiting" as const,
-            waitingInfos: [
-              {
-                icon: "clock",
-                info: "Waiting for approval",
-                futureTimeDate: new Date(Date.now() + 1000 * 60 * 15),
-              },
-            ],
-          },
-        },
-        {
-          title: genCommit().message,
-          state: "waiting" as const,
-          isOpen: false,
-          receivedAt: new Date(Date.now() + 1000 * 60 * 10),
-          childEventsInfo: {
-            count: 1,
-            state: "waiting" as const,
-            waitingInfos: [],
-          },
-        },
-      ]}
+      latestEvents={latestEvents}
+      nextInQueueEvents={nextInQueueEvents}
       metadata={[
         {
           icon: "book",
