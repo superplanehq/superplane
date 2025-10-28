@@ -1,5 +1,5 @@
 import React from 'react'
-import { Input } from '../ui/input'
+import { Input } from '../input'
 import { FieldRendererProps } from './types'
 
 export const NumberFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {

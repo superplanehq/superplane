@@ -1,5 +1,5 @@
 import React from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../select'
 import { useIntegrations } from '../../pages/canvas/hooks/useIntegrations'
 import { ComponentsConfigurationField } from '../../api-client'
 

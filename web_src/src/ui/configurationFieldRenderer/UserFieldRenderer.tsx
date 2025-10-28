@@ -1,26 +1,26 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useOrganizationRoles } from '../../hooks/useOrganizationData'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../select'
+import { useOrganizationUsers } from '../../hooks/useOrganizationData'
 import { ComponentsConfigurationField } from '../../api-client'
 
-interface RoleFieldRendererProps {
+interface UserFieldRendererProps {
   field: ComponentsConfigurationField
   value: string
   onChange: (value: string | undefined) => void
   domainId: string
 }
 
-export const RoleFieldRenderer = ({
+export const UserFieldRenderer = ({
   value,
   onChange,
   domainId
-}: RoleFieldRendererProps) => {
-  // Fetch roles from the organization
-  const { data: roles, isLoading, error } = useOrganizationRoles(domainId)
+}: UserFieldRendererProps) => {
+  // Fetch users from the organization
+  const { data: users, isLoading, error } = useOrganizationUsers(domainId)
 
   if (!domainId || domainId.trim() === '') {
     return (
       <div className="text-sm text-red-500 dark:text-red-400">
-        Role field requires domainId prop
+        User field requires domainId prop
       </div>
     )
   }
@@ -28,7 +28,7 @@ export const RoleFieldRenderer = ({
   if (error) {
     return (
       <div className="text-sm text-red-500 dark:text-red-400">
-        Failed to load roles: {error instanceof Error ? error.message : 'Unknown error'}
+        Failed to load users: {error instanceof Error ? error.message : 'Unknown error'}
       </div>
     )
   }
@@ -36,21 +36,21 @@ export const RoleFieldRenderer = ({
   if (isLoading) {
     return (
       <div className="text-sm text-gray-500 dark:text-zinc-400">
-        Loading roles...
+        Loading users...
       </div>
     )
   }
 
-  if (!roles || roles.length === 0) {
+  if (!users || users.length === 0) {
     return (
       <div className="space-y-2">
         <Select disabled>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="No roles available" />
+            <SelectValue placeholder="No users available" />
           </SelectTrigger>
         </Select>
         <p className="text-xs text-gray-500 dark:text-zinc-400">
-          No roles found in this organization.
+          No users found in this organization.
         </p>
       </div>
     )
@@ -62,14 +62,14 @@ export const RoleFieldRenderer = ({
       onValueChange={(val) => onChange(val || undefined)}
     >
       <SelectTrigger className="w-full">
-        <SelectValue placeholder="Select role" />
+        <SelectValue placeholder="Select user" />
       </SelectTrigger>
       <SelectContent>
-        {roles
-          .filter((role) => role.metadata?.name && role.metadata.name.trim() !== '')
-          .map((role) => (
-            <SelectItem key={role.metadata!.name} value={role.metadata!.name!}>
-              {role.spec?.displayName || role.metadata!.name}
+        {users
+          .filter((user) => user.metadata?.id && user.metadata.id.trim() !== '')
+          .map((user) => (
+            <SelectItem key={user.metadata!.id} value={user.metadata!.id!}>
+              {user.metadata?.email || user.spec?.displayName || user.metadata!.id}
             </SelectItem>
           ))}
       </SelectContent>
