@@ -143,6 +143,12 @@ export const Default: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+    onRun: () => console.log("Run action"),
+    onDuplicate: () => console.log("Duplicate action"),
+    onDeactivate: () => console.log("Deactivate action"),
+    onToggleView: () => console.log("Toggle view action"),
+    onDelete: () => console.log("Delete action"),
+    isCompactView: false,
   },
 };
 
@@ -191,6 +197,10 @@ export const WithInteractiveEvents: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+    onRun: () => console.log("Run action"),
+    onDuplicate: () => console.log("Duplicate action"),
+    onToggleView: () => console.log("Toggle view action"),
+    isCompactView: true,
   },
 };
 
@@ -247,6 +257,9 @@ export const WithDifferentIcon: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+    onRun: () => console.log("Run action"),
+    onDeactivate: () => console.log("Deactivate action"),
+    onDelete: () => console.log("Delete action"),
   },
 };
 
@@ -311,6 +324,12 @@ export const ExtendedMetadata: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+    onRun: () => console.log("Run action"),
+    onDuplicate: () => console.log("Duplicate action"),
+    onDeactivate: () => console.log("Deactivate action"),
+    onToggleView: () => console.log("Toggle view action"),
+    onDelete: () => console.log("Delete action"),
+    isCompactView: false,
   },
 };
 
@@ -339,5 +358,52 @@ export const ZeroState: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+  },
+};
+
+export const WithActionsDropdown: Story = {
+  render: (args) => {
+    const [isCompactView, setIsCompactView] = useState(false);
+
+    return (
+      <div className="relative w-[32rem] h-[40rem]">
+        <ComponentSidebar
+          {...args}
+          isOpen={true}
+          latestEvents={mockLatestEvents}
+          nextInQueueEvents={mockNextInQueueEvents}
+          onEventClick={() => console.log("Event clicked")}
+          moreInQueueCount={3}
+          onSeeFullHistory={() => console.log("See full history")}
+          isCompactView={isCompactView}
+          onToggleView={() => setIsCompactView(!isCompactView)}
+        />
+      </div>
+    );
+  },
+  args: {
+    metadata: mockMetadata,
+    title: "Component with All Actions",
+    iconSrc: GithubIcon,
+    iconBackground: "bg-green-600",
+    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
+    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
+    onClose: () => console.log("Close sidebar"),
+    onRun: () => {
+      console.log("Run action triggered");
+      alert("Run action triggered!");
+    },
+    onDuplicate: () => {
+      console.log("Duplicate action triggered");
+      alert("Duplicate action triggered!");
+    },
+    onDeactivate: () => {
+      console.log("Deactivate action triggered");
+      alert("Deactivate action triggered!");
+    },
+    onDelete: () => {
+      console.log("Delete action triggered");
+      alert("Delete action triggered!");
+    },
   },
 };
