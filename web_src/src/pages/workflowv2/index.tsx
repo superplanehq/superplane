@@ -1,22 +1,27 @@
 import { useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 
 import {
+  BlueprintsBlueprint,
+  ComponentsComponent,
   ComponentsEdge,
   ComponentsNode,
   TriggersTrigger,
   WorkflowsWorkflow,
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
+  WorkflowsWorkflowNodeQueueItem,
+  workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
 
-import { useWorkflow, useTriggers, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions } from "@/hooks/useWorkflowData";
-import { useBlueprints } from "@/hooks/useBlueprintData";
+import { useWorkflow, useTriggers, nodeEventsQueryOptions, nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, workflowKeys } from "@/hooks/useWorkflowData";
+import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getTriggerRenderer } from "./renderers";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 
 export function WorkflowPageV2() {
   const { organizationId, workflowId } = useParams<{
@@ -24,8 +29,10 @@ export function WorkflowPageV2() {
     workflowId: string;
   }>();
 
+  const queryClient = useQueryClient();
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
+  const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
 
   //
@@ -42,19 +49,30 @@ export function WorkflowPageV2() {
     [workflow?.nodes]
   );
 
+  const componentNodes = useMemo(
+    () => workflow?.nodes?.filter((node) => node.type === 'TYPE_COMPONENT') || [],
+    [workflow?.nodes]
+  );
+
+  // Fetch executions for both composite and component nodes
+  const nodesWithExecutions = useMemo(
+    () => [...compositeNodes, ...componentNodes],
+    [compositeNodes, componentNodes]
+  );
+
   const nodeEventsMap = useTriggerNodeEvents(workflowId!, triggerNodes);
-  const { nodeExecutionsMap, nodeQueueItemsMap } = useCompositeNodeData(workflowId!, compositeNodes);
+  const { nodeExecutionsMap, nodeQueueItemsMap } = useCompositeNodeData(workflowId!, nodesWithExecutions);
 
   const { nodes, edges } = useMemo(
     () => {
       if (!workflow) return { nodes: [], edges: [] };
-      return prepareData(workflow, triggers, blueprints, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareData(workflow, triggers, blueprints, components, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId!, queryClient);
     },
-    [workflow, triggers, blueprints, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap]
+    [workflow, triggers, blueprints, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient]
   );
 
   // Show loading indicator while data is being fetched
-  if (workflowLoading || triggersLoading || blueprintsLoading) {
+  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
     return null;
   }
 
@@ -133,16 +151,31 @@ function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode
 function prepareData(
   data: WorkflowsWorkflow,
   triggers: TriggersTrigger[],
-  blueprints: any[],
+  blueprints: BlueprintsBlueprint[],
+  components: ComponentsComponent[],
   nodeEventsMap: Record<string, any>,
-  nodeExecutionsMap: Record<string, any>,
-  nodeQueueItemsMap: Record<string, any>
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem>,
+  workflowId: string,
+  queryClient: any
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 } {
-  const nodes = data?.nodes!.map((node) => prepareNode(node, triggers, blueprints, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap));
   const edges = data?.edges!.map(prepareEdge);
+  const nodes = data?.nodes!.map((node) => {
+    return prepareNode(
+      node,
+      triggers,
+      blueprints,
+      components,
+      nodeEventsMap,
+      nodeExecutionsMap,
+      nodeQueueItemsMap,
+      workflowId,
+      queryClient
+    )
+  });
 
   return { nodes, edges };
 }
@@ -257,10 +290,13 @@ function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunStat
 function prepareNode(
   node: ComponentsNode,
   triggers: TriggersTrigger[],
-  blueprints: any[],
+  blueprints: BlueprintsBlueprint[],
+  components: ComponentsComponent[],
   nodeEventsMap: Record<string, any>,
   nodeExecutionsMap: Record<string, any>,
-  nodeQueueItemsMap: Record<string, any>
+  nodeQueueItemsMap: Record<string, any>,
+  workflowId: string,
+  queryClient: any
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -268,8 +304,155 @@ function prepareNode(
     case "TYPE_BLUEPRINT":
       return prepareCompositeNode(node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
     default:
-      return prepareCompositeNode(node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareComponentNode(node, components, nodeExecutionsMap, workflowId, queryClient);
   }
+}
+
+function prepareComponentNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, any>,
+  workflowId: string,
+  queryClient: any
+): CanvasNode {
+  switch (node.component?.name) {
+    case "approval":
+      return prepareApprovalNode(node, components, nodeExecutionsMap, workflowId, queryClient);
+  }
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x!, y: node.position?.y! },
+    data: {
+      type: "no-op",
+      label: node.name!,
+      state: "pending" as const,
+    },
+  };
+}
+
+function prepareApprovalNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  workflowId: string,
+  queryClient: any
+): CanvasNode {
+  const metadata = components.find((c) => c.name === "approval");
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+  const executionMetadata = execution?.metadata as any;
+
+  // Map backend records to approval items
+  const approvals = (executionMetadata?.records || []).map((record: any) => {
+    const isPending = record.state === 'pending';
+    const isExecutionActive = execution?.state === 'STATE_STARTED';
+
+    const approvalComment = record.approval?.comment;
+    const hasApprovalArtifacts = record.state === 'approved' && approvalComment;
+
+    return {
+      id: `${record.index}`,
+      title: record.type === 'user' && record.user ? record.user.name || record.user.email :
+             record.type === 'role' && record.role ? record.role :
+             record.type === 'group' && record.group ? record.group : 'Unknown',
+      approved: record.state === 'approved',
+      rejected: record.state === 'rejected',
+      approverName: record.user?.name,
+      approverAvatar: record.user?.avatarUrl,
+      rejectionComment: record.rejection?.reason,
+      interactive: isPending && isExecutionActive,
+      requireArtifacts: isPending && isExecutionActive ? [
+        {
+          label: "comment",
+          optional: true,
+        }
+      ] : undefined,
+      artifacts: hasApprovalArtifacts ? {
+        "Comment": approvalComment,
+      } : undefined,
+      artifactCount: hasApprovalArtifacts ? 1 : undefined,
+      onApprove: async (artifacts?: Record<string, string>) => {
+        if (!execution?.id) return;
+
+        try {
+          await workflowsInvokeNodeExecutionAction(
+            withOrganizationHeader({
+              path: {
+                workflowId: workflowId,
+                executionId: execution.id,
+                actionName: 'approve',
+              },
+              body: {
+                parameters: {
+                  index: record.index,
+                  comment: artifacts?.comment,
+                },
+              },
+            })
+          );
+
+          queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(workflowId, node.id!) });
+        } catch (error: any) {
+          console.error('Failed to approve:', error);
+        }
+      },
+      onReject: async (comment?: string) => {
+        if (!execution?.id) return;
+
+        try {
+          await workflowsInvokeNodeExecutionAction(
+            withOrganizationHeader({
+              path: {
+                workflowId: workflowId,
+                executionId: execution.id,
+                actionName: 'reject',
+              },
+              body: {
+                parameters: {
+                  index: record.index,
+                  reason: comment,
+                },
+              },
+            })
+          );
+
+          queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(workflowId, node.id!) });
+        } catch (error: any) {
+          console.error('Failed to reject:', error);
+        }
+      },
+    };
+  });
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x!, y: node.position?.y! },
+    data: {
+      type: "approval",
+      label: node.name!,
+      state: "pending" as const,
+      approval: {
+        iconSlug: metadata?.icon || "hand",
+        iconColor: getColorClass(metadata?.color || "orange"),
+        iconBackground: getBackgroundColorClass(metadata?.color || "orange"),
+        headerColor: getBackgroundColorClass(metadata?.color || "orange"),
+        collapsedBackground: getBackgroundColorClass(metadata?.color || "orange"),
+        title: node.name!,
+        description: metadata?.description,
+        receivedAt: execution ? new Date(execution.createdAt!) : undefined,
+        approvals,
+
+        //
+        // TODO: this also comes from the input event
+        //
+        awaitingEvent: execution?.state === 'STATE_STARTED' ? {
+          title: "",
+          subtitle: "",
+        } : undefined,
+      }
+    },
+  };
 }
 
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {

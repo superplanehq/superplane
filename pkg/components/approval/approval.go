@@ -229,11 +229,11 @@ func (a *Approval) Description() string {
 }
 
 func (a *Approval) Icon() string {
-	return "check"
+	return "hand"
 }
 
 func (a *Approval) Color() string {
-	return "green"
+	return "orange"
 }
 
 func (a *Approval) OutputChannels(configuration any) []components.OutputChannel {

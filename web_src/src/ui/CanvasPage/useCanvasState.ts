@@ -1,7 +1,7 @@
 import type { Edge, EdgeChange, Node, NodeChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { CanvasPageProps, OnApproveFn, OnRejectFn } from ".";
+import { CanvasPageProps } from ".";
 import { BreadcrumbItem } from "../../components/Breadcrumbs";
 
 export interface CanvasPageState {
@@ -28,8 +28,6 @@ export interface CanvasPageState {
   };
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
-  onApprove?: OnApproveFn;
-  onReject?: OnRejectFn;
 }
 
 export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
@@ -159,25 +157,23 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
 
   const componentSidebar = useComponentSidebarState();
 
-  return { 
-    title: props.title || "Untitled Workflow", 
+  return {
+    title: props.title || "Untitled Workflow",
     breadcrumbs: props.breadcrumbs || [
       { label: "Workflows" },
       { label: props.title || "Untitled Workflow" },
     ],
-    nodes, 
+    nodes,
     componentSidebar,
-    edges, 
-    setNodes, 
-    setEdges, 
-    onNodesChange, 
-    onEdgesChange, 
+    edges,
+    setNodes,
+    setEdges,
+    onNodesChange,
+    onEdgesChange,
     onNodeExpand: props.onNodeExpand,
-    isCollapsed, 
-    toggleCollapse, 
+    isCollapsed,
+    toggleCollapse,
     toggleNodeCollapse,
-    onApprove: props.onApprove,
-    onReject: props.onReject,
   };
 }
 

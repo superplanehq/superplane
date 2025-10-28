@@ -25,18 +25,6 @@ export interface CanvasNode extends ReactFlowNode {
 
 export interface CanvasEdge extends ReactFlowEdge {}
 
-export type OnApproveFn = (
-  nodeId: string,
-  approveId: string,
-  artifact?: Record<string, string>
-) => void;
-
-export type OnRejectFn = (
-  nodeId: string,
-  rejectId: string,
-  comment?: string
-) => void;
-
 export interface CanvasPageProps {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -46,8 +34,6 @@ export interface CanvasPageProps {
   breadcrumbs?: BreadcrumbItem[];
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
-  onApprove?: OnApproveFn;
-  onReject?: OnRejectFn;
 }
 
 const EDGE_STYLE = {
@@ -193,8 +179,6 @@ function CanvasContent({ state }: { state: CanvasPageState }) {
         <Block
           data={nodeProps.data as BlockData}
           onExpand={handleNodeExpand}
-          onApprove={state.onApprove}
-          onReject={state.onReject}
           nodeId={nodeProps.id}
           onClick={state.componentSidebar.open}
         />

@@ -6,7 +6,6 @@ import {
 } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
-import { OnApproveFn, OnRejectFn } from ".";
 import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
@@ -57,8 +56,6 @@ interface BlockProps {
   nodeId?: string;
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
-  onApprove?: OnApproveFn;
-  onReject?: OnRejectFn;
   onClick?: () => void;
 }
 
@@ -142,8 +139,6 @@ function RightHandle({ data }: BlockProps) {
 function BlockContent({
   data,
   onExpand,
-  onApprove,
-  onReject,
   nodeId,
 }: BlockProps) {
   const handleExpand = () => {
@@ -163,11 +158,7 @@ function BlockContent({
         />
       );
     case "approval":
-      return (
-        <Approval
-          {...prepApprovalData({ data, nodeId, onApprove, onReject })}
-        />
-      );
+      return <Approval {...(data.approval as ApprovalProps)} />;
     case "filter":
       return <Filter {...(data.filter as FilterProps)} />;
     case "if":
@@ -181,36 +172,3 @@ function BlockContent({
   }
 }
 
-function prepApprovalData({
-  data,
-  nodeId,
-  onApprove,
-  onReject,
-}: BlockProps): ApprovalProps {
-  const createApproveFn = (approveId: string) => {
-    return (artifact?: Record<string, string>) => {
-      if (onApprove && nodeId) {
-        onApprove(nodeId, approveId, artifact);
-      }
-    };
-  };
-
-  const createRejectFn = (rejectId: string) => {
-    return (comment?: string) => {
-      if (onReject && nodeId) {
-        onReject(nodeId, rejectId, comment);
-      }
-    };
-  };
-
-  const approvals = data.approval?.approvals || [];
-
-  return {
-    ...data.approval!,
-    approvals: approvals.map((a) => ({
-      ...a,
-      onApprove: createApproveFn(a.id),
-      onReject: createRejectFn(a.id),
-    })),
-  };
-}
