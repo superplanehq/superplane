@@ -32,7 +32,7 @@ import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } f
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 import { filterVisibleConfiguration } from '../../utils/components'
 import { WorkflowNodeSidebar } from '../../components/WorkflowNodeSidebar'
-import { ConfigurationFieldRenderer } from '../../components/ConfigurationFieldRenderer'
+import { ConfigurationFieldRenderer } from '@/ui/configurationFieldRenderer'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../../components/ui/resizable'
 import { EmitEventModal } from './components/EmitEventModal'

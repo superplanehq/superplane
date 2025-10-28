@@ -1,6 +1,6 @@
 import React from 'react'
 import { FieldRendererProps } from './types'
-import { MultiCombobox, MultiComboboxLabel } from '../MultiCombobox/multi-combobox'
+import { MultiCombobox, MultiComboboxLabel } from '@/components/MultiCombobox/multi-combobox'
 
 interface SelectOption {
   id: string

@@ -1,4 +1,4 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../select'
 import { useOrganizationGroups } from '../../hooks/useOrganizationData'
 import { ComponentsConfigurationField } from '../../api-client'
 
