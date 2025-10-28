@@ -304,14 +304,16 @@ function prepareNode(
     case "TYPE_BLUEPRINT":
       return prepareCompositeNode(node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
     default:
-      return prepareComponentNode(node, components, nodeExecutionsMap, workflowId, queryClient);
+      return prepareComponentNode(node, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient);
   }
 }
 
 function prepareComponentNode(
   node: ComponentsNode,
+  blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, any>,
+  nodeQueueItemsMap: Record<string, any>,
   workflowId: string,
   queryClient: any
 ): CanvasNode {
@@ -320,15 +322,10 @@ function prepareComponentNode(
       return prepareApprovalNode(node, components, nodeExecutionsMap, workflowId, queryClient);
   }
 
-  return {
-    id: node.id!,
-    position: { x: node.position?.x!, y: node.position?.y! },
-    data: {
-      type: "no-op",
-      label: node.name!,
-      state: "pending" as const,
-    },
-  };
+  //
+  // TODO: render other component-type nodes as composites for now
+  //
+  return prepareCompositeNode(node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
 }
 
 function prepareApprovalNode(
