@@ -119,7 +119,12 @@ func (w *WorkflowNodeQueueWorker) createNodeExecution(tx *gorm.DB, node *models.
 		return err
 	}
 
-	return queueItem.Delete(tx)
+	err = queueItem.Delete(tx)
+	if err != nil {
+		return err
+	}
+
+	return node.UpdateState(tx, models.WorkflowNodeStateProcessing)
 }
 
 func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
