@@ -1,6 +1,7 @@
 import { useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/utils/toast";
 
 import {
@@ -63,8 +64,8 @@ export function WorkflowPageV2() {
     [compositeNodes, componentNodes]
   );
 
-  const nodeEventsMap = useTriggerNodeEvents(workflowId!, triggerNodes);
-  const { nodeExecutionsMap, nodeQueueItemsMap } = useCompositeNodeData(workflowId!, nodesWithExecutions);
+  const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(workflowId!, triggerNodes);
+  const { nodeExecutionsMap, nodeQueueItemsMap, isLoading: nodeDataLoading } = useCompositeNodeData(workflowId!, nodesWithExecutions);
 
   const { nodes, edges } = useMemo(
     () => {
@@ -193,8 +194,15 @@ export function WorkflowPageV2() {
   }, [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient]);
 
   // Show loading indicator while data is being fetched
-  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading) {
-    return null;
+  if (workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || nodeEventsLoading || nodeDataLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <p className="text-sm text-gray-500">Loading workflow...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!workflow) {
@@ -222,6 +230,9 @@ function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]
     ),
   });
 
+  // Check if any queries are still loading
+  const isLoading = results.some((result) => result.isLoading);
+
   // Build a map of nodeId -> last event
   // Memoize to prevent unnecessary re-renders downstream
   const eventsMap = useMemo(() => {
@@ -235,7 +246,7 @@ function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]
     return map;
   }, [results, triggerNodes]);
 
-  return eventsMap;
+  return { eventsMap, isLoading };
 }
 
 function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode[]) {
@@ -252,6 +263,11 @@ function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode
       nodeQueueItemsQueryOptions(workflowId, node.id!)
     ),
   });
+
+  // Check if any queries are still loading
+  const isLoading =
+    executionResults.some((result) => result.isLoading) ||
+    queueItemResults.some((result) => result.isLoading);
 
   // Build maps of nodeId -> data
   // Memoize to prevent unnecessary re-renders downstream
@@ -277,7 +293,7 @@ function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode
     return map;
   }, [queueItemResults, compositeNodes]);
 
-  return { nodeExecutionsMap, nodeQueueItemsMap };
+  return { nodeExecutionsMap, nodeQueueItemsMap, isLoading };
 }
 
 function prepareData(
