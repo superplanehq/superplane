@@ -658,7 +658,7 @@ function prepareSidebarData(
       state,
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      values: execution.input as Record<string, string> || {},
+      values: {},
       childEventsInfo: {
         count: 0,
         waitingInfos: []
