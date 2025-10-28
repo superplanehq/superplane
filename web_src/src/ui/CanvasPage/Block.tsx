@@ -6,6 +6,8 @@ import {
 } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
+import { SparklesIcon } from "lucide-react";
+import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
@@ -65,6 +67,7 @@ export function Block(props: BlockProps) {
 
   return (
     <div className="relative w-fit" onClick={props.onClick}>
+      <AiPopup />
       <LeftHandle data={data} />
       <BlockContent {...props} />
       <RightHandle data={data} />
@@ -133,6 +136,34 @@ function RightHandle({ data }: BlockProps) {
   );
 }
 
+function AiPopup() {
+  return (
+    <div className="absolute left-0 -translate-y-[100%] text-left text-base">
+      <div className="bg-white rounded-lg shadow p-3 relative mb-2 border-blue-500 border-2">
+        <div className="flex items-center gap-1 mb-2">
+          <SparklesIcon className="inline-block text-blue-500" size={14} />
+          <div className="text-gray-800 font-bold">AI Suggestions</div>
+        </div>
+
+        <div className="text-sm text-gray-600">
+          Filter out non-release branches to avoid unintended deployments when
+          processing push events.
+        </div>
+
+        <div className="flex gap-2 mt-2">
+          <Button size="sm" variant="default" className="mt-2">
+            Apply Suggestion
+          </Button>
+
+          <Button size="sm" variant="secondary" className="mt-2">
+            Dismiss
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 //
 // Block content is the inner area of the block.
 //
@@ -151,7 +182,9 @@ function BlockContent({
 
   switch (data.type) {
     case "trigger":
-      return <Trigger {...(data.trigger as TriggerProps)} selected={selected} />;
+      return (
+        <Trigger {...(data.trigger as TriggerProps)} selected={selected} />
+      );
     case "composite":
       return (
         <Composite
@@ -161,7 +194,9 @@ function BlockContent({
         />
       );
     case "approval":
-      return <Approval {...(data.approval as ApprovalProps)} selected={selected} />;
+      return (
+        <Approval {...(data.approval as ApprovalProps)} selected={selected} />
+      );
     case "filter":
       return <Filter {...(data.filter as FilterProps)} selected={selected} />;
     case "if":
@@ -169,9 +204,13 @@ function BlockContent({
     case "noop":
       return <Noop {...(data.noop as NoopProps)} selected={selected} />;
     case "switch":
-      return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} />;
+      return (
+        <SwitchComponent
+          {...(data.switch as SwitchComponentProps)}
+          selected={selected}
+        />
+      );
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }
 }
-
