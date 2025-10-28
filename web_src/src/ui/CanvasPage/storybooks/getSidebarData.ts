@@ -95,7 +95,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
 
       const conversionStateMap: Record<string, string> = {
         success: "processed",
-        failed: "discarded",
+        fail: "discarded",
         running: "running",
       };
 
