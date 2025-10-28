@@ -185,27 +185,139 @@ export const MainSubWorkflow = {
 export const DeployToUS = {
   nodes: [
     {
-      id: "deploy-action",
-      position: { x: 100, y: -100 },
+      id: "drain-traffic",
+      position: { x: 0, y: 0 },
       data: {
-        label: `Deploy to US`,
+        label: `Drain Traffic`,
+        state: "success",
+        type: "composite",
+        composite: {
+          title: `Drain Traffic`,
+          description: `Reduce traffic to 0; wait to drain`,
+          iconSlug: "traffic-cone",
+          iconColor: "text-amber-600",
+          headerColor: "bg-amber-100",
+          collapsedBackground: 'bg-amber-100',
+          parameters: [
+            { icon: "globe", items: ["us.example.com", "weight: 0%"] }
+          ],
+          lastRunItem: {
+            title: `Drain complete`,
+            subtitle: "ingress/us",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 25),
+            state: "success",
+            values: { Drained: "OK", Connections: "0" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "argo-rollout",
+      position: { x: 480, y: 0 },
+      data: {
+        label: `Rollout with Argo`,
         state: "working",
         type: "composite",
         composite: {
-          title: `Deploy to US`,
-          description: `Execute deployment to US region`,
-          iconSrc: KubernetesIcon,
+          title: `Rollout with Argo`,
+          description: `Sync and roll out application`,
+          iconSlug: "git-branch",
+          iconColor: "text-blue-700",
           headerColor: "bg-blue-100",
-          iconBackground: 'bg-blue-500',
           collapsedBackground: 'bg-blue-100',
           parameters: [
-            { icon: "globe", items: ["/api/us", "200 OK"] }
+            { icon: "boxes", items: ["app: us-api", "strategy: canary"] }
           ],
           lastRunItem: {
-            title: `Deploy to US`,
-            subtitle: "default",
-            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 30),
+            title: `Argo sync`,
+            subtitle: "rollout/us-api",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 20),
             state: "success",
+            values: { Revision: "12", Status: "Healthy" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "run-migrations",
+      position: { x: 960, y: 0 },
+      data: {
+        label: `Run Migrations`,
+        state: "success",
+        type: "composite",
+        composite: {
+          title: `Run Migrations`,
+          description: `Apply DB migrations safely`,
+          iconSlug: "database",
+          iconColor: "text-emerald-700",
+          headerColor: "bg-emerald-100",
+          collapsedBackground: 'bg-emerald-100',
+          parameters: [
+            { icon: "server-cog", items: ["job: migrate", "concurrency: 1"] }
+          ],
+          lastRunItem: {
+            title: `Migrations applied`,
+            subtitle: "db/main",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 15),
+            state: "success",
+            values: { Steps: "3", Status: "OK" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "health-check",
+      position: { x: 1440, y: 0 },
+      data: {
+        label: `Health Check`,
+        state: "working",
+        type: "composite",
+        composite: {
+          title: `Health Check`,
+          description: `Probe readiness and SLOs`,
+          iconSlug: "heartbeat",
+          iconColor: "text-green-700",
+          headerColor: "bg-green-100",
+          collapsedBackground: 'bg-green-100',
+          parameters: [
+            { icon: "stethoscope", items: ["/healthz", "p95<250ms"] }
+          ],
+          lastRunItem: {
+            title: `Probes`,
+            subtitle: "readiness/liveness",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 10),
+            state: "running",
+            values: { Readiness: "OK", Latency: "210ms" },
+          },
+          collapsed: false,
+        },
+      },
+    },
+    {
+      id: "enable-traffic",
+      position: { x: 1920, y: 0 },
+      data: {
+        label: `Enable Live Traffic`,
+        state: "pending",
+        type: "composite",
+        composite: {
+          title: `Enable Live Traffic`,
+          description: `Restore weight to 100%`,
+          iconSlug: "toggle-right",
+          iconColor: "text-purple-700",
+          headerColor: "bg-purple-100",
+          collapsedBackground: 'bg-purple-100',
+          parameters: [
+            { icon: "globe", items: ["us.example.com", "weight: 100%"] }
+          ],
+          lastRunItem: {
+            title: `Cutover pending`,
+            subtitle: "promotion",
+            receivedAt: new Date(new Date().getTime() - 1000 * 60 * 5),
+            state: "pending",
             values: {},
           },
           collapsed: false,
@@ -213,7 +325,12 @@ export const DeployToUS = {
       },
     }
   ],
-  edges: [],
+  edges: [
+    { id: "us-e1", source: "drain-traffic", target: "argo-rollout" },
+    { id: "us-e2", source: "argo-rollout", target: "run-migrations" },
+    { id: "us-e3", source: "run-migrations", target: "health-check" },
+    { id: "us-e4", source: "health-check", target: "enable-traffic" },
+  ],
   title: "Deploy to US",
   breadcrumbs: [
     {
