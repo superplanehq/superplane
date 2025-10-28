@@ -4,7 +4,8 @@ import "./canvas-reset.css";
 import { MainSubWorkflow, SubWorkflowsMap } from "./storybooks/subworkflows";
 
 import { useEffect, useMemo, useState } from "react";
-import { CanvasPage } from "./index";
+import { CanvasPage, type CanvasNode } from "./index";
+import type { BlockData } from "./Block";
 import { createGetSidebarData } from "./storybooks/getSidebarData";
 import {
   getStorybookData,
@@ -30,6 +31,7 @@ export const BlueprintExecutionPage: Story = {
   render: (args) => {
     // Get data passed from SimpleDeployment story (Storybook only)
     const [executionData, setExecutionData] = useState<any>(null);
+    const [nodes, setNodes] = useState<CanvasNode[]>([]);
 
     useEffect(() => {
       const data = getStorybookData();
@@ -57,20 +59,96 @@ export const BlueprintExecutionPage: Story = {
       ? subworkflowData?.nodes
       : args.nodes;
 
+    // Initialize local nodes state when dynamicNodes changes
+    useEffect(() => {
+      if (dynamicNodes) {
+        console.log('Setting initial nodes:', dynamicNodes.length);
+        setNodes(dynamicNodes);
+      }
+    }, [dynamicNodes]);
+
     const getSidebarData = useMemo(
-      () => createGetSidebarData(dynamicNodes ?? []),
-      [dynamicNodes]
+      () => createGetSidebarData(nodes ?? []),
+      [nodes]
     );
+
+    const toggleNodeCollapse = (nodeId: string) => {
+      console.log('toggleNodeCollapse called for nodeId:', nodeId);
+      setNodes(prevNodes => {
+        console.log('Current nodes:', prevNodes.length);
+        const newNodes = prevNodes.map(node => {
+          if (node.id !== nodeId) return node;
+
+          console.log('Found node to toggle:', nodeId, node.data);
+          const nodeData = { ...node.data } as unknown as BlockData;
+
+          // Toggle collapse state based on node type
+          if (nodeData.type === "composite" && nodeData.composite) {
+            console.log('Toggling composite from', nodeData.composite.collapsed, 'to', !nodeData.composite.collapsed);
+            nodeData.composite = {
+              ...nodeData.composite,
+              collapsed: !nodeData.composite.collapsed,
+            };
+          }
+
+          if (nodeData.type === "approval" && nodeData.approval) {
+            console.log('Toggling approval from', nodeData.approval.collapsed, 'to', !nodeData.approval.collapsed);
+            nodeData.approval = {
+              ...nodeData.approval,
+              collapsed: !nodeData.approval.collapsed,
+            };
+          }
+
+          if (nodeData.type === "trigger" && nodeData.trigger) {
+            console.log('Toggling trigger from', nodeData.trigger.collapsed, 'to', !nodeData.trigger.collapsed);
+            nodeData.trigger = {
+              ...nodeData.trigger,
+              collapsed: !nodeData.trigger.collapsed,
+            };
+          }
+
+          const updatedNode: CanvasNode = { ...node, data: nodeData as unknown as Record<string, unknown> };
+          console.log('Updated node:', updatedNode);
+          return updatedNode;
+        });
+        console.log('Returning new nodes:', newNodes.length);
+        return newNodes;
+      });
+    };
 
     return (
       <div className="h-[100vh] w-full ">
         <CanvasPage
           {...args}
-          nodes={dynamicNodes}
+          nodes={nodes}
           edges={dynamicEdges}
           title={dynamicTitle}
           breadcrumbs={dynamicBreadcrumbs}
           getSidebarData={getSidebarData}
+          onRun={(nodeId) => {
+            console.log("Run action for node:", nodeId);
+          }}
+          onDuplicate={(nodeId) => {
+            console.log("Duplicate action for node:", nodeId);
+          }}
+          onDocs={(nodeId) => {
+            console.log("Documentation action for node:", nodeId);
+          }}
+          onEdit={(nodeId) => {
+            console.log("Edit action for node:", nodeId);
+          }}
+          onToggleView={(nodeId) => {
+            console.log("Toggle view action for node:", nodeId);
+            console.log("Current nodes before toggle:", nodes.length);
+            console.log("Node data before toggle:", nodes.find(n => n.id === nodeId)?.data);
+            toggleNodeCollapse(nodeId);
+          }}
+          onDeactivate={(nodeId) => {
+            console.log("Deactivate action for node:", nodeId);
+          }}
+          onDelete={(nodeId) => {
+            console.log("Delete action for node:", nodeId);
+          }}
         />
         {/* Debug info for Storybook (only visible in development) */}
         {isInStorybook() && executionData && (

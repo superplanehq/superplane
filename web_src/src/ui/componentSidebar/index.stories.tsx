@@ -143,6 +143,13 @@ export const Default: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+    onRun: () => console.log("Run action"),
+    onDuplicate: () => console.log("Duplicate action"),
+    onDocs: () => console.log("Documentation action"),
+    onEdit: () => console.log("Edit action"),
+    onToggleView: () => console.log("Toggle view action"),
+    onDeactivate: () => console.log("Deactivate action"),
+    onDelete: () => console.log("Delete action"),
   },
 };
 
@@ -191,6 +198,10 @@ export const WithInteractiveEvents: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+    onRun: () => console.log("Run action"),
+    onDuplicate: () => console.log("Duplicate action"),
+    onDocs: () => console.log("Documentation action"),
+    onToggleView: () => console.log("Toggle view action"),
   },
 };
 
@@ -247,6 +258,9 @@ export const WithDifferentIcon: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+    onRun: () => console.log("Run action"),
+    onDeactivate: () => console.log("Deactivate action"),
+    onDelete: () => console.log("Delete action"),
   },
 };
 
@@ -311,6 +325,13 @@ export const ExtendedMetadata: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+    onRun: () => console.log("Run action"),
+    onDuplicate: () => console.log("Duplicate action"),
+    onDocs: () => console.log("Documentation action"),
+    onEdit: () => console.log("Edit action"),
+    onToggleView: () => console.log("Toggle view action"),
+    onDeactivate: () => console.log("Deactivate action"),
+    onDelete: () => console.log("Delete action"),
   },
 };
 
@@ -339,5 +360,53 @@ export const ZeroState: Story = {
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
+  },
+};
+
+export const WithActionsDropdown: Story = {
+  render: (args) => {
+    return (
+      <div className="relative w-[32rem] h-[40rem]">
+        <ComponentSidebar
+          {...args}
+          isOpen={true}
+          latestEvents={mockLatestEvents}
+          nextInQueueEvents={mockNextInQueueEvents}
+          onEventClick={() => console.log("Event clicked")}
+          moreInQueueCount={3}
+          onSeeFullHistory={() => console.log("See full history")}
+        />
+      </div>
+    );
+  },
+  args: {
+    metadata: mockMetadata,
+    title: "Component with All Actions",
+    iconSrc: GithubIcon,
+    iconBackground: "bg-green-600",
+    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
+    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
+    onClose: () => console.log("Close sidebar"),
+    onRun: () => {
+      console.log("Run action triggered");
+    },
+    onDuplicate: () => {
+      console.log("Duplicate action triggered");
+    },
+    onDocs: () => {
+      console.log("Documentation action triggered");
+    },
+    onEdit: () => {
+      console.log("Edit action triggered");
+    },
+    onToggleView: () => {
+      console.log("Toggle view action triggered");
+    },
+    onDeactivate: () => {
+      console.log("Deactivate action triggered");
+    },
+    onDelete: () => {
+      console.log("Delete action triggered");
+    },
   },
 };

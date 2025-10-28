@@ -50,7 +50,7 @@ export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
 }
 
-export interface CanvasEdge extends ReactFlowEdge {}
+export interface CanvasEdge extends ReactFlowEdge { }
 
 export interface AiProps {
   sidebarOpen: boolean;
@@ -93,6 +93,14 @@ export interface CanvasPageProps {
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
 
+  onRun?: (nodeId: string) => void;
+  onDuplicate?: (nodeId: string) => void;
+  onDocs?: (nodeId: string) => void;
+  onEdit?: (nodeId: string) => void;
+  onDeactivate?: (nodeId: string) => void;
+  onToggleView?: (nodeId: string) => void;
+  onDelete?: (nodeId: string) => void;
+
   ai?: AiProps;
 
   // Building blocks for adding new nodes
@@ -114,11 +122,24 @@ function CanvasPage(props: CanvasPageProps) {
   const [isBuildingBlocksSidebarOpen, setIsBuildingBlocksSidebarOpen] = useState(true);
 
   const handleNodeEdit = useCallback((nodeId: string) => {
+    // Try the modal-based edit first (for node configuration)
     if (props.getNodeEditData) {
       const editData = props.getNodeEditData(nodeId);
       if (editData) {
         setEditingNodeData(editData);
+        return;
       }
+    }
+
+    // Fall back to the simple onEdit callback
+    if (props.onEdit) {
+      props.onEdit(nodeId);
+    }
+  }, [props]);
+
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    if (props.onNodeDelete) {
+      props.onNodeDelete(nodeId);
     }
   }, [props]);
 
@@ -177,9 +198,13 @@ function CanvasPage(props: CanvasPageProps) {
               state={state}
               onSave={props.onSave}
               onNodeEdit={handleNodeEdit}
-              onNodeDelete={props.onNodeDelete}
+              onNodeDelete={handleNodeDelete}
               onEdgeCreate={props.onEdgeCreate}
               hideHeader={true}
+              onToggleView={props.onToggleView}
+              onRun={props.onRun}
+              onDuplicate={props.onDuplicate}
+              onDeactivate={props.onDeactivate}
             />
           </ReactFlowProvider>
 
@@ -190,23 +215,32 @@ function CanvasPage(props: CanvasPageProps) {
             notificationMessage={state.ai.notificationMessage}
           />
 
-          <Sidebar state={state} getSidebarData={props.getSidebarData} />
-        </div>
-      </div>
+          <Sidebar
+            state={state}
+            getSidebarData={props.getSidebarData}
+            onRun={props.onRun}
+            onDuplicate={props.onDuplicate}
+            onDocs={props.onDocs}
+            onDeactivate={props.onDeactivate}
+            onDelete={handleNodeDelete} />
+        </div >
+      </div >
 
       {/* Edit existing node modal */}
-      {editingNodeData && (
-        <NodeConfigurationModal
-          isOpen={true}
-          onClose={() => setEditingNodeData(null)}
-          nodeName={editingNodeData.nodeName}
-          configuration={editingNodeData.configuration}
-          configurationFields={editingNodeData.configurationFields}
-          onSave={handleSaveConfiguration}
-          domainId={props.organizationId}
-          domainType="DOMAIN_TYPE_ORGANIZATION"
-        />
-      )}
+      {
+        editingNodeData && (
+          <NodeConfigurationModal
+            isOpen={true}
+            onClose={() => setEditingNodeData(null)}
+            nodeName={editingNodeData.nodeName}
+            configuration={editingNodeData.configuration}
+            configurationFields={editingNodeData.configurationFields}
+            onSave={handleSaveConfiguration}
+            domainId={props.organizationId}
+            domainType="DOMAIN_TYPE_ORGANIZATION"
+          />
+        )
+      }
 
       {/* Add new node modal */}
       {newNodeData && (
@@ -228,9 +262,21 @@ function CanvasPage(props: CanvasPageProps) {
 function Sidebar({
   state,
   getSidebarData,
+  onRun,
+  onDuplicate,
+  onDocs,
+  onDeactivate,
+  onToggleView,
+  onDelete,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  onRun?: (nodeId: string) => void;
+  onDuplicate?: (nodeId: string) => void;
+  onDocs?: (nodeId: string) => void;
+  onDeactivate?: (nodeId: string) => void;
+  onToggleView?: (nodeId: string) => void;
+  onDelete?: (nodeId: string) => void;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -291,6 +337,12 @@ function Sidebar({
           });
         });
       }}
+      onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
+      onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
+      onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
+      onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
+      onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
+      onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
     />
   );
 }
@@ -314,14 +366,23 @@ function CanvasContent({
   onNodeEdit,
   onNodeDelete,
   onEdgeCreate,
-  hideHeader
+  hideHeader,
+  onRun,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
   onNodeEdit: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
-  hideHeader?: boolean
+  hideHeader?: boolean,
+  onRun?: (nodeId: string) => void,
+  onDuplicate?: (nodeId: string) => void,
+  onDeactivate?: (nodeId: string) => void,
+  onToggleView?: (nodeId: string) => void,
+  onDelete?: (nodeId: string) => void,
 }) {
   const { fitView } = useReactFlow();
 
@@ -371,9 +432,13 @@ function CanvasContent({
           onExpand={handleNodeExpand}
           nodeId={nodeProps.id}
           onClick={() => handleNodeClick(nodeProps.id)}
-          onEdit={onNodeEdit}
-          onDelete={onNodeDelete}
+          onEdit={() => onNodeEdit(nodeProps.id)}
+          onDelete={() => onNodeDelete?.(nodeProps.id)}
           selected={nodeProps.selected}
+          onRun={onRun ? () => onRun(nodeProps.id) : undefined}
+          onDuplicate={onDuplicate ? () => onDuplicate(nodeProps.id) : undefined}
+          onDeactivate={onDeactivate ? () => onDeactivate(nodeProps.id) : undefined}
+          onToggleView={onToggleView ? () => onToggleView(nodeProps.id) : undefined}
           ai={{
             show: state.ai.sidebarOpen,
             suggestion: state.ai.suggestions[nodeProps.id] || null,
@@ -387,11 +452,12 @@ function CanvasContent({
       handleNodeExpand,
       handleNodeClick,
       onNodeEdit,
+      state.ai,
+      onRun,
+      onDuplicate,
+      onDeactivate,
+      onToggleView,
       onNodeDelete,
-      state.ai.suggestions,
-      state.ai.sidebarOpen,
-      state.ai.onApply,
-      state.ai.onDismiss,
     ]
   );
 

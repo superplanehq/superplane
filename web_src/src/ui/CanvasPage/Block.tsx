@@ -6,17 +6,12 @@ import {
 } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
-import { MoreVertical, PencilIcon, SparklesIcon, Trash2 } from "lucide-react";
+import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../dropdownMenu";
 import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
+import { ComponentActionsProps } from "../types/componentActions";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
 type BlockType =
@@ -66,15 +61,13 @@ export interface BlockData {
   switch?: SwitchComponentProps;
 }
 
-interface BlockProps {
+interface BlockProps extends ComponentActionsProps {
   data: BlockData;
   nodeId?: string;
   selected?: boolean;
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
-  onEdit?: (nodeId: string) => void;
-  onDelete?: (nodeId: string) => void;
 
   ai?: BlockAi;
 }
@@ -84,20 +77,8 @@ export function Block(props: BlockProps) {
   const ai = props.ai || {
     show: false,
     suggestion: null,
-    onApply: () => {},
-    onDismiss: () => {},
-  };
-
-  const handleEdit = () => {
-    if (props.onEdit && props.nodeId) {
-      props.onEdit(props.nodeId);
-    }
-  };
-
-  const handleDelete = () => {
-    if (props.onDelete && props.nodeId) {
-      props.onDelete(props.nodeId);
-    }
+    onApply: () => { },
+    onDismiss: () => { },
   };
 
   return (
@@ -108,38 +89,6 @@ export function Block(props: BlockProps) {
         <LeftHandle data={data} />
         <BlockContent {...props} onClick={props.onClick} />
         <RightHandle data={data} />
-
-        {/* Three-dots menu at top right */}
-        {(props.onEdit || props.onDelete) && (
-          <div className="absolute top-2 right-2 z-50">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-zinc-700"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreVertical size={16} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                {props.onEdit && (
-                  <DropdownMenuItem onClick={handleEdit}>
-                    <PencilIcon size={14} className="mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                )}
-                {props.onDelete && (
-                  <DropdownMenuItem onClick={handleDelete} className="text-red-600 focus:text-red-600">
-                    <Trash2 size={14} className="mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
       </div>
     </>
   );
@@ -263,6 +212,13 @@ function BlockContent({
   onExpand,
   nodeId,
   selected = false,
+  onRun,
+  onEdit,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
 }: BlockProps) {
   const handleExpand = () => {
     if (onExpand && nodeId) {
@@ -270,34 +226,42 @@ function BlockContent({
     }
   };
 
+  const actionProps = {
+    onRun,
+    onEdit,
+    onDuplicate,
+    onDeactivate,
+    onToggleView,
+    onDelete,
+    isCompactView,
+  };
+
   switch (data.type) {
     case "trigger":
-      return (
-        <Trigger {...(data.trigger as TriggerProps)} selected={selected} />
-      );
+      return <Trigger {...(data.trigger as TriggerProps)} selected={selected} {...actionProps} />;
     case "composite":
       return (
         <Composite
           {...(data.composite as CompositeProps)}
           onExpandChildEvents={handleExpand}
           selected={selected}
+          {...actionProps}
         />
       );
     case "approval":
-      return (
-        <Approval {...(data.approval as ApprovalProps)} selected={selected} />
-      );
+      return <Approval {...(data.approval as ApprovalProps)} selected={selected} {...actionProps} />;
     case "filter":
-      return <Filter {...(data.filter as FilterProps)} selected={selected} />;
+      return <Filter {...(data.filter as FilterProps)} selected={selected} {...actionProps} />;
     case "if":
-      return <If {...(data.if as IfProps)} selected={selected} />;
+      return <If {...(data.if as IfProps)} selected={selected} {...actionProps} />;
     case "noop":
-      return <Noop {...(data.noop as NoopProps)} selected={selected} />;
+      return <Noop {...(data.noop as NoopProps)} selected={selected} {...actionProps} />;
     case "switch":
       return (
         <SwitchComponent
           {...(data.switch as SwitchComponentProps)}
           selected={selected}
+          {...actionProps}
         />
       );
     default:

@@ -1,4 +1,5 @@
 import { ComponentBase, type EventSection } from "../componentBase";
+import { ComponentActionsProps } from "../types/componentActions";
 
 export interface IfCondition {
   field: string;
@@ -7,7 +8,7 @@ export interface IfCondition {
   logicalOperator?: "AND" | "OR";
 }
 
-export interface IfProps {
+export interface IfProps extends ComponentActionsProps {
   title?: string;
   conditions: IfCondition[];
   trueEvent?: Omit<EventSection, "title">;
@@ -27,6 +28,13 @@ export const If: React.FC<IfProps> = ({
   falseSectionLabel = "FALSE",
   collapsed = false,
   selected = false,
+  onRun,
+  onEdit,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
 }) => {
   const spec = conditions.length > 0 ? {
     title: "condition",
@@ -64,6 +72,13 @@ export const If: React.FC<IfProps> = ({
       eventSections={eventSections}
       collapsed={collapsed}
       selected={selected}
+      onRun={onRun}
+      onEdit={onEdit}
+      onDuplicate={onDuplicate}
+      onDeactivate={onDeactivate}
+      onToggleView={onToggleView}
+      onDelete={onDelete}
+      isCompactView={isCompactView}
     />
   );
 };

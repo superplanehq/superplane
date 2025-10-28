@@ -1,9 +1,10 @@
 import { resolveIcon } from "@/lib/utils";
-import { EllipsisVertical, TextAlignStart, X } from "lucide-react";
+import { TextAlignStart, X } from "lucide-react";
 import React, { JSX } from "react";
 import { ChildEvents, ChildEventsInfo } from "../childEvents";
 import { ChildEventsState } from "../composite";
 import { MetadataItem, MetadataList } from "../metadataList";
+import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 
 interface SidebarEvent {
   title: string;
@@ -35,6 +36,16 @@ interface ComponentSidebarProps {
   onEventClick?: (event: SidebarEvent) => void;
   onClose?: () => void;
   onSeeFullHistory?: () => void;
+
+  // Action handlers
+  onRun?: () => void;
+  onDuplicate?: () => void;
+  onDocs?: () => void;
+  onEdit?: () => void;
+  onDeactivate?: () => void;
+  onToggleView?: () => void;
+  onDelete?: () => void;
+  isCompactView?: boolean;
 }
 
 export const ComponentSidebar = ({
@@ -54,10 +65,19 @@ export const ComponentSidebar = ({
   moreInQueueCount = 0,
   hideQueueEvents = false,
   onSeeFullHistory,
+  onRun,
+  onDuplicate,
+  onDocs,
+  onEdit,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView = false,
 }: ComponentSidebarProps) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
   }, [iconSlug]);
+
 
   const createEventItem = (event: SidebarEvent, index: number): JSX.Element => {
     let EventIcon = resolveIcon("check");
@@ -181,7 +201,7 @@ export const ComponentSidebar = ({
   if (!isOpen) return null;
 
   return (
-    <div className="min-w-[27rem] border-l-2 border-gray-400 border-border flex-1 absolute right-0 top-[48px] h-full z-20 overflow-y-auto bg-white">
+    <div className="min-w-[27rem] border-l-2 border-gray-400 border-border flex-1 absolute right-0 top-0 h-full z-20 overflow-y-auto bg-white">
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-2 border-gray-400 bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
           <div
@@ -196,9 +216,16 @@ export const ComponentSidebar = ({
           </div>
           <div className="flex justify-between gap-3 w-full">
             <h2 className="text-xl font-semibold">{title}</h2>
-            <button className="ml-auto">
-              <EllipsisVertical size={16} />
-            </button>
+            <SidebarActionsDropdown
+              onRun={onRun}
+              onDuplicate={onDuplicate}
+              onDocs={onDocs}
+              onEdit={onEdit}
+              onDeactivate={onDeactivate}
+              onToggleView={onToggleView}
+              onDelete={onDelete}
+              isCompactView={isCompactView}
+            />
           </div>
           <div
             onClick={() => onClose?.()}

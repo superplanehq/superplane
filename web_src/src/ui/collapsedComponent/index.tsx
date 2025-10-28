@@ -1,7 +1,9 @@
 import React from "react";
 import { resolveIcon } from "@/lib/utils";
+import { SidebarActionsDropdown } from "../componentSidebar/SidebarActionsDropdown";
+import { ComponentActionsProps } from "../types/componentActions";
 
-export interface CollapsedComponentProps {
+export interface CollapsedComponentProps extends ComponentActionsProps {
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
@@ -23,6 +25,12 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   shape = "rounded",
   children,
   onDoubleClick,
+  onRun,
+  onDuplicate,
+  onEdit,
+  onDeactivate,
+  onToggleView,
+  onDelete,
 }) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -40,6 +48,17 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
         ) : (
           <Icon size={30} className={iconColor} />
         )}
+      </div>
+      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10">
+        <SidebarActionsDropdown
+          onRun={onRun}
+          onDuplicate={onDuplicate}
+          onEdit={onEdit}
+          onDeactivate={onDeactivate}
+          onToggleView={onToggleView}
+          onDelete={onDelete}
+          isCompactView={true}
+        />
       </div>
       <h2 className="absolute top-full left-1/2 transform -translate-x-1/2 text-base font-semibold text-neutral-900 pt-1 whitespace-nowrap">{title}</h2>
       {children && (

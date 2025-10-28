@@ -1,4 +1,5 @@
 import { ComponentBase, type EventSection } from "../componentBase";
+import { ComponentActionsProps } from "../types/componentActions";
 
 export interface FilterCondition {
   field: string;
@@ -7,7 +8,7 @@ export interface FilterCondition {
   logicalOperator?: "AND" | "OR";
 }
 
-export interface FilterProps {
+export interface FilterProps extends ComponentActionsProps {
   title?: string;
   filters: FilterCondition[];
   lastEvent?: Omit<EventSection, "title">;
@@ -21,6 +22,13 @@ export const Filter: React.FC<FilterProps> = ({
   lastEvent,
   collapsed = false,
   selected = false,
+  onRun,
+  onEdit,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
 }) => {
   const spec = filters.length > 0 ? {
     title: "filter",
@@ -52,6 +60,13 @@ export const Filter: React.FC<FilterProps> = ({
       eventSections={eventSections}
       collapsed={collapsed}
       selected={selected}
+      onRun={onRun}
+      onEdit={onEdit}
+      onDuplicate={onDuplicate}
+      onDeactivate={onDeactivate}
+      onToggleView={onToggleView}
+      onDelete={onDelete}
+      isCompactView={isCompactView}
     />
   );
 };

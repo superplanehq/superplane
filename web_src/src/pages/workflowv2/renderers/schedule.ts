@@ -65,7 +65,7 @@ function formatNextTrigger(timestamp: string | undefined): string {
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
-    let props: TriggerProps = {
+    const props: TriggerProps = {
       title: node.name!,
       iconSlug: trigger.icon,
       iconColor: getColorClass(trigger.color),
