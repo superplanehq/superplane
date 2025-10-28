@@ -18,8 +18,8 @@ export interface ChildEventsInfo {
 export interface ChildEventsProps {
   childEventsInfo: ChildEventsInfo;
   className?: string;
-  onExpandChildEvents?: () => void;
-  onReRunChildEvents?: () => void;
+  onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
+  onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
 }
 
 export const ChildEvents: React.FC<ChildEventsProps> = ({
@@ -52,7 +52,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
     <div className={className}>
       <div className="flex items-center justify-between gap-2">
         <div
-          onClick={hasWaitingInfos ? toggleWaitingInfos : undefined}
+          onClick={hasWaitingInfos ? (e) => { e.stopPropagation(); toggleWaitingInfos() } : undefined}
           className={
             "flex items-center gap-2 w-full " +
             (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")
@@ -69,14 +69,20 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
             <ExpandChildEventsIcon
               size={18}
               className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
-              onClick={onExpandChildEvents}
+              onClick={(e) => {
+                e.stopPropagation()
+                onExpandChildEvents(childEventsInfo)
+              }}
             />
           )}
           {onReRunChildEvents && (
             <ReRunChildEventsIcon
               size={18}
               className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
-              onClick={onReRunChildEvents}
+              onClick={(e) => {
+                e.stopPropagation()
+                onReRunChildEvents(childEventsInfo)
+              }}
             />
           )}
         </div>

@@ -26,8 +26,10 @@ interface ComponentSidebarProps {
   iconColor?: string;
   iconBackground?: string;
 
-  onExpandChildEvents?: () => void;
-  onReRunChildEvents?: () => void;
+  onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
+  onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
+  onEventClick?: (event: SidebarEvent) => void;
+  onClose?: () => void;
 }
 
 export const ComponentSidebar = ({
@@ -39,137 +41,57 @@ export const ComponentSidebar = ({
   iconBackground,
   onExpandChildEvents,
   onReRunChildEvents,
+  onEventClick,
+  onClose,
+  latestEvents,
+  nextInQueueEvents,
 }: ComponentSidebarProps) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
   }, [iconSlug]);
-  const latestEvents: SidebarEvent[] = [
-    {
-      title: "New commit",
-      subtitle: "main",
-      state: "processed",
-      isOpen: true,
-      receivedAt: new Date(),
-      childEventsInfo: {
-        count: 1,
-        state: "processed",
-        waitingInfos: [],
-      },
-    },
-    {
-      title: "New commit",
-      subtitle: "main",
-      state: "processed",
-      isOpen: false,
-      receivedAt: new Date(),
-      childEventsInfo: {
-        count: 1,
-        state: "processed",
-        waitingInfos: [],
-      },
-    },
-    {
-      title: "New commit",
-      subtitle: "main",
-      state: "processed",
-      isOpen: true,
-      receivedAt: new Date(),
-      values: {
-        "Author": "Pedro Forestileao",
-        "Commit": "New commit",
-        "Branch": "main",
-        "Type": "push",
-        "Event ID": "123123123-123123123-123123123",
-      },
-      childEventsInfo: {
-        count: 1,
-        state: "processed",
-        waitingInfos: [
-          {
-            icon: "check",
-            info: "Processed",
-          },
-          {
-            icon: "check",
-            info: "Deploy",
-          },
-          {
-            icon: "check",
-            info: "Post-deploy verification",
-          },
-        ],
-      },
-    },
-  ];
 
-  const nextInQueueEvents: SidebarEvent[] = [
-    {
-      title: "New commit",
-      subtitle: "main",
-      state: "processed",
-      isOpen: false,
-      receivedAt: new Date(),
-      childEventsInfo: {
-        count: 1,
-        state: "processed",
-        waitingInfos: [],
-      },
-    }
-  ];
 
   const createEventItem = (event: SidebarEvent, index: number): JSX.Element => {
-    let EventIcon = resolveIcon("check")
-    switch (event.state) {
-      case "processed":
-        EventIcon = resolveIcon("check")
-        break;
-      case "discarded":
-        EventIcon = resolveIcon("x")
-        break;
-    }
+    let EventIcon = resolveIcon("check");
+    let EventColor = "text-green-700";
+    let EventBackground = "bg-green-200";
+    let iconBorderColor = "border-gray-700";
+    let iconSize = 8;
+    let iconContainerSize = 4;
+    let iconStrokeWidth = 3;
 
-    let EventColor = "text-green-700"
     switch (event.state) {
       case "processed":
-        EventColor = "text-green-700"
+        EventIcon = resolveIcon("check");
+        EventColor = "text-green-700";
+        EventBackground = "bg-green-200";
+        iconBorderColor = "border-green-700";
+        iconSize = 8;
         break;
       case "discarded":
-        EventColor = "text-red-700"
-        break;
-    }
-
-    let EventBackground = "bg-green-200"
-    switch (event.state) {
-      case "processed":
-        EventBackground = "bg-green-200"
-        break;
-      case "discarded":
-        EventBackground = "bg-red-200"
+        EventIcon = resolveIcon("x");
+        EventColor = "text-red-700";
+        EventBackground = "bg-red-200";
+        iconBorderColor = "border-red-700";
+        iconSize = 8;
         break;
       case "waiting":
-        EventBackground = "bg-orange-200"
-        break;
-    }
-
-    let iconBorderColor = "border-gray-700"
-    switch (event.state) {
-      case "processed":
-        iconBorderColor = "border-green-700"
-        break;
-      case "discarded":
-        iconBorderColor = "border-red-700"
-        break;
-      case "waiting":
-        iconBorderColor = "border-orange-700"
+        EventIcon = resolveIcon("circle-dashed");
+        EventColor = "text-orange-700";
+        EventBackground = "bg-orange-200";
+        iconBorderColor = "";
+        iconSize = 17;
+        iconContainerSize = 5;
+        iconStrokeWidth = 2;
         break;
     }
 
     return (
-      <div key={event.title + index} onClick={() => { }} className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md cursor-pointer ${EventBackground} ${EventColor}`}>
+      <div key={event.title + index} onClick={(e) => { e.stopPropagation(); onEventClick?.(event) }} className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md cursor-pointer ${EventBackground} ${EventColor}`}>
         <div className="flex items-center gap-3 rounded-md w-full min-w-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className={`w-4 h-4 flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor}`}>
-              <EventIcon size={8} strokeWidth={3} className="thick   " />
+            <div className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor}`}>
+              <EventIcon size={iconSize} strokeWidth={iconStrokeWidth} className="thick   " />
             </div>
             <span className="truncate text-sm text-black font-medium">{event.title}</span>
           </div>
@@ -221,7 +143,7 @@ export const ComponentSidebar = ({
               <EllipsisVertical size={16} />
             </button>
           </div>
-          <div className="flex items-center justify-center gap-1 absolute top-6 right-2 text-xs font-medium cursor-pointer">
+          <div onClick={() => onClose?.()} className="flex items-center justify-center gap-1 absolute top-6 right-2 text-xs font-medium cursor-pointer">
             <span>Close</span>
             <X size={14} />
           </div>
@@ -230,7 +152,7 @@ export const ComponentSidebar = ({
       <div className="px-3 py-1 border-b-2 border-gray-400">
         <MetadataList items={metadata} className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono" />
       </div>
-      <div className="px-3 py-1 border-b-2 border-gray-400">
+      <div className="px-3 py-1 border-b-2 border-gray-400 pb-3">
         <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Latest events</h2>
         <div className="flex flex-col gap-2">
           {latestEvents.slice(0, 5).map((event, index) => {
@@ -238,7 +160,7 @@ export const ComponentSidebar = ({
           })}
         </div>
       </div>
-      <div className="px-3 py-1">
+      <div className="px-3 py-1 pb-3">
         <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">Next in queue</h2>
         <div className="flex flex-col gap-2">
           {nextInQueueEvents.slice(0, 5).map((event, index) => {
