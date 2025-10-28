@@ -67,6 +67,7 @@ export const ComponentSidebar = ({
     let iconSize = 8;
     let iconContainerSize = 4;
     let iconStrokeWidth = 3;
+    let animation = "";
 
     switch (event.state) {
       case "processed":
@@ -92,6 +93,16 @@ export const ComponentSidebar = ({
         iconContainerSize = 5;
         iconStrokeWidth = 2;
         break;
+      case "running":
+        EventIcon = resolveIcon("refresh-cw");
+        EventColor = "text-blue-700";
+        EventBackground = "bg-blue-100";
+        iconBorderColor = "";
+        iconSize = 17;
+        iconContainerSize = 5;
+        iconStrokeWidth = 2;
+        animation = "animate-spin";
+        break;
     }
 
     return (
@@ -106,7 +117,7 @@ export const ComponentSidebar = ({
         <div className="flex items-center gap-3 rounded-md w-full min-w-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div
-              className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor}`}
+              className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor} ${animation}`}
             >
               <EventIcon
                 size={iconSize}
