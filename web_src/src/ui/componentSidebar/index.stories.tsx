@@ -122,14 +122,17 @@ export const Default: Story = {
     };
 
     return (
-      <ComponentSidebar
-        {...args}
-        latestEvents={latestEvents}
-        nextInQueueEvents={nextEvents}
-        onEventClick={handleEventClick}
-        moreInQueueCount={2}
-        onSeeFullHistory={() => console.log("See full history")}
-      />
+      <div className="relative w-[32rem] h-[40rem]">
+        <ComponentSidebar
+          {...args}
+          isOpen={true}
+          latestEvents={latestEvents}
+          nextInQueueEvents={nextEvents}
+          onEventClick={handleEventClick}
+          moreInQueueCount={2}
+          onSeeFullHistory={() => console.log("See full history")}
+        />
+      </div>
     );
   },
   args: {
@@ -167,14 +170,17 @@ export const WithInteractiveEvents: Story = {
     };
 
     return (
-      <ComponentSidebar
-        {...args}
-        latestEvents={latestEvents}
-        nextInQueueEvents={nextEvents}
-        onEventClick={handleEventClick}
-        moreInQueueCount={2}
-        onSeeFullHistory={() => console.log("See full history")}
-      />
+      <div className="relative w-[32rem] h-[40rem]">
+        <ComponentSidebar
+          {...args}
+          isOpen={true}
+          latestEvents={latestEvents}
+          nextInQueueEvents={nextEvents}
+          onEventClick={handleEventClick}
+          moreInQueueCount={2}
+          onSeeFullHistory={() => console.log("See full history")}
+        />
+      </div>
     );
   },
   args: {
@@ -210,14 +216,17 @@ export const WithDifferentIcon: Story = {
     };
 
     return (
-      <ComponentSidebar
-        {...args}
-        latestEvents={latestEvents}
-        nextInQueueEvents={nextEvents}
-        onEventClick={handleEventClick}
-        moreInQueueCount={2}
-        onSeeFullHistory={() => console.log("See full history")}
-      />
+      <div className="relative w-[32rem] h-[40rem]">
+        <ComponentSidebar
+          {...args}
+          isOpen={true}
+          latestEvents={latestEvents}
+          nextInQueueEvents={nextEvents}
+          onEventClick={handleEventClick}
+          moreInQueueCount={2}
+          onSeeFullHistory={() => console.log("See full history")}
+        />
+      </div>
     );
   },
   args: {
@@ -263,14 +272,17 @@ export const ExtendedMetadata: Story = {
     };
 
     return (
-      <ComponentSidebar
-        {...args}
-        latestEvents={latestEvents}
-        nextInQueueEvents={nextEvents}
-        onEventClick={handleEventClick}
-        moreInQueueCount={2}
-        onSeeFullHistory={() => console.log("See full history")}
-      />
+      <div className="relative w-[32rem] h-[40rem]">
+        <ComponentSidebar
+          {...args}
+          isOpen={true}
+          latestEvents={latestEvents}
+          nextInQueueEvents={nextEvents}
+          onEventClick={handleEventClick}
+          moreInQueueCount={2}
+          onSeeFullHistory={() => console.log("See full history")}
+        />
+      </div>
     );
   },
   args: {
@@ -296,6 +308,34 @@ export const ExtendedMetadata: Story = {
     iconSlug: "github",
     iconColor: "text-purple-500",
     iconBackground: "bg-purple-200",
+    onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
+    onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
+    onClose: () => console.log("Close sidebar"),
+  },
+};
+
+export const ZeroState: Story = {
+  render: (args) => {
+    return (
+      <div className="relative w-[32rem] h-[40rem]">
+        <ComponentSidebar
+          {...args}
+          isOpen={true}
+          latestEvents={[]}
+          nextInQueueEvents={[]}
+          onEventClick={() => console.log("Event clicked")}
+          moreInQueueCount={0}
+          onSeeFullHistory={() => console.log("See full history")}
+        />
+      </div>
+    );
+  },
+  args: {
+    metadata: mockMetadata,
+    title: "Empty Component",
+    iconSlug: "circle-dashed",
+    iconColor: "text-gray-500",
+    iconBackground: "bg-gray-200",
     onExpandChildEvents: (childEventsInfo) => console.log("Expand child events", childEventsInfo),
     onReRunChildEvents: (childEventsInfo) => console.log("Re-run child events", childEventsInfo),
     onClose: () => console.log("Close sidebar"),
