@@ -12,6 +12,7 @@ import { Button } from "../../button";
 import { CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
 import { genDockerImage } from "./dockerImages";
+import { createGetSidebarData } from "./getSidebarData";
 import { handleNodeExpand } from "./navigation";
 import { SimulationEngine, sleep, useSimulationRunner } from "./useSimulation";
 
@@ -518,6 +519,11 @@ export const SimpleDeployment: Story = {
       });
     }, [nodes, simulation]);
 
+    const getSidebarData = useMemo(
+      () => createGetSidebarData(nodesWithHandlers),
+      [nodesWithHandlers]
+    );
+
     const renderContent = () => {
       return (
         <CanvasPage
@@ -525,6 +531,7 @@ export const SimpleDeployment: Story = {
           nodes={nodesWithHandlers}
           edges={edges}
           onNodeExpand={handleNodeExpand}
+          getSidebarData={getSidebarData}
         />
       );
     };

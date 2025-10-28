@@ -3,8 +3,9 @@ import "@xyflow/react/dist/style.css";
 import "./canvas-reset.css";
 import { MainSubWorkflow, SubWorkflowsMap } from "./storybooks/subworkflows";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CanvasPage } from "./index";
+import { createGetSidebarData } from "./storybooks/getSidebarData";
 import {
   getStorybookData,
   isInStorybook,
@@ -56,6 +57,11 @@ export const BlueprintExecutionPage: Story = {
       ? subworkflowData?.nodes
       : args.nodes;
 
+    const getSidebarData = useMemo(
+      () => createGetSidebarData(dynamicNodes ?? []),
+      [dynamicNodes]
+    );
+
     return (
       <div className="h-[100vh] w-full ">
         <CanvasPage
@@ -64,6 +70,7 @@ export const BlueprintExecutionPage: Story = {
           edges={dynamicEdges}
           title={dynamicTitle}
           breadcrumbs={dynamicBreadcrumbs}
+          getSidebarData={getSidebarData}
         />
         {/* Debug info for Storybook (only visible in development) */}
         {isInStorybook() && executionData && (

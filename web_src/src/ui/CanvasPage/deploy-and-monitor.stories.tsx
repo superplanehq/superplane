@@ -9,6 +9,7 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { useCallback, useMemo, useState } from "react";
 import { CanvasPage } from "./index";
+import { createGetSidebarData } from "./storybooks/getSidebarData";
 
 const meta = {
   title: "Pages/CanvasPage",
@@ -562,6 +563,11 @@ export const DeployAndMonitor: Story = {
       }
     }, [simulationNodes, simulationEdges]);
 
+    const getSidebarData = useMemo(
+      () => createGetSidebarData(simulationNodes ?? []),
+      [simulationNodes]
+    );
+
     return (
       <div className="h-[100vh] w-full ">
         <div className="absolute z-10 m-2">
@@ -572,7 +578,12 @@ export const DeployAndMonitor: Story = {
             Run
           </button>
         </div>
-        <CanvasPage {...args} nodes={simulationNodes} edges={simulationEdges} />
+        <CanvasPage
+          {...args}
+          nodes={simulationNodes}
+          edges={simulationEdges}
+          getSidebarData={getSidebarData}
+        />
       </div>
     );
   },

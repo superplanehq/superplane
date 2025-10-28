@@ -7,7 +7,9 @@ import "./../canvas-reset.css";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 
+import { useMemo } from "react";
 import { CanvasPage } from "./../index";
+import { createGetSidebarData } from "./getSidebarData";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -416,9 +418,14 @@ export const IncidentResponse: Story = {
     edges: incidentResponseEdges,
   },
   render: (args) => {
+    const getSidebarData = useMemo(
+      () => createGetSidebarData(args.nodes ?? []),
+      [args.nodes]
+    );
+
     return (
       <div className="h-[100vh] w-full ">
-        <CanvasPage {...args} />
+        <CanvasPage {...args} getSidebarData={getSidebarData} />
       </div>
     );
   },
