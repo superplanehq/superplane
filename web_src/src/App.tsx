@@ -72,11 +72,11 @@ function App() {
             />
             <Route
               path=":organizationId/workflows/:workflowId"
-              element={withAuthOnly(Workflow)}
+              element={withAuthOnly(WorkflowPageV2)}
             />
             <Route
-              path=":organizationId/workflows/:workflowId/v2"
-              element={withAuthOnly(WorkflowPageV2)}
+              path=":organizationId/workflows/:workflowId/old"
+              element={withAuthOnly(Workflow)}
             />
             <Route
               path=":organizationId/workflows/:workflowId/events"

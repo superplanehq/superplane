@@ -129,6 +129,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
             className="h-7 py-1 px-2"
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               setShowRejectionForm(true);
             }}
           >
@@ -139,6 +140,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
             className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               if (requireArtifacts.length > 0) {
                 setShowApprovalForm(true);
               } else {
@@ -198,7 +200,10 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           {content}
         </Item>
         {showRejectionForm && (
-          <div className="w-full border bg-gray-50 px-3 py-2 my-2 rounded-lg text-left">
+          <div
+            className="w-full border bg-gray-50 px-3 py-2 my-2 rounded-lg text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex flex-col gap-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -222,7 +227,8 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                   variant="outline"
                   size="default"
                   className="h-7 py-1 px-2"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowRejectionForm(false);
                     setRejectionCommentInput("");
                   }}
@@ -233,7 +239,8 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                   variant="default"
                   size="default"
                   className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     onReject?.(rejectionCommentInput);
                     setShowRejectionForm(false);
                     setRejectionCommentInput("");
@@ -247,7 +254,10 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
           </div>
         )}
         {showApprovalForm && (
-          <div className="w-full border my-2 bg-gray-50 px-3 py-2 rounded-lg text-left">
+          <div
+            className="w-full border my-2 bg-gray-50 px-3 py-2 rounded-lg text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex flex-col gap-4">
               {requireArtifacts.map((artifact, index) => (
                 <div key={index} className="flex flex-col gap-2">
@@ -282,7 +292,8 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <Button
                   variant="outline"
                   className="h-7 py-1 px-2"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowApprovalForm(false);
                     setArtifacts({});
                   }}
@@ -292,7 +303,8 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <Button
                   variant="default"
                   className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     onApprove?.(artifacts);
                     setShowApprovalForm(false);
                     setArtifacts({});
