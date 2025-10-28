@@ -22,6 +22,13 @@ type BlockType =
   | "noop"
   | "switch";
 
+interface BlockAi {
+  show: boolean;
+  suggestion: string | null;
+  onApply: () => void;
+  onDismiss: () => void;
+}
+
 export interface BlockData {
   label: string;
 
@@ -60,18 +67,29 @@ interface BlockProps {
 
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: () => void;
+
+  ai?: BlockAi;
 }
 
 export function Block(props: BlockProps) {
   const data = props.data;
+  const ai = props.ai || {
+    show: false,
+    suggestion: null,
+    onApply: () => {},
+    onDismiss: () => {},
+  };
 
   return (
-    <div className="relative w-fit" onClick={props.onClick}>
-      <AiPopup />
-      <LeftHandle data={data} />
-      <BlockContent {...props} />
-      <RightHandle data={data} />
-    </div>
+    <>
+      <AiPopup {...ai} />
+
+      <div className="relative w-fit" onClick={props.onClick}>
+        <LeftHandle data={data} />
+        <BlockContent {...props} onClick={props.onClick} />
+        <RightHandle data={data} />
+      </div>
+    </>
   );
 }
 
@@ -136,26 +154,46 @@ function RightHandle({ data }: BlockProps) {
   );
 }
 
-function AiPopup() {
+function AiPopup({ show, suggestion, onApply, onDismiss }: BlockAi) {
+  if (!show) return null;
+  if (!suggestion) return null;
+
+  const handleApply = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onApply();
+  };
+
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDismiss();
+  };
+
   return (
     <div className="absolute left-0 -translate-y-[100%] text-left text-base">
       <div className="bg-white rounded-lg shadow p-3 relative mb-2 border-blue-500 border-2">
         <div className="flex items-center gap-1 mb-2">
           <SparklesIcon className="inline-block text-blue-500" size={14} />
-          <div className="text-gray-800 font-bold">AI Suggestions</div>
+          <div className="text-gray-800 font-bold">Improvements</div>
         </div>
 
-        <div className="text-sm text-gray-600">
-          Filter out non-release branches to avoid unintended deployments when
-          processing push events.
-        </div>
+        <div className="text-sm">{suggestion}</div>
 
         <div className="flex gap-2 mt-2">
-          <Button size="sm" variant="default" className="mt-2">
-            Apply Suggestion
+          <Button
+            size="sm"
+            variant="default"
+            className="mt-2"
+            onClick={handleApply}
+          >
+            Apply
           </Button>
 
-          <Button size="sm" variant="secondary" className="mt-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-2"
+            onClick={handleDismiss}
+          >
             Dismiss
           </Button>
         </div>

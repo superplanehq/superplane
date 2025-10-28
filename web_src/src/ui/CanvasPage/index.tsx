@@ -49,6 +49,16 @@ export interface CanvasNode extends ReactFlowNode {
 
 export interface CanvasEdge extends ReactFlowEdge {}
 
+export interface AiProps {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  showNotifications: boolean;
+  notificationMessage?: string;
+  suggestions: Record<string, string>;
+  onApply: (suggestionId: string) => void;
+  onDismiss: (suggestionId: string) => void;
+}
+
 export interface CanvasPageProps {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -60,10 +70,7 @@ export interface CanvasPageProps {
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
 
-  aiSidebar?: {
-    showNotifications: boolean;
-    notificationMessage?: string;
-  };
+  ai?: AiProps;
 }
 
 const EDGE_STYLE = {
@@ -81,8 +88,10 @@ function CanvasPage(props: CanvasPageProps) {
       </ReactFlowProvider>
 
       <AiSidebar
-        showNotifications={state.aiSidebar.showNotifications}
-        notificationMessage={state.aiSidebar.notificationMessage}
+        isOpen={state.ai.sidebarOpen}
+        setIsOpen={state.ai.setSidebarOpen}
+        showNotifications={state.ai.showNotifications}
+        notificationMessage={state.ai.notificationMessage}
       />
 
       <Sidebar state={state} getSidebarData={props.getSidebarData} />
@@ -195,10 +204,23 @@ function CanvasContent({ state }: { state: CanvasPageState }) {
           nodeId={nodeProps.id}
           onClick={() => handleNodeClick(nodeProps.id)}
           selected={nodeProps.selected}
+          ai={{
+            show: state.ai.sidebarOpen,
+            suggestion: state.ai.suggestions[nodeProps.id] || null,
+            onApply: () => state.ai.onApply(nodeProps.id),
+            onDismiss: () => state.ai.onDismiss(nodeProps.id),
+          }}
         />
       ),
     }),
-    [handleNodeExpand, handleNodeClick]
+    [
+      handleNodeExpand,
+      handleNodeClick,
+      state.ai.suggestions,
+      state.ai.sidebarOpen,
+      state.ai.onApply,
+      state.ai.onDismiss,
+    ]
   );
 
   const edgeTypes = useMemo(() => ({}), []);
