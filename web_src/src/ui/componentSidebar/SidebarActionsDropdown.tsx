@@ -62,7 +62,7 @@ export const SidebarActionsDropdown = ({
     {
       id: "toggle-view",
       label: isCompactView ? "Detailed view" : "Compact view",
-      icon: isCompactView ? "expand" : "minimize",
+      icon: isCompactView ? "list-chevrons-up-down" : "list-chevrons-down-up",
       onAction: onToggleView,
       hasBorder: true,
     },
