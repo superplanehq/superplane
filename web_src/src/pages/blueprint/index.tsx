@@ -18,7 +18,7 @@ import { BlueprintBuilderPage } from '../../ui/BlueprintBuilderPage'
 import type { BreadcrumbItem } from '../../ui/BlueprintBuilderPage'
 import { BlockData } from '../../ui/CanvasPage/Block'
 import { Heading } from '../../components/Heading/heading'
-import { ComponentsComponent } from '../../api-client'
+import { ComponentsComponent, ComponentsNode } from '../../api-client'
 import {
   Dialog,
   DialogContent,
@@ -188,12 +188,7 @@ export const Blueprint = () => {
   useEffect(() => {
     if (!blueprint || components.length === 0) return
 
-    const allNodes: Node[] = (blueprint.nodes || []).map((node: any) => {
-      // Handle output channel nodes - skip for now as Block component doesn't support them
-      if (node.type === 'TYPE_OUTPUT_CHANNEL') {
-        return null
-      }
-
+    const allNodes: Node[] = (blueprint.nodes || []).map((node: ComponentsNode) => {
       // Handle component nodes
       const component = components.find((p: any) => p.name === node.component?.name)
       const blockData = createBlockData(node, component)
