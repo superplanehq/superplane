@@ -36,6 +36,7 @@ type WorkflowsWorkflowNodeExecution struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	ChildExecutions []WorkflowsWorkflowNodeExecution `json:"childExecutions,omitempty"`
 }
 
 // NewWorkflowsWorkflowNodeExecution instantiates a new WorkflowsWorkflowNodeExecution object
@@ -547,6 +548,38 @@ func (o *WorkflowsWorkflowNodeExecution) SetConfiguration(v map[string]interface
 	o.Configuration = v
 }
 
+// GetChildExecutions returns the ChildExecutions field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetChildExecutions() []WorkflowsWorkflowNodeExecution {
+	if o == nil || IsNil(o.ChildExecutions) {
+		var ret []WorkflowsWorkflowNodeExecution
+		return ret
+	}
+	return o.ChildExecutions
+}
+
+// GetChildExecutionsOk returns a tuple with the ChildExecutions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetChildExecutionsOk() ([]WorkflowsWorkflowNodeExecution, bool) {
+	if o == nil || IsNil(o.ChildExecutions) {
+		return nil, false
+	}
+	return o.ChildExecutions, true
+}
+
+// HasChildExecutions returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasChildExecutions() bool {
+	if o != nil && !IsNil(o.ChildExecutions) {
+		return true
+	}
+
+	return false
+}
+
+// SetChildExecutions gets a reference to the given []WorkflowsWorkflowNodeExecution and assigns it to the ChildExecutions field.
+func (o *WorkflowsWorkflowNodeExecution) SetChildExecutions(v []WorkflowsWorkflowNodeExecution) {
+	o.ChildExecutions = v
+}
+
 func (o WorkflowsWorkflowNodeExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -601,6 +634,9 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.Configuration) {
 		toSerialize["configuration"] = o.Configuration
+	}
+	if !IsNil(o.ChildExecutions) {
+		toSerialize["childExecutions"] = o.ChildExecutions
 	}
 	return toSerialize, nil
 }

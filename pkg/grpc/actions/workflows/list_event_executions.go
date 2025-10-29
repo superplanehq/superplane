@@ -33,7 +33,7 @@ func ListEventExecutions(ctx context.Context, registry *registry.Registry, workf
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeExecutions(executions)
+	serialized, err := SerializeNodeExecutions(executions, []models.WorkflowNodeExecution{})
 	if err != nil {
 		return nil, err
 	}

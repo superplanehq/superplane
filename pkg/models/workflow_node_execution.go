@@ -224,6 +224,20 @@ func ListPendingChildExecutionsInTransaction(tx *gorm.DB) ([]WorkflowNodeExecuti
 	return executions, nil
 }
 
+func FindChildExecutionsForMultiple(parentExecutionIDs []string) ([]WorkflowNodeExecution, error) {
+	var executions []WorkflowNodeExecution
+	err := database.Conn().
+		Where("parent_execution_id IN ?", parentExecutionIDs).
+		Find(&executions).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
 func FindChildExecutions(parentExecutionID uuid.UUID, states []string) ([]WorkflowNodeExecution, error) {
 	return FindChildExecutionsInTransaction(database.Conn(), parentExecutionID, states)
 }

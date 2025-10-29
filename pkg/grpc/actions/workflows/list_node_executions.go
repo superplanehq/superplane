@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -18,6 +19,11 @@ import (
 
 func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, pbStates []pb.WorkflowNodeExecution_State, pbResults []pb.WorkflowNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
 	wfID, err := uuid.Parse(workflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	workflowNode, err := models.FindWorkflowNode(database.Conn(), wfID, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +54,7 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 		return nil, err
 	}
 
-	serialized, err := SerializeNodeExecutions(executions)
+	serialized, err := SerializeNodeExecutionsForSingleNode(workflowNode, executions)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +67,20 @@ func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workfl
 	}, nil
 }
 
-func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.WorkflowNodeExecution, error) {
+func SerializeNodeExecutionsForSingleNode(node *models.WorkflowNode, executions []models.WorkflowNodeExecution) ([]*pb.WorkflowNodeExecution, error) {
+	if node.Type != models.NodeTypeBlueprint {
+		return SerializeNodeExecutions(executions, []models.WorkflowNodeExecution{})
+	}
+
+	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs(executions))
+	if err != nil {
+		return nil, err
+	}
+
+	return SerializeNodeExecutions(executions, childExecutions)
+}
+
+func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExecutions []models.WorkflowNodeExecution) ([]*pb.WorkflowNodeExecution, error) {
 	//
 	// Fetch all input records
 	//
@@ -103,7 +122,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 			return nil, err
 		}
 
-		result = append(result, &pb.WorkflowNodeExecution{
+		pbExecution := &pb.WorkflowNodeExecution{
 			Id:                  execution.ID.String(),
 			WorkflowId:          execution.WorkflowID.String(),
 			NodeId:              execution.NodeID,
@@ -119,10 +138,35 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution) ([]*pb.W
 			Configuration:       configuration,
 			Input:               input,
 			Outputs:             outputs,
-		})
+		}
+
+		if len(childExecutions) == 0 {
+			result = append(result, pbExecution)
+			continue
+		}
+
+		children := filterChildrenForParent(execution.ID, childExecutions)
+		childExecutions, err := SerializeNodeExecutions(children, []models.WorkflowNodeExecution{})
+		if err != nil {
+			return nil, err
+		}
+
+		pbExecution.ChildExecutions = append(pbExecution.ChildExecutions, childExecutions...)
+		result = append(result, pbExecution)
 	}
 
 	return result, nil
+}
+
+func filterChildrenForParent(parentExecutionID uuid.UUID, childExecutions []models.WorkflowNodeExecution) []models.WorkflowNodeExecution {
+	children := []models.WorkflowNodeExecution{}
+	for _, child := range childExecutions {
+		if child.ParentExecutionID.String() == parentExecutionID.String() {
+			children = append(children, child)
+		}
+	}
+
+	return children
 }
 
 func validateExecutionStates(in []pb.WorkflowNodeExecution_State) ([]string, error) {

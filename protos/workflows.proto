@@ -323,6 +323,7 @@ message WorkflowNodeExecution {
   google.protobuf.Timestamp updated_at = 13;
   google.protobuf.Struct metadata = 14;
   google.protobuf.Struct configuration = 15;
+  repeated WorkflowNodeExecution child_executions = 16;
 }
 
 message WorkflowNodeQueueItem {

@@ -7267,6 +7267,13 @@
         },
         "configuration": {
           "type": "object"
+        },
+        "childExecutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
+          }
         }
       }
     },
