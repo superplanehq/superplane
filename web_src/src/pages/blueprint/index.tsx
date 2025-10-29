@@ -1,27 +1,27 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ReactFlow,
   Node,
   Edge,
   addEdge,
-  Background,
-  BackgroundVariant,
-  Controls,
   Connection,
-  useNodesState,
-  useEdgesState,
-  NodeTypes,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useBlueprint, useUpdateBlueprint } from '../../hooks/useBlueprintData'
 import { useComponents } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
-import { AlertCircle, ArrowLeft, Save, PanelLeftClose, Menu, Plus, Trash2, ArrowUpRight } from 'lucide-react'
+import { AlertCircle, Plus, Trash2 } from 'lucide-react'
+import { BuildingBlock } from '../../ui/BuildingBlocksSidebar'
+import { BlueprintBuilderPage } from '../../ui/BlueprintBuilderPage'
+import type { BreadcrumbItem } from '../../ui/BlueprintBuilderPage'
+import { BlockData } from '../../ui/CanvasPage/Block'
 import { Heading } from '../../components/Heading/heading'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+import { ComponentsComponent } from '../../api-client'
 import {
   Dialog,
   DialogContent,
@@ -32,30 +32,9 @@ import {
 import { VisuallyHidden } from '../../components/ui/visually-hidden'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 import { filterVisibleConfiguration } from '../../utils/components'
-import { IfNode } from './components/nodes/IfNode'
-import { HttpNode } from './components/nodes/HttpNode'
-import { FilterNode } from './components/nodes/FilterNode'
-import { DefaultNode } from './components/nodes/DefaultNode'
-import { ApprovalNode } from './components/nodes/ApprovalNode'
-import { GithubTriggerNode } from './components/nodes/GithubTriggerNode'
-import { SemaphoreTriggerNode } from './components/nodes/SemaphoreTriggerNode'
 import { ConfigurationFieldRenderer } from '@/ui/configurationFieldRenderer'
 import { ScrollArea } from '../../components/ui/scroll-area'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui/tabs'
-import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from '../../components/ui/item'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import { getColorClass } from '../../utils/colors'
-import { resolveIcon } from '../../lib/utils'
-
-const nodeTypes: NodeTypes = {
-  if: IfNode,
-  http: HttpNode,
-  filter: FilterNode,
-  approval: ApprovalNode,
-  default: DefaultNode,
-  github: GithubTriggerNode,
-  semaphore: SemaphoreTriggerNode,
-}
 
 const elk = new ELK()
 
@@ -99,13 +78,11 @@ const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
 export const Blueprint = () => {
   const { organizationId, blueprintId } = useParams<{ organizationId: string; blueprintId: string }>()
   const navigate = useNavigate()
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isAddNodeModalOpen, setIsAddNodeModalOpen] = useState(false)
   const [selectedComponent, setSelectedComponent] = useState<any>(null)
   const [nodeName, setNodeName] = useState('')
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'components' | 'configuration' | 'outputChannels'>('components')
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([])
   const [isEditConfigFieldModalOpen, setIsEditConfigFieldModalOpen] = useState(false)
   const [editingConfigFieldIndex, setEditingConfigFieldIndex] = useState<number | null>(null)
@@ -119,13 +96,21 @@ export const Blueprint = () => {
   const [blueprintIcon, setBlueprintIcon] = useState('')
   const [blueprintColor, setBlueprintColor] = useState('')
 
+  // Handler for metadata changes
+  const handleMetadataChange = useCallback((metadata: any) => {
+    setBlueprintName(metadata.name)
+    setBlueprintDescription(metadata.description)
+    setBlueprintIcon(metadata.icon)
+    setBlueprintColor(metadata.color)
+  }, [])
+
   // Fetch blueprint and components
   const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId!, blueprintId!)
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!)
   const updateBlueprintMutation = useUpdateBlueprint(organizationId!, blueprintId!)
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const [nodes, setNodes] = useState<Node[]>([])
+  const [edges, setEdges] = useState<Edge[]>([])
 
   // Update blueprint configuration and output channels when blueprint loads
   useEffect(() => {
@@ -143,53 +128,102 @@ export const Blueprint = () => {
     }
   }, [blueprint])
 
+  // Helper function to map component type to block type
+  const getBlockType = (componentName: string): BlockData['type'] => {
+    const typeMap: Record<string, BlockData['type']> = {
+      'if': 'if',
+      'filter': 'filter',
+      'approval': 'approval',
+      'noop': 'noop',
+    }
+    return typeMap[componentName] || 'noop' // Default to noop for unknown components
+  }
+
+  // Helper function to create minimal BlockData for a component
+  const createBlockData = (node: any, component: ComponentsComponent | undefined): BlockData => {
+    const componentName = node.component?.name || ''
+    const blockType = getBlockType(componentName)
+    const channels = component?.outputChannels?.map((channel: any) => channel.name) || ['default']
+
+    const baseData: BlockData = {
+      label: node.name,
+      state: 'pending',
+      type: blockType,
+      outputChannels: channels,
+    }
+
+    // Add type-specific props based on component type
+    switch (blockType) {
+      case 'if':
+        baseData.if = {
+          title: node.name,
+          conditions: [],
+          collapsed: false,
+        }
+        break
+      case 'filter':
+        baseData.filter = {
+          title: node.name,
+          filters: [],
+          collapsed: false,
+        }
+        break
+      case 'approval':
+        baseData.approval = {
+          title: node.name,
+          description: component?.description,
+          iconSlug: component?.icon,
+          iconColor: 'text-orange-500',
+          headerColor: 'bg-orange-100',
+          collapsedBackground: 'bg-orange-100',
+          approvals: [],
+          collapsed: false,
+        }
+        break
+      case 'noop':
+        baseData.noop = {
+          title: node.name,
+          collapsed: false,
+        }
+        break
+    }
+
+    return baseData
+  }
+
   // Update nodes and edges when blueprint or components data changes
   useEffect(() => {
     if (!blueprint || components.length === 0) return
 
     const allNodes: Node[] = (blueprint.nodes || []).map((node: any) => {
-      // Handle output channel nodes
+      // Handle output channel nodes - skip for now as Block component doesn't support them
       if (node.type === 'TYPE_OUTPUT_CHANNEL') {
-        return {
-          id: node.id,
-          type: 'outputChannel',
-          data: {
-            label: node.name,
-          },
-          position: { x: 0, y: 0 }, // Will be set by elk
-        }
+        return null
       }
 
       // Handle component nodes
       const component = components.find((p: any) => p.name === node.component?.name)
-      const channels = component?.outputChannels?.map((channel: any) => channel.name) || ['default']
-      const componentName = node.component?.name
-
-      // Use the component name as node type if it exists in nodeTypes, otherwise use 'default'
-      const nodeType = componentName && nodeTypes[componentName as keyof typeof nodeTypes] ? componentName : 'default'
+      const blockData = createBlockData(node, component)
 
       return {
         id: node.id,
-        type: nodeType,
+        type: 'default', // BlueprintBuilderPage uses 'default' type for all nodes
         data: {
-          label: node.name,
-          component: componentName,
-          channels,
-          configuration: node.configuration || {},
-          icon: component?.icon,
-          color: component?.color,
+          ...blockData,
+          // Store original data for serialization
+          _originalComponent: node.component?.name,
+          _originalConfiguration: node.configuration || {},
         },
         position: node.position || { x: 0, y: 0 },
       }
-    })
+    }).filter(Boolean) as Node[]
 
     const loadedEdges: Edge[] = (blueprint.edges || []).map((edge: any, index: number) => ({
       id: `e${index}`,
       source: edge.sourceId,
       sourceHandle: edge.channel || 'default',
       target: edge.targetId,
-      label: edge.channel,
-      style: { strokeWidth: 2, stroke: '#64748b' },
+      style: { strokeWidth: 3, stroke: '#C9D5E1' },
     }))
 
     // Check if we have saved positions
@@ -206,25 +240,31 @@ export const Blueprint = () => {
         setEdges(layoutedEdges)
       })
     }
-  }, [blueprint, components, setNodes, setEdges])
+  }, [blueprint, components])
+
+  // Node and edge change handlers
+  const onNodesChange = useCallback((changes: any) => {
+    setNodes((nds) => applyNodeChanges(changes, nds))
+  }, [])
+
+  const onEdgesChange = useCallback((changes: any) => {
+    setEdges((eds) => applyEdgeChanges(changes, eds))
+  }, [])
 
   const onConnect = useCallback(
     (params: Connection) => {
-      // Prevent connections from output channels (output channels can only have incoming connections)
-      const sourceNode = nodes.find(n => n.id === params.source)
-      if (sourceNode?.type === 'outputChannel') {
-        showErrorToast('Output channels cannot have outgoing connections')
-        return
-      }
-
-      setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 2, stroke: '#64748b' } }, eds))
+      setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 3, stroke: '#C9D5E1' } }, eds))
     },
-    [setEdges, nodes]
+    []
   )
 
-  const handleComponentClick = (component: any) => {
+  const handleBlockClick = (block: BuildingBlock) => {
+    // Find the full component data from the components array
+    const component = components.find((c: ComponentsComponent) => c.name === block.name)
+    if (!component) return
+
     setSelectedComponent(component)
-    setNodeName(component.name)
+    setNodeName(block.label || block.name)
     setNodeConfiguration({})
     setIsAddNodeModalOpen(true)
   }
@@ -236,16 +276,24 @@ export const Blueprint = () => {
     return `${sanitizedComponent}-${sanitizedName}-${randomChars}`
   }
 
-  const handleNodeDoubleClick = useCallback((_: any, node: Node) => {
-    const component = components.find((p: any) => p.name === (node.data as any).component)
+  const handleNodeEdit = useCallback((nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId)
+    if (!node) return
+
+    const component = components.find((p: any) => p.name === (node.data as any)._originalComponent)
     if (!component) return
 
     setEditingNodeId(node.id)
     setSelectedComponent(component)
     setNodeName((node.data as any).label as string)
-    setNodeConfiguration((node.data as any).configuration || {})
+    setNodeConfiguration((node.data as any)._originalConfiguration || {})
     setIsAddNodeModalOpen(true)
-  }, [components])
+  }, [nodes, components])
+
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== nodeId))
+    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId))
+  }, [])
 
   const handleAddNode = () => {
     if (!selectedComponent || !nodeName.trim()) return
@@ -259,38 +307,50 @@ export const Blueprint = () => {
     if (editingNodeId) {
       // Update existing node
       setNodes((nds) =>
-        nds.map((node) =>
-          node.id === editingNodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  label: nodeName.trim(),
-                  configuration: filteredConfiguration,
-                },
-              }
-            : node
-        )
+        nds.map((node) => {
+          if (node.id !== editingNodeId) return node
+
+          const nodeData = node.data as any
+          const updatedData = {
+            ...nodeData,
+            label: nodeName.trim(),
+            _originalConfiguration: filteredConfiguration,
+          }
+
+          // Update the title in the type-specific props
+          if (nodeData.if) {
+            updatedData.if = { ...nodeData.if, title: nodeName.trim() }
+          }
+          if (nodeData.filter) {
+            updatedData.filter = { ...nodeData.filter, title: nodeName.trim() }
+          }
+          if (nodeData.approval) {
+            updatedData.approval = { ...nodeData.approval, title: nodeName.trim() }
+          }
+          if (nodeData.noop) {
+            updatedData.noop = { ...nodeData.noop, title: nodeName.trim() }
+          }
+
+          return {
+            ...node,
+            data: updatedData,
+          }
+        })
       )
     } else {
-      // Add new node with left-to-right positioning
+      // Add new node
       const newNodeId = generateNodeId(selectedComponent.name, nodeName.trim())
-      const channels = selectedComponent?.outputChannels?.map((channel: any) => channel.name) || ['default']
-
-      // Use component name as node type if it exists in nodeTypes, otherwise use 'default'
-      const nodeType = selectedComponent.name && nodeTypes[selectedComponent.name as keyof typeof nodeTypes]
-        ? selectedComponent.name
-        : 'default'
+      const mockNode = { component: { name: selectedComponent.name }, name: nodeName.trim() }
+      const blockData = createBlockData(mockNode, selectedComponent)
 
       const newNode: Node = {
         id: newNodeId,
-        type: nodeType,
+        type: 'default',
         position: { x: nodes.length * 250, y: 100 },
         data: {
-          label: nodeName.trim(),
-          component: selectedComponent.name,
-          channels,
-          configuration: filteredConfiguration,
+          ...blockData,
+          _originalComponent: selectedComponent.name,
+          _originalConfiguration: filteredConfiguration,
         },
       }
       setNodes((nds) => [...nds, newNode])
@@ -430,45 +490,28 @@ export const Blueprint = () => {
 
   const handleSave = async () => {
     try {
-      // Serialize all nodes including output channels
+      // Serialize all nodes
       const blueprintNodes = nodes.map((node) => {
-        if (node.type === 'outputChannel') {
-          // Output channel nodes
-          return {
-            id: node.id,
-            name: (node.data as any).label as string,
-            type: 'TYPE_OUTPUT_CHANNEL',
-            outputChannel: {
-              name: (node.data as any).label as string,
-            },
-            configuration: {},
-            position: {
-              x: Math.round(node.position.x),
-              y: Math.round(node.position.y),
-            },
-          }
-        } else {
-          // Component nodes
-          return {
-            id: node.id,
-            name: (node.data as any).label as string,
-            type: 'TYPE_COMPONENT',
-            component: {
-              name: (node.data as any).component as string,
-            },
-            configuration: (node.data as any).configuration || {},
-            position: {
-              x: Math.round(node.position.x),
-              y: Math.round(node.position.y),
-            },
-          }
+        const nodeData = node.data as any
+        return {
+          id: node.id,
+          name: nodeData.label as string,
+          type: 'TYPE_COMPONENT',
+          component: {
+            name: nodeData._originalComponent as string,
+          },
+          configuration: nodeData._originalConfiguration || {},
+          position: {
+            x: Math.round(node.position.x),
+            y: Math.round(node.position.y),
+          },
         }
       })
 
       const blueprintEdges = edges.map((edge) => ({
         sourceId: edge.source!,
         targetId: edge.target!,
-        channel: edge.sourceHandle || edge.label as string || 'default',
+        channel: edge.sourceHandle || 'default',
       }))
 
       await updateBlueprintMutation.mutateAsync({
@@ -510,314 +553,45 @@ export const Blueprint = () => {
     )
   }
 
+  // Create breadcrumbs
+  const breadcrumbs: BreadcrumbItem[] = [
+    { label: 'Blueprints', onClick: () => navigate(`/${organizationId}`) },
+    { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
+  ]
+
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header */}
-      <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/${organizationId}`)}>
-            <ArrowLeft />
-          </Button>
-          <div>
-            <Heading level={2} className="!text-xl !mb-0">{blueprint.name}</Heading>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={handleSave}
-            disabled={updateBlueprintMutation.isPending}
-          >
-            <Save />
-            {updateBlueprintMutation.isPending ? 'Saving...' : 'Save'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex relative">
-        {/* Sidebar */}
-        {isSidebarOpen && (
-          <div className="w-96 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col z-50">
-            {/* Sidebar Header */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-0">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setIsSidebarOpen(false)}
-                  aria-label="Close sidebar"
-                >
-                  <PanelLeftClose size={24} />
-                </Button>
-                <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">
-                  Blueprint Builder
-                </h2>
-              </div>
-            </div>
-
-            {/* Blueprint Settings */}
-            <div className="px-4 py-4 border-b border-zinc-200 dark:border-zinc-800">
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="blueprint-name" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Name
-                  </Label>
-                  <Input
-                    id="blueprint-name"
-                    value={blueprintName}
-                    onChange={(e) => setBlueprintName(e.target.value)}
-                    className="mt-1"
-                    placeholder="Blueprint name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="blueprint-description" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    Description
-                  </Label>
-                  <Input
-                    id="blueprint-description"
-                    value={blueprintDescription}
-                    onChange={(e) => setBlueprintDescription(e.target.value)}
-                    className="mt-1"
-                    placeholder="Blueprint description"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="blueprint-icon" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      Icon
-                    </Label>
-                    <Input
-                      id="blueprint-icon"
-                      value={blueprintIcon}
-                      onChange={(e) => setBlueprintIcon(e.target.value)}
-                      className="mt-1"
-                      placeholder="Icon name"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="blueprint-color" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      Color
-                    </Label>
-                    <Input
-                      id="blueprint-color"
-                      value={blueprintColor}
-                      onChange={(e) => setBlueprintColor(e.target.value)}
-                      className="mt-1"
-                      placeholder="Color"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)} className="flex-1 flex flex-col">
-              <TabsList className="mx-4 mt-4 grid w-auto grid-cols-3">
-                <TabsTrigger value="components">Components</TabsTrigger>
-                <TabsTrigger value="configuration">Configuration</TabsTrigger>
-                <TabsTrigger value="outputChannels">Output Channels</TabsTrigger>
-              </TabsList>
-
-              {/* Components Tab */}
-              <TabsContent value="components" className="flex-1 overflow-y-auto mt-0">
-                <div className="text-left p-4">
-                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                    Click on a component to add it to your blueprint
-                  </div>
-                  <ItemGroup>
-                    {components.map((component: any) => {
-                      const IconComponent = resolveIcon(component.icon || 'boxes')
-                      const colorClass = getColorClass(component.color)
-
-                      return (
-                        <Item
-                          key={component.name}
-                          onClick={() => handleComponentClick(component)}
-                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                          size="sm"
-                        >
-                          <ItemMedia>
-                            <IconComponent size={24} className={colorClass} />
-                          </ItemMedia>
-                          <ItemContent>
-                            <ItemTitle>{component.label || component.name}</ItemTitle>
-                            {component.description && (
-                              <ItemDescription>{component.description}</ItemDescription>
-                            )}
-                          </ItemContent>
-                        </Item>
-                      )
-                    })}
-                  </ItemGroup>
-                </div>
-              </TabsContent>
-
-              {/* Configuration Tab */}
-              <TabsContent value="configuration" className="flex-1 overflow-y-auto mt-0">
-                <div className="text-left p-4 space-y-6">
-                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                    Add configuration fields that can be used in your blueprint nodes
-                  </div>
-
-                  {/* Configuration Fields List */}
-                  {blueprintConfiguration.length > 0 && (
-                    <div className="space-y-4">
-                      {blueprintConfiguration.map((field: any, index: number) => (
-                        <div
-                          key={index}
-                          className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3 cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
-                          onClick={() => handleOpenConfigFieldModal(index)}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">
-                                {field.label || field.name}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                                Type: {field.type} {field.required && '(required)'}
-                              </p>
-                              {field.description && (
-                                <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
-                                  {field.description}
-                                </p>
-                              )}
-                              {field.type === 'select' && field.typeOptions?.select?.options && field.typeOptions.select.options.length > 0 && (
-                                <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
-                                  Options: {field.typeOptions.select.options.map((opt: any) => opt.label).join(', ')}
-                                </p>
-                              )}
-                              {field.type === 'multi_select' && field.typeOptions?.multiSelect?.options && field.typeOptions.multiSelect.options.length > 0 && (
-                                <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
-                                  Options: {field.typeOptions.multiSelect.options.map((opt: any) => opt.label).join(', ')}
-                                </p>
-                              )}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                const newConfig = blueprintConfiguration.filter((_, i) => i !== index)
-                                setBlueprintConfiguration(newConfig)
-                              }}
-                            >
-                              <Trash2 className="text-red-500" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Add New Configuration Field Button */}
-                  <Button
-                    variant="outline"
-                    onClick={() => handleOpenConfigFieldModal()}
-                    className="w-full"
-                  >
-                    <Plus />
-                    Add Configuration Field
-                  </Button>
-                </div>
-              </TabsContent>
-
-              {/* Output Channels Tab */}
-              <TabsContent value="outputChannels" className="flex-1 overflow-y-auto mt-0">
-                <div className="text-left p-4 space-y-6">
-                  <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                    Define output channels for this blueprint by selecting which node and channel should be exposed
-                  </div>
-
-                  {/* Output Channels List */}
-                  {blueprintOutputChannels.length > 0 && (
-                    <div className="space-y-4">
-                      {blueprintOutputChannels.map((outputChannel: any, index: number) => (
-                        <div
-                          key={index}
-                          className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3 cursor-pointer hover:border-green-400 dark:hover:border-green-600 transition-colors"
-                          onClick={() => handleOpenOutputChannelModal(index)}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <ArrowUpRight className="text-green-600 dark:text-green-400" />
-                                <p className="font-medium text-sm text-gray-900 dark:text-zinc-100">
-                                  {outputChannel.name}
-                                </p>
-                              </div>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400 mt-2">
-                                Node: {outputChannel.nodeId}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                Channel: {outputChannel.nodeOutputChannel || 'default'}
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                const newOutputChannels = blueprintOutputChannels.filter((_, i) => i !== index)
-                                setBlueprintOutputChannels(newOutputChannels)
-                              }}
-                            >
-                              <Trash2 className="text-red-500" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Add New Output Channel Button */}
-                  <Button
-                    variant="outline"
-                    onClick={() => handleOpenOutputChannelModal()}
-                    className="w-full"
-                  >
-                    <Plus />
-                    Add Output Channel
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
-
-        {/* React Flow Canvas */}
-        <div className="flex-1 relative">
-          {!isSidebarOpen && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsSidebarOpen(true)}
-              aria-label="Open sidebar"
-              className="absolute top-4 left-4 z-10 shadow-md"
-            >
-              <Menu size={24} />
-            </Button>
-          )}
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeDoubleClick={handleNodeDoubleClick}
-            fitView
-            colorMode="system"
-          >
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={24}
-              size={1}
-            />
-            <Controls />
-          </ReactFlow>
-        </div>
-      </div>
+    <>
+      <BlueprintBuilderPage
+        blueprintName={blueprintName}
+        breadcrumbs={breadcrumbs}
+        metadata={{
+          name: blueprintName,
+          description: blueprintDescription,
+          icon: blueprintIcon,
+          color: blueprintColor,
+        }}
+        onMetadataChange={handleMetadataChange}
+        configurationFields={blueprintConfiguration}
+        onConfigurationFieldsChange={setBlueprintConfiguration}
+        onAddConfigField={() => handleOpenConfigFieldModal()}
+        onEditConfigField={handleOpenConfigFieldModal}
+        outputChannels={blueprintOutputChannels}
+        onOutputChannelsChange={setBlueprintOutputChannels}
+        onAddOutputChannel={() => handleOpenOutputChannelModal()}
+        onEditOutputChannel={handleOpenOutputChannelModal}
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={(nodeId) => console.log('Node clicked:', nodeId)}
+        onNodeEdit={handleNodeEdit}
+        onNodeDelete={handleNodeDelete}
+        components={components}
+        onComponentClick={handleBlockClick}
+        onSave={handleSave}
+        isSaving={updateBlueprintMutation.isPending}
+      />
 
       {/* Add/Edit Node Modal */}
       <Dialog open={isAddNodeModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
@@ -1137,7 +911,7 @@ export const Blueprint = () => {
               {/* Node Output Channel Selection */}
               {outputChannelForm.nodeId && (() => {
                 const selectedNode = nodes.find((n) => n.id === outputChannelForm.nodeId)
-                const nodeChannels = (selectedNode?.data as any)?.channels || ['default']
+                const nodeChannels = (selectedNode?.data as any)?.outputChannels || ['default']
 
                 return (
                   <div>
@@ -1180,6 +954,6 @@ export const Blueprint = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
