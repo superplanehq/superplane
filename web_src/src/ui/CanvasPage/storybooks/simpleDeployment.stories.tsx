@@ -7,15 +7,14 @@ import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
-import { useMemo, useState, useCallback } from "react";
-import { Button } from "../../button";
-import { AiProps, CanvasNode, CanvasPage } from "../index";
+import { useCallback, useMemo, useState } from "react";
 import type { BlockData } from "../Block";
+import { AiProps, CanvasNode, CanvasPage } from "../index";
 import { genCommit } from "./commits";
 import { genDockerImage } from "./dockerImages";
 import { createGetSidebarData } from "./getSidebarData";
 import { handleNodeExpand } from "./navigation";
-import { SimulationEngine, sleep, useSimulationRunner } from "./useSimulation";
+import { sleep, useSimulationCron, useSimulationRunner } from "./useSimulation";
 
 const meta = {
   title: "Pages/CanvasPage/Examples",
@@ -495,19 +494,28 @@ export const SimpleDeployment: Story = {
     const edges = useMemo(() => args.edges ?? [], [args.edges]);
     const simulation = useSimulationRunner({ nodes, edges, setNodes });
 
+    useSimulationCron(10000, () => {
+      simulation.run("listen-code");
+    });
+
     const toggleNodeCollapse = useCallback((nodeId: string) => {
-      console.log('toggleNodeCollapse called for nodeId:', nodeId);
-      setNodes(prevNodes => {
-        console.log('Current nodes:', prevNodes.length);
-        const newNodes = prevNodes.map(node => {
+      console.log("toggleNodeCollapse called for nodeId:", nodeId);
+      setNodes((prevNodes) => {
+        console.log("Current nodes:", prevNodes.length);
+        const newNodes = prevNodes.map((node) => {
           if (node.id !== nodeId) return node;
 
-          console.log('Found node to toggle:', nodeId, node.data);
+          console.log("Found node to toggle:", nodeId, node.data);
           const nodeData = { ...node.data } as unknown as BlockData;
 
           // Toggle collapse state based on node type
           if (nodeData.type === "composite" && nodeData.composite) {
-            console.log('Toggling composite from', nodeData.composite.collapsed, 'to', !nodeData.composite.collapsed);
+            console.log(
+              "Toggling composite from",
+              nodeData.composite.collapsed,
+              "to",
+              !nodeData.composite.collapsed
+            );
             nodeData.composite = {
               ...nodeData.composite,
               collapsed: !nodeData.composite.collapsed,
@@ -515,7 +523,12 @@ export const SimpleDeployment: Story = {
           }
 
           if (nodeData.type === "approval" && nodeData.approval) {
-            console.log('Toggling approval from', nodeData.approval.collapsed, 'to', !nodeData.approval.collapsed);
+            console.log(
+              "Toggling approval from",
+              nodeData.approval.collapsed,
+              "to",
+              !nodeData.approval.collapsed
+            );
             nodeData.approval = {
               ...nodeData.approval,
               collapsed: !nodeData.approval.collapsed,
@@ -523,18 +536,26 @@ export const SimpleDeployment: Story = {
           }
 
           if (nodeData.type === "trigger" && nodeData.trigger) {
-            console.log('Toggling trigger from', nodeData.trigger.collapsed, 'to', !nodeData.trigger.collapsed);
+            console.log(
+              "Toggling trigger from",
+              nodeData.trigger.collapsed,
+              "to",
+              !nodeData.trigger.collapsed
+            );
             nodeData.trigger = {
               ...nodeData.trigger,
               collapsed: !nodeData.trigger.collapsed,
             };
           }
 
-          const updatedNode: CanvasNode = { ...node, data: nodeData as unknown as Record<string, unknown> };
-          console.log('Updated node:', updatedNode);
+          const updatedNode: CanvasNode = {
+            ...node,
+            data: nodeData as unknown as Record<string, unknown>,
+          };
+          console.log("Updated node:", updatedNode);
           return updatedNode;
         });
-        console.log('Returning new nodes:', newNodes.length);
+        console.log("Returning new nodes:", newNodes.length);
         return newNodes;
       });
     }, []);
@@ -603,8 +624,14 @@ export const SimpleDeployment: Story = {
           }}
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
-            console.log("Current nodes before toggle:", nodesWithHandlers.length);
-            console.log("Node data before toggle:", nodesWithHandlers.find(n => n.id === nodeId)?.data);
+            console.log(
+              "Current nodes before toggle:",
+              nodesWithHandlers.length
+            );
+            console.log(
+              "Node data before toggle:",
+              nodesWithHandlers.find((n) => n.id === nodeId)?.data
+            );
             toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {
@@ -622,39 +649,11 @@ export const SimpleDeployment: Story = {
       );
     };
 
-    return (
-      <div className="h-[100vh] w-full ">
-        <SimulatorButtons simulation={simulation} />
-
-        {renderContent()}
-      </div>
-    );
+    return <div className="h-[100vh] w-full ">{renderContent()}</div>;
   },
 };
 
 SimpleDeployment.storyName = "01 - Simple Deployment";
-
-function SimulatorButtons({ simulation }: { simulation: SimulationEngine }) {
-  return (
-    <div className="absolute z-[999] bottom-3 left-3 flex gap-2">
-      <Button
-        onClick={() => simulation.run("listen-code")}
-        size="sm"
-        variant="outline"
-      >
-        GitHub Push
-      </Button>
-
-      <Button
-        onClick={() => simulation.run("listen-image")}
-        size="sm"
-        variant="outline"
-      >
-        Docker Image Push
-      </Button>
-    </div>
-  );
-}
 
 function useAi(): AiProps {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
