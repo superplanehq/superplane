@@ -10,6 +10,7 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 import { useCallback, useMemo, useState } from "react";
 import type { BlockData } from "../Block";
 import { AiProps, CanvasNode, CanvasPage } from "../index";
+import { mockBuildingBlockCategories } from "./buildingBlocks";
 import { genCommit } from "./commits";
 import { genDockerImage } from "./dockerImages";
 import { createGetSidebarData } from "./getSidebarData";
@@ -488,9 +489,7 @@ export const SimpleDeployment: Story = {
     nodes: sampleNodes,
     edges: sampleEdges,
     title: "Simple Deployment",
-    triggers: [],
-    blueprints: [],
-    components: [],
+    buildingBlocks: mockBuildingBlockCategories,
   },
   render: function SimpleDeploymentRender(args) {
     const [nodes, setNodes] = useState<Node[]>(args.nodes ?? []);
