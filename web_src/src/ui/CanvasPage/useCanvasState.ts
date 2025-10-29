@@ -82,8 +82,16 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   }, [startCollapsed, initialNodes]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
+    // Check for position changes and notify parent
+    changes.forEach((change) => {
+      if (change.type === 'position' && change.position && change.dragging === false && props.onNodePositionChange) {
+        // Only notify when dragging ends (dragging === false)
+        props.onNodePositionChange(change.id, change.position);
+      }
+    });
+
     setNodes((nds) => applyNodeChanges(changes, nds));
-  }, []);
+  }, [props]);
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     // Check for edge removals and notify parent

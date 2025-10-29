@@ -92,6 +92,7 @@ export interface CanvasPageProps {
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
+  onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
 
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;

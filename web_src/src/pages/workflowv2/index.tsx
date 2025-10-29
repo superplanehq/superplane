@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -42,6 +42,24 @@ export function WorkflowPageV2() {
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
 
+  /**
+   * Track which node IDs have been persisted to the server.
+   * This helps us avoid unnecessary loading states when nodes
+   * are added to the workflow, but not persisted yet.
+   */
+  const persistedNodeIdsRef = useRef<Set<string>>(new Set());
+  const isInitialLoadRef = useRef(true);
+
+  /**
+   * Initialize persisted node IDs when workflow is first loaded
+   * This must happen during render (not in useEffect) to ensure it's available for the query hooks.
+   */
+  if (workflow && isInitialLoadRef.current) {
+    const nodeIds = workflow.nodes?.map(n => n.id!) || [];
+    persistedNodeIdsRef.current = new Set(nodeIds);
+    isInitialLoadRef.current = false;
+  }
+
   //
   // Get last event for triggers
   // Memoize to prevent unnecessary re-renders and query recreations
@@ -61,14 +79,22 @@ export function WorkflowPageV2() {
     [workflow?.nodes]
   );
 
-  // Fetch executions for both composite and component nodes
-  const nodesWithExecutions = useMemo(
-    () => [...compositeNodes, ...componentNodes],
-    [compositeNodes, componentNodes]
+  /**
+   * Filter to only include persisted nodes for data fetching
+   * This prevents unnecessary loading states when new nodes are added locally.
+   */
+  const persistedTriggerNodes = useMemo(
+    () => triggerNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!)),
+    [triggerNodes]
   );
 
-  const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(workflowId!, triggerNodes);
-  const { nodeExecutionsMap, nodeQueueItemsMap, isLoading: nodeDataLoading } = useCompositeNodeData(workflowId!, nodesWithExecutions);
+  const persistedNodesWithExecutions = useMemo(() => {
+    const allNodes = [...compositeNodes, ...componentNodes];
+    return allNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!));
+  }, [compositeNodes, componentNodes]);
+
+  const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(workflowId!, persistedTriggerNodes);
+  const { nodeExecutionsMap, nodeQueueItemsMap, isLoading: nodeDataLoading } = useCompositeNodeData(workflowId!, persistedNodesWithExecutions);
 
   // Prepare building blocks for the sidebar
   const buildingBlocks = useMemo(() => ({
@@ -320,6 +346,33 @@ export function WorkflowPageV2() {
     );
   }, [workflow, organizationId, workflowId, queryClient]);
 
+  /**
+   * Updates the position of a node in the local cache.
+   * Called when a node is dragged in the CanvasPage.
+   *
+   * @param nodeId - The ID of the node to update.
+   * @param position - The new position of the node.
+   */
+  const handleNodePositionChange = useCallback((nodeId: string, position: { x: number; y: number }) => {
+    if (!workflow || !organizationId || !workflowId) return;
+
+    const updatedNodes = workflow.nodes?.map((node) =>
+      node.id === nodeId
+        ? { ...node, position: { x: Math.round(position.x), y: Math.round(position.y) } }
+        : node
+    );
+
+    const updatedWorkflow = {
+      ...workflow,
+      nodes: updatedNodes,
+    };
+
+    queryClient.setQueryData(
+      workflowKeys.detail(organizationId, workflowId),
+      updatedWorkflow
+    );
+  }, [workflow, organizationId, workflowId, queryClient]);
+
   const handleSave = useCallback(async (canvasNodes: CanvasNode[]) => {
     if (!workflow || !organizationId || !workflowId) return;
 
@@ -361,6 +414,10 @@ export function WorkflowPageV2() {
         nodes: updatedNodes,
         edges: workflow.edges,
       });
+
+      // Update persisted node IDs after successful save
+      const nodeIds = updatedNodes?.map(n => n.id!) || [];
+      persistedNodeIdsRef.current = new Set(nodeIds);
 
       showSuccessToast("Workflow saved successfully");
     } catch (error) {
@@ -406,6 +463,7 @@ export function WorkflowPageV2() {
       onEdgeCreate={handleEdgeCreate}
       onNodeDelete={handleNodeDelete}
       onEdgeDelete={handleEdgeDelete}
+      onNodePositionChange={handleNodePositionChange}
       triggers={buildingBlocks.triggers}
       components={buildingBlocks.components}
       blueprints={buildingBlocks.blueprints}
