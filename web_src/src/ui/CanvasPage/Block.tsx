@@ -39,6 +39,9 @@ export interface BlockData {
   // last input event received by this block (for simulation display)
   lastEvent?: unknown;
 
+  // output channels for this block (e.g., ['default'], ['true', 'false'])
+  outputChannels?: string[];
+
   // trigger node specific props
   trigger?: TriggerProps;
 
@@ -141,17 +144,93 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
+  const channels = data.outputChannels || ["default"];
+
+  // Single channel: render one handle that respects collapsed state
+  if (channels.length === 1) {
+    return (
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={channels[0]}
+        style={{
+          ...HANDLE_STYLE,
+          right: -15,
+          top: isCollapsed ? "50%" : 30,
+          transform: isCollapsed ? "translateY(-50%)" : undefined,
+        }}
+      />
+    );
+  }
+
+  // Multiple channels: always show all handles with labels (even when collapsed)
+  // This ensures users always know which channel they're connecting to
+  const baseTop = isCollapsed ? 30 : 80; // Adjust starting position based on collapsed state
+  const spacing = 40; // Space between handles
+
   return (
-    <Handle
-      type="source"
-      position={Position.Right}
-      style={{
-        ...HANDLE_STYLE,
-        right: -15,
-        top: isCollapsed ? "50%" : 30,
-        transform: isCollapsed ? "translateY(-50%)" : undefined,
-      }}
-    />
+    <>
+      {channels.map((channel, index) => (
+        <div
+          key={channel}
+          className="absolute"
+          style={{
+            left: "100%",
+            top: baseTop + index * spacing,
+            transform: "translateY(-50%)",
+            paddingLeft: 4,
+          }}
+        >
+          <div className="relative flex items-center">
+            {/* Small line from node */}
+            <div
+              style={{
+                width: 20,
+                height: 3,
+                backgroundColor: "#C9D5E1",
+                pointerEvents: "none",
+                marginRight: 4,
+              }}
+            />
+            {/* Label text */}
+            <span
+              className="text-xs font-medium whitespace-nowrap"
+              style={{
+                color: "#8B9AAC",
+                pointerEvents: "none",
+                paddingLeft: 2,
+                paddingRight: 2,
+              }}
+            >
+              {channel}
+            </span>
+            {/* Small line to handle */}
+            <div
+              style={{
+                width: 16,
+                height: 3,
+                backgroundColor: "#C9D5E1",
+                pointerEvents: "none",
+                marginLeft: 4,
+              }}
+            />
+            {/* Handle (connection point) */}
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={channel}
+              style={{
+                ...HANDLE_STYLE,
+                position: "relative",
+                pointerEvents: "auto",
+                marginLeft: -6,
+                top: 5,
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
