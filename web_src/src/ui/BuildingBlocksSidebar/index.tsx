@@ -63,6 +63,14 @@ export function BuildingBlocksSidebar({
 
   const [searchTerm, setSearchTerm] = useState("");
 
+  const sortedCategories = blocks.sort((a, b) => {
+    if (a.name === "Primitives") return -1;
+    if (b.name === "Primitives") return 1;
+    if (a.name === "Custom Components") return -1;
+    if (b.name === "Custom Components") return 1;
+    return a.name.localeCompare(b.name);
+  });
+
   return (
     <div className="w-[280px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
       <div className="flex items-center gap-2 px-4 py-4">
@@ -88,7 +96,7 @@ export function BuildingBlocksSidebar({
       </div>
 
       <div className="flex-1 overflow-y-scroll">
-        {blocks.map((category) => (
+        {sortedCategories.map((category) => (
           <CategorySection
             key={category.name}
             category={category}
