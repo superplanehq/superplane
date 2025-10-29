@@ -19,7 +19,7 @@ export interface ComponentBaseSpecValue {
 export interface EventSection {
   title: string;
   receivedAt?: Date;
-  eventState?: "success" | "failed";
+  eventState?: "success" | "failed" | "neutral";
   eventTitle?: string;
   handleComponent?: React.ReactNode;
 }
@@ -109,10 +109,26 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
           const diff = section.receivedAt ? now.getTime() - section.receivedAt.getTime() : 0
           const timeAgo = section.receivedAt ? calcRelativeTimeFromDiff(diff) : ""
 
-          const LastEventIcon = section.eventState === "success" ? resolveIcon("check") : resolveIcon("x")
-          const LastEventColor = section.eventState === "success" ? "text-green-700" : "text-red-700"
-          const LastEventBackground = section.eventState === "success" ? "bg-green-200" : "bg-red-200"
-          const LastEventIconColor = section.eventState === "success" ? "text-green-600 bg-green-600" : "text-red-600 bg-red-600"
+          const LastEventIcon = section.eventState === "success"
+            ? resolveIcon("check")
+            : section.eventState === "neutral"
+              ? resolveIcon("circle")
+              : resolveIcon("x")
+          const LastEventColor = section.eventState === "success"
+            ? "text-green-700"
+            : section.eventState === "neutral"
+              ? "text-gray-500"
+              : "text-red-700"
+          const LastEventBackground = section.eventState === "success"
+            ? "bg-green-200"
+            : section.eventState === "neutral"
+              ? "bg-gray-100"
+              : "bg-red-200"
+          const LastEventIconColor = section.eventState === "success"
+            ? "text-green-600 bg-green-600"
+            : section.eventState === "neutral"
+              ? "text-gray-400 bg-gray-400"
+              : "text-red-600 bg-red-600"
 
           return (
             <div key={index} className={"px-4 pt-2 pb-6 relative" + (index < eventSections.length - 1 ? " border-b" : "")}>

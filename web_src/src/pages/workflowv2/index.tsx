@@ -802,7 +802,7 @@ function prepareCompositeNode(
       rootTriggerNode?.trigger?.name || ""
     );
 
-    let { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle(
+    const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle(
       execution.rootEvent!
     );
     (canvasNode.data.composite as CompositeProps).lastRunItem = {
@@ -909,6 +909,27 @@ function prepareComponentNode(
         nodeExecutionsMap,
         workflowId,
         queryClient
+      );
+    case "if":
+      return prepareIfNode(
+        nodes,
+        node,
+        components,
+        nodeExecutionsMap
+      );
+    case "noop":
+      return prepareNoopNode(
+        nodes,
+        node,
+        components,
+        nodeExecutionsMap
+      );
+    case "filter":
+      return prepareFilterNode(
+        nodes,
+        node,
+        components,
+        nodeExecutionsMap
       );
   }
 
@@ -1066,6 +1087,203 @@ function prepareApprovalNode(
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
             ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!)
             : undefined,
+      },
+    },
+  };
+}
+
+function prepareIfNode(
+  nodes: ComponentsNode[],
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+): CanvasNode {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Parse conditions from node configuration
+  const conditionConfig = node.configuration?.conditions;
+  const conditions = Array.isArray(conditionConfig) ? conditionConfig.map((condition: unknown) => {
+    const cond = condition as Record<string, unknown>;
+    const result: {
+      field: string;
+      operator: string;
+      value: string;
+      logicalOperator?: string;
+    } = {
+      field: (cond.field as string) || "",
+      operator: (cond.operator as string) || "",
+      value: (cond.value as string) || "",
+    };
+    if (cond.logicalOperator) {
+      result.logicalOperator = cond.logicalOperator as string;
+    }
+    return result;
+  }) : [];
+
+  // Get last execution for event data
+  let trueEvent, falseEvent;
+  if (execution) {
+    const rootTriggerNode = nodes.find(
+      (n) => n.id === execution.rootEvent?.nodeId
+    );
+    const rootTriggerRenderer = getTriggerRenderer(
+      rootTriggerNode?.trigger?.name || ""
+    );
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    const eventData = {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+    };
+
+    // Determine which branch was taken based on execution metadata or result
+    const wasTrueBranch = execution.result === "RESULT_PASSED";
+    if (wasTrueBranch) {
+      trueEvent = eventData;
+    } else {
+      falseEvent = eventData;
+    }
+  }
+
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "if",
+      label: node.name!,
+      state: "pending" as const,
+      if: {
+        title: node.name!,
+        conditions,
+        trueEvent: trueEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+        falseEvent: falseEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+        trueSectionLabel: "TRUE",
+        falseSectionLabel: "FALSE",
+      },
+    },
+  };
+}
+
+function prepareNoopNode(
+  nodes: ComponentsNode[],
+  node: ComponentsNode,
+  _components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+): CanvasNode {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Get last event data
+  let lastEvent;
+  if (execution) {
+    const rootTriggerNode = nodes.find(
+      (n) => n.id === execution.rootEvent?.nodeId
+    );
+    const rootTriggerRenderer = getTriggerRenderer(
+      rootTriggerNode?.trigger?.name || ""
+    );
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    lastEvent = {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+    };
+  }
+
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "noop",
+      label: node.name!,
+      state: "pending" as const,
+      noop: {
+        title: node.name!,
+        lastEvent: lastEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+      },
+    },
+  };
+}
+
+function prepareFilterNode(
+  nodes: ComponentsNode[],
+  node: ComponentsNode,
+  _components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+): CanvasNode {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Parse filters from node configuration
+  const filterConfig = node.configuration?.filters;
+  const filters = Array.isArray(filterConfig) ? filterConfig.map((filter: unknown) => {
+    const filt = filter as Record<string, unknown>;
+    const result: {
+      field: string;
+      operator: string;
+      value: string;
+      logicalOperator?: string;
+    } = {
+      field: (filt.field as string) || "",
+      operator: (filt.operator as string) || "",
+      value: (filt.value as string) || "",
+    };
+    if (filt.logicalOperator) {
+      result.logicalOperator = filt.logicalOperator as string;
+    }
+    return result;
+  }) : [];
+
+  // Get last event data
+  let lastEvent;
+  if (execution) {
+    const rootTriggerNode = nodes.find(
+      (n) => n.id === execution.rootEvent?.nodeId
+    );
+    const rootTriggerRenderer = getTriggerRenderer(
+      rootTriggerNode?.trigger?.name || ""
+    );
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    lastEvent = {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+    };
+  }
+
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "filter",
+      label: node.name!,
+      state: "pending" as const,
+      filter: {
+        title: node.name!,
+        filters,
+        lastEvent: lastEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
       },
     },
   };
