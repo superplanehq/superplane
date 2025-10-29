@@ -13,6 +13,7 @@ import {
 import { resolveIcon } from "@/lib/utils";
 import { getColorClass } from "@/utils/colors";
 import { Menu, PanelLeftClose } from "lucide-react";
+import { useState } from "react";
 
 export interface BuildingBlock {
   name: string;
@@ -60,17 +61,30 @@ export function BuildingBlocksSidebar({
     );
   }
 
+  const [searchTerm, setSearchTerm] = useState("");
+
   return (
     <div className="w-[280px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
-      <div className="flex items-center gap-3 px-4 pt-4 pb-0">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onToggle(false)}
-          aria-label="Close sidebar"
-        >
-          <PanelLeftClose size={24} />
-        </Button>
+      <div className="flex items-center gap-2 px-4 py-4">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Search components..."
+            className="w-full px-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 dark:placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-3 pb-0">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onToggle(false)}
+            aria-label="Close sidebar"
+          >
+            <PanelLeftClose size={24} />
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-scroll">
