@@ -89,20 +89,8 @@ export const Default: Story = {
         }}
         configurationFields={configurationFields}
         onConfigurationFieldsChange={setConfigurationFields}
-        onAddConfigField={() => {
-          console.log("Add configuration field");
-        }}
-        onEditConfigField={(index) => {
-          console.log("Edit configuration field:", index);
-        }}
         outputChannels={outputChannels}
         onOutputChannelsChange={setOutputChannels}
-        onAddOutputChannel={() => {
-          console.log("Add output channel");
-        }}
-        onEditOutputChannel={(index) => {
-          console.log("Edit output channel:", index);
-        }}
         nodes={nodes}
         edges={edges}
         onNodesChange={(changes) => {
@@ -176,20 +164,8 @@ export const EmptyBlueprint: Story = {
         }}
         configurationFields={configurationFields}
         onConfigurationFieldsChange={setConfigurationFields}
-        onAddConfigField={() => {
-          console.log("Add configuration field");
-        }}
-        onEditConfigField={(index) => {
-          console.log("Edit configuration field:", index);
-        }}
         outputChannels={outputChannels}
         onOutputChannelsChange={setOutputChannels}
-        onAddOutputChannel={() => {
-          console.log("Add output channel");
-        }}
-        onEditOutputChannel={(index) => {
-          console.log("Edit output channel:", index);
-        }}
         nodes={nodes}
         edges={edges}
         onNodesChange={(changes) => {

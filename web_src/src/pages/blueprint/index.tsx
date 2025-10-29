@@ -12,15 +12,12 @@ import '@xyflow/react/dist/style.css'
 import { useBlueprint, useUpdateBlueprint } from '../../hooks/useBlueprintData'
 import { useComponents } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
-import { AlertCircle, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { BuildingBlock } from '../../ui/BuildingBlocksSidebar'
 import { BlueprintBuilderPage } from '../../ui/BlueprintBuilderPage'
 import type { BreadcrumbItem } from '../../ui/BlueprintBuilderPage'
 import { BlockData } from '../../ui/CanvasPage/Block'
 import { Heading } from '../../components/Heading/heading'
-import { Input } from '../../components/ui/input'
-import { Label } from '../../components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { ComponentsComponent } from '../../api-client'
 import {
   Dialog,
@@ -30,6 +27,8 @@ import {
   DialogDescription,
 } from '../../components/ui/dialog'
 import { VisuallyHidden } from '../../components/ui/visually-hidden'
+import { Label } from '../../components/ui/label'
+import { Input } from '../../components/ui/input'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 import { filterVisibleConfiguration } from '../../utils/components'
 import { ConfigurationFieldRenderer } from '@/ui/configurationFieldRenderer'
@@ -84,13 +83,7 @@ export const Blueprint = () => {
   const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([])
-  const [isEditConfigFieldModalOpen, setIsEditConfigFieldModalOpen] = useState(false)
-  const [editingConfigFieldIndex, setEditingConfigFieldIndex] = useState<number | null>(null)
-  const [configFieldForm, setConfigFieldForm] = useState<any>({})
   const [blueprintOutputChannels, setBlueprintOutputChannels] = useState<any[]>([])
-  const [isEditOutputChannelModalOpen, setIsEditOutputChannelModalOpen] = useState(false)
-  const [editingOutputChannelIndex, setEditingOutputChannelIndex] = useState<number | null>(null)
-  const [outputChannelForm, setOutputChannelForm] = useState<any>({})
   const [blueprintName, setBlueprintName] = useState('')
   const [blueprintDescription, setBlueprintDescription] = useState('')
   const [blueprintIcon, setBlueprintIcon] = useState('')
@@ -371,122 +364,6 @@ export const Blueprint = () => {
     setEditingNodeId(null)
   }
 
-  const handleOpenConfigFieldModal = (index?: number) => {
-    if (index !== undefined) {
-      setEditingConfigFieldIndex(index)
-      setConfigFieldForm(blueprintConfiguration[index])
-    } else {
-      setEditingConfigFieldIndex(null)
-      setConfigFieldForm({
-        name: '',
-        label: '',
-        type: 'string',
-        description: '',
-        required: false,
-        typeOptions: {},
-      })
-    }
-    setIsEditConfigFieldModalOpen(true)
-  }
-
-  const handleCloseConfigFieldModal = () => {
-    setIsEditConfigFieldModalOpen(false)
-    setEditingConfigFieldIndex(null)
-    setConfigFieldForm({})
-  }
-
-  const handleSaveConfigField = () => {
-    if (!configFieldForm.name.trim()) {
-      showErrorToast('Field name is required')
-      return
-    }
-
-    // Validate options for select/multi_select types
-    if (configFieldForm.type === 'select') {
-      const options = configFieldForm.typeOptions?.select?.options || []
-      if (options.length === 0) {
-        showErrorToast('At least one option is required for select fields')
-        return
-      }
-
-      // Validate that all options have both label and value
-      const hasInvalidOption = options.some((opt: any) => !opt.label?.trim() || !opt.value?.trim())
-      if (hasInvalidOption) {
-        showErrorToast('All options must have both label and value')
-        return
-      }
-    } else if (configFieldForm.type === 'multi_select') {
-      const options = configFieldForm.typeOptions?.multiSelect?.options || []
-      if (options.length === 0) {
-        showErrorToast('At least one option is required for multi-select fields')
-        return
-      }
-
-      // Validate that all options have both label and value
-      const hasInvalidOption = options.some((opt: any) => !opt.label?.trim() || !opt.value?.trim())
-      if (hasInvalidOption) {
-        showErrorToast('All options must have both label and value')
-        return
-      }
-    }
-
-    if (editingConfigFieldIndex !== null) {
-      // Update existing field
-      const newConfig = [...blueprintConfiguration]
-      newConfig[editingConfigFieldIndex] = configFieldForm
-      setBlueprintConfiguration(newConfig)
-    } else {
-      // Add new field
-      setBlueprintConfiguration([...blueprintConfiguration, configFieldForm])
-    }
-
-    handleCloseConfigFieldModal()
-  }
-
-  const handleOpenOutputChannelModal = (index?: number) => {
-    if (index !== undefined) {
-      setEditingOutputChannelIndex(index)
-      setOutputChannelForm(blueprintOutputChannels[index])
-    } else {
-      setEditingOutputChannelIndex(null)
-      setOutputChannelForm({
-        name: '',
-        nodeId: '',
-        nodeOutputChannel: 'default',
-      })
-    }
-    setIsEditOutputChannelModalOpen(true)
-  }
-
-  const handleCloseOutputChannelModal = () => {
-    setIsEditOutputChannelModalOpen(false)
-    setEditingOutputChannelIndex(null)
-    setOutputChannelForm({})
-  }
-
-  const handleSaveOutputChannel = () => {
-    if (!outputChannelForm.name.trim()) {
-      showErrorToast('Output channel name is required')
-      return
-    }
-
-    if (!outputChannelForm.nodeId) {
-      showErrorToast('Node selection is required')
-      return
-    }
-
-    if (editingOutputChannelIndex !== null) {
-      // Update existing output channel
-      const newOutputChannels = [...blueprintOutputChannels]
-      newOutputChannels[editingOutputChannelIndex] = outputChannelForm
-      setBlueprintOutputChannels(newOutputChannels)
-    } else {
-      // Add new output channel
-      setBlueprintOutputChannels([...blueprintOutputChannels, outputChannelForm])
-    }
-
-    handleCloseOutputChannelModal()
-  }
 
   const handleSave = async () => {
     try {
@@ -573,12 +450,8 @@ export const Blueprint = () => {
         onMetadataChange={handleMetadataChange}
         configurationFields={blueprintConfiguration}
         onConfigurationFieldsChange={setBlueprintConfiguration}
-        onAddConfigField={() => handleOpenConfigFieldModal()}
-        onEditConfigField={handleOpenConfigFieldModal}
         outputChannels={blueprintOutputChannels}
         onOutputChannelsChange={setBlueprintOutputChannels}
-        onAddOutputChannel={() => handleOpenOutputChannelModal()}
-        onEditOutputChannel={handleOpenOutputChannelModal}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -648,310 +521,6 @@ export const Blueprint = () => {
               </DialogFooter>
             </div>
           </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      {/* Configuration Field Editor Modal */}
-      <Dialog open={isEditConfigFieldModalOpen} onOpenChange={(open) => !open && handleCloseConfigFieldModal()}>
-        <DialogContent className="max-w-2xl" showCloseButton={false}>
-          <VisuallyHidden>
-            <DialogTitle>
-              {editingConfigFieldIndex !== null ? 'Edit Configuration Field' : 'Add Configuration Field'}
-            </DialogTitle>
-            <DialogDescription>Configure the blueprint configuration field</DialogDescription>
-          </VisuallyHidden>
-          <div className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
-              {editingConfigFieldIndex !== null ? 'Edit Configuration Field' : 'Add Configuration Field'}
-            </h3>
-
-            <div className="space-y-4">
-              {/* Field Name */}
-              <div>
-                <Label className="block text-sm font-medium mb-2">Field Name *</Label>
-                <Input
-                  type="text"
-                  value={configFieldForm.name || ''}
-                  onChange={(e) => setConfigFieldForm({ ...configFieldForm, name: e.target.value })}
-                  placeholder="e.g., threshold_expression"
-                  autoFocus
-                />
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                  This is the internal name used in templates (e.g., $config.threshold_expression)
-                </p>
-              </div>
-
-              {/* Field Label */}
-              <div>
-                <Label className="block text-sm font-medium mb-2">Label *</Label>
-                <Input
-                  type="text"
-                  value={configFieldForm.label || ''}
-                  onChange={(e) => setConfigFieldForm({ ...configFieldForm, label: e.target.value })}
-                  placeholder="e.g., Threshold Expression"
-                />
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                  Display name shown in the UI
-                </p>
-              </div>
-
-              {/* Field Type */}
-              <div>
-                <Label className="block text-sm font-medium mb-2">Type *</Label>
-                <Select
-                  value={configFieldForm.type || 'string'}
-                  onValueChange={(val) => setConfigFieldForm({ ...configFieldForm, type: val })}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="string">String</SelectItem>
-                    <SelectItem value="number">Number</SelectItem>
-                    <SelectItem value="boolean">Boolean</SelectItem>
-                    <SelectItem value="select">Select</SelectItem>
-                    <SelectItem value="multi_select">Multi-Select</SelectItem>
-                    <SelectItem value="date">Date</SelectItem>
-                    <SelectItem value="url">URL</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Options Section (for select and multi_select types) */}
-              {(configFieldForm.type === 'select' || configFieldForm.type === 'multi_select') && (() => {
-                const isSelect = configFieldForm.type === 'select'
-                const currentOptions = isSelect
-                  ? (configFieldForm.typeOptions?.select?.options || [])
-                  : (configFieldForm.typeOptions?.multiSelect?.options || [])
-
-                const updateOptions = (newOptions: any[]) => {
-                  if (isSelect) {
-                    setConfigFieldForm({
-                      ...configFieldForm,
-                      typeOptions: {
-                        ...configFieldForm.typeOptions,
-                        select: { options: newOptions }
-                      }
-                    })
-                  } else {
-                    setConfigFieldForm({
-                      ...configFieldForm,
-                      typeOptions: {
-                        ...configFieldForm.typeOptions,
-                        multiSelect: { options: newOptions }
-                      }
-                    })
-                  }
-                }
-
-                return (
-                  <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="block text-sm font-medium">Options *</Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          updateOptions([...currentOptions, { label: '', value: '' }])
-                        }}
-                      >
-                        <Plus />
-                        Add Option
-                      </Button>
-                    </div>
-
-                    {currentOptions.length > 0 ? (
-                      <div className="space-y-2">
-                        {currentOptions.map((option: any, index: number) => (
-                          <div key={index} className="flex gap-2 items-start">
-                            <div className="flex-1 grid grid-cols-2 gap-2">
-                              <Input
-                                type="text"
-                                value={option.label || ''}
-                                onChange={(e) => {
-                                  const newOptions = [...currentOptions]
-                                  newOptions[index] = { ...option, label: e.target.value }
-                                  updateOptions(newOptions)
-                                }}
-                                placeholder="Label (e.g., Low)"
-                              />
-                              <Input
-                                type="text"
-                                value={option.value || ''}
-                                onChange={(e) => {
-                                  const newOptions = [...currentOptions]
-                                  newOptions[index] = { ...option, value: e.target.value }
-                                  updateOptions(newOptions)
-                                }}
-                                placeholder="Value (e.g., low)"
-                              />
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => {
-                                const newOptions = currentOptions.filter((_: any, i: number) => i !== index)
-                                updateOptions(newOptions)
-                              }}
-                            >
-                              <Trash2 className="text-red-500" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-500 dark:text-zinc-400">
-                        No options added yet. Click "Add Option" to add options.
-                      </p>
-                    )}
-                  </div>
-                )
-              })()}
-
-              {/* Field Description */}
-              <div>
-                <Label className="block text-sm font-medium mb-2">Description</Label>
-                <Input
-                  type="text"
-                  value={configFieldForm.description || ''}
-                  onChange={(e) => setConfigFieldForm({ ...configFieldForm, description: e.target.value })}
-                  placeholder="Describe the purpose of this field"
-                />
-              </div>
-
-              {/* Required Checkbox */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={configFieldForm.required || false}
-                  onChange={(e) => setConfigFieldForm({ ...configFieldForm, required: e.target.checked })}
-                  className="h-4 w-4 rounded border-gray-300 dark:border-zinc-700"
-                  id="required-checkbox"
-                />
-                <Label htmlFor="required-checkbox" className="cursor-pointer">
-                  Required field
-                </Label>
-              </div>
-            </div>
-
-            <DialogFooter className="mt-6">
-              <Button variant="outline" onClick={handleCloseConfigFieldModal}>
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleSaveConfigField}
-                disabled={!configFieldForm.name?.trim() || !configFieldForm.label?.trim()}
-              >
-                {editingConfigFieldIndex !== null ? 'Save Changes' : 'Add Field'}
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Output Channel Editor Modal */}
-      <Dialog open={isEditOutputChannelModalOpen} onOpenChange={(open) => !open && handleCloseOutputChannelModal()}>
-        <DialogContent className="max-w-2xl" showCloseButton={false}>
-          <VisuallyHidden>
-            <DialogTitle>
-              {editingOutputChannelIndex !== null ? 'Edit Output Channel' : 'Add Output Channel'}
-            </DialogTitle>
-            <DialogDescription>Configure the blueprint output channel</DialogDescription>
-          </VisuallyHidden>
-          <div className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-6">
-              {editingOutputChannelIndex !== null ? 'Edit Output Channel' : 'Add Output Channel'}
-            </h3>
-
-            <div className="space-y-4">
-              {/* Output Channel Name */}
-              <div>
-                <Label className="block text-sm font-medium mb-2">Output Channel Name *</Label>
-                <Input
-                  type="text"
-                  value={outputChannelForm.name || ''}
-                  onChange={(e) => setOutputChannelForm({ ...outputChannelForm, name: e.target.value })}
-                  placeholder="e.g., success, error, default"
-                  autoFocus
-                />
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                  The name of this output channel
-                </p>
-              </div>
-
-              {/* Node Selection */}
-              <div>
-                <Label className="block text-sm font-medium mb-2">Node *</Label>
-                <Select
-                  value={outputChannelForm.nodeId || ''}
-                  onValueChange={(val) => {
-                    // When node changes, reset the channel to default
-                    setOutputChannelForm({ ...outputChannelForm, nodeId: val, nodeOutputChannel: 'default' })
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a node" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {nodes
-                      .filter((node) => node.type !== 'outputChannel')
-                      .map((node) => (
-                        <SelectItem key={node.id} value={node.id}>
-                          {(node.data as any).label} ({node.id})
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                  Select which node's output to use for this channel
-                </p>
-              </div>
-
-              {/* Node Output Channel Selection */}
-              {outputChannelForm.nodeId && (() => {
-                const selectedNode = nodes.find((n) => n.id === outputChannelForm.nodeId)
-                const nodeChannels = (selectedNode?.data as any)?.outputChannels || ['default']
-
-                return (
-                  <div>
-                    <Label className="block text-sm font-medium mb-2">Node Output Channel *</Label>
-                    <Select
-                      value={outputChannelForm.nodeOutputChannel || 'default'}
-                      onValueChange={(val) => setOutputChannelForm({ ...outputChannelForm, nodeOutputChannel: val })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {nodeChannels.map((channel: string) => (
-                          <SelectItem key={channel} value={channel}>
-                            {channel}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-gray-500 dark:text-zinc-400 mt-1">
-                      Select which output channel from the node to expose
-                    </p>
-                  </div>
-                )
-              })()}
-            </div>
-
-            <DialogFooter className="mt-6">
-              <Button variant="outline" onClick={handleCloseOutputChannelModal}>
-                Cancel
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleSaveOutputChannel}
-                disabled={!outputChannelForm.name?.trim() || !outputChannelForm.nodeId}
-              >
-                {editingOutputChannelIndex !== null ? 'Save Changes' : 'Add Output Channel'}
-              </Button>
-            </DialogFooter>
-          </div>
         </DialogContent>
       </Dialog>
     </>

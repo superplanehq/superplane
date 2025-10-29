@@ -25,6 +25,12 @@ import {
   ConfigurationField,
   OutputChannel,
 } from "../BlueprintConfigurationSidebar";
+import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
+import { OutputChannelConfigurationModal } from "./OutputChannelConfigurationModal";
+import {
+  ComponentsConfigurationField,
+  SuperplaneBlueprintsOutputChannel,
+} from "@/api-client";
 
 export interface BlueprintBuilderPageProps {
   // Blueprint data
@@ -36,14 +42,10 @@ export interface BlueprintBuilderPageProps {
   // Configuration
   configurationFields: ConfigurationField[];
   onConfigurationFieldsChange: (fields: ConfigurationField[]) => void;
-  onAddConfigField: () => void;
-  onEditConfigField: (index: number) => void;
 
   // Output channels
   outputChannels: OutputChannel[];
   onOutputChannelsChange: (channels: OutputChannel[]) => void;
-  onAddOutputChannel: () => void;
-  onEditOutputChannel: (index: number) => void;
 
   // Canvas
   nodes: Node[];
@@ -68,6 +70,86 @@ export interface BlueprintBuilderPageProps {
 export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+
+  // Modal state management
+  const [isConfigFieldModalOpen, setIsConfigFieldModalOpen] = useState(false);
+  const [editingConfigFieldIndex, setEditingConfigFieldIndex] = useState<
+    number | null
+  >(null);
+  const [isOutputChannelModalOpen, setIsOutputChannelModalOpen] =
+    useState(false);
+  const [editingOutputChannelIndex, setEditingOutputChannelIndex] = useState<
+    number | null
+  >(null);
+
+  // Modal handlers
+  const handleAddConfigField = useCallback(() => {
+    setEditingConfigFieldIndex(null);
+    setIsConfigFieldModalOpen(true);
+  }, []);
+
+  const handleEditConfigField = useCallback((index: number) => {
+    setEditingConfigFieldIndex(index);
+    setIsConfigFieldModalOpen(true);
+  }, []);
+
+  const handleSaveConfigField = useCallback(
+    (field: ComponentsConfigurationField) => {
+      if (editingConfigFieldIndex !== null) {
+        // Update existing field
+        const newFields = [...props.configurationFields];
+        newFields[editingConfigFieldIndex] = field as ConfigurationField;
+        props.onConfigurationFieldsChange(newFields);
+      } else {
+        // Add new field
+        props.onConfigurationFieldsChange([
+          ...props.configurationFields,
+          field as ConfigurationField,
+        ]);
+      }
+      setIsConfigFieldModalOpen(false);
+      setEditingConfigFieldIndex(null);
+    },
+    [
+      editingConfigFieldIndex,
+      props.configurationFields,
+      props.onConfigurationFieldsChange,
+    ]
+  );
+
+  const handleAddOutputChannel = useCallback(() => {
+    setEditingOutputChannelIndex(null);
+    setIsOutputChannelModalOpen(true);
+  }, []);
+
+  const handleEditOutputChannel = useCallback((index: number) => {
+    setEditingOutputChannelIndex(index);
+    setIsOutputChannelModalOpen(true);
+  }, []);
+
+  const handleSaveOutputChannel = useCallback(
+    (outputChannel: SuperplaneBlueprintsOutputChannel) => {
+      if (editingOutputChannelIndex !== null) {
+        // Update existing output channel
+        const newChannels = [...props.outputChannels];
+        newChannels[editingOutputChannelIndex] = outputChannel as OutputChannel;
+        props.onOutputChannelsChange(newChannels);
+      } else {
+        // Add new output channel
+        props.onOutputChannelsChange([
+          ...props.outputChannels,
+          outputChannel as OutputChannel,
+        ]);
+      }
+      setIsOutputChannelModalOpen(false);
+      setEditingOutputChannelIndex(null);
+    },
+    [
+      editingOutputChannelIndex,
+      props.outputChannels,
+      props.onOutputChannelsChange,
+    ]
+  );
 
   // Transform components into building block categories
   const buildingBlockCategories = useMemo(() => {
@@ -189,14 +271,47 @@ export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
           onMetadataChange={props.onMetadataChange}
           configurationFields={props.configurationFields}
           onConfigurationFieldsChange={props.onConfigurationFieldsChange}
-          onAddConfigField={props.onAddConfigField}
-          onEditConfigField={props.onEditConfigField}
+          onAddConfigField={handleAddConfigField}
+          onEditConfigField={handleEditConfigField}
           outputChannels={props.outputChannels}
           onOutputChannelsChange={props.onOutputChannelsChange}
-          onAddOutputChannel={props.onAddOutputChannel}
-          onEditOutputChannel={props.onEditOutputChannel}
+          onAddOutputChannel={handleAddOutputChannel}
+          onEditOutputChannel={handleEditOutputChannel}
         />
       </div>
+
+      {/* Configuration Field Modal */}
+      <ConfigurationFieldModal
+        isOpen={isConfigFieldModalOpen}
+        onClose={() => {
+          setIsConfigFieldModalOpen(false);
+          setEditingConfigFieldIndex(null);
+        }}
+        field={
+          editingConfigFieldIndex !== null
+            ? (props.configurationFields[editingConfigFieldIndex] as ComponentsConfigurationField)
+            : undefined
+        }
+        onSave={handleSaveConfigField}
+      />
+
+      {/* Output Channel Modal */}
+      <OutputChannelConfigurationModal
+        isOpen={isOutputChannelModalOpen}
+        onClose={() => {
+          setIsOutputChannelModalOpen(false);
+          setEditingOutputChannelIndex(null);
+        }}
+        outputChannel={
+          editingOutputChannelIndex !== null
+            ? (props.outputChannels[
+                editingOutputChannelIndex
+              ] as SuperplaneBlueprintsOutputChannel)
+            : undefined
+        }
+        nodes={props.nodes}
+        onSave={handleSaveOutputChannel}
+      />
     </div>
   );
 }
