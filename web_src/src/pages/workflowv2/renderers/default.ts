@@ -1,13 +1,22 @@
-import { ComponentsNode, TriggersTrigger } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { TriggerRenderer } from "./types";
 import { TriggerProps } from "@/ui/trigger";
+import { formatTimeAgo } from "@/utils/date";
 
 /**
  * Default renderer for trigger types that don't have a specific renderer.
  * Uses basic icon/color configuration from the trigger metadata.
  */
 export const defaultTriggerRenderer: TriggerRenderer = {
+  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+    return {title: event.id!, subtitle: formatTimeAgo(new Date(event.createdAt!))};
+  },
+
+  getRootEventValues: (_: WorkflowsWorkflowEvent): Record<string, string> => {
+    return {};
+  },
+
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
     const props: TriggerProps = {
       title: node.name!,

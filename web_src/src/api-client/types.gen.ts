@@ -1367,6 +1367,7 @@ export type WorkflowsWorkflowNodeExecution = {
         [key: string]: unknown;
     };
     childExecutions?: Array<WorkflowsWorkflowNodeExecution>;
+    rootEvent?: WorkflowsWorkflowEvent;
 };
 
 export type WorkflowsWorkflowNodeExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED' | 'RESULT_CANCELLED';

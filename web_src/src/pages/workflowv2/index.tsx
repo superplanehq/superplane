@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/utils/toast";
@@ -26,6 +26,7 @@ import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { formatTimeAgo } from "@/utils/date";
 import { filterVisibleConfiguration } from "@/utils/components";
+import { TriggerRenderer } from "./renderers/types";
 
 export function WorkflowPageV2() {
   const { organizationId, workflowId } = useParams<{
@@ -33,6 +34,7 @@ export function WorkflowPageV2() {
     workflowId: string;
   }>();
 
+  const navigate = useNavigate()
   const queryClient = useQueryClient();
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
@@ -103,10 +105,13 @@ export function WorkflowPageV2() {
 
   const { nodes, edges } = useMemo(
     () => {
-      if (!workflow) return { nodes: [], edges: [] };
+      // Don't prepare data until everything is loaded
+      if (!workflow || workflowLoading || triggersLoading || blueprintsLoading || componentsLoading || nodeEventsLoading || nodeDataLoading) {
+        return { nodes: [], edges: [] };
+      }
       return prepareData(workflow, triggers, blueprints, components, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId!, queryClient);
     },
-    [workflow, triggers, blueprints, components, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient]
+    [workflow, triggers, blueprints, components, nodeEventsMap, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient, workflowLoading, triggersLoading, blueprintsLoading, componentsLoading, nodeEventsLoading, nodeDataLoading]
   );
 
   const getSidebarData = useCallback((nodeId: string): SidebarData | null => {
@@ -115,6 +120,7 @@ export function WorkflowPageV2() {
 
     return prepareSidebarData(
       node,
+      workflow?.nodes || [],
       blueprints,
       components,
       nodeExecutionsMap,
@@ -404,6 +410,15 @@ export function WorkflowPageV2() {
       components={buildingBlocks.components}
       blueprints={buildingBlocks.blueprints}
       onNodeAdd={handleNodeAdd}
+      breadcrumbs={[
+        {
+          label: "Workflows",
+          onClick: () => navigate(`/${organizationId}`)
+        },
+        {
+          label: workflow.name!
+        },
+      ]}
     />
   );
 }
@@ -498,6 +513,7 @@ function prepareData(
   const edges = data?.edges!.map(prepareEdge);
   const nodes = data?.nodes!.map((node) => {
     return prepareNode(
+      data?.nodes!,
       node,
       triggers,
       blueprints,
@@ -535,6 +551,7 @@ function prepareTriggerNode(
 }
 
 function prepareCompositeNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   blueprints: BlueprintsBlueprint[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -572,11 +589,16 @@ function prepareCompositeNode(
 
   if (executions.length > 0) {
     const execution = executions[0];
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId)
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    let { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
     (canvasNode.data.composite as CompositeProps).lastRunItem = {
-      title: "",
-      subtitle: "",
+      title: title,
+      subtitle: subtitle,
       receivedAt: new Date(execution.createdAt!),
       state: getRunItemState(execution),
+      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
 
       //
       // TODO: what is ChildEventsInfo.waitingInfos supposed to be???
@@ -584,13 +606,7 @@ function prepareCompositeNode(
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: []
-      },
-
-      //
-      // TODO: from the storybook pages, it seems like this comes from the root event.
-      // We kind of have this in execution.input, but it's the raw data.
-      //
-      values: {},
+      }
     }
   }
 
@@ -618,6 +634,7 @@ function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunStat
 }
 
 function prepareNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   triggers: TriggersTrigger[],
   blueprints: BlueprintsBlueprint[],
@@ -632,13 +649,14 @@ function prepareNode(
     case "TYPE_TRIGGER":
       return prepareTriggerNode(node, triggers, nodeEventsMap);
     case "TYPE_BLUEPRINT":
-      return prepareCompositeNode(node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
     default:
-      return prepareComponentNode(node, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient);
+      return prepareComponentNode(nodes, node, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap, workflowId, queryClient);
   }
 }
 
 function prepareComponentNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
@@ -649,16 +667,17 @@ function prepareComponentNode(
 ): CanvasNode {
   switch (node.component?.name) {
     case "approval":
-      return prepareApprovalNode(node, components, nodeExecutionsMap, workflowId, queryClient);
+      return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient);
   }
 
   //
   // TODO: render other component-type nodes as composites for now
   //
-  return prepareCompositeNode(node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
+  return prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
 }
 
 function prepareApprovalNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -669,6 +688,12 @@ function prepareApprovalNode(
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
   const executionMetadata = execution?.metadata as any;
+
+  let rootTriggerRenderer: TriggerRenderer | null = null;
+  if (execution) {
+    const rootTriggerNode = nodes.find((n) => n.id === execution!.rootEvent?.nodeId)
+    rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+  }
 
   // Map backend records to approval items
   const approvals = (executionMetadata?.records || []).map((record: any) => {
@@ -769,14 +794,8 @@ function prepareApprovalNode(
         description: metadata?.description,
         receivedAt: execution ? new Date(execution.createdAt!) : undefined,
         approvals,
-
-        //
-        // TODO: this also comes from the input event
-        //
-        awaitingEvent: execution?.state === 'STATE_STARTED' ? {
-          title: "",
-          subtitle: "",
-        } : undefined,
+        awaitingEvent: execution?.state === 'STATE_STARTED' && rootTriggerRenderer ?
+          rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!) : undefined,
       }
     },
   };
@@ -794,6 +813,7 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
 
 function prepareSidebarData(
   node: ComponentsNode,
+  nodes: ComponentsNode[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -830,17 +850,25 @@ function prepareSidebarData(
       ? "discarded" as const
       : "waiting" as const;
 
-    const timestamp = execution.createdAt
-      ? formatTimeAgo(new Date(execution.createdAt)).replace(' ago', '')
-      : '';
+    // Get root trigger information for better title/subtitle
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title, subtitle } = execution.rootEvent
+      ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
+      : { title: execution.id || "Execution", subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(' ago', '') : '' };
+
+    const values = execution.rootEvent
+      ? rootTriggerRenderer.getRootEventValues(execution.rootEvent)
+      : {};
 
     return {
-      title: execution.id || "Execution",
-      subtitle: timestamp,
+      title,
+      subtitle,
       state,
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      values: {},
+      values,
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: []
