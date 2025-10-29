@@ -51,6 +51,25 @@ export const githubTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const metadata = node.metadata as unknown as GitHubMetadata;
+    const configuration = node.configuration as unknown as GithubConfiguration;
+
+    const metadataItems = [];
+
+    // Only add repository metadata if it exists
+    if (metadata?.repository?.name) {
+      metadataItems.push({
+        icon: "book",
+        label: metadata.repository.name,
+      });
+    }
+
+    // Only add events metadata if configuration exists
+    if (configuration?.events && Array.isArray(configuration.events)) {
+      metadataItems.push({
+        icon: "funnel",
+        label: configuration.events.join(", "),
+      });
+    }
 
     const props: TriggerProps = {
       title: node.name!,
@@ -59,16 +78,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
       iconColor: getColorClass(trigger.color),
       headerColor: getBackgroundColorClass(trigger.color),
       collapsedBackground: getBackgroundColorClass(trigger.color),
-      metadata: [
-        {
-          icon: "book",
-          label: metadata.repository.name,
-        },
-        {
-          icon: "funnel",
-          label: (node.configuration as unknown as GithubConfiguration).events.join(", "),
-        }
-      ],
+      metadata: metadataItems,
       zeroStateText: "Waiting for the first push...",
     };
 
