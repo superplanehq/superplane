@@ -536,9 +536,9 @@ function prepareTriggerNode(
 
 function prepareCompositeNode(
   node: ComponentsNode,
-  blueprints: any[],
-  nodeExecutionsMap: Record<string, any>,
-  nodeQueueItemsMap: Record<string, any>
+  blueprints: BlueprintsBlueprint[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>
 ): CanvasNode {
   const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
   const color = blueprintMetadata?.color || "indigo";
@@ -575,17 +575,14 @@ function prepareCompositeNode(
     (canvasNode.data.composite as CompositeProps).lastRunItem = {
       title: "",
       subtitle: "",
-      receivedAt: new Date(execution.createdAt),
+      receivedAt: new Date(execution.createdAt!),
       state: getRunItemState(execution),
 
-      //
-      // TODO: we should either load child executions from /children endpoint,
-      // or return them as part of the execution payload here.
       //
       // TODO: what is ChildEventsInfo.waitingInfos supposed to be???
       //
       childEventsInfo: {
-        count: 3,
+        count: execution.childExecutions?.length || 0,
         waitingInfos: []
       },
 
@@ -601,7 +598,7 @@ function prepareCompositeNode(
     (canvasNode.data.composite as CompositeProps).nextInQueue = {
       title: "",
       subtitle: "",
-      receivedAt: new Date(queueItems[0].createdAt),
+      receivedAt: new Date(queueItems[0].createdAt!),
     }
   }
 
@@ -609,7 +606,7 @@ function prepareCompositeNode(
 }
 
 function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunState {
-  if (execution.state == "STATE_STARTED") {
+  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
     return "running";
   }
 
@@ -845,7 +842,7 @@ function prepareSidebarData(
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
       values: {},
       childEventsInfo: {
-        count: 0,
+        count: execution.childExecutions?.length || 0,
         waitingInfos: []
       }
     };
