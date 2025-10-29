@@ -91,12 +91,10 @@ export class SimulationEngine {
   ) {
     const queue = this.queues.get(nodeId);
     if (!queue) return;
-    console.log(queue);
     if (!queue.active) return;
 
     queue.active.approved = true;
 
-    console.log(`Simulation: Approved node ${nodeId}`);
     const update = this.updateNodeFn(nodeId);
     update("data.approval.approvals.0.approved", true);
     update("data.approval.approvals.0.interactive", false);
@@ -119,7 +117,6 @@ export class SimulationEngine {
     const updateNode = this.updateNodeFn(nodeId);
 
     event.process = new Promise<void>(async () => {
-      console.log(`Simulation: Running node ${node.id}`);
       queue.state = "running";
       queue.active = event;
       this.sendOnQueueChange(nodeId);
@@ -146,8 +143,6 @@ export class SimulationEngine {
 
       queue.active = null;
       this.sendOnQueueChange(nodeId);
-
-      console.log(`Simulation: Completed node ${node.id}`);
     });
   }
 

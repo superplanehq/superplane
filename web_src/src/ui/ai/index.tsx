@@ -17,8 +17,6 @@ export function AiSidebar(props: AiSidebarState) {
     setIsOpen: props.setIsOpen,
   });
 
-  console.log("AI Sidebar state:", props);
-
   return (
     <>
       <FloatingActionButton
