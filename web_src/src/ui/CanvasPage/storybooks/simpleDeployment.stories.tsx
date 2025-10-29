@@ -488,6 +488,9 @@ export const SimpleDeployment: Story = {
     nodes: sampleNodes,
     edges: sampleEdges,
     title: "Simple Deployment",
+    triggers: [],
+    blueprints: [],
+    components: [],
   },
   render: function SimpleDeploymentRender(args) {
     const [nodes, setNodes] = useState<Node[]>(args.nodes ?? []);
