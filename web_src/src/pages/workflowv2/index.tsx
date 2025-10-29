@@ -1,8 +1,8 @@
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useCallback, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { showErrorToast, showSuccessToast } from "@/utils/toast";
 
 import {
   BlueprintsBlueprint,
@@ -234,10 +234,11 @@ export function WorkflowPageV2() {
         blueprints,
         components,
         nodeExecutionsMap,
-        nodeQueueItemsMap
+        nodeQueueItemsMap,
+        nodeEventsMap
       );
     },
-    [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap]
+    [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap]
   );
 
   const getNodeEditData = useCallback(
@@ -628,7 +629,7 @@ function useTriggerNodeEvents(
 ) {
   const results = useQueries({
     queries: triggerNodes.map((node) =>
-      nodeEventsQueryOptions(workflowId, node.id!, { limit: 1 })
+      nodeEventsQueryOptions(workflowId, node.id!, { limit: 10 })
     ),
   });
 
@@ -638,11 +639,11 @@ function useTriggerNodeEvents(
   // Build a map of nodeId -> last event
   // Memoize to prevent unnecessary re-renders downstream
   const eventsMap = useMemo(() => {
-    const map: Record<string, WorkflowsWorkflowEvent> = {};
+    const map: Record<string, WorkflowsWorkflowEvent[]> = {};
     triggerNodes.forEach((node, index) => {
       const result = results[index];
       if (result.data?.events && result.data.events.length > 0) {
-        map[node.id!] = result.data.events[0];
+        map[node.id!] = result.data.events;
       }
     });
     return map;
@@ -706,11 +707,11 @@ function prepareData(
   triggers: TriggersTrigger[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
-  nodeEventsMap: Record<string, any>,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem>,
+  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
-  queryClient: any
+  queryClient: QueryClient
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -737,11 +738,11 @@ function prepareData(
 function prepareTriggerNode(
   node: ComponentsNode,
   triggers: TriggersTrigger[],
-  nodeEventsMap: Record<string, WorkflowsWorkflowEvent>
+  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
-  const lastEvent = nodeEventsMap[node.id!];
+  const lastEvent = nodeEventsMap[node.id!]?.[0];
 
   return {
     id: node.id!,
@@ -860,9 +861,9 @@ function prepareNode(
   triggers: TriggersTrigger[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
-  nodeEventsMap: Record<string, any>,
-  nodeExecutionsMap: Record<string, any>,
-  nodeQueueItemsMap: Record<string, any>,
+  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
   queryClient: any
 ): CanvasNode {
@@ -896,8 +897,8 @@ function prepareComponentNode(
   node: ComponentsNode,
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, any>,
-  nodeQueueItemsMap: Record<string, any>,
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
   queryClient: any
 ): CanvasNode {
@@ -1093,47 +1094,34 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   };
 }
 
-function prepareSidebarData(
-  node: ComponentsNode,
-  nodes: ComponentsNode[],
-  blueprints: BlueprintsBlueprint[],
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>
-): SidebarData {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const queueItems = nodeQueueItemsMap[node.id!] || [];
+function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[], node: ComponentsNode) {
+  return events.slice(0, 5).map((event) => {
+    const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
+    const { title, subtitle } = triggerRenderer.getTitleAndSubtitle(event);
+    const values = triggerRenderer.getRootEventValues(event);
 
-  // Get metadata based on node type
-  let metadata: any;
-  const nodeTitle = node.name || "Unknown";
-  let iconSlug = "boxes";
-  let color = "indigo";
+    return {
+      title,
+      subtitle,
+      state: "processed" as const,
+      isOpen: false,
+      receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
+      values,
+      childEventsInfo: {
+        count: 0,
+        waitingInfos: []
+      }
+    };
+  });
+}
 
-  if (node.type === "TYPE_BLUEPRINT") {
-    metadata = blueprints.find((b) => b.id === node.blueprint?.id);
-    if (metadata) {
-      iconSlug = metadata.icon || "boxes";
-      color = metadata.color || "indigo";
-    }
-  } else if (node.type === "TYPE_COMPONENT") {
-    metadata = components.find((c) => c.name === node.component?.name);
-    if (metadata) {
-      iconSlug = metadata.icon || "boxes";
-      color = metadata.color || "indigo";
-    }
-  }
-
-  // Convert executions to sidebar events (latest events)
-  const latestEvents = executions.slice(0, 5).map((execution) => {
-    const state =
-      execution.state === "STATE_FINISHED" &&
-      execution.result === "RESULT_PASSED"
-        ? ("processed" as const)
-        : execution.state === "STATE_FINISHED" &&
-          execution.result === "RESULT_FAILED"
-        ? ("discarded" as const)
-        : ("waiting" as const);
+function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution[], nodes: ComponentsNode[]) {
+  return executions.slice(0, 5).map((execution) => {
+    const state = execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
+      ? "processed" as const
+      : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
+        ? "discarded" as const
+        : "waiting" as const;
 
     // Get root trigger information for better title/subtitle
     const rootTriggerNode = nodes.find(
@@ -1171,6 +1159,44 @@ function prepareSidebarData(
       },
     };
   });
+}
+
+function prepareSidebarData(
+  node: ComponentsNode,
+  nodes: ComponentsNode[],
+  blueprints: BlueprintsBlueprint[],
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
+): SidebarData {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const queueItems = nodeQueueItemsMap[node.id!] || [];
+  const events = nodeEventsMap[node.id!] || [];
+
+  // Get metadata based on node type
+  let metadata;
+  const nodeTitle = node.name || "Unknown";
+  let iconSlug = "boxes";
+  let color = "indigo";
+
+  if (node.type === "TYPE_BLUEPRINT") {
+    metadata = blueprints.find((b) => b.id === node.blueprint?.id);
+    if (metadata) {
+      iconSlug = metadata.icon || "boxes";
+      color = metadata.color || "indigo";
+    }
+  } else if (node.type === "TYPE_COMPONENT") {
+    metadata = components.find((c) => c.name === node.component?.name);
+    if (metadata) {
+      iconSlug = metadata.icon || "boxes";
+      color = metadata.color || "indigo";
+    }
+  }
+
+  const latestEvents = node.type === "TYPE_TRIGGER"
+    ? mapTriggerEventsToSidebarEvents(events, node)
+    : mapExecutionsToSidebarEvents(executions, nodes);
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = queueItems.slice(0, 5).map((item) => {
@@ -1198,6 +1224,8 @@ function prepareSidebarData(
       label: `Node ID: ${node.id}`,
     },
   ];
+
+  const hideQueueEvents = node.type === "TYPE_TRIGGER";
 
   // Add configuration fields to metadata (only simple types)
   if (node.configuration) {
@@ -1228,5 +1256,6 @@ function prepareSidebarData(
     iconColor: getColorClass(color),
     iconBackground: getBackgroundColorClass(color),
     moreInQueueCount: Math.max(0, queueItems.length - 5),
+    hideQueueEvents,
   };
 }
