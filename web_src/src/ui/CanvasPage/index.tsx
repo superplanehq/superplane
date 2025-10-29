@@ -11,7 +11,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ComponentsConfigurationField } from "@/api-client";
 import { AiSidebar } from "../ai";
-import { BuildingBlock, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
+import {
+  BuildingBlock,
+  BuildingBlockCategory,
+  BuildingBlocksSidebar,
+} from "../BuildingBlocksSidebar";
 import type { ChildEventsInfo } from "../childEvents";
 import { ComponentSidebar } from "../componentSidebar";
 import type { MetadataItem } from "../metadataList";
@@ -116,9 +120,7 @@ export interface CanvasPageProps {
   ai?: AiProps;
 
   // Building blocks for adding new nodes
-  triggers?: BuildingBlock[];
-  components?: BuildingBlock[];
-  blueprints?: BuildingBlock[];
+  buildingBlocks: BuildingBlockCategory[];
   onNodeAdd?: (newNodeData: NewNodeData) => void;
 }
 
@@ -212,9 +214,7 @@ function CanvasPage(props: CanvasPageProps) {
         <BuildingBlocksSidebar
           isOpen={isBuildingBlocksSidebarOpen}
           onToggle={setIsBuildingBlocksSidebarOpen}
-          triggers={props.triggers || []}
-          components={props.components || []}
-          blueprints={props.blueprints || []}
+          blocks={props.buildingBlocks || []}
           onBlockClick={handleBuildingBlockClick}
         />
 

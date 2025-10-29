@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Item,
   ItemContent,
-  ItemDescription,
   ItemGroup,
   ItemMedia,
   ItemTitle,
@@ -29,21 +28,22 @@ export interface BuildingBlock {
   id?: string; // for blueprints
 }
 
+export type BuildingBlockCategory = {
+  name: string;
+  blocks: BuildingBlock[];
+};
+
 export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
-  triggers: BuildingBlock[];
-  components: BuildingBlock[];
-  blueprints: BuildingBlock[];
   onBlockClick: (block: BuildingBlock) => void;
+  blocks: BuildingBlockCategory[];
 }
 
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
-  triggers,
-  components,
-  blueprints,
+  blocks,
   onBlockClick,
 }: BuildingBlocksSidebarProps) {
   if (!isOpen) {
@@ -60,10 +60,8 @@ export function BuildingBlocksSidebar({
     );
   }
 
-  const allBlocks = triggers.concat(components).concat(blueprints);
-
   return (
-    <div className="w-96 h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
+    <div className="w-[280px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
       <div className="flex items-center gap-3 px-4 pt-4 pb-0">
         <Button
           variant="outline"
@@ -75,33 +73,57 @@ export function BuildingBlocksSidebar({
         </Button>
       </div>
 
-      <div className="flex-1 overflow-hidden px-4 pt-4">
-        <ItemGroup>
-          {allBlocks.map((block) => {
-            const IconComponent = resolveIcon(block.icon || "zap");
-            const colorClass = getColorClass(block.color);
-
-            return (
-              <Item
-                key={`${block.type}-${block.name}`}
-                onClick={() => onBlockClick(block)}
-                className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                size="sm"
-              >
-                <ItemMedia>
-                  <IconComponent size={24} className={colorClass} />
-                </ItemMedia>
-                <ItemContent>
-                  <ItemTitle>{block.label || block.name}</ItemTitle>
-                  {block.description && (
-                    <ItemDescription>{block.description}</ItemDescription>
-                  )}
-                </ItemContent>
-              </Item>
-            );
-          })}
-        </ItemGroup>
+      <div className="flex-1 overflow-y-scroll">
+        {blocks.map((category) => (
+          <CategorySection
+            key={category.name}
+            category={category}
+            onBlockClick={onBlockClick}
+          />
+        ))}
       </div>
     </div>
+  );
+}
+
+interface CategorySectionProps {
+  category: BuildingBlockCategory;
+  onBlockClick: (block: BuildingBlock) => void;
+}
+
+function CategorySection({ category, onBlockClick }: CategorySectionProps) {
+  const allBlocks = category.blocks;
+
+  return (
+    <details className="flex-1 px-4 pt-4" open>
+      <summary className="text-xs uppercase cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300 mb-2">
+        <span className="pl-2">{category.name}</span>
+      </summary>
+
+      <ItemGroup>
+        {allBlocks.map((block) => {
+          const IconComponent = resolveIcon(block.icon || "zap");
+          const colorClass = getColorClass(block.color);
+
+          return (
+            <Item
+              key={`${block.type}-${block.name}`}
+              onClick={() => onBlockClick(block)}
+              className="ml-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1"
+              size="sm"
+            >
+              <ItemMedia>
+                <IconComponent size={18} className={colorClass} />
+              </ItemMedia>
+              <ItemContent>
+                <ItemTitle className="text-xs font-normal">
+                  {block.label || block.name}
+                </ItemTitle>
+              </ItemContent>
+            </Item>
+          );
+        })}
+      </ItemGroup>
+    </details>
   );
 }
