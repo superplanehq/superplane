@@ -84,6 +84,14 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 	//
 	// Fetch all input records
 	//
+	rootEvents, err := models.FindWorkflowEvents(rootEventIds(executions))
+	if err != nil {
+		return nil, fmt.Errorf("error find input events: %v", err)
+	}
+
+	//
+	// Fetch all input records
+	//
 	inputEvents, err := models.FindWorkflowEvents(eventIDs(executions))
 	if err != nil {
 		return nil, fmt.Errorf("error find input events: %v", err)
@@ -102,6 +110,11 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 	//
 	result := make([]*pb.WorkflowNodeExecution, 0, len(executions))
 	for _, execution := range executions {
+		rootEvent, err := getRootEventForExecution(execution, rootEvents)
+		if err != nil {
+			return nil, err
+		}
+
 		input, err := getInputForExecution(execution, inputEvents)
 		if err != nil {
 			return nil, err
@@ -138,6 +151,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 			Configuration:       configuration,
 			Input:               input,
 			Outputs:             outputs,
+			RootEvent:           rootEvent,
 		}
 
 		if len(childExecutions) == 0 {
@@ -305,6 +319,15 @@ func eventIDs(executions []models.WorkflowNodeExecution) []string {
 	return ids
 }
 
+func rootEventIds(executions []models.WorkflowNodeExecution) []string {
+	ids := make([]string, len(executions))
+	for i, execution := range executions {
+		ids[i] = execution.RootEventID.String()
+	}
+
+	return ids
+}
+
 func getInputForExecution(execution models.WorkflowNodeExecution, events []models.WorkflowEvent) (*structpb.Struct, error) {
 	for _, event := range events {
 		if event.ID.String() == execution.EventID.String() {
@@ -319,6 +342,33 @@ func getInputForExecution(execution models.WorkflowNodeExecution, events []model
 			}
 
 			return data, nil
+		}
+	}
+
+	return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
+}
+
+func getRootEventForExecution(execution models.WorkflowNodeExecution, rootEvents []models.WorkflowEvent) (*pb.WorkflowEvent, error) {
+	for _, rootEvent := range rootEvents {
+		if rootEvent.ID.String() == execution.RootEventID.String() {
+			data, ok := rootEvent.Data.Data().(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("event data is not a map[string]any")
+			}
+
+			s, err := structpb.NewStruct(data)
+			if err != nil {
+				return nil, err
+			}
+
+			return &pb.WorkflowEvent{
+				Id:         rootEvent.ID.String(),
+				WorkflowId: rootEvent.WorkflowID.String(),
+				NodeId:     rootEvent.NodeID,
+				Channel:    rootEvent.Channel,
+				Data:       s,
+				CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
+			}, nil
 		}
 	}
 

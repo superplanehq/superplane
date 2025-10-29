@@ -7274,6 +7274,9 @@
             "type": "object",
             "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
           }
+        },
+        "rootEvent": {
+          "$ref": "#/definitions/WorkflowsWorkflowEvent"
         }
       }
     },

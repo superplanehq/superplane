@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { TriggerProps } from "@/ui/trigger";
 
 /**
@@ -20,4 +20,19 @@ export interface TriggerRenderer {
    * @returns the props needed to render the Trigger UI component
    */
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => TriggerProps;
+
+  /**
+   * Display values for the root event.
+   * @param event The root event from the backend
+   * @returns The values to display
+   */
+  getRootEventValues: (event: WorkflowsWorkflowEvent) => Record<string, string>;
+
+  /**
+   * Get the title and subtitle for the trigger.
+   * @param node The node from the backend
+   * @param trigger The trigger metadata from the backend
+   * @returns The title and subtitle to display
+   */
+  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent) => { title: string; subtitle: string };
 }

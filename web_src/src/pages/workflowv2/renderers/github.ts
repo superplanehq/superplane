@@ -20,6 +20,11 @@ interface GitHubEventData {
   head_commit?: {
     message?: string;
     id?: string;
+    author?: {
+      name?: string,
+      email?: string,
+      username: string
+    }
   };
 }
 
@@ -27,6 +32,23 @@ interface GitHubEventData {
  * Renderer for the "github" trigger type
  */
 export const githubTriggerRenderer: TriggerRenderer = {
+  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+    const eventData = event.data as GitHubEventData;
+    return {
+      title: eventData?.head_commit?.message!,
+      subtitle: eventData?.head_commit?.id!,
+    };
+  },
+
+  getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
+    const eventData = lastEvent.data as GitHubEventData;
+    return {
+      "Commit": eventData?.head_commit?.message!,
+      "SHA": eventData?.head_commit?.id!,
+      "Author": eventData?.head_commit?.author?.name!,
+    };
+  },
+
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: WorkflowsWorkflowEvent) => {
     const metadata = node.metadata as unknown as GitHubMetadata;
 

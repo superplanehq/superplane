@@ -140,7 +140,7 @@ export const Approval: React.FC<ApprovalProps> = ({
                   <span className="truncate text-sm">{awaitingEvent.title}</span>
                 </div>
                 {awaitingEvent.subtitle && (
-                  <span className="text-sm no-wrap whitespace-nowrap w-[20%] text-amber-800">
+                  <span className="truncate text-sm no-wrap whitespace-nowrap w-[20%] text-amber-800">
                     {awaitingEvent.subtitle}
                   </span>
                 )}

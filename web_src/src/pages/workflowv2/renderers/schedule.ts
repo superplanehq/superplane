@@ -1,4 +1,4 @@
-import { ComponentsNode, TriggersTrigger } from "@/api-client";
+import { ComponentsNode, TriggersTrigger, WorkflowsWorkflowEvent } from "@/api-client";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { convertUTCToLocalTime, formatTimestampInUserTimezone } from "@/utils/timezone";
 import { TriggerRenderer } from "./types";
@@ -64,6 +64,17 @@ function formatNextTrigger(timestamp: string | undefined): string {
  * Renderer for the "schedule" trigger type
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
+  getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
+    return {
+      title: "Event emitted by schedule",
+      subtitle: event.id!,
+    };
+  },
+
+  getRootEventValues: (_: WorkflowsWorkflowEvent): Record<string, string> => {
+    return {};
+  },
+
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
     const props: TriggerProps = {
       title: node.name!,

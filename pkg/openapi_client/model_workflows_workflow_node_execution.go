@@ -37,6 +37,7 @@ type WorkflowsWorkflowNodeExecution struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	Configuration map[string]interface{} `json:"configuration,omitempty"`
 	ChildExecutions []WorkflowsWorkflowNodeExecution `json:"childExecutions,omitempty"`
+	RootEvent *WorkflowsWorkflowEvent `json:"rootEvent,omitempty"`
 }
 
 // NewWorkflowsWorkflowNodeExecution instantiates a new WorkflowsWorkflowNodeExecution object
@@ -580,6 +581,38 @@ func (o *WorkflowsWorkflowNodeExecution) SetChildExecutions(v []WorkflowsWorkflo
 	o.ChildExecutions = v
 }
 
+// GetRootEvent returns the RootEvent field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowNodeExecution) GetRootEvent() WorkflowsWorkflowEvent {
+	if o == nil || IsNil(o.RootEvent) {
+		var ret WorkflowsWorkflowEvent
+		return ret
+	}
+	return *o.RootEvent
+}
+
+// GetRootEventOk returns a tuple with the RootEvent field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowNodeExecution) GetRootEventOk() (*WorkflowsWorkflowEvent, bool) {
+	if o == nil || IsNil(o.RootEvent) {
+		return nil, false
+	}
+	return o.RootEvent, true
+}
+
+// HasRootEvent returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowNodeExecution) HasRootEvent() bool {
+	if o != nil && !IsNil(o.RootEvent) {
+		return true
+	}
+
+	return false
+}
+
+// SetRootEvent gets a reference to the given WorkflowsWorkflowEvent and assigns it to the RootEvent field.
+func (o *WorkflowsWorkflowNodeExecution) SetRootEvent(v WorkflowsWorkflowEvent) {
+	o.RootEvent = &v
+}
+
 func (o WorkflowsWorkflowNodeExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -637,6 +670,9 @@ func (o WorkflowsWorkflowNodeExecution) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.ChildExecutions) {
 		toSerialize["childExecutions"] = o.ChildExecutions
+	}
+	if !IsNil(o.RootEvent) {
+		toSerialize["rootEvent"] = o.RootEvent
 	}
 	return toSerialize, nil
 }
