@@ -242,7 +242,7 @@ export const ComponentSidebar = ({
           className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
         />
       </div>}
-      <div className="px-3 py-1 border-b-2 border-gray-400 pb-3">
+      <div className="px-3 py-1 border-b-2 border-gray-400 pb-3 text-left">
         <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">
           Latest events
         </h2>
@@ -270,7 +270,7 @@ export const ComponentSidebar = ({
         </div>
       </div>
       {!hideQueueEvents &&
-        <div className="px-3 py-1 pb-3">
+        <div className="px-3 py-1 pb-3 text-left">
           <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">
             Next in queue
           </h2>

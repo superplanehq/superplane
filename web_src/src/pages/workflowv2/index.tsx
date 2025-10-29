@@ -228,7 +228,7 @@ export function WorkflowPageV2() {
       id: newNodeId,
       name: nodeName.trim(),
       type: buildingBlock.type === 'trigger' ? 'TYPE_TRIGGER'
-          : buildingBlock.type === 'blueprint' ? 'TYPE_BLUEPRINT'
+        : buildingBlock.type === 'blueprint' ? 'TYPE_BLUEPRINT'
           : 'TYPE_COMPONENT',
       configuration: filteredConfiguration,
       position: {
@@ -764,8 +764,8 @@ function prepareApprovalNode(
     return {
       id: `${record.index}`,
       title: record.type === 'user' && record.user ? record.user.name || record.user.email :
-             record.type === 'role' && record.role ? record.role :
-             record.type === 'group' && record.group ? record.group : 'Unknown',
+        record.type === 'role' && record.role ? record.role :
+          record.type === 'group' && record.group ? record.group : 'Unknown',
       approved: record.state === 'approved',
       rejected: record.state === 'rejected',
       approverName: record.user?.name,
@@ -905,8 +905,8 @@ function prepareSidebarData(
     const state = execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
       ? "processed" as const
       : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-      ? "discarded" as const
-      : "waiting" as const;
+        ? "discarded" as const
+        : "waiting" as const;
 
     // Get root trigger information for better title/subtitle
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -961,6 +961,8 @@ function prepareSidebarData(
     },
   ];
 
+  const hideQueueEvents = node.type === "TYPE_TRIGGER";
+
   // Add configuration fields to metadata (only simple types)
   if (node.configuration) {
     Object.entries(node.configuration).forEach(([key, value]) => {
@@ -990,5 +992,6 @@ function prepareSidebarData(
     iconColor: getColorClass(color),
     iconBackground: getBackgroundColorClass(color),
     moreInQueueCount: Math.max(0, queueItems.length - 5),
+    hideQueueEvents,
   };
 }
