@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Item,
   ItemContent,
-  ItemDescription,
   ItemGroup,
   ItemMedia,
   ItemTitle,
@@ -62,7 +61,7 @@ export function BuildingBlocksSidebar({
   }
 
   return (
-    <div className="w-96 h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
+    <div className="w-[280px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
       <div className="flex items-center gap-3 px-4 pt-4 pb-0">
         <Button
           variant="outline"
@@ -110,17 +109,16 @@ function CategorySection({ category, onBlockClick }: CategorySectionProps) {
             <Item
               key={`${block.type}-${block.name}`}
               onClick={() => onBlockClick(block)}
-              className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1"
+              className="ml-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1"
               size="sm"
             >
               <ItemMedia>
-                <IconComponent size={20} className={colorClass} />
+                <IconComponent size={18} className={colorClass} />
               </ItemMedia>
               <ItemContent>
-                <ItemTitle>{block.label || block.name}</ItemTitle>
-                {block.description && (
-                  <ItemDescription>{block.description}</ItemDescription>
-                )}
+                <ItemTitle className="text-xs font-normal">
+                  {block.label || block.name}
+                </ItemTitle>
               </ItemContent>
             </Item>
           );
