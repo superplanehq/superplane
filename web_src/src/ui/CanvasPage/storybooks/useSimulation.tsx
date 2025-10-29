@@ -29,6 +29,18 @@ export function useSimulationRunner(props: SimulationProps): SimulationEngine {
   );
 }
 
+export function useSimulationCron(intervalMs: number, callback: () => void) {
+  useMemo(() => {
+    callback();
+
+    const interval = setInterval(() => {
+      callback();
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [intervalMs]);
+}
+
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const noOp = async (input: any) => input;
 
