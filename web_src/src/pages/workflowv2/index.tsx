@@ -120,6 +120,7 @@ export function WorkflowPageV2() {
 
     return prepareSidebarData(
       node,
+      workflow?.nodes || [],
       blueprints,
       components,
       nodeExecutionsMap,
@@ -812,6 +813,7 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
 
 function prepareSidebarData(
   node: ComponentsNode,
+  nodes: ComponentsNode[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -848,17 +850,25 @@ function prepareSidebarData(
       ? "discarded" as const
       : "waiting" as const;
 
-    const timestamp = execution.createdAt
-      ? formatTimeAgo(new Date(execution.createdAt)).replace(' ago', '')
-      : '';
+    // Get root trigger information for better title/subtitle
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title, subtitle } = execution.rootEvent
+      ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
+      : { title: execution.id || "Execution", subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(' ago', '') : '' };
+
+    const values = execution.rootEvent
+      ? rootTriggerRenderer.getRootEventValues(execution.rootEvent)
+      : {};
 
     return {
-      title: execution.id || "Execution",
-      subtitle: timestamp,
+      title,
+      subtitle,
       state,
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      values: {},
+      values,
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: []

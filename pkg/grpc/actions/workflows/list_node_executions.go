@@ -84,7 +84,7 @@ func SerializeNodeExecutions(executions []models.WorkflowNodeExecution, childExe
 	//
 	// Fetch all input records
 	//
-	rootEvents, err := models.FindWorkflowEvents(rootEventIds(executions))
+	rootEvents, err := models.FindWorkflowEvents(rootEventIDs(executions))
 	if err != nil {
 		return nil, fmt.Errorf("error find input events: %v", err)
 	}
@@ -319,7 +319,7 @@ func eventIDs(executions []models.WorkflowNodeExecution) []string {
 	return ids
 }
 
-func rootEventIds(executions []models.WorkflowNodeExecution) []string {
+func rootEventIDs(executions []models.WorkflowNodeExecution) []string {
 	ids := make([]string, len(executions))
 	for i, execution := range executions {
 		ids[i] = execution.RootEventID.String()
