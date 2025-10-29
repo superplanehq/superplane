@@ -4,9 +4,9 @@ import type { Edge, Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "../canvas-reset.css";
 
-import { useMemo, useState, useCallback } from "react";
-import { CanvasPage, type CanvasNode } from "../index";
+import { useCallback, useMemo, useState } from "react";
 import type { BlockData } from "../Block";
+import { CanvasPage, type CanvasNode } from "../index";
 import { createGetSidebarData } from "./getSidebarData";
 
 const meta = {
@@ -44,7 +44,10 @@ const sampleNodes: Node[] = [
           { icon: "activity", label: "Pool: 45/100 connections" },
         ],
         parameters: [
-          { icon: "database", items: ["db-primary", "db-replica-1", "db-replica-2"] }
+          {
+            icon: "database",
+            items: ["db-primary", "db-replica-1", "db-replica-2"],
+          },
         ],
         lastRunItem: {
           title: "Database health check",
@@ -88,7 +91,7 @@ const sampleNodes: Node[] = [
           { icon: "box", label: "Pods: 11/24 healthy" },
         ],
         parameters: [
-          { icon: "server", items: ["prod-cluster-1", "prod-cluster-2"] }
+          { icon: "server", items: ["prod-cluster-1", "prod-cluster-2"] },
         ],
         lastRunItem: {
           title: "Resource check",
@@ -132,7 +135,7 @@ const sampleNodes: Node[] = [
           { icon: "server", label: "Load Balancer: Healthy" },
         ],
         parameters: [
-          { icon: "map", items: ["us-west-1", "eu-global-1", "asia-east-1"] }
+          { icon: "map", items: ["us-west-1", "eu-global-1", "asia-east-1"] },
         ],
         lastRunItem: {
           title: "Traffic monitoring check",
@@ -170,24 +173,30 @@ export const Monitor: Story = {
   args: {
     nodes: sampleNodes,
     edges: sampleEdges,
+    title: "Infrastructure Monitoring",
   },
   render: function MonitorRender(args) {
     const [nodes, setNodes] = useState<CanvasNode[]>(args.nodes ?? []);
     const edges = useMemo(() => args.edges ?? [], [args.edges]);
 
     const toggleNodeCollapse = useCallback((nodeId: string) => {
-      console.log('toggleNodeCollapse called for nodeId:', nodeId);
-      setNodes(prevNodes => {
-        console.log('Current nodes:', prevNodes.length);
-        const newNodes = prevNodes.map(node => {
+      console.log("toggleNodeCollapse called for nodeId:", nodeId);
+      setNodes((prevNodes) => {
+        console.log("Current nodes:", prevNodes.length);
+        const newNodes = prevNodes.map((node) => {
           if (node.id !== nodeId) return node;
 
-          console.log('Found node to toggle:', nodeId, node.data);
+          console.log("Found node to toggle:", nodeId, node.data);
           const nodeData = { ...node.data } as unknown as BlockData;
 
           // Toggle collapse state based on node type
           if (nodeData.type === "composite" && nodeData.composite) {
-            console.log('Toggling composite from', nodeData.composite.collapsed, 'to', !nodeData.composite.collapsed);
+            console.log(
+              "Toggling composite from",
+              nodeData.composite.collapsed,
+              "to",
+              !nodeData.composite.collapsed
+            );
             nodeData.composite = {
               ...nodeData.composite,
               collapsed: !nodeData.composite.collapsed,
@@ -195,7 +204,12 @@ export const Monitor: Story = {
           }
 
           if (nodeData.type === "approval" && nodeData.approval) {
-            console.log('Toggling approval from', nodeData.approval.collapsed, 'to', !nodeData.approval.collapsed);
+            console.log(
+              "Toggling approval from",
+              nodeData.approval.collapsed,
+              "to",
+              !nodeData.approval.collapsed
+            );
             nodeData.approval = {
               ...nodeData.approval,
               collapsed: !nodeData.approval.collapsed,
@@ -203,18 +217,26 @@ export const Monitor: Story = {
           }
 
           if (nodeData.type === "trigger" && nodeData.trigger) {
-            console.log('Toggling trigger from', nodeData.trigger.collapsed, 'to', !nodeData.trigger.collapsed);
+            console.log(
+              "Toggling trigger from",
+              nodeData.trigger.collapsed,
+              "to",
+              !nodeData.trigger.collapsed
+            );
             nodeData.trigger = {
               ...nodeData.trigger,
               collapsed: !nodeData.trigger.collapsed,
             };
           }
 
-          const updatedNode: CanvasNode = { ...node, data: nodeData as unknown as Record<string, unknown> };
-          console.log('Updated node:', updatedNode);
+          const updatedNode: CanvasNode = {
+            ...node,
+            data: nodeData as unknown as Record<string, unknown>,
+          };
+          console.log("Updated node:", updatedNode);
           return updatedNode;
         });
-        console.log('Returning new nodes:', newNodes.length);
+        console.log("Returning new nodes:", newNodes.length);
         return newNodes;
       });
     }, []);
@@ -246,7 +268,10 @@ export const Monitor: Story = {
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
             console.log("Current nodes before toggle:", nodes.length);
-            console.log("Node data before toggle:", nodes.find(n => n.id === nodeId)?.data);
+            console.log(
+              "Node data before toggle:",
+              nodes.find((n) => n.id === nodeId)?.data
+            );
             toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {
