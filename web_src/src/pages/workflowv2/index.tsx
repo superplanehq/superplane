@@ -603,6 +603,7 @@ function prepareTriggerNode(
       type: "trigger",
       label: node.name!,
       state: "pending" as const,
+      outputChannels: triggerMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       trigger: renderer.getTriggerProps(node, triggerMetadata!, lastEvent),
     },
   };
@@ -627,6 +628,7 @@ function prepareCompositeNode(
       type: "composite",
       label: node.name!,
       state: "pending" as const,
+      outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       composite: {
         iconSlug: blueprintMetadata?.icon || "boxes",
         iconColor: getColorClass(color),
@@ -730,8 +732,23 @@ function prepareComponentNode(
 
   //
   // TODO: render other component-type nodes as composites for now
+  // For generic components, we need to get outputChannels from component metadata
   //
-  return prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
+  const componentMetadata = components.find((c) => c.name === node.component?.name);
+  const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
+
+  // Override outputChannels with component metadata if available
+  if (componentMetadata?.outputChannels) {
+    return {
+      ...compositeNode,
+      data: {
+        ...compositeNode.data,
+        outputChannels: componentMetadata.outputChannels.map((c) => c.name!),
+      },
+    };
+  }
+
+  return compositeNode;
 }
 
 function prepareApprovalNode(
@@ -842,6 +859,7 @@ function prepareApprovalNode(
       type: "approval",
       label: node.name!,
       state: "pending" as const,
+      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
       approval: {
         iconSlug: metadata?.icon || "hand",
         iconColor: getColorClass(metadata?.color || "orange"),
@@ -866,6 +884,7 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
     id: id,
     source: edge.sourceId!,
     target: edge.targetId!,
+    sourceHandle: edge.channel!,
   };
 }
 

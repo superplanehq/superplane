@@ -50,7 +50,10 @@ export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
 }
 
-export interface CanvasEdge extends ReactFlowEdge {}
+export interface CanvasEdge extends ReactFlowEdge {
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+}
 
 export interface AiProps {
   sidebarOpen: boolean;
