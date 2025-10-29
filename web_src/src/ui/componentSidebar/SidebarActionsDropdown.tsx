@@ -1,6 +1,6 @@
 import { resolveIcon } from "@/lib/utils";
 import { EllipsisVertical } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface SidebarAction {
   id: string;
@@ -85,11 +85,14 @@ export const SidebarActionsDropdown = ({
   ];
 
   // Filter out actions that don't have an onAction function
-  const availableActions = actions.filter(action => action.onAction);
+  const availableActions = actions.filter((action) => action.onAction);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -116,23 +119,33 @@ export const SidebarActionsDropdown = ({
       {isOpen && (
         <div className="absolute right-0 top-full mt-1 w-53 bg-white border border-gray-200 rounded-md shadow-lg z-50">
           <div className="py-1">
-            {availableActions.length > 0 && availableActions.map((action) => {
-              const Icon = resolveIcon(action.icon);
-              return (
-                <div key={action.id} className={"px-2 " + (action.hasBorder ? "border-b-1 border-t-1 border-gray-200 my-1 hover:bg-gray-100 transition-colors" : "")}>
-                  <button
-                    onClick={() => {
-                      action.onAction?.();
-                      setIsOpen(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left flex items-center rounded-md gap-2 hover:bg-gray-100 text-sm text-gray-700 transition-colors ${action.hoverBackground} ${action.hoverColor} transition-colors`}
+            {availableActions.length > 0 &&
+              availableActions.map((action) => {
+                const Icon = resolveIcon(action.icon);
+                return (
+                  <div
+                    key={action.id}
+                    className={
+                      "px-2 " +
+                      (action.hasBorder
+                        ? "border-b-1 border-t-1 border-gray-200 my-1 hover:bg-gray-100 transition-colors"
+                        : "")
+                    }
                   >
-                    <Icon size={16} />
-                    <span>{action.label}</span>
-                  </button>
-                </div>
-              );
-            })}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        action.onAction?.();
+                        setIsOpen(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left flex items-center rounded-md gap-2 hover:bg-gray-100 text-sm text-gray-700 transition-colors ${action.hoverBackground} ${action.hoverColor} transition-colors`}
+                    >
+                      <Icon size={16} />
+                      <span>{action.label}</span>
+                    </button>
+                  </div>
+                );
+              })}
             {availableActions.length === 0 && (
               <div className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 text-sm text-gray-700 transition-colors">
                 <span>No actions available</span>
