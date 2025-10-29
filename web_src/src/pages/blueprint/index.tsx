@@ -13,26 +13,13 @@ import { useBlueprint, useUpdateBlueprint } from '../../hooks/useBlueprintData'
 import { useComponents } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
 import { AlertCircle } from 'lucide-react'
-import { BuildingBlock } from '../../ui/BuildingBlocksSidebar'
 import { BlueprintBuilderPage } from '../../ui/BlueprintBuilderPage'
-import type { BreadcrumbItem } from '../../ui/BlueprintBuilderPage'
+import type { BreadcrumbItem, NewNodeData } from '../../ui/BlueprintBuilderPage'
 import { BlockData } from '../../ui/CanvasPage/Block'
 import { Heading } from '../../components/Heading/heading'
 import { ComponentsComponent, ComponentsNode } from '../../api-client'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTitle,
-  DialogDescription,
-} from '../../components/ui/dialog'
-import { VisuallyHidden } from '../../components/ui/visually-hidden'
-import { Label } from '../../components/ui/label'
-import { Input } from '../../components/ui/input'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 import { filterVisibleConfiguration } from '../../utils/components'
-import { ConfigurationFieldRenderer } from '@/ui/configurationFieldRenderer'
-import { ScrollArea } from '../../components/ui/scroll-area'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
 const elk = new ELK()
@@ -77,11 +64,6 @@ const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
 export const Blueprint = () => {
   const { organizationId, blueprintId } = useParams<{ organizationId: string; blueprintId: string }>()
   const navigate = useNavigate()
-  const [isAddNodeModalOpen, setIsAddNodeModalOpen] = useState(false)
-  const [selectedComponent, setSelectedComponent] = useState<any>(null)
-  const [nodeName, setNodeName] = useState('')
-  const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>({})
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([])
   const [blueprintOutputChannels, setBlueprintOutputChannels] = useState<any[]>([])
   const [blueprintName, setBlueprintName] = useState('')
@@ -246,17 +228,6 @@ export const Blueprint = () => {
     []
   )
 
-  const handleBlockClick = (block: BuildingBlock) => {
-    // Find the full component data from the components array
-    const component = components.find((c: ComponentsComponent) => c.name === block.name)
-    if (!component) return
-
-    setSelectedComponent(component)
-    setNodeName(block.label || block.name)
-    setNodeConfiguration({})
-    setIsAddNodeModalOpen(true)
-  }
-
   const generateNodeId = (componentName: string, nodeName: string) => {
     const randomChars = Math.random().toString(36).substring(2, 8)
     const sanitizedComponent = componentName.toLowerCase().replace(/[^a-z0-9]/g, '-')
@@ -264,100 +235,104 @@ export const Blueprint = () => {
     return `${sanitizedComponent}-${sanitizedName}-${randomChars}`
   }
 
-  const handleNodeEdit = useCallback((nodeId: string) => {
+  const getNodeEditData = useCallback((nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId)
+    if (!node) return null
+
+    const component = components.find((p: any) => p.name === (node.data as any)._originalComponent)
+    if (!component) return null
+
+    return {
+      nodeId: node.id,
+      nodeName: (node.data as any).label as string,
+      configuration: (node.data as any)._originalConfiguration || {},
+      configurationFields: component.configuration || [],
+    }
+  }, [nodes, components])
+
+  const handleNodeConfigurationSave = useCallback((
+    nodeId: string,
+    configuration: Record<string, any>,
+    nodeName: string
+  ) => {
     const node = nodes.find((n) => n.id === nodeId)
     if (!node) return
 
     const component = components.find((p: any) => p.name === (node.data as any)._originalComponent)
     if (!component) return
 
-    setEditingNodeId(node.id)
-    setSelectedComponent(component)
-    setNodeName((node.data as any).label as string)
-    setNodeConfiguration((node.data as any)._originalConfiguration || {})
-    setIsAddNodeModalOpen(true)
+    // Filter configuration to only include visible fields
+    const filteredConfiguration = filterVisibleConfiguration(
+      configuration,
+      component.configuration || []
+    )
+
+    // Update existing node
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== nodeId) return n
+
+        const nodeData = n.data as any
+        const updatedData = {
+          ...nodeData,
+          label: nodeName.trim(),
+          _originalConfiguration: filteredConfiguration,
+        }
+
+        // Update the title in the type-specific props
+        if (nodeData.if) {
+          updatedData.if = { ...nodeData.if, title: nodeName.trim() }
+        }
+        if (nodeData.filter) {
+          updatedData.filter = { ...nodeData.filter, title: nodeName.trim() }
+        }
+        if (nodeData.approval) {
+          updatedData.approval = { ...nodeData.approval, title: nodeName.trim() }
+        }
+        if (nodeData.noop) {
+          updatedData.noop = { ...nodeData.noop, title: nodeName.trim() }
+        }
+
+        return {
+          ...n,
+          data: updatedData,
+        }
+      })
+    )
+  }, [nodes, components])
+
+  const handleNodeAdd = useCallback((newNodeData: NewNodeData) => {
+    const component = components.find((c: ComponentsComponent) => c.name === newNodeData.buildingBlock.name)
+    if (!component) return
+
+    // Filter configuration to only include visible fields
+    const filteredConfiguration = filterVisibleConfiguration(
+      newNodeData.configuration,
+      component.configuration || []
+    )
+
+    // Add new node
+    const newNodeId = generateNodeId(component.name!, newNodeData.nodeName.trim())
+    const mockNode = { component: { name: component.name }, name: newNodeData.nodeName.trim() }
+    const blockData = createBlockData(mockNode, component)
+
+    const newNode: Node = {
+      id: newNodeId,
+      type: 'default',
+      position: { x: nodes.length * 250, y: 100 },
+      data: {
+        ...blockData,
+        _originalComponent: component.name,
+        _originalConfiguration: filteredConfiguration,
+      },
+    }
+    setNodes((nds) => [...nds, newNode])
   }, [nodes, components])
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== nodeId))
     setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId))
   }, [])
-
-  const handleAddNode = () => {
-    if (!selectedComponent || !nodeName.trim()) return
-
-    // Filter configuration to only include visible fields
-    const filteredConfiguration = filterVisibleConfiguration(
-      nodeConfiguration,
-      selectedComponent.configuration || []
-    )
-
-    if (editingNodeId) {
-      // Update existing node
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id !== editingNodeId) return node
-
-          const nodeData = node.data as any
-          const updatedData = {
-            ...nodeData,
-            label: nodeName.trim(),
-            _originalConfiguration: filteredConfiguration,
-          }
-
-          // Update the title in the type-specific props
-          if (nodeData.if) {
-            updatedData.if = { ...nodeData.if, title: nodeName.trim() }
-          }
-          if (nodeData.filter) {
-            updatedData.filter = { ...nodeData.filter, title: nodeName.trim() }
-          }
-          if (nodeData.approval) {
-            updatedData.approval = { ...nodeData.approval, title: nodeName.trim() }
-          }
-          if (nodeData.noop) {
-            updatedData.noop = { ...nodeData.noop, title: nodeName.trim() }
-          }
-
-          return {
-            ...node,
-            data: updatedData,
-          }
-        })
-      )
-    } else {
-      // Add new node
-      const newNodeId = generateNodeId(selectedComponent.name, nodeName.trim())
-      const mockNode = { component: { name: selectedComponent.name }, name: nodeName.trim() }
-      const blockData = createBlockData(mockNode, selectedComponent)
-
-      const newNode: Node = {
-        id: newNodeId,
-        type: 'default',
-        position: { x: nodes.length * 250, y: 100 },
-        data: {
-          ...blockData,
-          _originalComponent: selectedComponent.name,
-          _originalConfiguration: filteredConfiguration,
-        },
-      }
-      setNodes((nds) => [...nds, newNode])
-    }
-
-    setIsAddNodeModalOpen(false)
-    setSelectedComponent(null)
-    setNodeName('')
-    setNodeConfiguration({})
-    setEditingNodeId(null)
-  }
-
-  const handleCloseModal = () => {
-    setIsAddNodeModalOpen(false)
-    setSelectedComponent(null)
-    setNodeName('')
-    setNodeConfiguration({})
-    setEditingNodeId(null)
-  }
 
 
   const handleSave = async () => {
@@ -453,71 +428,15 @@ export const Blueprint = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={(nodeId) => console.log('Node clicked:', nodeId)}
-        onNodeEdit={handleNodeEdit}
         onNodeDelete={handleNodeDelete}
+        getNodeEditData={getNodeEditData}
+        onNodeConfigurationSave={handleNodeConfigurationSave}
+        onNodeAdd={handleNodeAdd}
+        organizationId={organizationId}
         components={components}
-        onComponentClick={handleBlockClick}
         onSave={handleSave}
         isSaving={updateBlueprintMutation.isPending}
       />
-
-      {/* Add/Edit Node Modal */}
-      <Dialog open={isAddNodeModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
-        <DialogContent className="max-w-2xl p-0" showCloseButton={false}>
-          <VisuallyHidden>
-            <DialogTitle>{editingNodeId ? 'Edit Node' : 'Add Node'}</DialogTitle>
-            <DialogDescription>Configure the node settings and parameters</DialogDescription>
-          </VisuallyHidden>
-          <ScrollArea className="max-h-[80vh]">
-            <div className="p-6">
-              <div className="space-y-6">
-                {/* Node identification section */}
-                <div className="flex items-center gap-3">
-                  <Label className="min-w-[100px] text-left">Node Name</Label>
-                  <Input
-                    type="text"
-                    value={nodeName}
-                    onChange={(e) => setNodeName(e.target.value)}
-                    placeholder="Enter a name for this node"
-                    autoFocus
-                    className="flex-1"
-                  />
-                </div>
-
-                {/* Configuration section */}
-                {selectedComponent?.configuration && selectedComponent.configuration.length > 0 && (
-                  <div className="border-t border-gray-200 dark:border-zinc-700 pt-6 space-y-4">
-                    {selectedComponent.configuration.map((field: any) => (
-                      <ConfigurationFieldRenderer
-                        key={field.name}
-                        field={field}
-                        value={nodeConfiguration[field.name]}
-                        onChange={(value) => setNodeConfiguration({ ...nodeConfiguration, [field.name]: value })}
-                        allValues={nodeConfiguration}
-                        domainId={organizationId}
-                        domainType="DOMAIN_TYPE_ORGANIZATION"
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <DialogFooter className="mt-6">
-                <Button variant="outline" onClick={handleCloseModal}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="default"
-                  onClick={handleAddNode}
-                  disabled={!nodeName.trim()}
-                >
-                  {editingNodeId ? 'Save' : 'Add Node'}
-                </Button>
-              </DialogFooter>
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

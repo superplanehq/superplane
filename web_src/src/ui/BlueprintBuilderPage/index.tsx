@@ -31,6 +31,20 @@ import {
   ComponentsConfigurationField,
   SuperplaneBlueprintsOutputChannel,
 } from "@/api-client";
+import { NodeConfigurationModal } from "../CanvasPage/NodeConfigurationModal";
+
+export interface NodeEditData {
+  nodeId: string;
+  nodeName: string;
+  configuration: Record<string, any>;
+  configurationFields: ComponentsConfigurationField[];
+}
+
+export interface NewNodeData {
+  buildingBlock: BuildingBlock;
+  nodeName: string;
+  configuration: Record<string, any>;
+}
 
 export interface BlueprintBuilderPageProps {
   // Blueprint data
@@ -55,12 +69,20 @@ export interface BlueprintBuilderPageProps {
   onConnect: (connection: Connection) => void;
   onNodeDoubleClick?: (event: any, node: Node) => void;
   onNodeClick?: (nodeId: string) => void;
-  onNodeEdit?: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
+
+  // Node configuration
+  getNodeEditData?: (nodeId: string) => NodeEditData | null;
+  onNodeConfigurationSave?: (
+    nodeId: string,
+    configuration: Record<string, any>,
+    nodeName: string
+  ) => void;
+  onNodeAdd?: (newNodeData: NewNodeData) => void;
+  organizationId?: string;
 
   // Building blocks
   components: ComponentsComponent[];
-  onComponentClick: (block: BuildingBlock) => void;
 
   // Actions
   onSave: () => void;
@@ -81,6 +103,12 @@ export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
   const [editingOutputChannelIndex, setEditingOutputChannelIndex] = useState<
     number | null
   >(null);
+
+  // Node configuration modal state
+  const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(
+    null
+  );
+  const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
 
   // Modal handlers
   const handleAddConfigField = useCallback(() => {
@@ -151,6 +179,56 @@ export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
     ]
   );
 
+  // Node configuration handlers
+  const handleNodeEdit = useCallback(
+    (nodeId: string) => {
+      // Try the modal-based edit first (for node configuration)
+      if (props.getNodeEditData) {
+        const editData = props.getNodeEditData(nodeId);
+        if (editData) {
+          setEditingNodeData(editData);
+        }
+      }
+    },
+    [props]
+  );
+
+  const handleBuildingBlockClick = useCallback((block: BuildingBlock) => {
+    setNewNodeData({
+      buildingBlock: block,
+      nodeName: block.label || block.name || "",
+      configuration: {},
+    });
+  }, []);
+
+  const handleSaveConfiguration = useCallback(
+    (configuration: Record<string, any>, nodeName: string) => {
+      if (editingNodeData && props.onNodeConfigurationSave) {
+        props.onNodeConfigurationSave(
+          editingNodeData.nodeId,
+          configuration,
+          nodeName
+        );
+      }
+      setEditingNodeData(null);
+    },
+    [editingNodeData, props]
+  );
+
+  const handleSaveNewNode = useCallback(
+    (configuration: Record<string, any>, nodeName: string) => {
+      if (newNodeData && props.onNodeAdd) {
+        props.onNodeAdd({
+          buildingBlock: newNodeData.buildingBlock,
+          nodeName,
+          configuration,
+        });
+      }
+      setNewNodeData(null);
+    },
+    [newNodeData, props]
+  );
+
   // Transform components into building block categories
   const buildingBlockCategories = useMemo(() => {
     const categoryMap = new Map<string, BuildingBlock[]>();
@@ -203,13 +281,13 @@ export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
           data={nodeProps.data as BlockData}
           nodeId={nodeProps.id}
           onClick={() => props.onNodeClick?.(nodeProps.id)}
-          onEdit={() => props.onNodeEdit?.(nodeProps.id)}
+          onEdit={() => handleNodeEdit(nodeProps.id)}
           onDelete={() => props.onNodeDelete?.(nodeProps.id)}
           selected={nodeProps.selected}
         />
       ),
     }),
-    [props.onNodeClick, props.onNodeEdit, props.onNodeDelete]
+    [props.onNodeClick, props.onNodeDelete, handleNodeEdit]
   );
 
   return (
@@ -228,7 +306,7 @@ export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
         <BuildingBlocksSidebar
           isOpen={isLeftSidebarOpen}
           onToggle={setIsLeftSidebarOpen}
-          onBlockClick={props.onComponentClick}
+          onBlockClick={handleBuildingBlockClick}
           blocks={buildingBlockCategories}
         />
 
@@ -312,6 +390,34 @@ export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
         nodes={props.nodes}
         onSave={handleSaveOutputChannel}
       />
+
+      {/* Edit existing node modal */}
+      {editingNodeData && (
+        <NodeConfigurationModal
+          isOpen={true}
+          onClose={() => setEditingNodeData(null)}
+          nodeName={editingNodeData.nodeName}
+          configuration={editingNodeData.configuration}
+          configurationFields={editingNodeData.configurationFields}
+          onSave={handleSaveConfiguration}
+          domainId={props.organizationId}
+          domainType="DOMAIN_TYPE_ORGANIZATION"
+        />
+      )}
+
+      {/* Add new node modal */}
+      {newNodeData && (
+        <NodeConfigurationModal
+          isOpen={true}
+          onClose={() => setNewNodeData(null)}
+          nodeName={newNodeData.nodeName}
+          configuration={newNodeData.configuration}
+          configurationFields={newNodeData.buildingBlock.configuration || []}
+          onSave={handleSaveNewNode}
+          domainId={props.organizationId}
+          domainType="DOMAIN_TYPE_ORGANIZATION"
+        />
+      )}
     </div>
   );
 }
