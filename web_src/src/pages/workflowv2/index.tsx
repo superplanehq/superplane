@@ -107,6 +107,11 @@ export function WorkflowPageV2() {
     [workflow?.nodes]
   );
 
+  const filterComponentNodes = useMemo(
+    () => componentNodes.filter((node) => node.component?.name === "filter"),
+    [componentNodes]
+  );
+
   /**
    * Filter to only include persisted nodes for data fetching
    * This prevents unnecessary loading states when new nodes are added locally.
@@ -123,7 +128,7 @@ export function WorkflowPageV2() {
   }, [compositeNodes, componentNodes]);
 
   const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } =
-    useTriggerNodeEvents(workflowId!, persistedTriggerNodes);
+    useTriggerNodeEvents(workflowId!, persistedTriggerNodes.concat(filterComponentNodes));
   const {
     nodeExecutionsMap,
     nodeQueueItemsMap,
@@ -1102,24 +1107,8 @@ function prepareIfNode(
   const execution = executions.length > 0 ? executions[0] : null;
 
   // Parse conditions from node configuration
-  const conditionConfig = node.configuration?.conditions;
-  const conditions = Array.isArray(conditionConfig) ? conditionConfig.map((condition: unknown) => {
-    const cond = condition as Record<string, unknown>;
-    const result: {
-      field: string;
-      operator: string;
-      value: string;
-      logicalOperator?: string;
-    } = {
-      field: (cond.field as string) || "",
-      operator: (cond.operator as string) || "",
-      value: (cond.value as string) || "",
-    };
-    if (cond.logicalOperator) {
-      result.logicalOperator = cond.logicalOperator as string;
-    }
-    return result;
-  }) : [];
+  const expression = node.configuration?.expression;
+
 
   // Get last execution for event data
   let trueEvent, falseEvent;
@@ -1158,7 +1147,7 @@ function prepareIfNode(
       state: "pending" as const,
       if: {
         title: node.name!,
-        conditions,
+        expression,
         trueEvent: trueEvent || {
           eventTitle: "No events received yet",
           eventState: "neutral" as const

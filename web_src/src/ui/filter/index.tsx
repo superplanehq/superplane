@@ -3,13 +3,6 @@ import { ComponentBase, ComponentBaseSpecValue, type EventSection } from "../com
 import { ComponentActionsProps } from "../types/componentActions";
 import { useMemo } from "react";
 
-export interface FilterCondition {
-  field: string;
-  operator: string;
-  value: string;
-  logicalOperator?: "AND" | "OR";
-}
-
 export interface FilterProps extends ComponentActionsProps {
   title?: string;
   expression: string;
