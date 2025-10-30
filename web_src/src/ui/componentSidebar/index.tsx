@@ -1,6 +1,6 @@
 import { resolveIcon } from "@/lib/utils";
 import { TextAlignStart, X } from "lucide-react";
-import React, { JSX } from "react";
+import React, { JSX, useCallback, useEffect, useRef, useState } from "react";
 import { ChildEvents, ChildEventsInfo } from "../childEvents";
 import { ChildEventsState } from "../composite";
 import { MetadataItem, MetadataList } from "../metadataList";
@@ -74,9 +74,50 @@ export const ComponentSidebar = ({
   onDelete,
   isCompactView = false,
 }: ComponentSidebarProps) => {
+  const [sidebarWidth, setSidebarWidth] = useState(420);
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
   }, [iconSlug]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const newWidth = window.innerWidth - e.clientX;
+      // Set min width to 320px and max width to 800px
+      const clampedWidth = Math.max(320, Math.min(800, newWidth));
+      setSidebarWidth(clampedWidth);
+    },
+    [isResizing]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
 
   const createEventItem = (event: SidebarEvent, index: number): JSX.Element => {
@@ -201,7 +242,23 @@ export const ComponentSidebar = ({
   if (!isOpen) return null;
 
   return (
-    <div className="min-w-[27rem] border-l-2 border-gray-400 border-border flex-1 absolute right-0 top-0 h-full z-20 overflow-y-auto bg-white">
+    <div
+      ref={sidebarRef}
+      className="border-l-2 border-gray-400 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white"
+      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+    >
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${
+          isResizing ? "bg-blue-50" : ""
+        }`}
+        style={{ marginLeft: "-8px" }}
+      >
+        <div className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
+          isResizing ? "bg-blue-500" : ""
+        }`} />
+      </div>
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-2 border-gray-400 bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
           <div
