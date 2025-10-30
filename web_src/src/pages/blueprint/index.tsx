@@ -61,6 +61,87 @@ const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
   return { nodes: layoutedNodes, edges }
 }
 
+// Helper function to map component type to block type
+const getBlockType = (componentName: string): BlockData['type'] => {
+  const typeMap: Record<string, BlockData['type']> = {
+    'if': 'if',
+    'filter': 'filter',
+    'approval': 'approval',
+    'noop': 'noop',
+  }
+  return typeMap[componentName] || 'noop' // Default to noop for unknown components
+}
+
+// Helper function to create minimal BlockData for a component
+const createBlockData = (node: any, component: ComponentsComponent | undefined): BlockData => {
+  const componentName = node.component?.name || ''
+  const blockType = getBlockType(componentName)
+  const channels = component?.outputChannels?.map((channel: any) => channel.name) || ['default']
+
+  const baseData: BlockData = {
+    label: node.name,
+    state: 'pending',
+    type: blockType,
+    outputChannels: channels,
+  }
+  const expression = node.configuration?.expression
+  // Add type-specific props based on component type
+  switch (blockType) {
+    case 'if':
+      baseData.if = {
+        title: node.name,
+        expression,
+        trueEvent: {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+        falseEvent: {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+        trueSectionLabel: "TRUE",
+        falseSectionLabel: "FALSE",
+        collapsed: false,
+      }
+      break
+    case 'filter':
+      baseData.filter = {
+        title: node.name,
+        expression,
+        lastEvent: {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+        collapsed: false,
+      }
+      break
+    case 'approval':
+      baseData.approval = {
+        title: node.name,
+        description: component?.description,
+        iconSlug: component?.icon,
+        iconColor: 'text-orange-500',
+        headerColor: 'bg-orange-100',
+        collapsedBackground: 'bg-orange-100',
+        approvals: [],
+        collapsed: false,
+      }
+      break
+    case 'noop':
+      baseData.noop = {
+        title: node.name,
+        lastEvent: {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+        collapsed: false,
+      }
+      break
+  }
+
+  return baseData
+}
+
 export const Blueprint = () => {
   const { organizationId, blueprintId } = useParams<{ organizationId: string; blueprintId: string }>()
   const navigate = useNavigate()
@@ -102,71 +183,6 @@ export const Blueprint = () => {
       setBlueprintColor(blueprint.color || '')
     }
   }, [blueprint])
-
-  // Helper function to map component type to block type
-  const getBlockType = (componentName: string): BlockData['type'] => {
-    const typeMap: Record<string, BlockData['type']> = {
-      'if': 'if',
-      'filter': 'filter',
-      'approval': 'approval',
-      'noop': 'noop',
-    }
-    return typeMap[componentName] || 'noop' // Default to noop for unknown components
-  }
-
-  // Helper function to create minimal BlockData for a component
-  const createBlockData = (node: any, component: ComponentsComponent | undefined): BlockData => {
-    const componentName = node.component?.name || ''
-    const blockType = getBlockType(componentName)
-    const channels = component?.outputChannels?.map((channel: any) => channel.name) || ['default']
-
-    const baseData: BlockData = {
-      label: node.name,
-      state: 'pending',
-      type: blockType,
-      outputChannels: channels,
-    }
-
-    // Add type-specific props based on component type
-    switch (blockType) {
-      case 'if':
-        const expression = node.configuration?.expression
-        baseData.if = {
-          title: node.name,
-          expression: expression,
-          conditions: [],
-          collapsed: false,
-        }
-        break
-      case 'filter':
-        baseData.filter = {
-          title: node.name,
-          filters: [],
-          collapsed: false,
-        }
-        break
-      case 'approval':
-        baseData.approval = {
-          title: node.name,
-          description: component?.description,
-          iconSlug: component?.icon,
-          iconColor: 'text-orange-500',
-          headerColor: 'bg-orange-100',
-          collapsedBackground: 'bg-orange-100',
-          approvals: [],
-          collapsed: false,
-        }
-        break
-      case 'noop':
-        baseData.noop = {
-          title: node.name,
-          collapsed: false,
-        }
-        break
-    }
-
-    return baseData
-  }
 
   // Update nodes and edges when blueprint or components data changes
   useEffect(() => {
@@ -290,7 +306,11 @@ export const Blueprint = () => {
           }
         }
         if (nodeData.filter) {
-          updatedData.filter = { ...nodeData.filter, title: nodeName.trim() }
+          updatedData.filter = {
+            ...nodeData.filter,
+            title: nodeName.trim(),
+            expression: filteredConfiguration.expression
+          }
         }
         if (nodeData.approval) {
           updatedData.approval = { ...nodeData.approval, title: nodeName.trim() }
