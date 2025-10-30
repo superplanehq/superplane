@@ -63,7 +63,7 @@ export function BuildingBlocksSidebar({
 
   const [searchTerm, setSearchTerm] = useState("");
 
-  const sortedCategories = blocks.sort((a, b) => {
+  const sortedCategories = (blocks || []).sort((a, b) => {
     if (a.name === "Primitives") return -1;
     if (b.name === "Primitives") return 1;
     if (a.name === "Custom Components") return -1;
@@ -108,33 +108,6 @@ export function BuildingBlocksSidebar({
   );
 }
 
-const getColor = (color?: string): string => {
-  switch (color) {
-    case "blue":
-      return "bg-blue-200";
-    case "green":
-      return "bg-green-200";
-    case "red":
-      return "bg-red-200";
-    case "yellow":
-      return "bg-yellow-200";
-    case "purple":
-      return "bg-purple-200";
-    case "orange":
-      return "bg-orange-200";
-    case "pink":
-      return "bg-pink-200";
-    case "indigo":
-      return "bg-indigo-200";
-    case "sky":
-      return "bg-sky-200";
-    case "gray":
-      return "bg-gray-200";
-    default:
-      return "bg-gray-200";
-  }
-};
-
 interface CategorySectionProps {
   category: BuildingBlockCategory;
   onBlockClick: (block: BuildingBlock) => void;
@@ -142,9 +115,6 @@ interface CategorySectionProps {
 
 function CategorySection({ category, onBlockClick }: CategorySectionProps) {
   const allBlocks = category.blocks;
-  const isPrimitives = category.name === "Primitives";
-  const categoryColor = getColorClass(allBlocks[0]?.color);
-  const categoryBg = getColor(allBlocks[0]?.color);
 
   return (
     <details className="flex-1 px-5 mb-4" open>
@@ -155,11 +125,9 @@ function CategorySection({ category, onBlockClick }: CategorySectionProps) {
 
       <ItemGroup>
         {allBlocks.map((block) => {
-          const iconSlug = isPrimitives ? block.icon || "zap" : undefined;
+          const iconSlug = block.icon || "zap";
           const IconComponent = resolveIcon(iconSlug);
-          const colorClass = isPrimitives
-            ? getColorClass(block.color)
-            : categoryColor;
+          const colorClass = getColorClass(block.color);
 
           return (
             <Item
@@ -169,13 +137,7 @@ function CategorySection({ category, onBlockClick }: CategorySectionProps) {
               size="sm"
             >
               <ItemMedia>
-                {isPrimitives ? (
-                  <IconComponent size={14} className={colorClass} />
-                ) : (
-                  <span
-                    className={`inline-block h-[14px] w-[14px] rounded-[4px] ${categoryBg}`}
-                  />
-                )}
+                <IconComponent size={14} className={colorClass} />
               </ItemMedia>
 
               <ItemContent>
