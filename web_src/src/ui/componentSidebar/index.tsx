@@ -125,7 +125,7 @@ export const ComponentSidebar = ({
         {event.isOpen &&
           ((event.values && Object.entries(event.values).length > 0) ||
             (event.childEventsInfo && event.childEventsInfo.count > 0)) && (
-            <div className="rounded-sm bg-white border-1 border-gray-400 text-gray-500 w-full">
+            <div className="rounded-sm bg-white border-1 border-gray-200 text-gray-500 w-full">
               {event.values && Object.entries(event.values).length > 0 && (
                 <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
                   {Object.entries(event.values || {}).map(([key, value]) => (
@@ -148,7 +148,7 @@ export const ComponentSidebar = ({
                 <div
                   className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${
                     event.values && Object.entries(event.values).length > 0
-                      ? "border-t-1 border-gray-400"
+                      ? "border-t-1 border-gray-200"
                       : " rounded-t-sm"
                   }`}
                 >
@@ -169,8 +169,8 @@ export const ComponentSidebar = ({
   if (!isOpen) return null;
 
   return (
-    <div className="min-w-[27rem] border-l-2 border-gray-400 border-border flex-1 absolute right-0 top-[48px] h-full z-20 overflow-y-auto bg-white">
-      <div className="flex items-center justify-between gap-3 p-3 relative border-b-2 border-gray-400 bg-gray-50">
+    <div className="min-w-[27rem] border-l-1 border-t-1 border-gray-200 border-border flex-1 absolute right-0 top-[48px] h-full z-20 overflow-y-auto bg-white shadow-xl">
+      <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-gray-200 bg-gray-50">
         <div className="flex flex-col items-start gap-3 w-full mt-2">
           <div
             className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center ${
@@ -198,13 +198,13 @@ export const ComponentSidebar = ({
           </div>
         </div>
       </div>
-      <div className="px-3 py-1 border-b-2 border-gray-400">
+      <div className="px-3 py-1 border-b-1 border-gray-200">
         <MetadataList
           items={metadata}
           className="border-b-0 text-gray-500 font-medium gap-2 flex flex-col py-2 font-mono"
         />
       </div>
-      <div className="px-3 py-1 border-b-2 border-gray-400 pb-3">
+      <div className="px-3 py-1 border-b-1 border-gray-200 pb-3">
         <h2 className="text-sm font-semibold uppercase text-gray-500 my-2">
           Latest events
         </h2>
