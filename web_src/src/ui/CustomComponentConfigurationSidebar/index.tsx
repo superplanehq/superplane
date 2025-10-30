@@ -27,7 +27,7 @@ export interface OutputChannel {
   nodeOutputChannel: string;
 }
 
-export interface BlueprintConfigurationSidebarProps {
+export interface CustomComponentConfigurationSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
 
@@ -48,7 +48,7 @@ export interface BlueprintConfigurationSidebarProps {
   onEditOutputChannel: (index: number) => void;
 }
 
-export function BlueprintConfigurationSidebar({
+export function CustomComponentConfigurationSidebar({
   isOpen,
   onToggle,
   metadata,
@@ -61,7 +61,7 @@ export function BlueprintConfigurationSidebar({
   onOutputChannelsChange,
   onAddOutputChannel,
   onEditOutputChannel,
-}: BlueprintConfigurationSidebarProps) {
+}: CustomComponentConfigurationSidebarProps) {
   const [activeTab, setActiveTab] = useState<'configuration' | 'outputChannels'>('configuration');
 
   if (!isOpen) {
@@ -94,7 +94,7 @@ export function BlueprintConfigurationSidebar({
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-0">
         <h2 className="text-md font-semibold text-gray-900 dark:text-zinc-100">
-          Blueprint Settings
+          Custom Component Settings
         </h2>
         <Button
           variant="outline"
@@ -173,7 +173,7 @@ export function BlueprintConfigurationSidebar({
         <TabsContent value="configuration" className="flex-1 overflow-y-auto mt-0">
           <div className="text-left p-4 space-y-6">
             <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-              Add configuration fields that can be used in your blueprint nodes
+              Add configuration fields that can be used in your custom component nodes
             </div>
 
             {/* Configuration Fields List */}

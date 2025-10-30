@@ -80,7 +80,7 @@ export function CreateWorkflowModal({
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
       <DialogTitle>Create New Workflow</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a new workflow that can use both components and blueprints as building blocks.
+        Create a new workflow that can use both components and custom components as building blocks.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <MaterialSymbol name="close" size="sm" />

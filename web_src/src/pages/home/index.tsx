@@ -5,7 +5,7 @@ import { Text } from '../../components/Text/text'
 import { Button } from '../../components/Button/button'
 import { Plus, Search, LayoutGrid, List, Bot, Box, GitBranch } from 'lucide-react'
 import { CreateCanvasModal } from '../../components/CreateCanvasModal'
-import { CreateBlueprintModal } from '../../components/CreateBlueprintModal'
+import { CreateCustomComponentModal } from '../../components/CreateCustomComponentModal'
 import { CreateWorkflowModal } from '../../components/CreateWorkflowModal'
 import { CanvasCard, CanvasCardData } from '../../components/CanvasCard'
 import { useOrganizationCanvases, useCreateCanvas, useOrganizationUsers } from '../../hooks/useOrganizationData'
@@ -64,7 +64,7 @@ interface WorkflowCardData {
   type: 'workflow'
 }
 
-// Home page component - displays canvases and blueprints for the current user's organization
+// Home page component - displays canvases and custom components for the current user's organization
 const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -86,7 +86,7 @@ const HomePage = () => {
   const createWorkflowMutation = useCreateWorkflow(organizationId || '')
 
   const canvasError = canvasApiError ? 'Failed to fetch canvases. Please try again later.' : null
-  const blueprintError = blueprintApiError ? 'Failed to fetch blueprints. Please try again later.' : null
+  const blueprintError = blueprintApiError ? 'Failed to fetch custom components. Please try again later.' : null
   const workflowError = workflowApiError ? 'Failed to fetch workflows. Please try again later.' : null
 
   // Create user display names mapping for organization users
@@ -203,7 +203,7 @@ const HomePage = () => {
 
       if (result?.data?.blueprint?.id) {
         setShowCreateBlueprintModal(false)
-        navigate(`/${organizationId}/blueprints/${result.data.blueprint.id}`)
+        navigate(`/${organizationId}/custom-components/${result.data.blueprint.id}`)
       }
     }
   }
@@ -255,7 +255,7 @@ const HomePage = () => {
             {/* Page Header */}
             <div className='flex items-center justify-between mb-8'>
               <Heading level={2} className="!text-2xl mb-2">
-                {activeTab === 'canvases' ? 'Canvases' : activeTab === 'blueprints' ? 'Blueprints' : 'Workflows'}
+                {activeTab === 'canvases' ? 'Canvases' : activeTab === 'blueprints' ? 'Custom Components' : 'Workflows'}
               </Heading>
               <Button
                 color="blue"
@@ -263,7 +263,7 @@ const HomePage = () => {
                 onClick={activeTab === 'canvases' ? handleCreateCanvasClick : activeTab === 'blueprints' ? handleCreateBlueprintClick : handleCreateWorkflowClick}
               >
                 <Plus className="mr-2" size={20} />
-                New {activeTab === 'canvases' ? 'Canvas' : activeTab === 'blueprints' ? 'Blueprint' : 'Workflow'}
+                New {activeTab === 'canvases' ? 'Canvas' : activeTab === 'blueprints' ? 'Custom Component' : 'Workflow'}
               </Button>
             </div>
 
@@ -287,7 +287,7 @@ const HomePage = () => {
                     : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                 }`}
               >
-                Blueprints ({blueprints.length})
+                Custom Components ({blueprints.length})
               </button>
               <button
                 onClick={() => setActiveTab('workflows')}
@@ -375,7 +375,7 @@ const HomePage = () => {
                     </div>
                   )
                 ) : activeTab === 'blueprints' ? (
-                  // Blueprints
+                  // Custom Components
                   viewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                       {filteredBlueprints.map((blueprint) => {
@@ -389,7 +389,7 @@ const HomePage = () => {
                                     <IconComponent size={24} className={getColorClass(blueprint.color)} />
                                     <div className='flex flex-col flex-1 min-w-0'>
                                       <button
-                                        onClick={() => navigate(`/${organizationId}/blueprints/${blueprint.id}`)}
+                                        onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
                                         className="block text-left w-full"
                                       >
                                         <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate">
@@ -426,7 +426,7 @@ const HomePage = () => {
                         return (
                           <div key={blueprint.id} className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4">
                             <button
-                              onClick={() => navigate(`/${organizationId}/blueprints/${blueprint.id}`)}
+                              onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
                               className="block text-left w-full"
                             >
                               <div className="flex items-center gap-3">
@@ -526,7 +526,7 @@ const HomePage = () => {
                     <Text className="text-zinc-600 dark:text-zinc-400 mb-6">
                       {searchQuery
                         ? 'Try adjusting your search criteria.'
-                        : `Get started by creating your first ${activeTab === 'canvases' ? 'canvas' : activeTab === 'blueprints' ? 'blueprint' : 'workflow'}.`}
+                        : `Get started by creating your first ${activeTab === 'canvases' ? 'canvas' : activeTab === 'blueprints' ? 'custom component' : 'workflow'}.`}
                     </Text>
                   </div>
                 )}
@@ -544,8 +544,8 @@ const HomePage = () => {
         isLoading={createCanvasMutation.isPending}
       />
 
-      {/* Create Blueprint Modal */}
-      <CreateBlueprintModal
+      {/* Create Custom Component Modal */}
+      <CreateCustomComponentModal
         isOpen={showCreateBlueprintModal}
         onClose={handleCreateBlueprintClose}
         onSubmit={handleCreateBlueprintSubmit}

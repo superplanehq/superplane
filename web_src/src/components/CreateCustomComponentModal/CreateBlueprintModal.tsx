@@ -13,7 +13,7 @@ import {
 } from '../Dialog/dialog'
 import { showErrorToast } from '../../utils/toast'
 
-interface CreateBlueprintModalProps {
+interface CreateCustomComponentModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: { name: string; description?: string }) => Promise<void>
@@ -23,12 +23,12 @@ interface CreateBlueprintModalProps {
 const MAX_BLUEPRINT_NAME_LENGTH = 50
 const MAX_BLUEPRINT_DESCRIPTION_LENGTH = 200
 
-export function CreateBlueprintModal({
+export function CreateCustomComponentModal({
   isOpen,
   onClose,
   onSubmit,
   isLoading = false
-}: CreateBlueprintModalProps) {
+}: CreateCustomComponentModalProps) {
   const [blueprintName, setBlueprintName] = useState('')
   const [blueprintDescription, setBlueprintDescription] = useState('')
   const [nameError, setNameError] = useState('')
@@ -44,12 +44,12 @@ export function CreateBlueprintModal({
     setNameError('')
 
     if (!blueprintName.trim()) {
-      setNameError('Blueprint name is required')
+      setNameError('Custom Component name is required')
       return
     }
 
     if (blueprintName.trim().length > MAX_BLUEPRINT_NAME_LENGTH) {
-      setNameError(`Blueprint name must be ${MAX_BLUEPRINT_NAME_LENGTH} characters or less`)
+      setNameError(`Custom Component name must be ${MAX_BLUEPRINT_NAME_LENGTH} characters or less`)
       return
     }
 
@@ -65,22 +65,22 @@ export function CreateBlueprintModal({
       setNameError('')
       onClose()
     } catch (error) {
-      console.error('Error creating blueprint:', error)
-      const errorMessage = ((error as Error)?.message) || error?.toString() || 'Failed to create blueprint'
+      console.error('Error creating custom component:', error)
+      const errorMessage = ((error as Error)?.message) || error?.toString() || 'Failed to create custom component'
 
       showErrorToast(errorMessage)
 
       if (errorMessage.toLowerCase().includes('already') || errorMessage.toLowerCase().includes('exists')) {
-        setNameError('A blueprint with this name already exists')
+        setNameError('A custom component with this name already exists')
       }
     }
   }
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
-      <DialogTitle>Create New Blueprint</DialogTitle>
+      <DialogTitle>Create New Custom Component</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a new blueprint to define reusable workflow patterns using components.
+        Create a new custom component to define reusable workflow patterns using components.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <MaterialSymbol name="close" size="sm" />
@@ -91,7 +91,7 @@ export function CreateBlueprintModal({
           {/* Blueprint Name */}
           <Field>
             <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-              Blueprint name *
+              Custom Component name *
             </Label>
             <Input
               type="text"
@@ -104,7 +104,7 @@ export function CreateBlueprintModal({
                   setNameError('')
                 }
               }}
-              placeholder="Enter blueprint name"
+              placeholder="Enter custom component name"
               className={`w-full ${nameError ? 'border-red-500' : ''}`}
               autoFocus
               maxLength={MAX_BLUEPRINT_NAME_LENGTH}
@@ -131,7 +131,7 @@ export function CreateBlueprintModal({
                   setBlueprintDescription(e.target.value)
                 }
               }}
-              placeholder="Describe what this blueprint will be used for (optional)"
+              placeholder="Describe what this custom component will be used for (optional)"
               rows={3}
               className="w-full"
               maxLength={MAX_BLUEPRINT_DESCRIPTION_LENGTH}

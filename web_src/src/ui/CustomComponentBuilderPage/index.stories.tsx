@@ -2,25 +2,25 @@ import type { Meta, StoryObj } from "@storybook/react";
 import "@xyflow/react/dist/style.css";
 import "./blueprint-canvas-reset.css";
 import { useState } from "react";
-import { BlueprintBuilderPage } from "./index";
+import { CustomComponentBuilderPage } from "./index";
 import { mockComponents } from "./storybooks/mockComponents";
 import { mockNodes, mockEdges } from "./storybooks/mockBlueprint";
 import type { Node, Edge } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges } from "@xyflow/react";
-import type { ConfigurationField, OutputChannel } from "../BlueprintConfigurationSidebar";
+import type { ConfigurationField, OutputChannel } from "../CustomComponentConfigurationSidebar";
 
 const meta = {
-  title: "Pages/BlueprintBuilderPage",
-  component: BlueprintBuilderPage,
+  title: "Pages/CustomComponentBuilderPage",
+  component: CustomComponentBuilderPage,
   parameters: {
     layout: "fullscreen",
   },
   argTypes: {},
-} satisfies Meta<typeof BlueprintBuilderPage>;
+} satisfies Meta<typeof CustomComponentBuilderPage>;
 
 export default meta;
 
-type Story = StoryObj<typeof BlueprintBuilderPage>;
+type Story = StoryObj<typeof CustomComponentBuilderPage>;
 
 export const Default: Story = {
   render: () => {
@@ -69,10 +69,10 @@ export const Default: Story = {
     ]);
 
     return (
-      <BlueprintBuilderPage
-        blueprintName={blueprintName}
+      <CustomComponentBuilderPage
+        customComponentName={blueprintName}
         breadcrumbs={[
-          { label: "Blueprints" },
+          { label: "Custom Components" },
           { label: blueprintName, iconSlug: "rocket", iconColor: "text-blue-600" },
         ]}
         metadata={{
@@ -119,7 +119,7 @@ export const Default: Story = {
           console.log("Component clicked:", block.name);
         }}
         onSave={() => {
-          console.log("Save blueprint");
+          console.log("Save custom component");
           console.log("Nodes:", nodes);
           console.log("Edges:", edges);
           console.log("Configuration:", configurationFields);
@@ -136,7 +136,7 @@ export const EmptyBlueprint: Story = {
   render: () => {
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
-    const [blueprintName, setBlueprintName] = useState("New Blueprint");
+    const [blueprintName, setBlueprintName] = useState("New Custom Component");
     const [description, setDescription] = useState("");
     const [icon, setIcon] = useState("");
     const [color, setColor] = useState("");
@@ -144,10 +144,10 @@ export const EmptyBlueprint: Story = {
     const [outputChannels, setOutputChannels] = useState<OutputChannel[]>([]);
 
     return (
-      <BlueprintBuilderPage
-        blueprintName={blueprintName}
+      <CustomComponentBuilderPage
+        customComponentName={blueprintName}
         breadcrumbs={[
-          { label: "Blueprints" },
+          { label: "Custom Components" },
           { label: blueprintName, iconSlug: "rocket", iconColor: "text-blue-600" },
         ]}
         metadata={{
@@ -191,7 +191,7 @@ export const EmptyBlueprint: Story = {
           console.log("Component clicked:", block.name);
         }}
         onSave={() => {
-          console.log("Save blueprint");
+          console.log("Save custom component");
         }}
         isSaving={false}
       />

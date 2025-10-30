@@ -169,7 +169,7 @@ export function WorkflowPageV2() {
         ),
       },
       {
-        name: "Blueprints",
+        name: "Custom Components",
         blocks: blueprints.map(
           (b): BuildingBlock => ({
             id: b.id,
