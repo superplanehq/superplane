@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Play } from 'lucide-react'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Heading } from '@/components/Heading/heading'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import Editor from '@monaco-editor/react'
+import type { editor } from 'monaco-editor'
 
 interface EmitEventModalProps {
   isOpen: boolean
@@ -29,6 +30,17 @@ export const EmitEventModal = ({
   const [selectedChannel, setSelectedChannel] = useState<string>(channels[0] || 'default')
   const [eventData, setEventData] = useState<string>('{}')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+
+  // Cleanup editor when component unmounts
+  useEffect(() => {
+    return () => {
+      if (editorRef.current) {
+        editorRef.current.dispose()
+        editorRef.current = null
+      }
+    }
+  }, [])
 
   const handleClose = () => {
     setSelectedChannel(channels[0] || 'default')
@@ -97,6 +109,9 @@ export const EmitEventModal = ({
                 defaultLanguage="json"
                 value={eventData}
                 onChange={(value) => setEventData(value || '{}')}
+                onMount={(editor) => {
+                  editorRef.current = editor
+                }}
                 options={{
                   minimap: { enabled: false },
                   fontSize: 13,

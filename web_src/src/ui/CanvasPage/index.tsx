@@ -515,6 +515,9 @@ function CanvasContent({
     stateRef.current.componentSidebar.open(nodeId);
   }, []);
 
+  const onRunRef = useRef(onRun);
+  onRunRef.current = onRun;
+
   const handleSave = useCallback(() => {
     if (onSave) {
       onSave(stateRef.current.nodes);
@@ -549,7 +552,7 @@ function CanvasContent({
           onEdit={() => onNodeEdit(nodeProps.id)}
           onDelete={() => onNodeDelete?.(nodeProps.id)}
           selected={nodeProps.selected}
-          onRun={onRun ? () => onRun(nodeProps.id) : undefined}
+          onRun={onRunRef.current ? () => onRunRef.current?.(nodeProps.id) : undefined}
           onDuplicate={
             onDuplicate ? () => onDuplicate(nodeProps.id) : undefined
           }
@@ -573,7 +576,6 @@ function CanvasContent({
       handleNodeClick,
       onNodeEdit,
       state.ai,
-      onRun,
       onDuplicate,
       onDeactivate,
       onToggleView,
