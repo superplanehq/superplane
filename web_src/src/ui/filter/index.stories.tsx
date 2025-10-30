@@ -16,25 +16,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     title: "Filter events based on branch",
-    filters: [
-      {
-        field: "$.monarch_app.branch",
-        operator: "is",
-        value: "\"main\"",
-        logicalOperator: "AND"
-      },
-      {
-        field: "$.monarch_app.branch",
-        operator: "contains",
-        value: "\"dev\"",
-        logicalOperator: "AND"
-      },
-      {
-        field: "$.monarch_app.branch",
-        operator: "ends with",
-        value: "\"superplane\""
-      }
-    ],
+    expression: "$.monarch_app.branch == \"main\" and $.monarch_app.branch contains \"dev\" or $.monarch_app.branch endswith \"superplane\"",
     lastEvent: {
       receivedAt: new Date(),
       eventState: "success",

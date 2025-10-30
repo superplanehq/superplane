@@ -288,10 +288,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              configuration: updatedConfiguration,
-              name: updatedNodeName,
-            }
+            ...node,
+            configuration: updatedConfiguration,
+            name: updatedNodeName,
+          }
           : node
       );
 
@@ -342,8 +342,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-            ? "TYPE_BLUEPRINT"
-            : "TYPE_COMPONENT",
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: {
           x: (workflow.nodes?.length || 0) * 250,
@@ -485,12 +485,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
-            }
+            ...node,
+            position: {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            },
+          }
           : node
       );
 
@@ -982,10 +982,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-          ? record.role
-          : record.type === "group" && record.group
-          ? record.group
-          : "Unknown",
+            ? record.role
+            : record.type === "group" && record.group
+              ? record.group
+              : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -995,16 +995,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
+            {
+              label: "comment",
+              optional: true,
+            },
+          ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-            Comment: approvalComment,
-          }
+          Comment: approvalComment,
+        }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1231,26 +1231,8 @@ function prepareFilterNode(
   const execution = executions.length > 0 ? executions[0] : null;
 
   // Parse filters from node configuration
-  const filterConfig = node.configuration?.filters;
-  const filters = Array.isArray(filterConfig) ? filterConfig.map((filter: unknown) => {
-    const filt = filter as Record<string, unknown>;
-    const result: {
-      field: string;
-      operator: string;
-      value: string;
-      logicalOperator?: string;
-    } = {
-      field: (filt.field as string) || "",
-      operator: (filt.operator as string) || "",
-      value: (filt.value as string) || "",
-    };
-    if (filt.logicalOperator) {
-      result.logicalOperator = filt.logicalOperator as string;
-    }
-    return result;
-  }) : [];
+  const expression = node.configuration?.expression as string;
 
-  // Get last event data
   let lastEvent;
   if (execution) {
     const rootTriggerNode = nodes.find(
@@ -1279,7 +1261,7 @@ function prepareFilterNode(
       state: "pending" as const,
       filter: {
         title: node.name!,
-        filters,
+        expression,
         lastEvent: lastEvent || {
           eventTitle: "No events received yet",
           eventState: "neutral" as const
@@ -1339,11 +1321,11 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt
-            ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "")
-            : "",
-        };
+        title: execution.id || "Execution",
+        subtitle: execution.createdAt
+          ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "")
+          : "",
+      };
 
     const values = execution.rootEvent
       ? rootTriggerRenderer.getRootEventValues(execution.rootEvent)
