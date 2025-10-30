@@ -141,10 +141,15 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
+  if (data.type === "switch" || data.type === "if") {
+    return null;
+  }
+
   return (
     <Handle
       type="source"
       position={Position.Right}
+      id="default"
       style={{
         ...HANDLE_STYLE,
         right: -15,

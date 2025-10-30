@@ -6,7 +6,7 @@ import { Handle, Position } from "@xyflow/react";
 
 export interface IfProps extends ComponentActionsProps {
   title?: string;
-  expression: string;
+  expression?: string;
   trueEvent?: Omit<EventSection, "title">;
   falseEvent?: Omit<EventSection, "title">;
   trueSectionLabel?: string;
@@ -14,7 +14,6 @@ export interface IfProps extends ComponentActionsProps {
   collapsed?: boolean;
   selected?: boolean;
   hideHandle?: boolean;
-  nodeId?: string;
 }
 
 const HANDLE_STYLE = {
@@ -82,9 +81,9 @@ export const If: React.FC<IfProps> = ({
   onDelete,
   isCompactView,
   hideHandle = false,
-  nodeId,
 }) => {
   const conditions = useMemo(() => {
+    if (!expression) return [];
     const result: ComponentBaseSpecValue[] = [];
     const splittedExpression = splitBySpaces(expression);
     let current: ComponentBaseSpecValue = {
@@ -126,7 +125,7 @@ export const If: React.FC<IfProps> = ({
         <Handle
           type="source"
           position={Position.Right}
-          id={nodeId ? nodeId + "-true" : undefined}
+          id="true"
           style={{
             ...HANDLE_STYLE,
             right: -20,
@@ -145,7 +144,7 @@ export const If: React.FC<IfProps> = ({
         <Handle
           type="source"
           position={Position.Right}
-          id={nodeId ? nodeId + "-false" : undefined}
+          id="false"
           style={{
             ...HANDLE_STYLE,
             right: -20,

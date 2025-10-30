@@ -385,7 +385,6 @@ export function WorkflowPageV2() {
   const handleEdgeCreate = useCallback(
     (sourceId: string, targetId: string, sourceHandle?: string | null) => {
       if (!workflow || !organizationId || !workflowId) return;
-
       // Create the new edge
       const newEdge: ComponentsEdge = {
         sourceId,
@@ -1267,6 +1266,7 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
     id: id,
     source: edge.sourceId!,
     target: edge.targetId!,
+    sourceHandle: edge.channel
   };
 }
 

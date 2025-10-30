@@ -5,7 +5,7 @@ import { useMemo } from "react";
 
 export interface FilterProps extends ComponentActionsProps {
   title?: string;
-  expression: string;
+  expression?: string;
   lastEvent?: Omit<EventSection, "title">;
   collapsed?: boolean;
   selected?: boolean;
@@ -69,6 +69,7 @@ export const Filter: React.FC<FilterProps> = ({
 }) => {
   const filters = useMemo(() => {
     const result: ComponentBaseSpecValue[] = [];
+    if (!expression) return result;
     const splittedExpression = splitBySpaces(expression);
     let current: ComponentBaseSpecValue = {
       badges: []
