@@ -918,7 +918,6 @@ function prepareComponentNode(
       return prepareIfNode(
         nodes,
         node,
-        components,
         nodeExecutionsMap
       );
     case "noop":
@@ -1099,7 +1098,6 @@ function prepareApprovalNode(
 function prepareIfNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
-  components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
