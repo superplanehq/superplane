@@ -1,24 +1,20 @@
 import { ComponentBase, type EventSection } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
-
-export interface FilterCondition {
-  field: string;
-  operator: string;
-  value: string;
-  logicalOperator?: "AND" | "OR";
-}
+import { useMemo } from "react";
+import { parseExpression } from "@/lib/expressionParser";
 
 export interface FilterProps extends ComponentActionsProps {
   title?: string;
-  filters: FilterCondition[];
+  expression?: string;
   lastEvent?: Omit<EventSection, "title">;
   collapsed?: boolean;
   selected?: boolean;
 }
 
+
 export const Filter: React.FC<FilterProps> = ({
   title = "Filter events based on branch",
-  filters,
+  expression,
   lastEvent,
   collapsed = false,
   selected = false,
@@ -30,17 +26,12 @@ export const Filter: React.FC<FilterProps> = ({
   onDelete,
   isCompactView,
 }) => {
-  const spec = filters.length > 0 ? {
+  const filters = useMemo(() => parseExpression(expression || ""), [expression]);
+
+  const spec = expression ? {
     title: "filter",
     tooltipTitle: "filters applied",
-    values: filters.map(filter => ({
-      badges: [
-        { label: filter.field, bgColor: "bg-purple-100", textColor: "text-purple-700" },
-        { label: filter.operator, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: filter.value, bgColor: "bg-green-100", textColor: "text-green-700" },
-        ...(filter.logicalOperator ? [{ label: filter.logicalOperator, bgColor: "bg-gray-500", textColor: "text-white" }] : [])
-      ]
-    }))
+    values: filters
   } : undefined;
 
   const eventSections: EventSection[] = [];

@@ -1,16 +1,11 @@
 import { ComponentBase, type EventSection } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
-
-export interface IfCondition {
-  field: string;
-  operator: string;
-  value: string;
-  logicalOperator?: "AND" | "OR";
-}
+import { useMemo } from "react";
+import { Handle, Position } from "@xyflow/react";
+import { parseExpression } from "@/lib/expressionParser";
 
 export interface IfProps extends ComponentActionsProps {
   title?: string;
-  conditions?: IfCondition[];
   expression?: string;
   trueEvent?: Omit<EventSection, "title">;
   falseEvent?: Omit<EventSection, "title">;
@@ -18,11 +13,19 @@ export interface IfProps extends ComponentActionsProps {
   falseSectionLabel?: string;
   collapsed?: boolean;
   selected?: boolean;
+  hideHandle?: boolean;
 }
+
+const HANDLE_STYLE = {
+  width: 12,
+  height: 12,
+  border: "3px solid #C9D5E1",
+  background: "transparent",
+};
+
 
 export const If: React.FC<IfProps> = ({
   title = "If processed events",
-  conditions,
   expression,
   trueEvent,
   falseEvent,
@@ -37,39 +40,53 @@ export const If: React.FC<IfProps> = ({
   onToggleView,
   onDelete,
   isCompactView,
+  hideHandle = false,
 }) => {
+  const conditions = useMemo(() => parseExpression(expression || ""), [expression]);
+
   const spec = expression ? {
-    title: "expression",
-    tooltipTitle: "expression applied",
-    values: [{
-      badges: [
-        { label: expression, bgColor: "bg-blue-100", textColor: "text-blue-700" }
-      ]
-    }]
-  } : conditions && conditions.length > 0 ? {
     title: "condition",
     tooltipTitle: "conditions applied",
-    values: conditions.map(condition => ({
-      badges: [
-        { label: condition.field, bgColor: "bg-purple-100", textColor: "text-purple-700" },
-        { label: condition.operator, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: condition.value, bgColor: "bg-green-100", textColor: "text-green-700" },
-        ...(condition.logicalOperator ? [{ label: condition.logicalOperator, bgColor: "bg-gray-500", textColor: "text-white" }] : [])
-      ]
-    }))
+    values: conditions
   } : undefined;
 
   const eventSections: EventSection[] = [];
   if (trueEvent) {
     eventSections.push({
       title: trueSectionLabel,
-      ...trueEvent
+      ...trueEvent,
+      handleComponent: hideHandle ? undefined : (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="true"
+          style={{
+            ...HANDLE_STYLE,
+            right: -20,
+            top: "50%",
+            transform: "translateY(-50%)",
+          }}
+        />
+      )
     });
   }
   if (falseEvent) {
     eventSections.push({
       title: falseSectionLabel,
-      ...falseEvent
+      ...falseEvent,
+      handleComponent: hideHandle ? undefined : (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="false"
+          style={{
+            ...HANDLE_STYLE,
+            right: -20,
+            top: "50%",
+            transform: "translateY(-50%)",
+          }}
+        />
+      )
     });
   }
 

@@ -108,6 +108,11 @@ export function WorkflowPageV2() {
     [workflow?.nodes]
   );
 
+  const filterComponentNodes = useMemo(
+    () => componentNodes.filter((node) => node.component?.name === "filter"),
+    [componentNodes]
+  );
+
   /**
    * Filter to only include persisted nodes for data fetching
    * This prevents unnecessary loading states when new nodes are added locally.
@@ -124,7 +129,7 @@ export function WorkflowPageV2() {
   }, [compositeNodes, componentNodes]);
 
   const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } =
-    useTriggerNodeEvents(workflowId!, persistedTriggerNodes);
+    useTriggerNodeEvents(workflowId!, persistedTriggerNodes.concat(filterComponentNodes));
   const {
     nodeExecutionsMap,
     nodeQueueItemsMap,
@@ -289,10 +294,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              configuration: updatedConfiguration,
-              name: updatedNodeName,
-            }
+            ...node,
+            configuration: updatedConfiguration,
+            name: updatedNodeName,
+          }
           : node
       );
 
@@ -343,8 +348,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-            ? "TYPE_BLUEPRINT"
-            : "TYPE_COMPONENT",
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: {
           x: (workflow.nodes?.length || 0) * 250,
@@ -381,7 +386,6 @@ export function WorkflowPageV2() {
   const handleEdgeCreate = useCallback(
     (sourceId: string, targetId: string, sourceHandle?: string | null) => {
       if (!workflow || !organizationId || !workflowId) return;
-
       // Create the new edge
       const newEdge: ComponentsEdge = {
         sourceId,
@@ -486,12 +490,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
-            }
+            ...node,
+            position: {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            },
+          }
           : node
       );
 
@@ -833,7 +837,7 @@ function prepareCompositeNode(
       rootTriggerNode?.trigger?.name || ""
     );
 
-    let { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle(
+    const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle(
       execution.rootEvent!
     );
     (canvasNode.data.composite as CompositeProps).lastRunItem = {
@@ -941,6 +945,26 @@ function prepareComponentNode(
         workflowId,
         queryClient
       );
+    case "if":
+      return prepareIfNode(
+        nodes,
+        node,
+        nodeExecutionsMap
+      );
+    case "noop":
+      return prepareNoopNode(
+        nodes,
+        node,
+        components,
+        nodeExecutionsMap
+      );
+    case "filter":
+      return prepareFilterNode(
+        nodes,
+        node,
+        components,
+        nodeExecutionsMap
+      );
   }
 
   //
@@ -1001,10 +1025,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-          ? record.role
-          : record.type === "group" && record.group
-          ? record.group
-          : "Unknown",
+            ? record.role
+            : record.type === "group" && record.group
+              ? record.group
+              : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -1014,16 +1038,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
+            {
+              label: "comment",
+              optional: true,
+            },
+          ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-            Comment: approvalComment,
-          }
+          Comment: approvalComment,
+        }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1112,6 +1136,168 @@ function prepareApprovalNode(
   };
 }
 
+function prepareIfNode(
+  nodes: ComponentsNode[],
+  node: ComponentsNode,
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+): CanvasNode {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Parse conditions from node configuration
+  const expression = node.configuration?.expression;
+
+
+  // Get last execution for event data
+  let trueEvent, falseEvent;
+  if (execution) {
+    const rootTriggerNode = nodes.find(
+      (n) => n.id === execution.rootEvent?.nodeId
+    );
+    const rootTriggerRenderer = getTriggerRenderer(
+      rootTriggerNode?.trigger?.name || ""
+    );
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    const eventData = {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+    };
+
+    // Determine which branch was taken based on execution metadata or result
+    const wasTrueBranch = execution.result === "RESULT_PASSED";
+    if (wasTrueBranch) {
+      trueEvent = eventData;
+    } else {
+      falseEvent = eventData;
+    }
+  }
+
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "if",
+      label: node.name!,
+      state: "pending" as const,
+      if: {
+        title: node.name!,
+        expression,
+        trueEvent: trueEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+        falseEvent: falseEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+        trueSectionLabel: "TRUE",
+        falseSectionLabel: "FALSE",
+      },
+    },
+  };
+}
+
+function prepareNoopNode(
+  nodes: ComponentsNode[],
+  node: ComponentsNode,
+  _components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+): CanvasNode {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Get last event data
+  let lastEvent;
+  if (execution) {
+    const rootTriggerNode = nodes.find(
+      (n) => n.id === execution.rootEvent?.nodeId
+    );
+    const rootTriggerRenderer = getTriggerRenderer(
+      rootTriggerNode?.trigger?.name || ""
+    );
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    lastEvent = {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+    };
+  }
+
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "noop",
+      label: node.name!,
+      state: "pending" as const,
+      noop: {
+        title: node.name!,
+        lastEvent: lastEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+      },
+    },
+  };
+}
+
+function prepareFilterNode(
+  nodes: ComponentsNode[],
+  node: ComponentsNode,
+  _components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+): CanvasNode {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Parse filters from node configuration
+  const expression = node.configuration?.expression as string;
+
+  let lastEvent;
+  if (execution) {
+    const rootTriggerNode = nodes.find(
+      (n) => n.id === execution.rootEvent?.nodeId
+    );
+    const rootTriggerRenderer = getTriggerRenderer(
+      rootTriggerNode?.trigger?.name || ""
+    );
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    lastEvent = {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+    };
+  }
+
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "filter",
+      label: node.name!,
+      state: "pending" as const,
+      filter: {
+        title: node.name!,
+        expression,
+        lastEvent: lastEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const
+        },
+      },
+    },
+  };
+}
+
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
 
@@ -1163,11 +1349,11 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt
-            ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "")
-            : "",
-        };
+        title: execution.id || "Execution",
+        subtitle: execution.createdAt
+          ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "")
+          : "",
+      };
 
     const values = execution.rootEvent
       ? rootTriggerRenderer.getRootEventValues(execution.rootEvent)

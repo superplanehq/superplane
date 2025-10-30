@@ -16,19 +16,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     title: "If processed events",
-    conditions: [
-      {
-        field: "$.title",
-        operator: "contains",
-        value: "\"superplane\"",
-        logicalOperator: "OR"
-      },
-      {
-        field: "$.author",
-        operator: "contains",
-        value: "\"pedro\""
-      }
-    ],
+    expression: "$.title contains \"superplane\" or $.author contains \"pedro\"",
     trueEvent: {
       receivedAt: new Date(),
       eventState: "success",
@@ -40,6 +28,7 @@ export const Default: Story = {
       eventTitle: "Build failed"
     },
     trueSectionLabel: "TRUE",
-    falseSectionLabel: "FALSE"
+    falseSectionLabel: "FALSE",
+    hideHandle: true,
   },
 };

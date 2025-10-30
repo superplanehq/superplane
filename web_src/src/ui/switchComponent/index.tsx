@@ -17,13 +17,14 @@ export interface SwitchComponentProps extends ComponentActionsProps {
   stages: SwitchStage[];
   collapsed?: boolean;
   selected?: boolean;
+  hideHandle?: boolean;
 }
 
 const HANDLE_STYLE = {
   width: 12,
   height: 12,
-  border: "2px solid #555",
-  background: "#fff",
+  border: "3px solid #C9D5E1",
+  background: "transparent",
 };
 
 export const SwitchComponent: React.FC<SwitchComponentProps> = ({
@@ -38,6 +39,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   onToggleView,
   onDelete,
   isCompactView,
+  hideHandle = false,
 }) => {
   const spec = stages.length > 0 ? {
     title: "path",
@@ -57,14 +59,14 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
     receivedAt: stage.receivedAt,
     eventState: stage.eventState,
     eventTitle: stage.eventTitle,
-    handleComponent: (
+    handleComponent: hideHandle ? undefined : (
       <Handle
         type="source"
         position={Position.Right}
         id={stage.pathName}
         style={{
           ...HANDLE_STYLE,
-          right: -10,
+          right: -20,
           top: "50%",
           transform: "translateY(-50%)",
         }}

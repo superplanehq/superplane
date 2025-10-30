@@ -45,4 +45,9 @@ export const calcRelativeTimeFromDiff = (diff: number) => {
     return `${seconds}s`
   }
 }
-  
+
+export function splitBySpaces(input: string): string[] {
+  const regex = /(?:[^\s"']+|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')+/g;
+  const matches = input.match(regex);
+  return matches || [];
+}
