@@ -10,7 +10,8 @@ export interface IfCondition {
 
 export interface IfProps extends ComponentActionsProps {
   title?: string;
-  conditions: IfCondition[];
+  conditions?: IfCondition[];
+  expression?: string;
   trueEvent?: Omit<EventSection, "title">;
   falseEvent?: Omit<EventSection, "title">;
   trueSectionLabel?: string;
@@ -22,6 +23,7 @@ export interface IfProps extends ComponentActionsProps {
 export const If: React.FC<IfProps> = ({
   title = "If processed events",
   conditions,
+  expression,
   trueEvent,
   falseEvent,
   trueSectionLabel = "TRUE",
@@ -36,7 +38,15 @@ export const If: React.FC<IfProps> = ({
   onDelete,
   isCompactView,
 }) => {
-  const spec = conditions.length > 0 ? {
+  const spec = expression ? {
+    title: "expression",
+    tooltipTitle: "expression applied",
+    values: [{
+      badges: [
+        { label: expression, bgColor: "bg-blue-100", textColor: "text-blue-700" }
+      ]
+    }]
+  } : conditions && conditions.length > 0 ? {
     title: "condition",
     tooltipTitle: "conditions applied",
     values: conditions.map(condition => ({
