@@ -146,7 +146,6 @@ function RightHandle({ data }: BlockProps) {
 
   const channels = data.outputChannels;
 
-  console.log(data.filter, data.outputChannels)
   if ((channels?.length || 0) === 1) {
     return (
       <Handle
