@@ -15,6 +15,7 @@ import {
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
   workflowsInvokeNodeExecutionAction,
+  workflowsEmitNodeEvent,
 } from "@/api-client";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
@@ -511,6 +512,33 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, queryClient]
   );
 
+  const handleRun = useCallback(
+    async (nodeId: string, channel: string, data: any) => {
+      if (!workflowId) return;
+
+      try {
+        await workflowsEmitNodeEvent(
+          withOrganizationHeader({
+            path: {
+              workflowId: workflowId,
+              nodeId: nodeId,
+            },
+            body: {
+              channel,
+              data,
+            },
+          })
+        );
+        // Note: Success toast is shown by EmitEventModal
+      } catch (error) {
+        console.error("Failed to emit event:", error);
+        showErrorToast("Failed to emit event");
+        throw error; // Re-throw to let EmitEventModal handle it
+      }
+    },
+    [workflowId]
+  );
+
   const handleSave = useCallback(
     async (canvasNodes: CanvasNode[]) => {
       if (!workflow || !organizationId || !workflowId) return;
@@ -612,6 +640,7 @@ export function WorkflowPageV2() {
       onNodeDelete={handleNodeDelete}
       onEdgeDelete={handleEdgeDelete}
       onNodePositionChange={handleNodePositionChange}
+      onRun={handleRun}
       buildingBlocks={buildingBlocks}
       onNodeAdd={handleNodeAdd}
       breadcrumbs={[

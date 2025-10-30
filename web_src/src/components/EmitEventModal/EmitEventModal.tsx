@@ -1,3 +1,8 @@
+/**
+ * NOTE: This is the EmitEventModal used by the old canvas system (pages/canvas).
+ * This component should be removed once the old canvas system is removed.
+ * The new system uses @/ui/EmitEventModal instead.
+ */
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Editor from '@monaco-editor/react';

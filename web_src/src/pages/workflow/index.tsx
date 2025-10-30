@@ -35,7 +35,7 @@ import { WorkflowNodeSidebar } from '../../components/WorkflowNodeSidebar'
 import { ConfigurationFieldRenderer } from '@/ui/configurationFieldRenderer'
 import { ScrollArea } from '../../components/ui/scroll-area'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../../components/ui/resizable'
-import { EmitEventModal } from './components/EmitEventModal'
+import { EmitEventModal } from '@/ui/EmitEventModal'
 import { workflowsEmitNodeEvent } from '../../api-client/sdk.gen'
 import { withOrganizationHeader } from '../../utils/withOrganizationHeader'
 import {
