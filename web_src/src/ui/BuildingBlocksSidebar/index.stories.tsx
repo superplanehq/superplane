@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 
-import { BuildingBlocksSidebar, BuildingBlock } from "./index";
+import { BuildingBlocksSidebar, BuildingBlock, BuildingBlockCategory } from "./index";
 import React from "react";
 
 const sampleTriggers: BuildingBlock[] = [
@@ -110,6 +110,17 @@ const sampleBlueprints: BuildingBlock[] = [
   },
 ];
 
+const sampleBlocks: BuildingBlockCategory[] = [
+  {
+    name: "Primitives",
+    blocks: [...sampleTriggers, ...sampleComponents],
+  },
+  {
+    name: "Custom Components",
+    blocks: sampleBlueprints,
+  },
+];
+
 const meta = {
   title: "ui/BuildingBlocksSidebar",
   component: BuildingBlocksSidebar,
@@ -136,9 +147,7 @@ type Story = StoryObj<typeof BuildingBlocksSidebar>;
 export const Default: Story = {
   args: {
     isOpen: true,
-    triggers: sampleTriggers,
-    components: sampleComponents,
-    blueprints: sampleBlueprints,
+    blocks: sampleBlocks,
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(args.isOpen);
@@ -163,9 +172,7 @@ export const Default: Story = {
 export const Closed: Story = {
   args: {
     isOpen: false,
-    triggers: sampleTriggers,
-    components: sampleComponents,
-    blueprints: sampleBlueprints,
+    blocks: sampleBlocks,
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(args.isOpen);
@@ -190,9 +197,7 @@ export const Closed: Story = {
 export const EmptyLists: Story = {
   args: {
     isOpen: true,
-    triggers: [],
-    components: [],
-    blueprints: [],
+    blocks: [],
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(args.isOpen);
@@ -217,9 +222,12 @@ export const EmptyLists: Story = {
 export const OnlyTriggers: Story = {
   args: {
     isOpen: true,
-    triggers: sampleTriggers,
-    components: [],
-    blueprints: [],
+    blocks: [
+      {
+        name: "Primitives",
+        blocks: sampleTriggers,
+      },
+    ],
   },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(args.isOpen);

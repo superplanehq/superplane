@@ -255,8 +255,32 @@ func (i *GitHubResourceManager) List(resourceType string) ([]integrations.Resour
 }
 
 func (i *GitHubResourceManager) listRepositories() ([]integrations.Resource, error) {
-	opts := &github.RepositoryListByAuthenticatedUserOptions{}
-	repositories, _, err := i.client.Repositories.ListByAuthenticatedUser(context.Background(), opts)
+	_, _, err := i.client.Organizations.Get(context.Background(), i.Owner)
+	if err == nil {
+		return i.listOrganizationRepositories()
+	}
+
+	opts := &github.RepositoryListByUserOptions{}
+	repositories, _, err := i.client.Repositories.ListByUser(context.Background(), i.Owner, opts)
+	if err != nil {
+		return nil, fmt.Errorf("error getting repository: %v", err)
+	}
+
+	resources := []integrations.Resource{}
+	for _, repository := range repositories {
+		resources = append(resources, &Repository{
+			ID:             repository.GetID(),
+			RepositoryName: repository.GetFullName(),
+			RepositoryURL:  repository.GetHTMLURL(),
+		})
+	}
+
+	return resources, nil
+}
+
+func (i *GitHubResourceManager) listOrganizationRepositories() ([]integrations.Resource, error) {
+	opts := &github.RepositoryListByOrgOptions{}
+	repositories, _, err := i.client.Repositories.ListByOrg(context.Background(), i.Owner, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error getting repository: %v", err)
 	}

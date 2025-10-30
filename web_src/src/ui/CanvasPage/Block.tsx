@@ -39,6 +39,9 @@ export interface BlockData {
   // last input event received by this block (for simulation display)
   lastEvent?: unknown;
 
+  // output channels for this block (e.g., ['default'], ['true', 'false'])
+  outputChannels?: string[];
+
   // trigger node specific props
   trigger?: TriggerProps;
 
@@ -141,23 +144,24 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
-  if (data.type === "switch" || data.type === "if") {
-    return null;
-  }
+  const channels = data.outputChannels;
 
-  return (
-    <Handle
-      type="source"
-      position={Position.Right}
-      id="default"
-      style={{
-        ...HANDLE_STYLE,
-        right: -15,
-        top: isCollapsed ? "50%" : 30,
-        transform: isCollapsed ? "translateY(-50%)" : undefined,
-      }}
-    />
-  );
+  console.log(data.filter, data.outputChannels)
+  if ((channels?.length || 0) === 1) {
+    return (
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={channels![0]}
+        style={{
+          ...HANDLE_STYLE,
+          right: -15,
+          top: isCollapsed ? "50%" : 30,
+          transform: isCollapsed ? "translateY(-50%)" : undefined,
+        }}
+      />
+    );
+  }
 }
 
 function AiPopup({ show, suggestion, onApply, onDismiss }: BlockAi) {
