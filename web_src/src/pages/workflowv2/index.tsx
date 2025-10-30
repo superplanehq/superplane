@@ -904,13 +904,21 @@ function prepareNode(
     case "TYPE_TRIGGER":
       return prepareTriggerNode(node, triggers, nodeEventsMap);
     case "TYPE_BLUEPRINT":
-      return prepareCompositeNode(
-        nodes,
-        node,
-        blueprints,
-        nodeExecutionsMap,
-        nodeQueueItemsMap
-      );
+      const componentMetadata = components.find((c) => c.name === node.component?.name);
+      const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
+
+      // Override outputChannels with component metadata if available
+      if (componentMetadata?.outputChannels) {
+        return {
+          ...compositeNode,
+          data: {
+            ...compositeNode.data,
+            outputChannels: componentMetadata.outputChannels.map((c) => c.name!),
+          },
+        };
+      }
+
+      return compositeNode;
     default:
       return prepareComponentNode(
         nodes,
