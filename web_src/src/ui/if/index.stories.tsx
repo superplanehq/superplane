@@ -28,6 +28,7 @@ export const Default: Story = {
       eventTitle: "Build failed"
     },
     trueSectionLabel: "TRUE",
-    falseSectionLabel: "FALSE"
+    falseSectionLabel: "FALSE",
+    hideHandle: true,
   },
 };

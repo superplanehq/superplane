@@ -2,6 +2,7 @@ import { splitBySpaces } from "@/lib/utils";
 import { ComponentBase, ComponentBaseSpecValue, type EventSection } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
 import { useMemo } from "react";
+import { Handle, Position } from "@xyflow/react";
 
 export interface IfProps extends ComponentActionsProps {
   title?: string;
@@ -12,7 +13,16 @@ export interface IfProps extends ComponentActionsProps {
   falseSectionLabel?: string;
   collapsed?: boolean;
   selected?: boolean;
+  hideHandle?: boolean;
+  nodeId?: string;
 }
+
+const HANDLE_STYLE = {
+  width: 12,
+  height: 12,
+  border: "3px solid #C9D5E1",
+  background: "transparent",
+};
 
 const operators = new Set([
   ">=",
@@ -71,6 +81,8 @@ export const If: React.FC<IfProps> = ({
   onToggleView,
   onDelete,
   isCompactView,
+  hideHandle = false,
+  nodeId,
 }) => {
   const conditions = useMemo(() => {
     const result: ComponentBaseSpecValue[] = [];
@@ -109,13 +121,39 @@ export const If: React.FC<IfProps> = ({
   if (trueEvent) {
     eventSections.push({
       title: trueSectionLabel,
-      ...trueEvent
+      ...trueEvent,
+      handleComponent: hideHandle ? undefined : (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={nodeId ? nodeId + "-true" : undefined}
+          style={{
+            ...HANDLE_STYLE,
+            right: -20,
+            top: "50%",
+            transform: "translateY(-50%)",
+          }}
+        />
+      )
     });
   }
   if (falseEvent) {
     eventSections.push({
       title: falseSectionLabel,
-      ...falseEvent
+      ...falseEvent,
+      handleComponent: hideHandle ? undefined : (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={nodeId ? nodeId + "-false" : undefined}
+          style={{
+            ...HANDLE_STYLE,
+            right: -20,
+            top: "50%",
+            transform: "translateY(-50%)",
+          }}
+        />
+      )
     });
   }
 

@@ -16,6 +16,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     title: "Branch processed events",
+    hideHandle: true,
     stages: [
       {
         pathName: "MAIN",
