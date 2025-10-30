@@ -20,11 +20,11 @@ import {
   BuildingBlocksSidebar,
 } from "../BuildingBlocksSidebar";
 import {
-  BlueprintConfigurationSidebar,
+  CustomComponentConfigurationSidebar,
   BlueprintMetadata,
   ConfigurationField,
   OutputChannel,
-} from "../BlueprintConfigurationSidebar";
+} from "../CustomComponentConfigurationSidebar";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
 import { OutputChannelConfigurationModal } from "./OutputChannelConfigurationModal";
 import {
@@ -46,9 +46,9 @@ export interface NewNodeData {
   configuration: Record<string, any>;
 }
 
-export interface BlueprintBuilderPageProps {
-  // Blueprint data
-  blueprintName: string;
+export interface CustomComponentBuilderPageProps {
+  // Custom Component data
+  customComponentName: string;
   breadcrumbs?: BreadcrumbItem[];
   metadata: BlueprintMetadata;
   onMetadataChange: (metadata: BlueprintMetadata) => void;
@@ -89,7 +89,7 @@ export interface BlueprintBuilderPageProps {
   isSaving?: boolean;
 }
 
-export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
+export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProps) {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
 
@@ -295,7 +295,7 @@ export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
       {/* Header */}
       <div className="relative z-20">
         <Header
-          breadcrumbs={props.breadcrumbs || [{ label: props.blueprintName }]}
+          breadcrumbs={props.breadcrumbs || [{ label: props.customComponentName }]}
           onSave={props.isSaving ? undefined : props.onSave}
         />
       </div>
@@ -342,7 +342,7 @@ export function BlueprintBuilderPage(props: BlueprintBuilderPageProps) {
         </div>
 
         {/* Right Sidebar - Configuration & Settings */}
-        <BlueprintConfigurationSidebar
+        <CustomComponentConfigurationSidebar
           isOpen={isRightSidebarOpen}
           onToggle={setIsRightSidebarOpen}
           metadata={props.metadata}

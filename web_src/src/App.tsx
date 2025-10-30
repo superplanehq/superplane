@@ -13,7 +13,7 @@ import { AccountProvider } from "./contexts/AccountContext";
 import { useDarkMode } from "./hooks/useDarkMode";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
-import { Blueprint } from "./pages/blueprint";
+import { CustomComponent } from "./pages/custom-component";
 import { Canvas } from "./pages/canvas";
 import HomePage from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
@@ -67,8 +67,8 @@ function App() {
               element={withAuthOnly(Canvas)}
             />
             <Route
-              path=":organizationId/blueprints/:blueprintId"
-              element={withAuthOnly(Blueprint)}
+              path=":organizationId/custom-components/:blueprintId"
+              element={withAuthOnly(CustomComponent)}
             />
             <Route
               path=":organizationId/workflows/:workflowId"

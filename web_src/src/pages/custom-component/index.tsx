@@ -13,8 +13,8 @@ import { useBlueprint, useUpdateBlueprint } from '../../hooks/useBlueprintData'
 import { useComponents } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
 import { AlertCircle } from 'lucide-react'
-import { BlueprintBuilderPage } from '../../ui/BlueprintBuilderPage'
-import type { BreadcrumbItem, NewNodeData } from '../../ui/BlueprintBuilderPage'
+import { CustomComponentBuilderPage } from '../../ui/CustomComponentBuilderPage'
+import type { BreadcrumbItem, NewNodeData } from '../../ui/CustomComponentBuilderPage'
 import { BlockData } from '../../ui/CanvasPage/Block'
 import { Heading } from '../../components/Heading/heading'
 import { ComponentsComponent, ComponentsNode } from '../../api-client'
@@ -142,7 +142,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
   return baseData
 }
 
-export const Blueprint = () => {
+export const CustomComponent = () => {
   const { organizationId, blueprintId } = useParams<{ organizationId: string; blueprintId: string }>()
   const navigate = useNavigate()
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([])
@@ -402,10 +402,10 @@ export const Blueprint = () => {
         color: blueprintColor,
       })
 
-      showSuccessToast('Blueprint saved successfully')
+      showSuccessToast('Custom Component saved successfully')
     } catch (error) {
-      console.error('Error saving blueprint:', error)
-      showErrorToast('Failed to save blueprint')
+      console.error('Error saving custom component:', error)
+      showErrorToast('Failed to save custom component')
     }
   }
 
@@ -430,16 +430,15 @@ export const Blueprint = () => {
     )
   }
 
-  // Create breadcrumbs
   const breadcrumbs: BreadcrumbItem[] = [
-    { label: 'Blueprints', onClick: () => navigate(`/${organizationId}`) },
+    { label: 'Custom Components', onClick: () => navigate(`/${organizationId}`) },
     { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
   ]
 
   return (
     <>
-      <BlueprintBuilderPage
-        blueprintName={blueprintName}
+      <CustomComponentBuilderPage
+        customComponentName={blueprintName}
         breadcrumbs={breadcrumbs}
         metadata={{
           name: blueprintName,
