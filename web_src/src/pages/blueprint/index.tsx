@@ -130,8 +130,10 @@ export const Blueprint = () => {
     // Add type-specific props based on component type
     switch (blockType) {
       case 'if':
+        const expression = node.configuration?.expression
         baseData.if = {
           title: node.name,
+          expression: expression,
           conditions: [],
           collapsed: false,
         }
@@ -279,9 +281,13 @@ export const Blueprint = () => {
           _originalConfiguration: filteredConfiguration,
         }
 
-        // Update the title in the type-specific props
+        // Update the title and expression in the type-specific props
         if (nodeData.if) {
-          updatedData.if = { ...nodeData.if, title: nodeName.trim() }
+          updatedData.if = {
+            ...nodeData.if,
+            title: nodeName.trim(),
+            expression: filteredConfiguration.expression
+          }
         }
         if (nodeData.filter) {
           updatedData.filter = { ...nodeData.filter, title: nodeName.trim() }
@@ -313,7 +319,11 @@ export const Blueprint = () => {
 
     // Add new node
     const newNodeId = generateNodeId(component.name!, newNodeData.nodeName.trim())
-    const mockNode = { component: { name: component.name }, name: newNodeData.nodeName.trim() }
+    const mockNode = {
+      component: { name: component.name },
+      name: newNodeData.nodeName.trim(),
+      configuration: filteredConfiguration
+    }
     const blockData = createBlockData(mockNode, component)
 
     const newNode: Node = {

@@ -165,7 +165,7 @@ function RightHandle({ data }: BlockProps) {
 
   // Multiple channels: always show all handles with labels (even when collapsed)
   // This ensures users always know which channel they're connecting to
-  const baseTop = isCollapsed ? 30 : 80; // Adjust starting position based on collapsed state
+  const baseTop = isCollapsed ? 30 : 60; // Adjust starting position based on collapsed state
   const spacing = 40; // Space between handles
 
   return (
