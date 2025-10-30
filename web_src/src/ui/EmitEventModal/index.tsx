@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogFooter } from '../../../components/ui/dialog'
-import { Button } from '../../../components/ui/button'
-import { Label } from '../../../components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select'
-import { Heading } from '../../../components/Heading/heading'
-import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
-import { showSuccessToast, showErrorToast } from '../../../utils/toast'
+import { Play } from 'lucide-react'
+import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Heading } from '@/components/Heading/heading'
+import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import Editor from '@monaco-editor/react'
 
 interface EmitEventModalProps {
@@ -66,7 +66,7 @@ export const EmitEventModal = ({
       <DialogContent className="max-w-3xl max-h-[80vh]">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <MaterialSymbol name="send" size="lg" className="text-blue-600 dark:text-blue-400" />
+            <Play className="text-blue-600 dark:text-blue-400" size={24} />
             <Heading level={3} className="!mb-0">Emit Event</Heading>
           </div>
 
@@ -75,10 +75,10 @@ export const EmitEventModal = ({
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Output Channel</Label>
+            <div className="flex items-center gap-3">
+              <Label className="min-w-[120px]">Output Channel</Label>
               <Select value={selectedChannel} onValueChange={setSelectedChannel}>
-                <SelectTrigger>
+                <SelectTrigger className="flex-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -91,27 +91,20 @@ export const EmitEventModal = ({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Event Data (JSON)</Label>
-              <div className="border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
-                <Editor
-                  height="300px"
-                  defaultLanguage="json"
-                  value={eventData}
-                  onChange={(value) => setEventData(value || '{}')}
-                  theme="vs-dark"
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                  }}
-                />
-              </div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                Enter the event data as a JSON object
-              </div>
+            <div className="border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
+              <Editor
+                height="300px"
+                defaultLanguage="json"
+                value={eventData}
+                onChange={(value) => setEventData(value || '{}')}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 13,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                }}
+              />
             </div>
           </div>
 
@@ -120,7 +113,7 @@ export const EmitEventModal = ({
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={isSubmitting}>
-              <MaterialSymbol name="send" size="sm" />
+              <Play size={16} />
               {isSubmitting ? 'Emitting...' : 'Emit Event'}
             </Button>
           </DialogFooter>
