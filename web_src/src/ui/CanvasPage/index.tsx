@@ -24,6 +24,7 @@ import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
 import { Header, type BreadcrumbItem } from "./Header";
 import { NodeConfigurationModal } from "./NodeConfigurationModal";
+import { EmitEventModal } from "../EmitEventModal";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 
@@ -109,7 +110,7 @@ export interface CanvasPageProps {
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
 
-  onRun?: (nodeId: string) => void;
+  onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
@@ -137,6 +138,11 @@ function CanvasPage(props: CanvasPageProps) {
   const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
   const [isBuildingBlocksSidebarOpen, setIsBuildingBlocksSidebarOpen] =
     useState(false);
+  const [emitModalData, setEmitModalData] = useState<{
+    nodeId: string;
+    nodeName: string;
+    channels: string[];
+  } | null>(null);
 
   const handleNodeEdit = useCallback(
     (nodeId: string) => {
@@ -164,6 +170,34 @@ function CanvasPage(props: CanvasPageProps) {
       }
     },
     [props]
+  );
+
+  const handleNodeRun = useCallback(
+    (nodeId: string) => {
+      // Find the node to get its name and channels
+      const node = state.nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+
+      const nodeName = (node.data as any).label || nodeId;
+      const channels = (node.data as any).outputChannels || ['default'];
+
+      setEmitModalData({
+        nodeId,
+        nodeName,
+        channels,
+      });
+    },
+    [state.nodes]
+  );
+
+  const handleEmit = useCallback(
+    async (channel: string, data: any) => {
+      if (!emitModalData || !props.onRun) return;
+
+      // Call the onRun prop with nodeId, channel, and data
+      await props.onRun(emitModalData.nodeId, channel, data);
+    },
+    [emitModalData, props]
   );
 
   const handleBuildingBlockClick = useCallback((block: BuildingBlock) => {
@@ -228,7 +262,7 @@ function CanvasPage(props: CanvasPageProps) {
               onEdgeCreate={props.onEdgeCreate}
               hideHeader={true}
               onToggleView={props.onToggleView}
-              onRun={props.onRun}
+              onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
               onDeactivate={props.onDeactivate}
             />
@@ -244,7 +278,7 @@ function CanvasPage(props: CanvasPageProps) {
           <Sidebar
             state={state}
             getSidebarData={props.getSidebarData}
-            onRun={props.onRun}
+            onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
             onDocs={props.onDocs}
             onDeactivate={props.onDeactivate}
@@ -278,6 +312,20 @@ function CanvasPage(props: CanvasPageProps) {
           onSave={handleSaveNewNode}
           domainId={props.organizationId}
           domainType="DOMAIN_TYPE_ORGANIZATION"
+        />
+      )}
+
+      {/* Emit Event Modal */}
+      {emitModalData && (
+        <EmitEventModal
+          isOpen={true}
+          onClose={() => setEmitModalData(null)}
+          nodeId={emitModalData.nodeId}
+          nodeName={emitModalData.nodeName}
+          workflowId={props.organizationId || ""}
+          organizationId={props.organizationId || ""}
+          channels={emitModalData.channels}
+          onEmit={handleEmit}
         />
       )}
     </div>
@@ -467,6 +515,9 @@ function CanvasContent({
     stateRef.current.componentSidebar.open(nodeId);
   }, []);
 
+  const onRunRef = useRef(onRun);
+  onRunRef.current = onRun;
+
   const handleSave = useCallback(() => {
     if (onSave) {
       onSave(stateRef.current.nodes);
@@ -501,7 +552,7 @@ function CanvasContent({
           onEdit={() => onNodeEdit(nodeProps.id)}
           onDelete={() => onNodeDelete?.(nodeProps.id)}
           selected={nodeProps.selected}
-          onRun={onRun ? () => onRun(nodeProps.id) : undefined}
+          onRun={onRunRef.current ? () => onRunRef.current?.(nodeProps.id) : undefined}
           onDuplicate={
             onDuplicate ? () => onDuplicate(nodeProps.id) : undefined
           }
@@ -525,7 +576,6 @@ function CanvasContent({
       handleNodeClick,
       onNodeEdit,
       state.ai,
-      onRun,
       onDuplicate,
       onDeactivate,
       onToggleView,
