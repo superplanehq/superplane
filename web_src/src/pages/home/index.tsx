@@ -33,7 +33,6 @@ interface WorkflowCardData {
   type: "workflow";
 }
 
-// Home page component - displays canvases and custom components for the current user's organization
 const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -163,7 +162,6 @@ const HomePage = () => {
   }
 
   const error = activeTab === "blueprints" ? blueprintError : workflowError;
-  const currentItems = activeTab === "blueprints" ? filteredBlueprints : filteredWorkflows;
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-900 pt-10">
@@ -200,7 +198,6 @@ const HomePage = () => {
                 filteredBlueprints={filteredBlueprints}
                 filteredWorkflows={filteredWorkflows}
                 organizationId={organizationId}
-                currentItems={currentItems}
                 searchQuery={searchQuery}
               />
             )}
@@ -369,7 +366,6 @@ function Content({
   filteredBlueprints,
   filteredWorkflows,
   organizationId,
-  currentItems,
   searchQuery,
 }: {
   activeTab: TabType;
@@ -377,9 +373,10 @@ function Content({
   filteredBlueprints: BlueprintCardData[];
   filteredWorkflows: WorkflowCardData[];
   organizationId: string;
-  currentItems: BlueprintCardData[] | WorkflowCardData[];
   searchQuery: string;
 }) {
+  const currentItems = activeTab === "blueprints" ? filteredBlueprints : filteredWorkflows;
+
   return (
     <>
       {activeTab === "blueprints" ? (
