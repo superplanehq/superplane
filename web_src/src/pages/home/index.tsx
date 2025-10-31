@@ -1,54 +1,18 @@
-import { Bot, Box, GitBranch, LayoutGrid, List, Plus, Search } from "lucide-react";
+import { Box, GitBranch, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { SuperplaneCanvas } from "../../api-client";
 import { Button } from "../../components/Button/button";
-import { CanvasCard, CanvasCardData } from "../../components/CanvasCard";
-import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { CreateCustomComponentModal } from "../../components/CreateCustomComponentModal";
 import { CreateWorkflowModal } from "../../components/CreateWorkflowModal";
 import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints, useCreateBlueprint } from "../../hooks/useBlueprintData";
-import { useCreateCanvas, useOrganizationCanvases, useOrganizationUsers } from "../../hooks/useOrganizationData";
 import { useCreateWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
 import { getColorClass } from "../../utils/colors";
 
-interface UserData {
-  metadata?: {
-    id?: string;
-    email?: string;
-  };
-  spec?: {
-    displayName?: string;
-    accountProviders?: Array<{
-      avatarUrl?: string;
-      displayName?: string;
-      email?: string;
-    }>;
-  };
-}
-
-const createUserDisplayNames = (orgUsers: UserData[]) => {
-  const map: Record<string, { name: string; initials: string; avatar?: string }> = {};
-  orgUsers.forEach((user) => {
-    if (user.metadata?.id) {
-      const name = user.spec?.displayName || user.metadata?.email || user.metadata.id;
-      const initials = name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase();
-      const avatar = user.spec?.accountProviders?.[0]?.avatarUrl;
-      map[user.metadata.id] = { name, initials, avatar };
-    }
-  });
-  return map;
-};
-
-type TabType = "canvases" | "blueprints" | "workflows";
+type TabType = "blueprints" | "workflows";
 type ViewMode = "grid" | "list";
 
 interface BlueprintCardData {
@@ -73,60 +37,32 @@ interface WorkflowCardData {
 const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [activeTab, setActiveTab] = useState<TabType>("canvases");
-  const [showCreateCanvasModal, setShowCreateCanvasModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>("workflows");
+
   const [showCreateBlueprintModal, setShowCreateBlueprintModal] = useState(false);
   const [showCreateWorkflowModal, setShowCreateWorkflowModal] = useState(false);
+
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const navigate = useNavigate();
 
-  // Use the organization canvases hook with organization ID from URL
-  const {
-    data: canvasesData = [],
-    isLoading: canvasesLoading,
-    error: canvasApiError,
-  } = useOrganizationCanvases(organizationId || "");
-  const { data: orgUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId || "");
   const {
     data: blueprintsData = [],
     isLoading: blueprintsLoading,
     error: blueprintApiError,
   } = useBlueprints(organizationId || "");
+
   const {
     data: workflowsData = [],
     isLoading: workflowsLoading,
     error: workflowApiError,
   } = useWorkflows(organizationId || "");
-  const createCanvasMutation = useCreateCanvas(organizationId || "");
+
   const createBlueprintMutation = useCreateBlueprint(organizationId || "");
   const createWorkflowMutation = useCreateWorkflow(organizationId || "");
 
-  const canvasError = canvasApiError ? "Failed to fetch canvases. Please try again later." : null;
   const blueprintError = blueprintApiError ? "Failed to fetch custom components. Please try again later." : null;
   const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
-
-  // Create user display names mapping for organization users
-  const userDisplayNames = createUserDisplayNames(orgUsers);
-
-  // Transform API data to match CanvasCardData interface
-  const canvases: CanvasCardData[] = canvasesData.map((canvas: SuperplaneCanvas) => {
-    const createdById = canvas.metadata?.createdBy;
-    const creator = createdById ? userDisplayNames[createdById] : null;
-
-    return {
-      id: canvas.metadata!.id!,
-      name: canvas.metadata!.name!,
-      description: canvas.metadata!.description,
-      createdAt: canvas.metadata!.createdAt ? new Date(canvas.metadata!.createdAt!).toLocaleDateString() : "Unknown",
-      createdBy: {
-        name: creator?.name || "Unknown User",
-        initials: creator?.initials || "?",
-        avatar: creator?.avatar,
-      },
-      type: "canvas" as const,
-    };
-  });
 
   // Transform blueprint data
   const blueprints: BlueprintCardData[] = (blueprintsData || []).map((blueprint: any) => ({
@@ -148,14 +84,6 @@ const HomePage = () => {
     type: "workflow" as const,
   }));
 
-  // Filter items based on search and active tab
-  const filteredCanvases = canvases.filter((canvas) => {
-    const matchesSearch =
-      canvas.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      canvas.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
-
   const filteredBlueprints = blueprints.filter((blueprint) => {
     const matchesSearch =
       blueprint.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -170,11 +98,6 @@ const HomePage = () => {
     return matchesSearch;
   });
 
-  // Modal handlers
-  const handleCreateCanvasClick = () => {
-    setShowCreateCanvasModal(true);
-  };
-
   const handleCreateBlueprintClick = () => {
     setShowCreateBlueprintModal(true);
   };
@@ -183,35 +106,12 @@ const HomePage = () => {
     setShowCreateWorkflowModal(true);
   };
 
-  const handleCreateCanvasClose = () => {
-    setShowCreateCanvasModal(false);
-  };
-
   const handleCreateBlueprintClose = () => {
     setShowCreateBlueprintModal(false);
   };
 
   const handleCreateWorkflowClose = () => {
     setShowCreateWorkflowModal(false);
-  };
-
-  const handleCreateCanvasSubmit = async (data: { name: string; description?: string }) => {
-    if (organizationId) {
-      const result = await createCanvasMutation.mutateAsync({
-        canvas: {
-          metadata: {
-            name: data.name,
-            description: data.description,
-          },
-        },
-        organizationId: organizationId,
-      });
-
-      if (result) {
-        setShowCreateCanvasModal(false);
-        navigate(`/${organizationId}/canvas/${result.data?.canvas?.metadata?.id}`);
-      }
-    }
   };
 
   const handleCreateBlueprintSubmit = async (data: { name: string; description?: string }) => {
@@ -243,9 +143,7 @@ const HomePage = () => {
   };
 
   const isLoading =
-    (activeTab === "canvases" && (canvasesLoading || usersLoading)) ||
-    (activeTab === "blueprints" && blueprintsLoading) ||
-    (activeTab === "workflows" && workflowsLoading);
+    (activeTab === "blueprints" && blueprintsLoading) || (activeTab === "workflows" && workflowsLoading);
 
   if (isLoading) {
     return (
@@ -264,9 +162,8 @@ const HomePage = () => {
     );
   }
 
-  const error = activeTab === "canvases" ? canvasError : activeTab === "blueprints" ? blueprintError : workflowError;
-  const currentItems =
-    activeTab === "canvases" ? filteredCanvases : activeTab === "blueprints" ? filteredBlueprints : filteredWorkflows;
+  const error = activeTab === "blueprints" ? blueprintError : workflowError;
+  const currentItems = activeTab === "blueprints" ? filteredBlueprints : filteredWorkflows;
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-900 pt-10">
@@ -276,7 +173,6 @@ const HomePage = () => {
           <div className="p-4">
             <PageHeader
               activeTab={activeTab}
-              handleCreateCanvasClick={handleCreateCanvasClick}
               handleCreateBlueprintClick={handleCreateBlueprintClick}
               handleCreateWorkflowClick={handleCreateWorkflowClick}
             />
@@ -284,7 +180,6 @@ const HomePage = () => {
             <Tabs
               activeTab={activeTab}
               setActiveTab={setActiveTab}
-              canvases={filteredCanvases}
               blueprints={filteredBlueprints}
               workflows={filteredWorkflows}
             />
@@ -302,7 +197,6 @@ const HomePage = () => {
               <Content
                 activeTab={activeTab}
                 viewMode={viewMode}
-                filteredCanvases={filteredCanvases}
                 filteredBlueprints={filteredBlueprints}
                 filteredWorkflows={filteredWorkflows}
                 organizationId={organizationId}
@@ -313,14 +207,6 @@ const HomePage = () => {
           </div>
         </div>
       </main>
-
-      {/* Create Canvas Modal */}
-      <CreateCanvasModal
-        isOpen={showCreateCanvasModal}
-        onClose={handleCreateCanvasClose}
-        onSubmit={handleCreateCanvasSubmit}
-        isLoading={createCanvasMutation.isPending}
-      />
 
       {/* Create Custom Component Modal */}
       <CreateCustomComponentModal
@@ -348,24 +234,13 @@ const HomePage = () => {
 interface TabsProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
-  canvases: CanvasCardData[];
   blueprints: BlueprintCardData[];
   workflows: WorkflowCardData[];
 }
 
-function Tabs({ activeTab, setActiveTab, canvases, blueprints, workflows }: TabsProps) {
+function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
   return (
     <div className="flex border-b border-zinc-200 dark:border-zinc-700 mb-6">
-      <button
-        onClick={() => setActiveTab("canvases")}
-        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-          activeTab === "canvases"
-            ? "border-blue-600 text-blue-600"
-            : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-        }`}
-      >
-        Canvases ({canvases.length})
-      </button>
       <button
         onClick={() => setActiveTab("blueprints")}
         className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -376,6 +251,7 @@ function Tabs({ activeTab, setActiveTab, canvases, blueprints, workflows }: Tabs
       >
         Custom Components ({blueprints.length})
       </button>
+
       <button
         onClick={() => setActiveTab("workflows")}
         className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -449,35 +325,23 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
 
 interface PageHeaderProps {
   activeTab: TabType;
-  handleCreateCanvasClick: () => void;
   handleCreateBlueprintClick: () => void;
   handleCreateWorkflowClick: () => void;
 }
 
-function PageHeader({
-  activeTab,
-  handleCreateCanvasClick,
-  handleCreateBlueprintClick,
-  handleCreateWorkflowClick,
-}: PageHeaderProps) {
+function PageHeader({ activeTab, handleCreateBlueprintClick, handleCreateWorkflowClick }: PageHeaderProps) {
   return (
     <div className="flex items-center justify-between mb-8">
       <Heading level={2} className="!text-2xl mb-2">
-        {activeTab === "canvases" ? "Canvases" : activeTab === "blueprints" ? "Custom Components" : "Workflows"}
+        {activeTab === "blueprints" ? "Custom Components" : "Workflows"}
       </Heading>
       <Button
         color="blue"
         className="flex items-center bg-blue-700 text-white hover:bg-blue-600"
-        onClick={
-          activeTab === "canvases"
-            ? handleCreateCanvasClick
-            : activeTab === "blueprints"
-            ? handleCreateBlueprintClick
-            : handleCreateWorkflowClick
-        }
+        onClick={activeTab === "blueprints" ? handleCreateBlueprintClick : handleCreateWorkflowClick}
       >
         <Plus className="mr-2" size={20} />
-        New {activeTab === "canvases" ? "Canvas" : activeTab === "blueprints" ? "Custom Component" : "Workflow"}
+        New {activeTab === "blueprints" ? "Custom Component" : "Workflow"}
       </Button>
     </div>
   );
@@ -502,7 +366,6 @@ function ErrorState({ error }: { error: string }) {
 function Content({
   activeTab,
   viewMode,
-  filteredCanvases,
   filteredBlueprints,
   filteredWorkflows,
   organizationId,
@@ -511,31 +374,15 @@ function Content({
 }: {
   activeTab: TabType;
   viewMode: ViewMode;
-  filteredCanvases: CanvasCardData[];
   filteredBlueprints: BlueprintCardData[];
   filteredWorkflows: WorkflowCardData[];
   organizationId: string;
-  currentItems: CanvasCardData[] | BlueprintCardData[] | WorkflowCardData[];
+  currentItems: BlueprintCardData[] | WorkflowCardData[];
   searchQuery: string;
 }) {
   return (
     <>
-      {/* Items Display */}
-      {activeTab === "canvases" ? (
-        viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredCanvases.map((canvas) => (
-              <CanvasCard key={canvas.id} canvas={canvas} organizationId={organizationId!} variant="grid" />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredCanvases.map((canvas) => (
-              <CanvasCard key={canvas.id} canvas={canvas} organizationId={organizationId!} variant="list" />
-            ))}
-          </div>
-        )
-      ) : activeTab === "blueprints" ? (
+      {activeTab === "blueprints" ? (
         viewMode === "grid" ? (
           <BlueprintGridView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />
         ) : (
@@ -550,7 +397,6 @@ function Content({
       {/* Empty State */}
       {currentItems.length === 0 && (
         <div className="text-center py-12">
-          {activeTab === "canvases" && <Bot className="mx-auto text-zinc-400 mb-4" size={48} />}
           {activeTab === "blueprints" && <Box className="mx-auto text-zinc-400 mb-4" size={48} />}
           {activeTab === "workflows" && <GitBranch className="mx-auto text-zinc-400 mb-4" size={48} />}
           <Heading level={3} className="text-lg text-zinc-900 dark:text-white mb-2">
@@ -559,9 +405,7 @@ function Content({
           <Text className="text-zinc-600 dark:text-zinc-400 mb-6">
             {searchQuery
               ? "Try adjusting your search criteria."
-              : `Get started by creating your first ${
-                  activeTab === "canvases" ? "canvas" : activeTab === "blueprints" ? "custom component" : "workflow"
-                }.`}
+              : `Get started by creating your first ${activeTab === "blueprints" ? "custom component" : "workflow"}.`}
           </Text>
         </div>
       )}
