@@ -12,7 +12,7 @@ import { useCreateWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
 import { getColorClass } from "../../utils/colors";
 
-type TabType = "blueprints" | "workflows";
+type TabType = "canvases" | "custom-components";
 type ViewMode = "grid" | "list";
 
 interface BlueprintCardData {
@@ -36,7 +36,7 @@ interface WorkflowCardData {
 const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [activeTab, setActiveTab] = useState<TabType>("workflows");
+  const [activeTab, setActiveTab] = useState<TabType>("canvases");
 
   const [showCreateBlueprintModal, setShowCreateBlueprintModal] = useState(false);
   const [showCreateWorkflowModal, setShowCreateWorkflowModal] = useState(false);
@@ -63,7 +63,6 @@ const HomePage = () => {
   const blueprintError = blueprintApiError ? "Failed to fetch custom components. Please try again later." : null;
   const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
 
-  // Transform blueprint data
   const blueprints: BlueprintCardData[] = (blueprintsData || []).map((blueprint: any) => ({
     id: blueprint.id!,
     name: blueprint.name!,
@@ -74,7 +73,6 @@ const HomePage = () => {
     color: blueprint.color,
   }));
 
-  // Transform workflow data
   const workflows: WorkflowCardData[] = (workflowsData || []).map((workflow: any) => ({
     id: workflow.id!,
     name: workflow.name!,
@@ -142,7 +140,7 @@ const HomePage = () => {
   };
 
   const isLoading =
-    (activeTab === "blueprints" && blueprintsLoading) || (activeTab === "workflows" && workflowsLoading);
+    (activeTab === "custom-components" && blueprintsLoading) || (activeTab === "canvases" && workflowsLoading);
 
   if (isLoading) {
     return (
@@ -161,7 +159,7 @@ const HomePage = () => {
     );
   }
 
-  const error = activeTab === "blueprints" ? blueprintError : workflowError;
+  const error = activeTab === "custom-components" ? blueprintError : workflowError;
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-900 pt-10">
@@ -239,25 +237,25 @@ function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
   return (
     <div className="flex border-b border-zinc-200 dark:border-zinc-700 mb-6">
       <button
-        onClick={() => setActiveTab("blueprints")}
+        onClick={() => setActiveTab("canvases")}
         className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-          activeTab === "blueprints"
+          activeTab === "canvases"
+            ? "border-blue-600 text-blue-600"
+            : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+        }`}
+      >
+        Canvases ({workflows.length})
+      </button>
+
+      <button
+        onClick={() => setActiveTab("custom-components")}
+        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          activeTab === "custom-components"
             ? "border-blue-600 text-blue-600"
             : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
         }`}
       >
         Custom Components ({blueprints.length})
-      </button>
-
-      <button
-        onClick={() => setActiveTab("workflows")}
-        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-          activeTab === "workflows"
-            ? "border-blue-600 text-blue-600"
-            : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-        }`}
-      >
-        Workflows ({workflows.length})
       </button>
     </div>
   );
@@ -302,6 +300,8 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
     "focus:ring-2 focus:ring-blue-500 focus:border-transparent",
   );
 
+  const searchPlaceholder = activeTab === "custom-components" ? "Search components..." : "Search canvases...";
+
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 w-100">
@@ -309,7 +309,7 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" size={18} />
           <input
             type="text"
-            placeholder={`Search ${activeTab}...`}
+            placeholder={searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={inputStyle}
@@ -327,18 +327,23 @@ interface PageHeaderProps {
 }
 
 function PageHeader({ activeTab, handleCreateBlueprintClick, handleCreateWorkflowClick }: PageHeaderProps) {
+  const heading = activeTab === "custom-components" ? "Custom Components" : "Workflows";
+  const buttonText = activeTab === "custom-components" ? "New Component" : "New Canvas";
+  const handleNewClick = activeTab === "custom-components" ? handleCreateBlueprintClick : handleCreateWorkflowClick;
+
   return (
     <div className="flex items-center justify-between mb-8">
       <Heading level={2} className="!text-2xl mb-2">
-        {activeTab === "blueprints" ? "Custom Components" : "Workflows"}
+        {heading}
       </Heading>
+
       <Button
         color="blue"
         className="flex items-center bg-blue-700 text-white hover:bg-blue-600"
-        onClick={activeTab === "blueprints" ? handleCreateBlueprintClick : handleCreateWorkflowClick}
+        onClick={handleNewClick}
       >
         <Plus className="mr-2" size={20} />
-        New {activeTab === "blueprints" ? "Custom Component" : "Workflow"}
+        {buttonText}
       </Button>
     </div>
   );
@@ -375,38 +380,56 @@ function Content({
   organizationId: string;
   searchQuery: string;
 }) {
-  const currentItems = activeTab === "blueprints" ? filteredBlueprints : filteredWorkflows;
+  if (activeTab === "canvases") {
+    if (filteredWorkflows.length === 0) {
+      return <CanvasesEmptyState searchQuery={searchQuery} />;
+    }
 
+    if (viewMode === "grid") {
+      return <WorkflowGridView filteredWorkflows={filteredWorkflows} organizationId={organizationId} />;
+    } else {
+      return <WorkflowListView filteredWorkflows={filteredWorkflows} organizationId={organizationId} />;
+    }
+  } else if (activeTab === "custom-components") {
+    if (filteredBlueprints.length === 0) {
+      return <CustomComponentsEmptyState searchQuery={searchQuery} />;
+    }
+
+    if (viewMode === "grid") {
+      return <BlueprintGridView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />;
+    } else {
+      return <BlueprintListView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />;
+    }
+  }
+
+  throw new Error("Invalid activeTab value");
+}
+
+function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
   return (
-    <>
-      {activeTab === "blueprints" ? (
-        viewMode === "grid" ? (
-          <BlueprintGridView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />
-        ) : (
-          <BlueprintListView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />
-        )
-      ) : viewMode === "grid" ? (
-        <WorkflowGridView filteredWorkflows={filteredWorkflows} organizationId={organizationId} />
-      ) : (
-        <WorkflowListView filteredWorkflows={filteredWorkflows} organizationId={organizationId} />
-      )}
+    <div className="text-center py-12">
+      <Box className="mx-auto text-zinc-400 mb-4" size={48} />
+      <Heading level={3} className="text-lg text-zinc-900 dark:text-white mb-2">
+        {searchQuery ? "No custom components found" : "No custom components yet"}
+      </Heading>
+      <Text className="text-zinc-600 dark:text-zinc-400 mb-6">
+        {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first custom component."}
+      </Text>
+    </div>
+  );
+}
 
-      {/* Empty State */}
-      {currentItems.length === 0 && (
-        <div className="text-center py-12">
-          {activeTab === "blueprints" && <Box className="mx-auto text-zinc-400 mb-4" size={48} />}
-          {activeTab === "workflows" && <GitBranch className="mx-auto text-zinc-400 mb-4" size={48} />}
-          <Heading level={3} className="text-lg text-zinc-900 dark:text-white mb-2">
-            {searchQuery ? `No ${activeTab} found` : `No ${activeTab} yet`}
-          </Heading>
-          <Text className="text-zinc-600 dark:text-zinc-400 mb-6">
-            {searchQuery
-              ? "Try adjusting your search criteria."
-              : `Get started by creating your first ${activeTab === "blueprints" ? "custom component" : "workflow"}.`}
-          </Text>
-        </div>
-      )}
-    </>
+function CanvasesEmptyState({ searchQuery }: { searchQuery: string }) {
+  return (
+    <div className="text-center py-12">
+      <GitBranch className="mx-auto text-zinc-400 mb-4" size={48} />
+      <Heading level={3} className="text-lg text-zinc-900 dark:text-white mb-2">
+        {searchQuery ? "No canvases found" : "No canvases yet"}
+      </Heading>
+      <Text className="text-zinc-600 dark:text-zinc-400 mb-6">
+        {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first canvas."}
+      </Text>
+    </div>
   );
 }
 
