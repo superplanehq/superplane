@@ -3,7 +3,6 @@ package contexts
 import (
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/triggers"
@@ -35,10 +34,7 @@ func (s *EventContext) Emit(data any) error {
 		return err
 	}
 
-	err := messages.NewWorkflowEventCreatedMessage(s.workflowNode.WorkflowID.String(), &event).Publish()
-	if err != nil {
-		log.Errorf("failed to publish workflow event: %v", err)
-	}
+	messages.NewWorkflowEventCreatedMessage(s.workflowNode.WorkflowID.String(), &event).PublishWithDelay(100 * time.Millisecond)
 
 	return nil
 }

@@ -313,12 +313,7 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 		return err
 	}
 
-	for _, event := range events {
-		err := messages.NewWorkflowEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
-		if err != nil {
-			log.Printf("failed to publish workflow event: %v", err)
-		}
-	}
+	messages.PublishManyWorkflowEventsWithDelay(parentExecution.WorkflowID.String(), events, 100*time.Millisecond)
 
 	w.log("Parent execution %s completed", parentExecution.ID)
 	return event.RoutedInTransaction(tx)

@@ -1,7 +1,8 @@
 package contexts
 
 import (
-	log "github.com/sirupsen/logrus"
+	"time"
+
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -23,13 +24,7 @@ func (s *ExecutionStateContext) Pass(outputs map[string][]any) error {
 		return err
 	}
 
-	// Publish RabbitMQ messages for created events
-	for _, event := range events {
-		err := messages.NewWorkflowEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
-		if err != nil {
-			log.Errorf("failed to publish workflow event: %v", err)
-		}
-	}
+	messages.PublishManyWorkflowEventsWithDelay(s.execution.WorkflowID.String(), events, 100*time.Millisecond)
 
 	return nil
 }
