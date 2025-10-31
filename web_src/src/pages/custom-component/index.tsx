@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Node,
@@ -230,6 +230,19 @@ export const CustomComponent = () => {
     }
   }, [blueprint, components])
 
+  // Use refs to access latest values without causing re-renders
+  const nodesRef = useRef(nodes)
+  const componentsRef = useRef(components)
+
+  // Keep refs updated
+  useEffect(() => {
+    nodesRef.current = nodes
+  }, [nodes])
+
+  useEffect(() => {
+    componentsRef.current = components
+  }, [components])
+
   // Node and edge change handlers
   const onNodesChange = useCallback((changes: any) => {
     setNodes((nds) => applyNodeChanges(changes, nds))
@@ -254,10 +267,10 @@ export const CustomComponent = () => {
   }
 
   const getNodeEditData = useCallback((nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId)
+    const node = nodesRef.current.find((n) => n.id === nodeId)
     if (!node) return null
 
-    const component = components.find((p: any) => p.name === (node.data as any)._originalComponent)
+    const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent)
     if (!component) return null
 
     return {
@@ -266,17 +279,17 @@ export const CustomComponent = () => {
       configuration: (node.data as any)._originalConfiguration || {},
       configurationFields: component.configuration || [],
     }
-  }, [nodes, components])
+  }, [])
 
   const handleNodeConfigurationSave = useCallback((
     nodeId: string,
     configuration: Record<string, any>,
     nodeName: string
   ) => {
-    const node = nodes.find((n) => n.id === nodeId)
+    const node = nodesRef.current.find((n) => n.id === nodeId)
     if (!node) return
 
-    const component = components.find((p: any) => p.name === (node.data as any)._originalComponent)
+    const component = componentsRef.current.find((p: any) => p.name === (node.data as any)._originalComponent)
     if (!component) return
 
     // Filter configuration to only include visible fields
@@ -325,10 +338,10 @@ export const CustomComponent = () => {
         }
       })
     )
-  }, [nodes, components])
+  }, [])
 
   const handleNodeAdd = useCallback((newNodeData: NewNodeData) => {
-    const component = components.find((c: ComponentsComponent) => c.name === newNodeData.buildingBlock.name)
+    const component = componentsRef.current.find((c: ComponentsComponent) => c.name === newNodeData.buildingBlock.name)
     if (!component) return
 
     // Filter configuration to only include visible fields
@@ -349,7 +362,7 @@ export const CustomComponent = () => {
     const newNode: Node = {
       id: newNodeId,
       type: 'default',
-      position: { x: nodes.length * 250, y: 100 },
+      position: newNodeData.position || { x: nodesRef.current.length * 250, y: 100 },
       data: {
         ...blockData,
         _originalComponent: component.name,
@@ -357,7 +370,7 @@ export const CustomComponent = () => {
       },
     }
     setNodes((nds) => [...nds, newNode])
-  }, [nodes, components])
+  }, [])
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== nodeId))
@@ -456,7 +469,6 @@ export const CustomComponent = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeClick={(nodeId) => console.log('Node clicked:', nodeId)}
         onNodeDelete={handleNodeDelete}
         getNodeEditData={getNodeEditData}
         onNodeConfigurationSave={handleNodeConfigurationSave}

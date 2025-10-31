@@ -3,13 +3,14 @@ import {
   Controls,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type Connection,
   type Edge,
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./blueprint-canvas-reset.css";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 
 import { ComponentsComponent } from "@/api-client";
 import { Block, BlockData } from "../CanvasPage/Block";
@@ -44,6 +45,7 @@ export interface NewNodeData {
   buildingBlock: BuildingBlock;
   nodeName: string;
   configuration: Record<string, any>;
+  position?: { x: number; y: number };
 }
 
 export interface CustomComponentBuilderPageProps {
@@ -89,9 +91,121 @@ export interface CustomComponentBuilderPageProps {
   isSaving?: boolean;
 }
 
+// Canvas content component with ReactFlow hooks - defined outside to prevent re-creation
+function CanvasContent({
+  nodes,
+  edges,
+  nodeTypes,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  onNodeDoubleClick,
+  onBuildingBlockDrop,
+  onZoomChange,
+}: {
+  nodes: Node[];
+  edges: Edge[];
+  nodeTypes: any;
+  onNodesChange: (changes: any) => void;
+  onEdgesChange: (changes: any) => void;
+  onConnect: (connection: Connection) => void;
+  onNodeDoubleClick?: (event: any, node: Node) => void;
+  onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
+  onZoomChange?: (zoom: number) => void;
+}) {
+  const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
+
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const blockData = event.dataTransfer.getData("application/reactflow");
+      if (!blockData || !onBuildingBlockDrop) {
+        return;
+      }
+
+      try {
+        const block: BuildingBlock = JSON.parse(blockData);
+        const cursorPosition = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        // Adjust position to place node exactly where preview was shown
+        const nodeWidth = 420;
+        const cursorOffsetY = 30;
+        const position = {
+          x: cursorPosition.x - nodeWidth / 2,
+          y: cursorPosition.y - cursorOffsetY,
+        };
+
+        onBuildingBlockDrop(block, position);
+      } catch (error) {
+        console.error("Failed to parse building block data:", error);
+      }
+    },
+    [onBuildingBlockDrop, screenToFlowPosition]
+  );
+
+  const handleMove = useCallback(
+    (_event: any, viewport: { x: number; y: number; zoom: number }) => {
+      if (onZoomChange) {
+        onZoomChange(viewport.zoom);
+      }
+    },
+    [onZoomChange]
+  );
+
+  // Initialize: fit to view on mount with zoom constraints
+  useEffect(() => {
+    fitView({ maxZoom: 1.0, padding: 0.5 });
+
+    if (onZoomChange) {
+      const viewport = getViewport();
+      onZoomChange(viewport.zoom);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onNodeDoubleClick={onNodeDoubleClick}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onMove={handleMove}
+      minZoom={0.4}
+      maxZoom={1.5}
+      zoomOnScroll={true}
+      zoomOnPinch={true}
+      zoomOnDoubleClick={false}
+      panOnScroll={true}
+      panOnDrag={true}
+      selectionOnDrag={false}
+      panOnScrollSpeed={0.8}
+      nodesDraggable={true}
+      nodesConnectable={true}
+      elementsSelectable={true}
+    >
+      <Background bgColor="#F1F5F9" color="#F1F5F9" />
+      <Controls />
+    </ReactFlow>
+  );
+}
+
 export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProps) {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+  const [canvasZoom, setCanvasZoom] = useState(1);
 
   // Modal state management
   const [isConfigFieldModalOpen, setIsConfigFieldModalOpen] = useState(false);
@@ -190,14 +304,15 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         }
       }
     },
-    [props]
+    [props.getNodeEditData]
   );
 
-  const handleBuildingBlockClick = useCallback((block: BuildingBlock) => {
+  const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
     setNewNodeData({
       buildingBlock: block,
       nodeName: block.label || block.name || "",
       configuration: {},
+      position,
     });
   }, []);
 
@@ -222,6 +337,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
+          position: newNodeData.position,
         });
       }
       setNewNodeData(null);
@@ -267,7 +383,14 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     (connection: Connection) => {
       props.onConnect(connection);
     },
-    [props]
+    [props.onConnect]
+  );
+
+  const handleNodeDelete = useCallback(
+    (nodeId: string) => {
+      props.onNodeDelete?.(nodeId);
+    },
+    [props.onNodeDelete]
   );
 
   const nodeTypes = useMemo(
@@ -280,14 +403,13 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         <Block
           data={nodeProps.data as BlockData}
           nodeId={nodeProps.id}
-          onClick={() => props.onNodeClick?.(nodeProps.id)}
           onEdit={() => handleNodeEdit(nodeProps.id)}
-          onDelete={() => props.onNodeDelete?.(nodeProps.id)}
+          onDelete={() => handleNodeDelete(nodeProps.id)}
           selected={nodeProps.selected}
         />
       ),
     }),
-    [props.onNodeClick, props.onNodeDelete, handleNodeEdit]
+    [handleNodeEdit, handleNodeDelete]
   );
 
   return (
@@ -306,14 +428,14 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         <BuildingBlocksSidebar
           isOpen={isLeftSidebarOpen}
           onToggle={setIsLeftSidebarOpen}
-          onBlockClick={handleBuildingBlockClick}
           blocks={buildingBlockCategories}
+          canvasZoom={canvasZoom}
         />
 
         {/* React Flow Canvas */}
         <div className="flex-1 relative h-full w-full">
           <ReactFlowProvider>
-            <ReactFlow
+            <CanvasContent
               nodes={props.nodes}
               edges={props.edges}
               nodeTypes={nodeTypes}
@@ -321,23 +443,9 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
               onEdgesChange={props.onEdgesChange}
               onConnect={handleConnect}
               onNodeDoubleClick={props.onNodeDoubleClick}
-              fitView
-              minZoom={0.4}
-              maxZoom={1.5}
-              zoomOnScroll={true}
-              zoomOnPinch={true}
-              zoomOnDoubleClick={false}
-              panOnScroll={true}
-              panOnDrag={true}
-              selectionOnDrag={false}
-              panOnScrollSpeed={0.8}
-              nodesDraggable={true}
-              nodesConnectable={true}
-              elementsSelectable={true}
-            >
-              <Background bgColor="#F1F5F9" color="#F1F5F9" />
-              <Controls />
-            </ReactFlow>
+              onBuildingBlockDrop={handleBuildingBlockDrop}
+              onZoomChange={setCanvasZoom}
+            />
           </ReactFlowProvider>
         </div>
 

@@ -134,9 +134,6 @@ const meta = {
     onToggle: {
       action: "toggled",
     },
-    onBlockClick: {
-      action: "block clicked",
-    },
   },
 } satisfies Meta<typeof BuildingBlocksSidebar>;
 

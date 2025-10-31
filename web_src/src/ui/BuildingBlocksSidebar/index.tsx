@@ -11,9 +11,10 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
-import { getColorClass } from "@/utils/colors";
+import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { ChevronRight, Menu, PanelLeftClose } from "lucide-react";
 import { useState } from "react";
+import { createNodeDragPreview } from "./createNodeDragPreview";
 
 export interface BuildingBlock {
   name: string;
@@ -37,15 +38,15 @@ export type BuildingBlockCategory = {
 export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
-  onBlockClick: (block: BuildingBlock) => void;
   blocks: BuildingBlockCategory[];
+  canvasZoom?: number;
 }
 
 export function BuildingBlocksSidebar({
   isOpen,
   onToggle,
   blocks,
-  onBlockClick,
+  canvasZoom = 1,
 }: BuildingBlocksSidebarProps) {
   if (!isOpen) {
     return (
@@ -100,7 +101,7 @@ export function BuildingBlocksSidebar({
           <CategorySection
             key={category.name}
             category={category}
-            onBlockClick={onBlockClick}
+            canvasZoom={canvasZoom}
           />
         ))}
       </div>
@@ -110,10 +111,10 @@ export function BuildingBlocksSidebar({
 
 interface CategorySectionProps {
   category: BuildingBlockCategory;
-  onBlockClick: (block: BuildingBlock) => void;
+  canvasZoom: number;
 }
 
-function CategorySection({ category, onBlockClick }: CategorySectionProps) {
+function CategorySection({ category, canvasZoom }: CategorySectionProps) {
   const allBlocks = category.blocks;
 
   return (
@@ -128,12 +129,22 @@ function CategorySection({ category, onBlockClick }: CategorySectionProps) {
           const iconSlug = block.icon || "zap";
           const IconComponent = resolveIcon(iconSlug);
           const colorClass = getColorClass(block.color);
+          const backgroundColorClass = getBackgroundColorClass(block.color);
 
           return (
             <Item
               key={`${block.type}-${block.name}`}
-              onClick={() => onBlockClick(block)}
-              className="ml-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1 flex items-center gap-2"
+              draggable
+              onDragStart={(e) =>
+                createNodeDragPreview(
+                  e,
+                  block,
+                  colorClass,
+                  backgroundColorClass,
+                  canvasZoom
+                )
+              }
+              className="ml-3 cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1 flex items-center gap-2"
               size="sm"
             >
               <ItemMedia>
