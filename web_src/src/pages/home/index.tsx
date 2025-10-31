@@ -2,15 +2,18 @@ import { Box, GitBranch, LayoutGrid, List, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button/button";
+import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { CreateCustomComponentModal } from "../../components/CreateCustomComponentModal";
-import { CreateWorkflowModal } from "../../components/CreateWorkflowModal";
 import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
-import { useBlueprints, useCreateBlueprint } from "../../hooks/useBlueprintData";
-import { useCreateWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
+import { useBlueprints } from "../../hooks/useBlueprintData";
+import { useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
 import { getColorClass } from "../../utils/colors";
+
+import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
+import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
 
 type TabType = "canvases" | "custom-components";
 type ViewMode = "grid" | "list";
@@ -38,12 +41,11 @@ const HomePage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [activeTab, setActiveTab] = useState<TabType>("canvases");
 
-  const [showCreateBlueprintModal, setShowCreateBlueprintModal] = useState(false);
-  const [showCreateWorkflowModal, setShowCreateWorkflowModal] = useState(false);
+  const canvasModalState = useCreateCanvasModalState();
+  const customComponentModalState = useCreateCustomComponentModalState();
 
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
-  const navigate = useNavigate();
 
   const {
     data: blueprintsData = [],
@@ -56,9 +58,6 @@ const HomePage = () => {
     isLoading: workflowsLoading,
     error: workflowApiError,
   } = useWorkflows(organizationId || "");
-
-  const createBlueprintMutation = useCreateBlueprint(organizationId || "");
-  const createWorkflowMutation = useCreateWorkflow(organizationId || "");
 
   const blueprintError = blueprintApiError ? "Failed to fetch custom components. Please try again later." : null;
   const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
@@ -95,50 +94,6 @@ const HomePage = () => {
     return matchesSearch;
   });
 
-  const handleCreateBlueprintClick = () => {
-    setShowCreateBlueprintModal(true);
-  };
-
-  const handleCreateWorkflowClick = () => {
-    setShowCreateWorkflowModal(true);
-  };
-
-  const handleCreateBlueprintClose = () => {
-    setShowCreateBlueprintModal(false);
-  };
-
-  const handleCreateWorkflowClose = () => {
-    setShowCreateWorkflowModal(false);
-  };
-
-  const handleCreateBlueprintSubmit = async (data: { name: string; description?: string }) => {
-    if (organizationId) {
-      const result = await createBlueprintMutation.mutateAsync({
-        name: data.name,
-        description: data.description,
-      });
-
-      if (result?.data?.blueprint?.id) {
-        setShowCreateBlueprintModal(false);
-        navigate(`/${organizationId}/custom-components/${result.data.blueprint.id}`);
-      }
-    }
-  };
-
-  const handleCreateWorkflowSubmit = async (data: { name: string; description?: string }) => {
-    if (organizationId) {
-      const result = await createWorkflowMutation.mutateAsync({
-        name: data.name,
-        description: data.description,
-      });
-
-      if (result?.data?.workflow?.id) {
-        setShowCreateWorkflowModal(false);
-        navigate(`/${organizationId}/workflows/${result.data.workflow.id}`);
-      }
-    }
-  };
-
   const isLoading =
     (activeTab === "custom-components" && blueprintsLoading) || (activeTab === "canvases" && workflowsLoading);
 
@@ -161,17 +116,20 @@ const HomePage = () => {
 
   const error = activeTab === "custom-components" ? blueprintError : workflowError;
 
+  const onNewClick = () => {
+    if (activeTab === "custom-components") {
+      customComponentModalState.onOpen();
+    } else {
+      canvasModalState.onOpen();
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-900 pt-10">
-      {/* Main Content */}
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className="bg-zinc-50 dark:bg-zinc-900 w-full flex-grow-1 p-6">
           <div className="p-4">
-            <PageHeader
-              activeTab={activeTab}
-              handleCreateBlueprintClick={handleCreateBlueprintClick}
-              handleCreateWorkflowClick={handleCreateWorkflowClick}
-            />
+            <PageHeader activeTab={activeTab} onNewClick={onNewClick} />
 
             <Tabs
               activeTab={activeTab}
@@ -203,21 +161,8 @@ const HomePage = () => {
         </div>
       </main>
 
-      {/* Create Custom Component Modal */}
-      <CreateCustomComponentModal
-        isOpen={showCreateBlueprintModal}
-        onClose={handleCreateBlueprintClose}
-        onSubmit={handleCreateBlueprintSubmit}
-        isLoading={createBlueprintMutation.isPending}
-      />
-
-      {/* Create Workflow Modal */}
-      <CreateWorkflowModal
-        isOpen={showCreateWorkflowModal}
-        onClose={handleCreateWorkflowClose}
-        onSubmit={handleCreateWorkflowSubmit}
-        isLoading={createWorkflowMutation.isPending}
-      />
+      <CreateCanvasModal {...canvasModalState} />
+      <CreateCustomComponentModal {...customComponentModalState} />
     </div>
   );
 };
@@ -322,14 +267,12 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
 
 interface PageHeaderProps {
   activeTab: TabType;
-  handleCreateBlueprintClick: () => void;
-  handleCreateWorkflowClick: () => void;
+  onNewClick: () => void;
 }
 
-function PageHeader({ activeTab, handleCreateBlueprintClick, handleCreateWorkflowClick }: PageHeaderProps) {
+function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
   const heading = activeTab === "custom-components" ? "Custom Components" : "Workflows";
   const buttonText = activeTab === "custom-components" ? "New Component" : "New Canvas";
-  const handleNewClick = activeTab === "custom-components" ? handleCreateBlueprintClick : handleCreateWorkflowClick;
 
   return (
     <div className="flex items-center justify-between mb-8">
@@ -337,11 +280,7 @@ function PageHeader({ activeTab, handleCreateBlueprintClick, handleCreateWorkflo
         {heading}
       </Heading>
 
-      <Button
-        color="blue"
-        className="flex items-center bg-blue-700 text-white hover:bg-blue-600"
-        onClick={handleNewClick}
-      >
+      <Button color="blue" className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
         <Plus className="mr-2" size={20} />
         {buttonText}
       </Button>
