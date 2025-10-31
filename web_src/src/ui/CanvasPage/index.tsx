@@ -81,6 +81,7 @@ export interface NewNodeData {
   buildingBlock: BuildingBlock;
   nodeName: string;
   configuration: Record<string, any>;
+  position?: { x: number; y: number };
 }
 
 export interface CanvasPageProps {
@@ -123,6 +124,12 @@ export interface CanvasPageProps {
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
   onNodeAdd?: (newNodeData: NewNodeData) => void;
+
+  // Refs to persist state across re-renders
+  hasFitToViewRef?: React.MutableRefObject<boolean>;
+  hasUserToggledSidebarRef?: React.MutableRefObject<boolean>;
+  isSidebarOpenRef?: React.MutableRefObject<boolean | null>;
+  viewportRef?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
 }
 
 const EDGE_STYLE = {
@@ -136,8 +143,24 @@ function CanvasPage(props: CanvasPageProps) {
     null
   );
   const [newNodeData, setNewNodeData] = useState<NewNodeData | null>(null);
+
+  // Use refs from props if provided, otherwise create local ones
+  const hasFitToViewRef = props.hasFitToViewRef || useRef(false);
+  const hasUserToggledSidebarRef = props.hasUserToggledSidebarRef || useRef(false);
+  const isSidebarOpenRef = props.isSidebarOpenRef || useRef<boolean | null>(null);
+
+  // Initialize sidebar state from ref if available, otherwise based on whether nodes exist
   const [isBuildingBlocksSidebarOpen, setIsBuildingBlocksSidebarOpen] =
-    useState(false);
+    useState(() => {
+      // If we have a persisted state in the ref, use it
+      if (isSidebarOpenRef.current !== null) {
+        return isSidebarOpenRef.current;
+      }
+      // Otherwise, open if no nodes exist
+      return props.nodes.length === 0;
+    });
+
+  const [canvasZoom, setCanvasZoom] = useState(1);
   const [emitModalData, setEmitModalData] = useState<{
     nodeId: string;
     nodeName: string;
@@ -200,13 +223,20 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props]
   );
 
-  const handleBuildingBlockClick = useCallback((block: BuildingBlock) => {
+  const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
     setNewNodeData({
       buildingBlock: block,
       nodeName: block.name || "",
       configuration: {},
+      position,
     });
   }, []);
+
+  const handleSidebarToggle = useCallback((open: boolean) => {
+    hasUserToggledSidebarRef.current = true;
+    isSidebarOpenRef.current = open;
+    setIsBuildingBlocksSidebarOpen(open);
+  }, [hasUserToggledSidebarRef, isSidebarOpenRef]);
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string) => {
@@ -229,6 +259,7 @@ function CanvasPage(props: CanvasPageProps) {
           buildingBlock: newNodeData.buildingBlock,
           nodeName,
           configuration,
+          position: newNodeData.position,
         });
       }
       setNewNodeData(null);
@@ -247,13 +278,13 @@ function CanvasPage(props: CanvasPageProps) {
       <div className="flex-1 flex relative overflow-hidden">
         <BuildingBlocksSidebar
           isOpen={isBuildingBlocksSidebarOpen}
-          onToggle={setIsBuildingBlocksSidebarOpen}
+          onToggle={handleSidebarToggle}
           blocks={props.buildingBlocks || []}
-          onBlockClick={handleBuildingBlockClick}
+          canvasZoom={canvasZoom}
         />
 
         <div className="flex-1 relative">
-          <ReactFlowProvider>
+          <ReactFlowProvider key="canvas-flow-provider">
             <CanvasContent
               state={state}
               onSave={props.onSave}
@@ -265,6 +296,10 @@ function CanvasPage(props: CanvasPageProps) {
               onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
               onDeactivate={props.onDeactivate}
+              onBuildingBlockDrop={handleBuildingBlockDrop}
+              onZoomChange={setCanvasZoom}
+              hasFitToViewRef={hasFitToViewRef}
+              viewportRefProp={props.viewportRef}
             />
           </ReactFlowProvider>
 
@@ -477,6 +512,10 @@ function CanvasContent({
   onDuplicate,
   onDeactivate,
   onToggleView,
+  onBuildingBlockDrop,
+  onZoomChange,
+  hasFitToViewRef,
+  viewportRefProp,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -493,22 +532,34 @@ function CanvasContent({
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
+  onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
+  onZoomChange?: (zoom: number) => void;
+  hasFitToViewRef: React.MutableRefObject<boolean>;
+  viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
 }) {
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
   // Use refs to avoid recreating callbacks when state changes
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // Use viewport ref from props if provided, otherwise create local one
+  const viewportRef = viewportRefProp || useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
+
+  // Use viewport from ref as the state value
+  const viewport = viewportRef.current;
+
+  // Track if we've initialized to prevent flicker
+  const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
 
   const handleNodeExpand = useCallback(
     (nodeId: string) => {
       const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
       if (node && stateRef.current.onNodeExpand) {
         stateRef.current.onNodeExpand(nodeId, node.data);
-        fitView();
       }
     },
-    [fitView]
+    []
   );
 
   const handleNodeClick = useCallback((nodeId: string) => {
@@ -536,6 +587,83 @@ function CanvasContent({
     },
     [onEdgeCreate]
   );
+
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const blockData = event.dataTransfer.getData("application/reactflow");
+      if (!blockData || !onBuildingBlockDrop) {
+        return;
+      }
+
+      try {
+        const block: BuildingBlock = JSON.parse(blockData);
+        // Get the drop position from the cursor
+        const cursorPosition = screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        // Adjust position to place node exactly where preview was shown
+        // The drag preview has cursor at (width/2, 30px) from top-left
+        // So we need to offset by those amounts to get the node's top-left corner
+        const nodeWidth = 420; // Matches drag preview width
+        const cursorOffsetY = 30; // Y offset used in drag preview
+        const position = {
+          x: cursorPosition.x - nodeWidth / 2,
+          y: cursorPosition.y - cursorOffsetY,
+        };
+
+        onBuildingBlockDrop(block, position);
+      } catch (error) {
+        console.error("Failed to parse building block data:", error);
+      }
+    },
+    [onBuildingBlockDrop, screenToFlowPosition]
+  );
+
+  const handleMove = useCallback(
+    (_event: any, newViewport: { x: number; y: number; zoom: number }) => {
+      // Store the viewport in the ref (which persists across re-renders)
+      viewportRef.current = newViewport;
+
+      if (onZoomChange) {
+        onZoomChange(newViewport.zoom);
+      }
+    },
+    [onZoomChange, viewportRef]
+  );
+
+  // Handle fit to view on ReactFlow initialization
+  const handleInit = useCallback((reactFlowInstance: any) => {
+    if (!hasFitToViewRef.current) {
+      // Fit to view but don't zoom in too much (max zoom of 1.0)
+      fitView({ maxZoom: 1.0, padding: 0.5 });
+
+      // Store the initial viewport after fit
+      const initialViewport = getViewport();
+      viewportRef.current = initialViewport;
+
+      if (onZoomChange) {
+        onZoomChange(initialViewport.zoom);
+      }
+
+      hasFitToViewRef.current = true;
+      setIsInitialized(true);
+    } else {
+      // If we've already fit to view once and have a stored viewport, restore it
+      if (viewportRef.current) {
+        reactFlowInstance.setViewport(viewportRef.current);
+      }
+      setIsInitialized(true);
+    }
+  }, [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef]);
 
   const nodeTypes = useMemo(
     () => ({
@@ -618,7 +746,6 @@ function CanvasContent({
             edges={styledEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            fitView={true}
             minZoom={0.4}
             maxZoom={1.5}
             zoomOnScroll={true}
@@ -635,6 +762,13 @@ function CanvasContent({
             onEdgesChange={state.onEdgesChange}
             onConnect={handleConnect}
             onNodeDoubleClick={(_, node) => state.toggleNodeCollapse(node.id)}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onMove={handleMove}
+            onInit={handleInit}
+            defaultViewport={viewport}
+            fitView={false}
+            style={{ opacity: isInitialized ? 1 : 0 }}
           >
             <Background bgColor="#F1F5F9" color="#F1F5F9" />
           </ReactFlow>

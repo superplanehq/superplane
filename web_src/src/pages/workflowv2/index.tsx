@@ -78,6 +78,35 @@ export function WorkflowPageV2() {
   const isInitialLoadRef = useRef(true);
 
   /**
+   * Track if we've already done the initial fit to view.
+   * This ref persists across re-renders to prevent viewport changes on save.
+   */
+  const hasFitToViewRef = useRef(false);
+
+  /**
+   * Track if the user has manually toggled the building blocks sidebar.
+   * This ref persists across re-renders to preserve user preference.
+   */
+  const hasUserToggledSidebarRef = useRef(false);
+
+  /**
+   * Track the building blocks sidebar state.
+   * Initialize based on whether nodes exist (open if no nodes).
+   * This ref persists across re-renders to preserve sidebar state.
+   */
+  const isSidebarOpenRef = useRef<boolean | null>(null);
+  if (isSidebarOpenRef.current === null && workflow) {
+    // Initialize on first render
+    isSidebarOpenRef.current = workflow.nodes?.length === 0;
+  }
+
+  /**
+   * Track the canvas viewport state.
+   * This ref persists across re-renders to preserve viewport position and zoom.
+   */
+  const viewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
+
+  /**
    * Initialize persisted node IDs when workflow is first loaded
    * This must happen during render (not in useEffect) to ensure it's available for the query hooks.
    */
@@ -123,13 +152,19 @@ export function WorkflowPageV2() {
     [triggerNodes]
   );
 
+  const persistedFilterNodes = useMemo(
+    () =>
+      filterComponentNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!)),
+    [filterComponentNodes]
+  );
+
   const persistedNodesWithExecutions = useMemo(() => {
     const allNodes = [...compositeNodes, ...componentNodes];
     return allNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!));
   }, [compositeNodes, componentNodes]);
 
   const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } =
-    useTriggerNodeEvents(workflowId!, persistedTriggerNodes.concat(filterComponentNodes));
+    useTriggerNodeEvents(workflowId!, persistedTriggerNodes.concat(persistedFilterNodes));
   const {
     nodeExecutionsMap,
     nodeQueueItemsMap,
@@ -326,7 +361,7 @@ export function WorkflowPageV2() {
     (newNodeData: NewNodeData) => {
       if (!workflow || !organizationId || !workflowId) return;
 
-      const { buildingBlock, nodeName, configuration } = newNodeData;
+      const { buildingBlock, nodeName, configuration, position } = newNodeData;
 
       // Filter configuration to only include visible fields
       const filteredConfiguration = filterVisibleConfiguration(
@@ -351,7 +386,7 @@ export function WorkflowPageV2() {
               ? "TYPE_BLUEPRINT"
               : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
-        position: {
+        position: position || {
           x: (workflow.nodes?.length || 0) * 250,
           y: 100,
         },
@@ -643,6 +678,10 @@ export function WorkflowPageV2() {
       onRun={handleRun}
       buildingBlocks={buildingBlocks}
       onNodeAdd={handleNodeAdd}
+      hasFitToViewRef={hasFitToViewRef}
+      hasUserToggledSidebarRef={hasUserToggledSidebarRef}
+      isSidebarOpenRef={isSidebarOpenRef}
+      viewportRef={viewportRef}
       breadcrumbs={[
         {
           label: "Workflows",
