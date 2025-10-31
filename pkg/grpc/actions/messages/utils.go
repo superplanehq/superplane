@@ -8,6 +8,7 @@ import (
 )
 
 const DeliveryHubCanvasExchange = "superplane.canvas-exchange"
+const WorkflowExchange = "superplane.workflow-exchange"
 
 func Publish(exchange string, routingKey string, message []byte) error {
 	amqpURL, err := config.RabbitMQURL()

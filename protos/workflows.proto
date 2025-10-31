@@ -374,3 +374,14 @@ message ListEventExecutionsRequest {
 message ListEventExecutionsResponse {
   repeated WorkflowNodeExecution executions = 1;
 }
+
+//
+// Standalone messages
+//
+
+message EventCreated {
+  string id = 1;
+  string workflow_id = 2;
+  string node_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
