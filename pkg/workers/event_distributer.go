@@ -8,10 +8,8 @@ import (
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/public/ws"
-	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 )
 
 // EventDistributer coordinates message consumption from RabbitMQ
@@ -43,21 +41,7 @@ func (e *EventDistributer) Start() error {
 		Exchange   string
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
-	}{
-		{messages.DeliveryHubCanvasExchange, messages.EventCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.StageEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageEventCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.StageEventApprovedRoutingKey, e.createHandler(eventdistributer.HandleStageEventApproved)},
-		{messages.DeliveryHubCanvasExchange, messages.StageEventDiscardedRoutingKey, e.createHandler(eventdistributer.HandleStageEventDiscarded)},
-		{messages.DeliveryHubCanvasExchange, messages.EventSourceCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventSourceCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleExecutionCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleExecutionStarted)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleExecutionFinished)},
-		{messages.DeliveryHubCanvasExchange, messages.StageCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.ConnectionGroupCreatedRoutingKey, e.createHandler(eventdistributer.HandleConnectionGroupCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.StageUpdatedRoutingKey, e.createHandler(eventdistributer.HandleStageUpdated)},
-		{messages.DeliveryHubCanvasExchange, messages.AlertCreatedRoutingKey, e.createHandler(eventdistributer.HandleAlertCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.AlertAcknowledgedRoutingKey, e.createHandler(eventdistributer.HandleAlertAcknowledged)},
-	}
+	}{}
 
 	// Start a consumer for each route
 	for _, route := range routes {
