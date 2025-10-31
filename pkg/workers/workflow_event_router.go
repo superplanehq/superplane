@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -307,9 +308,16 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 		}
 	}
 
-	err = parentExecution.PassInTransaction(tx, outputs)
+	events, err := parentExecution.PassInTransaction(tx, outputs)
 	if err != nil {
 		return err
+	}
+
+	for _, event := range events {
+		err := messages.NewWorkflowEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		if err != nil {
+			log.Printf("failed to publish workflow event: %v", err)
+		}
 	}
 
 	w.log("Parent execution %s completed", parentExecution.ID)

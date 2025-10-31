@@ -1,7 +1,9 @@
 package contexts
 
 import (
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -16,7 +18,20 @@ func NewExecutionStateContext(tx *gorm.DB, execution *models.WorkflowNodeExecuti
 }
 
 func (s *ExecutionStateContext) Pass(outputs map[string][]any) error {
-	return s.execution.PassInTransaction(s.tx, outputs)
+	events, err := s.execution.PassInTransaction(s.tx, outputs)
+	if err != nil {
+		return err
+	}
+
+	// Publish RabbitMQ messages for created events
+	for _, event := range events {
+		err := messages.NewWorkflowEventCreatedMessage(event.WorkflowID.String(), &event).Publish()
+		if err != nil {
+			log.Errorf("failed to publish workflow event: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {
