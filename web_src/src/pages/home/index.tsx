@@ -288,21 +288,15 @@ const HomePage = () => {
               workflows={filteredWorkflows}
             />
 
-            {/* Actions and Filters */}
             <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between">
               <SearchBar activeTab={activeTab} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
               <ViewModeToggle viewMode={viewMode} setViewMode={setViewMode} />
             </div>
 
-            {/* Loading State */}
             {isLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <Text className="text-zinc-500">Loading {activeTab}...</Text>
-              </div>
+              <LoadingState activeTab={activeTab} />
             ) : error ? (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                <Text>{error}</Text>
-              </div>
+              <ErrorState error={error} />
             ) : (
               <>
                 {/* Items Display */}
@@ -671,6 +665,22 @@ function PageHeader({
         <Plus className="mr-2" size={20} />
         New {activeTab === "canvases" ? "Canvas" : activeTab === "blueprints" ? "Custom Component" : "Workflow"}
       </Button>
+    </div>
+  );
+}
+
+function LoadingState({ activeTab }: { activeTab: string }) {
+  return (
+    <div className="flex justify-center items-center h-40">
+      <Text className="text-zinc-500">Loading {activeTab}...</Text>
+    </div>
+  );
+}
+
+function ErrorState({ error }: { error: string }) {
+  return (
+    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+      <Text>{error}</Text>
     </div>
   );
 }
