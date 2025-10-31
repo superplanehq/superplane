@@ -105,5 +105,9 @@
     "vite": "^6.3.5",
     "vitest": "^2.1.8",
     "web-worker": "^1.5.0"
+  },
+  "prettier": {
+    "printWidth": 120,
+    "trailingComma": "all"
   }
 }
