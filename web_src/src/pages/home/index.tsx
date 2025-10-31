@@ -518,8 +518,6 @@ function Content({
   currentItems: CanvasCardData[] | BlueprintCardData[] | WorkflowCardData[];
   searchQuery: string;
 }) {
-  const navigate = useNavigate();
-
   return (
     <>
       {/* Items Display */}
@@ -538,161 +536,15 @@ function Content({
           </div>
         )
       ) : activeTab === "blueprints" ? (
-        // Custom Components
         viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredBlueprints.map((blueprint) => {
-              const IconComponent = resolveIcon(blueprint.icon);
-              return (
-                <div
-                  key={blueprint.id}
-                  className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow"
-                >
-                  <div className="p-6 flex flex-col justify-between h-full">
-                    <div>
-                      <div className="flex items-center mb-4">
-                        <div className="flex items-center justify-between space-x-3 flex-1">
-                          <IconComponent size={24} className={getColorClass(blueprint.color)} />
-                          <div className="flex flex-col flex-1 min-w-0">
-                            <button
-                              onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
-                              className="block text-left w-full"
-                            >
-                              <Heading
-                                level={3}
-                                className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
-                              >
-                                {blueprint.name}
-                              </Heading>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mb-4">
-                        <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
-                          {blueprint.description || "No description"}
-                        </Text>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <div className="text-zinc-500 text-left">
-                        <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
-                          Created at {blueprint.createdAt}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <BlueprintGridView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />
         ) : (
-          <div className="space-y-2">
-            {filteredBlueprints.map((blueprint) => {
-              const IconComponent = resolveIcon(blueprint.icon);
-              return (
-                <div
-                  key={blueprint.id}
-                  className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4"
-                >
-                  <button
-                    onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
-                    className="block text-left w-full"
-                  >
-                    <div className="flex items-center gap-3">
-                      <IconComponent size={24} className={getColorClass(blueprint.color)} />
-                      <div className="flex-1">
-                        <Heading
-                          level={3}
-                          className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
-                        >
-                          {blueprint.name}
-                        </Heading>
-                        <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {blueprint.description || "No description"}
-                        </Text>
-                        <Text className="text-xs text-zinc-500 mt-2">Created at {blueprint.createdAt}</Text>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+          <BlueprintListView filteredBlueprints={filteredBlueprints} organizationId={organizationId} />
         )
-      ) : // Workflows
-      viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredWorkflows.map((workflow) => (
-            <div
-              key={workflow.id}
-              className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow"
-            >
-              <div className="p-6 flex flex-col justify-between h-full">
-                <div>
-                  <div className="flex items-start mb-4">
-                    <div className="flex items-start justify-between space-x-3 flex-1">
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <button
-                          onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
-                          className="block text-left w-full"
-                        >
-                          <Heading
-                            level={3}
-                            className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
-                          >
-                            {workflow.name}
-                          </Heading>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
-                      {workflow.description || "No description"}
-                    </Text>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div className="text-zinc-500 text-left">
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
-                      Created at {workflow.createdAt}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+      ) : viewMode === "grid" ? (
+        <WorkflowGridView filteredWorkflows={filteredWorkflows} organizationId={organizationId} />
       ) : (
-        <div className="space-y-2">
-          {filteredWorkflows.map((workflow) => (
-            <div
-              key={workflow.id}
-              className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4"
-            >
-              <button
-                onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
-                className="block text-left w-full"
-              >
-                <Heading
-                  level={3}
-                  className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
-                >
-                  {workflow.name}
-                </Heading>
-                <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {workflow.description || "No description"}
-                </Text>
-                <Text className="text-xs text-zinc-500 mt-2">Created at {workflow.createdAt}</Text>
-              </button>
-            </div>
-          ))}
-        </div>
+        <WorkflowListView filteredWorkflows={filteredWorkflows} organizationId={organizationId} />
       )}
 
       {/* Empty State */}
@@ -714,6 +566,211 @@ function Content({
         </div>
       )}
     </>
+  );
+}
+
+interface WorkflowGridViewProps {
+  filteredWorkflows: WorkflowCardData[];
+  organizationId: string;
+}
+
+function WorkflowGridView({ filteredWorkflows, organizationId }: WorkflowGridViewProps) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {filteredWorkflows.map((workflow) => (
+        <WorkflowCard key={workflow.id} workflow={workflow} organizationId={organizationId} navigate={navigate} />
+      ))}
+    </div>
+  );
+}
+
+interface WorkflowListViewProps {
+  filteredWorkflows: WorkflowCardData[];
+  organizationId: string;
+}
+
+function WorkflowListView({ filteredWorkflows, organizationId }: WorkflowListViewProps) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="space-y-2">
+      {filteredWorkflows.map((workflow) => (
+        <WorkflowListItem key={workflow.id} workflow={workflow} organizationId={organizationId} navigate={navigate} />
+      ))}
+    </div>
+  );
+}
+
+interface WorkflowCardProps {
+  workflow: WorkflowCardData;
+  organizationId: string;
+  navigate: any;
+}
+
+function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps) {
+  return (
+    <div
+      key={workflow.id}
+      className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow"
+    >
+      <div className="p-6 flex flex-col justify-between h-full">
+        <div>
+          <div className="flex items-start mb-4">
+            <div className="flex items-start justify-between space-x-3 flex-1">
+              <div className="flex flex-col flex-1 min-w-0">
+                <button
+                  onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
+                  className="block text-left w-full"
+                >
+                  <Heading
+                    level={3}
+                    className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                  >
+                    {workflow.name}
+                  </Heading>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
+              {workflow.description || "No description"}
+            </Text>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <div className="text-zinc-500 text-left">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">Created at {workflow.createdAt}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardProps) {
+  return (
+    <div
+      key={workflow.id}
+      className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4"
+    >
+      <button
+        onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
+        className="block text-left w-full"
+      >
+        <Heading
+          level={3}
+          className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+        >
+          {workflow.name}
+        </Heading>
+        <Text className="text-sm text-zinc-600 dark:text-zinc-400">{workflow.description || "No description"}</Text>
+        <Text className="text-xs text-zinc-500 mt-2">Created at {workflow.createdAt}</Text>
+      </button>
+    </div>
+  );
+}
+
+interface BlueprintGridViewProps {
+  filteredBlueprints: BlueprintCardData[];
+  organizationId: string;
+}
+
+function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGridViewProps) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      {filteredBlueprints.map((blueprint) => {
+        const IconComponent = resolveIcon(blueprint.icon);
+        return (
+          <div
+            key={blueprint.id}
+            className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow"
+          >
+            <div className="p-6 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center mb-4">
+                  <div className="flex items-center justify-between space-x-3 flex-1">
+                    <IconComponent size={24} className={getColorClass(blueprint.color)} />
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <button
+                        onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
+                        className="block text-left w-full"
+                      >
+                        <Heading
+                          level={3}
+                          className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+                        >
+                          {blueprint.name}
+                        </Heading>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
+                    {blueprint.description || "No description"}
+                  </Text>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div className="text-zinc-500 text-left">
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
+                    Created at {blueprint.createdAt}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGridViewProps) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="space-y-2">
+      {filteredBlueprints.map((blueprint) => {
+        const IconComponent = resolveIcon(blueprint.icon);
+        return (
+          <div
+            key={blueprint.id}
+            className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4"
+          >
+            <button
+              onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
+              className="block text-left w-full"
+            >
+              <div className="flex items-center gap-3">
+                <IconComponent size={24} className={getColorClass(blueprint.color)} />
+                <div className="flex-1">
+                  <Heading
+                    level={3}
+                    className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+                  >
+                    {blueprint.name}
+                  </Heading>
+                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {blueprint.description || "No description"}
+                  </Text>
+                  <Text className="text-xs text-zinc-500 mt-2">Created at {blueprint.createdAt}</Text>
+                </div>
+              </div>
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
