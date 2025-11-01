@@ -17,7 +17,7 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 # - export junit report
 # - sets paralellism to 1
 #
-GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short-verbose --junitfile junit-report.xml 
+GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
 
 #
 # Targets for test environment
@@ -47,6 +47,10 @@ test.watch:
 
 test.e2e:
 	$(GOTESTSUM) --packages="$(E2E_TEST_PACKAGES)" -- -p 1
+
+test.shell:
+	docker compose -f docker-compose.dev.yml run --rm -e DB_NAME=superplane_test -v /Users/shiroyasha/code/superplane/superplane/tmp/screenshots:/app/test/screenshots app /bin/bash
+
 
 #
 # Targets for dev environment
