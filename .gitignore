@@ -7,3 +7,4 @@ design/node_modules/
 .DS_Store
 main
 tmp/screenshots
+e2e.test
