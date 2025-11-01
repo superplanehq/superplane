@@ -23,6 +23,7 @@ import { isFieldVisible } from '../../utils/components'
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   domainId?: string
   domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION"
+  hasError?: boolean
 }
 
 export const ConfigurationFieldRenderer = ({
@@ -31,7 +32,8 @@ export const ConfigurationFieldRenderer = ({
   onChange,
   allValues = {},
   domainId,
-  domainType
+  domainType,
+  hasError = false
 }: ConfigurationFieldRendererProps) => {
   // Check visibility conditions
   const isVisible = React.useMemo(() => {
@@ -42,7 +44,7 @@ export const ConfigurationFieldRenderer = ({
     return null
   }
   const renderField = () => {
-    const commonProps = { field, value, onChange, allValues }
+    const commonProps = { field, value, onChange, allValues, hasError }
 
     switch (field.type) {
       case 'string':
@@ -107,11 +109,15 @@ export const ConfigurationFieldRenderer = ({
 
   return (
     <div className="space-y-2">
-      <Label className="block text-left">
+      <Label className={`block text-left ${hasError ? 'text-red-600 dark:text-red-400' : ''}`}>
         {field.label || field.name}
+        {field.required && <span className="text-red-500 ml-1">*</span>}
+        {hasError && field.required && (
+          <span className="text-red-500 text-xs ml-2">- required field</span>
+        )}
       </Label>
       <div className="flex items-center gap-2">
-        <div className="flex-1">
+        <div className={`flex-1 ${hasError ? 'ring-2 ring-red-500 ring-offset-1 rounded-md' : ''}`}>
           {renderField()}
         </div>
         {field.description && (

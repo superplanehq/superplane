@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,9 +15,9 @@ interface NodeConfigurationModalProps {
   isOpen: boolean;
   onClose: () => void;
   nodeName: string;
-  configuration: Record<string, any>;
+  configuration: Record<string, unknown>;
   configurationFields: ComponentsConfigurationField[];
-  onSave: (updatedConfiguration: Record<string, any>, updatedNodeName: string) => void;
+  onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
   domainId?: string;
   domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
 }
@@ -32,20 +32,51 @@ export function NodeConfigurationModal({
   domainId,
   domainType,
 }: NodeConfigurationModalProps) {
-  const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, any>>(
+  const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(
     configuration || {}
   );
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
+  const [showValidation, setShowValidation] = useState(false);
+
+  const isFieldEmpty = (value: unknown): boolean => {
+    if (value === null || value === undefined) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (Array.isArray(value)) return value.length === 0;
+    if (typeof value === 'object') return Object.keys(value).length === 0;
+    return false;
+  };
+
+  const validateAllFields = useCallback((): boolean => {
+    const errors = new Set<string>();
+
+    configurationFields.forEach((field) => {
+      if (field.required && field.name) {
+        const value = nodeConfiguration[field.name];
+        if (isFieldEmpty(value)) {
+          errors.add(field.name);
+        }
+      }
+    });
+
+    setValidationErrors(errors);
+    setShowValidation(true);
+    return errors.size === 0;
+  }, [configurationFields, nodeConfiguration]);
 
   // Sync state when props change (e.g., when modal opens for a different node)
   useEffect(() => {
     setNodeConfiguration(configuration || {});
     setCurrentNodeName(nodeName);
+    setValidationErrors(new Set());
+    setShowValidation(false);
   }, [configuration, nodeName]);
 
   const handleSave = () => {
-    onSave(nodeConfiguration, currentNodeName);
-    onClose();
+    if (validateAllFields()) {
+      onSave(nodeConfiguration, currentNodeName);
+      onClose();
+    }
   };
 
   const handleClose = () => {
@@ -94,6 +125,7 @@ export function NodeConfigurationModal({
                         allValues={nodeConfiguration}
                         domainId={domainId}
                         domainType={domainType}
+                        hasError={showValidation && validationErrors.has(fieldName)}
                       />
                     );
                   })}
@@ -105,7 +137,10 @@ export function NodeConfigurationModal({
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button variant="default" onClick={handleSave}>
+              <Button
+                variant="default"
+                onClick={handleSave}
+              >
                 Add
               </Button>
             </DialogFooter>
