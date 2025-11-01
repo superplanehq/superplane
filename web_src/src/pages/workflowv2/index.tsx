@@ -630,6 +630,7 @@ export function WorkflowPageV2() {
       viewportRef={viewportRef}
       unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
       saveIsPrimary={hasUnsavedChanges}
+      saveButtonHidden={!hasUnsavedChanges}
       breadcrumbs={[
         {
           label: "Canvases",

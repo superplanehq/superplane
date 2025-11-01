@@ -91,6 +91,7 @@ export interface CanvasPageProps {
   organizationId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
+  saveButtonHidden?: boolean;
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -267,6 +268,7 @@ function CanvasPage(props: CanvasPageProps) {
           organizationId={props.organizationId}
           unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
+          saveButtonHidden={props.saveButtonHidden}
         />
       </div>
 
@@ -300,7 +302,7 @@ function CanvasPage(props: CanvasPageProps) {
             />
           </ReactFlowProvider>
 
-  <AiSidebar
+          <AiSidebar
             enabled={state.ai.enabled}
             isOpen={state.ai.sidebarOpen}
             setIsOpen={state.ai.setSidebarOpen}
@@ -453,7 +455,7 @@ function Sidebar({
   );
 }
 
-function CanvasContentHeader({ state, onSave, organizationId, unsavedMessage, saveIsPrimary }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; organizationId?: string; unsavedMessage?: string; saveIsPrimary?: boolean }) {
+function CanvasContentHeader({ state, onSave, organizationId, unsavedMessage, saveIsPrimary, saveButtonHidden }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; organizationId?: string; unsavedMessage?: string; saveIsPrimary?: boolean; saveButtonHidden?: boolean }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -477,6 +479,7 @@ function CanvasContentHeader({ state, onSave, organizationId, unsavedMessage, sa
       organizationId={organizationId}
       unsavedMessage={unsavedMessage}
       saveIsPrimary={saveIsPrimary}
+      saveButtonHidden={saveButtonHidden}
     />
   );
 }
