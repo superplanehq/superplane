@@ -2,6 +2,12 @@ import SuperplaneLogo from "@/assets/superplane.svg";
 import { resolveIcon } from "@/lib/utils";
 import { Button } from "../button";
 import { Save } from "lucide-react";
+import { Avatar } from "@/components/Avatar/avatar";
+import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from "@/components/Dropdown/dropdown";
+import { Text } from "@/components/Text/text";
+import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
+import { useAccount } from "@/contexts/AccountContext";
+import { useOrganization } from "@/hooks/useOrganizationData";
 
 export interface BreadcrumbItem {
   label: string;
@@ -16,9 +22,13 @@ interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
   onSave?: () => void;
   onLogoClick?: () => void;
+  organizationId?: string;
 }
 
-export function Header({ breadcrumbs, onSave, onLogoClick }: HeaderProps) {
+export function Header({ breadcrumbs, onSave, onLogoClick, organizationId }: HeaderProps) {
+  const { account } = useAccount();
+  const { data: organization } = useOrganization(organizationId || '');
+
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="flex items-center justify-between h-12 px-6">
@@ -92,15 +102,129 @@ export function Header({ breadcrumbs, onSave, onLogoClick }: HeaderProps) {
           })}
         </div>
 
-        {/* Right side - Save button */}
-        {onSave ? (
-          <Button onClick={onSave} size="sm" variant="outline">
-            <Save />
-            Save
-          </Button>
-        ) : (
-          <div className="w-8"></div>
-        )}
+        {/* Right side - Save button and Account Dropdown */}
+        <div className="flex items-center gap-3">
+          {onSave && (
+            <Button onClick={onSave} size="sm" variant="outline">
+              <Save />
+              Save
+            </Button>
+          )}
+
+          {organizationId && (
+            <Dropdown>
+              <DropdownButton
+                as={Button}
+                size="sm"
+                variant="outline"
+              >
+                <span className="text-sm font-medium truncate max-w-[150px]">{organization?.metadata?.name || account?.name}</span>
+                <Avatar
+                  src={account?.avatar_url}
+                  initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                  alt={account?.name || 'User'}
+                  className="w-5 h-5 -mr-1"
+                />
+              </DropdownButton>
+
+              <DropdownMenu className="w-64">
+                {/* User Section */}
+                <DropdownHeader>
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      src={account?.avatar_url}
+                      initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                      alt={account?.name || 'User'}
+                      className="size-8"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <Text className="font-medium truncate">{account?.name || 'Loading...'}</Text>
+                      <Text className="text-sm text-zinc-500 truncate">{account?.email || 'Loading...'}</Text>
+                    </div>
+                  </div>
+                </DropdownHeader>
+
+                {/* User Actions */}
+                <DropdownSection>
+                  <DropdownItem href={`/${organizationId}/settings/profile`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="person" data-slot="icon" size='sm' />
+                      <DropdownLabel>Profile</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+
+                {/* Organization Section */}
+                <DropdownDivider />
+
+                <DropdownHeader>
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      initials={(organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
+                      alt={organization?.metadata?.name || 'Organization'}
+                      className="size-8"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <Text className="font-medium truncate max-w-[150px] truncate-ellipsis">{organization?.metadata?.name || 'Organization'}</Text>
+                    </div>
+                  </div>
+                </DropdownHeader>
+
+                {/* Organization Actions */}
+                <DropdownSection>
+                  <DropdownItem href={`/${organizationId}/settings/general`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="business" data-slot="icon" size='sm' />
+                      <DropdownLabel>Organization Settings</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+
+                  <DropdownItem href={`/${organizationId}/settings/members`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="person" data-slot="icon" size='sm' />
+                      <DropdownLabel>Members</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+
+                  <DropdownItem href={`/${organizationId}/settings/groups`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="group" data-slot="icon" size='sm' />
+                      <DropdownLabel>Groups</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+
+                  <DropdownItem href={`/${organizationId}/settings/roles`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="shield" data-slot="icon" size='sm' />
+                      <DropdownLabel>Roles</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+
+                  <DropdownItem href="/">
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="swap_horiz" data-slot="icon" size='sm' />
+                      <DropdownLabel>Change organization</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+
+                <DropdownDivider />
+
+                {/* Sign Out Section */}
+                <DropdownSection>
+                  <DropdownItem onClick={() => {
+                    window.location.href = '/logout';
+                  }}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="logout" data-slot="icon" size='sm' />
+                      <DropdownLabel>Sign Out</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+              </DropdownMenu>
+            </Dropdown>
+          )}
+        </div>
       </div>
     </header>
   );

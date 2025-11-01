@@ -458,7 +458,7 @@ function CanvasContentHeader({ state, onSave, organizationId }: { state: CanvasP
     }
   }, [organizationId]);
 
-  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} onLogoClick={organizationId ? handleLogoClick : undefined} />;
+  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} onLogoClick={organizationId ? handleLogoClick : undefined} organizationId={organizationId} />;
 }
 
 function CanvasContent({

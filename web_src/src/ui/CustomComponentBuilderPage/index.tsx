@@ -426,6 +426,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           breadcrumbs={props.breadcrumbs || [{ label: props.customComponentName }]}
           onSave={props.isSaving ? undefined : props.onSave}
           onLogoClick={props.organizationId ? handleLogoClick : undefined}
+          organizationId={props.organizationId}
         />
       </div>
 

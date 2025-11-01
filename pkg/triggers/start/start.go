@@ -19,7 +19,7 @@ func (s *Start) Name() string {
 }
 
 func (s *Start) Label() string {
-	return "Start"
+	return "Manual Run"
 }
 
 func (s *Start) Description() string {
@@ -31,7 +31,7 @@ func (s *Start) Icon() string {
 }
 
 func (s *Start) Color() string {
-	return "red"
+	return "purple"
 }
 
 func (s *Start) Configuration() []components.ConfigurationField {
