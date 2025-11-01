@@ -90,6 +90,8 @@ export interface CustomComponentBuilderPageProps {
   // Actions
   onSave: () => void;
   isSaving?: boolean;
+  unsavedMessage?: string;
+  saveIsPrimary?: boolean;
 }
 
 // Canvas content component with ReactFlow hooks - defined outside to prevent re-creation
@@ -400,6 +402,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           onSave={props.isSaving ? undefined : props.onSave}
           onLogoClick={props.organizationId ? handleLogoClick : undefined}
           organizationId={props.organizationId}
+          unsavedMessage={props.unsavedMessage}
+          saveIsPrimary={props.saveIsPrimary}
         />
       </div>
 

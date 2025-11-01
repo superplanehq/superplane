@@ -1,7 +1,7 @@
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -186,6 +186,19 @@ export function WorkflowPageV2() {
   );
 
   useWorkflowWebsocket(workflowId!, organizationId!, refetchEvents, refetchExecutions);
+
+  // Warn user before leaving page with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "Your work isn't saved, unsaved changes will be lost. Are you sure you want to leave?";
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const buildingBlocks = useMemo(
     () => buildBuildingBlockCategories(triggers, components, blueprints),
@@ -633,7 +646,7 @@ export function WorkflowPageV2() {
       breadcrumbs={[
         {
           label: "Canvases",
-          onClick: () => navigate(`/${organizationId}`),
+          href: `/${organizationId}`,
         },
         {
           label: workflow.name!,
