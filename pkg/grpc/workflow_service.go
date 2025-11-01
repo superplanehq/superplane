@@ -50,7 +50,7 @@ func (s *WorkflowService) UpdateWorkflow(ctx context.Context, req *pb.UpdateWork
 
 func (s *WorkflowService) DeleteWorkflow(ctx context.Context, req *pb.DeleteWorkflowRequest) (*pb.DeleteWorkflowResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return workflows.DeleteWorkflow(ctx, s.registry, organizationID, req.Id)
+	return workflows.DeleteWorkflow(ctx, s.registry, uuid.MustParse(organizationID), req.Id)
 }
 
 func (s *WorkflowService) ListNodeQueueItems(ctx context.Context, req *pb.ListNodeQueueItemsRequest) (*pb.ListNodeQueueItemsResponse, error) {

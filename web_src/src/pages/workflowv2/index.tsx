@@ -25,6 +25,7 @@ import {
   nodeQueueItemsQueryOptions,
   useTriggers,
   useUpdateWorkflow,
+  useDeleteWorkflow,
   useWorkflow,
   workflowKeys,
 } from "@/hooks/useWorkflowData";
@@ -54,6 +55,7 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
+  const deleteWorkflowMutation = useDeleteWorkflow(organizationId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
@@ -582,6 +584,19 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient],
   );
 
+  const handleDelete = useCallback(async () => {
+    if (!organizationId || !workflowId) return;
+
+    try {
+      await deleteWorkflowMutation.mutateAsync(workflowId);
+      showSuccessToast("Workflow deleted successfully");
+      navigate(`/${organizationId}`);
+    } catch (error) {
+      console.error("Failed to delete workflow:", error);
+      showErrorToast("Failed to delete workflow");
+    }
+  }, [organizationId, workflowId, deleteWorkflowMutation, navigate]);
+
   // Show loading indicator while data is being fetched
   if (
     workflowLoading ||
@@ -615,6 +630,7 @@ export function WorkflowPageV2() {
       getNodeEditData={getNodeEditData}
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onSave={handleSave}
+      onDelete={handleDelete}
       onEdgeCreate={handleEdgeCreate}
       onNodeDelete={handleNodeDelete}
       onEdgeDelete={handleEdgeDelete}
