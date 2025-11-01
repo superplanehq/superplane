@@ -89,7 +89,6 @@ export interface CustomComponentBuilderPageProps {
 
   // Actions
   onSave: () => void;
-  onDelete?: () => void;
   isSaving?: boolean;
 }
 

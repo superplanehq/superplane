@@ -9,7 +9,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useBlueprint, useUpdateBlueprint, useDeleteBlueprint } from '../../hooks/useBlueprintData'
+import { useBlueprint, useUpdateBlueprint } from '../../hooks/useBlueprintData'
 import { useComponents } from '../../hooks/useBlueprintData'
 import { Button } from '../../components/ui/button'
 import { AlertCircle } from 'lucide-react'
@@ -164,7 +164,6 @@ export const CustomComponent = () => {
   const { data: blueprint, isLoading: blueprintLoading } = useBlueprint(organizationId!, blueprintId!)
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!)
   const updateBlueprintMutation = useUpdateBlueprint(organizationId!, blueprintId!)
-  const deleteBlueprintMutation = useDeleteBlueprint(organizationId!)
 
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
@@ -423,17 +422,6 @@ export const CustomComponent = () => {
     }
   }
 
-  const handleDelete = async () => {
-    try {
-      await deleteBlueprintMutation.mutateAsync(blueprintId!)
-      showSuccessToast('Component deleted successfully')
-      navigate(`/${organizationId}`)
-    } catch (error) {
-      console.error('Error deleting component:', error)
-      showErrorToast('Failed to delete component')
-    }
-  }
-
   if (blueprintLoading || componentsLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -488,7 +476,6 @@ export const CustomComponent = () => {
         organizationId={organizationId}
         components={components}
         onSave={handleSave}
-        onDelete={handleDelete}
         isSaving={updateBlueprintMutation.isPending}
       />
     </>
