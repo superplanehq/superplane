@@ -10,9 +10,9 @@ import (
 // AssetHandler serves static files from the assets filesystem
 // and handles SPA routing by serving index.html for non-asset routes
 type AssetHandler struct {
-	assets    http.FileSystem
-	basePath  string
-	indexFile http.File
+    assets    http.FileSystem
+    basePath  string
+    indexFile http.File
 }
 
 // NewAssetHandler creates a new AssetHandler with the given file system
@@ -30,11 +30,11 @@ func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
 // ServeHTTP implements the http.Handler interface
 func (h *AssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	// Handle /app/assets/* paths
-	if h.isAssetPath(r.URL.Path) {
-		h.serveAsset(w, r)
-		return
-	}
+    // Handle /app/assets/* paths
+    if h.isAssetPath(r.URL.Path) {
+        h.serveAsset(w, r)
+        return
+    }
 
 	// For all other paths, serve index.html for SPA routing
 	h.serveIndex(w, r)
@@ -42,7 +42,18 @@ func (h *AssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // isAssetPath checks if the request is for an asset file
 func (h *AssetHandler) isAssetPath(path string) bool {
-	return strings.HasPrefix(path, h.basePath+"/assets")
+    if strings.HasPrefix(path, h.basePath+"/assets") {
+        return true
+    }
+
+    // Also serve common root-level assets produced by Vite's public/ directory
+    // e.g., /favicon.ico, /robots.txt, /manifest.webmanifest
+    root := strings.TrimPrefix(path, h.basePath)
+    switch root {
+    case "/favicon.ico", "/robots.txt", "/manifest.webmanifest":
+        return true
+    }
+    return false
 }
 
 // serveAsset serves static files from the assets directory

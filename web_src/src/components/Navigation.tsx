@@ -7,6 +7,7 @@ import { Link } from './Link/link';
 import { useOrganization } from '../hooks/useOrganizationData';
 import { useAccount } from '../contexts/AccountContext';
 import { useParams } from 'react-router-dom';
+import SuperplaneLogo from '@/assets/superplane.svg';
 
 const Navigation: React.FC = () => {
   const { account } = useAccount();
@@ -14,9 +15,13 @@ const Navigation: React.FC = () => {
   const { data: organization } = useOrganization(organizationId || '');
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 border-b">
-      <div className="flex items-center justify-between px-2 py-[8px]">
+      <div className="flex items-center justify-between h-12 px-6">
         <Link href={`/${organizationId}`} className="flex items-center flex-shrink-0 text-decoration-none">
-          <strong className="ml-2 text-xl text-gray-900 dark:text-white">SuperPlane</strong>
+          <img
+            src={SuperplaneLogo}
+            alt="SuperPlane"
+            className="w-8 h-8"
+          />
         </Link>
         <div className="flex items-center flex-shrink-0">
 

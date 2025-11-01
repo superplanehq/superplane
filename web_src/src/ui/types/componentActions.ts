@@ -4,6 +4,7 @@ export interface ComponentActionsProps {
   onRun?: () => void;
   onDuplicate?: () => void;
   onEdit?: () => void;
+  onConfigure?: () => void;
   onDeactivate?: () => void;
   onToggleView?: () => void;
   onDelete?: () => void;

@@ -116,7 +116,7 @@ const sampleBlocks: BuildingBlockCategory[] = [
     blocks: [...sampleTriggers, ...sampleComponents],
   },
   {
-    name: "Custom Components",
+    name: "Components",
     blocks: sampleBlueprints,
   },
 ];

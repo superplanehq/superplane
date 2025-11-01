@@ -10,6 +10,7 @@ import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { useCallback, useMemo, useState } from "react";
 import type { BlockData } from "./../Block";
 import { CanvasPage, type CanvasNode } from "./../index";
+import { mockBuildingBlockCategories } from "./buildingBlocks";
 import { createGetSidebarData } from "./getSidebarData";
 
 const meta = {
@@ -170,8 +171,7 @@ const incidentResponseNodes: Node[] = [
       type: "composite",
       composite: {
         title: "Normalize + Dedupe + Classify",
-        description:
-          "Normalize vendor alerts, suppress duplicates, classify root cause",
+        description: "Normalize vendor alerts, suppress duplicates, classify root cause",
         iconSlug: "git-merge",
         iconColor: "text-slate-700",
         headerColor: "bg-slate-200",
@@ -231,8 +231,7 @@ const incidentResponseNodes: Node[] = [
             value: '"recent_deploy"',
             receivedAt: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
             eventState: "success",
-            eventTitle:
-              "TypeError in CheckoutController after checkout@2025.10.27.4 deploy",
+            eventTitle: "TypeError in CheckoutController after checkout@2025.10.27.4 deploy",
           },
           {
             pathName: "INFRA_FAIL",
@@ -462,6 +461,7 @@ export const IncidentResponse: Story = {
     nodes: incidentResponseNodes,
     edges: incidentResponseEdges,
     title: "Incident Response",
+    buildingBlocks: mockBuildingBlockCategories,
   },
   render: (args) => {
     const [nodes, setNodes] = useState<CanvasNode[]>(args.nodes ?? []);
@@ -478,12 +478,7 @@ export const IncidentResponse: Story = {
 
           // Toggle collapse state based on node type
           if (nodeData.type === "composite" && nodeData.composite) {
-            console.log(
-              "Toggling composite from",
-              nodeData.composite.collapsed,
-              "to",
-              !nodeData.composite.collapsed
-            );
+            console.log("Toggling composite from", nodeData.composite.collapsed, "to", !nodeData.composite.collapsed);
             nodeData.composite = {
               ...nodeData.composite,
               collapsed: !nodeData.composite.collapsed,
@@ -491,12 +486,7 @@ export const IncidentResponse: Story = {
           }
 
           if (nodeData.type === "approval" && nodeData.approval) {
-            console.log(
-              "Toggling approval from",
-              nodeData.approval.collapsed,
-              "to",
-              !nodeData.approval.collapsed
-            );
+            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
             nodeData.approval = {
               ...nodeData.approval,
               collapsed: !nodeData.approval.collapsed,
@@ -504,12 +494,7 @@ export const IncidentResponse: Story = {
           }
 
           if (nodeData.type === "trigger" && nodeData.trigger) {
-            console.log(
-              "Toggling trigger from",
-              nodeData.trigger.collapsed,
-              "to",
-              !nodeData.trigger.collapsed
-            );
+            console.log("Toggling trigger from", nodeData.trigger.collapsed, "to", !nodeData.trigger.collapsed);
             nodeData.trigger = {
               ...nodeData.trigger,
               collapsed: !nodeData.trigger.collapsed,
@@ -528,10 +513,7 @@ export const IncidentResponse: Story = {
       });
     }, []);
 
-    const getSidebarData = useMemo(
-      () => createGetSidebarData(nodes ?? []),
-      [nodes]
-    );
+    const getSidebarData = useMemo(() => createGetSidebarData(nodes ?? []), [nodes]);
 
     return (
       <div className="h-[100vh] w-full ">
@@ -554,10 +536,7 @@ export const IncidentResponse: Story = {
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
             console.log("Current nodes before toggle:", nodes.length);
-            console.log(
-              "Node data before toggle:",
-              nodes.find((n) => n.id === nodeId)?.data
-            );
+            console.log("Node data before toggle:", nodes.find((n) => n.id === nodeId)?.data);
             toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {

@@ -306,7 +306,9 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 		}
 
 		for _, outputEvent := range outputEvents {
-			outputs[outputChannel.Name] = append(outputs[outputChannel.Name], outputEvent.Data.Data())
+			if outputEvent.Channel == outputChannel.NodeOutputChannel {
+				outputs[outputChannel.Name] = append(outputs[outputChannel.Name], outputEvent.Data.Data())
+			}
 		}
 	}
 
