@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"slices"
@@ -54,6 +55,19 @@ func validateNumber(field ConfigurationField, value any) error {
 
 	if options.Max != nil && num > float64(*options.Max) {
 		return fmt.Errorf("must be at most %d", *options.Max)
+	}
+
+	return nil
+}
+
+func validateNumericString(field ConfigurationField, value any) error {
+	if _, ok := value.(string); !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	_, err := strconv.ParseFloat(value.(string), 64)
+	if err != nil {
+		return fmt.Errorf("must be a numeric string")
 	}
 
 	return nil
@@ -249,6 +263,9 @@ func validateFieldValue(field ConfigurationField, value any) error {
 
 	case FieldTypeObject:
 		return validateObject(field, value)
+
+	case FieldTypeTimeInterval:
+		return validateNumericString(field, value)
 	}
 
 	return nil

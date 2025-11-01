@@ -169,6 +169,7 @@ const (
 	FieldTypeList                = "list"
 	FieldTypeObject              = "object"
 	FieldTypeTime                = "time"
+	FieldTypeTimeInterval        = "time-interval"
 	FieldTypeUser                = "user"
 	FieldTypeRole                = "role"
 	FieldTypeGroup               = "group"

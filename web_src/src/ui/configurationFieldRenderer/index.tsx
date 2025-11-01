@@ -15,6 +15,7 @@ import { ObjectFieldRenderer } from './ObjectFieldRenderer'
 import { IntegrationFieldRenderer } from './IntegrationFieldRenderer'
 import { IntegrationResourceFieldRenderer } from './IntegrationResourceFieldRenderer'
 import { TimeFieldRenderer } from './TimeFieldRenderer'
+import { TimeIntervalFieldRenderer } from './TimeIntervalFieldRenderer'
 import { UserFieldRenderer } from './UserFieldRenderer'
 import { RoleFieldRenderer } from './RoleFieldRenderer'
 import { GroupFieldRenderer } from './GroupFieldRenderer'
@@ -74,6 +75,9 @@ export const ConfigurationFieldRenderer = ({
 
       case 'time':
         return <TimeFieldRenderer {...commonProps} />
+
+      case 'time-interval':
+        return <TimeIntervalFieldRenderer {...commonProps} />
 
       case 'integration':
         return <IntegrationFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} domainType={domainType} />

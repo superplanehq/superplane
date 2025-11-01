@@ -47,8 +47,8 @@ func (w *Wait) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{
 			Name:     "until",
-			Label:    "Wait Until",
-			Type:     components.FieldTypeString,
+			Label:    "Set wait interval",
+			Type:     components.FieldTypeTimeInterval,
 			Required: true,
 		},
 	}
