@@ -519,6 +519,7 @@ export const CustomComponent = () => {
         onSave={handleSave}
         isSaving={updateBlueprintMutation.isPending}
         unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
+        saveButtonHidden={!hasUnsavedChanges}
         saveIsPrimary={hasUnsavedChanges}
       />
     </>

@@ -92,6 +92,7 @@ export interface CustomComponentBuilderPageProps {
   isSaving?: boolean;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
+  saveButtonHidden?: boolean;
 }
 
 // Canvas content component with ReactFlow hooks - defined outside to prevent re-creation
@@ -404,6 +405,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           organizationId={props.organizationId}
           unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
+          saveButtonHidden={props.saveButtonHidden}
         />
       </div>
 
@@ -476,8 +478,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         outputChannel={
           editingOutputChannelIndex !== null
             ? (props.outputChannels[
-                editingOutputChannelIndex
-              ] as SuperplaneBlueprintsOutputChannel)
+              editingOutputChannelIndex
+            ] as SuperplaneBlueprintsOutputChannel)
             : undefined
         }
         nodes={props.nodes}
