@@ -132,7 +132,7 @@ function CategorySection({ category, canvasZoom, searchTerm = "", showWip = true
   const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
 
   const baseBlocks = categoryMatches
-    ? (category.blocks || [])
+    ? category.blocks || []
     : (category.blocks || []).filter((block) => {
         const name = (block.name || "").toLowerCase();
         const label = (block.label || "").toLowerCase();
@@ -173,9 +173,7 @@ function CategorySection({ category, canvasZoom, searchTerm = "", showWip = true
               }}
               aria-disabled={!isLive}
               title={isLive ? undefined : "Coming soon"}
-              className={
-                `ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
-              }
+              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-800/50`}
               size="sm"
             >
               <ItemMedia>
@@ -185,15 +183,6 @@ function CategorySection({ category, canvasZoom, searchTerm = "", showWip = true
               <ItemContent>
                 <ItemTitle className="text-xs font-normal">{block.label || block.name}</ItemTitle>
               </ItemContent>
-
-              {block.isLive ? (
-                <div className="ml-auto pr-1">
-                  <span
-                    title="Available now"
-                    className="inline-block h-2 w-2 rounded-full bg-purple-600"
-                  />
-                </div>
-              ) : null}
 
               <GripVerticalIcon className="text-zinc-500 hover:text-zinc-800" size={14} />
             </Item>
