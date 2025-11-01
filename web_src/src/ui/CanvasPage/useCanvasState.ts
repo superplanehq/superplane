@@ -178,6 +178,7 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
 
   // Memoize the default ai object to prevent unnecessary re-renders
   const defaultAi = useMemo<AiProps>(() => ({
+    enabled: false,
     sidebarOpen: false,
     setSidebarOpen: () => {},
     showNotifications: false,
