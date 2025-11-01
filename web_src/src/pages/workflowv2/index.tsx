@@ -569,9 +569,10 @@ export function WorkflowPageV2() {
 
         showSuccessToast("Workflow saved successfully");
         setHasUnsavedChanges(false);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to save workflow:", error);
-        showErrorToast("Failed to save workflow");
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save workflow";
+        showErrorToast(errorMessage);
 
         // Rollback to previous state on error
         if (previousWorkflow) {
