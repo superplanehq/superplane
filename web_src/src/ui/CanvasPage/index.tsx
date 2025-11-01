@@ -724,7 +724,6 @@ function CanvasContent({
             onNodesChange={state.onNodesChange}
             onEdgesChange={state.onEdgesChange}
             onConnect={handleConnect}
-            onNodeDoubleClick={(_, node) => state.toggleNodeCollapse(node.id)}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onMove={handleMove}
