@@ -31,7 +31,7 @@ export const BlueprintExecutionPage: Story = {
   render: (args) => {
     // Get data passed from SimpleDeployment story (Storybook only)
     const [executionData, setExecutionData] = useState<any>(null);
-    const [nodes, setNodes] = useState<CanvasNode[]>([]);
+    const [nodes, setNodes] = useState<CanvasNode[]>(args.nodes || []);
 
     useEffect(() => {
       const data = getStorybookData();
