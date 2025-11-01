@@ -1,5 +1,5 @@
-import { Box, GitBranch, LayoutGrid, List, Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { Box, GitBranch, LayoutGrid, List, MoreVertical, Plus, Search, Trash2 } from "lucide-react";
+import { useState, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button/button";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
@@ -8,9 +8,12 @@ import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 import { useBlueprints } from "../../hooks/useBlueprintData";
-import { useWorkflows } from "../../hooks/useWorkflowData";
+import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
 import { getColorClass } from "../../utils/colors";
+import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "../../components/Dropdown/dropdown";
+import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../../components/Dialog/dialog";
 
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { useCreateCustomComponentModalState } from "./useCreateCustomComponentModalState";
@@ -432,22 +435,21 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
     >
       <div className="p-6 flex flex-col justify-between h-full">
         <div>
-          <div className="flex items-start mb-4">
-            <div className="flex items-start justify-between space-x-3 flex-1">
-              <div className="flex flex-col flex-1 min-w-0">
-                <button
-                  onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
-                  className="block text-left w-full"
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex flex-col flex-1 min-w-0">
+              <button
+                onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
+                className="block text-left w-full"
+              >
+                <Heading
+                  level={3}
+                  className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
                 >
-                  <Heading
-                    level={3}
-                    className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
-                  >
-                    {workflow.name}
-                  </Heading>
-                </button>
-              </div>
+                  {workflow.name}
+                </Heading>
+              </button>
             </div>
+            <WorkflowActionsMenu workflow={workflow} organizationId={organizationId} />
           </div>
 
           <div className="mb-4">
@@ -476,28 +478,115 @@ function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardPr
       key={workflow.id}
       className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4"
     >
-      <button
-        onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
-        className="block text-left w-full"
-      >
-        <Heading
-          level={3}
-          className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+      <div className="flex items-start justify-between gap-3">
+        <button
+          onClick={() => navigate(`/${organizationId}/workflows/${workflow.id}`)}
+          className="block text-left w-full"
         >
-          {workflow.name}
-        </Heading>
-        <Text className="text-sm text-zinc-600 dark:text-zinc-400">{workflow.description || "No description"}</Text>
-        <Text className="text-xs text-zinc-500 mt-2">
-          {workflow.createdBy?.name ? (
-            <>
-              Created by <strong>{workflow.createdBy.name}</strong> · {workflow.createdAt}
-            </>
-          ) : (
-            <>Created at {workflow.createdAt}</>
-          )}
-        </Text>
-      </button>
+          <Heading
+            level={3}
+            className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+          >
+            {workflow.name}
+          </Heading>
+          <Text className="text-sm text-zinc-600 dark:text-zinc-400">{workflow.description || "No description"}</Text>
+          <Text className="text-xs text-zinc-500 mt-2">
+            {workflow.createdBy?.name ? (
+              <>
+                Created by <strong>{workflow.createdBy.name}</strong> · {workflow.createdAt}
+              </>
+            ) : (
+              <>Created at {workflow.createdAt}</>
+            )}
+          </Text>
+        </button>
+
+        <WorkflowActionsMenu workflow={workflow} organizationId={organizationId} />
+      </div>
     </div>
+  );
+}
+
+interface WorkflowActionsMenuProps {
+  workflow: WorkflowCardData;
+  organizationId: string;
+}
+
+function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const deleteWorkflowMutation = useDeleteWorkflow(organizationId);
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+  };
+
+  const openDialog = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteWorkflowMutation.mutateAsync(workflow.id);
+      showSuccessToast("Canvas deleted successfully");
+      closeDialog();
+    } catch (error) {
+      console.error("Failed to delete canvas:", error);
+      showErrorToast("Failed to delete canvas");
+    }
+  };
+
+  return (
+    <>
+      <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
+        <Dropdown>
+          <DropdownButton
+            plain
+            className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+            aria-label="Canvas actions"
+            onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
+            disabled={deleteWorkflowMutation.isPending}
+          >
+            <MoreVertical size={16} />
+          </DropdownButton>
+          <DropdownMenu>
+            <DropdownItem
+              onClick={openDialog}
+              className="text-red-600 dark:text-red-400"
+            >
+              <span className="flex items-center gap-2">
+                <Trash2 size={16} />
+                Delete
+              </span>
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      </div>
+
+      <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
+        <DialogTitle className="text-red-900 dark:text-red-100">Delete canvas</DialogTitle>
+        <DialogDescription className="text-sm text-zinc-600 dark:text-zinc-400">
+          This action cannot be undone. Are you sure you want to delete this canvas?
+        </DialogDescription>
+        <DialogBody>
+          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+            Deleting <span className="font-medium text-zinc-900 dark:text-zinc-100">{workflow.name}</span> will remove its automations and history.
+          </Text>
+        </DialogBody>
+        <DialogActions>
+          <Button plain onClick={closeDialog}>Cancel</Button>
+          <Button
+            color="red"
+            onClick={handleDelete}
+            disabled={deleteWorkflowMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            <Trash2 size={16} />
+            {deleteWorkflowMutation.isPending ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
 
