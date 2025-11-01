@@ -48,7 +48,7 @@ func EmitNodeEvent(
 
 	err = messages.NewWorkflowEventCreatedMessage(workflowID.String(), &event).Publish()
 	if err != nil {
-		log.Error("failed to publish workflow event: %v", err)
+		log.Errorf("failed to publish workflow event: %v", err)
 	}
 
 	return &pb.EmitNodeEventResponse{
