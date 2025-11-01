@@ -78,9 +78,9 @@ export function CreateCustomComponentModal({
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
-      <DialogTitle>Create New Component</DialogTitle>
+      <DialogTitle>New component</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a new component that can be reused across your canvases and automations.
+        Create a custom component that can be reused across your canvases and automations.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <MaterialSymbol name="close" size="sm" />
@@ -95,6 +95,7 @@ export function CreateCustomComponentModal({
             </Label>
             <Input
               type="text"
+              autoComplete="off"
               value={blueprintName}
               onChange={(e) => {
                 if (e.target.value.length <= MAX_BLUEPRINT_NAME_LENGTH) {
@@ -104,7 +105,7 @@ export function CreateCustomComponentModal({
                   setNameError('')
                 }
               }}
-              placeholder="Enter component name"
+              placeholder="Give this component a clear name for reuse"
               className={`w-full ${nameError ? 'border-red-500' : ''}`}
               autoFocus
               maxLength={MAX_BLUEPRINT_NAME_LENGTH}
@@ -131,7 +132,7 @@ export function CreateCustomComponentModal({
                   setBlueprintDescription(e.target.value)
                 }
               }}
-              placeholder="Describe what this component will be used for (optional)"
+              placeholder="Note the purpose of this component (optional)"
               rows={3}
               className="w-full"
               maxLength={MAX_BLUEPRINT_DESCRIPTION_LENGTH}
@@ -150,7 +151,7 @@ export function CreateCustomComponentModal({
           disabled={!blueprintName.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"
         >
-          {isLoading ? 'Creating...' : 'Create'}
+          {isLoading ? 'Creating component...' : 'Create component'}
         </Button>
       </DialogActions>
 
