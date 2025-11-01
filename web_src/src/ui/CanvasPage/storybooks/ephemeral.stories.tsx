@@ -6,9 +6,10 @@ import "./../canvas-reset.css";
 
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
-import { useMemo, useState, useCallback } from "react";
-import { CanvasPage, type CanvasNode } from "./../index";
+import { useCallback, useMemo, useState } from "react";
 import type { BlockData } from "./../Block";
+import { CanvasPage, type CanvasNode } from "./../index";
+import { mockBuildingBlockCategories } from "./buildingBlocks";
 import { createGetSidebarData } from "./getSidebarData";
 import { handleNodeExpand } from "./navigation";
 
@@ -95,7 +96,7 @@ const ephemeralNodes: Node[] = [
         collapsedBackground: "bg-blue-100",
         parameters: [
           { icon: "settings", items: ["TTL: 2d 15h"] },
-          { icon: "settings", items: ["Max Envs: 50"] }
+          { icon: "settings", items: ["Max Envs: 50"] },
         ],
         metadata: [
           { icon: "server", label: "Active: 7/50 environments" },
@@ -113,9 +114,7 @@ const ephemeralNodes: Node[] = [
                 {
                   icon: "clock",
                   info: "Waiting for DNS propagation",
-                  futureTimeDate: new Date(
-                    new Date().getTime() + 1000 * 60 * 210
-                  ), // 3h 30min = 210 minutes
+                  futureTimeDate: new Date(new Date().getTime() + 1000 * 60 * 210), // 3h 30min = 210 minutes
                 },
               ],
             },
@@ -125,9 +124,7 @@ const ephemeralNodes: Node[] = [
               User: "Sarah Chen",
               "Environment ID": "env-pr-4523",
               URL: "https://pr-4523.staging.app.com",
-              "Shutdown at": new Date(
-                new Date().getTime() + 1000 * 60 * 60 * 12
-              ).toLocaleString(),
+              "Shutdown at": new Date(new Date().getTime() + 1000 * 60 * 60 * 12).toLocaleString(),
             },
           },
           {
@@ -141,9 +138,7 @@ const ephemeralNodes: Node[] = [
                 {
                   icon: "clock",
                   info: "Waiting for health check",
-                  futureTimeDate: new Date(
-                    new Date().getTime() + 1000 * 60 * 180
-                  ), // 3 hours
+                  futureTimeDate: new Date(new Date().getTime() + 1000 * 60 * 180), // 3 hours
                 },
               ],
             },
@@ -166,9 +161,7 @@ const ephemeralNodes: Node[] = [
                 {
                   icon: "clock",
                   info: "Waiting for SSL certificate",
-                  futureTimeDate: new Date(
-                    new Date().getTime() + 1000 * 60 * 150
-                  ), // 2.5 hours
+                  futureTimeDate: new Date(new Date().getTime() + 1000 * 60 * 150), // 2.5 hours
                 },
               ],
             },
@@ -191,9 +184,7 @@ const ephemeralNodes: Node[] = [
                 {
                   icon: "clock",
                   info: "Waiting for database migration",
-                  futureTimeDate: new Date(
-                    new Date().getTime() + 1000 * 60 * 120
-                  ), // 2 hours
+                  futureTimeDate: new Date(new Date().getTime() + 1000 * 60 * 120), // 2 hours
                 },
               ],
             },
@@ -216,9 +207,7 @@ const ephemeralNodes: Node[] = [
                 {
                   icon: "clock",
                   info: "Waiting for container startup",
-                  futureTimeDate: new Date(
-                    new Date().getTime() + 1000 * 60 * 90
-                  ), // 1.5 hours
+                  futureTimeDate: new Date(new Date().getTime() + 1000 * 60 * 90), // 1.5 hours
                 },
               ],
             },
@@ -241,9 +230,7 @@ const ephemeralNodes: Node[] = [
                 {
                   icon: "clock",
                   info: "Waiting for load balancer",
-                  futureTimeDate: new Date(
-                    new Date().getTime() + 1000 * 60 * 60
-                  ), // 1 hour
+                  futureTimeDate: new Date(new Date().getTime() + 1000 * 60 * 60), // 1 hour
                 },
               ],
             },
@@ -266,9 +253,7 @@ const ephemeralNodes: Node[] = [
                 {
                   icon: "clock",
                   info: "Waiting for network setup",
-                  futureTimeDate: new Date(
-                    new Date().getTime() + 1000 * 60 * 30
-                  ), // 30 minutes
+                  futureTimeDate: new Date(new Date().getTime() + 1000 * 60 * 30), // 30 minutes
                 },
               ],
             },
@@ -320,10 +305,8 @@ const ephemeralNodes: Node[] = [
             "Environment ID": "env-pr-4501",
             "Triggered by": "System",
             "Resources removed": "Database, Storage, DNS, Network",
-            "Duration": "2m 37s",
-            "Completed at": new Date(
-              new Date().getTime() - 1000 * 60 * 118
-            ).toLocaleString(),
+            Duration: "2m 37s",
+            "Completed at": new Date(new Date().getTime() - 1000 * 60 * 118).toLocaleString(),
           },
         },
         collapsed: false,
@@ -351,24 +334,25 @@ export const Ephemeral: Story = {
       {
         label: "Ephemeral Environments",
       },
-    ]
+    ],
+    buildingBlocks: mockBuildingBlockCategories,
   },
   render: (args) => {
     const [nodes, setNodes] = useState<CanvasNode[]>(args.nodes ?? []);
 
     const toggleNodeCollapse = useCallback((nodeId: string) => {
-      console.log('toggleNodeCollapse called for nodeId:', nodeId);
-      setNodes(prevNodes => {
-        console.log('Current nodes:', prevNodes.length);
-        const newNodes = prevNodes.map(node => {
+      console.log("toggleNodeCollapse called for nodeId:", nodeId);
+      setNodes((prevNodes) => {
+        console.log("Current nodes:", prevNodes.length);
+        const newNodes = prevNodes.map((node) => {
           if (node.id !== nodeId) return node;
 
-          console.log('Found node to toggle:', nodeId, node.data);
+          console.log("Found node to toggle:", nodeId, node.data);
           const nodeData = { ...node.data } as unknown as BlockData;
 
           // Toggle collapse state based on node type
           if (nodeData.type === "composite" && nodeData.composite) {
-            console.log('Toggling composite from', nodeData.composite.collapsed, 'to', !nodeData.composite.collapsed);
+            console.log("Toggling composite from", nodeData.composite.collapsed, "to", !nodeData.composite.collapsed);
             nodeData.composite = {
               ...nodeData.composite,
               collapsed: !nodeData.composite.collapsed,
@@ -376,7 +360,7 @@ export const Ephemeral: Story = {
           }
 
           if (nodeData.type === "approval" && nodeData.approval) {
-            console.log('Toggling approval from', nodeData.approval.collapsed, 'to', !nodeData.approval.collapsed);
+            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
             nodeData.approval = {
               ...nodeData.approval,
               collapsed: !nodeData.approval.collapsed,
@@ -384,7 +368,7 @@ export const Ephemeral: Story = {
           }
 
           if (nodeData.type === "trigger" && nodeData.trigger) {
-            console.log('Toggling trigger from', nodeData.trigger.collapsed, 'to', !nodeData.trigger.collapsed);
+            console.log("Toggling trigger from", nodeData.trigger.collapsed, "to", !nodeData.trigger.collapsed);
             nodeData.trigger = {
               ...nodeData.trigger,
               collapsed: !nodeData.trigger.collapsed,
@@ -392,18 +376,15 @@ export const Ephemeral: Story = {
           }
 
           const updatedNode: CanvasNode = { ...node, data: nodeData as unknown as Record<string, unknown> };
-          console.log('Updated node:', updatedNode);
+          console.log("Updated node:", updatedNode);
           return updatedNode;
         });
-        console.log('Returning new nodes:', newNodes.length);
+        console.log("Returning new nodes:", newNodes.length);
         return newNodes;
       });
     }, []);
 
-    const getSidebarData = useMemo(
-      () => createGetSidebarData(nodes ?? []),
-      [nodes]
-    );
+    const getSidebarData = useMemo(() => createGetSidebarData(nodes ?? []), [nodes]);
 
     return (
       <div className="h-[100vh] w-full ">
@@ -426,7 +407,7 @@ export const Ephemeral: Story = {
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
             console.log("Current nodes before toggle:", nodes.length);
-            console.log("Node data before toggle:", nodes.find(n => n.id === nodeId)?.data);
+            console.log("Node data before toggle:", nodes.find((n) => n.id === nodeId)?.data);
             toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {
