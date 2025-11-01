@@ -1,18 +1,9 @@
-import type {
-  SuperplaneBlueprintsOutputChannel,
-  SuperplaneComponentsOutputChannel,
-} from "@/api-client";
+import type { SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChannel } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import {
-  Item,
-  ItemContent,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item";
+import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
-import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { ChevronRight, Menu, PanelLeftClose } from "lucide-react";
+import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose } from "lucide-react";
 import { useState } from "react";
 import { createNodeDragPreview } from "./createNodeDragPreview";
 
@@ -21,9 +12,7 @@ export interface BuildingBlock {
   label?: string;
   description?: string;
   type: "trigger" | "component" | "blueprint";
-  outputChannels?: Array<
-    SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel
-  >;
+  outputChannels?: Array<SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel>;
   configuration?: any[];
   icon?: string;
   color?: string;
@@ -42,12 +31,7 @@ export interface BuildingBlocksSidebarProps {
   canvasZoom?: number;
 }
 
-export function BuildingBlocksSidebar({
-  isOpen,
-  onToggle,
-  blocks,
-  canvasZoom = 1,
-}: BuildingBlocksSidebarProps) {
+export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1 }: BuildingBlocksSidebarProps) {
   if (!isOpen) {
     return (
       <Button
@@ -85,12 +69,7 @@ export function BuildingBlocksSidebar({
           />
         </div>
         <div className="flex items-center gap-3 pb-0">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onToggle(false)}
-            aria-label="Close sidebar"
-          >
+          <Button variant="outline" size="icon" onClick={() => onToggle(false)} aria-label="Close sidebar">
             <PanelLeftClose size={24} />
           </Button>
         </div>
@@ -98,11 +77,7 @@ export function BuildingBlocksSidebar({
 
       <div className="flex-1 overflow-y-scroll">
         {sortedCategories.map((category) => (
-          <CategorySection
-            key={category.name}
-            category={category}
-            canvasZoom={canvasZoom}
-          />
+          <CategorySection key={category.name} category={category} canvasZoom={canvasZoom} />
         ))}
       </div>
     </div>
@@ -135,15 +110,7 @@ function CategorySection({ category, canvasZoom }: CategorySectionProps) {
             <Item
               key={`${block.type}-${block.name}`}
               draggable
-              onDragStart={(e) =>
-                createNodeDragPreview(
-                  e,
-                  block,
-                  colorClass,
-                  backgroundColorClass,
-                  canvasZoom
-                )
-              }
+              onDragStart={(e) => createNodeDragPreview(e, block, colorClass, backgroundColorClass, canvasZoom)}
               className="ml-3 cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1 flex items-center gap-2"
               size="sm"
             >
@@ -152,10 +119,10 @@ function CategorySection({ category, canvasZoom }: CategorySectionProps) {
               </ItemMedia>
 
               <ItemContent>
-                <ItemTitle className="text-xs font-normal">
-                  {block.label || block.name}
-                </ItemTitle>
+                <ItemTitle className="text-xs font-normal">{block.label || block.name}</ItemTitle>
               </ItemContent>
+
+              <GripVerticalIcon className="text-zinc-500 hover:text-zinc-800" size={14} />
             </Item>
           );
         })}
