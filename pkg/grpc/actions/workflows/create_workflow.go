@@ -1,41 +1,46 @@
 package workflows
 
 import (
-    "context"
-    "time"
+	"context"
+	"time"
 
-    "github.com/google/uuid"
-    "github.com/superplanehq/superplane/pkg/database"
-    "github.com/superplanehq/superplane/pkg/authentication"
-    "github.com/superplanehq/superplane/pkg/models"
-    pb "github.com/superplanehq/superplane/pkg/protos/workflows"
-    "github.com/superplanehq/superplane/pkg/registry"
-    "gorm.io/datatypes"
-    "gorm.io/gorm"
-    "gorm.io/gorm/clause"
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizationID string, pbWorkflow *pb.Workflow) (*pb.CreateWorkflowResponse, error) {
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
 	nodes, edges, err := ParseWorkflow(registry, organizationID, pbWorkflow)
 	if err != nil {
 		return nil, err
 	}
 
-    now := time.Now()
-    workflow := models.Workflow{
-        ID:             uuid.New(),
-        OrganizationID: uuid.MustParse(organizationID),
-        Name:           pbWorkflow.Name,
-        Description:    pbWorkflow.Description,
-        CreatedAt:      &now,
-        UpdatedAt:      &now,
-        Edges:          datatypes.NewJSONSlice(edges),
-    }
+	createdBy := uuid.MustParse(userID)
 
-    if userID, ok := authentication.GetUserIdFromMetadata(ctx); ok {
-        uid := uuid.MustParse(userID)
-        workflow.CreatedBy = &uid
-    }
+	now := time.Now()
+	workflow := models.Workflow{
+		ID:             uuid.New(),
+		OrganizationID: uuid.MustParse(organizationID),
+		Name:           pbWorkflow.Name,
+		Description:    pbWorkflow.Description,
+		CreatedBy:      &createdBy,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+		Edges:          datatypes.NewJSONSlice(edges),
+	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 
