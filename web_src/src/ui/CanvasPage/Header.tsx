@@ -15,19 +15,34 @@ export interface BreadcrumbItem {
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
   onSave?: () => void;
+  onLogoClick?: () => void;
 }
 
-export function Header({ breadcrumbs, onSave }: HeaderProps) {
+export function Header({ breadcrumbs, onSave, onLogoClick }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="flex items-center justify-between h-12 px-6">
         {/* Logo */}
         <div className="flex items-center">
-          <img
-            src={SuperplaneLogo}
-            alt="Logo"
-            className="w-8 h-8"
-          />
+          {onLogoClick ? (
+            <button
+              onClick={onLogoClick}
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+              aria-label="Go to organization homepage"
+            >
+              <img
+                src={SuperplaneLogo}
+                alt="Logo"
+                className="w-8 h-8"
+              />
+            </button>
+          ) : (
+            <img
+              src={SuperplaneLogo}
+              alt="Logo"
+              className="w-8 h-8"
+            />
+          )}
         </div>
 
         {/* Breadcrumbs */}

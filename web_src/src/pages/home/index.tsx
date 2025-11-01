@@ -271,14 +271,22 @@ interface PageHeaderProps {
 }
 
 function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
-  const heading = activeTab === "custom-components" ? "components" : "Canvases";
+  const heading = activeTab === "custom-components" ? "Components" : "Canvases";
+  const description = activeTab === "custom-components"
+    ? "Overview of all components created and maintained by your team."
+    : "Overview of all mapped automations across your organization.";
   const buttonText = activeTab === "custom-components" ? "New Component" : "New Canvas";
 
   return (
-    <div className="flex items-center justify-between mb-8">
-      <Heading level={2} className="!text-2xl mb-2">
-        {heading}
-      </Heading>
+    <div className="flex items-center justify-between mb-6">
+      <div>
+        <Heading level={2} className="!text-2xl mb-2">
+          {heading}
+        </Heading>
+        <Text className="text-zinc-600 dark:text-zinc-400">
+          {description}
+        </Text>
+      </div>
 
       <Button color="blue" className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
         <Plus className="mr-2" size={20} />
