@@ -53,6 +53,8 @@ import {
 import ELK from 'elkjs/lib/elk.bundled.js'
 import { getColorClass } from '../../utils/colors'
 import { resolveIcon } from '../../lib/utils'
+import { BuildingBlock } from '@/ui/BuildingBlocksSidebar'
+import { buildBuildingBlockCategories, flattenBuildingBlocks } from '@/ui/buildingBlocks'
 
 const nodeTypes: NodeTypes = {
   if: WorkflowIfNode,
@@ -106,16 +108,7 @@ const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
   return { nodes: layoutedNodes, edges }
 }
 
-type BuildingBlock = {
-  name: string
-  label?: string
-  description?: string
-  type: 'trigger' | 'component' | 'blueprint'
-  outputChannels?: { name: string }[]
-  configuration?: any[]
-  icon?: string
-  color?: string
-}
+// Uses shared BuildingBlock type from ui/BuildingBlocksSidebar
 
 export const Workflow = () => {
   const { organizationId, workflowId } = useParams<{ organizationId: string; workflowId: string }>()
@@ -140,12 +133,10 @@ export const Workflow = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
-  // Combine components, blueprints, and triggers into building blocks
-  const buildingBlocks: BuildingBlock[] = [
-    ...triggers.map((t: any) => ({ ...t, type: 'trigger' as const })),
-    ...components.map((p: any) => ({ ...p, type: 'component' as const })),
-    ...blueprints.map((b: any) => ({ ...b, type: 'blueprint' as const }))
-  ]
+  // Use shared builder to match workflowv2 building blocks
+  const buildingBlocks: BuildingBlock[] = flattenBuildingBlocks(
+    buildBuildingBlockCategories(triggers, components, blueprints)
+  )
 
   // Define handlers before they're used in useEffect
   // Use setNodes to access current nodes without adding it as a dependency

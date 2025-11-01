@@ -33,6 +33,7 @@ import {
   SuperplaneBlueprintsOutputChannel,
 } from "@/api-client";
 import { NodeConfigurationModal } from "../CanvasPage/NodeConfigurationModal";
+import { buildBuildingBlockCategories } from "../buildingBlocks";
 
 export interface NodeEditData {
   nodeId: string;
@@ -346,39 +347,11 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [newNodeData, props]
   );
 
-  // Transform components into building block categories
-  const buildingBlockCategories = useMemo(() => {
-    const categoryMap = new Map<string, BuildingBlock[]>();
-
-    props.components.forEach((component: ComponentsComponent) => {
-      const categoryName = "Primitives";
-
-      const block: BuildingBlock = {
-        name: component.name || "",
-        label: component.label || component.name || "",
-        description: component.description,
-        type: "component",
-        outputChannels: component.outputChannels || [],
-        configuration: component.configuration || [],
-        icon: component.icon,
-        color: component.color,
-      };
-
-      if (!categoryMap.has(categoryName)) {
-        categoryMap.set(categoryName, []);
-      }
-      categoryMap.get(categoryName)!.push(block);
-    });
-
-    const categories: BuildingBlockCategory[] = Array.from(
-      categoryMap.entries()
-    ).map(([name, blocks]) => ({
-      name,
-      blocks,
-    }));
-
-    return categories;
-  }, [props.components]);
+  // Use shared builder (merge mocks + live components)
+  const buildingBlockCategories = useMemo<BuildingBlockCategory[]>(
+    () => buildBuildingBlockCategories([], props.components, []),
+    [props.components]
+  );
 
   const handleConnect = useCallback(
     (connection: Connection) => {
