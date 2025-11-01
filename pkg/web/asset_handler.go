@@ -17,18 +17,14 @@ type AssetHandler struct {
 
 // NewAssetHandler creates a new AssetHandler with the given file system
 func NewAssetHandler(assets http.FileSystem, basePath string) http.Handler {
-    // Load index.html once. http.FileSystem expects paths to start with '/'.
-    indexFile, _ := assets.Open("/index.html")
-    if indexFile == nil {
-        // Fallback for embedded assets where files live under dist/
-        indexFile, _ = assets.Open("/dist/index.html")
-    }
+	// Load index.html once
+	indexFile, _ := assets.Open("index.html")
 
-    return &AssetHandler{
-        assets:    assets,
-        basePath:  basePath,
-        indexFile: indexFile,
-    }
+	return &AssetHandler{
+		assets:    assets,
+		basePath:  basePath,
+		indexFile: indexFile,
+	}
 }
 
 // ServeHTTP implements the http.Handler interface
@@ -62,26 +58,13 @@ func (h *AssetHandler) isAssetPath(path string) bool {
 
 // serveAsset serves static files from the assets directory
 func (h *AssetHandler) serveAsset(w http.ResponseWriter, r *http.Request) {
-    path := strings.TrimPrefix(r.URL.Path, h.basePath)
-    // Ensure leading slash for http.FileSystem
-    if !strings.HasPrefix(path, "/") {
-        path = "/" + path
-    }
+	path := strings.TrimPrefix(r.URL.Path, h.basePath)
 
-    f, err := h.assets.Open(path)
-    if err != nil {
-        // Fallback for embedded assets where files live under dist/
-        // Avoid double slashes
-        if strings.HasPrefix(path, "/") {
-            f, err = h.assets.Open("/dist" + path)
-        } else {
-            f, err = h.assets.Open("/dist/" + path)
-        }
-    }
-    if err != nil {
-        http.NotFound(w, r)
-        return
-    }
+	f, err := h.assets.Open(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	defer f.Close()
 
 	if fi, _ := f.Stat(); fi != nil && !fi.IsDir() {
@@ -97,27 +80,16 @@ func (h *AssetHandler) serveAsset(w http.ResponseWriter, r *http.Request) {
 
 // serveIndex serves the index.html file for SPA routing
 func (h *AssetHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
-    f := h.indexFile
-    // If not preloaded, try to open dynamically (supports both layouts)
-    if f == nil {
-        if file, err := h.assets.Open("/index.html"); err == nil {
-            f = file
-            defer f.Close()
-        } else if file, err2 := h.assets.Open("/dist/index.html"); err2 == nil {
-            f = file
-            defer f.Close()
-        }
-    }
-    if f == nil {
-        http.Error(w, "index.html not found", http.StatusInternalServerError)
-        return
-    }
+	if h.indexFile == nil {
+		http.Error(w, "index.html not found", http.StatusInternalServerError)
+		return
+	}
 
-    // Reset and serve index.html
-    f.Seek(0, 0)
-    if fi, _ := f.Stat(); fi != nil {
-        w.Header().Set("Content-Type", "text/html; charset=utf-8")
-        w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-        http.ServeContent(w, r, "index.html", fi.ModTime(), f)
-    }
+	// Reset and serve index.html
+	h.indexFile.Seek(0, 0)
+	if fi, _ := h.indexFile.Stat(); fi != nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		http.ServeContent(w, r, "index.html", fi.ModTime(), h.indexFile)
+	}
 }

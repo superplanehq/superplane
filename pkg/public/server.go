@@ -1029,15 +1029,16 @@ func (s *Server) setupDevProxy(webBasePath string) {
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
 	origDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalPath := req.URL.Path
+    proxy.Director = func(req *http.Request) {
+        originalPath := req.URL.Path
 
-		origDirector(req)
+        origDirector(req)
 
-		req.Host = target.Host
-
-		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
-	}
+        req.Host = target.Host
+        if os.Getenv("QUIET_PROXY_LOGS") != "yes" {
+            log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
+        }
+    }
 
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {

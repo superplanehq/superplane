@@ -16,6 +16,7 @@ func TestHomePage(t *testing.T) {
 		s.FillIn("Canvas name", "E2E Canvas")
 		s.ClickButton("Create canvas")
 		s.Sleep(2000)
+		s.TakeScreenshot()
 		s.AssertText("E2E Canvas")
 	})
 }

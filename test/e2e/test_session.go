@@ -1,20 +1,21 @@
 package e2e
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"os/exec"
-	"strings"
-	"testing"
-	"time"
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+    "os/exec"
+    "strings"
+    "testing"
+    "time"
 
-	pw "github.com/playwright-community/playwright-go"
-	"github.com/superplanehq/superplane/pkg/authorization"
-	spjwt "github.com/superplanehq/superplane/pkg/jwt"
-	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/server"
+    pw "github.com/playwright-community/playwright-go"
+    "github.com/superplanehq/superplane/pkg/authorization"
+    "github.com/superplanehq/superplane/pkg/database"
+    spjwt "github.com/superplanehq/superplane/pkg/jwt"
+    "github.com/superplanehq/superplane/pkg/models"
+    "github.com/superplanehq/superplane/pkg/server"
 )
 
 type TestSession struct {
@@ -35,8 +36,8 @@ func NewTestSession(t *testing.T) *TestSession {
 }
 
 func (s *TestSession) Start() {
-	// Common server env
-	os.Setenv("START_PUBLIC_API", "yes")
+    // Common server env
+    os.Setenv("START_PUBLIC_API", "yes")
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
 	os.Setenv("START_WEB_SERVER", "yes")
 	os.Setenv("WEB_BASE_PATH", "")
@@ -45,7 +46,9 @@ func (s *TestSession) Start() {
 	os.Setenv("NO_ENCRYPTION", "yes")
 	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
 	os.Setenv("JWT_SECRET", "test-jwt-secret")
-	os.Setenv("BASE_URL", "http://127.0.0.1:8000")
+    os.Setenv("BASE_URL", "http://127.0.0.1:8000")
+    os.Setenv("QUIET_PROXY_LOGS", "yes")
+    os.Setenv("QUIET_HTTP_LOGS", "yes")
 
 	// Always use Vite dev server and proxy in development mode
 	os.Setenv("APP_ENV", "development")
@@ -79,13 +82,16 @@ func (s *TestSession) Start() {
 	}
 	s.page = p
 
-	// Capture console and network failures
-	s.page.OnConsole(func(m pw.ConsoleMessage) { s.console = append(s.console, fmt.Sprintf("[%s] %s", m.Type(), m.Text())) })
-	s.page.OnPageError(func(e error) { s.console = append(s.console, fmt.Sprintf("[pageerror] %v", e)) })
-	s.page.OnRequestFailed(func(r pw.Request) { s.neterrs = append(s.neterrs, fmt.Sprintf("FAIL %s %s", r.Method(), r.URL())) })
+    // Capture console and network failures
+    s.page.OnConsole(func(m pw.ConsoleMessage) { s.console = append(s.console, fmt.Sprintf("[%s] %s", m.Type(), m.Text())) })
+    s.page.OnPageError(func(e error) { s.console = append(s.console, fmt.Sprintf("[pageerror] %v", e)) })
+    s.page.OnRequestFailed(func(r pw.Request) { s.neterrs = append(s.neterrs, fmt.Sprintf("FAIL %s %s", r.Method(), r.URL())) })
 
-	// Prepare an account, organization, and user, then authenticate via cookie
-	s.setupUserAndOrganization()
+    // Reset the database between tests
+    s.resetDatabase()
+
+    // Prepare an account, organization, and user, then authenticate via cookie
+    s.setupUserAndOrganization()
 }
 
 func (s *TestSession) Visit(path string) {
@@ -126,12 +132,32 @@ func (s *TestSession) Sleep(ms int) { time.Sleep(time.Duration(ms) * time.Millis
 // WaitForNetworkIdle waits until Playwright observes network idle.
 // Uses the page load state 'networkidle' with the session timeout.
 func (s *TestSession) WaitForNetworkIdle() {
-	if err := s.page.WaitForLoadState(pw.PageWaitForLoadStateOptions{
-		State:   pw.LoadStateNetworkidle,
-		Timeout: pw.Float(s.timeoutMs),
-	}); err != nil {
-		s.t.Fatalf("wait for network idle: %v", err)
-	}
+    if err := s.page.WaitForLoadState(pw.PageWaitForLoadStateOptions{
+        State:   pw.LoadStateNetworkidle,
+        Timeout: pw.Float(s.timeoutMs),
+    }); err != nil {
+        s.t.Fatalf("wait for network idle: %v", err)
+    }
+}
+
+// resetDatabase truncates all public tables (except migration tables),
+// restarting identities and cascading to maintain referential integrity.
+func (s *TestSession) resetDatabase() {
+    sql := `DO $$
+    DECLARE r RECORD;
+    BEGIN
+        FOR r IN (
+            SELECT tablename
+            FROM pg_tables
+            WHERE schemaname = 'public'
+              AND tablename NOT IN ('schema_migrations')
+        ) LOOP
+            EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
+        END LOOP;
+    END$$;`
+    if err := database.Conn().Exec(sql).Error; err != nil {
+        s.t.Fatalf("reset database: %v", err)
+    }
 }
 
 func (s *TestSession) Login() {
