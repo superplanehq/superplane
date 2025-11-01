@@ -77,7 +77,12 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
 
       <div className="flex-1 overflow-y-scroll">
         {sortedCategories.map((category) => (
-          <CategorySection key={category.name} category={category} canvasZoom={canvasZoom} />
+          <CategorySection
+            key={category.name}
+            category={category}
+            canvasZoom={canvasZoom}
+            searchTerm={searchTerm}
+          />
         ))}
       </div>
     </div>
@@ -87,10 +92,24 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
 interface CategorySectionProps {
   category: BuildingBlockCategory;
   canvasZoom: number;
+  searchTerm?: string;
 }
 
-function CategorySection({ category, canvasZoom }: CategorySectionProps) {
-  const allBlocks = category.blocks;
+function CategorySection({ category, canvasZoom, searchTerm = "" }: CategorySectionProps) {
+  const query = searchTerm.trim().toLowerCase();
+  const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
+
+  const allBlocks = categoryMatches
+    ? (category.blocks || [])
+    : (category.blocks || []).filter((block) => {
+        const name = (block.name || "").toLowerCase();
+        const label = (block.label || "").toLowerCase();
+        return name.includes(query) || label.includes(query);
+      });
+
+  if (allBlocks.length === 0) {
+    return null;
+  }
 
   return (
     <details className="flex-1 px-5 mb-4" open>
