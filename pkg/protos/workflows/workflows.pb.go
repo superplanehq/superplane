@@ -2068,6 +2068,210 @@ func (x *EventCreated) GetTimestamp() *timestamp.Timestamp {
 	return nil
 }
 
+type ExecutionCreated struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkflowId    string                 `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
+	NodeId        string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Timestamp     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecutionCreated) Reset() {
+	*x = ExecutionCreated{}
+	mi := &file_workflows_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecutionCreated) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutionCreated) ProtoMessage() {}
+
+func (x *ExecutionCreated) ProtoReflect() protoreflect.Message {
+	mi := &file_workflows_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutionCreated.ProtoReflect.Descriptor instead.
+func (*ExecutionCreated) Descriptor() ([]byte, []int) {
+	return file_workflows_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ExecutionCreated) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExecutionCreated) GetWorkflowId() string {
+	if x != nil {
+		return x.WorkflowId
+	}
+	return ""
+}
+
+func (x *ExecutionCreated) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *ExecutionCreated) GetTimestamp() *timestamp.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
+type ExecutionStarted struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkflowId    string                 `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
+	NodeId        string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Timestamp     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecutionStarted) Reset() {
+	*x = ExecutionStarted{}
+	mi := &file_workflows_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecutionStarted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutionStarted) ProtoMessage() {}
+
+func (x *ExecutionStarted) ProtoReflect() protoreflect.Message {
+	mi := &file_workflows_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutionStarted.ProtoReflect.Descriptor instead.
+func (*ExecutionStarted) Descriptor() ([]byte, []int) {
+	return file_workflows_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ExecutionStarted) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExecutionStarted) GetWorkflowId() string {
+	if x != nil {
+		return x.WorkflowId
+	}
+	return ""
+}
+
+func (x *ExecutionStarted) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *ExecutionStarted) GetTimestamp() *timestamp.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
+type ExecutionFinished struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	WorkflowId    string                 `protobuf:"bytes,2,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`
+	NodeId        string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	Timestamp     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecutionFinished) Reset() {
+	*x = ExecutionFinished{}
+	mi := &file_workflows_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecutionFinished) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutionFinished) ProtoMessage() {}
+
+func (x *ExecutionFinished) ProtoReflect() protoreflect.Message {
+	mi := &file_workflows_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutionFinished.ProtoReflect.Descriptor instead.
+func (*ExecutionFinished) Descriptor() ([]byte, []int) {
+	return file_workflows_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ExecutionFinished) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExecutionFinished) GetWorkflowId() string {
+	if x != nil {
+		return x.WorkflowId
+	}
+	return ""
+}
+
+func (x *ExecutionFinished) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *ExecutionFinished) GetTimestamp() *timestamp.Timestamp {
+	if x != nil {
+		return x.Timestamp
+	}
+	return nil
+}
+
 var File_workflows_proto protoreflect.FileDescriptor
 
 const file_workflows_proto_rawDesc = "" +
@@ -2246,6 +2450,24 @@ const file_workflows_proto_rawDesc = "" +
 	"\vworkflow_id\x18\x02 \x01(\tR\n" +
 	"workflowId\x12\x17\n" +
 	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x128\n" +
+	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\x96\x01\n" +
+	"\x10ExecutionCreated\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vworkflow_id\x18\x02 \x01(\tR\n" +
+	"workflowId\x12\x17\n" +
+	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x128\n" +
+	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\x96\x01\n" +
+	"\x10ExecutionStarted\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vworkflow_id\x18\x02 \x01(\tR\n" +
+	"workflowId\x12\x17\n" +
+	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x128\n" +
+	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\x97\x01\n" +
+	"\x11ExecutionFinished\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vworkflow_id\x18\x02 \x01(\tR\n" +
+	"workflowId\x12\x17\n" +
+	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x128\n" +
 	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\x92\x1a\n" +
 	"\tWorkflows\x12\xc1\x01\n" +
 	"\rListWorkflows\x12*.Superplane.Workflows.ListWorkflowsRequest\x1a+.Superplane.Workflows.ListWorkflowsResponse\"W\x92A;\n" +
@@ -2290,7 +2512,7 @@ func file_workflows_proto_rawDescGZIP() []byte {
 }
 
 var file_workflows_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_workflows_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_workflows_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_workflows_proto_goTypes = []any{
 	(WorkflowNodeExecution_State)(0),          // 0: Superplane.Workflows.WorkflowNodeExecution.State
 	(WorkflowNodeExecution_Result)(0),         // 1: Superplane.Workflows.WorkflowNodeExecution.Result
@@ -2326,10 +2548,13 @@ var file_workflows_proto_goTypes = []any{
 	(*ListEventExecutionsRequest)(nil),        // 31: Superplane.Workflows.ListEventExecutionsRequest
 	(*ListEventExecutionsResponse)(nil),       // 32: Superplane.Workflows.ListEventExecutionsResponse
 	(*EventCreated)(nil),                      // 33: Superplane.Workflows.EventCreated
-	(*timestamp.Timestamp)(nil),               // 34: google.protobuf.Timestamp
-	(*components.Node)(nil),                   // 35: Superplane.Components.Node
-	(*components.Edge)(nil),                   // 36: Superplane.Components.Edge
-	(*_struct.Struct)(nil),                    // 37: google.protobuf.Struct
+	(*ExecutionCreated)(nil),                  // 34: Superplane.Workflows.ExecutionCreated
+	(*ExecutionStarted)(nil),                  // 35: Superplane.Workflows.ExecutionStarted
+	(*ExecutionFinished)(nil),                 // 36: Superplane.Workflows.ExecutionFinished
+	(*timestamp.Timestamp)(nil),               // 37: google.protobuf.Timestamp
+	(*components.Node)(nil),                   // 38: Superplane.Components.Node
+	(*components.Edge)(nil),                   // 39: Superplane.Components.Edge
+	(*_struct.Struct)(nil),                    // 40: google.protobuf.Struct
 }
 var file_workflows_proto_depIdxs = []int32{
 	13, // 0: Superplane.Workflows.ListWorkflowsResponse.workflows:type_name -> Superplane.Workflows.Workflow
@@ -2338,75 +2563,78 @@ var file_workflows_proto_depIdxs = []int32{
 	13, // 3: Superplane.Workflows.CreateWorkflowResponse.workflow:type_name -> Superplane.Workflows.Workflow
 	13, // 4: Superplane.Workflows.UpdateWorkflowRequest.workflow:type_name -> Superplane.Workflows.Workflow
 	13, // 5: Superplane.Workflows.UpdateWorkflowResponse.workflow:type_name -> Superplane.Workflows.Workflow
-	34, // 6: Superplane.Workflows.Workflow.created_at:type_name -> google.protobuf.Timestamp
-	34, // 7: Superplane.Workflows.Workflow.updated_at:type_name -> google.protobuf.Timestamp
-	35, // 8: Superplane.Workflows.Workflow.nodes:type_name -> Superplane.Components.Node
-	36, // 9: Superplane.Workflows.Workflow.edges:type_name -> Superplane.Components.Edge
-	34, // 10: Superplane.Workflows.ListNodeEventsRequest.before:type_name -> google.protobuf.Timestamp
+	37, // 6: Superplane.Workflows.Workflow.created_at:type_name -> google.protobuf.Timestamp
+	37, // 7: Superplane.Workflows.Workflow.updated_at:type_name -> google.protobuf.Timestamp
+	38, // 8: Superplane.Workflows.Workflow.nodes:type_name -> Superplane.Components.Node
+	39, // 9: Superplane.Workflows.Workflow.edges:type_name -> Superplane.Components.Edge
+	37, // 10: Superplane.Workflows.ListNodeEventsRequest.before:type_name -> google.protobuf.Timestamp
 	30, // 11: Superplane.Workflows.ListNodeEventsResponse.events:type_name -> Superplane.Workflows.WorkflowEvent
-	34, // 12: Superplane.Workflows.ListNodeEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	37, // 13: Superplane.Workflows.EmitNodeEventRequest.data:type_name -> google.protobuf.Struct
-	34, // 14: Superplane.Workflows.ListNodeQueueItemsRequest.before:type_name -> google.protobuf.Timestamp
+	37, // 12: Superplane.Workflows.ListNodeEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	40, // 13: Superplane.Workflows.EmitNodeEventRequest.data:type_name -> google.protobuf.Struct
+	37, // 14: Superplane.Workflows.ListNodeQueueItemsRequest.before:type_name -> google.protobuf.Timestamp
 	25, // 15: Superplane.Workflows.ListNodeQueueItemsResponse.items:type_name -> Superplane.Workflows.WorkflowNodeQueueItem
-	34, // 16: Superplane.Workflows.ListNodeQueueItemsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	37, // 16: Superplane.Workflows.ListNodeQueueItemsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
 	0,  // 17: Superplane.Workflows.ListNodeExecutionsRequest.states:type_name -> Superplane.Workflows.WorkflowNodeExecution.State
 	1,  // 18: Superplane.Workflows.ListNodeExecutionsRequest.results:type_name -> Superplane.Workflows.WorkflowNodeExecution.Result
-	34, // 19: Superplane.Workflows.ListNodeExecutionsRequest.before:type_name -> google.protobuf.Timestamp
+	37, // 19: Superplane.Workflows.ListNodeExecutionsRequest.before:type_name -> google.protobuf.Timestamp
 	24, // 20: Superplane.Workflows.ListNodeExecutionsResponse.executions:type_name -> Superplane.Workflows.WorkflowNodeExecution
-	34, // 21: Superplane.Workflows.ListNodeExecutionsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	37, // 21: Superplane.Workflows.ListNodeExecutionsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
 	24, // 22: Superplane.Workflows.ListChildExecutionsResponse.executions:type_name -> Superplane.Workflows.WorkflowNodeExecution
 	0,  // 23: Superplane.Workflows.WorkflowNodeExecution.state:type_name -> Superplane.Workflows.WorkflowNodeExecution.State
 	1,  // 24: Superplane.Workflows.WorkflowNodeExecution.result:type_name -> Superplane.Workflows.WorkflowNodeExecution.Result
 	2,  // 25: Superplane.Workflows.WorkflowNodeExecution.result_reason:type_name -> Superplane.Workflows.WorkflowNodeExecution.ResultReason
-	37, // 26: Superplane.Workflows.WorkflowNodeExecution.input:type_name -> google.protobuf.Struct
-	37, // 27: Superplane.Workflows.WorkflowNodeExecution.outputs:type_name -> google.protobuf.Struct
-	34, // 28: Superplane.Workflows.WorkflowNodeExecution.created_at:type_name -> google.protobuf.Timestamp
-	34, // 29: Superplane.Workflows.WorkflowNodeExecution.updated_at:type_name -> google.protobuf.Timestamp
-	37, // 30: Superplane.Workflows.WorkflowNodeExecution.metadata:type_name -> google.protobuf.Struct
-	37, // 31: Superplane.Workflows.WorkflowNodeExecution.configuration:type_name -> google.protobuf.Struct
+	40, // 26: Superplane.Workflows.WorkflowNodeExecution.input:type_name -> google.protobuf.Struct
+	40, // 27: Superplane.Workflows.WorkflowNodeExecution.outputs:type_name -> google.protobuf.Struct
+	37, // 28: Superplane.Workflows.WorkflowNodeExecution.created_at:type_name -> google.protobuf.Timestamp
+	37, // 29: Superplane.Workflows.WorkflowNodeExecution.updated_at:type_name -> google.protobuf.Timestamp
+	40, // 30: Superplane.Workflows.WorkflowNodeExecution.metadata:type_name -> google.protobuf.Struct
+	40, // 31: Superplane.Workflows.WorkflowNodeExecution.configuration:type_name -> google.protobuf.Struct
 	24, // 32: Superplane.Workflows.WorkflowNodeExecution.child_executions:type_name -> Superplane.Workflows.WorkflowNodeExecution
 	30, // 33: Superplane.Workflows.WorkflowNodeExecution.root_event:type_name -> Superplane.Workflows.WorkflowEvent
-	37, // 34: Superplane.Workflows.WorkflowNodeQueueItem.input:type_name -> google.protobuf.Struct
-	34, // 35: Superplane.Workflows.WorkflowNodeQueueItem.created_at:type_name -> google.protobuf.Timestamp
-	37, // 36: Superplane.Workflows.InvokeNodeExecutionActionRequest.parameters:type_name -> google.protobuf.Struct
-	34, // 37: Superplane.Workflows.ListWorkflowEventsRequest.before:type_name -> google.protobuf.Timestamp
+	40, // 34: Superplane.Workflows.WorkflowNodeQueueItem.input:type_name -> google.protobuf.Struct
+	37, // 35: Superplane.Workflows.WorkflowNodeQueueItem.created_at:type_name -> google.protobuf.Timestamp
+	40, // 36: Superplane.Workflows.InvokeNodeExecutionActionRequest.parameters:type_name -> google.protobuf.Struct
+	37, // 37: Superplane.Workflows.ListWorkflowEventsRequest.before:type_name -> google.protobuf.Timestamp
 	30, // 38: Superplane.Workflows.ListWorkflowEventsResponse.events:type_name -> Superplane.Workflows.WorkflowEvent
-	34, // 39: Superplane.Workflows.ListWorkflowEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	37, // 40: Superplane.Workflows.WorkflowEvent.data:type_name -> google.protobuf.Struct
-	34, // 41: Superplane.Workflows.WorkflowEvent.created_at:type_name -> google.protobuf.Timestamp
+	37, // 39: Superplane.Workflows.ListWorkflowEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	40, // 40: Superplane.Workflows.WorkflowEvent.data:type_name -> google.protobuf.Struct
+	37, // 41: Superplane.Workflows.WorkflowEvent.created_at:type_name -> google.protobuf.Timestamp
 	24, // 42: Superplane.Workflows.ListEventExecutionsResponse.executions:type_name -> Superplane.Workflows.WorkflowNodeExecution
-	34, // 43: Superplane.Workflows.EventCreated.timestamp:type_name -> google.protobuf.Timestamp
-	3,  // 44: Superplane.Workflows.Workflows.ListWorkflows:input_type -> Superplane.Workflows.ListWorkflowsRequest
-	7,  // 45: Superplane.Workflows.Workflows.CreateWorkflow:input_type -> Superplane.Workflows.CreateWorkflowRequest
-	5,  // 46: Superplane.Workflows.Workflows.DescribeWorkflow:input_type -> Superplane.Workflows.DescribeWorkflowRequest
-	9,  // 47: Superplane.Workflows.Workflows.UpdateWorkflow:input_type -> Superplane.Workflows.UpdateWorkflowRequest
-	11, // 48: Superplane.Workflows.Workflows.DeleteWorkflow:input_type -> Superplane.Workflows.DeleteWorkflowRequest
-	18, // 49: Superplane.Workflows.Workflows.ListNodeQueueItems:input_type -> Superplane.Workflows.ListNodeQueueItemsRequest
-	20, // 50: Superplane.Workflows.Workflows.ListNodeExecutions:input_type -> Superplane.Workflows.ListNodeExecutionsRequest
-	14, // 51: Superplane.Workflows.Workflows.ListNodeEvents:input_type -> Superplane.Workflows.ListNodeEventsRequest
-	16, // 52: Superplane.Workflows.Workflows.EmitNodeEvent:input_type -> Superplane.Workflows.EmitNodeEventRequest
-	26, // 53: Superplane.Workflows.Workflows.InvokeNodeExecutionAction:input_type -> Superplane.Workflows.InvokeNodeExecutionActionRequest
-	22, // 54: Superplane.Workflows.Workflows.ListChildExecutions:input_type -> Superplane.Workflows.ListChildExecutionsRequest
-	28, // 55: Superplane.Workflows.Workflows.ListWorkflowEvents:input_type -> Superplane.Workflows.ListWorkflowEventsRequest
-	31, // 56: Superplane.Workflows.Workflows.ListEventExecutions:input_type -> Superplane.Workflows.ListEventExecutionsRequest
-	4,  // 57: Superplane.Workflows.Workflows.ListWorkflows:output_type -> Superplane.Workflows.ListWorkflowsResponse
-	8,  // 58: Superplane.Workflows.Workflows.CreateWorkflow:output_type -> Superplane.Workflows.CreateWorkflowResponse
-	6,  // 59: Superplane.Workflows.Workflows.DescribeWorkflow:output_type -> Superplane.Workflows.DescribeWorkflowResponse
-	10, // 60: Superplane.Workflows.Workflows.UpdateWorkflow:output_type -> Superplane.Workflows.UpdateWorkflowResponse
-	12, // 61: Superplane.Workflows.Workflows.DeleteWorkflow:output_type -> Superplane.Workflows.DeleteWorkflowResponse
-	19, // 62: Superplane.Workflows.Workflows.ListNodeQueueItems:output_type -> Superplane.Workflows.ListNodeQueueItemsResponse
-	21, // 63: Superplane.Workflows.Workflows.ListNodeExecutions:output_type -> Superplane.Workflows.ListNodeExecutionsResponse
-	15, // 64: Superplane.Workflows.Workflows.ListNodeEvents:output_type -> Superplane.Workflows.ListNodeEventsResponse
-	17, // 65: Superplane.Workflows.Workflows.EmitNodeEvent:output_type -> Superplane.Workflows.EmitNodeEventResponse
-	27, // 66: Superplane.Workflows.Workflows.InvokeNodeExecutionAction:output_type -> Superplane.Workflows.InvokeNodeExecutionActionResponse
-	23, // 67: Superplane.Workflows.Workflows.ListChildExecutions:output_type -> Superplane.Workflows.ListChildExecutionsResponse
-	29, // 68: Superplane.Workflows.Workflows.ListWorkflowEvents:output_type -> Superplane.Workflows.ListWorkflowEventsResponse
-	32, // 69: Superplane.Workflows.Workflows.ListEventExecutions:output_type -> Superplane.Workflows.ListEventExecutionsResponse
-	57, // [57:70] is the sub-list for method output_type
-	44, // [44:57] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	37, // 43: Superplane.Workflows.EventCreated.timestamp:type_name -> google.protobuf.Timestamp
+	37, // 44: Superplane.Workflows.ExecutionCreated.timestamp:type_name -> google.protobuf.Timestamp
+	37, // 45: Superplane.Workflows.ExecutionStarted.timestamp:type_name -> google.protobuf.Timestamp
+	37, // 46: Superplane.Workflows.ExecutionFinished.timestamp:type_name -> google.protobuf.Timestamp
+	3,  // 47: Superplane.Workflows.Workflows.ListWorkflows:input_type -> Superplane.Workflows.ListWorkflowsRequest
+	7,  // 48: Superplane.Workflows.Workflows.CreateWorkflow:input_type -> Superplane.Workflows.CreateWorkflowRequest
+	5,  // 49: Superplane.Workflows.Workflows.DescribeWorkflow:input_type -> Superplane.Workflows.DescribeWorkflowRequest
+	9,  // 50: Superplane.Workflows.Workflows.UpdateWorkflow:input_type -> Superplane.Workflows.UpdateWorkflowRequest
+	11, // 51: Superplane.Workflows.Workflows.DeleteWorkflow:input_type -> Superplane.Workflows.DeleteWorkflowRequest
+	18, // 52: Superplane.Workflows.Workflows.ListNodeQueueItems:input_type -> Superplane.Workflows.ListNodeQueueItemsRequest
+	20, // 53: Superplane.Workflows.Workflows.ListNodeExecutions:input_type -> Superplane.Workflows.ListNodeExecutionsRequest
+	14, // 54: Superplane.Workflows.Workflows.ListNodeEvents:input_type -> Superplane.Workflows.ListNodeEventsRequest
+	16, // 55: Superplane.Workflows.Workflows.EmitNodeEvent:input_type -> Superplane.Workflows.EmitNodeEventRequest
+	26, // 56: Superplane.Workflows.Workflows.InvokeNodeExecutionAction:input_type -> Superplane.Workflows.InvokeNodeExecutionActionRequest
+	22, // 57: Superplane.Workflows.Workflows.ListChildExecutions:input_type -> Superplane.Workflows.ListChildExecutionsRequest
+	28, // 58: Superplane.Workflows.Workflows.ListWorkflowEvents:input_type -> Superplane.Workflows.ListWorkflowEventsRequest
+	31, // 59: Superplane.Workflows.Workflows.ListEventExecutions:input_type -> Superplane.Workflows.ListEventExecutionsRequest
+	4,  // 60: Superplane.Workflows.Workflows.ListWorkflows:output_type -> Superplane.Workflows.ListWorkflowsResponse
+	8,  // 61: Superplane.Workflows.Workflows.CreateWorkflow:output_type -> Superplane.Workflows.CreateWorkflowResponse
+	6,  // 62: Superplane.Workflows.Workflows.DescribeWorkflow:output_type -> Superplane.Workflows.DescribeWorkflowResponse
+	10, // 63: Superplane.Workflows.Workflows.UpdateWorkflow:output_type -> Superplane.Workflows.UpdateWorkflowResponse
+	12, // 64: Superplane.Workflows.Workflows.DeleteWorkflow:output_type -> Superplane.Workflows.DeleteWorkflowResponse
+	19, // 65: Superplane.Workflows.Workflows.ListNodeQueueItems:output_type -> Superplane.Workflows.ListNodeQueueItemsResponse
+	21, // 66: Superplane.Workflows.Workflows.ListNodeExecutions:output_type -> Superplane.Workflows.ListNodeExecutionsResponse
+	15, // 67: Superplane.Workflows.Workflows.ListNodeEvents:output_type -> Superplane.Workflows.ListNodeEventsResponse
+	17, // 68: Superplane.Workflows.Workflows.EmitNodeEvent:output_type -> Superplane.Workflows.EmitNodeEventResponse
+	27, // 69: Superplane.Workflows.Workflows.InvokeNodeExecutionAction:output_type -> Superplane.Workflows.InvokeNodeExecutionActionResponse
+	23, // 70: Superplane.Workflows.Workflows.ListChildExecutions:output_type -> Superplane.Workflows.ListChildExecutionsResponse
+	29, // 71: Superplane.Workflows.Workflows.ListWorkflowEvents:output_type -> Superplane.Workflows.ListWorkflowEventsResponse
+	32, // 72: Superplane.Workflows.Workflows.ListEventExecutions:output_type -> Superplane.Workflows.ListEventExecutionsResponse
+	60, // [60:73] is the sub-list for method output_type
+	47, // [47:60] is the sub-list for method input_type
+	47, // [47:47] is the sub-list for extension type_name
+	47, // [47:47] is the sub-list for extension extendee
+	0,  // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_workflows_proto_init() }
@@ -2420,7 +2648,7 @@ func file_workflows_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_workflows_proto_rawDesc), len(file_workflows_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   31,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
