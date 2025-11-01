@@ -123,7 +123,7 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 
 	err = execution.StartInTransaction(tx)
 
-	if err != nil {
+	if err == nil {
 		messages.NewWorkflowExecutionStartedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 	}
 
@@ -135,6 +135,8 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	if err != nil {
 		return fmt.Errorf("failed to start execution: %w", err)
 	}
+
+	messages.NewWorkflowExecutionStartedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 
 	ref := node.Ref.Data()
 	component, err := w.registry.GetComponent(ref.Component.Name)
