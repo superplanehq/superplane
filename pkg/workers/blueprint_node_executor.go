@@ -88,7 +88,7 @@ func (w *BlueprintNodeExecutor) processExecution(tx *gorm.DB, execution *models.
 	parentNodeRef := parentNode.Ref.Data()
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, parentNodeRef.Blueprint.ID)
 	if err != nil {
-		return fmt.Errorf("failed to find blueprint: %w", err)
+		return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, "failed to find blueprint")
 	}
 
 	node, err := blueprint.FindNode(childNodeID(execution))

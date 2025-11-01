@@ -764,7 +764,8 @@ function prepareCompositeNode(
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
-  const color = blueprintMetadata?.color || "indigo";
+  const isMissing = !blueprintMetadata;
+  const color = blueprintMetadata?.color || "gray";
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
 
@@ -777,13 +778,14 @@ function prepareCompositeNode(
       state: "pending" as const,
       outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       composite: {
-        iconSlug: blueprintMetadata?.icon || "boxes",
+        iconSlug: blueprintMetadata?.icon || "box-x",
         iconColor: getColorClass(color),
         iconBackground: getBackgroundColorClass(color),
         headerColor: getBackgroundColorClass(color),
         collapsedBackground: getBackgroundColorClass(color),
         title: node.name!,
         description: blueprintMetadata?.description,
+        isMissing: isMissing,
         parameters: Object.keys(node.configuration!).map((key) => {
           return {
             icon: "cog",

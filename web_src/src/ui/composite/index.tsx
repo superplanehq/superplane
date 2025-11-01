@@ -50,6 +50,7 @@ export interface CompositeProps extends ComponentActionsProps {
   collapsedBackground?: string;
   collapsed?: boolean;
   selected?: boolean;
+  isMissing?: boolean;
 
   startLastValuesOpen?: boolean;
 
@@ -59,7 +60,7 @@ export interface CompositeProps extends ComponentActionsProps {
   onViewMoreEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false, onRun, onEdit, onConfigure, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false, isMissing = false, onRun, onEdit, onConfigure, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
   // All hooks must be called before any early returns
   const [showLastRunValues, setShowLastRunValues] = React.useState<Record<number, boolean>>(
     startLastValuesOpen ? { 0: true } : {}
@@ -202,6 +203,17 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           onDelete={onDelete}
           isCompactView={isCompactView}
         />
+
+        {isMissing && (
+          <div className="px-3 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+            <div className="flex-shrink-0">
+              {React.createElement(resolveIcon("alert-triangle"), { className: "h-4 w-4 text-amber-700" })}
+            </div>
+            <div className="text-sm text-amber-700">
+              <span className="font-medium">Component deleted:</span> This component no longer exists and needs to be removed or replaced.
+            </div>
+          </div>
+        )}
 
         {parameters.length > 0 && (
           <MetadataList
