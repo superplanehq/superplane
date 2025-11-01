@@ -7,6 +7,7 @@ import "../canvas-reset.css";
 import { useCallback, useMemo, useState } from "react";
 import type { BlockData } from "../Block";
 import { CanvasPage, type CanvasNode } from "../index";
+import { mockBuildingBlockCategories } from "./buildingBlocks";
 import { createGetSidebarData } from "./getSidebarData";
 
 const meta = {
@@ -90,9 +91,7 @@ const sampleNodes: Node[] = [
           { icon: "hard-drive", label: "Disk: 85% used" },
           { icon: "box", label: "Pods: 11/24 healthy" },
         ],
-        parameters: [
-          { icon: "server", items: ["prod-cluster-1", "prod-cluster-2"] },
-        ],
+        parameters: [{ icon: "server", items: ["prod-cluster-1", "prod-cluster-2"] }],
         lastRunItem: {
           title: "Resource check",
           subtitle: "11/24 pods",
@@ -134,9 +133,7 @@ const sampleNodes: Node[] = [
           { icon: "alert-circle", label: "Error Rate: 0.3%" },
           { icon: "server", label: "Load Balancer: Healthy" },
         ],
-        parameters: [
-          { icon: "map", items: ["us-west-1", "eu-global-1", "asia-east-1"] },
-        ],
+        parameters: [{ icon: "map", items: ["us-west-1", "eu-global-1", "asia-east-1"] }],
         lastRunItem: {
           title: "Traffic monitoring check",
           subtitle: "1,247 req/s",
@@ -174,6 +171,7 @@ export const Monitor: Story = {
     nodes: sampleNodes,
     edges: sampleEdges,
     title: "Infrastructure Monitoring",
+    buildingBlocks: mockBuildingBlockCategories,
   },
   render: function MonitorRender(args) {
     const [nodes, setNodes] = useState<CanvasNode[]>(args.nodes ?? []);
@@ -191,12 +189,7 @@ export const Monitor: Story = {
 
           // Toggle collapse state based on node type
           if (nodeData.type === "composite" && nodeData.composite) {
-            console.log(
-              "Toggling composite from",
-              nodeData.composite.collapsed,
-              "to",
-              !nodeData.composite.collapsed
-            );
+            console.log("Toggling composite from", nodeData.composite.collapsed, "to", !nodeData.composite.collapsed);
             nodeData.composite = {
               ...nodeData.composite,
               collapsed: !nodeData.composite.collapsed,
@@ -204,12 +197,7 @@ export const Monitor: Story = {
           }
 
           if (nodeData.type === "approval" && nodeData.approval) {
-            console.log(
-              "Toggling approval from",
-              nodeData.approval.collapsed,
-              "to",
-              !nodeData.approval.collapsed
-            );
+            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
             nodeData.approval = {
               ...nodeData.approval,
               collapsed: !nodeData.approval.collapsed,
@@ -217,12 +205,7 @@ export const Monitor: Story = {
           }
 
           if (nodeData.type === "trigger" && nodeData.trigger) {
-            console.log(
-              "Toggling trigger from",
-              nodeData.trigger.collapsed,
-              "to",
-              !nodeData.trigger.collapsed
-            );
+            console.log("Toggling trigger from", nodeData.trigger.collapsed, "to", !nodeData.trigger.collapsed);
             nodeData.trigger = {
               ...nodeData.trigger,
               collapsed: !nodeData.trigger.collapsed,
@@ -241,10 +224,7 @@ export const Monitor: Story = {
       });
     }, []);
 
-    const getSidebarData = useMemo(
-      () => createGetSidebarData(nodes ?? []),
-      [nodes]
-    );
+    const getSidebarData = useMemo(() => createGetSidebarData(nodes ?? []), [nodes]);
 
     return (
       <div className="h-[100vh] w-full ">
@@ -268,10 +248,7 @@ export const Monitor: Story = {
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
             console.log("Current nodes before toggle:", nodes.length);
-            console.log(
-              "Node data before toggle:",
-              nodes.find((n) => n.id === nodeId)?.data
-            );
+            console.log("Node data before toggle:", nodes.find((n) => n.id === nodeId)?.data);
             toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {
