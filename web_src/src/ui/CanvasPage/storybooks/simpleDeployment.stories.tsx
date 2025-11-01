@@ -121,8 +121,7 @@ const sampleNodes: CanvasNode[] = [
       type: "composite",
       composite: {
         title: "Build/Test/Deploy Stage",
-        description:
-          "Build new release of the monarch app and runs all required tests",
+        description: "Build new release of the monarch app and runs all required tests",
         iconSlug: "git-branch",
         iconColor: "text-purple-700",
         headerColor: "bg-purple-100",
@@ -184,8 +183,7 @@ const sampleNodes: CanvasNode[] = [
       type: "approval",
       approval: {
         title: "Approve Release",
-        description:
-          "New releases are deployed to staging for testing and require approvals.",
+        description: "New releases are deployed to staging for testing and require approvals.",
         iconSlug: "hand",
         iconColor: "text-orange-500",
         headerColor: "bg-orange-100",
@@ -512,12 +510,7 @@ export const SimpleDeployment: Story = {
 
           // Toggle collapse state based on node type
           if (nodeData.type === "composite" && nodeData.composite) {
-            console.log(
-              "Toggling composite from",
-              nodeData.composite.collapsed,
-              "to",
-              !nodeData.composite.collapsed
-            );
+            console.log("Toggling composite from", nodeData.composite.collapsed, "to", !nodeData.composite.collapsed);
             nodeData.composite = {
               ...nodeData.composite,
               collapsed: !nodeData.composite.collapsed,
@@ -525,12 +518,7 @@ export const SimpleDeployment: Story = {
           }
 
           if (nodeData.type === "approval" && nodeData.approval) {
-            console.log(
-              "Toggling approval from",
-              nodeData.approval.collapsed,
-              "to",
-              !nodeData.approval.collapsed
-            );
+            console.log("Toggling approval from", nodeData.approval.collapsed, "to", !nodeData.approval.collapsed);
             nodeData.approval = {
               ...nodeData.approval,
               collapsed: !nodeData.approval.collapsed,
@@ -538,12 +526,7 @@ export const SimpleDeployment: Story = {
           }
 
           if (nodeData.type === "trigger" && nodeData.trigger) {
-            console.log(
-              "Toggling trigger from",
-              nodeData.trigger.collapsed,
-              "to",
-              !nodeData.trigger.collapsed
-            );
+            console.log("Toggling trigger from", nodeData.trigger.collapsed, "to", !nodeData.trigger.collapsed);
             nodeData.trigger = {
               ...nodeData.trigger,
               collapsed: !nodeData.trigger.collapsed,
@@ -572,19 +555,12 @@ export const SimpleDeployment: Story = {
               ...node.data,
               approval: {
                 ...node.data.approval,
-                approvals: node.data.approval.approvals.map(
-                  (approval: any) => ({
-                    ...approval,
-                    onApprove: (artifacts?: Record<string, string>) =>
-                      simulation.onApprove(
-                        node.id,
-                        approval.id || "0",
-                        artifacts
-                      ),
-                    onReject: (comment?: string) =>
-                      simulation.onReject(node.id, approval.id || "0", comment),
-                  })
-                ),
+                approvals: node.data.approval.approvals.map((approval: any) => ({
+                  ...approval,
+                  onApprove: (artifacts?: Record<string, string>) =>
+                    simulation.onApprove(node.id, approval.id || "0", artifacts),
+                  onReject: (comment?: string) => simulation.onReject(node.id, approval.id || "0", comment),
+                })),
               },
             },
           };
@@ -593,10 +569,7 @@ export const SimpleDeployment: Story = {
       });
     }, [nodes, simulation]);
 
-    const getSidebarData = useMemo(
-      () => createGetSidebarData(nodesWithHandlers),
-      [nodesWithHandlers]
-    );
+    const getSidebarData = useMemo(() => createGetSidebarData(nodesWithHandlers), [nodesWithHandlers]);
 
     const ai = useAi();
 
@@ -626,14 +599,8 @@ export const SimpleDeployment: Story = {
           }}
           onToggleView={(nodeId) => {
             console.log("Toggle view action for node:", nodeId);
-            console.log(
-              "Current nodes before toggle:",
-              nodesWithHandlers.length
-            );
-            console.log(
-              "Node data before toggle:",
-              nodesWithHandlers.find((n) => n.id === nodeId)?.data
-            );
+            console.log("Current nodes before toggle:", nodesWithHandlers.length);
+            console.log("Node data before toggle:", nodesWithHandlers.find((n) => n.id === nodeId)?.data);
             toggleNodeCollapse(nodeId);
           }}
           onDeactivate={(nodeId) => {
@@ -661,10 +628,8 @@ function useAi(): AiProps {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({
-    "listen-code":
-      "Filter out non-release branches to avoid unintended deployments when processing push events.",
-    approve:
-      "Add the QA team to the approval step to ensure proper testing before deployment.",
+    "listen-code": "Filter out non-release branches to avoid unintended deployments when processing push events.",
+    approve: "Add the QA team to the approval step to ensure proper testing before deployment.",
   });
 
   const onApply = (nodeId: string) => {
@@ -686,6 +651,7 @@ function useAi(): AiProps {
   const suggestionCount = Object.keys(aiSuggestions).length;
 
   return {
+    enabled: true,
     sidebarOpen: isSidebarOpen,
     setSidebarOpen: setIsSidebarOpen,
     showNotifications: suggestionCount > 0,

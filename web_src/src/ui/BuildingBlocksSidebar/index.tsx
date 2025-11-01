@@ -1,28 +1,18 @@
-import type {
-  SuperplaneBlueprintsOutputChannel,
-  SuperplaneComponentsOutputChannel,
-} from "@/api-client";
+import type { SuperplaneBlueprintsOutputChannel, SuperplaneComponentsOutputChannel } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import {
-  Item,
-  ItemContent,
-  ItemGroup,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item";
+import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
-import { getColorClass } from "@/utils/colors";
-import { ChevronRight, Menu, PanelLeftClose } from "lucide-react";
+import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose } from "lucide-react";
 import { useState } from "react";
+import { createNodeDragPreview } from "./createNodeDragPreview";
 
 export interface BuildingBlock {
   name: string;
   label?: string;
   description?: string;
   type: "trigger" | "component" | "blueprint";
-  outputChannels?: Array<
-    SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel
-  >;
+  outputChannels?: Array<SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel>;
   configuration?: any[];
   icon?: string;
   color?: string;
@@ -37,16 +27,11 @@ export type BuildingBlockCategory = {
 export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
-  onBlockClick: (block: BuildingBlock) => void;
   blocks: BuildingBlockCategory[];
+  canvasZoom?: number;
 }
 
-export function BuildingBlocksSidebar({
-  isOpen,
-  onToggle,
-  blocks,
-  onBlockClick,
-}: BuildingBlocksSidebarProps) {
+export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1 }: BuildingBlocksSidebarProps) {
   if (!isOpen) {
     return (
       <Button
@@ -84,12 +69,7 @@ export function BuildingBlocksSidebar({
           />
         </div>
         <div className="flex items-center gap-3 pb-0">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onToggle(false)}
-            aria-label="Close sidebar"
-          >
+          <Button variant="outline" size="icon" onClick={() => onToggle(false)} aria-label="Close sidebar">
             <PanelLeftClose size={24} />
           </Button>
         </div>
@@ -100,7 +80,8 @@ export function BuildingBlocksSidebar({
           <CategorySection
             key={category.name}
             category={category}
-            onBlockClick={onBlockClick}
+            canvasZoom={canvasZoom}
+            searchTerm={searchTerm}
           />
         ))}
       </div>
@@ -110,11 +91,25 @@ export function BuildingBlocksSidebar({
 
 interface CategorySectionProps {
   category: BuildingBlockCategory;
-  onBlockClick: (block: BuildingBlock) => void;
+  canvasZoom: number;
+  searchTerm?: string;
 }
 
-function CategorySection({ category, onBlockClick }: CategorySectionProps) {
-  const allBlocks = category.blocks;
+function CategorySection({ category, canvasZoom, searchTerm = "" }: CategorySectionProps) {
+  const query = searchTerm.trim().toLowerCase();
+  const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
+
+  const allBlocks = categoryMatches
+    ? (category.blocks || [])
+    : (category.blocks || []).filter((block) => {
+        const name = (block.name || "").toLowerCase();
+        const label = (block.label || "").toLowerCase();
+        return name.includes(query) || label.includes(query);
+      });
+
+  if (allBlocks.length === 0) {
+    return null;
+  }
 
   return (
     <details className="flex-1 px-5 mb-4" open>
@@ -128,12 +123,14 @@ function CategorySection({ category, onBlockClick }: CategorySectionProps) {
           const iconSlug = block.icon || "zap";
           const IconComponent = resolveIcon(iconSlug);
           const colorClass = getColorClass(block.color);
+          const backgroundColorClass = getBackgroundColorClass(block.color);
 
           return (
             <Item
               key={`${block.type}-${block.name}`}
-              onClick={() => onBlockClick(block)}
-              className="ml-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1 flex items-center gap-2"
+              draggable
+              onDragStart={(e) => createNodeDragPreview(e, block, colorClass, backgroundColorClass, canvasZoom)}
+              className="ml-3 cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1 flex items-center gap-2"
               size="sm"
             >
               <ItemMedia>
@@ -141,10 +138,10 @@ function CategorySection({ category, onBlockClick }: CategorySectionProps) {
               </ItemMedia>
 
               <ItemContent>
-                <ItemTitle className="text-xs font-normal">
-                  {block.label || block.name}
-                </ItemTitle>
+                <ItemTitle className="text-xs font-normal">{block.label || block.name}</ItemTitle>
               </ItemContent>
+
+              <GripVerticalIcon className="text-zinc-500 hover:text-zinc-800" size={14} />
             </Item>
           );
         })}

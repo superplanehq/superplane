@@ -5,6 +5,7 @@ import { Conversations } from "./Conversations";
 import { FloatingActionButton } from "./FloatingActionButton";
 
 interface AiSidebarState {
+  enabled?: boolean;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   showNotifications: boolean;
@@ -12,6 +13,10 @@ interface AiSidebarState {
 }
 
 export function AiSidebar(props: AiSidebarState) {
+  if (!props.enabled) {
+    return null;
+  }
+
   const state = useAiSidebarState({
     isOpen: props.isOpen,
     setIsOpen: props.setIsOpen,
@@ -41,19 +46,9 @@ export function AiSidebar(props: AiSidebarState) {
   );
 }
 
-function useAiSidebarState({
-  isOpen,
-  setIsOpen,
-}: {
-  isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
-}) {
-  const [activeConversationId, setActiveConversationId] = useState<
-    string | undefined
-  >(undefined);
-  const [conversations, setConversations] = useState<
-    Conversations.Conversation[]
-  >([]);
+function useAiSidebarState({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (open: boolean) => void }) {
+  const [activeConversationId, setActiveConversationId] = useState<string | undefined>(undefined);
+  const [conversations, setConversations] = useState<Conversations.Conversation[]>([]);
 
   function openSidebar() {
     setIsOpen(true);
@@ -113,7 +108,7 @@ function useAiSidebarState({
           };
         }
         return convo;
-      })
+      }),
     );
 
     const msg = [
@@ -148,15 +143,12 @@ function useAiSidebarState({
             };
           }
           return convo;
-        })
+        }),
       );
     }
   }
 
-  function sendMessage(
-    message: string,
-    conversationId?: string | undefined
-  ): Promise<void> {
+  function sendMessage(message: string, conversationId?: string | undefined): Promise<void> {
     console.log("Sending message to conversation", conversationId, message);
     return Promise.resolve();
   }

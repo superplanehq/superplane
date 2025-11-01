@@ -93,3 +93,10 @@ promotions:
       - result: passed
         branch:
           - "main"
+
+  - name: Deploy to sxmoon
+    pipeline_file: deploy-to-sxmoon.yml
+    auto_promote_on:
+      - result: passed
+        branch:
+          - "^develop$"
