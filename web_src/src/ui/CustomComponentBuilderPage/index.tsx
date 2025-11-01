@@ -88,6 +88,7 @@ export interface CustomComponentBuilderPageProps {
 
   // Actions
   onSave: () => void;
+  onDelete?: () => void;
   isSaving?: boolean;
 }
 
@@ -425,8 +426,11 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         <Header
           breadcrumbs={props.breadcrumbs || [{ label: props.customComponentName }]}
           onSave={props.isSaving ? undefined : props.onSave}
+          onDelete={props.onDelete}
           onLogoClick={props.organizationId ? handleLogoClick : undefined}
           organizationId={props.organizationId}
+          deleteModalTitle="Delete Component"
+          deleteModalDescription="This will permanently delete the custom component. To proceed, please type the name of the component for confirmation."
         />
       </div>
 

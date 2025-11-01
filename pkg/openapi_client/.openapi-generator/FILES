@@ -160,6 +160,7 @@ docs/SuperplaneAddUserBody.md
 docs/SuperplaneAlert.md
 docs/SuperplaneApproveStageEventResponse.md
 docs/SuperplaneBlueprintsOutputChannel.md
+docs/SuperplaneBlueprintsUserRef.md
 docs/SuperplaneCancelStageExecutionResponse.md
 docs/SuperplaneCanvas.md
 docs/SuperplaneCanvasMetadata.md
@@ -252,6 +253,7 @@ docs/SuperplaneValueFrom.md
 docs/SuperplaneValueFromEventData.md
 docs/SuperplaneValueFromLastExecution.md
 docs/SuperplaneValueFromSecret.md
+docs/SuperplaneWorkflowsUserRef.md
 docs/TriggerAPI.md
 docs/TriggersDescribeTriggerResponse.md
 docs/TriggersListTriggersResponse.md
@@ -284,7 +286,6 @@ docs/WorkflowsListWorkflowEventsResponse.md
 docs/WorkflowsListWorkflowsResponse.md
 docs/WorkflowsUpdateWorkflowBody.md
 docs/WorkflowsUpdateWorkflowResponse.md
-docs/WorkflowsUserRef.md
 docs/WorkflowsWorkflow.md
 docs/WorkflowsWorkflowEvent.md
 docs/WorkflowsWorkflowNodeExecution.md
@@ -412,6 +413,7 @@ model_superplane_add_user_body.go
 model_superplane_alert.go
 model_superplane_approve_stage_event_response.go
 model_superplane_blueprints_output_channel.go
+model_superplane_blueprints_user_ref.go
 model_superplane_cancel_stage_execution_response.go
 model_superplane_canvas.go
 model_superplane_canvas_metadata.go
@@ -504,6 +506,7 @@ model_superplane_value_from.go
 model_superplane_value_from_event_data.go
 model_superplane_value_from_last_execution.go
 model_superplane_value_from_secret.go
+model_superplane_workflows_user_ref.go
 model_triggers_describe_trigger_response.go
 model_triggers_list_triggers_response.go
 model_triggers_trigger.go
@@ -530,7 +533,6 @@ model_workflows_list_workflow_events_response.go
 model_workflows_list_workflows_response.go
 model_workflows_update_workflow_body.go
 model_workflows_update_workflow_response.go
-model_workflows_user_ref.go
 model_workflows_workflow.go
 model_workflows_workflow_event.go
 model_workflows_workflow_node_execution.go

@@ -145,6 +145,36 @@
           "Blueprint"
         ]
       },
+      "delete": {
+        "summary": "Delete blueprint",
+        "description": "Deletes an existing blueprint",
+        "operationId": "Blueprints_DeleteBlueprint",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/BlueprintsDeleteBlueprintResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blueprint"
+        ]
+      },
       "patch": {
         "summary": "Update blueprint",
         "description": "Updates an existing blueprint",
@@ -3984,6 +4014,9 @@
           "$ref": "#/definitions/BlueprintsBlueprint"
         }
       }
+    },
+    "BlueprintsDeleteBlueprintResponse": {
+      "type": "object"
     },
     "BlueprintsDescribeBlueprintResponse": {
       "type": "object",

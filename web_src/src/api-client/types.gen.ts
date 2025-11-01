@@ -40,6 +40,10 @@ export type BlueprintsCreateBlueprintResponse = {
     blueprint?: BlueprintsBlueprint;
 };
 
+export type BlueprintsDeleteBlueprintResponse = {
+    [key: string]: unknown;
+};
+
 export type BlueprintsDescribeBlueprintResponse = {
     blueprint?: BlueprintsBlueprint;
 };
@@ -1468,6 +1472,33 @@ export type BlueprintsCreateBlueprintResponses = {
 };
 
 export type BlueprintsCreateBlueprintResponse2 = BlueprintsCreateBlueprintResponses[keyof BlueprintsCreateBlueprintResponses];
+
+export type BlueprintsDeleteBlueprintData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/blueprints/{id}';
+};
+
+export type BlueprintsDeleteBlueprintErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type BlueprintsDeleteBlueprintError = BlueprintsDeleteBlueprintErrors[keyof BlueprintsDeleteBlueprintErrors];
+
+export type BlueprintsDeleteBlueprintResponses = {
+    /**
+     * A successful response.
+     */
+    200: BlueprintsDeleteBlueprintResponse;
+};
+
+export type BlueprintsDeleteBlueprintResponse2 = BlueprintsDeleteBlueprintResponses[keyof BlueprintsDeleteBlueprintResponses];
 
 export type BlueprintsDescribeBlueprintData = {
     body?: never;
