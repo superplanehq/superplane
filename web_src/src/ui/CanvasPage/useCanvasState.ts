@@ -118,7 +118,7 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
         if (nodeType && nodeData[nodeType]) {
           nodeData[nodeType] = {
             ...nodeData[nodeType],
-            collapsed: !nodeData[nodeType].collapsed,
+            collapsed: !(nodeData[nodeType] as { collapsed: boolean }).collapsed,
           };
         }
 
