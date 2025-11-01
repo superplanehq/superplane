@@ -17,7 +17,6 @@ export function CustomEdge({
   sourcePosition,
   targetPosition,
   style = {},
-  markerEnd,
   selected,
 }: EdgeProps) {
   const { setEdges } = useReactFlow();
