@@ -4,6 +4,7 @@ import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem
 import { Text } from './Text/text';
 import { MaterialSymbol } from './MaterialSymbol/material-symbol';
 import { Link } from './Link/link';
+import { Button } from './ui/button';
 import { useOrganization } from '../hooks/useOrganizationData';
 import { useAccount } from '../contexts/AccountContext';
 import { useParams } from 'react-router-dom';
@@ -29,18 +30,16 @@ const Navigation: React.FC = () => {
           {/* Merged Account Dropdown */}
           <Dropdown>
             <DropdownButton
-              plain
-              className="flex items-center justify-between gap-x-4 rounded-md border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
+              as={Button}
+              size="sm"
+              variant="outline"
             >
-              {/* Organization Avatar with User Avatar Overlay */}
-              <Text className="text-sm font-medium flex-1 text-left max-w-[150px] truncate">{organization?.metadata?.name || account?.name}</Text>
-
-              {/* User Avatar (smaller, overlapping in bottom-right) */}
+              <span className="text-sm font-medium truncate max-w-[150px]">{organization?.metadata?.name || account?.name}</span>
               <Avatar
                 src={account?.avatar_url}
                 initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
                 alt={account?.name || 'User'}
-                className="w-7 h-7"
+                className="w-5 h-5 -mr-1"
               />
             </DropdownButton>
 

@@ -289,7 +289,7 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
       </div>
 
       <Button color="blue" className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
-        <Plus className="mr-2" size={20} />
+        <Plus size={20} />
         {buttonText}
       </Button>
     </div>
