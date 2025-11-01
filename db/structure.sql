@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mgwUx9Tqh4aox4r8hQvsoqgYjiofgX8ReFkylplpIHDcgfEXKlBfgZ8P2gRlBEC
+\restrict HBfFqZZh5qBXP45bw0q8FbmzBst8T1Ebaa6XkOsTcdsHX7bsU0AgD3j0RfvHd2o
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg22.04+1)
@@ -652,7 +652,8 @@ CREATE TABLE public.workflows (
     description text,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    edges jsonb DEFAULT '[]'::jsonb NOT NULL
+    edges jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_by uuid
 );
 
 
@@ -1636,13 +1637,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mgwUx9Tqh4aox4r8hQvsoqgYjiofgX8ReFkylplpIHDcgfEXKlBfgZ8P2gRlBEC
+\unrestrict HBfFqZZh5qBXP45bw0q8FbmzBst8T1Ebaa6XkOsTcdsHX7bsU0AgD3j0RfvHd2o
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict vaooPQm0dDeNyJPSFEfmiY2hTqGToLfzTywTFGfxofcFeCVbOLvLKYrZkqNfTWH
+\restrict HLq6CcC06bWdM0oQapexeb5L6edwncOmUcvivE8qDRhnPQ42PAfFpmwZVs7om3j
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg22.04+1)
@@ -1664,7 +1665,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251024021411	f
+20251101120000	f
 \.
 
 
@@ -1672,5 +1673,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vaooPQm0dDeNyJPSFEfmiY2hTqGToLfzTywTFGfxofcFeCVbOLvLKYrZkqNfTWH
+\unrestrict HLq6CcC06bWdM0oQapexeb5L6edwncOmUcvivE8qDRhnPQ42PAfFpmwZVs7om3j
 

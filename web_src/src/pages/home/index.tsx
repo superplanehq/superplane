@@ -34,6 +34,7 @@ interface WorkflowCardData {
   description?: string;
   createdAt: string;
   type: "workflow";
+  createdByName?: string;
 }
 
 const HomePage = () => {
@@ -78,6 +79,7 @@ const HomePage = () => {
     description: workflow.description,
     createdAt: workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString() : "Unknown",
     type: "workflow" as const,
+    createdByName: workflow.createdByName,
   }));
 
   const filteredBlueprints = blueprints.filter((blueprint) => {
@@ -455,6 +457,9 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
 
         <div className="flex justify-between items-center">
           <div className="text-zinc-500 text-left">
+            {workflow.createdByName && (
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">Created by <strong>{workflow.createdByName}</strong></p>
+            )}
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">Created at {workflow.createdAt}</p>
           </div>
         </div>
@@ -480,7 +485,15 @@ function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardPr
           {workflow.name}
         </Heading>
         <Text className="text-sm text-zinc-600 dark:text-zinc-400">{workflow.description || "No description"}</Text>
-        <Text className="text-xs text-zinc-500 mt-2">Created at {workflow.createdAt}</Text>
+        <Text className="text-xs text-zinc-500 mt-2">
+          {workflow.createdByName ? (
+            <>
+              Created by <strong>{workflow.createdByName}</strong> · {workflow.createdAt}
+            </>
+          ) : (
+            <>Created at {workflow.createdAt}</>
+          )}
+        </Text>
       </button>
     </div>
   );

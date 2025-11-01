@@ -1,17 +1,18 @@
 package workflows
 
 import (
-	"context"
-	"time"
+    "context"
+    "time"
 
-	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
-	"github.com/superplanehq/superplane/pkg/registry"
-	"gorm.io/datatypes"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+    "github.com/google/uuid"
+    "github.com/superplanehq/superplane/pkg/database"
+    "github.com/superplanehq/superplane/pkg/authentication"
+    "github.com/superplanehq/superplane/pkg/models"
+    pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+    "github.com/superplanehq/superplane/pkg/registry"
+    "gorm.io/datatypes"
+    "gorm.io/gorm"
+    "gorm.io/gorm/clause"
 )
 
 func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizationID string, pbWorkflow *pb.Workflow) (*pb.CreateWorkflowResponse, error) {
@@ -20,16 +21,21 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 		return nil, err
 	}
 
-	now := time.Now()
-	workflow := models.Workflow{
-		ID:             uuid.New(),
-		OrganizationID: uuid.MustParse(organizationID),
-		Name:           pbWorkflow.Name,
-		Description:    pbWorkflow.Description,
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-		Edges:          datatypes.NewJSONSlice(edges),
-	}
+    now := time.Now()
+    workflow := models.Workflow{
+        ID:             uuid.New(),
+        OrganizationID: uuid.MustParse(organizationID),
+        Name:           pbWorkflow.Name,
+        Description:    pbWorkflow.Description,
+        CreatedAt:      &now,
+        UpdatedAt:      &now,
+        Edges:          datatypes.NewJSONSlice(edges),
+    }
+
+    if userID, ok := authentication.GetUserIdFromMetadata(ctx); ok {
+        uid := uuid.MustParse(userID)
+        workflow.CreatedBy = &uid
+    }
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 

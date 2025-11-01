@@ -1329,6 +1329,8 @@ export type WorkflowsWorkflow = {
     updatedAt?: string;
     nodes?: Array<ComponentsNode>;
     edges?: Array<ComponentsEdge>;
+    createdBy?: string;
+    createdByName?: string;
 };
 
 export type WorkflowsWorkflowEvent = {

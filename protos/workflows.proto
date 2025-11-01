@@ -222,6 +222,10 @@ message Workflow {
   google.protobuf.Timestamp updated_at = 6;
   repeated Components.Node nodes = 7;
   repeated Components.Edge edges = 8;
+  // ID of the user that created the workflow
+  string created_by = 9;
+  // Display name of the user that created the workflow (convenience field)
+  string created_by_name = 10;
 }
 
 message ListNodeEventsRequest {

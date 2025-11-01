@@ -7191,6 +7191,14 @@
             "type": "object",
             "$ref": "#/definitions/ComponentsEdge"
           }
+        },
+        "createdBy": {
+          "type": "string",
+          "title": "ID of the user that created the workflow"
+        },
+        "createdByName": {
+          "type": "string",
+          "title": "Display name of the user that created the workflow (convenience field)"
         }
       }
     },

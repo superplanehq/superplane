@@ -1,17 +1,17 @@
 package workflows
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/superplanehq/superplane/pkg/components"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/models"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
-	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
-	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
+    "github.com/superplanehq/superplane/pkg/components"
+    "github.com/superplanehq/superplane/pkg/grpc/actions"
+    "github.com/superplanehq/superplane/pkg/models"
+    compb "github.com/superplanehq/superplane/pkg/protos/components"
+    pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+    "github.com/superplanehq/superplane/pkg/registry"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
+    "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
@@ -33,16 +33,27 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		}
 	}
 
-	return &pb.Workflow{
-		Id:             workflow.ID.String(),
-		OrganizationId: workflow.OrganizationID.String(),
-		Name:           workflow.Name,
-		Description:    workflow.Description,
-		CreatedAt:      timestamppb.New(*workflow.CreatedAt),
-		UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
-		Nodes:          actions.NodesToProto(nodes),
-		Edges:          actions.EdgesToProto(workflow.Edges),
-	}
+    var createdBy string
+    var createdByName string
+    if workflow.CreatedBy != nil {
+        createdBy = workflow.CreatedBy.String()
+        if user, err := models.FindMaybeDeletedUserByID(workflow.OrganizationID.String(), createdBy); err == nil && user != nil {
+            createdByName = user.Name
+        }
+    }
+
+    return &pb.Workflow{
+        Id:             workflow.ID.String(),
+        OrganizationId: workflow.OrganizationID.String(),
+        Name:           workflow.Name,
+        Description:    workflow.Description,
+        CreatedAt:      timestamppb.New(*workflow.CreatedAt),
+        UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
+        Nodes:          actions.NodesToProto(nodes),
+        Edges:          actions.EdgesToProto(workflow.Edges),
+        CreatedBy:      createdBy,
+        CreatedByName:  createdByName,
+    }
 }
 
 func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workflow) ([]models.Node, []models.Edge, error) {
