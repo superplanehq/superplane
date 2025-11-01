@@ -1320,6 +1320,11 @@ export type WorkflowsUpdateWorkflowResponse = {
     workflow?: WorkflowsWorkflow;
 };
 
+export type WorkflowsUserRef = {
+    id?: string;
+    name?: string;
+};
+
 export type WorkflowsWorkflow = {
     id?: string;
     organizationId?: string;
@@ -1329,6 +1334,7 @@ export type WorkflowsWorkflow = {
     updatedAt?: string;
     nodes?: Array<ComponentsNode>;
     edges?: Array<ComponentsEdge>;
+    createdBy?: WorkflowsUserRef;
 };
 
 export type WorkflowsWorkflowEvent = {

@@ -284,6 +284,7 @@ docs/WorkflowsListWorkflowEventsResponse.md
 docs/WorkflowsListWorkflowsResponse.md
 docs/WorkflowsUpdateWorkflowBody.md
 docs/WorkflowsUpdateWorkflowResponse.md
+docs/WorkflowsUserRef.md
 docs/WorkflowsWorkflow.md
 docs/WorkflowsWorkflowEvent.md
 docs/WorkflowsWorkflowNodeExecution.md
@@ -529,6 +530,7 @@ model_workflows_list_workflow_events_response.go
 model_workflows_list_workflows_response.go
 model_workflows_update_workflow_body.go
 model_workflows_update_workflow_response.go
+model_workflows_user_ref.go
 model_workflows_workflow.go
 model_workflows_workflow_event.go
 model_workflows_workflow_node_execution.go

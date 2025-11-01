@@ -7155,6 +7155,17 @@
         }
       }
     },
+    "WorkflowsUserRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "WorkflowsWorkflow": {
       "type": "object",
       "properties": {
@@ -7191,6 +7202,10 @@
             "type": "object",
             "$ref": "#/definitions/ComponentsEdge"
           }
+        },
+        "createdBy": {
+          "$ref": "#/definitions/WorkflowsUserRef",
+          "title": "Creator reference"
         }
       }
     },
