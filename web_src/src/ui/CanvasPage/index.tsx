@@ -130,6 +130,8 @@ const EDGE_STYLE = {
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
 } as const;
 
+const DEFAULT_CANVAS_ZOOM = 0.8;
+
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
@@ -150,7 +152,8 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
-  const [canvasZoom, setCanvasZoom] = useState(1);
+  const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
+  const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [emitModalData, setEmitModalData] = useState<{
     nodeId: string;
     nodeName: string;
@@ -527,6 +530,10 @@ function CanvasContent({
   // Use viewport ref from props if provided, otherwise create local one
   const viewportRef = viewportRefProp || useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
 
+  if (!viewportRef.current && (stateRef.current.nodes?.length ?? 0) === 0) {
+    viewportRef.current = { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+  }
+
   // Use viewport from ref as the state value
   const viewport = viewportRef.current;
 
@@ -618,15 +625,27 @@ function CanvasContent({
   const handleInit = useCallback(
     (reactFlowInstance: any) => {
       if (!hasFitToViewRef.current) {
-        // Fit to view but don't zoom in too much (max zoom of 1.0)
-        fitView({ maxZoom: 1.0, padding: 0.5 });
+        const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
 
-        // Store the initial viewport after fit
-        const initialViewport = getViewport();
-        viewportRef.current = initialViewport;
+        if (hasNodes) {
+          // Fit to view but don't zoom in too much (max zoom of 1.0)
+          fitView({ maxZoom: 1.0, padding: 0.5 });
 
-        if (onZoomChange) {
-          onZoomChange(initialViewport.zoom);
+          // Store the initial viewport after fit
+          const initialViewport = getViewport();
+          viewportRef.current = initialViewport;
+
+          if (onZoomChange) {
+            onZoomChange(initialViewport.zoom);
+          }
+        } else {
+          const defaultViewport = viewportRef.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
+          viewportRef.current = defaultViewport;
+          reactFlowInstance.setViewport(defaultViewport);
+
+          if (onZoomChange) {
+            onZoomChange(defaultViewport.zoom);
+          }
         }
 
         hasFitToViewRef.current = true;
