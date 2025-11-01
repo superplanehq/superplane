@@ -19,6 +19,7 @@ import type { MetadataItem } from "../metadataList";
 import { ViewToggle } from "../ViewToggle";
 import { Block, BlockData } from "./Block";
 import "./canvas-reset.css";
+import { CustomEdge } from "./CustomEdge";
 import { Header, type BreadcrumbItem } from "./Header";
 import { NodeConfigurationModal } from "./NodeConfigurationModal";
 import { Simulation } from "./storybooks/useSimulation";
@@ -126,7 +127,7 @@ export interface CanvasPageProps {
 }
 
 const EDGE_STYLE = {
-  type: "default",
+  type: "custom",
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
 } as const;
 
@@ -693,7 +694,9 @@ function CanvasContent({
     [handleNodeExpand, handleNodeClick, onNodeEdit, state.ai, onDuplicate, onDeactivate, onToggleView, onNodeDelete],
   );
 
-  const edgeTypes = useMemo(() => ({}), []);
+  const edgeTypes = useMemo(() => ({
+    custom: CustomEdge,
+  }), []);
   const styledEdges = useMemo(() => state.edges?.map((e) => ({ ...e, ...EDGE_STYLE })), [state.edges]);
 
   return (
