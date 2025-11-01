@@ -621,6 +621,10 @@ function CanvasContent({
     [onZoomChange, viewportRef],
   );
 
+  const handlePaneClick = useCallback(() => {
+    stateRef.current.componentSidebar.close();
+  }, []);
+
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
     (reactFlowInstance: any) => {
@@ -729,6 +733,7 @@ function CanvasContent({
             onDrop={handleDrop}
             onMove={handleMove}
             onInit={handleInit}
+            onPaneClick={handlePaneClick}
             defaultViewport={viewport}
             fitView={false}
             style={{ opacity: isInitialized ? 1 : 0 }}
