@@ -1,6 +1,6 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { resolveIcon } from "@/lib/utils";
-import { Save, Trash2 } from "lucide-react";
+import { Save, Trash2, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Button } from "../button";
 
 export interface BreadcrumbItem {
@@ -30,15 +31,23 @@ interface HeaderProps {
 
 export function Header({ breadcrumbs, onSave, onDelete, onLogoClick }: HeaderProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+
+  // Get the workflow name from the last breadcrumb
+  const workflowName = breadcrumbs[breadcrumbs.length - 1]?.label || "";
 
   const handleDeleteClick = () => {
     setShowDeleteModal(true);
+    setDeleteConfirmation("");
   };
 
   const handleConfirmDelete = () => {
     setShowDeleteModal(false);
+    setDeleteConfirmation("");
     onDelete?.();
   };
+
+  const isDeleteEnabled = deleteConfirmation === workflowName;
 
   return (
     <>
@@ -141,13 +150,35 @@ export function Header({ breadcrumbs, onSave, onDelete, onLogoClick }: HeaderPro
 
       {/* Delete Confirmation Modal */}
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Delete Workflow</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this workflow? This action cannot be undone.
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <DialogTitle className="text-xl">Delete Workflow</DialogTitle>
+            </div>
+            <DialogDescription className="text-base space-y-3 pt-2">
+              <p className="text-gray-700 font-medium">
+                This action cannot be undone. This will permanently delete the workflow and all associated events and executions.
+              </p>
+              <p className="text-gray-600">
+                Please type <span className="font-mono font-semibold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">{workflowName}</span> to confirm.
+              </p>
             </DialogDescription>
           </DialogHeader>
+
+          <div className="py-4">
+            <Input
+              type="text"
+              placeholder={`Enter "${workflowName}" to confirm`}
+              value={deleteConfirmation}
+              onChange={(e) => setDeleteConfirmation(e.target.value)}
+              className="font-mono"
+              autoFocus
+            />
+          </div>
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -158,8 +189,11 @@ export function Header({ breadcrumbs, onSave, onDelete, onLogoClick }: HeaderPro
             <Button
               variant="destructive"
               onClick={handleConfirmDelete}
+              disabled={!isDeleteEnabled}
+              className="bg-red-600 hover:bg-red-700 text-white disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
             >
-              Delete
+              <Trash2 className="h-4 w-4 mr-1.5" />
+              Delete Workflow
             </Button>
           </DialogFooter>
         </DialogContent>

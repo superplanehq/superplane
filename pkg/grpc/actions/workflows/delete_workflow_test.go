@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -92,5 +93,46 @@ func Test__DeleteWorkflow(t *testing.T) {
 		support.VerifyWorkflowEventsCount(t, workflow.ID, 0)
 		support.VerifyWorkflowNodeExecutionsCount(t, workflow.ID, 0)
 		support.VerifyWorkflowNodeQueueCount(t, workflow.ID, 0)
+	})
+
+	t.Run("workflow node webhook is deleted", func(t *testing.T) {
+		//
+		// Create webhook
+		//
+		webhookID := uuid.New()
+		webhook := models.Webhook{
+			ID:     webhookID,
+			State:  models.WebhookStatePending,
+			Secret: []byte("secret"),
+		}
+
+		require.NoError(t, database.Conn().Create(&webhook).Error)
+
+		//
+		// Create a workflow with node that has webhook
+		//
+		workflow, _ := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			[]models.WorkflowNode{
+				{
+					NodeID: "node-1",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+					WebhookID: &webhookID,
+				},
+			},
+			[]models.Edge{},
+		)
+
+		//
+		// Delete the workflow, and verify webhook is deleted too.
+		//
+		_, err := DeleteWorkflow(context.Background(), r.Registry, r.Organization.ID, workflow.ID.String())
+		require.NoError(t, err)
+		_, err = models.FindWebhook(webhookID)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
 }
