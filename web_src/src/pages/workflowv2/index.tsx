@@ -1132,6 +1132,7 @@ function prepareIfNode(
         },
         trueSectionLabel: "TRUE",
         falseSectionLabel: "FALSE",
+        collapsedBackground: getBackgroundColorClass("white"),
       },
     },
   };
@@ -1174,6 +1175,7 @@ function prepareNoopNode(
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
         },
+        collapsedBackground: getBackgroundColorClass("white"),
       },
     },
   };
@@ -1219,6 +1221,7 @@ function prepareFilterNode(
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
         },
+        collapsedBackground: getBackgroundColorClass("white"),
       },
     },
   };

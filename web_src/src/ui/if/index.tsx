@@ -14,6 +14,7 @@ export interface IfProps extends ComponentActionsProps {
   collapsed?: boolean;
   selected?: boolean;
   hideHandle?: boolean;
+  collapsedBackground?: string;
 }
 
 const HANDLE_STYLE = {
@@ -33,6 +34,7 @@ export const If: React.FC<IfProps> = ({
   falseSectionLabel = "FALSE",
   collapsed = false,
   selected = false,
+  collapsedBackground,
   onRun,
   onEdit,
   onDuplicate,
@@ -98,6 +100,7 @@ export const If: React.FC<IfProps> = ({
       spec={spec}
       eventSections={eventSections}
       collapsed={collapsed}
+      collapsedBackground={collapsedBackground}
       selected={selected}
       onRun={onRun}
       onEdit={onEdit}

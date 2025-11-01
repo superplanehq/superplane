@@ -18,6 +18,7 @@ export interface SwitchComponentProps extends ComponentActionsProps {
   collapsed?: boolean;
   selected?: boolean;
   hideHandle?: boolean;
+  collapsedBackground?: string;
 }
 
 const HANDLE_STYLE = {
@@ -32,6 +33,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   stages,
   collapsed = false,
   selected = false,
+  collapsedBackground,
   onRun,
   onEdit,
   onDuplicate,
@@ -82,6 +84,7 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
       spec={spec}
       eventSections={eventSections}
       collapsed={collapsed}
+      collapsedBackground={collapsedBackground}
       selected={selected}
       onRun={onRun}
       onEdit={onEdit}

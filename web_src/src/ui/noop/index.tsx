@@ -6,6 +6,7 @@ export interface NoopProps extends ComponentActionsProps {
   lastEvent?: Omit<EventSection, "title">;
   collapsed?: boolean;
   selected?: boolean;
+  collapsedBackground?: string;
 }
 
 export const Noop: React.FC<NoopProps> = ({
@@ -13,6 +14,7 @@ export const Noop: React.FC<NoopProps> = ({
   lastEvent,
   collapsed = false,
   selected = false,
+  collapsedBackground,
   onRun,
   onEdit,
   onDuplicate,
@@ -36,6 +38,7 @@ export const Noop: React.FC<NoopProps> = ({
       headerColor="bg-gray-50"
       eventSections={eventSections}
       collapsed={collapsed}
+      collapsedBackground={collapsedBackground}
       selected={selected}
       onRun={onRun}
       onEdit={onEdit}
