@@ -10,6 +10,7 @@ func TestHomePage(t *testing.T) {
 
 	t.Run("creating a new canvas", func(t *testing.T) {
 		s.Start()
+		s.Login()
 		s.VisitHomePage()
 		s.AssertText("New Canvas")
 		s.ClickButton("New Canvas")

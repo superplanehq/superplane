@@ -1,21 +1,20 @@
 package e2e
 
 import (
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "os/exec"
-    "strings"
-    "testing"
-    "time"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"testing"
+	"time"
 
-    pw "github.com/playwright-community/playwright-go"
-    "github.com/superplanehq/superplane/pkg/authorization"
-    "github.com/superplanehq/superplane/pkg/database"
-    spjwt "github.com/superplanehq/superplane/pkg/jwt"
-    "github.com/superplanehq/superplane/pkg/models"
-    "github.com/superplanehq/superplane/pkg/server"
+	pw "github.com/playwright-community/playwright-go"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
+	spjwt "github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/server"
 )
 
 type TestSession struct {
@@ -26,9 +25,9 @@ type TestSession struct {
 	page      pw.Page
 	timeoutMs float64
 	viteCmd   *exec.Cmd
-	console   []string
-	neterrs   []string
-	orgID     string
+
+	orgID   string
+	account *models.Account
 }
 
 func NewTestSession(t *testing.T) *TestSession {
@@ -36,8 +35,7 @@ func NewTestSession(t *testing.T) *TestSession {
 }
 
 func (s *TestSession) Start() {
-    // Common server env
-    os.Setenv("START_PUBLIC_API", "yes")
+	os.Setenv("START_PUBLIC_API", "yes")
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
 	os.Setenv("START_WEB_SERVER", "yes")
 	os.Setenv("WEB_BASE_PATH", "")
@@ -46,11 +44,11 @@ func (s *TestSession) Start() {
 	os.Setenv("NO_ENCRYPTION", "yes")
 	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
 	os.Setenv("JWT_SECRET", "test-jwt-secret")
-    os.Setenv("BASE_URL", "http://127.0.0.1:8000")
-    os.Setenv("QUIET_PROXY_LOGS", "yes")
-    os.Setenv("QUIET_HTTP_LOGS", "yes")
+	os.Setenv("BASE_URL", "http://127.0.0.1:8000")
 
-	// Always use Vite dev server and proxy in development mode
+	os.Setenv("QUIET_PROXY_LOGS", "yes")
+	os.Setenv("QUIET_HTTP_LOGS", "yes")
+
 	os.Setenv("APP_ENV", "development")
 	_ = os.Unsetenv("ASSETS_ROOT")
 	s.startVite()
@@ -82,16 +80,32 @@ func (s *TestSession) Start() {
 	}
 	s.page = p
 
-    // Capture console and network failures
-    s.page.OnConsole(func(m pw.ConsoleMessage) { s.console = append(s.console, fmt.Sprintf("[%s] %s", m.Type(), m.Text())) })
-    s.page.OnPageError(func(e error) { s.console = append(s.console, fmt.Sprintf("[pageerror] %v", e)) })
-    s.page.OnRequestFailed(func(r pw.Request) { s.neterrs = append(s.neterrs, fmt.Sprintf("FAIL %s %s", r.Method(), r.URL())) })
+	// Stream browser console and network issues to test output
+	s.page.OnConsole(func(m pw.ConsoleMessage) {
+		s.t.Logf("[console.%s] %s", m.Type(), m.Text())
+	})
 
-    // Reset the database between tests
-    s.resetDatabase()
+	s.page.OnPageError(func(err error) {
+		s.t.Logf("[Browser Logs] %v", err)
+	})
 
-    // Prepare an account, organization, and user, then authenticate via cookie
-    s.setupUserAndOrganization()
+	s.page.OnRequestFailed(func(r pw.Request) {
+		reason := ""
+		if err := r.Failure(); err != nil {
+			reason = err.Error()
+		}
+		s.t.Logf("[Browser Logs] %s (%s)", r.URL(), reason)
+	})
+
+	s.page.OnResponse(func(resp pw.Response) {
+		status := resp.Status()
+		if status >= 400 {
+			s.t.Logf("[Browser Logs] %d %s", status, resp.URL())
+		}
+	})
+
+	s.resetDatabase()
+	s.setupUserAndOrganization()
 }
 
 func (s *TestSession) Visit(path string) {
@@ -126,24 +140,16 @@ func (s *TestSession) TakeScreenshot() {
 	}
 }
 
-// Sleep pauses the test for the given milliseconds (avoid; prefer WaitForNetworkIdle).
-func (s *TestSession) Sleep(ms int) { time.Sleep(time.Duration(ms) * time.Millisecond) }
-
-// WaitForNetworkIdle waits until Playwright observes network idle.
-// Uses the page load state 'networkidle' with the session timeout.
-func (s *TestSession) WaitForNetworkIdle() {
-    if err := s.page.WaitForLoadState(pw.PageWaitForLoadStateOptions{
-        State:   pw.LoadStateNetworkidle,
-        Timeout: pw.Float(s.timeoutMs),
-    }); err != nil {
-        s.t.Fatalf("wait for network idle: %v", err)
-    }
+func (s *TestSession) Sleep(ms int) {
+	time.Sleep(time.Duration(ms) * time.Millisecond)
 }
 
-// resetDatabase truncates all public tables (except migration tables),
-// restarting identities and cascading to maintain referential integrity.
 func (s *TestSession) resetDatabase() {
-    sql := `DO $$
+	//
+	// resetDatabase truncates all public tables (except migration tables),
+	// restarting identities and cascading to maintain referential integrity.
+	//
+	sql := `DO $$
     DECLARE r RECORD;
     BEGIN
         FOR r IN (
@@ -155,14 +161,29 @@ func (s *TestSession) resetDatabase() {
             EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
         END LOOP;
     END$$;`
-    if err := database.Conn().Exec(sql).Error; err != nil {
-        s.t.Fatalf("reset database: %v", err)
-    }
+
+	if err := database.Conn().Exec(sql).Error; err != nil {
+		s.t.Fatalf("reset database: %v", err)
+	}
 }
 
 func (s *TestSession) Login() {
-	// Backward compatibility: keep calling the new setup
-	s.setupUserAndOrganization()
+	// Authenticate via the account cookie
+	secret := os.Getenv("JWT_SECRET")
+	signer := spjwt.NewSigner(secret)
+	token, err := signer.Generate(s.account.ID.String(), 24*time.Hour)
+	if err != nil {
+		s.t.Fatalf("jwt: %v", err)
+	}
+
+	if err := s.context.AddCookies([]pw.OptionalCookie{{
+		Name:     "account_token",
+		Value:    token,
+		URL:      pw.String("http://127.0.0.1:8000/"),
+		HttpOnly: pw.Bool(true),
+	}}); err != nil {
+		s.t.Fatalf("add cookie: %v", err)
+	}
 }
 
 // setupUserAndOrganization ensures there is an account, an organization,
@@ -203,36 +224,15 @@ func (s *TestSession) setupUserAndOrganization() {
 		}
 	}
 
-	// Persist for convenience when visiting org-scoped routes
-	s.orgID = organization.ID.String()
-
-	// Create default org roles and assign owner to the user (best-effort)
-	// This mirrors server org bootstrap but tests can proceed even if this fails.
-	// Avoid introducing a hard dependency if RBAC files are not configured.
 	if svc, err := authorization.NewAuthService(); err == nil {
 		_ = svc.SetupOrganizationRoles(organization.ID.String())
 		_ = svc.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
 	}
 
-	// Authenticate via the account cookie
-	secret := os.Getenv("JWT_SECRET")
-	signer := spjwt.NewSigner(secret)
-	token, err := signer.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
-		s.t.Fatalf("jwt: %v", err)
-	}
-
-	if err := s.context.AddCookies([]pw.OptionalCookie{{
-		Name:     "account_token",
-		Value:    token,
-		URL:      pw.String("http://127.0.0.1:8000/"),
-		HttpOnly: pw.Bool(true),
-	}}); err != nil {
-		s.t.Fatalf("add cookie: %v", err)
-	}
+	s.orgID = organization.ID.String()
+	s.account = account
 }
 
-// ClickButton finds and clicks a button by its visible text.
 func (s *TestSession) ClickButton(text string) {
 	selector := fmt.Sprintf("button:has-text(\"%s\"), [role=button]:has-text(\"%s\")", text, text)
 	if err := s.page.Locator(selector).First().Click(pw.LocatorClickOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
@@ -240,8 +240,6 @@ func (s *TestSession) ClickButton(text string) {
 	}
 }
 
-// FillIn fills a text input or textarea identified by its accessible label
-// (preferred) or placeholder text as a fallback.
 func (s *TestSession) FillIn(label, value string) {
 	// Try by accessible name via role=textbox
 	if el := s.page.GetByRole("textbox", pw.PageGetByRoleOptions{Name: label}); el != nil {
@@ -272,46 +270,24 @@ func (s *TestSession) FillIn(label, value string) {
 	s.t.Fatalf("fill in %q failed; last label text: %q", label, box)
 }
 
-// VisitHomePage navigates to the org-scoped home route.
 func (s *TestSession) VisitHomePage() {
-	if s.orgID == "" {
-		s.t.Fatalf("VisitHomePage called before org/user setup")
-	}
 	s.Visit("/" + s.orgID + "/")
-}
-
-func (s *TestSession) DumpBrowserLogs() {
-	if len(s.console) > 0 {
-		s.t.Logf("Console logs:\n%s", strings.Join(s.console, "\n"))
-	}
-	if len(s.neterrs) > 0 {
-		s.t.Logf("Network failures:\n%s", strings.Join(s.neterrs, "\n"))
-	}
-}
-
-// DumpPageSource saves the current page HTML to a file and logs the path.
-func (s *TestSession) DumpPageSource() {
-	content, err := s.page.Content()
-	if err != nil {
-		s.t.Logf("could not get page content: %v", err)
-		return
-	}
-	s.t.Logf("Page source (len=%d):\n%s", len(content), content)
 }
 
 func (s *TestSession) startVite() {
 	cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
 	cmd.Dir = "../../web_src"
 	cmd.Env = append(os.Environ(), "BROWSER=none")
-	// Keep logs quiet in tests
+
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
+
 	if err := cmd.Start(); err != nil {
 		s.t.Fatalf("vite start: %v", err)
 	}
+
 	s.viteCmd = cmd
 
-	// Wait until Vite is listening
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		resp, err := http.Get("http://127.0.0.1:5173/")
