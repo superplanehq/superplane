@@ -235,6 +235,8 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 		if err := tx.Create(&nodeExecution).Error; err != nil {
 			return err
 		}
+
+		messages.NewWorkflowExecutionCreatedMessage(workflow.ID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
 	}
 
 	return event.RoutedInTransaction(tx)
@@ -313,7 +315,8 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 		return err
 	}
 
-	messages.PublishManyWorkflowEventsWithDelay(parentExecution.WorkflowID.String(), events, 100*time.Millisecond)
+	messages.NewWorkflowExecutionFinishedMessage(parentExecution.WorkflowID.String(), parentExecution).PublishWithDelay(1 * time.Second)
+	messages.PublishManyWorkflowEventsWithDelay(parentExecution.WorkflowID.String(), events, 1*time.Second)
 
 	w.log("Parent execution %s completed", parentExecution.ID)
 	return event.RoutedInTransaction(tx)

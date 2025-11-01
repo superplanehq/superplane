@@ -24,11 +24,14 @@ func (s *ExecutionStateContext) Pass(outputs map[string][]any) error {
 		return err
 	}
 
-	messages.PublishManyWorkflowEventsWithDelay(s.execution.WorkflowID.String(), events, 100*time.Millisecond)
+	messages.NewWorkflowExecutionFinishedMessage(s.execution.WorkflowID.String(), s.execution).PublishWithDelay(1 * time.Second)
+	messages.PublishManyWorkflowEventsWithDelay(s.execution.WorkflowID.String(), events, 1*time.Second)
 
 	return nil
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {
-	return s.execution.FailInTransaction(s.tx, reason, message)
+	err := s.execution.FailInTransaction(s.tx, reason, message)
+	messages.NewWorkflowExecutionFinishedMessage(s.execution.WorkflowID.String(), s.execution).PublishWithDelay(1 * time.Second)
+	return err
 }
