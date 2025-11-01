@@ -2,12 +2,13 @@ import React from 'react'
 import { Input } from '../input'
 import { FieldRendererProps } from './types'
 
-export const DateFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const DateFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   return (
     <Input
       type="date"
-      value={value ?? field.defaultValue ?? ''}
+      value={(value as string) ?? (field.defaultValue as string) ?? ''}
       onChange={(e) => onChange(e.target.value || undefined)}
+      className={hasError ? 'border-red-500 border-2' : ''}
     />
   )
 }

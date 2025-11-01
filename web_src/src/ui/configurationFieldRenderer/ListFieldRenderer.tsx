@@ -5,7 +5,21 @@ import { Input } from '../input'
 import { FieldRendererProps } from './types'
 import { ConfigurationFieldRenderer } from './index'
 
-export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, domainId, domainType }) => {
+interface ExtendedFieldRendererProps extends FieldRendererProps {
+  validationErrors?: Set<string>
+  fieldPath?: string
+}
+
+export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  domainId,
+  domainType,
+  hasError: _hasError,
+  validationErrors,
+  fieldPath = field.name || ''
+}) => {
   const items = Array.isArray(value) ? value : []
   const listOptions = field.typeOptions?.list
   const itemDefinition = listOptions?.itemDefinition
@@ -24,7 +38,7 @@ export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
     onChange(newItems.length > 0 ? newItems : undefined)
   }
 
-  const updateItem = (index: number, newValue: any) => {
+  const updateItem = (index: number, newValue: unknown) => {
     const newItems = [...items]
     newItems[index] = newValue
     onChange(newItems)
@@ -37,20 +51,26 @@ export const ListFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
           <div className="flex-1">
             {itemDefinition?.type === 'object' && itemDefinition.schema ? (
               <div className="border border-gray-300 dark:border-zinc-700 rounded-md p-4 space-y-4">
-                {itemDefinition.schema.map((schemaField) => (
-                  <ConfigurationFieldRenderer
-                    key={schemaField.name}
-                    field={schemaField}
-                    value={item[schemaField.name!]}
-                    onChange={(val) => {
-                      const newItem = { ...item, [schemaField.name!]: val }
-                      updateItem(index, newItem)
-                    }}
-                    allValues={item}
-                    domainId={domainId}
-                    domainType={domainType}
-                  />
-                ))}
+                {itemDefinition.schema.map((schemaField) => {
+                  const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`
+                  const hasNestedError = validationErrors?.has(nestedFieldPath) || false
+
+                  return (
+                    <ConfigurationFieldRenderer
+                      key={schemaField.name}
+                      field={schemaField}
+                      value={item[schemaField.name!]}
+                      onChange={(val) => {
+                        const newItem = { ...item, [schemaField.name!]: val }
+                        updateItem(index, newItem)
+                      }}
+                      allValues={item}
+                      domainId={domainId}
+                      domainType={domainType}
+                      hasError={hasNestedError}
+                    />
+                  )
+                })}
               </div>
             ) : (
               <Input
