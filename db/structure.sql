@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gbqGdgEYXe37grMJaf8JF8idcvfsEABIte9aRxhCvXi2nGKO3htjUCahVPpLIMj
+\restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg22.04+1)
@@ -1638,13 +1638,13 @@ ALTER TABLE ONLY public.workflow_nodes
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gbqGdgEYXe37grMJaf8JF8idcvfsEABIte9aRxhCvXi2nGKO3htjUCahVPpLIMj
+\unrestrict abcdef123
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict loAVm7cRG67bIOIKSGxGjGBv63NpnzMboT26wHkS0iQzUJU2vrwIkJHXBNJeTcI
+\restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
 -- Dumped by pg_dump version 17.6 (Ubuntu 17.6-2.pgdg22.04+1)
@@ -1674,5 +1674,5 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict loAVm7cRG67bIOIKSGxGjGBv63NpnzMboT26wHkS0iQzUJU2vrwIkJHXBNJeTcI
+\unrestrict abcdef123
 
