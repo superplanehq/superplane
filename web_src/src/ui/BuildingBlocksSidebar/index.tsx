@@ -51,8 +51,8 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
   const sortedCategories = (blocks || []).sort((a, b) => {
     if (a.name === "Primitives") return -1;
     if (b.name === "Primitives") return 1;
-    if (a.name === "Custom Components") return -1;
-    if (b.name === "Custom Components") return 1;
+    if (a.name === "Components") return -1;
+    if (b.name === "Components") return 1;
     return a.name.localeCompare(b.name);
   });
 

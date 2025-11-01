@@ -69,7 +69,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
       <DialogTitle>Create New Canvas</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a new canvas that can use both components and custom components as building blocks.
+        Create a new canvas to start automating your DevOps operations. You can always edit the canvas details later.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <MaterialSymbol name="close" size="sm" />

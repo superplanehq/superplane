@@ -350,7 +350,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     const categoryMap = new Map<string, BuildingBlock[]>();
 
     props.components.forEach((component: ComponentsComponent) => {
-      const categoryName = "Components";
+      const categoryName = "Primitives";
 
       const block: BuildingBlock = {
         name: component.name || "",

@@ -177,7 +177,7 @@ export function WorkflowPageV2() {
         ),
       },
       {
-        name: "Components",
+        name: "Primitives",
         blocks: components.map(
           (c): BuildingBlock => ({
             name: c.name!,
@@ -192,7 +192,7 @@ export function WorkflowPageV2() {
         ),
       },
       {
-        name: "Custom Components",
+        name: "Components",
         blocks: blueprints.map(
           (b): BuildingBlock => ({
             id: b.id,

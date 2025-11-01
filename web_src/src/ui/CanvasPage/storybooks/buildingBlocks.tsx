@@ -2933,7 +2933,7 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
     ],
   },
   {
-    name: "Custom Components",
+    name: "Components",
     blocks: [
       // Complex user-built components
       {

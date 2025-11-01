@@ -59,7 +59,7 @@ const HomePage = () => {
     error: workflowApiError,
   } = useWorkflows(organizationId || "");
 
-  const blueprintError = blueprintApiError ? "Failed to fetch custom components. Please try again later." : null;
+  const blueprintError = blueprintApiError ? "Failed to fetch components. Please try again later." : null;
   const workflowError = workflowApiError ? "Failed to fetch workflows. Please try again later." : null;
 
   const blueprints: BlueprintCardData[] = (blueprintsData || []).map((blueprint: any) => ({
@@ -200,7 +200,7 @@ function Tabs({ activeTab, setActiveTab, blueprints, workflows }: TabsProps) {
             : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
         }`}
       >
-        Custom Components ({blueprints.length})
+        Components ({blueprints.length})
       </button>
     </div>
   );
@@ -271,7 +271,7 @@ interface PageHeaderProps {
 }
 
 function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
-  const heading = activeTab === "custom-components" ? "Custom Components" : "Canvases";
+  const heading = activeTab === "custom-components" ? "components" : "Canvases";
   const buttonText = activeTab === "custom-components" ? "New Component" : "New Canvas";
 
   return (
@@ -349,10 +349,10 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
     <div className="text-center py-12">
       <Box className="mx-auto text-zinc-400 mb-4" size={48} />
       <Heading level={3} className="text-lg text-zinc-900 dark:text-white mb-2">
-        {searchQuery ? "No custom components found" : "No custom components yet"}
+        {searchQuery ? "No components found" : "No components yet"}
       </Heading>
       <Text className="text-zinc-600 dark:text-zinc-400 mb-6">
-        {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first custom component."}
+        {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first component."}
       </Text>
     </div>
   );
