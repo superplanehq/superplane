@@ -80,30 +80,8 @@ func (s *TestSession) Start() {
 	}
 	s.page = p
 
-	// Stream browser console and network issues to test output
-	s.page.OnConsole(func(m pw.ConsoleMessage) {
-		s.t.Logf("[console.%s] %s", m.Type(), m.Text())
-	})
-
-	s.page.OnPageError(func(err error) {
-		s.t.Logf("[Browser Logs] %v", err)
-	})
-
-	s.page.OnRequestFailed(func(r pw.Request) {
-		reason := ""
-		if err := r.Failure(); err != nil {
-			reason = err.Error()
-		}
-		s.t.Logf("[Browser Logs] %s (%s)", r.URL(), reason)
-	})
-
-	s.page.OnResponse(func(resp pw.Response) {
-		status := resp.Status()
-		if status >= 400 {
-			s.t.Logf("[Browser Logs] %d %s", status, resp.URL())
-		}
-	})
-
+	s.setUpNavigationLogger()
+	s.streamBrowserLogs()
 	s.resetDatabase()
 	s.setupUserAndOrganization()
 }
@@ -297,4 +275,82 @@ func (s *TestSession) startVite() {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+}
+
+func (s *TestSession) setUpNavigationLogger() {
+	// Expose a logging function to capture SPA (client-side) URL changes
+	if err := s.page.ExposeFunction("_spNav", func(args ...interface{}) interface{} {
+		if len(args) > 0 {
+			if url, ok := args[0].(string); ok {
+				s.t.Logf("[Browser Logs] Navigated to %s", url)
+			}
+		}
+		return nil
+	}); err != nil {
+		s.t.Fatalf("expose function: %v", err)
+	}
+
+	// Inject a script that hooks into the History API and URL change events
+	// to report client-side navigations (e.g., react-router)
+	if err := s.context.AddInitScript(pw.Script{Content: pw.String(`
+        (() => {
+          try {
+            let last = location.href;
+            const notify = () => {
+              const href = location.href;
+              if (href !== last) {
+                last = href;
+                if (window._spNav) {
+                  window._spNav(href);
+                }
+              }
+            };
+            const push = history.pushState;
+            const replace = history.replaceState;
+            history.pushState = function(...args){ const r = push.apply(this, args); notify(); return r; };
+            history.replaceState = function(...args){ const r = replace.apply(this, args); notify(); return r; };
+            window.addEventListener('popstate', notify);
+            window.addEventListener('hashchange', notify);
+            // Initial report
+            if (window._spNav) { window._spNav(location.href); }
+          } catch (_) { /* ignore */ }
+        })();
+    `)}); err != nil {
+		s.t.Fatalf("init script: %v", err)
+	}
+
+	// Log when the main frame navigates to a new URL (full navigations)
+	s.page.OnFrameNavigated(func(f pw.Frame) {
+		if f.ParentFrame() == nil { // main frame only
+			s.t.Logf("[Browser Logs] Navigated to %s", f.URL())
+		}
+	})
+}
+
+func (s *TestSession) streamBrowserLogs() {
+	// Stream browser console and network issues to test output
+	s.page.OnConsole(func(m pw.ConsoleMessage) {
+		s.t.Logf("[console.%s] %s", m.Type(), m.Text())
+	})
+
+	// Non-navigation logs (leave here): console, errors, requests, responses
+
+	s.page.OnPageError(func(err error) {
+		s.t.Logf("[Browser Logs] %v", err)
+	})
+
+	s.page.OnRequestFailed(func(r pw.Request) {
+		reason := ""
+		if err := r.Failure(); err != nil {
+			reason = err.Error()
+		}
+		s.t.Logf("[Browser Logs] %s (%s)", r.URL(), reason)
+	})
+
+	s.page.OnResponse(func(resp pw.Response) {
+		status := resp.Status()
+		if status >= 400 {
+			s.t.Logf("[Browser Logs] %d %s", status, resp.URL())
+		}
+	})
 }
