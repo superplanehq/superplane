@@ -293,7 +293,10 @@ function CanvasPage(props: CanvasPageProps) {
               onNodeDelete={handleNodeDelete}
               onEdgeCreate={props.onEdgeCreate}
               hideHeader={true}
-              onToggleView={props.onToggleView}
+              onToggleView={(nodeId) => {
+                state.toggleNodeCollapse(nodeId);
+                props.onToggleView?.(nodeId);
+              }}
               onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
