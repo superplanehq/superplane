@@ -7,7 +7,7 @@ import { CreateCustomComponentModal } from "../../components/CreateCustomCompone
 import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
-import { useBlueprints } from "../../hooks/useBlueprintData";
+import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
 import { useDeleteWorkflow, useWorkflows } from "../../hooks/useWorkflowData";
 import { cn, resolveIcon } from "../../lib/utils";
 import { getColorClass } from "../../utils/colors";
@@ -590,6 +590,89 @@ function WorkflowActionsMenu({ workflow, organizationId }: WorkflowActionsMenuPr
   );
 }
 
+interface BlueprintActionsMenuProps {
+  blueprint: BlueprintCardData;
+  organizationId: string;
+}
+
+function BlueprintActionsMenu({ blueprint, organizationId }: BlueprintActionsMenuProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const deleteBlueprintMutation = useDeleteBlueprint(organizationId);
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+  };
+
+  const openDialog = (event: MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteBlueprintMutation.mutateAsync(blueprint.id);
+      showSuccessToast("Component deleted successfully");
+      closeDialog();
+    } catch (error) {
+      console.error("Failed to delete component:", error);
+      showErrorToast("Failed to delete component");
+    }
+  };
+
+  return (
+    <>
+      <div className="flex-shrink-0" onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}>
+        <Dropdown>
+          <DropdownButton
+            plain
+            className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+            aria-label="Component actions"
+            onClick={(event: MouseEvent<HTMLButtonElement>) => event.stopPropagation()}
+            disabled={deleteBlueprintMutation.isPending}
+          >
+            <MoreVertical size={16} />
+          </DropdownButton>
+          <DropdownMenu>
+            <DropdownItem
+              onClick={openDialog}
+              className="text-red-600 dark:text-red-400"
+            >
+              <span className="flex items-center gap-2">
+                <Trash2 size={16} />
+                Delete
+              </span>
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      </div>
+
+      <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
+        <DialogTitle className="text-red-900 dark:text-red-100">Delete component</DialogTitle>
+        <DialogDescription className="text-sm text-zinc-600 dark:text-zinc-400">
+          This action cannot be undone. Are you sure you want to delete this component?
+        </DialogDescription>
+        <DialogBody>
+          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+            Deleting <span className="font-medium text-zinc-900 dark:text-zinc-100">{blueprint.name}</span> will permanently remove it.
+          </Text>
+        </DialogBody>
+        <DialogActions>
+          <Button plain onClick={closeDialog}>Cancel</Button>
+          <Button
+            color="red"
+            onClick={handleDelete}
+            disabled={deleteBlueprintMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            <Trash2 size={16} />
+            {deleteBlueprintMutation.isPending ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
 interface BlueprintGridViewProps {
   filteredBlueprints: BlueprintCardData[];
   organizationId: string;
@@ -609,8 +692,8 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
           >
             <div className="p-6 flex flex-col justify-between h-full">
               <div>
-                <div className="flex items-center mb-4">
-                  <div className="flex items-center justify-between space-x-3 flex-1">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <IconComponent size={24} className={getColorClass(blueprint.color)} />
                     <div className="flex flex-col flex-1 min-w-0">
                       <button
@@ -626,6 +709,7 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
                       </button>
                     </div>
                   </div>
+                  <BlueprintActionsMenu blueprint={blueprint} organizationId={organizationId} />
                 </div>
 
                 <div className="mb-4">
@@ -667,34 +751,38 @@ function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGrid
             key={blueprint.id}
             className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow p-4"
           >
-            <button
-              onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
-              className="block text-left w-full"
-            >
-              <div className="flex items-center gap-3">
-                <IconComponent size={24} className={getColorClass(blueprint.color)} />
-                <div className="flex-1">
-                  <Heading
-                    level={3}
-                    className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
-                  >
-                    {blueprint.name}
-                  </Heading>
-                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {blueprint.description || "No description"}
-                  </Text>
-                  <Text className="text-xs text-zinc-500 mt-2">
-                    {blueprint.createdBy?.name ? (
-                      <>
-                        Created by <strong>{blueprint.createdBy.name}</strong> · {blueprint.createdAt}
-                      </>
-                    ) : (
-                      <>Created at {blueprint.createdAt}</>
-                    )}
-                  </Text>
+            <div className="flex items-start justify-between gap-3">
+              <button
+                onClick={() => navigate(`/${organizationId}/custom-components/${blueprint.id}`)}
+                className="block text-left w-full"
+              >
+                <div className="flex items-center gap-3">
+                  <IconComponent size={24} className={getColorClass(blueprint.color)} />
+                  <div className="flex-1">
+                    <Heading
+                      level={3}
+                      className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-1"
+                    >
+                      {blueprint.name}
+                    </Heading>
+                    <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {blueprint.description || "No description"}
+                    </Text>
+                    <Text className="text-xs text-zinc-500 mt-2">
+                      {blueprint.createdBy?.name ? (
+                        <>
+                          Created by <strong>{blueprint.createdBy.name}</strong> · {blueprint.createdAt}
+                        </>
+                      ) : (
+                        <>Created at {blueprint.createdAt}</>
+                      )}
+                    </Text>
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+
+              <BlueprintActionsMenu blueprint={blueprint} organizationId={organizationId} />
+            </div>
           </div>
         );
       })}

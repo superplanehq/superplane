@@ -25,8 +25,6 @@ interface HeaderProps {
   organizationId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
-  deleteModalTitle?: string;
-  deleteModalDescription?: string;
 }
 
 export function Header({ breadcrumbs, onSave, onLogoClick, organizationId, unsavedMessage, saveIsPrimary }: HeaderProps) {
