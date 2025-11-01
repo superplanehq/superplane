@@ -271,7 +271,7 @@ interface PageHeaderProps {
 }
 
 function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
-  const heading = activeTab === "custom-components" ? "Custom Components" : "Workflows";
+  const heading = activeTab === "custom-components" ? "Custom Components" : "Canvases";
   const buttonText = activeTab === "custom-components" ? "New Component" : "New Canvas";
 
   return (
