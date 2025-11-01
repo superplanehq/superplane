@@ -3963,6 +3963,9 @@
         },
         "color": {
           "type": "string"
+        },
+        "createdBy": {
+          "$ref": "#/definitions/SuperplaneBlueprintsUserRef"
         }
       }
     },
@@ -5378,6 +5381,17 @@
         }
       }
     },
+    "SuperplaneBlueprintsUserRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneCancelStageExecutionBody": {
       "type": "object"
     },
@@ -6752,6 +6766,17 @@
         }
       }
     },
+    "SuperplaneWorkflowsUserRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "TriggersDescribeTriggerResponse": {
       "type": "object",
       "properties": {
@@ -7155,17 +7180,6 @@
         }
       }
     },
-    "WorkflowsUserRef": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        }
-      }
-    },
     "WorkflowsWorkflow": {
       "type": "object",
       "properties": {
@@ -7204,7 +7218,7 @@
           }
         },
         "createdBy": {
-          "$ref": "#/definitions/WorkflowsUserRef",
+          "$ref": "#/definitions/SuperplaneWorkflowsUserRef",
           "title": "Creator reference"
         }
       }

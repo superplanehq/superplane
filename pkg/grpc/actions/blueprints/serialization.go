@@ -1,34 +1,45 @@
 package blueprints
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/superplanehq/superplane/pkg/components"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
-	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
-	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
+    "github.com/superplanehq/superplane/pkg/components"
+    "github.com/superplanehq/superplane/pkg/grpc/actions"
+    "github.com/superplanehq/superplane/pkg/models"
+    pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
+    componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+    "github.com/superplanehq/superplane/pkg/registry"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
+    "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func SerializeBlueprint(in *models.Blueprint) *pb.Blueprint {
-	return &pb.Blueprint{
-		Id:             in.ID.String(),
-		OrganizationId: in.OrganizationID.String(),
-		Name:           in.Name,
-		Description:    in.Description,
-		CreatedAt:      timestamppb.New(*in.CreatedAt),
-		UpdatedAt:      timestamppb.New(*in.UpdatedAt),
-		Icon:           in.Icon,
-		Color:          in.Color,
-		Nodes:          actions.NodesToProto(in.Nodes),
-		Edges:          actions.EdgesToProto(in.Edges),
-		Configuration:  ConfigurationToProto(in.Configuration),
-		OutputChannels: OutputChannelsToProto(in.OutputChannels),
-	}
+    var createdBy *pb.UserRef
+    if in.CreatedBy != nil {
+        idStr := in.CreatedBy.String()
+        name := ""
+        if user, err := models.FindMaybeDeletedUserByID(in.OrganizationID.String(), idStr); err == nil && user != nil {
+            name = user.Name
+        }
+        createdBy = &pb.UserRef{Id: idStr, Name: name}
+    }
+
+    return &pb.Blueprint{
+        Id:             in.ID.String(),
+        OrganizationId: in.OrganizationID.String(),
+        Name:           in.Name,
+        Description:    in.Description,
+        CreatedAt:      timestamppb.New(*in.CreatedAt),
+        UpdatedAt:      timestamppb.New(*in.UpdatedAt),
+        Icon:           in.Icon,
+        Color:          in.Color,
+        Nodes:          actions.NodesToProto(in.Nodes),
+        Edges:          actions.EdgesToProto(in.Edges),
+        Configuration:  ConfigurationToProto(in.Configuration),
+        OutputChannels: OutputChannelsToProto(in.OutputChannels),
+        CreatedBy:      createdBy,
+    }
 }
 
 func ParseBlueprint(registry *registry.Registry, blueprint *pb.Blueprint) ([]models.Node, []models.Edge, error) {

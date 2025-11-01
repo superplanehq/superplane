@@ -1,20 +1,27 @@
 package blueprints
 
 import (
-	"context"
-	"fmt"
-	"time"
+    "context"
+    "fmt"
+    "time"
 
-	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
-	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
-	"github.com/superplanehq/superplane/pkg/registry"
-	"gorm.io/datatypes"
+    "github.com/google/uuid"
+    "github.com/superplanehq/superplane/pkg/database"
+    "github.com/superplanehq/superplane/pkg/authentication"
+    "github.com/superplanehq/superplane/pkg/models"
+    pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
+    componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+    "github.com/superplanehq/superplane/pkg/registry"
+    "gorm.io/datatypes"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
 )
 
 func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizationID string, blueprint *pb.Blueprint) (*pb.CreateBlueprintResponse, error) {
+    userID, ok := authentication.GetUserIdFromMetadata(ctx)
+    if !ok {
+        return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+    }
 	nodes, edges, err := ParseBlueprint(registry, blueprint)
 	if err != nil {
 		return nil, err
@@ -37,20 +44,21 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 
 	orgID, _ := uuid.Parse(organizationID)
 	now := time.Now()
-	model := &models.Blueprint{
-		ID:             uuid.New(),
-		OrganizationID: orgID,
-		Name:           blueprint.Name,
-		Description:    blueprint.Description,
-		Icon:           blueprint.Icon,
-		Color:          blueprint.Color,
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-		Nodes:          nodes,
-		Edges:          edges,
-		Configuration:  datatypes.NewJSONSlice(configuration),
-		OutputChannels: datatypes.NewJSONSlice(outputChannels),
-	}
+    model := &models.Blueprint{
+        ID:             uuid.New(),
+        OrganizationID: orgID,
+        Name:           blueprint.Name,
+        Description:    blueprint.Description,
+        Icon:           blueprint.Icon,
+        Color:          blueprint.Color,
+        CreatedBy:      func() *uuid.UUID { u := uuid.MustParse(userID); return &u }(),
+        CreatedAt:      &now,
+        UpdatedAt:      &now,
+        Nodes:          nodes,
+        Edges:          edges,
+        Configuration:  datatypes.NewJSONSlice(configuration),
+        OutputChannels: datatypes.NewJSONSlice(outputChannels),
+    }
 
 	if err := database.Conn().Create(model).Error; err != nil {
 		return nil, err
