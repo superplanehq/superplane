@@ -1,17 +1,17 @@
 package workflows
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/superplanehq/superplane/pkg/components"
-    "github.com/superplanehq/superplane/pkg/grpc/actions"
-    "github.com/superplanehq/superplane/pkg/models"
-    compb "github.com/superplanehq/superplane/pkg/protos/components"
-    pb "github.com/superplanehq/superplane/pkg/protos/workflows"
-    "github.com/superplanehq/superplane/pkg/registry"
-    "google.golang.org/grpc/codes"
-    "google.golang.org/grpc/status"
-    "google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
+	compb "github.com/superplanehq/superplane/pkg/protos/components"
+	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
@@ -33,27 +33,27 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		}
 	}
 
-    var createdBy *pb.UserRef
-    if workflow.CreatedBy != nil {
-        idStr := workflow.CreatedBy.String()
-        name := ""
-        if user, err := models.FindMaybeDeletedUserByID(workflow.OrganizationID.String(), idStr); err == nil && user != nil {
-            name = user.Name
-        }
-        createdBy = &pb.UserRef{Id: idStr, Name: name}
-    }
+	var createdBy *pb.UserRef
+	if workflow.CreatedBy != nil {
+		idStr := workflow.CreatedBy.String()
+		name := ""
+		if user, err := models.FindMaybeDeletedUserByID(workflow.OrganizationID.String(), idStr); err == nil && user != nil {
+			name = user.Name
+		}
+		createdBy = &pb.UserRef{Id: idStr, Name: name}
+	}
 
-    return &pb.Workflow{
-        Id:             workflow.ID.String(),
-        OrganizationId: workflow.OrganizationID.String(),
-        Name:           workflow.Name,
-        Description:    workflow.Description,
-        CreatedAt:      timestamppb.New(*workflow.CreatedAt),
-        UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
-        Nodes:          actions.NodesToProto(nodes),
-        Edges:          actions.EdgesToProto(workflow.Edges),
-        CreatedBy:      createdBy,
-    }
+	return &pb.Workflow{
+		Id:             workflow.ID.String(),
+		OrganizationId: workflow.OrganizationID.String(),
+		Name:           workflow.Name,
+		Description:    workflow.Description,
+		CreatedAt:      timestamppb.New(*workflow.CreatedAt),
+		UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
+		Nodes:          actions.NodesToProto(nodes),
+		Edges:          actions.EdgesToProto(workflow.Edges),
+		CreatedBy:      createdBy,
+	}
 }
 
 func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workflow) ([]models.Node, []models.Edge, error) {
@@ -83,7 +83,7 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		nodeIDs[node.Id] = true
 
 		if err := validateNodeRef(registry, orgID, node); err != nil {
-			return nil, nil, status.Errorf(codes.InvalidArgument, "node %s: %v", node.Id, err)
+			return nil, nil, status.Errorf(codes.InvalidArgument, "node '%s' (%s): %v", node.Name, node.Id, err)
 		}
 	}
 

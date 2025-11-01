@@ -3,6 +3,7 @@ package blueprints
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -63,7 +64,12 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		OutputChannels: datatypes.NewJSONSlice(outputChannels),
 	}
 
-	if err := database.Conn().Create(model).Error; err != nil {
+	err = database.Conn().Create(model).Error
+	if err != nil {
+		if strings.Contains(err.Error(), "unique constraint") {
+			return nil, status.Error(codes.InvalidArgument, "A component with this name already exists")
+		}
+
 		return nil, err
 	}
 
