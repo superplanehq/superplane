@@ -144,12 +144,16 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
-  const channels = data.outputChannels || ["default"];
+  let channels = data.outputChannels || ["default"];
 
   const isIfOrSwitch = data.type === "if" || data.type === "switch";
 
-  if (isIfOrSwitch) {
+  if (isIfOrSwitch && !isCollapsed) {
     return null;
+  }
+
+  if (data.type === "if") {
+    channels = ["true", "false"];
   }
 
   // Single channel: render one handle that respects collapsed state
