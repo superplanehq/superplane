@@ -1,7 +1,7 @@
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -99,6 +99,9 @@ export function WorkflowPageV2() {
    * This ref persists across re-renders to preserve viewport position and zoom.
    */
   const viewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
+
+  // Track unsaved changes on the canvas
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   /**
    * Initialize persisted node IDs when workflow is first loaded
@@ -365,6 +368,7 @@ export function WorkflowPageV2() {
 
       // Update local cache without triggering API call
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -448,6 +452,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -470,6 +475,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -506,6 +512,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -539,6 +546,7 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -624,6 +632,7 @@ export function WorkflowPageV2() {
         persistedNodeIdsRef.current = new Set(nodeIds);
 
         showSuccessToast("Workflow saved successfully");
+        setHasUnsavedChanges(false);
       } catch (error) {
         console.error("Failed to save workflow:", error);
         showErrorToast("Failed to save workflow");
@@ -696,6 +705,8 @@ export function WorkflowPageV2() {
       hasUserToggledSidebarRef={hasUserToggledSidebarRef}
       isSidebarOpenRef={isSidebarOpenRef}
       viewportRef={viewportRef}
+      unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
+      saveIsPrimary={hasUnsavedChanges}
       breadcrumbs={[
         {
           label: "Canvases",

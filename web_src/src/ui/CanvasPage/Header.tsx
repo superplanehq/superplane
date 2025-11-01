@@ -34,9 +34,11 @@ interface HeaderProps {
   onDelete?: () => void;
   onLogoClick?: () => void;
   organizationId?: string;
+  unsavedMessage?: string;
+  saveIsPrimary?: boolean;
 }
 
-export function Header({ breadcrumbs, onSave, onDelete, onLogoClick, organizationId }: HeaderProps) {
+export function Header({ breadcrumbs, onSave, onDelete, onLogoClick, organizationId, unsavedMessage, saveIsPrimary }: HeaderProps) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || '');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -132,16 +134,18 @@ export function Header({ breadcrumbs, onSave, onDelete, onLogoClick, organizatio
             })}
           </div>
 
-          {/* Right side - Save button and Account Dropdown */}
-          <div className="flex items-center gap-3">
+        {/* Right side - Save button and Account Dropdown */}
+        <div className="flex items-center gap-3">
+          {unsavedMessage && (
+            <span className="text-sm text-amber-700 bg-amber-100 px-2 py-1 rounded-md hidden sm:inline">
+              {unsavedMessage}
+            </span>
+          )}
           {onSave && (
-            <button
-              onClick={onSave}
-              className="text-[15px] text-gray-500 hover:text-black transition-colors flex items-center gap-1.5"
-            >
-              <Save size={16} />
+            <Button onClick={onSave} size="sm" variant={saveIsPrimary ? "default" : "outline"}>
+              <Save />
               Save
-            </button>
+            </Button>
           )}
           {onDelete && (
             <button
