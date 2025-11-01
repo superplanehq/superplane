@@ -97,7 +97,6 @@ export interface CanvasPageProps {
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
   onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
-  onDelete?: () => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
@@ -265,7 +264,6 @@ function CanvasPage(props: CanvasPageProps) {
         <CanvasContentHeader
           state={state}
           onSave={props.onSave}
-          onDelete={props.onDelete}
           organizationId={props.organizationId}
           unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
@@ -455,7 +453,7 @@ function Sidebar({
   );
 }
 
-function CanvasContentHeader({ state, onSave, onDelete, organizationId, unsavedMessage, saveIsPrimary }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; onDelete?: () => void; organizationId?: string; unsavedMessage?: string; saveIsPrimary?: boolean }) {
+function CanvasContentHeader({ state, onSave, organizationId, unsavedMessage, saveIsPrimary }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; organizationId?: string; unsavedMessage?: string; saveIsPrimary?: boolean }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -475,7 +473,6 @@ function CanvasContentHeader({ state, onSave, onDelete, organizationId, unsavedM
     <Header
       breadcrumbs={state.breadcrumbs}
       onSave={onSave ? handleSave : undefined}
-      onDelete={onDelete}
       onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}
       unsavedMessage={unsavedMessage}

@@ -1,18 +1,8 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { resolveIcon } from "@/lib/utils";
-import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Button } from "../button";
 import { Avatar } from "@/components/Avatar/avatar";
-import { Save, Trash2, AlertTriangle } from "lucide-react";
+import { Save } from "lucide-react";
 import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from "@/components/Dropdown/dropdown";
 import { Text } from "@/components/Text/text";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
@@ -31,34 +21,15 @@ export interface BreadcrumbItem {
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
   onSave?: () => void;
-  onDelete?: () => void;
   onLogoClick?: () => void;
   organizationId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
 }
 
-export function Header({ breadcrumbs, onSave, onDelete, onLogoClick, organizationId, unsavedMessage, saveIsPrimary }: HeaderProps) {
+export function Header({ breadcrumbs, onSave, onLogoClick, organizationId, unsavedMessage, saveIsPrimary }: HeaderProps) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || '');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
-
-  // Get the workflow name from the last breadcrumb
-  const workflowName = breadcrumbs[breadcrumbs.length - 1]?.label || "";
-
-  const handleDeleteClick = () => {
-    setShowDeleteModal(true);
-    setDeleteConfirmation("");
-  };
-
-  const handleConfirmDelete = () => {
-    setShowDeleteModal(false);
-    setDeleteConfirmation("");
-    onDelete?.();
-  };
-
-  const isDeleteEnabled = deleteConfirmation === workflowName;
 
   return (
     <>
@@ -134,8 +105,8 @@ export function Header({ breadcrumbs, onSave, onDelete, onLogoClick, organizatio
             })}
           </div>
 
-        {/* Right side - Save button and Account Dropdown */}
-        <div className="flex items-center gap-3">
+          {/* Right side - Save button and Account Dropdown */}
+          <div className="flex items-center gap-3">
           {unsavedMessage && (
             <span className="text-sm text-amber-700 bg-amber-100 px-2 py-1 rounded-md hidden sm:inline">
               {unsavedMessage}
@@ -146,15 +117,6 @@ export function Header({ breadcrumbs, onSave, onDelete, onLogoClick, organizatio
               <Save />
               Save
             </Button>
-          )}
-          {onDelete && (
-            <button
-              onClick={handleDeleteClick}
-              className="text-[15px] text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1.5"
-            >
-              <Trash2 size={16} />
-              Delete
-            </button>
           )}
 
           {organizationId && (
@@ -275,53 +237,6 @@ export function Header({ breadcrumbs, onSave, onDelete, onLogoClick, organizatio
           </div>
         </div>
       </header>
-
-      {/* Delete Confirmation Modal */}
-      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <DialogTitle className="text-xl">Delete Workflow</DialogTitle>
-            </div>
-            <DialogDescription className="text-base space-y-3 pt-2">
-              <div className="flex items-center gap-2 px-1 py-2 text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                <p className="text-sm font-medium">This action cannot be undone.</p>
-              </div>
-              <p className="text-gray-600">
-                This will permanently delete the workflow and all associated events and executions. To proceed, please type the name of the workflow for confirmation.
-              </p>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Input
-              type="text"
-              placeholder={workflowName}
-              value={deleteConfirmation}
-              onChange={(e) => setDeleteConfirmation(e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteModal(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDelete}
-              disabled={!isDeleteEnabled}
-              className="bg-red-600 hover:bg-red-700 text-white disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
-            >
-              <Trash2 className="h-4 w-4 mr-1.5" />
-              Delete Workflow
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

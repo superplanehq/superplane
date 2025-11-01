@@ -19,6 +19,7 @@ This document captures the architecture principles, patterns, and workflow for d
 ### TypeScript
 
 - **Strict mode**: Ensure all TypeScript types are properly defined with no implicit any
+- **No implicit inline any**: Always type inline handler parameters (e.g., event arguments) instead of relying on implicit `any`
 - **Shared types**: Use centralized type files to avoid circular dependencies
 - **Interface consistency**: Match callback signatures across similar components
 - **Prefer named exports over default exports**: Vite and other bundlers have a harder time working with default exports (slower compile speed, flaky name lookup in IDEs)

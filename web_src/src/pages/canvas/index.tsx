@@ -51,8 +51,6 @@ export function Canvas() {
         return 'integrations';
       case 'members':
         return 'members';
-      case 'delete':
-        return 'delete';
       default:
         return 'editor';
     }
