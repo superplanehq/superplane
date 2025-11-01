@@ -42,6 +42,7 @@ interface ComponentSidebarProps {
   onDuplicate?: () => void;
   onDocs?: () => void;
   onEdit?: () => void;
+  onConfigure?: () => void;
   onDeactivate?: () => void;
   onToggleView?: () => void;
   onDelete?: () => void;
@@ -69,6 +70,7 @@ export const ComponentSidebar = ({
   onDuplicate,
   onDocs,
   onEdit,
+  onConfigure,
   onDeactivate,
   onToggleView,
   onDelete,
@@ -278,6 +280,7 @@ export const ComponentSidebar = ({
               onDuplicate={onDuplicate}
               onDocs={onDocs}
               onEdit={onEdit}
+              onConfigure={onConfigure}
               onDeactivate={onDeactivate}
               onToggleView={onToggleView}
               onDelete={onDelete}

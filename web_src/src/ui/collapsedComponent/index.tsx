@@ -28,6 +28,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   onRun,
   onDuplicate,
   onEdit,
+  onConfigure,
   onDeactivate,
   onToggleView,
   onDelete,
@@ -54,6 +55,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
           onRun={onRun}
           onDuplicate={onDuplicate}
           onEdit={onEdit}
+          onConfigure={onConfigure}
           onDeactivate={onDeactivate}
           onToggleView={onToggleView}
           onDelete={onDelete}

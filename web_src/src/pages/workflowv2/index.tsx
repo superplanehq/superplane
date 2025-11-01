@@ -541,6 +541,17 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, queryClient],
   );
 
+  const handleConfigure = useCallback(
+    (nodeId: string) => {
+      const node = workflow?.nodes?.find((n) => n.id === nodeId);
+      if (!node) return;
+      if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id && organizationId) {
+        navigate(`/${organizationId}/custom-components/${node.blueprint.id}`);
+      }
+    },
+    [workflow, organizationId, navigate],
+  );
+
   const handleRun = useCallback(
     async (nodeId: string, channel: string, data: any) => {
       if (!workflowId) return;
@@ -662,6 +673,7 @@ export function WorkflowPageV2() {
       onEdgeDelete={handleEdgeDelete}
       onNodePositionChange={handleNodePositionChange}
       onRun={handleRun}
+      onConfigure={handleConfigure}
       buildingBlocks={buildingBlocks}
       onNodeAdd={handleNodeAdd}
       hasFitToViewRef={hasFitToViewRef}
