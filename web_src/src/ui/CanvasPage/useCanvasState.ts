@@ -38,6 +38,29 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(startCollapsed ?? false);
+  const [collapsedNodeIds, setCollapsedNodeIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (initialNodes) setNodes(initialNodes.map((node) => {
+      const nodeData = { ...node.data };
+      const isCollapsed = collapsedNodeIds.includes(node.id);
+          const nodeType = nodeData.type as string;
+
+          if (nodeType && nodeData[nodeType]) {
+            nodeData[nodeType] = {
+              ...nodeData[nodeType],
+              collapsed: isCollapsed,
+            };
+          }
+
+          return { ...node, data: nodeData };
+    }));
+  }, [initialNodes, collapsedNodeIds]);
+
+  useEffect(() => {
+    if (initialEdges) setEdges(initialEdges);
+  }, [initialEdges]);
+
 
   // Apply initial collapsed state to nodes
   useEffect(() => {
@@ -103,14 +126,25 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
           return { ...node, data: nodeData };
         })
       );
+      if (newCollapsed) {
+        setCollapsedNodeIds(nodes.map((node) => node.id));
+      } else {
+        setCollapsedNodeIds([]);
+      }
       return newCollapsed;
     });
-  }, []);
+    
+  }, [nodes]);
 
   const toggleNodeCollapse = useCallback((nodeId: string) => {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id !== nodeId) return node;
+
+        setCollapsedNodeIds((prev) => {
+          const newCollapsed = !prev.includes(nodeId);
+          return newCollapsed ? [...prev, nodeId] : prev.filter((id) => id !== nodeId);
+        });
 
         const nodeData = { ...node.data };
         const nodeType = nodeData.type as string;
