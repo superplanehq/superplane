@@ -1,6 +1,5 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { resolveIcon } from "@/lib/utils";
-import { Save, Trash2, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
@@ -12,6 +11,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "../button";
+import { Avatar } from "@/components/Avatar/avatar";
+import { Save, Trash2, AlertTriangle } from "lucide-react";
+import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from "@/components/Dropdown/dropdown";
+import { Text } from "@/components/Text/text";
+import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
+import { useAccount } from "@/contexts/AccountContext";
+import { useOrganization } from "@/hooks/useOrganizationData";
 
 export interface BreadcrumbItem {
   label: string;
@@ -27,9 +33,12 @@ interface HeaderProps {
   onSave?: () => void;
   onDelete?: () => void;
   onLogoClick?: () => void;
+  organizationId?: string;
 }
 
-export function Header({ breadcrumbs, onSave, onDelete, onLogoClick }: HeaderProps) {
+export function Header({ breadcrumbs, onSave, onDelete, onLogoClick, organizationId }: HeaderProps) {
+  const { account } = useAccount();
+  const { data: organization } = useOrganization(organizationId || '');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
@@ -123,58 +132,169 @@ export function Header({ breadcrumbs, onSave, onDelete, onLogoClick }: HeaderPro
             })}
           </div>
 
-          {/* Right side - Save and Delete buttons */}
-          <div className="flex items-center gap-4 text-[15px] text-gray-500">
-            {onSave && (
-              <button
-                onClick={onSave}
-                className="hover:text-black transition-colors flex items-center gap-1.5"
+          {/* Right side - Save button and Account Dropdown */}
+          <div className="flex items-center gap-3">
+          {onSave && (
+            <button
+              onClick={onSave}
+              className="text-[15px] text-gray-500 hover:text-black transition-colors flex items-center gap-1.5"
+            >
+              <Save size={16} />
+              Save
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={handleDeleteClick}
+              className="text-[15px] text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1.5"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
+          )}
+
+          {organizationId && (
+            <>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <Dropdown>
+              <DropdownButton
+                as="button"
+                className="text-[15px] text-gray-500 hover:text-black transition-colors flex items-center gap-2 focus:outline-none"
               >
-                <Save size={16} />
-                Save
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={handleDeleteClick}
-                className="hover:text-red-600 transition-colors flex items-center gap-1.5"
-              >
-                <Trash2 size={16} />
-                Delete
-              </button>
-            )}
-            {!onSave && !onDelete && <div className="w-8"></div>}
+                <span className="truncate max-w-[150px]">{organization?.metadata?.name || account?.name}</span>
+                <Avatar
+                  src={account?.avatar_url}
+                  initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                  alt={account?.name || 'User'}
+                  className="w-5 h-5"
+                />
+              </DropdownButton>
+
+              <DropdownMenu className="w-64">
+                {/* User Section */}
+                <DropdownHeader>
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      src={account?.avatar_url}
+                      initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                      alt={account?.name || 'User'}
+                      className="size-8"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <Text className="font-medium truncate">{account?.name || 'Loading...'}</Text>
+                      <Text className="text-sm text-zinc-500 truncate">{account?.email || 'Loading...'}</Text>
+                    </div>
+                  </div>
+                </DropdownHeader>
+
+                {/* User Actions */}
+                <DropdownSection>
+                  <DropdownItem href={`/${organizationId}/settings/profile`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="person" data-slot="icon" size='sm' />
+                      <DropdownLabel>Profile</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+
+                {/* Organization Section */}
+                <DropdownDivider />
+
+                <DropdownHeader>
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      initials={(organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
+                      alt={organization?.metadata?.name || 'Organization'}
+                      className="size-8"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <Text className="font-medium truncate max-w-[150px] truncate-ellipsis">{organization?.metadata?.name || 'Organization'}</Text>
+                    </div>
+                  </div>
+                </DropdownHeader>
+
+                {/* Organization Actions */}
+                <DropdownSection>
+                  <DropdownItem href={`/${organizationId}/settings/general`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="business" data-slot="icon" size='sm' />
+                      <DropdownLabel>Organization Settings</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+
+                  <DropdownItem href={`/${organizationId}/settings/members`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="person" data-slot="icon" size='sm' />
+                      <DropdownLabel>Members</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+
+                  <DropdownItem href={`/${organizationId}/settings/groups`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="group" data-slot="icon" size='sm' />
+                      <DropdownLabel>Groups</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+
+                  <DropdownItem href={`/${organizationId}/settings/roles`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="shield" data-slot="icon" size='sm' />
+                      <DropdownLabel>Roles</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+
+                  <DropdownItem href="/">
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="swap_horiz" data-slot="icon" size='sm' />
+                      <DropdownLabel>Change organization</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+
+                <DropdownDivider />
+
+                {/* Sign Out Section */}
+                <DropdownSection>
+                  <DropdownItem onClick={() => {
+                    window.location.href = '/logout';
+                  }}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="logout" data-slot="icon" size='sm' />
+                      <DropdownLabel>Sign Out</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+              </DropdownMenu>
+            </Dropdown>
+            </>
+          )}
           </div>
         </div>
       </header>
 
       {/* Delete Confirmation Modal */}
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-2">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
-              </div>
               <DialogTitle className="text-xl">Delete Workflow</DialogTitle>
             </div>
             <DialogDescription className="text-base space-y-3 pt-2">
-              <p className="text-gray-700 font-medium">
-                This action cannot be undone. This will permanently delete the workflow and all associated events and executions.
-              </p>
+              <div className="flex items-center gap-2 px-1 py-2 text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                <p className="text-sm font-medium">This action cannot be undone.</p>
+              </div>
               <p className="text-gray-600">
-                Please type <span className="font-mono font-semibold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded">{workflowName}</span> to confirm.
+                This will permanently delete the workflow and all associated events and executions. To proceed, please type the name of the workflow for confirmation.
               </p>
             </DialogDescription>
           </DialogHeader>
-
-          <div className="py-4">
+          <div className="py-2">
             <Input
               type="text"
-              placeholder={`Enter "${workflowName}" to confirm`}
+              placeholder={workflowName}
               value={deleteConfirmation}
               onChange={(e) => setDeleteConfirmation(e.target.value)}
-              className="font-mono"
               autoFocus
             />
           </div>

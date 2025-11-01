@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose } from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { createNodeDragPreview } from "./createNodeDragPreview";
 
@@ -17,6 +17,7 @@ export interface BuildingBlock {
   icon?: string;
   color?: string;
   id?: string; // for blueprints
+  isLive?: boolean; // marks items that actually work now
 }
 
 export type BuildingBlockCategory = {
@@ -47,6 +48,8 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
   }
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [showWip, setShowWip] = useState(true);
 
   const sortedCategories = (blocks || []).sort((a, b) => {
     if (a.name === "Primitives") return -1;
@@ -57,8 +60,8 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
   });
 
   return (
-    <div className="w-[300px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
-      <div className="flex items-center gap-2 px-4 py-4">
+    <div className="w-[360px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
+      <div className="flex items-center gap-2 px-4 py-4 relative">
         <div className="flex-1">
           <input
             type="text"
@@ -69,10 +72,37 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
           />
         </div>
         <div className="flex items-center gap-3 pb-0">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setIsConfigOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={isConfigOpen}
+            aria-label="Configure"
+          >
+            <Settings2 size={20} />
+          </Button>
           <Button variant="outline" size="icon" onClick={() => onToggle(false)} aria-label="Close sidebar">
             <PanelLeftClose size={24} />
           </Button>
         </div>
+
+        {isConfigOpen && (
+          <div
+            role="menu"
+            className="absolute right-4 top-12 z-20 w-60 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-lg"
+          >
+            <button
+              className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+              onClick={() => {
+                setShowWip((v) => !v);
+                setIsConfigOpen(false);
+              }}
+            >
+              {showWip ? "Hide WIP elements" : "Show WIP elements"}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-scroll">
@@ -81,6 +111,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
             key={category.name}
             category={category}
             canvasZoom={canvasZoom}
+            showWip={showWip}
             searchTerm={searchTerm}
           />
         ))}
@@ -93,19 +124,22 @@ interface CategorySectionProps {
   category: BuildingBlockCategory;
   canvasZoom: number;
   searchTerm?: string;
+  showWip?: boolean;
 }
 
-function CategorySection({ category, canvasZoom, searchTerm = "" }: CategorySectionProps) {
+function CategorySection({ category, canvasZoom, searchTerm = "", showWip = true }: CategorySectionProps) {
   const query = searchTerm.trim().toLowerCase();
   const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
 
-  const allBlocks = categoryMatches
+  const baseBlocks = categoryMatches
     ? (category.blocks || [])
     : (category.blocks || []).filter((block) => {
         const name = (block.name || "").toLowerCase();
         const label = (block.label || "").toLowerCase();
         return name.includes(query) || label.includes(query);
       });
+
+  const allBlocks = showWip ? baseBlocks : baseBlocks.filter((b) => b.isLive);
 
   if (allBlocks.length === 0) {
     return null;
@@ -125,12 +159,23 @@ function CategorySection({ category, canvasZoom, searchTerm = "" }: CategorySect
           const colorClass = getColorClass(block.color);
           const backgroundColorClass = getBackgroundColorClass(block.color);
 
+          const isLive = !!block.isLive;
           return (
             <Item
               key={`${block.type}-${block.name}`}
-              draggable
-              onDragStart={(e) => createNodeDragPreview(e, block, colorClass, backgroundColorClass, canvasZoom)}
-              className="ml-3 cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-800/50 px-2 py-1 flex items-center gap-2"
+              draggable={isLive}
+              onDragStart={(e) => {
+                if (!isLive) {
+                  e.preventDefault();
+                  return;
+                }
+                createNodeDragPreview(e, block, colorClass, backgroundColorClass, canvasZoom);
+              }}
+              aria-disabled={!isLive}
+              title={isLive ? undefined : "Coming soon"}
+              className={
+                `ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
+              }
               size="sm"
             >
               <ItemMedia>
@@ -140,6 +185,15 @@ function CategorySection({ category, canvasZoom, searchTerm = "" }: CategorySect
               <ItemContent>
                 <ItemTitle className="text-xs font-normal">{block.label || block.name}</ItemTitle>
               </ItemContent>
+
+              {block.isLive ? (
+                <div className="ml-auto pr-1">
+                  <span
+                    title="Available now"
+                    className="inline-block h-2 w-2 rounded-full bg-purple-600"
+                  />
+                </div>
+              ) : null}
 
               <GripVerticalIcon className="text-zinc-500 hover:text-zinc-800" size={14} />
             </Item>

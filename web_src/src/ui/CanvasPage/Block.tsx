@@ -296,6 +296,7 @@ function BlockContent({
   selected = false,
   onRun,
   onEdit,
+  onConfigure,
   onDuplicate,
   onDeactivate,
   onToggleView,
@@ -311,6 +312,7 @@ function BlockContent({
   const actionProps = {
     onRun,
     onEdit,
+    onConfigure,
     onDuplicate,
     onDeactivate,
     onToggleView,

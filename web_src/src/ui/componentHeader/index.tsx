@@ -26,6 +26,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   onRun,
   onDuplicate,
   onEdit,
+  onConfigure,
   onDeactivate,
   onToggleView,
   onDelete,
@@ -47,6 +48,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
             onRun={onRun}
             onDuplicate={onDuplicate}
             onEdit={onEdit}
+            onConfigure={onConfigure}
             onDeactivate={onDeactivate}
             onToggleView={onToggleView}
             onDelete={onDelete}

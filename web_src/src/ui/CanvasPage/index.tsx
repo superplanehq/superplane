@@ -105,6 +105,7 @@ export interface CanvasPageProps {
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
+  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
 
@@ -280,6 +281,7 @@ function CanvasPage(props: CanvasPageProps) {
               onToggleView={props.onToggleView}
               onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
+              onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
               onBuildingBlockDrop={handleBuildingBlockDrop}
               onZoomChange={setCanvasZoom}
@@ -301,6 +303,7 @@ function CanvasPage(props: CanvasPageProps) {
             onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
             onDocs={props.onDocs}
+            onConfigure={props.onConfigure}
             onDeactivate={props.onDeactivate}
             onDelete={handleNodeDelete}
           />
@@ -358,6 +361,7 @@ function Sidebar({
   onRun,
   onDuplicate,
   onDocs,
+  onConfigure,
   onDeactivate,
   onToggleView,
   onDelete,
@@ -367,6 +371,7 @@ function Sidebar({
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
+  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
@@ -429,6 +434,7 @@ function Sidebar({
       onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
       onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
       onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
+      onConfigure={onConfigure ? () => onConfigure(state.componentSidebar.selectedNodeId!) : undefined}
       onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
       onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
       onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
@@ -452,7 +458,7 @@ function CanvasContentHeader({ state, onSave, onDelete, organizationId }: { stat
     }
   }, [organizationId]);
 
-  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} onDelete={onDelete} onLogoClick={organizationId ? handleLogoClick : undefined} />;
+  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} onDelete={onDelete} onLogoClick={organizationId ? handleLogoClick : undefined} organizationId={organizationId} />;
 }
 
 function CanvasContent({
@@ -464,6 +470,7 @@ function CanvasContent({
   hideHeader,
   onRun,
   onDuplicate,
+  onConfigure,
   onDeactivate,
   onToggleView,
   onBuildingBlockDrop,
@@ -479,6 +486,7 @@ function CanvasContent({
   hideHeader?: boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
+  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
@@ -624,6 +632,7 @@ function CanvasContent({
           selected={nodeProps.selected}
           onRun={onRunRef.current ? () => onRunRef.current?.(nodeProps.id) : undefined}
           onDuplicate={onDuplicate ? () => onDuplicate(nodeProps.id) : undefined}
+          onConfigure={onConfigure ? () => onConfigure(nodeProps.id) : undefined}
           onDeactivate={onDeactivate ? () => onDeactivate(nodeProps.id) : undefined}
           onToggleView={onToggleView ? () => onToggleView(nodeProps.id) : undefined}
           ai={{

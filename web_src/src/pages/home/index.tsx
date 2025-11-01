@@ -34,6 +34,7 @@ interface WorkflowCardData {
   description?: string;
   createdAt: string;
   type: "workflow";
+  createdBy?: { id?: string; name?: string };
 }
 
 const HomePage = () => {
@@ -78,6 +79,7 @@ const HomePage = () => {
     description: workflow.description,
     createdAt: workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString() : "Unknown",
     type: "workflow" as const,
+    createdBy: workflow.createdBy,
   }));
 
   const filteredBlueprints = blueprints.filter((blueprint) => {
@@ -289,7 +291,7 @@ function PageHeader({ activeTab, onNewClick }: PageHeaderProps) {
       </div>
 
       <Button color="blue" className="flex items-center bg-blue-700 text-white hover:bg-blue-600" onClick={onNewClick}>
-        <Plus className="mr-2" size={20} />
+        <Plus size={20} />
         {buttonText}
       </Button>
     </div>
@@ -455,6 +457,9 @@ function WorkflowCard({ workflow, organizationId, navigate }: WorkflowCardProps)
 
         <div className="flex justify-between items-center">
           <div className="text-zinc-500 text-left">
+            {workflow.createdBy?.name && (
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">Created by <strong>{workflow.createdBy.name}</strong></p>
+            )}
             <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">Created at {workflow.createdAt}</p>
           </div>
         </div>
@@ -480,7 +485,15 @@ function WorkflowListItem({ workflow, organizationId, navigate }: WorkflowCardPr
           {workflow.name}
         </Heading>
         <Text className="text-sm text-zinc-600 dark:text-zinc-400">{workflow.description || "No description"}</Text>
-        <Text className="text-xs text-zinc-500 mt-2">Created at {workflow.createdAt}</Text>
+        <Text className="text-xs text-zinc-500 mt-2">
+          {workflow.createdBy?.name ? (
+            <>
+              Created by <strong>{workflow.createdBy.name}</strong> · {workflow.createdAt}
+            </>
+          ) : (
+            <>Created at {workflow.createdAt}</>
+          )}
+        </Text>
       </button>
     </div>
   );
