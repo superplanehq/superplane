@@ -29,8 +29,7 @@ type WorkflowsWorkflow struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Nodes []ComponentsNode `json:"nodes,omitempty"`
 	Edges []ComponentsEdge `json:"edges,omitempty"`
-	CreatedBy *string `json:"createdBy,omitempty"`
-	CreatedByName *string `json:"createdByName,omitempty"`
+	CreatedBy *WorkflowsUserRef `json:"createdBy,omitempty"`
 }
 
 // NewWorkflowsWorkflow instantiates a new WorkflowsWorkflow object
@@ -307,9 +306,9 @@ func (o *WorkflowsWorkflow) SetEdges(v []ComponentsEdge) {
 }
 
 // GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetCreatedBy() string {
+func (o *WorkflowsWorkflow) GetCreatedBy() WorkflowsUserRef {
 	if o == nil || IsNil(o.CreatedBy) {
-		var ret string
+		var ret WorkflowsUserRef
 		return ret
 	}
 	return *o.CreatedBy
@@ -317,7 +316,7 @@ func (o *WorkflowsWorkflow) GetCreatedBy() string {
 
 // GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetCreatedByOk() (*string, bool) {
+func (o *WorkflowsWorkflow) GetCreatedByOk() (*WorkflowsUserRef, bool) {
 	if o == nil || IsNil(o.CreatedBy) {
 		return nil, false
 	}
@@ -333,41 +332,9 @@ func (o *WorkflowsWorkflow) HasCreatedBy() bool {
 	return false
 }
 
-// SetCreatedBy gets a reference to the given string and assigns it to the CreatedBy field.
-func (o *WorkflowsWorkflow) SetCreatedBy(v string) {
+// SetCreatedBy gets a reference to the given WorkflowsUserRef and assigns it to the CreatedBy field.
+func (o *WorkflowsWorkflow) SetCreatedBy(v WorkflowsUserRef) {
 	o.CreatedBy = &v
-}
-
-// GetCreatedByName returns the CreatedByName field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetCreatedByName() string {
-	if o == nil || IsNil(o.CreatedByName) {
-		var ret string
-		return ret
-	}
-	return *o.CreatedByName
-}
-
-// GetCreatedByNameOk returns a tuple with the CreatedByName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetCreatedByNameOk() (*string, bool) {
-	if o == nil || IsNil(o.CreatedByName) {
-		return nil, false
-	}
-	return o.CreatedByName, true
-}
-
-// HasCreatedByName returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasCreatedByName() bool {
-	if o != nil && !IsNil(o.CreatedByName) {
-		return true
-	}
-
-	return false
-}
-
-// SetCreatedByName gets a reference to the given string and assigns it to the CreatedByName field.
-func (o *WorkflowsWorkflow) SetCreatedByName(v string) {
-	o.CreatedByName = &v
 }
 
 func (o WorkflowsWorkflow) MarshalJSON() ([]byte, error) {
@@ -406,9 +373,6 @@ func (o WorkflowsWorkflow) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CreatedBy) {
 		toSerialize["createdBy"] = o.CreatedBy
-	}
-	if !IsNil(o.CreatedByName) {
-		toSerialize["createdByName"] = o.CreatedByName
 	}
 	return toSerialize, nil
 }

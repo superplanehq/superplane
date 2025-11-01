@@ -33,13 +33,14 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		}
 	}
 
-    var createdBy string
-    var createdByName string
+    var createdBy *pb.UserRef
     if workflow.CreatedBy != nil {
-        createdBy = workflow.CreatedBy.String()
-        if user, err := models.FindMaybeDeletedUserByID(workflow.OrganizationID.String(), createdBy); err == nil && user != nil {
-            createdByName = user.Name
+        idStr := workflow.CreatedBy.String()
+        name := ""
+        if user, err := models.FindMaybeDeletedUserByID(workflow.OrganizationID.String(), idStr); err == nil && user != nil {
+            name = user.Name
         }
+        createdBy = &pb.UserRef{Id: idStr, Name: name}
     }
 
     return &pb.Workflow{
@@ -52,7 +53,6 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
         Nodes:          actions.NodesToProto(nodes),
         Edges:          actions.EdgesToProto(workflow.Edges),
         CreatedBy:      createdBy,
-        CreatedByName:  createdByName,
     }
 }
 

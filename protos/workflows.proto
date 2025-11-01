@@ -213,6 +213,11 @@ message DeleteWorkflowRequest {
 
 message DeleteWorkflowResponse {}
 
+message UserRef {
+  string id = 1;
+  string name = 2;
+}
+
 message Workflow {
   string id = 1;
   string organization_id = 2;
@@ -222,10 +227,8 @@ message Workflow {
   google.protobuf.Timestamp updated_at = 6;
   repeated Components.Node nodes = 7;
   repeated Components.Edge edges = 8;
-  // ID of the user that created the workflow
-  string created_by = 9;
-  // Display name of the user that created the workflow (convenience field)
-  string created_by_name = 10;
+  // Creator reference
+  UserRef created_by = 9;
 }
 
 message ListNodeEventsRequest {

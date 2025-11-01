@@ -7155,6 +7155,17 @@
         }
       }
     },
+    "WorkflowsUserRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "WorkflowsWorkflow": {
       "type": "object",
       "properties": {
@@ -7193,12 +7204,8 @@
           }
         },
         "createdBy": {
-          "type": "string",
-          "title": "ID of the user that created the workflow"
-        },
-        "createdByName": {
-          "type": "string",
-          "title": "Display name of the user that created the workflow (convenience field)"
+          "$ref": "#/definitions/WorkflowsUserRef",
+          "title": "Creator reference"
         }
       }
     },
