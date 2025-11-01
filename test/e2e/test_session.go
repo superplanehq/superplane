@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -340,11 +341,16 @@ func (s *TestSession) streamBrowserLogs() {
 	})
 
 	s.page.OnRequestFailed(func(r pw.Request) {
-		reason := ""
 		if err := r.Failure(); err != nil {
-			reason = err.Error()
+			// Ignore common benign cancellations during SPA navigations/HMR
+			if strings.Contains(err.Error(), "ERR_ABORTED") {
+				return
+			}
+			s.t.Logf("[Browser Logs] %s (%s)", r.URL(), err.Error())
+			return
 		}
-		s.t.Logf("[Browser Logs] %s (%s)", r.URL(), reason)
+		// No explicit failure info
+		s.t.Logf("[Browser Logs] %s (request failed)", r.URL())
 	})
 
 	s.page.OnResponse(func(resp pw.Response) {
