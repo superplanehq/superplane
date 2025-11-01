@@ -51,11 +51,20 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [showWip, setShowWip] = useState(true);
 
-  const sortedCategories = (blocks || []).sort((a, b) => {
-    if (a.name === "Primitives") return -1;
-    if (b.name === "Primitives") return 1;
-    if (a.name === "Components") return -1;
-    if (b.name === "Components") return 1;
+  const categoryOrder: Record<string, number> = {
+    Primitives: 0,
+    Triggers: 1,
+    Components: 2,
+  };
+
+  const sortedCategories = [...(blocks || [])].sort((a, b) => {
+    const aOrder = categoryOrder[a.name] ?? Infinity;
+    const bOrder = categoryOrder[b.name] ?? Infinity;
+
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+
     return a.name.localeCompare(b.name);
   });
 
