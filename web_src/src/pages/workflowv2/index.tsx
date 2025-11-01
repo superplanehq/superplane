@@ -1,8 +1,8 @@
-import { useMemo, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { useCallback, useMemo, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import {
   BlueprintsBlueprint,
@@ -14,8 +14,8 @@ import {
   WorkflowsWorkflowEvent,
   WorkflowsWorkflowNodeExecution,
   WorkflowsWorkflowNodeQueueItem,
-  workflowsInvokeNodeExecutionAction,
   workflowsEmitNodeEvent,
+  workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
@@ -53,21 +53,11 @@ export function WorkflowPageV2() {
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const updateWorkflowMutation = useUpdateWorkflow(
-    organizationId!,
-    workflowId!
-  );
+  const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
-  const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(
-    organizationId!
-  );
-  const { data: components = [], isLoading: componentsLoading } = useComponents(
-    organizationId!
-  );
-  const { data: workflow, isLoading: workflowLoading } = useWorkflow(
-    organizationId!,
-    workflowId!
-  );
+  const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
+  const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
+  const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
 
   /**
    * Track which node IDs have been persisted to the server.
@@ -122,24 +112,22 @@ export function WorkflowPageV2() {
   //
   const triggerNodes = useMemo(
     () => workflow?.nodes?.filter((node) => node.type === "TYPE_TRIGGER") || [],
-    [workflow?.nodes]
+    [workflow?.nodes],
   );
 
   const compositeNodes = useMemo(
-    () =>
-      workflow?.nodes?.filter((node) => node.type === "TYPE_BLUEPRINT") || [],
-    [workflow?.nodes]
+    () => workflow?.nodes?.filter((node) => node.type === "TYPE_BLUEPRINT") || [],
+    [workflow?.nodes],
   );
 
   const componentNodes = useMemo(
-    () =>
-      workflow?.nodes?.filter((node) => node.type === "TYPE_COMPONENT") || [],
-    [workflow?.nodes]
+    () => workflow?.nodes?.filter((node) => node.type === "TYPE_COMPONENT") || [],
+    [workflow?.nodes],
   );
 
   const filterComponentNodes = useMemo(
     () => componentNodes.filter((node) => node.component?.name === "filter"),
-    [componentNodes]
+    [componentNodes],
   );
 
   /**
@@ -147,15 +135,13 @@ export function WorkflowPageV2() {
    * This prevents unnecessary loading states when new nodes are added locally.
    */
   const persistedTriggerNodes = useMemo(
-    () =>
-      triggerNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!)),
-    [triggerNodes]
+    () => triggerNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!)),
+    [triggerNodes],
   );
 
   const persistedFilterNodes = useMemo(
-    () =>
-      filterComponentNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!)),
-    [filterComponentNodes]
+    () => filterComponentNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!)),
+    [filterComponentNodes],
   );
 
   const persistedNodesWithExecutions = useMemo(() => {
@@ -163,8 +149,10 @@ export function WorkflowPageV2() {
     return allNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!));
   }, [compositeNodes, componentNodes]);
 
-  const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } =
-    useTriggerNodeEvents(workflowId!, persistedTriggerNodes.concat(persistedFilterNodes));
+  const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(
+    workflowId!,
+    persistedTriggerNodes.concat(persistedFilterNodes),
+  );
   const {
     nodeExecutionsMap,
     nodeQueueItemsMap,
@@ -185,7 +173,7 @@ export function WorkflowPageV2() {
             configuration: t.configuration,
             icon: t.icon,
             color: t.color,
-          })
+          }),
         ),
       },
       {
@@ -200,7 +188,7 @@ export function WorkflowPageV2() {
             configuration: c.configuration,
             icon: c.icon,
             color: c.color,
-          })
+          }),
         ),
       },
       {
@@ -215,11 +203,11 @@ export function WorkflowPageV2() {
             configuration: b.configuration,
             icon: b.icon,
             color: b.color,
-          })
+          }),
         ),
       },
     ],
-    [triggers, components, blueprints]
+    [triggers, components, blueprints],
   );
 
   const { nodes, edges } = useMemo(() => {
@@ -244,7 +232,7 @@ export function WorkflowPageV2() {
       nodeExecutionsMap,
       nodeQueueItemsMap,
       workflowId!,
-      queryClient
+      queryClient,
     );
   }, [
     workflow,
@@ -276,10 +264,10 @@ export function WorkflowPageV2() {
         components,
         nodeExecutionsMap,
         nodeQueueItemsMap,
-        nodeEventsMap
+        nodeEventsMap,
       );
     },
-    [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap]
+    [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap],
   );
 
   const getNodeEditData = useCallback(
@@ -291,19 +279,13 @@ export function WorkflowPageV2() {
       let configurationFields: ComponentsComponent["configuration"] = [];
 
       if (node.type === "TYPE_BLUEPRINT") {
-        const blueprintMetadata = blueprints.find(
-          (b) => b.id === node.blueprint?.id
-        );
+        const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
         configurationFields = blueprintMetadata?.configuration || [];
       } else if (node.type === "TYPE_COMPONENT") {
-        const componentMetadata = components.find(
-          (c) => c.name === node.component?.name
-        );
+        const componentMetadata = components.find((c) => c.name === node.component?.name);
         configurationFields = componentMetadata?.configuration || [];
       } else if (node.type === "TYPE_TRIGGER") {
-        const triggerMetadata = triggers.find(
-          (t) => t.name === node.trigger?.name
-        );
+        const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
       }
 
@@ -314,26 +296,22 @@ export function WorkflowPageV2() {
         configurationFields,
       };
     },
-    [workflow, blueprints, components, triggers]
+    [workflow, blueprints, components, triggers],
   );
 
   const handleNodeConfigurationSave = useCallback(
-    (
-      nodeId: string,
-      updatedConfiguration: Record<string, any>,
-      updatedNodeName: string
-    ) => {
+    (nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string) => {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Update the node's configuration and name in local cache only
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            configuration: updatedConfiguration,
-            name: updatedNodeName,
-          }
-          : node
+              ...node,
+              configuration: updatedConfiguration,
+              name: updatedNodeName,
+            }
+          : node,
       );
 
       const updatedWorkflow = {
@@ -342,12 +320,9 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache without triggering API call
-      queryClient.setQueryData(
-        workflowKeys.detail(organizationId, workflowId),
-        updatedWorkflow
-      );
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient]
+    [workflow, organizationId, workflowId, queryClient],
   );
 
   const generateNodeId = (blockName: string, nodeName: string) => {
@@ -364,16 +339,10 @@ export function WorkflowPageV2() {
       const { buildingBlock, nodeName, configuration, position } = newNodeData;
 
       // Filter configuration to only include visible fields
-      const filteredConfiguration = filterVisibleConfiguration(
-        configuration,
-        buildingBlock.configuration || []
-      );
+      const filteredConfiguration = filterVisibleConfiguration(configuration, buildingBlock.configuration || []);
 
       // Generate a unique node ID
-      const newNodeId = generateNodeId(
-        buildingBlock.name || "node",
-        nodeName.trim()
-      );
+      const newNodeId = generateNodeId(buildingBlock.name || "node", nodeName.trim());
 
       // Create the new node
       const newNode: ComponentsNode = {
@@ -383,8 +352,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-              ? "TYPE_BLUEPRINT"
-              : "TYPE_COMPONENT",
+            ? "TYPE_BLUEPRINT"
+            : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: position || {
           x: (workflow.nodes?.length || 0) * 250,
@@ -410,12 +379,9 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(
-        workflowKeys.detail(organizationId, workflowId),
-        updatedWorkflow
-      );
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient]
+    [workflow, organizationId, workflowId, queryClient],
   );
 
   const handleEdgeCreate = useCallback(
@@ -437,12 +403,9 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(
-        workflowKeys.detail(organizationId, workflowId),
-        updatedWorkflow
-      );
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient]
+    [workflow, organizationId, workflowId, queryClient],
   );
 
   const handleNodeDelete = useCallback(
@@ -453,9 +416,7 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.filter((node) => node.id !== nodeId);
 
       // Remove any edges connected to this node
-      const updatedEdges = workflow.edges?.filter(
-        (edge) => edge.sourceId !== nodeId && edge.targetId !== nodeId
-      );
+      const updatedEdges = workflow.edges?.filter((edge) => edge.sourceId !== nodeId && edge.targetId !== nodeId);
 
       const updatedWorkflow = {
         ...workflow,
@@ -464,12 +425,9 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(
-        workflowKeys.detail(organizationId, workflowId),
-        updatedWorkflow
-      );
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient]
+    [workflow, organizationId, workflowId, queryClient],
   );
 
   const handleEdgeDelete = useCallback(
@@ -493,7 +451,7 @@ export function WorkflowPageV2() {
           (toRemove) =>
             edge.sourceId === toRemove.sourceId &&
             edge.targetId === toRemove.targetId &&
-            edge.channel === toRemove.channel
+            edge.channel === toRemove.channel,
         );
       });
 
@@ -503,12 +461,9 @@ export function WorkflowPageV2() {
       };
 
       // Update local cache
-      queryClient.setQueryData(
-        workflowKeys.detail(organizationId, workflowId),
-        updatedWorkflow
-      );
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient]
+    [workflow, organizationId, workflowId, queryClient],
   );
 
   /**
@@ -525,13 +480,13 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            position: {
-              x: Math.round(position.x),
-              y: Math.round(position.y),
-            },
-          }
-          : node
+              ...node,
+              position: {
+                x: Math.round(position.x),
+                y: Math.round(position.y),
+              },
+            }
+          : node,
       );
 
       const updatedWorkflow = {
@@ -539,12 +494,9 @@ export function WorkflowPageV2() {
         nodes: updatedNodes,
       };
 
-      queryClient.setQueryData(
-        workflowKeys.detail(organizationId, workflowId),
-        updatedWorkflow
-      );
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
     },
-    [workflow, organizationId, workflowId, queryClient]
+    [workflow, organizationId, workflowId, queryClient],
   );
 
   const handleRun = useCallback(
@@ -562,7 +514,7 @@ export function WorkflowPageV2() {
               channel,
               data,
             },
-          })
+          }),
         );
         // Note: Success toast is shown by EmitEventModal
       } catch (error) {
@@ -571,7 +523,7 @@ export function WorkflowPageV2() {
         throw error; // Re-throw to let EmitEventModal handle it
       }
     },
-    [workflowId]
+    [workflowId],
   );
 
   const handleSave = useCallback(
@@ -594,9 +546,7 @@ export function WorkflowPageV2() {
       });
 
       // Save previous state for rollback
-      const previousWorkflow = queryClient.getQueryData(
-        workflowKeys.detail(organizationId, workflowId)
-      );
+      const previousWorkflow = queryClient.getQueryData(workflowKeys.detail(organizationId, workflowId));
 
       // Optimistically update the cache to prevent flicker
       const updatedWorkflow = {
@@ -604,10 +554,7 @@ export function WorkflowPageV2() {
         nodes: updatedNodes,
       };
 
-      queryClient.setQueryData(
-        workflowKeys.detail(organizationId, workflowId),
-        updatedWorkflow
-      );
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
 
       try {
         await updateWorkflowMutation.mutateAsync({
@@ -628,14 +575,11 @@ export function WorkflowPageV2() {
 
         // Rollback to previous state on error
         if (previousWorkflow) {
-          queryClient.setQueryData(
-            workflowKeys.detail(organizationId, workflowId),
-            previousWorkflow
-          );
+          queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), previousWorkflow);
         }
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient]
+    [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient],
   );
 
   // Show loading indicator while data is being fetched
@@ -684,7 +628,7 @@ export function WorkflowPageV2() {
       viewportRef={viewportRef}
       breadcrumbs={[
         {
-          label: "Workflows",
+          label: "Canvases",
           onClick: () => navigate(`/${organizationId}`),
         },
         {
@@ -695,14 +639,9 @@ export function WorkflowPageV2() {
   );
 }
 
-function useTriggerNodeEvents(
-  workflowId: string,
-  triggerNodes: ComponentsNode[]
-) {
+function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]) {
   const results = useQueries({
-    queries: triggerNodes.map((node) =>
-      nodeEventsQueryOptions(workflowId, node.id!, { limit: 10 })
-    ),
+    queries: triggerNodes.map((node) => nodeEventsQueryOptions(workflowId, node.id!, { limit: 10 })),
   });
 
   // Check if any queries are still loading
@@ -724,28 +663,20 @@ function useTriggerNodeEvents(
   return { eventsMap, isLoading };
 }
 
-function useCompositeNodeData(
-  workflowId: string,
-  compositeNodes: ComponentsNode[]
-) {
+function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode[]) {
   // Fetch last executions for each composite node
   const executionResults = useQueries({
-    queries: compositeNodes.map((node) =>
-      nodeExecutionsQueryOptions(workflowId, node.id!, { limit: 1 })
-    ),
+    queries: compositeNodes.map((node) => nodeExecutionsQueryOptions(workflowId, node.id!, { limit: 1 })),
   });
 
   // Fetch queue items for each composite node
   const queueItemResults = useQueries({
-    queries: compositeNodes.map((node) =>
-      nodeQueueItemsQueryOptions(workflowId, node.id!)
-    ),
+    queries: compositeNodes.map((node) => nodeQueueItemsQueryOptions(workflowId, node.id!)),
   });
 
   // Check if any queries are still loading
   const isLoading =
-    executionResults.some((result) => result.isLoading) ||
-    queueItemResults.some((result) => result.isLoading);
+    executionResults.some((result) => result.isLoading) || queueItemResults.some((result) => result.isLoading);
 
   // Build maps of nodeId -> data
   // Memoize to prevent unnecessary re-renders downstream
@@ -783,7 +714,7 @@ function prepareData(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
-  queryClient: QueryClient
+  queryClient: QueryClient,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -800,7 +731,7 @@ function prepareData(
       nodeExecutionsMap,
       nodeQueueItemsMap,
       workflowId,
-      queryClient
+      queryClient,
     );
   });
 
@@ -810,7 +741,7 @@ function prepareData(
 function prepareTriggerNode(
   node: ComponentsNode,
   triggers: TriggersTrigger[],
-  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>
+  nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
@@ -834,7 +765,7 @@ function prepareCompositeNode(
   node: ComponentsNode,
   blueprints: BlueprintsBlueprint[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
   const color = blueprintMetadata?.color || "indigo";
@@ -869,16 +800,10 @@ function prepareCompositeNode(
 
   if (executions.length > 0) {
     const execution = executions[0];
-    const rootTriggerNode = nodes.find(
-      (n) => n.id === execution.rootEvent?.nodeId
-    );
-    const rootTriggerRenderer = getTriggerRenderer(
-      rootTriggerNode?.trigger?.name || ""
-    );
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
-    const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle(
-      execution.rootEvent!
-    );
+    const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
     (canvasNode.data.composite as CompositeProps).lastRunItem = {
       title: title,
       subtitle: subtitle,
@@ -907,20 +832,12 @@ function prepareCompositeNode(
   return canvasNode;
 }
 
-function getRunItemState(
-  execution: WorkflowsWorkflowNodeExecution
-): LastRunState {
-  if (
-    execution.state == "STATE_PENDING" ||
-    execution.state == "STATE_STARTED"
-  ) {
+function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunState {
+  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
     return "running";
   }
 
-  if (
-    execution.state == "STATE_FINISHED" &&
-    execution.result == "RESULT_PASSED"
-  ) {
+  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
     return "success";
   }
 
@@ -937,7 +854,7 @@ function prepareNode(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
-  queryClient: any
+  queryClient: any,
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -967,7 +884,7 @@ function prepareNode(
         nodeExecutionsMap,
         nodeQueueItemsMap,
         workflowId,
-        queryClient
+        queryClient,
       );
   }
 }
@@ -980,38 +897,17 @@ function prepareComponentNode(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
-  queryClient: any
+  queryClient: any,
 ): CanvasNode {
   switch (node.component?.name) {
     case "approval":
-      return prepareApprovalNode(
-        nodes,
-        node,
-        components,
-        nodeExecutionsMap,
-        workflowId,
-        queryClient
-      );
+      return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient);
     case "if":
-      return prepareIfNode(
-        nodes,
-        node,
-        nodeExecutionsMap
-      );
+      return prepareIfNode(nodes, node, nodeExecutionsMap);
     case "noop":
-      return prepareNoopNode(
-        nodes,
-        node,
-        components,
-        nodeExecutionsMap
-      );
+      return prepareNoopNode(nodes, node, components, nodeExecutionsMap);
     case "filter":
-      return prepareFilterNode(
-        nodes,
-        node,
-        components,
-        nodeExecutionsMap
-      );
+      return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
   }
 
   //
@@ -1041,7 +937,7 @@ function prepareApprovalNode(
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   workflowId: string,
-  queryClient: any
+  queryClient: any,
 ): CanvasNode {
   const metadata = components.find((c) => c.name === "approval");
   const executions = nodeExecutionsMap[node.id!] || [];
@@ -1050,12 +946,8 @@ function prepareApprovalNode(
 
   let rootTriggerRenderer: TriggerRenderer | null = null;
   if (execution) {
-    const rootTriggerNode = nodes.find(
-      (n) => n.id === execution!.rootEvent?.nodeId
-    );
-    rootTriggerRenderer = getTriggerRenderer(
-      rootTriggerNode?.trigger?.name || ""
-    );
+    const rootTriggerNode = nodes.find((n) => n.id === execution!.rootEvent?.nodeId);
+    rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
   }
 
   // Map backend records to approval items
@@ -1072,10 +964,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-            ? record.role
-            : record.type === "group" && record.group
-              ? record.group
-              : "Unknown",
+          ? record.role
+          : record.type === "group" && record.group
+          ? record.group
+          : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -1085,16 +977,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-            {
-              label: "comment",
-              optional: true,
-            },
-          ]
+              {
+                label: "comment",
+                optional: true,
+              },
+            ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-          Comment: approvalComment,
-        }
+            Comment: approvalComment,
+          }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1114,7 +1006,7 @@ function prepareApprovalNode(
                   comment: artifacts?.comment,
                 },
               },
-            })
+            }),
           );
 
           queryClient.invalidateQueries({
@@ -1141,7 +1033,7 @@ function prepareApprovalNode(
                   reason: comment,
                 },
               },
-            })
+            }),
           );
 
           queryClient.invalidateQueries({
@@ -1167,9 +1059,7 @@ function prepareApprovalNode(
         iconColor: getColorClass(metadata?.color || "orange"),
         iconBackground: getBackgroundColorClass(metadata?.color || "orange"),
         headerColor: getBackgroundColorClass(metadata?.color || "orange"),
-        collapsedBackground: getBackgroundColorClass(
-          metadata?.color || "orange"
-        ),
+        collapsedBackground: getBackgroundColorClass(metadata?.color || "orange"),
         title: node.name!,
         description: metadata?.description,
         receivedAt: execution ? new Date(execution.createdAt!) : undefined,
@@ -1186,7 +1076,7 @@ function prepareApprovalNode(
 function prepareIfNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
@@ -1194,23 +1084,18 @@ function prepareIfNode(
   // Parse conditions from node configuration
   const expression = node.configuration?.expression;
 
-
   // Get last execution for event data
   let trueEvent, falseEvent;
   if (execution) {
-    const rootTriggerNode = nodes.find(
-      (n) => n.id === execution.rootEvent?.nodeId
-    );
-    const rootTriggerRenderer = getTriggerRenderer(
-      rootTriggerNode?.trigger?.name || ""
-    );
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
     const eventData = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
     };
 
     // Determine which branch was taken based on execution metadata or result
@@ -1221,7 +1106,6 @@ function prepareIfNode(
       falseEvent = eventData;
     }
   }
-
 
   return {
     id: node.id!,
@@ -1235,11 +1119,11 @@ function prepareIfNode(
         expression,
         trueEvent: trueEvent || {
           eventTitle: "No events received yet",
-          eventState: "neutral" as const
+          eventState: "neutral" as const,
         },
         falseEvent: falseEvent || {
           eventTitle: "No events received yet",
-          eventState: "neutral" as const
+          eventState: "neutral" as const,
         },
         trueSectionLabel: "TRUE",
         falseSectionLabel: "FALSE",
@@ -1252,7 +1136,7 @@ function prepareNoopNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   _components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
@@ -1260,22 +1144,17 @@ function prepareNoopNode(
   // Get last event data
   let lastEvent;
   if (execution) {
-    const rootTriggerNode = nodes.find(
-      (n) => n.id === execution.rootEvent?.nodeId
-    );
-    const rootTriggerRenderer = getTriggerRenderer(
-      rootTriggerNode?.trigger?.name || ""
-    );
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
     };
   }
-
 
   return {
     id: node.id!,
@@ -1288,7 +1167,7 @@ function prepareNoopNode(
         title: node.name!,
         lastEvent: lastEvent || {
           eventTitle: "No events received yet",
-          eventState: "neutral" as const
+          eventState: "neutral" as const,
         },
       },
     },
@@ -1299,7 +1178,7 @@ function prepareFilterNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
   _components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
@@ -1309,22 +1188,17 @@ function prepareFilterNode(
 
   let lastEvent;
   if (execution) {
-    const rootTriggerNode = nodes.find(
-      (n) => n.id === execution.rootEvent?.nodeId
-    );
-    const rootTriggerRenderer = getTriggerRenderer(
-      rootTriggerNode?.trigger?.name || ""
-    );
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? "success" as const : "failed" as const
+      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
     };
   }
-
 
   return {
     id: node.id!,
@@ -1338,7 +1212,7 @@ function prepareFilterNode(
         expression,
         lastEvent: lastEvent || {
           eventTitle: "No events received yet",
-          eventState: "neutral" as const
+          eventState: "neutral" as const,
         },
       },
     },
@@ -1371,49 +1245,40 @@ function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[], node:
       values,
       childEventsInfo: {
         count: 0,
-        waitingInfos: []
-      }
+        waitingInfos: [],
+      },
     };
   });
 }
 
 function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution[], nodes: ComponentsNode[]) {
   return executions.slice(0, 5).map((execution) => {
-    const state = execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
-      ? "processed" as const
-      : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-        ? "discarded" as const
-        : "waiting" as const;
+    const state =
+      execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
+        ? ("processed" as const)
+        : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
+        ? ("discarded" as const)
+        : ("waiting" as const);
 
     // Get root trigger information for better title/subtitle
-    const rootTriggerNode = nodes.find(
-      (n) => n.id === execution.rootEvent?.nodeId
-    );
-    const rootTriggerRenderer = getTriggerRenderer(
-      rootTriggerNode?.trigger?.name || ""
-    );
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
 
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-        title: execution.id || "Execution",
-        subtitle: execution.createdAt
-          ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "")
-          : "",
-      };
+          title: execution.id || "Execution",
+          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+        };
 
-    const values = execution.rootEvent
-      ? rootTriggerRenderer.getRootEventValues(execution.rootEvent)
-      : {};
+    const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
     return {
       title,
       subtitle,
       state,
       isOpen: false,
-      receivedAt: execution.createdAt
-        ? new Date(execution.createdAt)
-        : undefined,
+      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
       values,
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
@@ -1456,15 +1321,14 @@ function prepareSidebarData(
     }
   }
 
-  const latestEvents = node.type === "TYPE_TRIGGER"
-    ? mapTriggerEventsToSidebarEvents(events, node)
-    : mapExecutionsToSidebarEvents(executions, nodes);
+  const latestEvents =
+    node.type === "TYPE_TRIGGER"
+      ? mapTriggerEventsToSidebarEvents(events, node)
+      : mapExecutionsToSidebarEvents(executions, nodes);
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = queueItems.slice(0, 5).map((item) => {
-    const timestamp = item.createdAt
-      ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "")
-      : "";
+    const timestamp = item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "";
 
     return {
       title: item.id || "Queued",
@@ -1495,10 +1359,7 @@ function prepareSidebarData(
       // Only include simple types (string, number, boolean)
       // Exclude objects, arrays, null, undefined
       const valueType = typeof value;
-      const isSimpleType =
-        valueType === "string" ||
-        valueType === "number" ||
-        valueType === "boolean";
+      const isSimpleType = valueType === "string" || valueType === "number" || valueType === "boolean";
 
       if (isSimpleType) {
         metadataItems.push({
