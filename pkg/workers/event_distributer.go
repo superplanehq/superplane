@@ -8,8 +8,10 @@ import (
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 )
 
 // EventDistributer coordinates message consumption from RabbitMQ
@@ -41,7 +43,12 @@ func (e *EventDistributer) Start() error {
 		Exchange   string
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
-	}{}
+	}{
+		{messages.WorkflowExchange, messages.WorkflowEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowEventCreated)},
+		{messages.WorkflowExchange, messages.WorkflowExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionCreated)},
+		{messages.WorkflowExchange, messages.WorkflowExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionStarted)},
+		{messages.WorkflowExchange, messages.WorkflowExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionFinished)},
+	}
 
 	// Start a consumer for each route
 	for _, route := range routes {

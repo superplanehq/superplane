@@ -42,27 +42,35 @@ func SerializeWorkflowEvents(events []models.WorkflowEvent) ([]*pb.WorkflowEvent
 	result := make([]*pb.WorkflowEvent, 0, len(events))
 
 	for _, event := range events {
-		data, ok := event.Data.Data().(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("event data is not a map[string]any")
-		}
-
-		s, err := structpb.NewStruct(data)
+		serializedEvent, err := SerializeWorkflowEvent(event)
 		if err != nil {
 			return nil, err
 		}
-
-		result = append(result, &pb.WorkflowEvent{
-			Id:         event.ID.String(),
-			WorkflowId: event.WorkflowID.String(),
-			NodeId:     event.NodeID,
-			Channel:    event.Channel,
-			Data:       s,
-			CreatedAt:  timestamppb.New(*event.CreatedAt),
-		})
+		result = append(result, serializedEvent)
 	}
 
 	return result, nil
+}
+
+func SerializeWorkflowEvent(event models.WorkflowEvent) (*pb.WorkflowEvent, error) {
+	data, ok := event.Data.Data().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("event data is not a map[string]any")
+	}
+
+	s, err := structpb.NewStruct(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.WorkflowEvent{
+		Id:         event.ID.String(),
+		WorkflowId: event.WorkflowID.String(),
+		NodeId:     event.NodeID,
+		Channel:    event.Channel,
+		Data:       s,
+		CreatedAt:  timestamppb.New(*event.CreatedAt),
+	}, nil
 }
 
 func getLastEventTimestamp(events []models.WorkflowEvent) *timestamppb.Timestamp {
