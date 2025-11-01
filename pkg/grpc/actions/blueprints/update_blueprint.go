@@ -20,29 +20,29 @@ func UpdateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, status.Errorf(codes.InvalidArgument, "invalid blueprint id: %v", err)
 	}
 
+	existing, err := models.FindBlueprint(organizationID, id)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "blueprint not found: %v", err)
+	}
+
 	nodes, edges, err := ParseBlueprint(registry, blueprint)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blueprint: %v", err)
 	}
 
 	outputChannels, err := ParseOutputChannels(registry, blueprint.Nodes, blueprint.OutputChannels)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid output channels: %v", err)
 	}
 
 	err = ValidateNodeConfigurations(nodes, registry)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid node configurations: %v", err)
 	}
 
 	configuration, err := ProtoToConfiguration(blueprint.Configuration)
 	if err != nil {
-		return nil, err
-	}
-
-	existing, err := models.FindBlueprint(organizationID, id)
-	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "blueprint not found: %v", err)
+		return nil, status.Errorf(codes.InvalidArgument, "invalid configuration: %v", err)
 	}
 
 	now := time.Now()

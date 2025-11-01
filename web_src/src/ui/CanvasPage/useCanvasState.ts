@@ -39,38 +39,17 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(startCollapsed ?? false);
 
-  useEffect(() => {
-    if (initialNodes) setNodes(initialNodes);
-  }, [initialNodes]);
-
-  useEffect(() => {
-    if (initialEdges) setEdges(initialEdges);
-  }, [initialEdges]);
-
   // Apply initial collapsed state to nodes
   useEffect(() => {
     if (startCollapsed !== undefined && initialNodes) {
       setNodes((nds) =>
         nds.map((node) => {
           const nodeData = { ...node.data };
+          const nodeType = nodeData.type as string;
 
-          if (nodeData.type === "composite" && nodeData.composite) {
-            nodeData.composite = {
-              ...nodeData.composite,
-              collapsed: startCollapsed,
-            };
-          }
-
-          if (nodeData.type === "approval" && nodeData.approval) {
-            nodeData.approval = {
-              ...nodeData.approval,
-              collapsed: startCollapsed,
-            };
-          }
-
-          if (nodeData.type === "trigger" && nodeData.trigger) {
-            nodeData.trigger = {
-              ...nodeData.trigger,
+          if (nodeType && nodeData[nodeType]) {
+            nodeData[nodeType] = {
+              ...nodeData[nodeType],
               collapsed: startCollapsed,
             };
           }
@@ -112,24 +91,11 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
       setNodes((nds) =>
         nds.map((node) => {
           const nodeData = { ...node.data };
+          const nodeType = nodeData.type as string;
 
-          if (nodeData.type === "composite" && nodeData.composite) {
-            nodeData.composite = {
-              ...nodeData.composite,
-              collapsed: newCollapsed,
-            };
-          }
-
-          if (nodeData.type === "approval" && nodeData.approval) {
-            nodeData.approval = {
-              ...nodeData.approval,
-              collapsed: newCollapsed,
-            };
-          }
-
-          if (nodeData.type === "trigger" && nodeData.trigger) {
-            nodeData.trigger = {
-              ...nodeData.trigger,
+          if (nodeType && nodeData[nodeType]) {
+            nodeData[nodeType] = {
+              ...nodeData[nodeType],
               collapsed: newCollapsed,
             };
           }
@@ -146,26 +112,13 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
       nds.map((node) => {
         if (node.id !== nodeId) return node;
 
-        const nodeData = { ...node.data } as any;
+        const nodeData = { ...node.data };
+        const nodeType = nodeData.type as string;
 
-        if (nodeData.type === "composite" && nodeData.composite) {
-          nodeData.composite = {
-            ...nodeData.composite,
-            collapsed: !nodeData.composite.collapsed,
-          };
-        }
-
-        if (nodeData.type === "approval" && nodeData.approval) {
-          nodeData.approval = {
-            ...nodeData.approval,
-            collapsed: !nodeData.approval.collapsed,
-          };
-        }
-
-        if (nodeData.type === "trigger" && nodeData.trigger) {
-          nodeData.trigger = {
-            ...nodeData.trigger,
-            collapsed: !nodeData.trigger.collapsed,
+        if (nodeType && nodeData[nodeType]) {
+          nodeData[nodeType] = {
+            ...nodeData[nodeType],
+            collapsed: !(nodeData[nodeType] as { collapsed: boolean }).collapsed,
           };
         }
 

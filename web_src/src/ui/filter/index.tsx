@@ -9,6 +9,7 @@ export interface FilterProps extends ComponentActionsProps {
   lastEvent?: Omit<EventSection, "title">;
   collapsed?: boolean;
   selected?: boolean;
+  collapsedBackground?: string;
 }
 
 
@@ -18,6 +19,7 @@ export const Filter: React.FC<FilterProps> = ({
   lastEvent,
   collapsed = false,
   selected = false,
+  collapsedBackground,
   onRun,
   onEdit,
   onDuplicate,
@@ -50,6 +52,7 @@ export const Filter: React.FC<FilterProps> = ({
       spec={spec}
       eventSections={eventSections}
       collapsed={collapsed}
+      collapsedBackground={collapsedBackground}
       selected={selected}
       onRun={onRun}
       onEdit={onEdit}

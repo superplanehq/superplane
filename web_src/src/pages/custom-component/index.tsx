@@ -456,9 +456,10 @@ export const CustomComponent = () => {
 
       showSuccessToast('Component saved successfully')
       setHasUnsavedChanges(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving component:', error)
-      showErrorToast('Failed to save component')
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to save component'
+      showErrorToast(errorMessage)
     }
   }
 
