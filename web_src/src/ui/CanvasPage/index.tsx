@@ -89,6 +89,8 @@ export interface CanvasPageProps {
   title?: string;
   breadcrumbs?: BreadcrumbItem[];
   organizationId?: string;
+  unsavedMessage?: string;
+  saveIsPrimary?: boolean;
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -100,6 +102,7 @@ export interface CanvasPageProps {
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
+  onDirty?: () => void;
 
   onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
   onDuplicate?: (nodeId: string) => void;
@@ -217,7 +220,9 @@ function CanvasPage(props: CanvasPageProps) {
       configuration: {},
       position,
     });
-  }, []);
+    // Mark canvas as dirty immediately on drop
+    if (props.onDirty) props.onDirty();
+  }, [props]);
 
   const handleSidebarToggle = useCallback(
     (open: boolean) => {
@@ -257,7 +262,14 @@ function CanvasPage(props: CanvasPageProps) {
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
       <div className="relative z-20">
-        <CanvasContentHeader state={state} onSave={props.onSave} onDelete={props.onDelete} organizationId={props.organizationId} />
+        <CanvasContentHeader
+          state={state}
+          onSave={props.onSave}
+          onDelete={props.onDelete}
+          organizationId={props.organizationId}
+          unsavedMessage={props.unsavedMessage}
+          saveIsPrimary={props.saveIsPrimary}
+        />
       </div>
 
       {/* Main content area with sidebar and canvas */}
@@ -290,7 +302,8 @@ function CanvasPage(props: CanvasPageProps) {
             />
           </ReactFlowProvider>
 
-          <AiSidebar
+  <AiSidebar
+            enabled={state.ai.enabled}
             isOpen={state.ai.sidebarOpen}
             setIsOpen={state.ai.setSidebarOpen}
             showNotifications={state.ai.showNotifications}
@@ -442,7 +455,7 @@ function Sidebar({
   );
 }
 
-function CanvasContentHeader({ state, onSave, onDelete, organizationId }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; onDelete?: () => void; organizationId?: string }) {
+function CanvasContentHeader({ state, onSave, onDelete, organizationId, unsavedMessage, saveIsPrimary }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; onDelete?: () => void; organizationId?: string; unsavedMessage?: string; saveIsPrimary?: boolean }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -458,7 +471,17 @@ function CanvasContentHeader({ state, onSave, onDelete, organizationId }: { stat
     }
   }, [organizationId]);
 
-  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} onDelete={onDelete} onLogoClick={organizationId ? handleLogoClick : undefined} organizationId={organizationId} />;
+  return (
+    <Header
+      breadcrumbs={state.breadcrumbs}
+      onSave={onSave ? handleSave : undefined}
+      onDelete={onDelete}
+      onLogoClick={organizationId ? handleLogoClick : undefined}
+      organizationId={organizationId}
+      unsavedMessage={unsavedMessage}
+      saveIsPrimary={saveIsPrimary}
+    />
+  );
 }
 
 function CanvasContent({
