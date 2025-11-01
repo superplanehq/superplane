@@ -151,6 +151,7 @@ export const CustomComponent = () => {
   const [blueprintDescription, setBlueprintDescription] = useState('')
   const [blueprintIcon, setBlueprintIcon] = useState('')
   const [blueprintColor, setBlueprintColor] = useState('')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   // Handler for metadata changes
   const handleMetadataChange = useCallback((metadata: any) => {
@@ -158,6 +159,7 @@ export const CustomComponent = () => {
     setBlueprintDescription(metadata.description)
     setBlueprintIcon(metadata.icon)
     setBlueprintColor(metadata.color)
+    setHasUnsavedChanges(true)
   }, [])
 
   // Fetch blueprint and components
@@ -243,18 +245,43 @@ export const CustomComponent = () => {
     componentsRef.current = components
   }, [components])
 
+  // Warn user before leaving page with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "Your work isn't saved, unsaved changes will be lost. Are you sure you want to leave?";
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   // Node and edge change handlers
   const onNodesChange = useCallback((changes: any) => {
     setNodes((nds) => applyNodeChanges(changes, nds))
+    // Only mark as unsaved if it's a position change (user dragging nodes)
+    // Don't mark for 'select' or 'dimensions' changes which happen automatically
+    const hasPositionChange = changes.some((change: any) => change.type === 'position' && change.dragging)
+    if (hasPositionChange) {
+      setHasUnsavedChanges(true)
+    }
   }, [])
 
   const onEdgesChange = useCallback((changes: any) => {
     setEdges((eds) => applyEdgeChanges(changes, eds))
+    // Only mark as unsaved for edge removal, not for selection changes
+    const hasRemoval = changes.some((change: any) => change.type === 'remove')
+    if (hasRemoval) {
+      setHasUnsavedChanges(true)
+    }
   }, [])
 
   const onConnect = useCallback(
     (params: Connection) => {
       setEdges((eds) => addEdge({ ...params, style: { strokeWidth: 3, stroke: '#C9D5E1' } }, eds))
+      setHasUnsavedChanges(true)
     },
     []
   )
@@ -338,6 +365,7 @@ export const CustomComponent = () => {
         }
       })
     )
+    setHasUnsavedChanges(true)
   }, [])
 
   const handleNodeAdd = useCallback((newNodeData: NewNodeData) => {
@@ -370,13 +398,24 @@ export const CustomComponent = () => {
       },
     }
     setNodes((nds) => [...nds, newNode])
+    setHasUnsavedChanges(true)
   }, [])
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nds) => nds.filter((n) => n.id !== nodeId))
     setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId))
+    setHasUnsavedChanges(true)
   }, [])
 
+  const handleConfigurationFieldsChange = useCallback((fields: any[]) => {
+    setBlueprintConfiguration(fields)
+    setHasUnsavedChanges(true)
+  }, [])
+
+  const handleOutputChannelsChange = useCallback((channels: any[]) => {
+    setBlueprintOutputChannels(channels)
+    setHasUnsavedChanges(true)
+  }, [])
 
   const handleSave = async () => {
     try {
@@ -416,6 +455,7 @@ export const CustomComponent = () => {
       })
 
       showSuccessToast('Component saved successfully')
+      setHasUnsavedChanges(false)
     } catch (error: any) {
       console.error('Error saving component:', error)
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to save component'
@@ -445,7 +485,7 @@ export const CustomComponent = () => {
   }
 
   const breadcrumbs: BreadcrumbItem[] = [
-    { label: 'Components', onClick: () => navigate(`/${organizationId}`) },
+    { label: 'Components', href: `/${organizationId}` },
     { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
   ]
 
@@ -462,9 +502,9 @@ export const CustomComponent = () => {
         }}
         onMetadataChange={handleMetadataChange}
         configurationFields={blueprintConfiguration}
-        onConfigurationFieldsChange={setBlueprintConfiguration}
+        onConfigurationFieldsChange={handleConfigurationFieldsChange}
         outputChannels={blueprintOutputChannels}
-        onOutputChannelsChange={setBlueprintOutputChannels}
+        onOutputChannelsChange={handleOutputChannelsChange}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -478,6 +518,8 @@ export const CustomComponent = () => {
         components={components}
         onSave={handleSave}
         isSaving={updateBlueprintMutation.isPending}
+        unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
+        saveIsPrimary={hasUnsavedChanges}
       />
     </>
   )

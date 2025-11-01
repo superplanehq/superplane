@@ -12,6 +12,7 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 export interface BreadcrumbItem {
   label: string;
   onClick?: () => void;
+  href?: string;
   iconSrc?: string;
   iconSlug?: string;
   iconColor?: string;
@@ -35,7 +36,7 @@ export function Header({ breadcrumbs, onSave, onLogoClick, organizationId, unsav
   return (
     <>
       <header className="bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between h-12 px-6">
+        <div className="relative flex items-center justify-between h-12 px-6">
           {/* Logo */}
           <div className="flex items-center">
             {onLogoClick ? (
@@ -59,8 +60,8 @@ export function Header({ breadcrumbs, onSave, onLogoClick, organizationId, unsav
             )}
           </div>
 
-          {/* Breadcrumbs */}
-          <div className="flex items-center space-x-2 text-[15px] text-gray-500">
+          {/* Breadcrumbs - Absolutely centered */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center space-x-2 text-[15px] text-gray-500">
             {breadcrumbs.map((item, index) => {
               const IconComponent = item.iconSlug ? resolveIcon(item.iconSlug) : null;
 
@@ -69,8 +70,9 @@ export function Header({ breadcrumbs, onSave, onLogoClick, organizationId, unsav
                   {index > 0 && (
                     <div className="w-2 mx-2">/</div>
                   )}
-                  {item.onClick ? (
-                    <button
+                  {item.href || item.onClick ? (
+                    <a
+                      href={item.href}
                       onClick={item.onClick}
                       className="hover:text-black transition-colors flex items-center gap-2"
                     >
@@ -85,7 +87,7 @@ export function Header({ breadcrumbs, onSave, onLogoClick, organizationId, unsav
                         </div>
                       )}
                       {item.label}
-                    </button>
+                    </a>
                   ) : (
                     <span className={`flex items-center gap-2 ${index === breadcrumbs.length - 1 ? "text-black font-medium" : ""}`}>
                       {item.iconSrc && (
