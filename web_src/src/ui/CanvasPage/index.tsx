@@ -102,6 +102,7 @@ export interface CanvasPageProps {
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
+  onDirty?: () => void;
 
   onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
   onDuplicate?: (nodeId: string) => void;
@@ -219,7 +220,9 @@ function CanvasPage(props: CanvasPageProps) {
       configuration: {},
       position,
     });
-  }, []);
+    // Mark canvas as dirty immediately on drop
+    if (props.onDirty) props.onDirty();
+  }, [props]);
 
   const handleSidebarToggle = useCallback(
     (open: boolean) => {
@@ -299,7 +302,8 @@ function CanvasPage(props: CanvasPageProps) {
             />
           </ReactFlowProvider>
 
-          <AiSidebar
+  <AiSidebar
+            enabled={state.ai.enabled}
             isOpen={state.ai.sidebarOpen}
             setIsOpen={state.ai.setSidebarOpen}
             showNotifications={state.ai.showNotifications}

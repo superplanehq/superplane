@@ -428,6 +428,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -688,6 +689,7 @@ export function WorkflowPageV2() {
       nodes={nodes}
       edges={edges}
       organizationId={organizationId}
+      onDirty={() => setHasUnsavedChanges(true)}
       getSidebarData={getSidebarData}
       getNodeEditData={getNodeEditData}
       onNodeConfigurationSave={handleNodeConfigurationSave}
