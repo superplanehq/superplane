@@ -72,7 +72,7 @@ export const Default: Story = {
       <CustomComponentBuilderPage
         customComponentName={blueprintName}
         breadcrumbs={[
-          { label: "Custom Components" },
+          { label: "Components" },
           { label: blueprintName, iconSlug: "rocket", iconColor: "text-blue-600" },
         ]}
         metadata={{
@@ -119,7 +119,7 @@ export const Default: Story = {
           console.log("Component clicked:", block.name);
         }}
         onSave={() => {
-          console.log("Save custom component");
+          console.log("Save component");
           console.log("Nodes:", nodes);
           console.log("Edges:", edges);
           console.log("Configuration:", configurationFields);
@@ -136,7 +136,7 @@ export const EmptyBlueprint: Story = {
   render: () => {
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
-    const [blueprintName, setBlueprintName] = useState("New Custom Component");
+    const [blueprintName, setBlueprintName] = useState("New Component");
     const [description, setDescription] = useState("");
     const [icon, setIcon] = useState("");
     const [color, setColor] = useState("");
@@ -147,7 +147,7 @@ export const EmptyBlueprint: Story = {
       <CustomComponentBuilderPage
         customComponentName={blueprintName}
         breadcrumbs={[
-          { label: "Custom Components" },
+          { label: "Components" },
           { label: blueprintName, iconSlug: "rocket", iconColor: "text-blue-600" },
         ]}
         metadata={{
@@ -191,7 +191,7 @@ export const EmptyBlueprint: Story = {
           console.log("Component clicked:", block.name);
         }}
         onSave={() => {
-          console.log("Save custom component");
+          console.log("Save component");
         }}
         isSaving={false}
       />

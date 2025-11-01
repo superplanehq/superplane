@@ -350,7 +350,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     const categoryMap = new Map<string, BuildingBlock[]>();
 
     props.components.forEach((component: ComponentsComponent) => {
-      const categoryName = "Components";
+      const categoryName = "Primitives";
 
       const block: BuildingBlock = {
         name: component.name || "",
@@ -412,6 +412,12 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [handleNodeEdit, handleNodeDelete]
   );
 
+  const handleLogoClick = useCallback(() => {
+    if (props.organizationId) {
+      window.location.href = `/${props.organizationId}`;
+    }
+  }, [props.organizationId]);
+
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden relative flex flex-col sp-blueprint-canvas">
       {/* Header */}
@@ -419,6 +425,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         <Header
           breadcrumbs={props.breadcrumbs || [{ label: props.customComponentName }]}
           onSave={props.isSaving ? undefined : props.onSave}
+          onLogoClick={props.organizationId ? handleLogoClick : undefined}
         />
       </div>
 

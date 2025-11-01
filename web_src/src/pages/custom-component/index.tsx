@@ -415,10 +415,10 @@ export const CustomComponent = () => {
         color: blueprintColor,
       })
 
-      showSuccessToast('Custom Component saved successfully')
+      showSuccessToast('Component saved successfully')
     } catch (error) {
-      console.error('Error saving custom component:', error)
-      showErrorToast('Failed to save custom component')
+      console.error('Error saving component:', error)
+      showErrorToast('Failed to save component')
     }
   }
 
@@ -444,7 +444,7 @@ export const CustomComponent = () => {
   }
 
   const breadcrumbs: BreadcrumbItem[] = [
-    { label: 'Custom Components', onClick: () => navigate(`/${organizationId}`) },
+    { label: 'Components', onClick: () => navigate(`/${organizationId}`) },
     { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
   ]
 

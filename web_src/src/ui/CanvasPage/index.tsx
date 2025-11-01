@@ -256,7 +256,7 @@ function CanvasPage(props: CanvasPageProps) {
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
       <div className="relative z-20">
-        <CanvasContentHeader state={state} onSave={props.onSave} />
+        <CanvasContentHeader state={state} onSave={props.onSave} organizationId={props.organizationId} />
       </div>
 
       {/* Main content area with sidebar and canvas */}
@@ -436,7 +436,7 @@ function Sidebar({
   );
 }
 
-function CanvasContentHeader({ state, onSave }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void }) {
+function CanvasContentHeader({ state, onSave, organizationId }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; organizationId?: string }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -446,7 +446,13 @@ function CanvasContentHeader({ state, onSave }: { state: CanvasPageState; onSave
     }
   }, [onSave]);
 
-  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} />;
+  const handleLogoClick = useCallback(() => {
+    if (organizationId) {
+      window.location.href = `/${organizationId}`;
+    }
+  }, [organizationId]);
+
+  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} onLogoClick={organizationId ? handleLogoClick : undefined} />;
 }
 
 function CanvasContent({

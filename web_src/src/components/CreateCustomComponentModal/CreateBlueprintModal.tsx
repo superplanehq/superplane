@@ -44,12 +44,12 @@ export function CreateCustomComponentModal({
     setNameError('')
 
     if (!blueprintName.trim()) {
-      setNameError('Custom Component name is required')
+      setNameError('Component name is required')
       return
     }
 
     if (blueprintName.trim().length > MAX_BLUEPRINT_NAME_LENGTH) {
-      setNameError(`Custom Component name must be ${MAX_BLUEPRINT_NAME_LENGTH} characters or less`)
+      setNameError(`Component name must be ${MAX_BLUEPRINT_NAME_LENGTH} characters or less`)
       return
     }
 
@@ -65,22 +65,22 @@ export function CreateCustomComponentModal({
       setNameError('')
       onClose()
     } catch (error) {
-      console.error('Error creating custom component:', error)
-      const errorMessage = ((error as Error)?.message) || error?.toString() || 'Failed to create custom component'
+      console.error('Error creating component:', error)
+      const errorMessage = ((error as Error)?.message) || error?.toString() || 'Something went wrong. We failed to create a component'
 
       showErrorToast(errorMessage)
 
       if (errorMessage.toLowerCase().includes('already') || errorMessage.toLowerCase().includes('exists')) {
-        setNameError('A custom component with this name already exists')
+        setNameError('A component with this name already exists')
       }
     }
   }
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
-      <DialogTitle>Create New Custom Component</DialogTitle>
+      <DialogTitle>Create New Component</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a new custom component to define reusable workflow patterns using components.
+        Create a new component that can be reused across your canvases and automations.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <MaterialSymbol name="close" size="sm" />
@@ -91,7 +91,7 @@ export function CreateCustomComponentModal({
           {/* Blueprint Name */}
           <Field>
             <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-              Custom Component name *
+              Component name *
             </Label>
             <Input
               type="text"
@@ -104,7 +104,7 @@ export function CreateCustomComponentModal({
                   setNameError('')
                 }
               }}
-              placeholder="Enter custom component name"
+              placeholder="Enter component name"
               className={`w-full ${nameError ? 'border-red-500' : ''}`}
               autoFocus
               maxLength={MAX_BLUEPRINT_NAME_LENGTH}
@@ -131,7 +131,7 @@ export function CreateCustomComponentModal({
                   setBlueprintDescription(e.target.value)
                 }
               }}
-              placeholder="Describe what this custom component will be used for (optional)"
+              placeholder="Describe what this component will be used for (optional)"
               rows={3}
               className="w-full"
               maxLength={MAX_BLUEPRINT_DESCRIPTION_LENGTH}

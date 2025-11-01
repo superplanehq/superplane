@@ -533,7 +533,7 @@ export const Workflow = () => {
                     Components
                   </TabsTrigger>
                   <TabsTrigger value="blueprints" className="flex-1">
-                    Custom Components
+                    Components
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -606,7 +606,7 @@ export const Workflow = () => {
 
                 <TabsContent value="blueprints" className="flex-1 overflow-y-auto text-left mt-4 data-[state=inactive]:hidden">
                   <div className="!text-xs text-gray-500 dark:text-zinc-400 mb-3">
-                    Click on a custom component to add it to your workflow
+                    Click on a component to add it to your workflow
                   </div>
                   <ItemGroup>
                     {buildingBlocks.filter(b => b.type === 'blueprint').map((block: BuildingBlock) => {
