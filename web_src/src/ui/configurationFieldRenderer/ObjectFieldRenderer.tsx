@@ -3,8 +3,8 @@ import Editor from '@monaco-editor/react'
 import { FieldRendererProps } from './types'
 import { ConfigurationFieldRenderer } from './index'
 
-export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, domainId, domainType }) => {
-  const objValue = value ?? {}
+export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, domainId, domainType, hasError }) => {
+  const objValue = (value as Record<string, unknown>) ?? {}
   const [isDarkMode, setIsDarkMode] = React.useState(false)
   const [jsonError, setJsonError] = React.useState<string | null>(null)
   const objectOptions = field.typeOptions?.object
@@ -42,7 +42,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
 
     return (
       <div className="flex flex-col gap-2">
-        <div className="border border-gray-300 dark:border-zinc-700 rounded-md overflow-hidden" style={{ height: '200px' }}>
+        <div className={`border rounded-md overflow-hidden ${hasError ? 'border-red-500 border-2' : 'border-gray-300 dark:border-zinc-700'}`} style={{ height: '200px' }}>
           <Editor
             height="100%"
             defaultLanguage="json"
@@ -89,7 +89,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
           field={schemaField}
           value={objValue[schemaField.name!]}
           onChange={(val) => {
-            const newValue = { ...objValue, [schemaField.name!]: val }
+            const newValue: Record<string, unknown> = { ...objValue, [schemaField.name!]: val }
             onChange(newValue)
           }}
           allValues={objValue}

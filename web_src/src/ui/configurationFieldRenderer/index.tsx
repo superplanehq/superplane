@@ -24,6 +24,8 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
   domainId?: string
   domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION"
   hasError?: boolean
+  validationErrors?: Set<string>
+  fieldPath?: string
 }
 
 export const ConfigurationFieldRenderer = ({
@@ -33,7 +35,9 @@ export const ConfigurationFieldRenderer = ({
   allValues = {},
   domainId,
   domainType,
-  hasError = false
+  hasError = false,
+  validationErrors,
+  fieldPath
 }: ConfigurationFieldRendererProps) => {
   // Check visibility conditions
   const isVisible = React.useMemo(() => {
@@ -72,31 +76,31 @@ export const ConfigurationFieldRenderer = ({
         return <TimeFieldRenderer {...commonProps} />
 
       case 'integration':
-        return <IntegrationFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} domainType={domainType} />
+        return <IntegrationFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} domainType={domainType} />
 
       case 'integration-resource':
-        return <IntegrationResourceFieldRenderer field={field} value={value} onChange={onChange} allValues={allValues} domainId={domainId} domainType={domainType} />
+        return <IntegrationResourceFieldRenderer field={field} value={value as string} onChange={onChange} allValues={allValues} domainId={domainId} domainType={domainType} />
 
       case 'user':
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">User field requires domainId prop</div>
         }
-        return <UserFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} />
+        return <UserFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />
 
       case 'role':
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">Role field requires domainId prop</div>
         }
-        return <RoleFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} />
+        return <RoleFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />
 
       case 'group':
         if (!domainId) {
           return <div className="text-sm text-red-500 dark:text-red-400">Group field requires domainId prop</div>
         }
-        return <GroupFieldRenderer field={field} value={value} onChange={onChange} domainId={domainId} />
+        return <GroupFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} />
 
       case 'list':
-        return <ListFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />
+        return <ListFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} validationErrors={validationErrors} fieldPath={fieldPath || field.name} />
 
       case 'object':
         return <ObjectFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />
@@ -117,7 +121,7 @@ export const ConfigurationFieldRenderer = ({
         )}
       </Label>
       <div className="flex items-center gap-2">
-        <div className={`flex-1 ${hasError ? 'ring-2 ring-red-500 ring-offset-1 rounded-md' : ''}`}>
+        <div className="flex-1">
           {renderField()}
         </div>
         {field.description && (
