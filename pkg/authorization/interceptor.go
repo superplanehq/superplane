@@ -129,6 +129,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbBlueprints.Blueprints_DescribeBlueprint_FullMethodName: {Resource: "blueprint", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbBlueprints.Blueprints_CreateBlueprint_FullMethodName:   {Resource: "blueprint", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbBlueprints.Blueprints_UpdateBlueprint_FullMethodName:   {Resource: "blueprint", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbBlueprints.Blueprints_DeleteBlueprint_FullMethodName:   {Resource: "blueprint", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 
 		// Workflows rules
 		pbWorkflows.Workflows_ListWorkflows_FullMethodName:             {Resource: "workflow", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},

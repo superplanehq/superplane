@@ -121,10 +121,11 @@ openapi.spec.gen:
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client
-	openapi-generator generate \
-		-i api/swagger/superplane.swagger.json \
+	docker run --rm \
+		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
+		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
-		-o pkg/openapi_client \
+		-o /local/pkg/openapi_client \
 		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false
 	rm -rf pkg/openapi_client/test
 	rm -rf pkg/openapi_client/docs

@@ -71,6 +71,17 @@ service Blueprints {
       tags: "Blueprint";
     };
   }
+
+  rpc DeleteBlueprint(DeleteBlueprintRequest) returns (DeleteBlueprintResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/blueprints/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete blueprint";
+      description: "Deletes an existing blueprint";
+      tags: "Blueprint";
+    };
+  }
 }
 
 message ListBlueprintsRequest {}
@@ -103,6 +114,12 @@ message UpdateBlueprintRequest {
 message UpdateBlueprintResponse {
   Blueprint blueprint = 1;
 }
+
+message DeleteBlueprintRequest {
+  string id = 1;
+}
+
+message DeleteBlueprintResponse {}
 
 message Blueprint {
   string id = 1;

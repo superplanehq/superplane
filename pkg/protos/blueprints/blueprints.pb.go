@@ -377,6 +377,86 @@ func (x *UpdateBlueprintResponse) GetBlueprint() *Blueprint {
 	return nil
 }
 
+type DeleteBlueprintRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteBlueprintRequest) Reset() {
+	*x = DeleteBlueprintRequest{}
+	mi := &file_blueprints_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteBlueprintRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteBlueprintRequest) ProtoMessage() {}
+
+func (x *DeleteBlueprintRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_blueprints_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteBlueprintRequest.ProtoReflect.Descriptor instead.
+func (*DeleteBlueprintRequest) Descriptor() ([]byte, []int) {
+	return file_blueprints_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *DeleteBlueprintRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type DeleteBlueprintResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteBlueprintResponse) Reset() {
+	*x = DeleteBlueprintResponse{}
+	mi := &file_blueprints_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteBlueprintResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteBlueprintResponse) ProtoMessage() {}
+
+func (x *DeleteBlueprintResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_blueprints_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteBlueprintResponse.ProtoReflect.Descriptor instead.
+func (*DeleteBlueprintResponse) Descriptor() ([]byte, []int) {
+	return file_blueprints_proto_rawDescGZIP(), []int{9}
+}
+
 type Blueprint struct {
 	state          protoimpl.MessageState           `protogen:"open.v1"`
 	Id             string                           `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -398,7 +478,7 @@ type Blueprint struct {
 
 func (x *Blueprint) Reset() {
 	*x = Blueprint{}
-	mi := &file_blueprints_proto_msgTypes[8]
+	mi := &file_blueprints_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -410,7 +490,7 @@ func (x *Blueprint) String() string {
 func (*Blueprint) ProtoMessage() {}
 
 func (x *Blueprint) ProtoReflect() protoreflect.Message {
-	mi := &file_blueprints_proto_msgTypes[8]
+	mi := &file_blueprints_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -423,7 +503,7 @@ func (x *Blueprint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Blueprint.ProtoReflect.Descriptor instead.
 func (*Blueprint) Descriptor() ([]byte, []int) {
-	return file_blueprints_proto_rawDescGZIP(), []int{8}
+	return file_blueprints_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Blueprint) GetId() string {
@@ -528,7 +608,7 @@ type OutputChannel struct {
 
 func (x *OutputChannel) Reset() {
 	*x = OutputChannel{}
-	mi := &file_blueprints_proto_msgTypes[9]
+	mi := &file_blueprints_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -540,7 +620,7 @@ func (x *OutputChannel) String() string {
 func (*OutputChannel) ProtoMessage() {}
 
 func (x *OutputChannel) ProtoReflect() protoreflect.Message {
-	mi := &file_blueprints_proto_msgTypes[9]
+	mi := &file_blueprints_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -553,7 +633,7 @@ func (x *OutputChannel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutputChannel.ProtoReflect.Descriptor instead.
 func (*OutputChannel) Descriptor() ([]byte, []int) {
-	return file_blueprints_proto_rawDescGZIP(), []int{9}
+	return file_blueprints_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *OutputChannel) GetName() string {
@@ -587,7 +667,7 @@ type UserRef struct {
 
 func (x *UserRef) Reset() {
 	*x = UserRef{}
-	mi := &file_blueprints_proto_msgTypes[10]
+	mi := &file_blueprints_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -599,7 +679,7 @@ func (x *UserRef) String() string {
 func (*UserRef) ProtoMessage() {}
 
 func (x *UserRef) ProtoReflect() protoreflect.Message {
-	mi := &file_blueprints_proto_msgTypes[10]
+	mi := &file_blueprints_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -612,7 +692,7 @@ func (x *UserRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserRef.ProtoReflect.Descriptor instead.
 func (*UserRef) Descriptor() ([]byte, []int) {
-	return file_blueprints_proto_rawDescGZIP(), []int{10}
+	return file_blueprints_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *UserRef) GetId() string {
@@ -651,7 +731,10 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12>\n" +
 	"\tblueprint\x18\x02 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"Y\n" +
 	"\x17UpdateBlueprintResponse\x12>\n" +
-	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"\xdf\x04\n" +
+	"\tblueprint\x18\x01 \x01(\v2 .Superplane.Blueprints.BlueprintR\tblueprint\"(\n" +
+	"\x16DeleteBlueprintRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x19\n" +
+	"\x17DeleteBlueprintResponse\"\xdf\x04\n" +
 	"\tBlueprint\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12\x12\n" +
@@ -676,7 +759,7 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x13node_output_channel\x18\x03 \x01(\tR\x11nodeOutputChannel\"-\n" +
 	"\aUserRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name2\xcb\x06\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name2\x9e\b\n" +
 	"\n" +
 	"Blueprints\x12\xca\x01\n" +
 	"\x0eListBlueprints\x12,.Superplane.Blueprints.ListBlueprintsRequest\x1a-.Superplane.Blueprints.ListBlueprintsResponse\"[\x92A>\n" +
@@ -686,7 +769,9 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x0fCreateBlueprint\x12-.Superplane.Blueprints.CreateBlueprintRequest\x1a..Superplane.Blueprints.CreateBlueprintResponse\"V\x92A6\n" +
 	"\tBlueprint\x12\x10Create blueprint\x1a\x17Creates a new blueprint\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/blueprints\x12\xd3\x01\n" +
 	"\x0fUpdateBlueprint\x12-.Superplane.Blueprints.UpdateBlueprintRequest\x1a..Superplane.Blueprints.UpdateBlueprintResponse\"a\x92A<\n" +
-	"\tBlueprint\x12\x10Update blueprint\x1a\x1dUpdates an existing blueprint\x82\xd3\xe4\x93\x02\x1c:\x01*2\x17/api/v1/blueprints/{id}B\xce\x01\x92A\x90\x01\x12f\n" +
+	"\tBlueprint\x12\x10Update blueprint\x1a\x1dUpdates an existing blueprint\x82\xd3\xe4\x93\x02\x1c:\x01*2\x17/api/v1/blueprints/{id}\x12\xd0\x01\n" +
+	"\x0fDeleteBlueprint\x12-.Superplane.Blueprints.DeleteBlueprintRequest\x1a..Superplane.Blueprints.DeleteBlueprintResponse\"^\x92A<\n" +
+	"\tBlueprint\x12\x10Delete blueprint\x1a\x1dDeletes an existing blueprint\x82\xd3\xe4\x93\x02\x19*\x17/api/v1/blueprints/{id}B\xce\x01\x92A\x90\x01\x12f\n" +
 	"\x19Superplane Blueprints API\x12\x1dAPI for Superplane blueprints\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/blueprintsb\x06proto3"
 
@@ -702,7 +787,7 @@ func file_blueprints_proto_rawDescGZIP() []byte {
 	return file_blueprints_proto_rawDescData
 }
 
-var file_blueprints_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_blueprints_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_blueprints_proto_goTypes = []any{
 	(*ListBlueprintsRequest)(nil),         // 0: Superplane.Blueprints.ListBlueprintsRequest
 	(*ListBlueprintsResponse)(nil),        // 1: Superplane.Blueprints.ListBlueprintsResponse
@@ -712,38 +797,42 @@ var file_blueprints_proto_goTypes = []any{
 	(*CreateBlueprintResponse)(nil),       // 5: Superplane.Blueprints.CreateBlueprintResponse
 	(*UpdateBlueprintRequest)(nil),        // 6: Superplane.Blueprints.UpdateBlueprintRequest
 	(*UpdateBlueprintResponse)(nil),       // 7: Superplane.Blueprints.UpdateBlueprintResponse
-	(*Blueprint)(nil),                     // 8: Superplane.Blueprints.Blueprint
-	(*OutputChannel)(nil),                 // 9: Superplane.Blueprints.OutputChannel
-	(*UserRef)(nil),                       // 10: Superplane.Blueprints.UserRef
-	(*timestamp.Timestamp)(nil),           // 11: google.protobuf.Timestamp
-	(*components.Node)(nil),               // 12: Superplane.Components.Node
-	(*components.Edge)(nil),               // 13: Superplane.Components.Edge
-	(*components.ConfigurationField)(nil), // 14: Superplane.Components.ConfigurationField
+	(*DeleteBlueprintRequest)(nil),        // 8: Superplane.Blueprints.DeleteBlueprintRequest
+	(*DeleteBlueprintResponse)(nil),       // 9: Superplane.Blueprints.DeleteBlueprintResponse
+	(*Blueprint)(nil),                     // 10: Superplane.Blueprints.Blueprint
+	(*OutputChannel)(nil),                 // 11: Superplane.Blueprints.OutputChannel
+	(*UserRef)(nil),                       // 12: Superplane.Blueprints.UserRef
+	(*timestamp.Timestamp)(nil),           // 13: google.protobuf.Timestamp
+	(*components.Node)(nil),               // 14: Superplane.Components.Node
+	(*components.Edge)(nil),               // 15: Superplane.Components.Edge
+	(*components.ConfigurationField)(nil), // 16: Superplane.Components.ConfigurationField
 }
 var file_blueprints_proto_depIdxs = []int32{
-	8,  // 0: Superplane.Blueprints.ListBlueprintsResponse.blueprints:type_name -> Superplane.Blueprints.Blueprint
-	8,  // 1: Superplane.Blueprints.DescribeBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
-	8,  // 2: Superplane.Blueprints.CreateBlueprintRequest.blueprint:type_name -> Superplane.Blueprints.Blueprint
-	8,  // 3: Superplane.Blueprints.CreateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
-	8,  // 4: Superplane.Blueprints.UpdateBlueprintRequest.blueprint:type_name -> Superplane.Blueprints.Blueprint
-	8,  // 5: Superplane.Blueprints.UpdateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
-	11, // 6: Superplane.Blueprints.Blueprint.created_at:type_name -> google.protobuf.Timestamp
-	11, // 7: Superplane.Blueprints.Blueprint.updated_at:type_name -> google.protobuf.Timestamp
-	12, // 8: Superplane.Blueprints.Blueprint.nodes:type_name -> Superplane.Components.Node
-	13, // 9: Superplane.Blueprints.Blueprint.edges:type_name -> Superplane.Components.Edge
-	14, // 10: Superplane.Blueprints.Blueprint.configuration:type_name -> Superplane.Components.ConfigurationField
-	9,  // 11: Superplane.Blueprints.Blueprint.output_channels:type_name -> Superplane.Blueprints.OutputChannel
-	10, // 12: Superplane.Blueprints.Blueprint.created_by:type_name -> Superplane.Blueprints.UserRef
+	10, // 0: Superplane.Blueprints.ListBlueprintsResponse.blueprints:type_name -> Superplane.Blueprints.Blueprint
+	10, // 1: Superplane.Blueprints.DescribeBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	10, // 2: Superplane.Blueprints.CreateBlueprintRequest.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	10, // 3: Superplane.Blueprints.CreateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	10, // 4: Superplane.Blueprints.UpdateBlueprintRequest.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	10, // 5: Superplane.Blueprints.UpdateBlueprintResponse.blueprint:type_name -> Superplane.Blueprints.Blueprint
+	13, // 6: Superplane.Blueprints.Blueprint.created_at:type_name -> google.protobuf.Timestamp
+	13, // 7: Superplane.Blueprints.Blueprint.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 8: Superplane.Blueprints.Blueprint.nodes:type_name -> Superplane.Components.Node
+	15, // 9: Superplane.Blueprints.Blueprint.edges:type_name -> Superplane.Components.Edge
+	16, // 10: Superplane.Blueprints.Blueprint.configuration:type_name -> Superplane.Components.ConfigurationField
+	11, // 11: Superplane.Blueprints.Blueprint.output_channels:type_name -> Superplane.Blueprints.OutputChannel
+	12, // 12: Superplane.Blueprints.Blueprint.created_by:type_name -> Superplane.Blueprints.UserRef
 	0,  // 13: Superplane.Blueprints.Blueprints.ListBlueprints:input_type -> Superplane.Blueprints.ListBlueprintsRequest
 	2,  // 14: Superplane.Blueprints.Blueprints.DescribeBlueprint:input_type -> Superplane.Blueprints.DescribeBlueprintRequest
 	4,  // 15: Superplane.Blueprints.Blueprints.CreateBlueprint:input_type -> Superplane.Blueprints.CreateBlueprintRequest
 	6,  // 16: Superplane.Blueprints.Blueprints.UpdateBlueprint:input_type -> Superplane.Blueprints.UpdateBlueprintRequest
-	1,  // 17: Superplane.Blueprints.Blueprints.ListBlueprints:output_type -> Superplane.Blueprints.ListBlueprintsResponse
-	3,  // 18: Superplane.Blueprints.Blueprints.DescribeBlueprint:output_type -> Superplane.Blueprints.DescribeBlueprintResponse
-	5,  // 19: Superplane.Blueprints.Blueprints.CreateBlueprint:output_type -> Superplane.Blueprints.CreateBlueprintResponse
-	7,  // 20: Superplane.Blueprints.Blueprints.UpdateBlueprint:output_type -> Superplane.Blueprints.UpdateBlueprintResponse
-	17, // [17:21] is the sub-list for method output_type
-	13, // [13:17] is the sub-list for method input_type
+	8,  // 17: Superplane.Blueprints.Blueprints.DeleteBlueprint:input_type -> Superplane.Blueprints.DeleteBlueprintRequest
+	1,  // 18: Superplane.Blueprints.Blueprints.ListBlueprints:output_type -> Superplane.Blueprints.ListBlueprintsResponse
+	3,  // 19: Superplane.Blueprints.Blueprints.DescribeBlueprint:output_type -> Superplane.Blueprints.DescribeBlueprintResponse
+	5,  // 20: Superplane.Blueprints.Blueprints.CreateBlueprint:output_type -> Superplane.Blueprints.CreateBlueprintResponse
+	7,  // 21: Superplane.Blueprints.Blueprints.UpdateBlueprint:output_type -> Superplane.Blueprints.UpdateBlueprintResponse
+	9,  // 22: Superplane.Blueprints.Blueprints.DeleteBlueprint:output_type -> Superplane.Blueprints.DeleteBlueprintResponse
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
 	13, // [13:13] is the sub-list for extension type_name
 	13, // [13:13] is the sub-list for extension extendee
 	0,  // [0:13] is the sub-list for field type_name
@@ -760,7 +849,7 @@ func file_blueprints_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_blueprints_proto_rawDesc), len(file_blueprints_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

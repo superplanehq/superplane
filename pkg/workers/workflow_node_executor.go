@@ -90,7 +90,7 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 	ref := node.Ref.Data()
 	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, ref.Blueprint.ID)
 	if err != nil {
-		return fmt.Errorf("blueprint %s not found: %w", ref.Blueprint.ID, err)
+		return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, "failed to find blueprint")
 	}
 
 	firstNode := blueprint.FindRootNode()

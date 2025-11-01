@@ -44,3 +44,8 @@ func (s *BlueprintService) UpdateBlueprint(ctx context.Context, req *pb.UpdateBl
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return blueprints.UpdateBlueprint(ctx, s.registry, organizationID, req.Id, req.Blueprint)
 }
+
+func (s *BlueprintService) DeleteBlueprint(ctx context.Context, req *pb.DeleteBlueprintRequest) (*pb.DeleteBlueprintResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return blueprints.DeleteBlueprint(ctx, organizationID, req.Id)
+}

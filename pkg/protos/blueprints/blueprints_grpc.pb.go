@@ -23,6 +23,7 @@ const (
 	Blueprints_DescribeBlueprint_FullMethodName = "/Superplane.Blueprints.Blueprints/DescribeBlueprint"
 	Blueprints_CreateBlueprint_FullMethodName   = "/Superplane.Blueprints.Blueprints/CreateBlueprint"
 	Blueprints_UpdateBlueprint_FullMethodName   = "/Superplane.Blueprints.Blueprints/UpdateBlueprint"
+	Blueprints_DeleteBlueprint_FullMethodName   = "/Superplane.Blueprints.Blueprints/DeleteBlueprint"
 )
 
 // BlueprintsClient is the client API for Blueprints service.
@@ -33,6 +34,7 @@ type BlueprintsClient interface {
 	DescribeBlueprint(ctx context.Context, in *DescribeBlueprintRequest, opts ...grpc.CallOption) (*DescribeBlueprintResponse, error)
 	CreateBlueprint(ctx context.Context, in *CreateBlueprintRequest, opts ...grpc.CallOption) (*CreateBlueprintResponse, error)
 	UpdateBlueprint(ctx context.Context, in *UpdateBlueprintRequest, opts ...grpc.CallOption) (*UpdateBlueprintResponse, error)
+	DeleteBlueprint(ctx context.Context, in *DeleteBlueprintRequest, opts ...grpc.CallOption) (*DeleteBlueprintResponse, error)
 }
 
 type blueprintsClient struct {
@@ -83,6 +85,16 @@ func (c *blueprintsClient) UpdateBlueprint(ctx context.Context, in *UpdateBluepr
 	return out, nil
 }
 
+func (c *blueprintsClient) DeleteBlueprint(ctx context.Context, in *DeleteBlueprintRequest, opts ...grpc.CallOption) (*DeleteBlueprintResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteBlueprintResponse)
+	err := c.cc.Invoke(ctx, Blueprints_DeleteBlueprint_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BlueprintsServer is the server API for Blueprints service.
 // All implementations should embed UnimplementedBlueprintsServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type BlueprintsServer interface {
 	DescribeBlueprint(context.Context, *DescribeBlueprintRequest) (*DescribeBlueprintResponse, error)
 	CreateBlueprint(context.Context, *CreateBlueprintRequest) (*CreateBlueprintResponse, error)
 	UpdateBlueprint(context.Context, *UpdateBlueprintRequest) (*UpdateBlueprintResponse, error)
+	DeleteBlueprint(context.Context, *DeleteBlueprintRequest) (*DeleteBlueprintResponse, error)
 }
 
 // UnimplementedBlueprintsServer should be embedded to have
@@ -111,6 +124,9 @@ func (UnimplementedBlueprintsServer) CreateBlueprint(context.Context, *CreateBlu
 }
 func (UnimplementedBlueprintsServer) UpdateBlueprint(context.Context, *UpdateBlueprintRequest) (*UpdateBlueprintResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateBlueprint not implemented")
+}
+func (UnimplementedBlueprintsServer) DeleteBlueprint(context.Context, *DeleteBlueprintRequest) (*DeleteBlueprintResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteBlueprint not implemented")
 }
 func (UnimplementedBlueprintsServer) testEmbeddedByValue() {}
 
@@ -204,6 +220,24 @@ func _Blueprints_UpdateBlueprint_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Blueprints_DeleteBlueprint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteBlueprintRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlueprintsServer).DeleteBlueprint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Blueprints_DeleteBlueprint_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlueprintsServer).DeleteBlueprint(ctx, req.(*DeleteBlueprintRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Blueprints_ServiceDesc is the grpc.ServiceDesc for Blueprints service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -226,6 +260,10 @@ var Blueprints_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateBlueprint",
 			Handler:    _Blueprints_UpdateBlueprint_Handler,
+		},
+		{
+			MethodName: "DeleteBlueprint",
+			Handler:    _Blueprints_DeleteBlueprint_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

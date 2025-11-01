@@ -4,6 +4,7 @@ import {
   blueprintsDescribeBlueprint,
   blueprintsCreateBlueprint,
   blueprintsUpdateBlueprint,
+  blueprintsDeleteBlueprint,
   componentsListComponents,
   componentsDescribeComponent,
 } from '../api-client/sdk.gen'
@@ -109,6 +110,23 @@ export const useUpdateBlueprint = (organizationId: string, blueprintId: string) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: blueprintKeys.detail(organizationId, blueprintId) })
+      queryClient.invalidateQueries({ queryKey: blueprintKeys.list(organizationId) })
+    },
+  })
+}
+
+export const useDeleteBlueprint = (organizationId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (blueprintId: string) => {
+      return await blueprintsDeleteBlueprint(
+        withOrganizationHeader({
+          path: { id: blueprintId }
+        })
+      )
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: blueprintKeys.list(organizationId) })
     },
   })
