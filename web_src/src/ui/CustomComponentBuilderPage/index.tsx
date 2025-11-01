@@ -14,6 +14,7 @@ import { useCallback, useMemo, useState, useEffect } from "react";
 
 import { ComponentsComponent } from "@/api-client";
 import { Block, BlockData } from "../CanvasPage/Block";
+import { CustomEdge } from "../CanvasPage/CustomEdge";
 import { Header, BreadcrumbItem } from "../CanvasPage/Header";
 import {
   BuildingBlock,
@@ -99,6 +100,7 @@ function CanvasContent({
   nodes,
   edges,
   nodeTypes,
+  edgeTypes,
   onNodesChange,
   onEdgesChange,
   onConnect,
@@ -109,6 +111,7 @@ function CanvasContent({
   nodes: Node[];
   edges: Edge[];
   nodeTypes: any;
+  edgeTypes: any;
   onNodesChange: (changes: any) => void;
   onEdgesChange: (changes: any) => void;
   onConnect: (connection: Connection) => void;
@@ -179,6 +182,7 @@ function CanvasContent({
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
@@ -387,6 +391,19 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [handleNodeEdit, handleNodeDelete]
   );
 
+  const edgeTypes = useMemo(() => ({
+    custom: CustomEdge,
+  }), []);
+
+  // Style edges with custom type
+  const styledEdges = useMemo(() =>
+    props.edges.map((edge) => ({
+      ...edge,
+      type: 'custom',
+    })),
+    [props.edges]
+  );
+
   const handleLogoClick = useCallback(() => {
     if (props.organizationId) {
       window.location.href = `/${props.organizationId}`;
@@ -422,8 +439,9 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           <ReactFlowProvider>
             <CanvasContent
               nodes={props.nodes}
-              edges={props.edges}
+              edges={styledEdges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onNodesChange={props.onNodesChange}
               onEdgesChange={props.onEdgesChange}
               onConnect={handleConnect}
