@@ -40,8 +40,6 @@ func (w *WebhookCleanupWorker) Start(ctx context.Context) {
 				w.log("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
-			w.log("Found %d deleted webhooks", len(webhooks))
-
 			for _, webhook := range webhooks {
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.log("Error acquiring semaphore: %v", err)

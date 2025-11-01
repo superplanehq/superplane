@@ -12,18 +12,19 @@ import (
 )
 
 type Blueprint struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	Name           string
-	Description    string
-	Icon           string
-	Color          string
-	CreatedAt      *time.Time
-	UpdatedAt      *time.Time
-	Nodes          datatypes.JSONSlice[Node]
-	Edges          datatypes.JSONSlice[Edge]
-	Configuration  datatypes.JSONSlice[components.ConfigurationField]
-	OutputChannels datatypes.JSONSlice[BlueprintOutputChannel]
+    ID             uuid.UUID
+    OrganizationID uuid.UUID
+    Name           string
+    Description    string
+    Icon           string
+    Color          string
+    CreatedBy      *uuid.UUID
+    CreatedAt      *time.Time
+    UpdatedAt      *time.Time
+    Nodes          datatypes.JSONSlice[Node]
+    Edges          datatypes.JSONSlice[Edge]
+    Configuration  datatypes.JSONSlice[components.ConfigurationField]
+    OutputChannels datatypes.JSONSlice[BlueprintOutputChannel]
 }
 
 type BlueprintOutputChannel struct {

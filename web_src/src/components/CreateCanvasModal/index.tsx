@@ -67,9 +67,9 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
 
   return (
     <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
-      <DialogTitle>Create New Canvas</DialogTitle>
+      <DialogTitle>New canvas</DialogTitle>
       <DialogDescription className="text-sm">
-        Create a new canvas to start automating your DevOps operations. You can always edit the canvas details later.
+        Create a new canvas to orchestrate your DevOps work. You can tweak the details any time.
       </DialogDescription>
       <button onClick={handleClose} className="absolute top-4 right-4">
         <MaterialSymbol name="close" size="sm" />
@@ -81,6 +81,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
             <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Canvas name *</Label>
             <Input
               type="text"
+              autoComplete="off"
               value={name}
               onChange={(e) => {
                 if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
@@ -90,7 +91,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
                   setNameError("");
                 }
               }}
-              placeholder="Enter canvas name"
+              placeholder="Give your canvas a memorable name"
               className={`w-full ${nameError ? "border-red-500" : ""}`}
               autoFocus
               maxLength={MAX_CANVAS_NAME_LENGTH}
@@ -110,7 +111,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
                   setDescription(e.target.value);
                 }
               }}
-              placeholder="Describe what this canvas will be used for (optional)"
+              placeholder="Note what this canvas orchestrates (optional)"
               rows={3}
               className="w-full"
               maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
@@ -129,7 +130,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
           disabled={!name.trim() || isLoading || !!nameError}
           className="flex items-center gap-2"
         >
-          {isLoading ? "Creating..." : "Create"}
+          {isLoading ? "Creating canvas..." : "Create canvas"}
         </Button>
       </DialogActions>
     </Dialog>

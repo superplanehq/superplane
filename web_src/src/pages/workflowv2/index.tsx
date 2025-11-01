@@ -1,7 +1,7 @@
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -25,11 +25,11 @@ import {
   nodeQueueItemsQueryOptions,
   useTriggers,
   useUpdateWorkflow,
+  useDeleteWorkflow,
   useWorkflow,
   workflowKeys,
 } from "@/hooks/useWorkflowData";
 import {
-  BuildingBlock,
   CanvasEdge,
   CanvasNode,
   CanvasPage,
@@ -37,7 +37,6 @@ import {
   NodeEditData,
   SidebarData,
 } from "@/ui/CanvasPage";
-import { BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
@@ -45,8 +44,8 @@ import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
-import { mockBuildingBlockCategories } from "@/ui/CanvasPage/storybooks/buildingBlocks";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
+import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 
 export function WorkflowPageV2() {
   const { organizationId, workflowId } = useParams<{
@@ -57,6 +56,7 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const updateWorkflowMutation = useUpdateWorkflow(organizationId!, workflowId!);
+  const deleteWorkflowMutation = useDeleteWorkflow(organizationId!);
   const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
@@ -98,6 +98,9 @@ export function WorkflowPageV2() {
    * This ref persists across re-renders to preserve viewport position and zoom.
    */
   const viewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
+
+  // Track unsaved changes on the canvas
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   /**
    * Initialize persisted node IDs when workflow is first loaded
@@ -186,97 +189,10 @@ export function WorkflowPageV2() {
 
   useWorkflowWebsocket(workflowId!, organizationId!, refetchEvents, refetchExecutions);
 
-
-  // Prepare building blocks for the sidebar
-  const buildingBlocks = useMemo(() => {
-    const liveCategories: BuildingBlockCategory[] = [
-      {
-        name: "Triggers",
-        blocks: triggers.map(
-          (t): BuildingBlock => ({
-            name: t.name!,
-            label: t.label,
-            description: t.description,
-            type: "trigger",
-            configuration: t.configuration,
-            icon: t.icon,
-            color: t.color,
-            isLive: true,
-          }),
-        ),
-      },
-      {
-        name: "Primitives",
-        blocks: components.map(
-          (c): BuildingBlock => ({
-            name: c.name!,
-            label: c.label,
-            description: c.description,
-            type: "component",
-            outputChannels: c.outputChannels,
-            configuration: c.configuration,
-            icon: c.icon,
-            color: c.color,
-            isLive: true,
-          }),
-        ),
-      },
-      {
-        name: "Components",
-        blocks: blueprints.map(
-          (b): BuildingBlock => ({
-            id: b.id,
-            name: b.name!,
-            description: b.description,
-            type: "blueprint",
-            outputChannels: b.outputChannels,
-            configuration: b.configuration,
-            icon: b.icon,
-            color: b.color,
-            isLive: true,
-          }),
-        ),
-      },
-    ];
-
-    // Merge mock building blocks with live ones while avoiding duplicates
-    // Dedupe key: `${type}:${name}`
-    const byCategory = new Map<string, { blocks: Map<string, BuildingBlock>; order: string[] }>();
-
-    const addCategoryIfMissing = (name: string) => {
-      if (!byCategory.has(name)) {
-        byCategory.set(name, { blocks: new Map(), order: [] });
-      }
-    };
-
-    const addBlocks = (categoryName: string, blocks: BuildingBlock[]) => {
-      addCategoryIfMissing(categoryName);
-      const entry = byCategory.get(categoryName)!;
-      blocks.forEach((blk) => {
-        const key = `${blk.type}:${blk.name}`;
-        if (!entry.blocks.has(key)) {
-          entry.blocks.set(key, blk);
-          entry.order.push(key);
-        }
-      });
-    };
-
-    // Seed with live categories first to prioritize real components
-    liveCategories.forEach((cat) => addBlocks(cat.name, cat.blocks));
-    // Merge in mocks
-    mockBuildingBlockCategories.forEach((cat) => addBlocks(cat.name, cat.blocks));
-
-    // Materialize back to array with stable order (live-first, then mock additions)
-    const merged: BuildingBlockCategory[] = [];
-    byCategory.forEach((value, key) => {
-      merged.push({
-        name: key,
-        blocks: value.order.map((k) => value.blocks.get(k)!).filter(Boolean),
-      });
-    });
-
-    return merged;
-  }, [triggers, components, blueprints]);
+  const buildingBlocks = useMemo(
+    () => buildBuildingBlockCategories(triggers, components, blueprints),
+    [triggers, components, blueprints],
+  );
 
   const { nodes, edges } = useMemo(() => {
     // Don't prepare data until everything is loaded
@@ -389,6 +305,7 @@ export function WorkflowPageV2() {
 
       // Update local cache without triggering API call
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -448,6 +365,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -472,6 +390,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -494,6 +413,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -530,6 +450,7 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -563,6 +484,7 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
     },
     [workflow, organizationId, workflowId, queryClient],
   );
@@ -648,6 +570,7 @@ export function WorkflowPageV2() {
         persistedNodeIdsRef.current = new Set(nodeIds);
 
         showSuccessToast("Workflow saved successfully");
+        setHasUnsavedChanges(false);
       } catch (error) {
         console.error("Failed to save workflow:", error);
         showErrorToast("Failed to save workflow");
@@ -660,6 +583,19 @@ export function WorkflowPageV2() {
     },
     [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient],
   );
+
+  const handleDelete = useCallback(async () => {
+    if (!organizationId || !workflowId) return;
+
+    try {
+      await deleteWorkflowMutation.mutateAsync(workflowId);
+      showSuccessToast("Workflow deleted successfully");
+      navigate(`/${organizationId}`);
+    } catch (error) {
+      console.error("Failed to delete workflow:", error);
+      showErrorToast("Failed to delete workflow");
+    }
+  }, [organizationId, workflowId, deleteWorkflowMutation, navigate]);
 
   // Show loading indicator while data is being fetched
   if (
@@ -690,10 +626,12 @@ export function WorkflowPageV2() {
       nodes={nodes}
       edges={edges}
       organizationId={organizationId}
+      onDirty={() => setHasUnsavedChanges(true)}
       getSidebarData={getSidebarData}
       getNodeEditData={getNodeEditData}
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onSave={handleSave}
+      onDelete={handleDelete}
       onEdgeCreate={handleEdgeCreate}
       onNodeDelete={handleNodeDelete}
       onEdgeDelete={handleEdgeDelete}
@@ -706,6 +644,8 @@ export function WorkflowPageV2() {
       hasUserToggledSidebarRef={hasUserToggledSidebarRef}
       isSidebarOpenRef={isSidebarOpenRef}
       viewportRef={viewportRef}
+      unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
+      saveIsPrimary={hasUnsavedChanges}
       breadcrumbs={[
         {
           label: "Canvases",

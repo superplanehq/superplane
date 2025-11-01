@@ -53,7 +53,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		//
 		// Update the workflow node records
 		//
-		existingNodes, err := existingWorkflow.FindNodes()
+		existingNodes, err := models.FindWorkflowNodes(existingWorkflow.ID)
 		if err != nil {
 			return err
 		}
@@ -176,21 +176,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 func deleteNodes(tx *gorm.DB, existingNodes []models.WorkflowNode, newNodes []models.Node, workflowID uuid.UUID) error {
 	for _, existingNode := range existingNodes {
 		if !slices.ContainsFunc(newNodes, func(n models.Node) bool { return n.ID == existingNode.NodeID }) {
-			err := models.DeleteWorkflowNode(tx, workflowID, existingNode.NodeID)
-			if err != nil {
-				return err
-			}
-
-			if existingNode.WebhookID == nil {
-				continue
-			}
-
-			webhook, err := models.FindWebhook(*existingNode.WebhookID)
-			if err != nil {
-				return err
-			}
-
-			err = tx.Delete(&webhook).Error
+			err := models.DeleteWorkflowNode(tx, existingNode)
 			if err != nil {
 				return err
 			}

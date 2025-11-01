@@ -117,10 +117,15 @@ message Blueprint {
   repeated OutputChannel output_channels = 10;
   string icon = 11;
   string color = 12;
+  UserRef created_by = 13;
 }
 
 message OutputChannel {
   string name = 1;
   string node_id = 2;
   string node_output_channel = 3;
+}
+message UserRef {
+  string id = 1;
+  string name = 2;
 }

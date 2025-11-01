@@ -6,15 +6,23 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
 
 func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizationID string, blueprint *pb.Blueprint) (*pb.CreateBlueprintResponse, error) {
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
 	nodes, edges, err := ParseBlueprint(registry, blueprint)
 	if err != nil {
 		return nil, err
@@ -35,6 +43,8 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		return nil, err
 	}
 
+	createdBy := uuid.MustParse(userID)
+
 	orgID, _ := uuid.Parse(organizationID)
 	now := time.Now()
 	model := &models.Blueprint{
@@ -44,6 +54,7 @@ func CreateBlueprint(ctx context.Context, registry *registry.Registry, organizat
 		Description:    blueprint.Description,
 		Icon:           blueprint.Icon,
 		Color:          blueprint.Color,
+		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 		Nodes:          nodes,

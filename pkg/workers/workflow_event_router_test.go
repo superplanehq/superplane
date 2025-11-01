@@ -2,16 +2,12 @@ package workers
 
 import (
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
-	"gorm.io/gorm/clause"
 )
 
 func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
@@ -23,7 +19,7 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	//
 	node1 := "trigger-1"
 	node2 := "component-1"
-	workflow, _ := createTestWorkflow(
+	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
 		[]models.WorkflowNode{
@@ -38,7 +34,7 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	//
 	// Create the root event for the trigger node, and process it.
 	//
-	event := emitTestEventForNode(t, workflow.ID, node1, "default", nil)
+	event := support.EmitWorkflowEventForNode(t, workflow.ID, node1, "default", nil)
 	err := router.LockAndProcessEvent(*event)
 	require.NoError(t, err)
 
@@ -64,7 +60,7 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	trigger1 := "trigger-1"
 	node1 := "component-1"
 	node2 := "component-2"
-	workflow, _ := createTestWorkflow(
+	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
 		[]models.WorkflowNode{
@@ -82,14 +78,18 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	// Create root event for trigger node,
 	// and create execution with output event for node1.
 	//
-	triggerEvent := emitTestEventForNode(t, workflow.ID, trigger1, "default", nil)
-	execution := createTestExecution(t, workflow.ID, node1, triggerEvent.ID, triggerEvent.ID, nil)
-	outputEvent := emitTestEventForNode(t, workflow.ID, node1, "default", &execution.ID)
+	triggerEvent := support.EmitWorkflowEventForNode(t, workflow.ID, trigger1, "default", nil)
+	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, node1, triggerEvent.ID, triggerEvent.ID, nil)
+	require.NoError(t, execution.Pass(map[string][]any{"default": {map[string]any{}}}))
 
 	//
 	// Process node1 output event and verify it was routed properly.
 	//
-	err := router.LockAndProcessEvent(*outputEvent)
+	events, err := models.ListWorkflowEvents(workflow.ID, node1, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	outputEvent := events[0]
+	err = router.LockAndProcessEvent(outputEvent)
 	require.NoError(t, err)
 
 	updatedEvent, err := models.FindWorkflowEvent(outputEvent.ID)
@@ -113,7 +113,7 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	//   if-1 --true--> up
 	//        --false-> down
 	//
-	blueprint := createTestBlueprint(
+	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
 		[]models.Node{
@@ -128,7 +128,7 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 
 	// Create a workflow that uses this custom component
 	customComponentNode := "blueprint-1"
-	workflow, _ := createTestWorkflow(
+	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
 		[]models.WorkflowNode{
@@ -162,15 +162,15 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	//
 	// Create parent execution for the custom component
 	//
-	rootEvent := emitTestEventForNode(t, workflow.ID, "trigger-1", "default", nil)
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "trigger-1", "default", nil)
 	require.NoError(t, rootEvent.Routed())
-	parentExecution := createTestExecution(t, workflow.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
+	parentExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Create and pass child execution,
 	// emit output event on "true" channel.
 	//
-	childExecution := createTestExecution(t, workflow.ID, customComponentNode+":if-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
+	childExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode+":if-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
 	require.NoError(t, childExecution.Pass(map[string][]any{
 		"true": {map[string]any{}},
 	}))
@@ -206,7 +206,7 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	//
 	//   filter-1 --default--> default
 	//
-	blueprint := createTestBlueprint(
+	blueprint := support.CreateBlueprint(
 		t,
 		r.Organization.ID,
 		[]models.Node{
@@ -220,7 +220,7 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 
 	// Create a workflow that uses this custom component
 	customComponentNode := "blueprint-1"
-	workflow, _ := createTestWorkflow(
+	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
 		[]models.WorkflowNode{
@@ -249,14 +249,14 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	//
 	// Create parent execution for the custom component
 	//
-	rootEvent := emitTestEventForNode(t, workflow.ID, "trigger-1", "default", nil)
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "trigger-1", "default", nil)
 	require.NoError(t, rootEvent.Routed())
-	parentExecution := createTestExecution(t, workflow.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
+	parentExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode, rootEvent.ID, rootEvent.ID, nil)
 
 	//
 	// Create and pass child execution, emitting 5 events.
 	//
-	childExecution := createTestExecution(t, workflow.ID, customComponentNode+":filter-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
+	childExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode+":filter-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
 	require.NoError(t, childExecution.Pass(map[string][]any{
 		"default": {
 			map[string]any{},
@@ -288,79 +288,6 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	assert.Len(t, filterEventsByChannel(parentOutputEvents, "default"), 5)
 }
 
-//
-// Helper functions
-//
-
-func createTestWorkflow(t *testing.T, orgID uuid.UUID, nodes []models.WorkflowNode, edges []models.Edge) (*models.Workflow, []models.WorkflowNode) {
-	now := time.Now()
-
-	//
-	// Create workflow
-	//
-	workflow := &models.Workflow{
-		ID:             uuid.New(),
-		OrganizationID: orgID,
-		Name:           support.RandomName("workflow"),
-		Description:    "Test workflow",
-		Edges:          datatypes.NewJSONSlice(edges),
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-
-	require.NoError(t, database.Conn().Create(workflow).Error)
-
-	//
-	// Create workflow nodes
-	//
-	for _, node := range nodes {
-		node.WorkflowID = workflow.ID
-		node.State = models.WorkflowNodeStateReady
-		node.CreatedAt = &now
-		node.UpdatedAt = &now
-		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&node).Error)
-	}
-
-	return workflow, nodes
-}
-
-func createTestBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
-	now := time.Now()
-
-	blueprint := models.Blueprint{
-		ID:             uuid.New(),
-		OrganizationID: orgID,
-		Name:           support.RandomName("blueprint"),
-		Nodes:          datatypes.NewJSONSlice(nodes),
-		Edges:          datatypes.NewJSONSlice(edges),
-		OutputChannels: datatypes.NewJSONSlice(outputChannels),
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-	}
-
-	require.NoError(t, database.Conn().Create(&blueprint).Error)
-
-	return &blueprint
-}
-
-func createTestExecution(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID, parentExecutionID *uuid.UUID) *models.WorkflowNodeExecution {
-	now := time.Now()
-	execution := models.WorkflowNodeExecution{
-		WorkflowID:        workflowID,
-		NodeID:            nodeID,
-		RootEventID:       rootEventID,
-		EventID:           eventID,
-		ParentExecutionID: parentExecutionID,
-		State:             models.WorkflowNodeExecutionStatePending,
-		Configuration:     datatypes.NewJSONType(map[string]any{}),
-		CreatedAt:         &now,
-		UpdatedAt:         &now,
-	}
-
-	require.NoError(t, database.Conn().Create(&execution).Error)
-	return &execution
-}
-
 func filterEventsByChannel(events []models.WorkflowEvent, channel string) []models.WorkflowEvent {
 	var filtered []models.WorkflowEvent
 	for _, event := range events {
@@ -369,19 +296,4 @@ func filterEventsByChannel(events []models.WorkflowEvent, channel string) []mode
 		}
 	}
 	return filtered
-}
-
-func emitTestEventForNode(t *testing.T, workflowID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.WorkflowEvent {
-	now := time.Now()
-	event := models.WorkflowEvent{
-		WorkflowID:  workflowID,
-		NodeID:      nodeID,
-		Channel:     channel,
-		Data:        datatypes.NewJSONType[any](map[string]any{"key": "value"}),
-		State:       models.WorkflowEventStatePending,
-		ExecutionID: executionID,
-		CreatedAt:   &now,
-	}
-	require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&event).Error)
-	return &event
 }

@@ -29,6 +29,7 @@ type WorkflowsWorkflow struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Nodes []ComponentsNode `json:"nodes,omitempty"`
 	Edges []ComponentsEdge `json:"edges,omitempty"`
+	CreatedBy *SuperplaneWorkflowsUserRef `json:"createdBy,omitempty"`
 }
 
 // NewWorkflowsWorkflow instantiates a new WorkflowsWorkflow object
@@ -304,6 +305,38 @@ func (o *WorkflowsWorkflow) SetEdges(v []ComponentsEdge) {
 	o.Edges = v
 }
 
+// GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
+func (o *WorkflowsWorkflow) GetCreatedBy() SuperplaneWorkflowsUserRef {
+	if o == nil || IsNil(o.CreatedBy) {
+		var ret SuperplaneWorkflowsUserRef
+		return ret
+	}
+	return *o.CreatedBy
+}
+
+// GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflow) GetCreatedByOk() (*SuperplaneWorkflowsUserRef, bool) {
+	if o == nil || IsNil(o.CreatedBy) {
+		return nil, false
+	}
+	return o.CreatedBy, true
+}
+
+// HasCreatedBy returns a boolean if a field has been set.
+func (o *WorkflowsWorkflow) HasCreatedBy() bool {
+	if o != nil && !IsNil(o.CreatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedBy gets a reference to the given SuperplaneWorkflowsUserRef and assigns it to the CreatedBy field.
+func (o *WorkflowsWorkflow) SetCreatedBy(v SuperplaneWorkflowsUserRef) {
+	o.CreatedBy = &v
+}
+
 func (o WorkflowsWorkflow) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -337,6 +370,9 @@ func (o WorkflowsWorkflow) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Edges) {
 		toSerialize["edges"] = o.Edges
+	}
+	if !IsNil(o.CreatedBy) {
+		toSerialize["createdBy"] = o.CreatedBy
 	}
 	return toSerialize, nil
 }

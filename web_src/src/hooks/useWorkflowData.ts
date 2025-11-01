@@ -4,6 +4,7 @@ import {
   workflowsDescribeWorkflow,
   workflowsCreateWorkflow,
   workflowsUpdateWorkflow,
+  workflowsDeleteWorkflow,
   workflowsListNodeExecutions,
   workflowsListWorkflowEvents,
   workflowsListEventExecutions,
@@ -125,6 +126,23 @@ export const useUpdateWorkflow = (organizationId: string, workflowId: string) =>
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workflowKeys.detail(organizationId, workflowId) })
+      queryClient.invalidateQueries({ queryKey: workflowKeys.list(organizationId) })
+    },
+  })
+}
+
+export const useDeleteWorkflow = (organizationId: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (workflowId: string) => {
+      return await workflowsDeleteWorkflow(
+        withOrganizationHeader({
+          path: { id: workflowId }
+        })
+      )
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workflowKeys.list(organizationId) })
     },
   })
