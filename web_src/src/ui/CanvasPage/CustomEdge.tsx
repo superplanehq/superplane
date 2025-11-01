@@ -68,11 +68,13 @@ export function CustomEdge({
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               pointerEvents: 'all',
+              width: '40px',
+              height: '40px',
             }}
-            className="nodrag nopan"
+            className="nodrag nopan group flex items-center justify-center"
           >
             <button
-              className="flex items-center justify-center bg-white rounded-full shadow-lg hover:bg-red-50 transition-colors cursor-pointer"
+              className="flex items-center justify-center bg-red-100 rounded-full shadow-lg group-hover:bg-red-50 transition-all cursor-pointer group-hover:scale-[2]"
               onClick={onDeleteClick}
               aria-label="Delete edge"
             >
