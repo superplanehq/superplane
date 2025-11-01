@@ -99,4 +99,4 @@ promotions:
     auto_promote_on:
       - result: passed
         branch:
-          - "develop"
+          - "^develop$"
