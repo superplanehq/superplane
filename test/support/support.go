@@ -3,6 +3,7 @@ package support
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/test/semaphore"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
+	"gorm.io/gorm/clause"
 
 	// Import components and triggers to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
@@ -382,4 +384,143 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgViewer, organizationID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
 	return user
+}
+
+func EmitWorkflowEventForNode(t *testing.T, workflowID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.WorkflowEvent {
+	now := time.Now()
+	event := models.WorkflowEvent{
+		WorkflowID:  workflowID,
+		NodeID:      nodeID,
+		Channel:     channel,
+		Data:        datatypes.NewJSONType[any](map[string]any{"key": "value"}),
+		State:       models.WorkflowEventStatePending,
+		ExecutionID: executionID,
+		CreatedAt:   &now,
+	}
+	require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&event).Error)
+	return &event
+}
+
+func CreateWorkflowQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) {
+	now := time.Now()
+
+	queueItem := models.WorkflowNodeQueueItem{
+		ID:          uuid.New(),
+		WorkflowID:  workflowID,
+		NodeID:      nodeID,
+		RootEventID: rootEventID,
+		EventID:     eventID,
+		CreatedAt:   &now,
+	}
+
+	err := database.Conn().Create(&queueItem).Error
+	require.NoError(t, err)
+}
+
+func CreateWorkflowNodeExecution(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID, parentExecutionID *uuid.UUID) *models.WorkflowNodeExecution {
+	now := time.Now()
+	execution := models.WorkflowNodeExecution{
+		WorkflowID:        workflowID,
+		NodeID:            nodeID,
+		RootEventID:       rootEventID,
+		EventID:           eventID,
+		ParentExecutionID: parentExecutionID,
+		State:             models.WorkflowNodeExecutionStatePending,
+		Configuration:     datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
+	}
+
+	require.NoError(t, database.Conn().Create(&execution).Error)
+	return &execution
+}
+
+func CreateWorkflow(t *testing.T, orgID uuid.UUID, nodes []models.WorkflowNode, edges []models.Edge) (*models.Workflow, []models.WorkflowNode) {
+	now := time.Now()
+
+	//
+	// Create workflow
+	//
+	workflow := &models.Workflow{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		Name:           RandomName("workflow"),
+		Description:    "Test workflow",
+		Edges:          datatypes.NewJSONSlice(edges),
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Create(workflow).Error)
+
+	//
+	// Create workflow nodes
+	//
+	for _, node := range nodes {
+		node.WorkflowID = workflow.ID
+		node.State = models.WorkflowNodeStateReady
+		node.CreatedAt = &now
+		node.UpdatedAt = &now
+		require.NoError(t, database.Conn().Clauses(clause.Returning{}).Create(&node).Error)
+	}
+
+	return workflow, nodes
+}
+
+func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges []models.Edge, outputChannels []models.BlueprintOutputChannel) *models.Blueprint {
+	now := time.Now()
+
+	blueprint := models.Blueprint{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		Name:           RandomName("blueprint"),
+		Nodes:          datatypes.NewJSONSlice(nodes),
+		Edges:          datatypes.NewJSONSlice(edges),
+		OutputChannels: datatypes.NewJSONSlice(outputChannels),
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Create(&blueprint).Error)
+
+	return &blueprint
+}
+
+func VerifyWorkflowEventsCount(t *testing.T, workflowID uuid.UUID, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.WorkflowEvent{}).
+		Where("workflow_id = ?", workflowID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
+}
+
+func VerifyWorkflowNodeExecutionsCount(t *testing.T, workflowID uuid.UUID, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.WorkflowNodeExecution{}).
+		Where("workflow_id = ?", workflowID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
+}
+
+func VerifyWorkflowNodeQueueCount(t *testing.T, workflowID uuid.UUID, expected int) {
+	var actual int64
+
+	err := database.Conn().
+		Model(&models.WorkflowNodeQueueItem{}).
+		Where("workflow_id = ?", workflowID).
+		Count(&actual).
+		Error
+
+	require.NoError(t, err)
+	require.Equal(t, expected, int(actual))
 }

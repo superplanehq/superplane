@@ -95,6 +95,7 @@ export interface CanvasPageProps {
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
   onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
+  onDelete?: () => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
   onNodeDelete?: (nodeId: string) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
@@ -107,7 +108,6 @@ export interface CanvasPageProps {
   onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
-  onDelete?: (nodeId: string) => void;
 
   ai?: AiProps;
 
@@ -257,7 +257,7 @@ function CanvasPage(props: CanvasPageProps) {
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
       <div className="relative z-20">
-        <CanvasContentHeader state={state} onSave={props.onSave} organizationId={props.organizationId} />
+        <CanvasContentHeader state={state} onSave={props.onSave} onDelete={props.onDelete} organizationId={props.organizationId} />
       </div>
 
       {/* Main content area with sidebar and canvas */}
@@ -442,7 +442,7 @@ function Sidebar({
   );
 }
 
-function CanvasContentHeader({ state, onSave, organizationId }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; organizationId?: string }) {
+function CanvasContentHeader({ state, onSave, onDelete, organizationId }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; onDelete?: () => void; organizationId?: string }) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -458,7 +458,7 @@ function CanvasContentHeader({ state, onSave, organizationId }: { state: CanvasP
     }
   }, [organizationId]);
 
-  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} onLogoClick={organizationId ? handleLogoClick : undefined} organizationId={organizationId} />;
+  return <Header breadcrumbs={state.breadcrumbs} onSave={onSave ? handleSave : undefined} onDelete={onDelete} onLogoClick={organizationId ? handleLogoClick : undefined} organizationId={organizationId} />;
 }
 
 function CanvasContent({

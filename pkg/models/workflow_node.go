@@ -34,12 +34,22 @@ type WorkflowNode struct {
 	UpdatedAt     *time.Time
 }
 
-func DeleteWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) error {
-	return tx.
-		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID).
-		Delete(&WorkflowNode{}).
-		Error
+func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
+	err := tx.Delete(&node).Error
+	if err != nil {
+		return err
+	}
+
+	if node.WebhookID == nil {
+		return nil
+	}
+
+	webhook, err := FindWebhook(*node.WebhookID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Delete(&webhook).Error
 }
 
 func FindWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*WorkflowNode, error) {

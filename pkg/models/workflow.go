@@ -35,10 +35,10 @@ func (w *Workflow) FindNode(id string) (*WorkflowNode, error) {
 	return &node, nil
 }
 
-func (w *Workflow) FindNodes() ([]WorkflowNode, error) {
+func FindWorkflowNodes(workflowID uuid.UUID) ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
 	err := database.Conn().
-		Where("workflow_id = ?", w.ID).
+		Where("workflow_id = ?", workflowID).
 		Find(&nodes).
 		Error
 

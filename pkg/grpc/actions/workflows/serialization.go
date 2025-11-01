@@ -15,7 +15,7 @@ import (
 )
 
 func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
-	workflowNodes, err := workflow.FindNodes()
+	workflowNodes, err := models.FindWorkflowNodes(workflow.ID)
 	if err != nil {
 		return nil
 	}
