@@ -33,6 +33,7 @@ type BlueprintsBlueprint struct {
 	OutputChannels []SuperplaneBlueprintsOutputChannel `json:"outputChannels,omitempty"`
 	Icon *string `json:"icon,omitempty"`
 	Color *string `json:"color,omitempty"`
+	CreatedBy *SuperplaneBlueprintsUserRef `json:"createdBy,omitempty"`
 }
 
 // NewBlueprintsBlueprint instantiates a new BlueprintsBlueprint object
@@ -436,6 +437,38 @@ func (o *BlueprintsBlueprint) SetColor(v string) {
 	o.Color = &v
 }
 
+// GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
+func (o *BlueprintsBlueprint) GetCreatedBy() SuperplaneBlueprintsUserRef {
+	if o == nil || IsNil(o.CreatedBy) {
+		var ret SuperplaneBlueprintsUserRef
+		return ret
+	}
+	return *o.CreatedBy
+}
+
+// GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *BlueprintsBlueprint) GetCreatedByOk() (*SuperplaneBlueprintsUserRef, bool) {
+	if o == nil || IsNil(o.CreatedBy) {
+		return nil, false
+	}
+	return o.CreatedBy, true
+}
+
+// HasCreatedBy returns a boolean if a field has been set.
+func (o *BlueprintsBlueprint) HasCreatedBy() bool {
+	if o != nil && !IsNil(o.CreatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedBy gets a reference to the given SuperplaneBlueprintsUserRef and assigns it to the CreatedBy field.
+func (o *BlueprintsBlueprint) SetCreatedBy(v SuperplaneBlueprintsUserRef) {
+	o.CreatedBy = &v
+}
+
 func (o BlueprintsBlueprint) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -481,6 +514,9 @@ func (o BlueprintsBlueprint) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Color) {
 		toSerialize["color"] = o.Color
+	}
+	if !IsNil(o.CreatedBy) {
+		toSerialize["createdBy"] = o.CreatedBy
 	}
 	return toSerialize, nil
 }

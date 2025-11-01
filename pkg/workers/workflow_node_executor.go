@@ -11,6 +11,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -113,12 +114,20 @@ func (w *WorkflowNodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *mode
 		return err
 	}
 
-	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
+	createdChildExecution, err := models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
 	if err != nil {
 		return fmt.Errorf("failed to create child execution: %w", err)
 	}
 
-	return execution.StartInTransaction(tx)
+	messages.NewWorkflowExecutionCreatedMessage(createdChildExecution.WorkflowID.String(), createdChildExecution).PublishWithDelay(1 * time.Second)
+
+	err = execution.StartInTransaction(tx)
+
+	if err == nil {
+		messages.NewWorkflowExecutionStartedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
+	}
+
+	return err
 }
 
 func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.WorkflowNodeExecution, node *models.WorkflowNode) error {
@@ -126,6 +135,8 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	if err != nil {
 		return fmt.Errorf("failed to start execution: %w", err)
 	}
+
+	messages.NewWorkflowExecutionStartedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 
 	ref := node.Ref.Data()
 	component, err := w.registry.GetComponent(ref.Component.Name)
@@ -153,8 +164,12 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	}
 
 	if err := component.Execute(ctx); err != nil {
-		return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
+		err = execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
+		messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
+		return err
 	}
+
+	messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
 
 	w.log("Execute() returned for execution=%s, node=%s", execution.ID, node.NodeID)
 	return tx.Save(execution).Error

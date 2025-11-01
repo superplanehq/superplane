@@ -3,6 +3,7 @@ package contexts
 import (
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/triggers"
 	"gorm.io/datatypes"
@@ -29,5 +30,11 @@ func (s *EventContext) Emit(data any) error {
 		CreatedAt:  &now,
 	}
 
-	return s.tx.Create(&event).Error
+	if err := s.tx.Create(&event).Error; err != nil {
+		return err
+	}
+
+	messages.NewWorkflowEventCreatedMessage(s.workflowNode.WorkflowID.String(), &event).PublishWithDelay(100 * time.Millisecond)
+
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -234,6 +235,8 @@ func (w *WorkflowEventRouter) processChildExecutionEvent(tx *gorm.DB, workflow *
 		if err := tx.Create(&nodeExecution).Error; err != nil {
 			return err
 		}
+
+		messages.NewWorkflowExecutionCreatedMessage(workflow.ID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
 	}
 
 	return event.RoutedInTransaction(tx)
@@ -309,10 +312,13 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 		}
 	}
 
-	err = parentExecution.PassInTransaction(tx, outputs)
+	events, err := parentExecution.PassInTransaction(tx, outputs)
 	if err != nil {
 		return err
 	}
+
+	messages.NewWorkflowExecutionFinishedMessage(parentExecution.WorkflowID.String(), parentExecution).PublishWithDelay(1 * time.Second)
+	messages.PublishManyWorkflowEventsWithDelay(parentExecution.WorkflowID.String(), events, 1*time.Second)
 
 	w.log("Parent execution %s completed", parentExecution.ID)
 	return event.RoutedInTransaction(tx)

@@ -44,6 +44,7 @@ import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
+import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 
 export function WorkflowPageV2() {
@@ -164,7 +165,30 @@ export function WorkflowPageV2() {
     isLoading: nodeDataLoading,
   } = useCompositeNodeData(workflowId!, persistedNodesWithExecutions);
 
-  // Prepare building blocks for the sidebar (shared logic)
+  const refetchEvents = useCallback(
+    (nodeId: string) => {
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.nodeEvent(workflowId!, nodeId, 10),
+      });
+    },
+    [queryClient, workflowId],
+  );
+
+  const refetchExecutions = useCallback(
+    (nodeId: string) => {
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.nodeExecution(workflowId!, nodeId),
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.nodeQueueItem(workflowId!, nodeId),
+      });
+    },
+    [queryClient, workflowId],
+  );
+
+  useWorkflowWebsocket(workflowId!, organizationId!, refetchEvents, refetchExecutions);
+
   const buildingBlocks = useMemo(
     () => buildBuildingBlockCategories(triggers, components, blueprints),
     [triggers, components, blueprints],
@@ -267,10 +291,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              configuration: updatedConfiguration,
-              name: updatedNodeName,
-            }
+            ...node,
+            configuration: updatedConfiguration,
+            name: updatedNodeName,
+          }
           : node,
       );
 
@@ -313,8 +337,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-            ? "TYPE_BLUEPRINT"
-            : "TYPE_COMPONENT",
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: position || {
           x: (workflow.nodes?.length || 0) * 250,
@@ -445,12 +469,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
-            }
+            ...node,
+            position: {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            },
+          }
           : node,
       );
 
@@ -960,10 +984,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-          ? record.role
-          : record.type === "group" && record.group
-          ? record.group
-          : "Unknown",
+            ? record.role
+            : record.type === "group" && record.group
+              ? record.group
+              : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -973,16 +997,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
+            {
+              label: "comment",
+              optional: true,
+            },
+          ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-            Comment: approvalComment,
-          }
+          Comment: approvalComment,
+        }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1253,8 +1277,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
         ? ("processed" as const)
         : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-        ? ("discarded" as const)
-        : ("waiting" as const);
+          ? ("discarded" as const)
+          : ("waiting" as const);
 
     // Get root trigger information for better title/subtitle
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -1263,9 +1287,9 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-        };
+        title: execution.id || "Execution",
+        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+      };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 

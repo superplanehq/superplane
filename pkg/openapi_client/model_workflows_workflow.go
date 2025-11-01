@@ -29,7 +29,7 @@ type WorkflowsWorkflow struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Nodes []ComponentsNode `json:"nodes,omitempty"`
 	Edges []ComponentsEdge `json:"edges,omitempty"`
-	CreatedBy *WorkflowsUserRef `json:"createdBy,omitempty"`
+	CreatedBy *SuperplaneWorkflowsUserRef `json:"createdBy,omitempty"`
 }
 
 // NewWorkflowsWorkflow instantiates a new WorkflowsWorkflow object
@@ -306,9 +306,9 @@ func (o *WorkflowsWorkflow) SetEdges(v []ComponentsEdge) {
 }
 
 // GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetCreatedBy() WorkflowsUserRef {
+func (o *WorkflowsWorkflow) GetCreatedBy() SuperplaneWorkflowsUserRef {
 	if o == nil || IsNil(o.CreatedBy) {
-		var ret WorkflowsUserRef
+		var ret SuperplaneWorkflowsUserRef
 		return ret
 	}
 	return *o.CreatedBy
@@ -316,7 +316,7 @@ func (o *WorkflowsWorkflow) GetCreatedBy() WorkflowsUserRef {
 
 // GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetCreatedByOk() (*WorkflowsUserRef, bool) {
+func (o *WorkflowsWorkflow) GetCreatedByOk() (*SuperplaneWorkflowsUserRef, bool) {
 	if o == nil || IsNil(o.CreatedBy) {
 		return nil, false
 	}
@@ -332,8 +332,8 @@ func (o *WorkflowsWorkflow) HasCreatedBy() bool {
 	return false
 }
 
-// SetCreatedBy gets a reference to the given WorkflowsUserRef and assigns it to the CreatedBy field.
-func (o *WorkflowsWorkflow) SetCreatedBy(v WorkflowsUserRef) {
+// SetCreatedBy gets a reference to the given SuperplaneWorkflowsUserRef and assigns it to the CreatedBy field.
+func (o *WorkflowsWorkflow) SetCreatedBy(v SuperplaneWorkflowsUserRef) {
 	o.CreatedBy = &v
 }
 

@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
 	"gorm.io/datatypes"
@@ -42,6 +44,11 @@ func EmitNodeEvent(
 
 	if err := database.Conn().Create(&event).Error; err != nil {
 		return nil, fmt.Errorf("failed to create workflow event: %w", err)
+	}
+
+	err = messages.NewWorkflowEventCreatedMessage(workflowID.String(), &event).Publish()
+	if err != nil {
+		log.Errorf("failed to publish workflow event: %v", err)
 	}
 
 	return &pb.EmitNodeEventResponse{

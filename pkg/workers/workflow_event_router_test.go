@@ -80,7 +80,8 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	//
 	triggerEvent := support.EmitWorkflowEventForNode(t, workflow.ID, trigger1, "default", nil)
 	execution := support.CreateWorkflowNodeExecution(t, workflow.ID, node1, triggerEvent.ID, triggerEvent.ID, nil)
-	require.NoError(t, execution.Pass(map[string][]any{"default": {map[string]any{}}}))
+	_, err := execution.Pass(map[string][]any{"default": {map[string]any{}}})
+	require.NoError(t, err)
 
 	//
 	// Process node1 output event and verify it was routed properly.
@@ -171,9 +172,10 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	// emit output event on "true" channel.
 	//
 	childExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode+":if-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
-	require.NoError(t, childExecution.Pass(map[string][]any{
+	_, err := childExecution.Pass(map[string][]any{
 		"true": {map[string]any{}},
-	}))
+	})
+	require.NoError(t, err)
 
 	//
 	// Process the child output event,
@@ -257,7 +259,7 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	// Create and pass child execution, emitting 5 events.
 	//
 	childExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, customComponentNode+":filter-1", rootEvent.ID, rootEvent.ID, &parentExecution.ID)
-	require.NoError(t, childExecution.Pass(map[string][]any{
+	_, err := childExecution.Pass(map[string][]any{
 		"default": {
 			map[string]any{},
 			map[string]any{},
@@ -265,7 +267,8 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 			map[string]any{},
 			map[string]any{},
 		},
-	}))
+	})
+	require.NoError(t, err)
 
 	//
 	// Process one of the child output events,

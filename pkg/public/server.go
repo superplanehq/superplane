@@ -9,7 +9,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -303,7 +302,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 	// WebSocket endpoint - protected by organization scoped authentication
 	s.Router.Handle(
-		"/ws/{canvasId}",
+		"/ws/{workflowId}",
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleWebSocket)),
 	)
@@ -992,21 +991,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vars := mux.Vars(r)
-	canvasID := vars["canvasId"]
-	_, err := models.FindCanvasByID(canvasID, user.OrganizationID)
+	workflowID := vars["workflowId"]
+
+	parsedWorkflowID, err := uuid.Parse(workflowID)
 	if err != nil {
-		http.Error(w, "canvas not found", http.StatusNotFound)
+		http.Error(w, "workflow not found", http.StatusNotFound)
 		return
 	}
 
-	accessibleCanvases, err := s.authService.GetAccessibleCanvasesForUser(user.ID.String())
+	_, err = models.FindWorkflow(user.OrganizationID, parsedWorkflowID)
 	if err != nil {
-		log.Errorf("Error getting accessible canvases for user %s: %v", user.ID.String(), err)
-		http.Error(w, "", http.StatusInternalServerError)
-	}
-
-	if !slices.Contains(accessibleCanvases, canvasID) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "workflow not found", http.StatusNotFound)
 		return
 	}
 
@@ -1019,7 +1014,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := s.wsHub.NewClient(ws, canvasID)
+	client := s.wsHub.NewClient(ws, workflowID)
 
 	<-client.Done
 }
