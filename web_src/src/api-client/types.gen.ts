@@ -29,6 +29,7 @@ export type BlueprintsBlueprint = {
     outputChannels?: Array<SuperplaneBlueprintsOutputChannel>;
     icon?: string;
     color?: string;
+    createdBy?: SuperplaneBlueprintsUserRef;
 };
 
 export type BlueprintsCreateBlueprintRequest = {
@@ -628,6 +629,11 @@ export type SuperplaneBlueprintsOutputChannel = {
     nodeOutputChannel?: string;
 };
 
+export type SuperplaneBlueprintsUserRef = {
+    id?: string;
+    name?: string;
+};
+
 export type SuperplaneCancelStageExecutionBody = {
     [key: string]: unknown;
 };
@@ -1161,6 +1167,11 @@ export type SuperplaneValueFromSecret = {
     key?: string;
 };
 
+export type SuperplaneWorkflowsUserRef = {
+    id?: string;
+    name?: string;
+};
+
 export type TriggersDescribeTriggerResponse = {
     trigger?: TriggersTrigger;
 };
@@ -1320,11 +1331,6 @@ export type WorkflowsUpdateWorkflowResponse = {
     workflow?: WorkflowsWorkflow;
 };
 
-export type WorkflowsUserRef = {
-    id?: string;
-    name?: string;
-};
-
 export type WorkflowsWorkflow = {
     id?: string;
     organizationId?: string;
@@ -1334,7 +1340,7 @@ export type WorkflowsWorkflow = {
     updatedAt?: string;
     nodes?: Array<ComponentsNode>;
     edges?: Array<ComponentsEdge>;
-    createdBy?: WorkflowsUserRef;
+    createdBy?: SuperplaneWorkflowsUserRef;
 };
 
 export type WorkflowsWorkflowEvent = {

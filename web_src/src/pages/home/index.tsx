@@ -26,6 +26,7 @@ interface BlueprintCardData {
   type: "blueprint";
   icon?: string;
   color?: string;
+  createdBy?: { id?: string; name?: string };
 }
 
 interface WorkflowCardData {
@@ -71,6 +72,7 @@ const HomePage = () => {
     type: "blueprint" as const,
     icon: blueprint.icon,
     color: blueprint.color,
+    createdBy: blueprint.createdBy,
   }));
 
   const workflows: WorkflowCardData[] = (workflowsData || []).map((workflow: any) => ({
@@ -546,6 +548,11 @@ function BlueprintGridView({ filteredBlueprints, organizationId }: BlueprintGrid
 
               <div className="flex justify-between items-center">
                 <div className="text-zinc-500 text-left">
+                  {blueprint.createdBy?.name && (
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">
+                      Created by <strong>{blueprint.createdBy.name}</strong>
+                    </p>
+                  )}
                   <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
                     Created at {blueprint.createdAt}
                   </p>
@@ -587,7 +594,15 @@ function BlueprintListView({ filteredBlueprints, organizationId }: BlueprintGrid
                   <Text className="text-sm text-zinc-600 dark:text-zinc-400">
                     {blueprint.description || "No description"}
                   </Text>
-                  <Text className="text-xs text-zinc-500 mt-2">Created at {blueprint.createdAt}</Text>
+                  <Text className="text-xs text-zinc-500 mt-2">
+                    {blueprint.createdBy?.name ? (
+                      <>
+                        Created by <strong>{blueprint.createdBy.name}</strong> · {blueprint.createdAt}
+                      </>
+                    ) : (
+                      <>Created at {blueprint.createdAt}</>
+                    )}
+                  </Text>
                 </div>
               </div>
             </button>
