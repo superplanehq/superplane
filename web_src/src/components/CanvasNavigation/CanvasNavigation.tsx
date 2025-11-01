@@ -5,16 +5,14 @@ import {
   Dropdown,
   DropdownMenu,
   DropdownItem,
-  DropdownButton
 } from '../Dropdown/dropdown'
 import { ControlledTabs, type Tab } from '../Tabs/tabs'
 import { useOrganizationCanvases } from '../../hooks/useOrganizationData'
 import { CanvasSecrets } from '../SettingsPage/components/CanvasSecrets'
 import { CanvasIntegrations } from '../SettingsPage/components/CanvasIntegrations'
 import { CanvasMembers } from '../SettingsPage/components/CanvasMembers'
-import { CanvasDelete } from '../SettingsPage/components/CanvasDelete'
 
-export type CanvasView = 'editor' | 'integrations' | 'members' | 'secrets' | 'delete'
+export type CanvasView = 'editor' | 'integrations' | 'members' | 'secrets'
 
 export interface CanvasNavigationProps {
   canvasName: string
@@ -94,24 +92,11 @@ export function CanvasNavigation({
       <div className="flex items-center justify-between w-full h-full">
         <ControlledTabs
           tabs={navigationTabs}
-          activeTab={activeView === 'delete' ? '' : activeView}
+          activeTab={activeView}
           variant='dark-underline'
           onTabChange={(tabId) => onViewChange(tabId as CanvasView)}
         />
 
-        {/* More Actions Dropdown */}
-        <div className="flex items-center">
-          <Dropdown>
-            <DropdownButton plain className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded">
-              <MaterialSymbol name="more_vert" size="md" className="text-black dark:text-zinc-400" />
-            </DropdownButton>
-            <DropdownMenu>
-              <DropdownItem onClick={() => onViewChange('delete')}>
-                Delete
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-        </div>
       </div>
     </nav>
   )
@@ -130,8 +115,6 @@ export function CanvasNavigationContent({ canvasId, activeView, organizationId }
       return <CanvasIntegrations canvasId={canvasId} organizationId={organizationId} />
     case 'members':
       return <CanvasMembers canvasId={canvasId} organizationId={organizationId} />
-    case 'delete':
-      return <CanvasDelete canvasId={canvasId} organizationId={organizationId} />
     default:
       return null
   }

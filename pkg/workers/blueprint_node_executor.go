@@ -12,6 +12,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -120,7 +121,9 @@ func (w *BlueprintNodeExecutor) processExecution(tx *gorm.DB, execution *models.
 	}
 
 	if err := component.Execute(ctx); err != nil {
-		return execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
+		err := execution.FailInTransaction(tx, models.WorkflowNodeExecutionResultReasonError, err.Error())
+		messages.NewWorkflowExecutionFinishedMessage(execution.WorkflowID.String(), execution).PublishWithDelay(1 * time.Second)
+		return err
 	}
 
 	return tx.Save(execution).Error

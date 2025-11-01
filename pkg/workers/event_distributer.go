@@ -44,19 +44,10 @@ func (e *EventDistributer) Start() error {
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
 	}{
-		{messages.DeliveryHubCanvasExchange, messages.EventCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.StageEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageEventCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.StageEventApprovedRoutingKey, e.createHandler(eventdistributer.HandleStageEventApproved)},
-		{messages.DeliveryHubCanvasExchange, messages.StageEventDiscardedRoutingKey, e.createHandler(eventdistributer.HandleStageEventDiscarded)},
-		{messages.DeliveryHubCanvasExchange, messages.EventSourceCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventSourceCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleExecutionCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleExecutionStarted)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleExecutionFinished)},
-		{messages.DeliveryHubCanvasExchange, messages.StageCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.ConnectionGroupCreatedRoutingKey, e.createHandler(eventdistributer.HandleConnectionGroupCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.StageUpdatedRoutingKey, e.createHandler(eventdistributer.HandleStageUpdated)},
-		{messages.DeliveryHubCanvasExchange, messages.AlertCreatedRoutingKey, e.createHandler(eventdistributer.HandleAlertCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.AlertAcknowledgedRoutingKey, e.createHandler(eventdistributer.HandleAlertAcknowledged)},
+		{messages.WorkflowExchange, messages.WorkflowEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowEventCreated)},
+		{messages.WorkflowExchange, messages.WorkflowExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionCreated)},
+		{messages.WorkflowExchange, messages.WorkflowExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionStarted)},
+		{messages.WorkflowExchange, messages.WorkflowExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleWorkflowExecutionFinished)},
 	}
 
 	// Start a consumer for each route

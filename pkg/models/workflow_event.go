@@ -54,6 +54,21 @@ func FindWorkflowEventsForExecutions(executionIDs []string) ([]WorkflowEvent, er
 	return events, nil
 }
 
+func FindWorkflowEventForWorkflow(workflowID uuid.UUID, id uuid.UUID) (*WorkflowEvent, error) {
+	var event WorkflowEvent
+	err := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("id = ?", id).
+		First(&event).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
 func FindWorkflowEvent(id uuid.UUID) (*WorkflowEvent, error) {
 	return FindWorkflowEventInTransaction(database.Conn(), id)
 }

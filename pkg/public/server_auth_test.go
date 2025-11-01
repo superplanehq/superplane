@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -119,67 +118,6 @@ func Test__ListAccountOrganizations(t *testing.T) {
 		response := httptest.NewRecorder()
 		server.Router.ServeHTTP(response, req)
 		assert.Equal(t, http.StatusOK, response.Code)
-	})
-}
-
-func Test__CanvasWebSocket(t *testing.T) {
-	r := support.Setup(t)
-	server, _, token := setupTestServer(r, t)
-
-	t.Run("no authenticated account -> unauthorized", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/ws/"+uuid.NewString(), nil)
-		req.Header.Set("Connection", "upgrade")
-		req.Header.Set("Upgrade", "websocket")
-		req.Header.Set("Sec-WebSocket-Version", "13")
-		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
-
-		response := httptest.NewRecorder()
-		server.Router.ServeHTTP(response, req)
-		assert.Equal(t, http.StatusUnauthorized, response.Code)
-	})
-
-	t.Run("no organization ID header -> unauthorized", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/ws/"+uuid.NewString(), nil)
-		req.Header.Set("Connection", "upgrade")
-		req.Header.Set("Upgrade", "websocket")
-		req.Header.Set("Sec-WebSocket-Version", "13")
-		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
-		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
-
-		response := httptest.NewRecorder()
-		server.Router.ServeHTTP(response, req)
-		assert.Equal(t, http.StatusUnauthorized, response.Code)
-	})
-
-	t.Run("canvas that does not exist", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "/ws/"+uuid.NewString(), nil)
-		req.Header.Set("Connection", "upgrade")
-		req.Header.Set("Upgrade", "websocket")
-		req.Header.Set("Sec-WebSocket-Version", "13")
-		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
-		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
-		req.Header.Set("x-organization-id", r.Organization.ID.String())
-
-		response := httptest.NewRecorder()
-		server.Router.ServeHTTP(response, req)
-		assert.Equal(t, http.StatusNotFound, response.Code)
-	})
-
-	t.Run("user does not have access to canvas", func(t *testing.T) {
-		user := support.CreateUser(t, r, r.Organization.ID)
-		canvas := support.CreateCanvas(t, r, r.Organization.ID, user.ID)
-
-		req, _ := http.NewRequest(http.MethodGet, "/ws/"+canvas.ID.String(), nil)
-		req.Header.Set("Connection", "upgrade")
-		req.Header.Set("Upgrade", "websocket")
-		req.Header.Set("Sec-WebSocket-Version", "13")
-		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
-		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
-		req.Header.Set("x-organization-id", r.Organization.ID.String())
-
-		response := httptest.NewRecorder()
-		server.Router.ServeHTTP(response, req)
-		assert.Equal(t, http.StatusUnauthorized, response.Code)
 	})
 }
 

@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
@@ -123,6 +124,8 @@ func (w *WorkflowNodeQueueWorker) createNodeExecution(tx *gorm.DB, node *models.
 	if err != nil {
 		return err
 	}
+
+	messages.NewWorkflowExecutionCreatedMessage(nodeExecution.WorkflowID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
 
 	return node.UpdateState(tx, models.WorkflowNodeStateProcessing)
 }

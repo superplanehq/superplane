@@ -302,13 +302,21 @@ func (e *WorkflowNodeExecution) StartInTransaction(tx *gorm.DB) error {
 		Error
 }
 
-func (e *WorkflowNodeExecution) Pass(outputs map[string][]any) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		return e.PassInTransaction(tx, outputs)
+func (e *WorkflowNodeExecution) Pass(outputs map[string][]any) ([]WorkflowEvent, error) {
+	var events []WorkflowEvent
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		events, err = e.PassInTransaction(tx, outputs)
+		if err != nil {
+			return err
+		}
+		return nil
 	})
+
+	return events, err
 }
 
-func (e *WorkflowNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[string][]any) error {
+func (e *WorkflowNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[string][]any) ([]WorkflowEvent, error) {
 	now := time.Now()
 
 	//
@@ -332,7 +340,7 @@ func (e *WorkflowNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs ma
 	if len(events) > 0 {
 		err := tx.Create(&events).Error
 		if err != nil {
-			return fmt.Errorf("failed to create events: %w", err)
+			return nil, fmt.Errorf("failed to create events: %w", err)
 		}
 	}
 
@@ -341,25 +349,31 @@ func (e *WorkflowNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs ma
 	//
 	node, err := FindWorkflowNode(tx, e.WorkflowID, e.NodeID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+		return nil, err
 	}
 
 	if node != nil {
 		err = node.UpdateState(tx, WorkflowNodeStateReady)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	//
 	// Update execution state
 	//
-	return tx.Model(e).
+	err = tx.Model(e).
 		Updates(map[string]interface{}{
 			"state":      WorkflowNodeExecutionStateFinished,
 			"result":     WorkflowNodeExecutionResultPassed,
 			"updated_at": &now,
 		}).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func (e *WorkflowNodeExecution) Fail(reason, message string) error {

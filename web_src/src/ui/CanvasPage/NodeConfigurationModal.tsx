@@ -106,7 +106,7 @@ export function NodeConfigurationModal({
                 Cancel
               </Button>
               <Button variant="default" onClick={handleSave}>
-                Save
+                Add
               </Button>
             </DialogFooter>
           </div>

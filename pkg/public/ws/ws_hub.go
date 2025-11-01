@@ -11,18 +11,18 @@ import (
 )
 
 const (
-    writeWait = 10 * time.Second       // Time allowed to write a message
-    pongWait  = 20 * time.Second       // Must receive pong within 20s
-    pingPeriod = 10 * time.Second      // Ping every 10s
+	writeWait  = 10 * time.Second // Time allowed to write a message
+	pongWait   = 20 * time.Second // Must receive pong within 20s
+	pingPeriod = 10 * time.Second // Ping every 10s
 )
 
 // Client represents a connected websocket client
 type Client struct {
-	hub      *Hub
-	conn     *websocket.Conn
-	send     chan []byte
-	Done     chan struct{}
-	canvasID string // Which canvas this client is watching
+	hub        *Hub
+	conn       *websocket.Conn
+	send       chan []byte
+	Done       chan struct{}
+	workflowID string // Which workflow this client is watching
 }
 
 // Hub maintains the set of active clients and broadcasts messages to them
@@ -30,8 +30,8 @@ type Hub struct {
 	// Registered clients
 	clients map[*Client]bool
 
-	// Map of canvas IDs to clients subscribed to that canvas
-	canvasSubscriptions map[string]map[*Client]bool
+	// Map of workflow IDs to clients subscribed to that workflow
+	workflowSubscriptions map[string]map[*Client]bool
 
 	// Register requests from the clients
 	register chan *Client
@@ -46,11 +46,11 @@ type Hub struct {
 // NewHub creates a new hub
 func NewHub() *Hub {
 	return &Hub{
-		clients:             make(map[*Client]bool),
-		canvasSubscriptions: make(map[string]map[*Client]bool),
-		register:            make(chan *Client),
-		unregister:          make(chan *Client),
-		mutex:               sync.RWMutex{},
+		clients:               make(map[*Client]bool),
+		workflowSubscriptions: make(map[string]map[*Client]bool),
+		register:              make(chan *Client),
+		unregister:            make(chan *Client),
+		mutex:                 sync.RWMutex{},
 	}
 }
 
@@ -75,11 +75,11 @@ func (h *Hub) registerClient(client *Client) {
 
 	h.clients[client] = true
 
-	if _, ok := h.canvasSubscriptions[client.canvasID]; !ok {
-		h.canvasSubscriptions[client.canvasID] = make(map[*Client]bool)
+	if _, ok := h.workflowSubscriptions[client.workflowID]; !ok {
+		h.workflowSubscriptions[client.workflowID] = make(map[*Client]bool)
 	}
-	h.canvasSubscriptions[client.canvasID][client] = true
-	log.Debugf("Client subscribed to canvas: %s", client.canvasID)
+	h.workflowSubscriptions[client.workflowID][client] = true
+	log.Debugf("Client subscribed to workflow: %s", client.workflowID)
 
 	log.Debugf("New client registered %v, total clients: %d", client, len(h.clients))
 }
@@ -94,14 +94,14 @@ func (h *Hub) unregisterClient(client *Client) {
 		delete(h.clients, client)
 		close(client.send)
 
-		// Also remove from canvas subscriptions
-		if client.canvasID != "" {
-			if clients, ok := h.canvasSubscriptions[client.canvasID]; ok {
+		// Also remove from workflow subscriptions
+		if client.workflowID != "" {
+			if clients, ok := h.workflowSubscriptions[client.workflowID]; ok {
 				delete(clients, client)
 
-				// If this was the last client for this canvas, remove the canvas entry
+				// If this was the last client for this workflow, remove the workflow entry
 				if len(clients) == 0 {
-					delete(h.canvasSubscriptions, client.canvasID)
+					delete(h.workflowSubscriptions, client.workflowID)
 				}
 			}
 		}
@@ -124,13 +124,12 @@ func (h *Hub) BroadcastAll(message []byte) {
 	}
 }
 
-// BroadcastToCanvas sends a message to all clients subscribed to a specific canvas
-func (h *Hub) BroadcastToCanvas(canvasID string, message []byte) {
+func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
 	h.mutex.RLock()
 	defer h.mutex.RUnlock()
 
-	// Get clients subscribed to this canvas
-	if clients, ok := h.canvasSubscriptions[canvasID]; ok {
+	// Get clients subscribed to this workflow
+	if clients, ok := h.workflowSubscriptions[workflowID]; ok {
 		for client := range clients {
 			select {
 			case client.send <- message:
@@ -143,13 +142,13 @@ func (h *Hub) BroadcastToCanvas(canvasID string, message []byte) {
 }
 
 // NewClient creates a new websocket client
-func (h *Hub) NewClient(conn *websocket.Conn, canvasID string) *Client {
+func (h *Hub) NewClient(conn *websocket.Conn, workflowID string) *Client {
 	client := &Client{
-		hub:      h,
-		conn:     conn,
-		send:     make(chan []byte, 4096),
-		Done:     make(chan struct{}),
-		canvasID: canvasID,
+		hub:        h,
+		conn:       conn,
+		send:       make(chan []byte, 4096),
+		Done:       make(chan struct{}),
+		workflowID: workflowID,
 	}
 
 	// Register this client with the hub
