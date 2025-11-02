@@ -22,6 +22,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
 
       if (trigger.lastEventData) {
         latestEvents.push({
+          id: trigger.lastEventData.id,
           title: trigger.lastEventData.title,
           subtitle: trigger.lastEventData.subtitle,
           state: trigger.lastEventData.state || "processed",
@@ -37,6 +38,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 3 random latest events
       latestEvents.push(
         {
+          id: "550e8400-e29b-41d4-a716-446655440000",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
@@ -45,6 +47,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           values: { email: "john@example.com", userId: "u_123" },
         },
         {
+          id: "550e8400-e29b-41d4-a716-446655440001",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
@@ -53,6 +56,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           values: { amount: "49.99", currency: "USD" },
         },
         {
+          id: "550e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "discarded",
@@ -64,6 +68,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 2 queue events
       const nextInQueueEvents: SidebarEvent[] = [
         {
+          id: "650e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
@@ -71,6 +76,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           receivedAt: new Date(Date.now() + 5 * 60 * 1000),
         },
         {
+          id: "750e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
@@ -109,6 +115,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
 
       if (composite?.lastRunItem) {
         latestEvents.push({
+          id: composite.lastRunItem.id,
           title: composite.lastRunItem.title,
           subtitle: composite.lastRunItem.subtitle,
           state: (conversionStateMap[composite.lastRunItem.state] || "processed") as "waiting" | "processed" | "discarded",
@@ -122,6 +129,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 3 random latest events
       latestEvents.push(
         {
+          id: "850e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
@@ -130,6 +138,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           values: { duration: "1.2s", steps: "5" },
         },
         {
+          id: "950e8400-e29b-41d4-a716-446655440001",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
@@ -147,6 +156,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           }
         },
         {
+          id: "1050e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "discarded",
@@ -157,6 +167,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
 
       if (composite.nextInQueue) {
         nextInQueueEvents.push({
+          id: "650e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
@@ -168,6 +179,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 2 additional queue events
       nextInQueueEvents.push(
         {
+          id: "950e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
@@ -175,6 +187,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           receivedAt: new Date(Date.now() + 15 * 60 * 1000),
         },
         {
+          id: "1050e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
@@ -205,6 +218,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
 
       if (approval?.awaitingEvent) {
         latestEvents.push({
+          id: approval.awaitingEvent.id,
           title: approval.awaitingEvent.title,
           subtitle: approval.awaitingEvent.subtitle,
           state: "waiting",
@@ -216,6 +230,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 3 random latest events
       latestEvents.push(
         {
+          id: "250e8400-e29b-41d4-a716-446655440000",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
@@ -224,6 +239,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           values: { amount: "2500", department: "Marketing" },
         },
         {
+          id: "350e8400-e29b-41d4-a716-446655440001",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
@@ -232,6 +248,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           values: { pullRequest: "142", reviewer: "alice" },
         },
         {
+          id: "450e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "discarded",
@@ -243,6 +260,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 2 queue events
       const nextInQueueEvents: SidebarEvent[] = [
         {
+          id: "550e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
@@ -250,6 +268,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           receivedAt: new Date(Date.now() + 3 * 60 * 1000),
         },
         {
+          id: "650e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
@@ -287,6 +306,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
         sortedStages.slice(0, 5).forEach((stage: any) => {
           if (stage.eventTitle) {
             latestEvents.push({
+              id: stage.id,
               title: stage.eventTitle,
               subtitle: stage.pathName,
               state: stage.eventState || "processed",
@@ -300,6 +320,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 3 additional random events
       latestEvents.push(
         {
+          id: "750e8400-e29b-41d4-a716-446655440000",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "processed",
@@ -308,6 +329,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           values: { path: "premium", users: "45" },
         },
         {
+          id: "850e8400-e29b-41d4-a716-446655440001",
           title: genFunction().message,
           state: "processed",
           isOpen: false,
@@ -315,6 +337,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           values: { path: "basic", users: "127" },
         },
         {
+          id: "950e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "discarded",
@@ -326,6 +349,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
       // Add 2 queue events
       const nextInQueueEvents: SidebarEvent[] = [
         {
+          id: "850e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
@@ -333,6 +357,7 @@ export function createGetSidebarData(nodes: CanvasNode[]) {
           receivedAt: new Date(Date.now() + 7 * 60 * 1000),
         },
         {
+          id: "950e8400-e29b-41d4-a716-446655440002",
           title: genFunction().message,
           subtitle: genFunction()?.size || genFunction()?.sha,
           state: "waiting",
