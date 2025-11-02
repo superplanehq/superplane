@@ -4,6 +4,11 @@ agent:
   machine:
     type: f1-standard-2
     os_image: ubuntu2204
+
+auto_cancel:
+  running:
+    when: "branch != 'develop' or branch != 'main'"
+
 blocks:
   - name: "\U0001F9EA QA"
     dependencies: []
