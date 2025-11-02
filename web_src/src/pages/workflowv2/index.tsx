@@ -930,7 +930,7 @@ function prepareComponentNode(
     case "filter":
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
     case "http":
-      return prepareHttpNode(nodes, node, components, nodeExecutionsMap);
+      return prepareHttpNode(node, components, nodeExecutionsMap);
   }
 
   //
@@ -1246,7 +1246,6 @@ function prepareFilterNode(
 }
 
 function prepareHttpNode(
-  nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
