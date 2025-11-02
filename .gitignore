@@ -8,3 +8,4 @@ design/node_modules/
 main
 tmp/screenshots
 e2e.test
+wget-log*
