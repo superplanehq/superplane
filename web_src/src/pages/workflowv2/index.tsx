@@ -272,21 +272,26 @@ export function WorkflowPageV2() {
 
       // Get configuration fields from metadata based on node type
       let configurationFields: ComponentsComponent["configuration"] = [];
+      let displayLabel: string | undefined = node.name || undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
         const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
         configurationFields = blueprintMetadata?.configuration || [];
+        displayLabel = blueprintMetadata?.name || displayLabel;
       } else if (node.type === "TYPE_COMPONENT") {
         const componentMetadata = components.find((c) => c.name === node.component?.name);
         configurationFields = componentMetadata?.configuration || [];
+        displayLabel = componentMetadata?.label || displayLabel;
       } else if (node.type === "TYPE_TRIGGER") {
         const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
+        displayLabel = triggerMetadata?.label || displayLabel;
       }
 
       return {
         nodeId: node.id!,
         nodeName: node.name!,
+        displayLabel,
         configuration: node.configuration || {},
         configurationFields,
       };

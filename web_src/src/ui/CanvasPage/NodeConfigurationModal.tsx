@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
+  DialogHeader,
+  DialogTitle,
   DialogContent,
   DialogFooter,
 } from "@/components/ui/dialog";
@@ -15,6 +17,7 @@ interface NodeConfigurationModalProps {
   isOpen: boolean;
   onClose: () => void;
   nodeName: string;
+  nodeLabel?: string;
   configuration: Record<string, unknown>;
   configurationFields: ComponentsConfigurationField[];
   onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
@@ -26,6 +29,7 @@ export function NodeConfigurationModal({
   isOpen,
   onClose,
   nodeName,
+  nodeLabel,
   configuration,
   configurationFields,
   onSave,
@@ -128,9 +132,18 @@ export function NodeConfigurationModal({
     onClose();
   };
 
+  const displayLabel = nodeLabel || nodeName || "Node configuration";
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-2xl p-0" showCloseButton={false}>
+      <DialogContent
+        className="max-w-2xl p-0"
+        showCloseButton={false}
+        aria-describedby={undefined} /* Disable DialogDescription */
+      >
+        <DialogHeader className="px-6 pt-6 pb-0 text-left">
+          <DialogTitle>New {displayLabel}</DialogTitle>
+        </DialogHeader>
         <ScrollArea className="max-h-[80vh]">
           <div className="p-6">
             <div className="space-y-6">

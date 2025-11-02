@@ -71,6 +71,7 @@ export interface AiProps {
 export interface NodeEditData {
   nodeId: string;
   nodeName: string;
+  displayLabel?: string;
   configuration: Record<string, any>;
   configurationFields: ComponentsConfigurationField[];
 }
@@ -78,6 +79,7 @@ export interface NodeEditData {
 export interface NewNodeData {
   buildingBlock: BuildingBlock;
   nodeName: string;
+  displayLabel?: string;
   configuration: Record<string, any>;
   position?: { x: number; y: number };
 }
@@ -259,6 +261,7 @@ function CanvasPage(props: CanvasPageProps) {
     setNewNodeData({
       buildingBlock: block,
       nodeName: block.name || "",
+      displayLabel: block.label || block.name || "",
       configuration: {},
       position,
     });
@@ -379,6 +382,7 @@ function CanvasPage(props: CanvasPageProps) {
           isOpen={true}
           onClose={() => setEditingNodeData(null)}
           nodeName={editingNodeData.nodeName}
+          nodeLabel={editingNodeData.displayLabel}
           configuration={editingNodeData.configuration}
           configurationFields={editingNodeData.configurationFields}
           onSave={handleSaveConfiguration}
@@ -393,6 +397,7 @@ function CanvasPage(props: CanvasPageProps) {
           isOpen={true}
           onClose={() => setNewNodeData(null)}
           nodeName={newNodeData.nodeName}
+          nodeLabel={newNodeData.displayLabel}
           configuration={newNodeData.configuration}
           configurationFields={newNodeData.buildingBlock.configuration || []}
           onSave={handleSaveNewNode}
