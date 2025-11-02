@@ -133,6 +133,44 @@ const EDGE_STYLE = {
 
 const DEFAULT_CANVAS_ZOOM = 0.8;
 
+/*
+ * nodeTypes must be defined outside of the component to prevent
+ * react-flow from remounting the node types on every render.
+ */
+const nodeTypes = {
+  default: (nodeProps: { data: BlockData & { _callbacksRef?: any }; id: string; selected?: boolean }) => {
+    const { _callbacksRef, ...blockData } = nodeProps.data;
+    const callbacks = _callbacksRef?.current;
+
+    if (!callbacks) {
+      return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
+    }
+
+    return (
+      <Block
+        data={blockData}
+        nodeId={nodeProps.id}
+        selected={nodeProps.selected}
+        onExpand={callbacks.handleNodeExpand}
+        onClick={() => callbacks.handleNodeClick(nodeProps.id)}
+        onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
+        onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
+        onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
+        onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
+        onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
+        onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
+        onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
+        ai={{
+          show: callbacks.aiState.sidebarOpen,
+          suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
+          onApply: () => callbacks.aiState.onApply(nodeProps.id),
+          onDismiss: () => callbacks.aiState.onDismiss(nodeProps.id),
+        }}
+      />
+    );
+  },
+};
+
 function CanvasPage(props: CanvasPageProps) {
   const state = useCanvasState(props);
   const [editingNodeData, setEditingNodeData] = useState<NodeEditData | null>(null);
@@ -262,6 +300,14 @@ function CanvasPage(props: CanvasPageProps) {
     [newNodeData, props],
   );
 
+  const handleToggleView = useCallback(
+    (nodeId: string) => {
+      state.toggleNodeCollapse(nodeId);
+      props.onToggleView?.(nodeId);
+    },
+    [state.toggleNodeCollapse, props.onToggleView],
+  );
+
   return (
     <div className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -294,10 +340,7 @@ function CanvasPage(props: CanvasPageProps) {
               onNodeDelete={handleNodeDelete}
               onEdgeCreate={props.onEdgeCreate}
               hideHeader={true}
-              onToggleView={(nodeId) => {
-                state.toggleNodeCollapse(nodeId);
-                props.onToggleView?.(nodeId);
-              }}
+              onToggleView={handleToggleView}
               onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
@@ -558,6 +601,24 @@ function CanvasContent({
   const onRunRef = useRef(onRun);
   onRunRef.current = onRun;
 
+  const onNodeEditRef = useRef(onNodeEdit);
+  onNodeEditRef.current = onNodeEdit;
+
+  const onNodeDeleteRef = useRef(onNodeDelete);
+  onNodeDeleteRef.current = onNodeDelete;
+
+  const onDuplicateRef = useRef(onDuplicate);
+  onDuplicateRef.current = onDuplicate;
+
+  const onConfigureRef = useRef(onConfigure);
+  onConfigureRef.current = onConfigure;
+
+  const onDeactivateRef = useRef(onDeactivate);
+  onDeactivateRef.current = onDeactivate;
+
+  const onToggleViewRef = useRef(onToggleView);
+  onToggleViewRef.current = onToggleView;
+
   const handleSave = useCallback(() => {
     if (onSave) {
       onSave(stateRef.current.nodes);
@@ -669,33 +730,42 @@ function CanvasContent({
     [fitView, getViewport, onZoomChange, hasFitToViewRef, viewportRef],
   );
 
-  const nodeTypes = useMemo(
-    () => ({
-      default: (nodeProps: { data: unknown; id: string; selected?: boolean }) => (
-        <Block
-          data={nodeProps.data as BlockData}
-          onExpand={handleNodeExpand}
-          nodeId={nodeProps.id}
-          onClick={() => handleNodeClick(nodeProps.id)}
-          onEdit={() => onNodeEdit(nodeProps.id)}
-          onDelete={() => onNodeDelete?.(nodeProps.id)}
-          selected={nodeProps.selected}
-          onRun={onRunRef.current ? () => onRunRef.current?.(nodeProps.id) : undefined}
-          onDuplicate={onDuplicate ? () => onDuplicate(nodeProps.id) : undefined}
-          onConfigure={onConfigure ? () => onConfigure(nodeProps.id) : undefined}
-          onDeactivate={onDeactivate ? () => onDeactivate(nodeProps.id) : undefined}
-          onToggleView={onToggleView ? () => onToggleView(nodeProps.id) : undefined}
-          ai={{
-            show: state.ai.sidebarOpen,
-            suggestion: state.ai.suggestions[nodeProps.id] || null,
-            onApply: () => state.ai.onApply(nodeProps.id),
-            onDismiss: () => state.ai.onDismiss(nodeProps.id),
-          }}
-        />
-      ),
-    }),
-    [handleNodeExpand, handleNodeClick, onNodeEdit, state.ai, onDuplicate, onDeactivate, onToggleView, onNodeDelete],
-  );
+  // Store callback handlers in a ref so they can be accessed without being in node data
+  const callbacksRef = useRef({
+    handleNodeExpand,
+    handleNodeClick,
+    onNodeEdit: onNodeEditRef,
+    onNodeDelete: onNodeDeleteRef,
+    onRun: onRunRef,
+    onDuplicate: onDuplicateRef,
+    onConfigure: onConfigureRef,
+    onDeactivate: onDeactivateRef,
+    onToggleView: onToggleViewRef,
+    aiState: state.ai,
+  });
+  callbacksRef.current = {
+    handleNodeExpand,
+    handleNodeClick,
+    onNodeEdit: onNodeEditRef,
+    onNodeDelete: onNodeDeleteRef,
+    onRun: onRunRef,
+    onDuplicate: onDuplicateRef,
+    onConfigure: onConfigureRef,
+    onDeactivate: onDeactivateRef,
+    onToggleView: onToggleViewRef,
+    aiState: state.ai,
+  };
+
+  // Just pass the state nodes directly - callbacks will be added in nodeTypes
+  const nodesWithCallbacks = useMemo(() => {
+    return state.nodes.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        _callbacksRef: callbacksRef,
+      },
+    }));
+  }, [state.nodes]);
 
   const edgeTypes = useMemo(() => ({
     custom: CustomEdge,
@@ -715,7 +785,7 @@ function CanvasContent({
       <div className={hideHeader ? "h-full" : "pt-12 h-full"}>
         <div className="h-full w-full">
           <ReactFlow
-            nodes={state.nodes}
+            nodes={nodesWithCallbacks}
             edges={styledEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}

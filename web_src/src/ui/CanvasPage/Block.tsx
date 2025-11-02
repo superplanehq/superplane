@@ -95,7 +95,7 @@ export function Block(props: BlockProps) {
 
       <div className="relative w-fit" onClick={props.onClick}>
         <LeftHandle data={data} />
-        <BlockContent {...props} onClick={props.onClick} />
+        <BlockContent {...props} />
         <RightHandle data={data} />
       </div>
     </>
