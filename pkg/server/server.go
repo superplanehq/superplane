@@ -1,10 +1,10 @@
 package server
 
 import (
-    "context"
-    "strconv"
-    "os"
-    "time"
+	"context"
+	"os"
+	"strconv"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -218,7 +218,7 @@ func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Auth
 }
 
 func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
-    log.Println("Starting Public API with integrated Web Server")
+	log.Println("Starting Public API with integrated Web Server")
 
 	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
 	if basePath == "" {
@@ -267,25 +267,24 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 		log.Println("Web server routes not registered (START_WEB_SERVER != yes)")
 	}
 
-    // Allow overriding the public API port to avoid clashes in tests/dev
-    port := 8000
-    if p := os.Getenv("PUBLIC_API_PORT"); p != "" {
-        if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
-            port = v
-        } else {
-            log.Warnf("Invalid PUBLIC_API_PORT %q, falling back to 8000", p)
-        }
-    } else if p := os.Getenv("PORT"); p != "" { // common env var name
-        if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
-            port = v
-        }
-    }
+	err = server.Serve("0.0.0.0", lookupPublicApiPort())
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
-    log.WithField("port", port).Info("Starting HTTP server")
-    err = server.Serve("0.0.0.0", port)
-    if err != nil {
-        log.Fatal(err)
-    }
+func lookupPublicApiPort() int {
+	port := 8000
+
+	if p := os.Getenv("PUBLIC_API_PORT"); p != "" {
+		if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
+			port = v
+		} else {
+			log.Warnf("Invalid PUBLIC_API_PORT %q, falling back to 8000", p)
+		}
+	}
+
+	return port
 }
 
 func Start() {

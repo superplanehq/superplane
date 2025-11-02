@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -22,23 +21,14 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 			next.ServeHTTP(lrw, r)
 
 			duration := time.Since(start)
-
-			if os.Getenv("QUIET_HTTP_LOGS") == "yes" {
-				logger.WithFields(log.Fields{
-					"method": r.Method,
-					"status": lrw.statusCode,
-					"path":   r.URL.Path,
-				}).Info("req")
-			} else {
-				logger.WithFields(log.Fields{
-					"method":     r.Method,
-					"path":       r.URL.Path,
-					"remote":     r.RemoteAddr,
-					"user_agent": r.UserAgent(),
-					"duration":   duration,
-					"status":     lrw.statusCode,
-				}).Info("handled request")
-			}
+			logger.WithFields(log.Fields{
+				"method":     r.Method,
+				"path":       r.URL.Path,
+				"remote":     r.RemoteAddr,
+				"user_agent": r.UserAgent(),
+				"duration":   duration,
+				"status":     lrw.statusCode,
+			}).Info("handled request")
 		})
 	}
 }

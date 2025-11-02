@@ -27,8 +27,8 @@ type TestSession struct {
 	timeoutMs float64
 	viteCmd   *exec.Cmd
 
-    orgID   string
-    baseURL string
+	orgID   string
+	baseURL string
 	account *models.Account
 }
 
@@ -42,68 +42,69 @@ func (s *TestSession) Start() {
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
 	os.Setenv("START_WEB_SERVER", "yes")
 	os.Setenv("WEB_BASE_PATH", "")
-    // Enable gRPC gateway so REST /api/v1/* routes hit gRPC handlers
-    os.Setenv("START_GRPC_GATEWAY", "yes")
-    // Allow casbin to reload policies if tests create roles via another enforcer
-    os.Setenv("CASBIN_AUTO_RELOAD", "yes")
+	os.Setenv("START_GRPC_GATEWAY", "yes")
+	os.Setenv("CASBIN_AUTO_RELOAD", "yes")
 	os.Setenv("START_EVENT_DISTRIBUTER", "no")
 	os.Setenv("NO_ENCRYPTION", "yes")
 	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
 	os.Setenv("JWT_SECRET", "test-jwt-secret")
-    // Use a non-default API port to avoid clashing with a running dev server
-    os.Setenv("PUBLIC_API_PORT", "8001")
-    os.Setenv("BASE_URL", "http://127.0.0.1:8001")
-
-	os.Setenv("QUIET_PROXY_LOGS", "yes")
-	os.Setenv("QUIET_HTTP_LOGS", "yes")
-
+	os.Setenv("PUBLIC_API_PORT", "8001")
+	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
 	os.Setenv("APP_ENV", "development")
-	_ = os.Unsetenv("ASSETS_ROOT")
-    s.startVite()
 
-    go server.Start()
-    time.Sleep(500 * time.Millisecond)
-
-    s.baseURL = os.Getenv("BASE_URL")
-    if s.baseURL == "" {
-        s.baseURL = "http://127.0.0.1:8000"
-    }
-
-	r, err := pw.Run()
-	if err != nil {
-		s.t.Fatalf("playwright: %v", err)
-	}
-	s.runner = r
-
-	b, err := r.Chromium.Launch()
-	if err != nil {
-		s.t.Fatalf("browser: %v", err)
-	}
-	s.browser = b
-
-	c, err := b.NewContext()
-	if err != nil {
-		s.t.Fatalf("context: %v", err)
-	}
-	s.context = c
-
-	p, err := c.NewPage()
-	if err != nil {
-		s.t.Fatalf("page: %v", err)
-	}
-	s.page = p
+	s.startVite()
+	s.startAppServer()
+	s.startPlaywright()
+	s.launchBrowser()
 
 	s.setUpNavigationLogger()
 	s.streamBrowserLogs()
 	s.resetDatabase()
 	s.setupUserAndOrganization()
+
+}
+
+func (s *TestSession) startPlaywright() {
+	r, err := pw.Run()
+	if err != nil {
+		s.t.Fatalf("playwright: %v", err)
+	}
+
+	s.runner = r
+}
+
+func (s *TestSession) launchBrowser() {
+	b, err := s.runner.Chromium.Launch()
+	if err != nil {
+		s.t.Fatalf("browser: %v", err)
+	}
+
+	c, err := b.NewContext()
+	if err != nil {
+		s.t.Fatalf("context: %v", err)
+	}
+
+	p, err := c.NewPage()
+	if err != nil {
+		s.t.Fatalf("page: %v", err)
+	}
+
+	s.browser = b
+	s.context = c
+	s.page = p
+}
+
+func (s *TestSession) startAppServer() {
+	go server.Start()
+	time.Sleep(500 * time.Millisecond)
+	s.baseURL = os.Getenv("BASE_URL")
 }
 
 func (s *TestSession) Visit(path string) {
-    _, err := s.page.Goto(s.baseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
-    if err != nil {
-        s.t.Fatalf("goto: %v", err)
-    }
+	_, err := s.page.Goto(s.baseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
+	if err != nil {
+		s.t.Fatalf("goto: %v", err)
+	}
 }
 
 func (s *TestSession) AssertText(text string) {
@@ -171,14 +172,14 @@ func (s *TestSession) Login() {
 		s.t.Fatalf("jwt: %v", err)
 	}
 
-    if err := s.context.AddCookies([]pw.OptionalCookie{{
-        Name:     "account_token",
-        Value:    token,
-        URL:      pw.String(s.baseURL + "/"),
-        HttpOnly: pw.Bool(true),
-    }}); err != nil {
-        s.t.Fatalf("add cookie: %v", err)
-    }
+	if err := s.context.AddCookies([]pw.OptionalCookie{{
+		Name:     "account_token",
+		Value:    token,
+		URL:      pw.String(s.baseURL + "/"),
+		HttpOnly: pw.Bool(true),
+	}}); err != nil {
+		s.t.Fatalf("add cookie: %v", err)
+	}
 }
 
 // setupUserAndOrganization ensures there is an account, an organization,
@@ -250,14 +251,14 @@ func (s *TestSession) FillIn(label, value string) {
 }
 
 func (s *TestSession) VisitHomePage() {
-    s.Visit("/" + s.orgID + "/")
+	s.Visit("/" + s.orgID + "/")
 }
 
 func (s *TestSession) startVite() {
-    cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
-    cmd.Dir = "../../web_src"
-    // Point Vite proxy at the test server's API port
-    cmd.Env = append(os.Environ(), "BROWSER=none", "API_PORT=8001")
+	cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
+	cmd.Dir = "../../web_src"
+	// Point Vite proxy at the test server's API port
+	cmd.Env = append(os.Environ(), "BROWSER=none", "API_PORT=8001")
 
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
