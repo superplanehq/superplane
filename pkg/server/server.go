@@ -267,13 +267,13 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 		log.Println("Web server routes not registered (START_WEB_SERVER != yes)")
 	}
 
-	err = server.Serve("0.0.0.0", lookupPublicApiPort())
+	err = server.Serve("0.0.0.0", lookupPublicAPIPort())
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func lookupPublicApiPort() int {
+func lookupPublicAPIPort() int {
 	port := 8000
 
 	if p := os.Getenv("PUBLIC_API_PORT"); p != "" {

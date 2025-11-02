@@ -39,7 +39,7 @@ blocks:
       jobs:
         - name: "\U0001F9EA E2E Tests"
           commands:
-            - make test.setup
+            - make test.e2e.setup
             - make test.e2e
       epilogue:
         always:

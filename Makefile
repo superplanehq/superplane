@@ -36,6 +36,10 @@ test.setup:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
+test.e2e.setup:
+	$(MAKE) test.setup
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm ci"
+
 test.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
