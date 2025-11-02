@@ -19,8 +19,8 @@ func NewExecutionRequestContext(tx *gorm.DB, execution *models.WorkflowNodeExecu
 }
 
 func (c *ExecutionRequestContext) ScheduleActionCall(actionName string, parameters map[string]any, interval time.Duration) error {
-	if interval < 10*time.Second {
-		return fmt.Errorf("interval must be bigger than 10s")
+	if interval < time.Second {
+		return fmt.Errorf("interval must be bigger than 1s")
 	}
 
 	runAt := time.Now().Add(interval)

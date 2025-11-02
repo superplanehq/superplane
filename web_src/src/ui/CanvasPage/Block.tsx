@@ -12,6 +12,7 @@ import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
 import { Http, HttpProps } from "../http";
+import { Wait, WaitProps } from "../wait";
 import { ComponentActionsProps } from "../types/componentActions";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
@@ -23,6 +24,7 @@ type BlockType =
   | "if"
   | "noop"
   | "http"
+  | "wait"
   | "switch";
 
 interface BlockAi {
@@ -64,6 +66,9 @@ export interface BlockData {
 
   // http node specific props
   http?: HttpProps;
+
+  // wait node specific props
+  wait?: WaitProps;
 
   // switch node specific props
   switch?: SwitchComponentProps;
@@ -124,6 +129,7 @@ function LeftHandle({ data }: BlockProps) {
     (data.type === "if" && data.if?.collapsed) ||
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
+    (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
   return (
@@ -149,6 +155,7 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "if" && data.if?.collapsed) ||
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
+    (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
   let channels = data.outputChannels || ["default"];
@@ -353,6 +360,8 @@ function BlockContent({
       return <Noop {...(data.noop as NoopProps)} selected={selected} {...actionProps} />;
     case "http":
       return <Http {...(data.http as HttpProps)} selected={selected} {...actionProps} />;
+    case "wait":
+      return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
     case "switch":
       return (
         <SwitchComponent

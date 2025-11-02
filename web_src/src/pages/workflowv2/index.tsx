@@ -936,6 +936,8 @@ function prepareComponentNode(
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
     case "http":
       return prepareHttpNode(node, components, nodeExecutionsMap);
+    case "wait":
+      return prepareWaitNode(node, components, nodeExecutionsMap);
   }
 
   //
@@ -1293,6 +1295,45 @@ function prepareHttpNode(
         payload: configuration?.payload,
         headers: configuration?.headers,
         lastExecution,
+        collapsedBackground: getBackgroundColorClass("white"),
+      },
+    },
+  };
+}
+
+function prepareWaitNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+): CanvasNode {
+  const metadata = components.find((c) => c.name === "wait");
+  const configuration = node.configuration as any;
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  let lastExecution;
+  if (execution) {
+    lastExecution = {
+      receivedAt: new Date(execution.createdAt!),
+      state: getRunItemState(execution) === "success" ? ("success" as const) : getRunItemState(execution) === "running" ? ("running" as const) : ("failed" as const),
+    };
+  }
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "wait",
+      label: node.name!,
+      state: "pending" as const,
+      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
+      wait: {
+        title: node.name!,
+        duration: configuration?.duration,
+        lastExecution,
+        iconColor: getColorClass(metadata?.color || "yellow"),
+        iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
+        headerColor: getBackgroundColorClass(metadata?.color || "yellow"),
         collapsedBackground: getBackgroundColorClass("white"),
       },
     },
