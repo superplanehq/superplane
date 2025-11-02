@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	spjwt "github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/e2e/queries"
 )
 
 // TestSession handles per-test actions: db, auth, and page ops.
@@ -35,6 +36,9 @@ func (s *TestSession) Close() {
 		_ = s.page.Close()
 	}
 }
+
+// Page exposes the underlying playwright Page to satisfy queries.Runner.
+func (s *TestSession) Page() pw.Page { return s.page }
 
 func (s *TestSession) Visit(path string) {
 	_, err := s.page.Goto(s.baseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
@@ -142,22 +146,22 @@ func (s *TestSession) setupUserAndOrganization() {
 	s.account = account
 }
 
-func (s *TestSession) ClickButton(text string) {
-	s.t.Logf("Clicking button: %q", text)
-	selector := fmt.Sprintf("button:has-text(\"%s\"), [role=button]:has-text(\"%s\")", text, text)
-	if err := s.page.Locator(selector).First().Click(pw.LocatorClickOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
-		s.t.Fatalf("click button %q: %v", text, err)
+func (s *TestSession) Click(q queries.Query) {
+	s.t.Logf("Clicking button %q", q.Describe())
+
+	if err := q.Run(s).Click(pw.LocatorClickOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("click button %q: %v", q.Describe(), err)
 	}
 }
 
-func (s *TestSession) FillIn(label, value string) {
-	s.t.Logf("Filling in %q with %q", label, value)
-	if el := s.page.GetByTestId(label); el != nil {
+func (s *TestSession) FillIn(q queries.Query, value string) {
+	s.t.Logf("Filling in %q with %q", q.Describe(), value)
+
+	if el := q.Run(s); el != nil {
 		if err := el.Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err == nil {
 			return
 		}
 	}
-	s.t.Fatalf("fill in %q failed", label)
 }
 
 func (s *TestSession) VisitHomePage() {
