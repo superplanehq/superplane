@@ -1,0 +1,161 @@
+#!/usr/bin/env ruby
+
+require 'date'
+
+FIRST_COLUMN_WIDTH = 12
+
+class GitLogs
+  def self.load
+    start_of_year = Date.new(Date.today().year, 1, 1)
+    end_of_year = Date.new(Date.today().year, 12, 31)
+
+    log_data = `git log origin/develop --pretty=format:"%H,%an,%at,%s" --since=#{start_of_year.strftime('%Y-%m-%d')} --until=#{end_of_year.strftime('%Y-%m-%d')}`
+    logs = log_data.split("\n").map { |line| GitLog.new(line) }
+
+    GitLogs.new(logs)
+  end
+
+  def initialize(logs)
+    @logs = logs
+  end
+
+  def group_by_week
+    @weeks ||= @logs.group_by { |log| log.week }.map { |week, logs| Week.new(week, logs) }.sort_by { |week| week.week }
+  end
+
+  def authors
+    @logs.map { |log| log.author }.uniq
+  end
+
+  def average_commits_per_week_by_author(author)
+    @logs.select { |log| log.author == author }.count / group_by_week.count.to_f
+  end
+
+  def total_commits_for_author(author)
+    @logs.select { |log| log.author == author }.count
+  end
+
+  def total_commits
+    @logs.count
+  end
+
+  def total_feat
+    @logs.select { |log| log.message.start_with?('feat:') }.count
+  end
+
+  def total_bugfixes
+    @logs.select { |log| log.message.start_with?('fix:') }.count
+  end
+
+  def total_chore
+    @logs.select { |log| log.message.start_with?('chore:') }.count
+  end
+
+  def total_docs
+    @logs.select { |log| log.message.start_with?('docs:') }.count
+  end
+end
+
+class GitLog
+  attr_reader :commit_hash, :author, :timestamp, :message
+
+  def initialize(raw_data)
+    @commit_hash, @author, @timestamp, @message = raw_data.strip.split(',')
+  end
+
+  def week
+    Date.strptime(@timestamp, '%s').strftime('%W')
+  end
+end
+
+class Week
+  attr_reader :week
+
+  def initialize(week, logs)
+    @week = week
+    @logs = logs
+  end
+
+  def total_commits
+    @logs.count
+  end
+
+  def total_feat
+    @logs.select { |log| log.message.start_with?('feat:') }.count
+  end
+
+  def total_bugfixes
+    @logs.select { |log| log.message.start_with?('fix:') }.count
+  end
+
+  def total_chore
+    @logs.select { |log| log.message.start_with?('chore:') }.count
+  end
+
+  def total_docs
+    @logs.select { |log| log.message.start_with?('docs:') }.count
+  end
+
+  def total_by_author(author)
+    @logs.select { |log| log.author == author }.count
+  end
+end
+
+class GitStats
+  def initialize
+    @logs = GitLogs.load()
+    @weeks = @logs.group_by_week()
+  end
+
+  def draw_table
+    puts separator()
+    puts header()
+    puts separator()
+
+    @logs.authors.each do |author|
+      show_numbers(short_name(author), @weeks.map { |w| w.total_by_author(author) })
+    end
+
+    puts separator()
+
+    show_numbers("Throughput", @weeks.map { |w| w.total_commits })
+    show_numbers("Velocity", @weeks.map { |w| w.total_feat })
+    show_numbers("Fixes", @weeks.map { |w| w.total_bugfixes })
+    show_numbers("Chores", @weeks.map { |w| w.total_chore })
+    show_numbers("Docs", @weeks.map { |w| w.total_docs })
+
+    puts separator()
+  end
+
+  def short_name(author)
+    author.split(" ")[0]
+  end
+
+  def header
+    @header ||= "WEEK".ljust(FIRST_COLUMN_WIDTH) + @weeks.map { |w| w.week.to_s.ljust(2) }.join(' ')
+  end
+
+  def separator
+    @separator ||= "-" * header.length
+  end
+end
+
+def show_numbers(label, numbers)
+  str = label.ljust(FIRST_COLUMN_WIDTH)
+
+  str += numbers.map do |n|
+    if n == 0
+      "\e[36m .\e[0m"
+    else
+      n.to_s.rjust(2)
+    end
+  end.join(' ')
+
+  str += "   = #{numbers.sum.to_s.rjust(4)}"
+  str += " (avg: #{(numbers.sum.to_f / numbers.select { |n| n > 0 }.count).round(1).to_s.rjust(4)})"
+
+  puts str
+end
+
+stats = GitStats.new()
+stats.draw_table()

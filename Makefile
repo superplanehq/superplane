@@ -52,6 +52,9 @@ test.watch:
 test.e2e:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app go test ./test/e2e/... -p 1 -v
 
+test.shell:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
+
 #
 # Targets for dev environment
 #

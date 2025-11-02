@@ -264,17 +264,20 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props],
   );
 
-  const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
-    setNewNodeData({
-      buildingBlock: block,
-      nodeName: block.name || "",
-      displayLabel: block.label || block.name || "",
-      configuration: {},
-      position,
-    });
-    // Mark canvas as dirty immediately on drop
-    if (props.onDirty) props.onDirty();
-  }, [props]);
+  const handleBuildingBlockDrop = useCallback(
+    (block: BuildingBlock, position?: { x: number; y: number }) => {
+      setNewNodeData({
+        buildingBlock: block,
+        nodeName: block.name || "",
+        displayLabel: block.label || block.name || "",
+        configuration: {},
+        position,
+      });
+      // Mark canvas as dirty immediately on drop
+      if (props.onDirty) props.onDirty();
+    },
+    [props],
+  );
 
   const handleSidebarToggle = useCallback(
     (open: boolean) => {
@@ -342,7 +345,7 @@ function CanvasPage(props: CanvasPageProps) {
         />
 
         <div className="flex-1 relative">
-          <ReactFlowProvider key="canvas-flow-provider">
+          <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
             <CanvasContent
               state={state}
               onSave={props.onSave}
@@ -483,9 +486,9 @@ function Sidebar({
   }
 
   return (
-        <ComponentSidebar
-          isOpen={state.componentSidebar.isOpen}
-          onClose={state.componentSidebar.close}
+    <ComponentSidebar
+      isOpen={state.componentSidebar.isOpen}
+      onClose={state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}
       metadata={sidebarData.metadata}
@@ -527,7 +530,21 @@ function Sidebar({
   );
 }
 
-function CanvasContentHeader({ state, onSave, organizationId, unsavedMessage, saveIsPrimary, saveButtonHidden }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; organizationId?: string; unsavedMessage?: string; saveIsPrimary?: boolean; saveButtonHidden?: boolean }) {
+function CanvasContentHeader({
+  state,
+  onSave,
+  organizationId,
+  unsavedMessage,
+  saveIsPrimary,
+  saveButtonHidden,
+}: {
+  state: CanvasPageState;
+  onSave?: (nodes: CanvasNode[]) => void;
+  organizationId?: string;
+  unsavedMessage?: string;
+  saveIsPrimary?: boolean;
+  saveButtonHidden?: boolean;
+}) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -797,9 +814,12 @@ function CanvasContent({
     }));
   }, [state.nodes]);
 
-  const edgeTypes = useMemo(() => ({
-    custom: CustomEdge,
-  }), []);
+  const edgeTypes = useMemo(
+    () => ({
+      custom: CustomEdge,
+    }),
+    [],
+  );
   const styledEdges = useMemo(() => state.edges?.map((e) => ({ ...e, ...EDGE_STYLE })), [state.edges]);
 
   return (
