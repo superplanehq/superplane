@@ -24,6 +24,8 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   description,
   onDoubleClick,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onDuplicate,
   onEdit,
   onConfigure,
@@ -46,6 +48,8 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
         <div className="absolute top-2 right-2">
           <SidebarActionsDropdown
             onRun={onRun}
+            runDisabled={runDisabled}
+            runDisabledTooltip={runDisabledTooltip}
             onDuplicate={onDuplicate}
             onEdit={onEdit}
             onConfigure={onConfigure}

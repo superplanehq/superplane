@@ -655,6 +655,8 @@ export function WorkflowPageV2() {
       unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
       saveIsPrimary={hasUnsavedChanges}
       saveButtonHidden={!hasUnsavedChanges}
+      runDisabled={hasUnsavedChanges}
+      runDisabledTooltip={hasUnsavedChanges ? "Save canvas changes before running" : undefined}
       breadcrumbs={[
         {
           label: "Canvases",

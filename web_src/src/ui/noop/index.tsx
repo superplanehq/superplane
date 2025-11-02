@@ -16,6 +16,8 @@ export const Noop: React.FC<NoopProps> = ({
   selected = false,
   collapsedBackground,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onEdit,
   onDuplicate,
   onDeactivate,
@@ -41,6 +43,8 @@ export const Noop: React.FC<NoopProps> = ({
       collapsedBackground={collapsedBackground}
       selected={selected}
       onRun={onRun}
+      runDisabled={runDisabled}
+      runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}

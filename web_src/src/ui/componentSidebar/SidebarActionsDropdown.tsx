@@ -1,5 +1,6 @@
 import { resolveIcon } from "@/lib/utils";
 import { EllipsisVertical } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 import { useEffect, useRef, useState } from "react";
 
 export interface SidebarAction {
@@ -14,6 +15,8 @@ export interface SidebarAction {
 
 interface SidebarActionsDropdownProps {
   onRun?: () => void;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
   onDuplicate?: () => void;
   onDocs?: () => void;
   onEdit?: () => void;
@@ -26,6 +29,8 @@ interface SidebarActionsDropdownProps {
 
 export const SidebarActionsDropdown = ({
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onDuplicate,
   onDocs,
   onEdit,
@@ -92,8 +97,12 @@ export const SidebarActionsDropdown = ({
     },
   ];
 
-  // Filter out actions that don't have an onAction function
-  const availableActions = actions.filter((action) => action.onAction);
+  // Filter out actions that don't have an onAction function,
+  // but keep Run even if disabled (so we can show tooltip/disabled state)
+  const availableActions = actions.filter((action) => {
+    if (action.id === "run") return !!onRun; // keep if run is supported
+    return Boolean(action.onAction);
+  });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -130,7 +139,9 @@ export const SidebarActionsDropdown = ({
             {availableActions.length > 0 &&
               availableActions.map((action) => {
                 const Icon = resolveIcon(action.icon);
-                return (
+                const isRun = action.id === "run";
+                const disabled = isRun && runDisabled;
+                const content = (
                   <div
                     key={action.id}
                     className={
@@ -143,16 +154,38 @@ export const SidebarActionsDropdown = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        action.onAction?.();
-                        setIsOpen(false);
+                        if (!disabled) {
+                          action.onAction?.();
+                          setIsOpen(false);
+                        }
                       }}
-                      className={`w-full px-3 py-2 text-left flex items-center rounded-md gap-2 hover:bg-gray-100 text-sm text-gray-700 transition-colors ${action.hoverBackground} ${action.hoverColor} transition-colors`}
+                      disabled={disabled}
+                      aria-disabled={disabled}
+                      className={`w-full px-3 py-2 text-left flex items-center rounded-md gap-2 text-sm transition-colors ${action.hoverBackground || ''} ${action.hoverColor || ''} ${disabled ? 'text-gray-300 cursor-not-allowed bg-white hover:bg-white hover:opacity-100' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
                       <Icon size={16} />
                       <span>{action.label}</span>
                     </button>
                   </div>
                 );
+
+                if (isRun && disabled && runDisabledTooltip) {
+                  return (
+                    <TooltipProvider delayDuration={150} key={action.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          {/* wrap content */}
+                          <div>{content}</div>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          {runDisabledTooltip}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                }
+
+                return content;
               })}
             {availableActions.length === 0 && (
               <div className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 text-sm text-gray-700 transition-colors">

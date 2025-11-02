@@ -39,6 +39,8 @@ interface ComponentSidebarProps {
 
   // Action handlers
   onRun?: () => void;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
   onDuplicate?: () => void;
   onDocs?: () => void;
   onEdit?: () => void;
@@ -67,6 +69,8 @@ export const ComponentSidebar = ({
   hideQueueEvents = false,
   onSeeFullHistory,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onDuplicate,
   onDocs,
   onEdit,
@@ -277,6 +281,8 @@ export const ComponentSidebar = ({
             <h2 className="text-xl font-semibold">{title}</h2>
             <SidebarActionsDropdown
               onRun={onRun}
+              runDisabled={runDisabled}
+              runDisabledTooltip={runDisabledTooltip}
               onDuplicate={onDuplicate}
               onDocs={onDocs}
               onEdit={onEdit}
