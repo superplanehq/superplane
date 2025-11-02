@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { flattenForAutocomplete, getAutocompleteSuggestions, getAutocompleteSuggestionsWithTypes, getValueAtPath } from './core';
 
@@ -20,7 +20,7 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
 let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noExampleObjectText = 'No suggestions found', showValuePreview = false, ...props }) => {
+  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noExampleObjectText = 'No suggestions found', showValuePreview = false, ...props }, forwardedRef) => {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<Array<{ suggestion: string; type: string }>>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -33,6 +33,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    useImperativeHandle(forwardedRef, () => inputRef.current as HTMLInputElement);
 
     const getWordAtCursor = (text: string, position: number) => {
       const beforeCursor = text.substring(0, position);

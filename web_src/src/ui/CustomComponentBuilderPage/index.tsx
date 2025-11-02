@@ -39,6 +39,7 @@ import { buildBuildingBlockCategories } from "../buildingBlocks";
 export interface NodeEditData {
   nodeId: string;
   nodeName: string;
+  displayLabel?: string;
   configuration: Record<string, any>;
   configurationFields: ComponentsConfigurationField[];
 }
@@ -46,6 +47,7 @@ export interface NodeEditData {
 export interface NewNodeData {
   buildingBlock: BuildingBlock;
   nodeName: string;
+  displayLabel?: string;
   configuration: Record<string, any>;
   position?: { x: number; y: number };
 }
@@ -318,7 +320,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
     setNewNodeData({
       buildingBlock: block,
-      nodeName: block.label || block.name || "",
+      nodeName: block.name || "",
+      displayLabel: block.label || block.name || "",
       configuration: {},
       position,
     });
@@ -510,6 +513,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           isOpen={true}
           onClose={() => setEditingNodeData(null)}
           nodeName={editingNodeData.nodeName}
+          nodeLabel={editingNodeData.displayLabel}
           configuration={editingNodeData.configuration}
           configurationFields={editingNodeData.configurationFields}
           onSave={handleSaveConfiguration}
@@ -524,6 +528,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           isOpen={true}
           onClose={() => setNewNodeData(null)}
           nodeName={newNodeData.nodeName}
+          nodeLabel={newNodeData.displayLabel}
           configuration={newNodeData.configuration}
           configurationFields={newNodeData.buildingBlock.configuration || []}
           onSave={handleSaveNewNode}

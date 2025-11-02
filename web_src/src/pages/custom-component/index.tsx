@@ -334,6 +334,7 @@ export const CustomComponent = () => {
     return {
       nodeId: node.id,
       nodeName: (node.data as any).label as string,
+      displayLabel: component.label || ((node.data as any).label as string),
       configuration: (node.data as any)._originalConfiguration || {},
       configurationFields: component.configuration || [],
     }
