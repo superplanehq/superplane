@@ -202,3 +202,32 @@ func (s *TestSession) DragAndDrop(source queries.Query, target queries.Query, of
 		s.t.Fatalf("mouse up on target %q: %v", target.Describe(), err)
 	}
 }
+
+func (s *TestSession) AssertVisible(q queries.Query) {
+	s.t.Logf("Asserting visibility of %q", q.Describe())
+
+	if err := q.Run(s).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("asserting visibility of %q: %v", q.Describe(), err)
+	}
+}
+
+func (s *TestSession) AssertDisabled(q queries.Query) {
+	s.t.Logf("Asserting %q is disabled", q.Describe())
+
+	el := q.Run(s)
+	disabled, err := el.IsDisabled()
+	if err != nil {
+		s.t.Fatalf("checking if %q is disabled: %v", q.Describe(), err)
+	}
+	if !disabled {
+		s.t.Fatalf("expected %q to be disabled", q.Describe())
+	}
+}
+
+func (s *TestSession) HoverOver(q queries.Query) {
+	s.t.Logf("Hovering over %q", q.Describe())
+
+	if err := q.Run(s).Hover(pw.LocatorHoverOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("hover over %q: %v", q.Describe(), err)
+	}
+}

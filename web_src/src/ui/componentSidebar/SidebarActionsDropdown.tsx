@@ -1,6 +1,6 @@
 import { resolveIcon } from "@/lib/utils";
-import { EllipsisVertical } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
+import { EllipsisVertical } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export interface SidebarAction {
@@ -25,6 +25,7 @@ interface SidebarActionsDropdownProps {
   onToggleView?: () => void;
   onDelete?: () => void;
   isCompactView?: boolean;
+  dataTestId?: string;
 }
 
 export const SidebarActionsDropdown = ({
@@ -38,6 +39,7 @@ export const SidebarActionsDropdown = ({
   onDeactivate,
   onToggleView,
   onDelete,
+  dataTestId,
   isCompactView = false,
 }: SidebarActionsDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -106,10 +108,7 @@ export const SidebarActionsDropdown = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -121,7 +120,7 @@ export const SidebarActionsDropdown = ({
   }, []);
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative" ref={dropdownRef} data-testid={dataTestId}>
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -161,7 +160,13 @@ export const SidebarActionsDropdown = ({
                       }}
                       disabled={disabled}
                       aria-disabled={disabled}
-                      className={`w-full px-3 py-2 text-left flex items-center rounded-md gap-2 text-sm transition-colors ${action.hoverBackground || ''} ${action.hoverColor || ''} ${disabled ? 'text-gray-300 cursor-not-allowed bg-white hover:bg-white hover:opacity-100' : 'text-gray-700 hover:bg-gray-100'}`}
+                      className={`w-full px-3 py-2 text-left flex items-center rounded-md gap-2 text-sm transition-colors ${
+                        action.hoverBackground || ""
+                      } ${action.hoverColor || ""} ${
+                        disabled
+                          ? "text-gray-300 cursor-not-allowed bg-white hover:bg-white hover:opacity-100"
+                          : "text-gray-700 hover:bg-gray-100"
+                      }`}
                     >
                       <Icon size={16} />
                       <span>{action.label}</span>
@@ -177,9 +182,7 @@ export const SidebarActionsDropdown = ({
                           {/* wrap content */}
                           <div>{content}</div>
                         </TooltipTrigger>
-                        <TooltipContent side="left">
-                          {runDisabledTooltip}
-                        </TooltipContent>
+                        <TooltipContent side="left">{runDisabledTooltip}</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   );

@@ -5,6 +5,7 @@ import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose, Settings2 } from "lucide-react";
 import { useState } from "react";
+import { toTestId } from "../../utils/testID";
 import { createNodeDragPreview } from "./createNodeDragPreview";
 
 export interface BuildingBlock {
@@ -204,8 +205,4 @@ function CategorySection({ category, canvasZoom, searchTerm = "", showWip = true
       </ItemGroup>
     </details>
   );
-}
-
-function toTestId(name: string) {
-  return name.toLowerCase().replace(/\s+/g, "-");
 }

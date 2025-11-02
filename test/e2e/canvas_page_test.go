@@ -72,35 +72,17 @@ func (s *CanvasPageSteps) AssertUnsavedChangesNoteIsVisible() {
 }
 
 func (s *CanvasPageSteps) AssertCantRunNode() {
-	// page := s.session.Page()
+	dropdown := q.TestID("node-noop-header-dropdown")
+	runOption := q.Locator("button:has-text('Run')")
 
-	// kebab := page.Locator("button[aria-label='More actions']").First()
-	// require.NoError(s.ctx.t, kebab.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.session.timeoutMs)}))
-	// require.NoError(s.ctx.t, kebab.Click())
-
-	// runBtn := page.Locator("role=button[name='Run']").First()
-	// if c, _ := runBtn.Count(); c == 0 {
-	// 	runBtn = page.Locator("button:has-text('Run')").First()
-	// }
-
-	// require.NoError(s.ctx.t, runBtn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.session.timeoutMs)}))
-
-	// disabled, _ := runBtn.GetAttribute("disabled")
-	// ariaDisabled, _ := runBtn.GetAttribute("aria-disabled")
-	// if disabled == nil && (ariaDisabled == nil || *ariaDisabled != "true") {
-	// 	s.ctx.t.Fatalf("expected Run button to be disabled")
-	// }
+	s.session.Click(dropdown)
+	s.session.AssertVisible(runOption)
+	s.session.AssertDisabled(runOption)
 }
 
-// AssertExplainationIsShownWhenHoverOverRun: placeholder assertion
 func (s *CanvasPageSteps) AssertExplainationIsShownWhenHoverOverRun() {
-	// page := s.session.Page()
-	// runBtn := page.Locator("role=button[name='Run']").First()
-	// if c, _ := runBtn.Count(); c == 0 {
-	// 	runBtn = page.Locator("button:has-text('Run')").First()
-	// }
-	// require.NoError(s.ctx.t, runBtn.Hover())
-	// // Tooltip text
-	// tip := page.Locator("text=Save canvas changes before running").First()
-	// require.NoError(s.ctx.t, tip.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.session.timeoutMs)}))
+	runOption := q.Locator("button:has-text('Run')")
+
+	s.session.HoverOver(runOption)
+	s.session.AssertText("Save canvas changes before running")
 }
