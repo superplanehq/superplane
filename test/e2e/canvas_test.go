@@ -12,13 +12,9 @@ func TestHomePage(t *testing.T) {
 		s.Start()
 		s.Login()
 		s.VisitHomePage()
-		s.AssertText("New Canvas")
 		s.ClickButton("New Canvas")
-		s.FillIn("canvas-name-input", "E2E Canvas")
-		s.Sleep(100)
+		s.FillIn("canvas-name-input", "Example Canvas")
 		s.ClickButton("Create canvas")
-		s.TakeScreenshot()
-
-		s.t.Logf("DONE?")
+		s.AssertText("Example Canvas")
 	})
 }

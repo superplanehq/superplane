@@ -214,15 +214,12 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-    err = pbWorkflows.RegisterWorkflowsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
-    if err != nil {
-        return err
-    }
+	err = pbWorkflows.RegisterWorkflowsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
 
-    // Loud confirmation that gRPC Gateway is registered
-    log.WithFields(log.Fields{"grpc_addr": grpcServerAddr}).Warn("[LOUD] gRPC Gateway registered for public API")
-
-    // Public health check
+	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
@@ -257,28 +254,21 @@ func headersMatcher(key string) (string, bool) {
 }
 
 func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        user, ok := middleware.GetUserFromContext(r.Context())
-        if !ok {
-            http.Error(w, "User not found in context", http.StatusUnauthorized)
-            return
-        }
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := middleware.GetUserFromContext(r.Context())
+		if !ok {
+			http.Error(w, "User not found in context", http.StatusUnauthorized)
+			return
+		}
 
-        r2 := new(http.Request)
-        *r2 = *r
-        r2.URL = new(url.URL)
-        *r2.URL = *r.URL
-        r2.Header.Set("x-User-id", user.ID.String())
-        r2.Header.Set("x-Organization-id", user.OrganizationID.String())
-        // Loud log before forwarding to gRPC Gateway
-        log.WithFields(log.Fields{
-            "method": r.Method,
-            "path":   r.URL.Path,
-            "org_id": user.OrganizationID.String(),
-            "user_id": user.ID.String(),
-        }).Warn("[LOUD] Forwarding request to gRPC Gateway")
-        grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
-    })
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		r2.Header.Set("x-User-id", user.ID.String())
+		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
+		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
+	})
 }
 
 // RegisterOpenAPIHandler adds handlers to serve the OpenAPI specification and Swagger UI
@@ -1039,16 +1029,15 @@ func (s *Server) setupDevProxy(webBasePath string) {
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
 	origDirector := proxy.Director
-    proxy.Director = func(req *http.Request) {
-        originalPath := req.URL.Path
+	proxy.Director = func(req *http.Request) {
+		originalPath := req.URL.Path
 
-        origDirector(req)
+		origDirector(req)
 
-        req.Host = target.Host
-        if os.Getenv("QUIET_PROXY_LOGS") != "yes" {
-            log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
-        }
-    }
+		req.Host = target.Host
+
+		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
+	}
 
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {

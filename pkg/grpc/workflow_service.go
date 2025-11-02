@@ -2,10 +2,8 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/workflows"
@@ -39,49 +37,6 @@ func (s *WorkflowService) CreateWorkflow(ctx context.Context, req *pb.CreateWork
 		return nil, status.Error(codes.InvalidArgument, "workflow is required")
 	}
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAA                      AAAAAAAAAA")
-	fmt.Println("AAAAAAAAAA                      AAAAAAAAAA")
-	fmt.Println("AAAAAAAAAA    Work goddammit    AAAAAAAAAA")
-	fmt.Println("AAAAAAAAAA                      AAAAAAAAAA")
-	fmt.Println("AAAAAAAAAA                      AAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-
-	// Intentionally loud diagnostics
-	log.WithFields(log.Fields{
-		"org_id":    organizationID,
-		"name":      req.Workflow.GetName(),
-		"nodes_cnt": len(req.Workflow.GetNodes()),
-		"edges_cnt": len(req.Workflow.GetEdges()),
-	}).Info("CreateWorkflow request received")
-	log.WithFields(log.Fields{
-		"org_id": organizationID,
-		"name":   req.Workflow.GetName(),
-	}).Warn("[LOUD] CreateWorkflow ENTER")
-	log.WithFields(log.Fields{
-		"payload_name":        req.Workflow.GetName(),
-		"payload_description": req.Workflow.GetDescription(),
-	}).Info("[LOUD] CreateWorkflow payload summary")
 	return workflows.CreateWorkflow(ctx, s.registry, organizationID, req.Workflow)
 }
 
