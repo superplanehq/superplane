@@ -35,7 +35,7 @@ func (e *HTTP) Name() string {
 }
 
 func (e *HTTP) Label() string {
-	return "HTTP"
+	return "HTTP Request"
 }
 
 func (e *HTTP) Description() string {
