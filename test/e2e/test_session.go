@@ -1,17 +1,17 @@
 package e2e
 
 import (
-	"fmt"
-	"os"
-	"testing"
-	"time"
+    "fmt"
+    "os"
+    "testing"
+    "time"
 
-	pw "github.com/playwright-community/playwright-go"
-	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/database"
-	spjwt "github.com/superplanehq/superplane/pkg/jwt"
-	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/test/e2e/queries"
+    pw "github.com/playwright-community/playwright-go"
+    "github.com/superplanehq/superplane/pkg/authorization"
+    "github.com/superplanehq/superplane/pkg/database"
+    spjwt "github.com/superplanehq/superplane/pkg/jwt"
+    "github.com/superplanehq/superplane/pkg/models"
+    "github.com/superplanehq/superplane/test/e2e/queries"
 )
 
 // TestSession handles per-test actions: db, auth, and page ops.
@@ -165,5 +165,5 @@ func (s *TestSession) FillIn(q queries.Query, value string) {
 }
 
 func (s *TestSession) VisitHomePage() {
-	s.Visit("/" + s.orgID + "/")
+    s.Visit("/" + s.orgID + "/")
 }

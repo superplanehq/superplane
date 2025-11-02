@@ -12,19 +12,19 @@ import (
 )
 
 type Blueprint struct {
-    ID             uuid.UUID
-    OrganizationID uuid.UUID
-    Name           string
-    Description    string
-    Icon           string
-    Color          string
-    CreatedBy      *uuid.UUID
-    CreatedAt      *time.Time
-    UpdatedAt      *time.Time
-    Nodes          datatypes.JSONSlice[Node]
-    Edges          datatypes.JSONSlice[Edge]
-    Configuration  datatypes.JSONSlice[components.ConfigurationField]
-    OutputChannels datatypes.JSONSlice[BlueprintOutputChannel]
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	Name           string
+	Description    string
+	Icon           string
+	Color          string
+	CreatedBy      *uuid.UUID
+	CreatedAt      *time.Time
+	UpdatedAt      *time.Time
+	Nodes          datatypes.JSONSlice[Node]
+	Edges          datatypes.JSONSlice[Edge]
+	Configuration  datatypes.JSONSlice[components.ConfigurationField]
+	OutputChannels datatypes.JSONSlice[BlueprintOutputChannel]
 }
 
 type BlueprintOutputChannel struct {
@@ -76,6 +76,21 @@ func FindBlueprint(orgID, id string) (*Blueprint, error) {
 	err := database.Conn().
 		Where("organization_id = ?", orgID).
 		Where("id = ?", id).
+		First(&blueprint).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &blueprint, nil
+}
+
+func FindBlueprintByName(name string, orgID uuid.UUID) (*Blueprint, error) {
+	var blueprint Blueprint
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Where("name = ?", name).
 		First(&blueprint).
 		Error
 
