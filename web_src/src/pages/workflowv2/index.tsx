@@ -508,7 +508,7 @@ export function WorkflowPageV2() {
         // Pass workflow info as URL parameters
         const params = new URLSearchParams({
           fromWorkflow: workflowId!,
-          workflowName: workflow.name || 'Workflow',
+          workflowName: workflow.name || 'Canvas',
         });
         navigate(`/${organizationId}/custom-components/${node.blueprint.id}?${params.toString()}`);
       }
@@ -585,11 +585,11 @@ export function WorkflowPageV2() {
         const nodeIds = updatedNodes?.map((n) => n.id!) || [];
         persistedNodeIdsRef.current = new Set(nodeIds);
 
-        showSuccessToast("Workflow saved successfully");
+        showSuccessToast("Canvas changes saved");
         setHasUnsavedChanges(false);
       } catch (error: any) {
-        console.error("Failed to save workflow:", error);
-        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save workflow";
+        console.error("Failed to save changes to the canvas:", error);
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
 
         // Rollback to previous state on error
@@ -614,7 +614,7 @@ export function WorkflowPageV2() {
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-          <p className="text-sm text-gray-500">Loading workflow...</p>
+          <p className="text-sm text-gray-500">Loading canvas...</p>
         </div>
       </div>
     );
