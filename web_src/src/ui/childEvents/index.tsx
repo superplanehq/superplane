@@ -32,7 +32,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
   onExpandChildEvents,
   onReRunChildEvents,
 }) => {
-  const [showWaiting, setShowWaiting] = React.useState(false);
+  const [showDetails, setShowDetails] = React.useState(false);
 
   const ChildEventsArrowIcon = React.useMemo(() => {
     return resolveIcon("corner-down-right");
@@ -48,24 +48,23 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
 
   const hasWaitingInfos = (childEventsInfo?.waitingInfos?.length || 0) > 0;
 
-  const toggleWaitingInfos = () => {
-    setShowWaiting(!showWaiting);
+  const toggleDetails = () => {
+    setShowDetails(!showDetails);
   };
 
   return (
     <div className={className}>
       <div className="flex items-center justify-between gap-2">
         <div
-          onClick={hasWaitingInfos ? (e) => { e.stopPropagation(); toggleWaitingInfos() } : undefined}
-          className={
-            "flex items-center gap-2 w-full " +
-            (hasWaitingInfos ? "cursor-pointer hover:text-gray-700 hover:scale-102 transition-all" : "")
-          }
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleDetails();
+          }}
+          className={"flex items-center gap-2 w-full cursor-pointer hover:text-gray-700 hover:scale-102 transition-all"}
         >
           <ChildEventsArrowIcon size={18} className="text-gray-500" />
           <span className="text-sm">
-            {childEventsInfo.count} child event{childEventsInfo.count === 1 ? "" : "s"}{" "}
-            {childEventsInfo.state || ""}
+            {childEventsInfo.count} child event{childEventsInfo.count === 1 ? "" : "s"} {childEventsInfo.state || ""}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -74,8 +73,8 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
               size={18}
               className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
               onClick={(e) => {
-                e.stopPropagation()
-                onExpandChildEvents(childEventsInfo)
+                e.stopPropagation();
+                onExpandChildEvents(childEventsInfo);
               }}
             />
           )}
@@ -84,14 +83,14 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
               size={18}
               className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
               onClick={(e) => {
-                e.stopPropagation()
-                onReRunChildEvents(childEventsInfo)
+                e.stopPropagation();
+                onReRunChildEvents(childEventsInfo);
               }}
             />
           )}
         </div>
       </div>
-      {childEventsInfo.items && childEventsInfo.items.length > 0 && (
+      {showDetails && childEventsInfo.items && childEventsInfo.items.length > 0 && (
         <div className="flex flex-col items-start justify-between pl-7 py-1 text-gray-600 w-full">
           {childEventsInfo.items.map((item, idx) => {
             const Icon =
@@ -99,7 +98,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
                 ? resolveIcon("check")
                 : item.state === "discarded"
                 ? resolveIcon("x")
-                : resolveIcon("clock")
+                : resolveIcon("clock");
             const colorClass =
               item.state === "processed"
                 ? "text-green-700"
@@ -123,20 +122,25 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
           })}
         </div>
       )}
-      {hasWaitingInfos && showWaiting && (
+      {hasWaitingInfos && showDetails && (
         <div className="flex flex-col items-center justify-between pl-2 py-1 text-gray-500 w-full">
           {childEventsInfo.waitingInfos.map((waitingInfo) => {
             const Icon = resolveIcon(waitingInfo.icon);
             return (
-              <div key={waitingInfo.info} className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full">
+              <div
+                key={waitingInfo.info}
+                className="flex justify-between items-center gap-3 pl-2 py-1 rounded-md w-full"
+              >
                 <span className="text-sm text-right flex items-center gap-2">
                   <Icon size={18} className="text-gray-500" />
                   {waitingInfo.info}
                 </span>
-                {waitingInfo.futureTimeDate && <span className="text-sm">
-                  {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
-                  &nbsp;left
-                </span>}
+                {waitingInfo.futureTimeDate && (
+                  <span className="text-sm">
+                    {calcRelativeTimeFromDiff(new Date(waitingInfo.futureTimeDate).getTime() - new Date().getTime())}
+                    &nbsp;left
+                  </span>
+                )}
               </div>
             );
           })}
