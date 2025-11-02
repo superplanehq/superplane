@@ -125,7 +125,6 @@ export const useUpdateWorkflow = (organizationId: string, workflowId: string) =>
       )
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: workflowKeys.detail(organizationId, workflowId) })
       queryClient.invalidateQueries({ queryKey: workflowKeys.list(organizationId) })
     },
   })
