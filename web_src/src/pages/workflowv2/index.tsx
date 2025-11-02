@@ -843,6 +843,16 @@ function prepareCompositeNode(
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: [],
+        items: (execution.childExecutions || []).map((ce) => {
+          const label = friendlyChildLabel(ce, nodes);
+          const state =
+            ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
+              ? ("processed" as const)
+              : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
+              ? ("discarded" as const)
+              : ("running" as const);
+          return { label, state, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
+        }),
       },
     };
   }
@@ -868,6 +878,28 @@ function getRunItemState(execution: WorkflowsWorkflowNodeExecution): LastRunStat
   }
 
   return "failed";
+}
+
+function friendlyChildLabel(ce: WorkflowsWorkflowNodeExecution, nodes: ComponentsNode[]) {
+  const meta: any = ce.metadata || {};
+  const metaLabel = meta.title || meta.nodeTitle || meta.nodeName || meta.nodeLabel || meta.displayName || meta.name || meta.label;
+  if (metaLabel && typeof metaLabel === 'string' && metaLabel.trim().length > 0) return metaLabel as string;
+
+  const fromGraph = nodes.find((n) => n.id === ce.nodeId)?.name;
+  if (fromGraph) return fromGraph;
+
+  const raw = (ce.nodeId || '').toString();
+  const afterColon = raw.includes(':') ? raw.split(':').pop()! : raw;
+  const parts = afterColon.split('-');
+  if (parts.length > 1 && /^[a-z0-9]{5,}$/.test(parts[parts.length - 1])) {
+    parts.pop();
+  }
+  const deduped: string[] = [];
+  for (const p of parts) {
+    if (deduped.length === 0 || deduped[deduped.length - 1] !== p) deduped.push(p);
+  }
+  const label = deduped.join(' ');
+  return label.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function prepareNode(
@@ -1411,6 +1443,16 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: [],
+        items: (execution.childExecutions || []).map((ce) => {
+          const label = friendlyChildLabel(ce, nodes);
+          const st =
+            ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
+              ? ("processed" as const)
+              : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
+              ? ("discarded" as const)
+              : ("running" as const);
+          return { label, state: st, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
+        }),
       },
     };
   });
