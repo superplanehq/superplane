@@ -46,7 +46,7 @@ test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.e2e:
-	$(GOTESTSUM) --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -v
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app go test ./test/e2e/... -p 1 -v
 
 #
 # Targets for dev environment
