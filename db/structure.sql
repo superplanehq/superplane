@@ -638,7 +638,8 @@ CREATE TABLE public.workflow_nodes (
     updated_at timestamp without time zone NOT NULL,
     webhook_id uuid,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    "position" jsonb DEFAULT '{}'::jsonb NOT NULL
+    "position" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    is_collapsed boolean DEFAULT false NOT NULL
 );
 
 
@@ -1658,7 +1659,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251102173731	f
+20251102175802	f
 \.
 
 

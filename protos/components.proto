@@ -201,6 +201,7 @@ message Node {
   ComponentRef component = 7;
   BlueprintRef blueprint = 8;
   TriggerRef trigger = 9;
+  bool is_collapsed = 10;
 }
 
 message Position {

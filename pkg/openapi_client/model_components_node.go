@@ -29,6 +29,7 @@ type ComponentsNode struct {
 	Component *NodeComponentRef `json:"component,omitempty"`
 	Blueprint *NodeBlueprintRef `json:"blueprint,omitempty"`
 	Trigger *NodeTriggerRef `json:"trigger,omitempty"`
+	IsCollapsed *bool `json:"isCollapsed,omitempty"`
 }
 
 // NewComponentsNode instantiates a new ComponentsNode object
@@ -340,6 +341,38 @@ func (o *ComponentsNode) SetTrigger(v NodeTriggerRef) {
 	o.Trigger = &v
 }
 
+// GetIsCollapsed returns the IsCollapsed field value if set, zero value otherwise.
+func (o *ComponentsNode) GetIsCollapsed() bool {
+	if o == nil || IsNil(o.IsCollapsed) {
+		var ret bool
+		return ret
+	}
+	return *o.IsCollapsed
+}
+
+// GetIsCollapsedOk returns a tuple with the IsCollapsed field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ComponentsNode) GetIsCollapsedOk() (*bool, bool) {
+	if o == nil || IsNil(o.IsCollapsed) {
+		return nil, false
+	}
+	return o.IsCollapsed, true
+}
+
+// HasIsCollapsed returns a boolean if a field has been set.
+func (o *ComponentsNode) HasIsCollapsed() bool {
+	if o != nil && !IsNil(o.IsCollapsed) {
+		return true
+	}
+
+	return false
+}
+
+// SetIsCollapsed gets a reference to the given bool and assigns it to the IsCollapsed field.
+func (o *ComponentsNode) SetIsCollapsed(v bool) {
+	o.IsCollapsed = &v
+}
+
 func (o ComponentsNode) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -376,6 +409,9 @@ func (o ComponentsNode) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Trigger) {
 		toSerialize["trigger"] = o.Trigger
+	}
+	if !IsNil(o.IsCollapsed) {
+		toSerialize["isCollapsed"] = o.IsCollapsed
 	}
 	return toSerialize, nil
 }

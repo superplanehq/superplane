@@ -136,6 +136,7 @@ export type ComponentsNode = {
     component?: NodeComponentRef;
     blueprint?: NodeBlueprintRef;
     trigger?: NodeTriggerRef;
+    isCollapsed?: boolean;
 };
 
 export type ComponentsNodeType = 'TYPE_COMPONENT' | 'TYPE_BLUEPRINT' | 'TYPE_TRIGGER';

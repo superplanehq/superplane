@@ -562,6 +562,7 @@ export function WorkflowPageV2() {
               x: Math.round(canvasNode.position.x),
               y: Math.round(canvasNode.position.y),
             },
+            isCollapsed: (canvasNode.data[node.type!] as { isCollapsed: boolean })?.isCollapsed || false,
           };
         }
         return node;
