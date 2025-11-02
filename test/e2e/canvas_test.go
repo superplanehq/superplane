@@ -1,10 +1,10 @@
 package e2e
 
 import (
-	"fmt"
 	"testing"
 
 	uuid "github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 )
@@ -17,27 +17,19 @@ func TestHomePage(t *testing.T) {
 
 	t.Run("creating a new canvas", func(t *testing.T) {
 		steps.Start()
-		defer steps.Cleanup()
-
 		steps.VisitHomePage()
 		steps.FillInNewCanvasForm("Example Canvas")
 		steps.AssertCanvasSavedInDB("Example Canvas")
 	})
 
-	// t.Run("creating a new component", func(t *testing.T) {
-	// 	steps.Start()
-	// 	defer steps.Cleanup()
-
-	// 	steps.VisitHomePage()
-	// 	steps.SwitchToComponentsTab()
-	// 	steps.FillInNewComponentForm("Example Component")
-	// 	steps.AssertComponentSavedInDB("Example Component")
-	// })
+	t.Run("creating a new component", func(t *testing.T) {
+		steps.Start()
+		steps.VisitHomePage()
+		steps.SwitchToComponentsTab()
+		steps.FillInNewComponentForm("Example Component")
+		steps.AssertComponentSavedInDB("Example Component")
+	})
 }
-
-//
-// TestHomePageSteps contains step definitions for home page tests.
-//
 
 type TestHomePageSteps struct {
 	ctx     *TestContext
@@ -50,45 +42,16 @@ func (steps *TestHomePageSteps) Start() {
 	steps.session.Login()
 }
 
-func (steps *TestHomePageSteps) Cleanup() {
-	steps.session.Close()
-}
-
 func (steps *TestHomePageSteps) VisitHomePage() {
 	steps.session.Visit("/" + steps.session.orgID + "/")
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
 	orgUUID := uuid.MustParse(steps.session.orgID)
+	canvas, err := models.FindWorkflowByName(canvasName, orgUUID)
 
-	c, err := models.ListCanvases()
-	if err != nil {
-		steps.ctx.t.Fatalf("failed to list canvases: %v", err)
-	}
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-	fmt.Println(c)
-
-	canvas, err := models.FindCanvasByName(canvasName, orgUUID)
-
-	if err != nil {
-		steps.ctx.t.Fatalf("failed to find canvas in DB: %v", err)
-	}
-
-	if canvas.Name != canvasName {
-		steps.ctx.t.Fatalf("expected canvas name %q, got %q", canvasName, canvas.Name)
-	}
+	assert.NoError(steps.ctx.t, err)
+	assert.Equal(steps.ctx.t, canvasName, canvas.Name)
 }
 
 func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
@@ -100,20 +63,14 @@ func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
 	steps.session.FillIn(canvasNameInput, canvasName)
 	steps.session.Click(saveCanvasButton)
 	steps.session.Sleep(500) // wait for canvas to be created
-	steps.session.TakeScreenshot()
 }
 
 func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {
 	orgUUID := uuid.MustParse(steps.session.orgID)
 	component, err := models.FindBlueprintByName(s, orgUUID)
 
-	if err != nil {
-		steps.ctx.t.Fatalf("failed to find component in DB: %v", err)
-	}
-
-	if component.Name != s {
-		steps.ctx.t.Fatalf("expected component name %q, got %q", s, component.Name)
-	}
+	assert.NoError(steps.ctx.t, err)
+	assert.Equal(steps.ctx.t, s, component.Name)
 }
 
 func (steps *TestHomePageSteps) FillInNewComponentForm(name string) {
@@ -124,6 +81,7 @@ func (steps *TestHomePageSteps) FillInNewComponentForm(name string) {
 	steps.session.Click(newComponentButton)
 	steps.session.FillIn(componentNameInput, name)
 	steps.session.Click(saveComponentButton)
+	steps.session.Sleep(500)
 }
 
 func (steps *TestHomePageSteps) SwitchToComponentsTab() {
