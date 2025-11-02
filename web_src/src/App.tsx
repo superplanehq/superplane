@@ -17,8 +17,6 @@ import { CustomComponent } from "./pages/custom-component";
 import { Canvas } from "./pages/canvas";
 import HomePage from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
-import { Workflow } from "./pages/workflow";
-import { WorkflowEvents } from "./pages/workflow/events";
 import { WorkflowPageV2 } from "./pages/workflowv2";
 
 // Create a client
@@ -73,14 +71,6 @@ function App() {
             <Route
               path=":organizationId/workflows/:workflowId"
               element={withAuthOnly(WorkflowPageV2)}
-            />
-            <Route
-              path=":organizationId/workflows/:workflowId/old"
-              element={withAuthOnly(Workflow)}
-            />
-            <Route
-              path=":organizationId/workflows/:workflowId/events"
-              element={withAuthOnly(WorkflowEvents)}
             />
             <Route
               path=":organizationId/settings/*"
