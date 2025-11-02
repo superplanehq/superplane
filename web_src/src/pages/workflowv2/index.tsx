@@ -504,11 +504,16 @@ export function WorkflowPageV2() {
     (nodeId: string) => {
       const node = workflow?.nodes?.find((n) => n.id === nodeId);
       if (!node) return;
-      if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id && organizationId) {
-        navigate(`/${organizationId}/custom-components/${node.blueprint.id}`);
+      if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id && organizationId && workflow) {
+        // Pass workflow info as URL parameters
+        const params = new URLSearchParams({
+          fromWorkflow: workflowId!,
+          workflowName: workflow.name || 'Workflow',
+        });
+        navigate(`/${organizationId}/custom-components/${node.blueprint.id}?${params.toString()}`);
       }
     },
-    [workflow, organizationId, navigate],
+    [workflow, organizationId, workflowId, navigate],
   );
 
   const handleRun = useCallback(

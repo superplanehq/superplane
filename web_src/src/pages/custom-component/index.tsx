@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Node,
   Edge,
@@ -162,6 +162,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
 export const CustomComponent = () => {
   const { organizationId, blueprintId } = useParams<{ organizationId: string; blueprintId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [blueprintConfiguration, setBlueprintConfiguration] = useState<any[]>([])
   const [blueprintOutputChannels, setBlueprintOutputChannels] = useState<any[]>([])
   const [blueprintName, setBlueprintName] = useState('')
@@ -504,10 +505,19 @@ export const CustomComponent = () => {
     )
   }
 
-  const breadcrumbs: BreadcrumbItem[] = [
-    { label: 'Components', href: `/${organizationId}` },
-    { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
-  ]
+  // Get workflow info from URL parameters
+  const fromWorkflowId = searchParams.get('fromWorkflow')
+  const workflowName = searchParams.get('workflowName')
+
+  const breadcrumbs: BreadcrumbItem[] = fromWorkflowId && workflowName
+    ? [
+        { label: workflowName, href: `/${organizationId}/workflows/${fromWorkflowId}` },
+        { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
+      ]
+    : [
+        { label: 'Components', href: `/${organizationId}` },
+        { label: blueprintName, iconSlug: blueprintIcon, iconColor: `text-${blueprintColor}-600` },
+      ]
 
   return (
     <>
