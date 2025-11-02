@@ -73,7 +73,7 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
         // Preserve collapsed state from existing node
         if (existingNode && nodeType && nodeData[nodeType]) {
           const existingType = existingNode.data.type as string;
-          const existingCollapsed = existingType && existingNode.data[existingType]?.collapsed;
+          const existingCollapsed = existingType && (existingNode.data[existingType] as any)?.collapsed;
 
           nodeData[nodeType] = {
             ...nodeData[nodeType],
