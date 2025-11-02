@@ -843,6 +843,17 @@ function prepareCompositeNode(
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: [],
+        items: (execution.childExecutions || []).map((ce) => {
+          const childNode = nodes.find((n) => n.id === ce.nodeId);
+          const label = childNode?.name || ce.nodeId || "";
+          const state =
+            ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
+              ? ("processed" as const)
+              : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
+              ? ("discarded" as const)
+              : ("running" as const);
+          return { label, state, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
+        }),
       },
     };
   }
@@ -1411,6 +1422,17 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: [],
+        items: (execution.childExecutions || []).map((ce) => {
+          const childNode = nodes.find((n) => n.id === ce.nodeId);
+          const label = childNode?.name || ce.nodeId || "";
+          const st =
+            ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
+              ? ("processed" as const)
+              : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
+              ? ("discarded" as const)
+              : ("running" as const);
+          return { label, state: st, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
+        }),
       },
     };
   });

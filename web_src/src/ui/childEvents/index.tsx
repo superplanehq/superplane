@@ -1,7 +1,6 @@
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
-
-type ChildEventsState = "processed" | "discarded" | "waiting" | "running";
+import type { ChildEventsState } from "../composite";
 
 export interface WaitingInfo {
   icon: string;
@@ -13,6 +12,11 @@ export interface ChildEventsInfo {
   count: number;
   state?: ChildEventsState;
   waitingInfos: WaitingInfo[];
+  items?: {
+    label: string;
+    state: ChildEventsState;
+    startedAt?: Date;
+  }[];
 }
 
 export interface ChildEventsProps {
@@ -87,6 +91,38 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
           )}
         </div>
       </div>
+      {childEventsInfo.items && childEventsInfo.items.length > 0 && (
+        <div className="flex flex-col items-start justify-between pl-7 py-1 text-gray-600 w-full">
+          {childEventsInfo.items.map((item, idx) => {
+            const Icon =
+              item.state === "processed"
+                ? resolveIcon("check")
+                : item.state === "discarded"
+                ? resolveIcon("x")
+                : resolveIcon("clock")
+            const colorClass =
+              item.state === "processed"
+                ? "text-green-700"
+                : item.state === "discarded"
+                ? "text-red-700"
+                : "text-blue-800";
+
+            return (
+              <div key={`${item.label}-${idx}`} className="flex justify-between items-center gap-3 py-1 w-full">
+                <span className={`text-sm flex items-center gap-2 ${colorClass}`}>
+                  <Icon size={16} />
+                  {item.label}
+                </span>
+                {item.startedAt && (
+                  <span className="text-xs text-gray-500">
+                    {calcRelativeTimeFromDiff(new Date().getTime() - new Date(item.startedAt).getTime())}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {hasWaitingInfos && showWaiting && (
         <div className="flex flex-col items-center justify-between pl-2 py-1 text-gray-500 w-full">
           {childEventsInfo.waitingInfos.map((waitingInfo) => {
