@@ -28,14 +28,9 @@ import {
   useWorkflow,
   workflowKeys,
 } from "@/hooks/useWorkflowData";
-import {
-  CanvasEdge,
-  CanvasNode,
-  CanvasPage,
-  NewNodeData,
-  NodeEditData,
-  SidebarData,
-} from "@/ui/CanvasPage";
+import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
+import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { CanvasEdge, CanvasNode, CanvasPage, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
@@ -43,8 +38,6 @@ import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
-import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
-import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 
 export function WorkflowPageV2() {
   const { organizationId, workflowId } = useParams<{
@@ -196,8 +189,8 @@ export function WorkflowPageV2() {
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
   const buildingBlocks = useMemo(
@@ -307,10 +300,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            configuration: updatedConfiguration,
-            name: updatedNodeName,
-          }
+              ...node,
+              configuration: updatedConfiguration,
+              name: updatedNodeName,
+            }
           : node,
       );
 
@@ -353,8 +346,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-              ? "TYPE_BLUEPRINT"
-              : "TYPE_COMPONENT",
+            ? "TYPE_BLUEPRINT"
+            : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: position || {
           x: (workflow.nodes?.length || 0) * 250,
@@ -485,12 +478,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            position: {
-              x: Math.round(position.x),
-              y: Math.round(position.y),
-            },
-          }
+              ...node,
+              position: {
+                x: Math.round(position.x),
+                y: Math.round(position.y),
+              },
+            }
           : node,
       );
 
@@ -1001,10 +994,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-            ? record.role
-            : record.type === "group" && record.group
-              ? record.group
-              : "Unknown",
+          ? record.role
+          : record.type === "group" && record.group
+          ? record.group
+          : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -1014,16 +1007,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-            {
-              label: "comment",
-              optional: true,
-            },
-          ]
+              {
+                label: "comment",
+                optional: true,
+              },
+            ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-          Comment: approvalComment,
-        }
+            Comment: approvalComment,
+          }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1279,7 +1272,12 @@ function prepareHttpNode(
     lastExecution = {
       statusCode: response?.status,
       receivedAt: new Date(execution.createdAt!),
-      state: getRunItemState(execution) === "success" ? ("success" as const) : getRunItemState(execution) === "running" ? ("running" as const) : ("failed" as const),
+      state:
+        getRunItemState(execution) === "success"
+          ? ("success" as const)
+          : getRunItemState(execution) === "running"
+          ? ("running" as const)
+          : ("failed" as const),
     };
   }
 
@@ -1365,6 +1363,7 @@ function mapTriggerEventsToSidebarEvents(events: WorkflowsWorkflowEvent[], node:
     const values = triggerRenderer.getRootEventValues(event);
 
     return {
+      id: event.id!,
       title,
       subtitle,
       state: "processed" as const,
@@ -1385,8 +1384,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
         ? ("processed" as const)
         : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-          ? ("discarded" as const)
-          : ("waiting" as const);
+        ? ("discarded" as const)
+        : ("waiting" as const);
 
     // Get root trigger information for better title/subtitle
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -1395,13 +1394,14 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-        title: execution.id || "Execution",
-        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-      };
+          title: execution.id || "Execution",
+          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+        };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
     return {
+      id: execution.id!,
       title,
       subtitle,
       state,
@@ -1459,6 +1459,7 @@ function prepareSidebarData(
     const timestamp = item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "";
 
     return {
+      id: item.id!,
       title: item.id || "Queued",
       subtitle: timestamp,
       state: "waiting" as const,
