@@ -10,10 +10,7 @@ import (
 )
 
 func TestHomePage(t *testing.T) {
-	ctx := NewTestContext(t)
-	ctx.Start()
-
-	steps := &TestHomePageSteps{ctx: ctx}
+	steps := &TestHomePageSteps{t: t}
 
 	t.Run("creating a new canvas", func(t *testing.T) {
 		steps.Start()
@@ -32,12 +29,12 @@ func TestHomePage(t *testing.T) {
 }
 
 type TestHomePageSteps struct {
-	ctx     *TestContext
+	t       *testing.T
 	session *TestSession
 }
 
 func (steps *TestHomePageSteps) Start() {
-	steps.session = steps.ctx.NewSession()
+	steps.session = ctx.NewSession(steps.t)
 	steps.session.Start()
 	steps.session.Login()
 }
@@ -50,8 +47,8 @@ func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
 	orgUUID := uuid.MustParse(steps.session.orgID)
 	canvas, err := models.FindWorkflowByName(canvasName, orgUUID)
 
-	assert.NoError(steps.ctx.t, err)
-	assert.Equal(steps.ctx.t, canvasName, canvas.Name)
+	assert.NoError(steps.t, err)
+	assert.Equal(steps.t, canvasName, canvas.Name)
 }
 
 func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
@@ -69,8 +66,8 @@ func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {
 	orgUUID := uuid.MustParse(steps.session.orgID)
 	component, err := models.FindBlueprintByName(s, orgUUID)
 
-	assert.NoError(steps.ctx.t, err)
-	assert.Equal(steps.ctx.t, s, component.Name)
+	assert.NoError(steps.t, err)
+	assert.Equal(steps.t, s, component.Name)
 }
 
 func (steps *TestHomePageSteps) FillInNewComponentForm(name string) {

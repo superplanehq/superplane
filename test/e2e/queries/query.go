@@ -41,3 +41,14 @@ func Text(text string) Query {
 		},
 	}
 }
+
+func Locator(selector string) Query {
+	return Query{
+		run: func(r Runner) pw.Locator {
+			return r.Page().Locator(selector).First()
+		},
+		describe: func() string {
+			return selector
+		},
+	}
+}

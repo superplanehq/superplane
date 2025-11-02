@@ -313,6 +313,8 @@ function BlockContent({
   nodeId,
   selected = false,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onEdit,
   onConfigure,
   onDuplicate,
@@ -329,6 +331,8 @@ function BlockContent({
 
   const actionProps = {
     onRun,
+    runDisabled,
+    runDisabledTooltip,
     onEdit,
     onConfigure,
     onDuplicate,

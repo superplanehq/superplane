@@ -1,5 +1,6 @@
-import React from "react";
 import { resolveIcon } from "@/lib/utils";
+import React from "react";
+import { toTestId } from "../../utils/testID";
 import { SidebarActionsDropdown } from "../componentSidebar/SidebarActionsDropdown";
 import { ComponentActionsProps } from "../types/componentActions";
 
@@ -24,6 +25,8 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   description,
   onDoubleClick,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onDuplicate,
   onEdit,
   onConfigure,
@@ -37,15 +40,25 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   }, [iconSlug]);
 
   return (
-    <div className={"text-left text-lg w-full px-2 flex flex-col border-b p-2 gap-2 rounded-t items-center relative " + headerColor} onDoubleClick={onDoubleClick}>
+    <div
+      className={
+        "text-left text-lg w-full px-2 flex flex-col border-b p-2 gap-2 rounded-t items-center relative " + headerColor
+      }
+      onDoubleClick={onDoubleClick}
+    >
       <div className="w-full flex items-center gap-2">
-        <div className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
+        <div
+          className={`w-6 h-6 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ""}`}
+        >
           {iconSrc ? <img src={iconSrc} alt={title} className="w-5 h-5 " /> : <Icon size={20} className={iconColor} />}
         </div>
         <h2 className="font-semibold">{title}</h2>
         <div className="absolute top-2 right-2">
           <SidebarActionsDropdown
+            dataTestId={toTestId(`node-${title}-header-dropdown`)}
             onRun={onRun}
+            runDisabled={runDisabled}
+            runDisabledTooltip={runDisabledTooltip}
             onDuplicate={onDuplicate}
             onEdit={onEdit}
             onConfigure={onConfigure}

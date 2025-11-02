@@ -5,6 +5,7 @@ import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose, Settings2 } from "lucide-react";
 import { useState } from "react";
+import { toTestId } from "../../utils/testID";
 import { createNodeDragPreview } from "./createNodeDragPreview";
 
 export interface BuildingBlock {
@@ -69,7 +70,10 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
   });
 
   return (
-    <div className="w-[360px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
+    <div
+      className="w-[360px] h-full bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col"
+      data-testid="building-blocks-sidebar"
+    >
       <div className="flex items-center gap-2 px-4 py-4 relative">
         <div className="flex-1">
           <input
@@ -171,6 +175,7 @@ function CategorySection({ category, canvasZoom, searchTerm = "", showWip = true
           const isLive = !!block.isLive;
           return (
             <Item
+              data-testid={toTestId(`building-block-${block.name}`)}
               key={`${block.type}-${block.name}`}
               draggable={isLive}
               onDragStart={(e) => {

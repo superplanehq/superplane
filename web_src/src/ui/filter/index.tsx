@@ -21,6 +21,8 @@ export const Filter: React.FC<FilterProps> = ({
   selected = false,
   collapsedBackground,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onEdit,
   onDuplicate,
   onDeactivate,
@@ -55,6 +57,8 @@ export const Filter: React.FC<FilterProps> = ({
       collapsedBackground={collapsedBackground}
       selected={selected}
       onRun={onRun}
+      runDisabled={runDisabled}
+      runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}

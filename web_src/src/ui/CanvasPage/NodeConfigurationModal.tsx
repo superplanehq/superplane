@@ -1,17 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import {
-  Dialog,
-  DialogHeader,
-  DialogTitle,
-  DialogContent,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { ComponentsConfigurationField } from "@/api-client";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useCallback, useEffect, useState } from "react";
+
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { ComponentsConfigurationField } from "@/api-client";
 
 interface NodeConfigurationModalProps {
   isOpen: boolean;
@@ -36,73 +31,75 @@ export function NodeConfigurationModal({
   domainId,
   domainType,
 }: NodeConfigurationModalProps) {
-  const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(
-    configuration || {}
-  );
+  const [nodeConfiguration, setNodeConfiguration] = useState<Record<string, unknown>>(configuration || {});
   const [currentNodeName, setCurrentNodeName] = useState<string>(nodeName);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
 
   const isFieldEmpty = (value: unknown): boolean => {
     if (value === null || value === undefined) return true;
-    if (typeof value === 'string') return value.trim() === '';
+    if (typeof value === "string") return value.trim() === "";
     if (Array.isArray(value)) return value.length === 0;
-    if (typeof value === 'object') return Object.keys(value).length === 0;
+    if (typeof value === "object") return Object.keys(value).length === 0;
     return false;
   };
 
   // Recursively validate nested fields in objects and lists
-  const validateNestedFields = useCallback((
-    fields: ComponentsConfigurationField[],
-    values: Record<string, unknown>,
-    parentPath: string = ''
-  ): Set<string> => {
-    const errors = new Set<string>();
+  const validateNestedFields = useCallback(
+    (fields: ComponentsConfigurationField[], values: Record<string, unknown>, parentPath: string = ""): Set<string> => {
+      const errors = new Set<string>();
 
-    fields.forEach((field) => {
-      if (!field.name) return;
+      fields.forEach((field) => {
+        if (!field.name) return;
 
-      const fieldPath = parentPath ? `${parentPath}.${field.name}` : field.name;
-      const value = values[field.name];
+        const fieldPath = parentPath ? `${parentPath}.${field.name}` : field.name;
+        const value = values[field.name];
 
-      // Check if this field itself is required and empty
-      if (field.required && isFieldEmpty(value)) {
-        errors.add(fieldPath);
-      }
-
-      // Handle nested validation for different field types
-      if (field.type === 'list' && Array.isArray(value) && field.typeOptions?.list?.itemDefinition) {
-        const itemSchema = field.typeOptions.list.itemDefinition.schema;
-        if (itemSchema) {
-          value.forEach((item, index) => {
-            if (typeof item === 'object' && item !== null) {
-              const nestedErrors = validateNestedFields(
-                itemSchema,
-                item as Record<string, unknown>,
-                `${fieldPath}[${index}]`
-              );
-              nestedErrors.forEach(error => errors.add(error));
-            }
-          });
+        // Check if this field itself is required and empty
+        if (field.required && isFieldEmpty(value)) {
+          errors.add(fieldPath);
         }
-      } else if (field.type === 'object' && typeof value === 'object' && value !== null && field.typeOptions?.object?.schema) {
-        const nestedErrors = validateNestedFields(
-          field.typeOptions.object.schema,
-          value as Record<string, unknown>,
-          fieldPath
-        );
-        nestedErrors.forEach(error => errors.add(error));
-      }
-    });
 
-    return errors;
-  }, []);
+        // Handle nested validation for different field types
+        if (field.type === "list" && Array.isArray(value) && field.typeOptions?.list?.itemDefinition) {
+          const itemSchema = field.typeOptions.list.itemDefinition.schema;
+          if (itemSchema) {
+            value.forEach((item, index) => {
+              if (typeof item === "object" && item !== null) {
+                const nestedErrors = validateNestedFields(
+                  itemSchema,
+                  item as Record<string, unknown>,
+                  `${fieldPath}[${index}]`,
+                );
+                nestedErrors.forEach((error) => errors.add(error));
+              }
+            });
+          }
+        } else if (
+          field.type === "object" &&
+          typeof value === "object" &&
+          value !== null &&
+          field.typeOptions?.object?.schema
+        ) {
+          const nestedErrors = validateNestedFields(
+            field.typeOptions.object.schema,
+            value as Record<string, unknown>,
+            fieldPath,
+          );
+          nestedErrors.forEach((error) => errors.add(error));
+        }
+      });
+
+      return errors;
+    },
+    [],
+  );
 
   const validateAllFields = useCallback((): boolean => {
     const errors = validateNestedFields(configurationFields, nodeConfiguration);
 
     if (isFieldEmpty(currentNodeName)) {
-      errors.add('nodeName');
+      errors.add("nodeName");
     }
 
     setValidationErrors(errors);
@@ -149,10 +146,14 @@ export function NodeConfigurationModal({
             <div className="space-y-6">
               {/* Node identification section */}
               <div className="flex flex-col  gap-2 h-[60px]">
-                <Label className={`min-w-[100px] text-left ${showValidation && validationErrors.has('nodeName') ? 'text-red-600 dark:text-red-400' : ''}`}>
+                <Label
+                  className={`min-w-[100px] text-left ${
+                    showValidation && validationErrors.has("nodeName") ? "text-red-600 dark:text-red-400" : ""
+                  }`}
+                >
                   Node Name
                   <span className="text-red-500 ml-1">*</span>
-                  {showValidation && validationErrors.has('nodeName') && (
+                  {showValidation && validationErrors.has("nodeName") && (
                     <span className="text-red-500 text-xs ml-2">- required field</span>
                   )}
                 </Label>
@@ -162,7 +163,9 @@ export function NodeConfigurationModal({
                   onChange={(e) => setCurrentNodeName(e.target.value)}
                   placeholder="Enter a name for this node"
                   autoFocus
-                  className={`flex-1 ${showValidation && validationErrors.has('nodeName') ? 'border-red-500 border-2' : ''}`}
+                  className={`flex-1 ${
+                    showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
+                  }`}
                 />
               </div>
 
@@ -186,11 +189,14 @@ export function NodeConfigurationModal({
                         allValues={nodeConfiguration}
                         domainId={domainId}
                         domainType={domainType}
-                        hasError={showValidation && (
-                          validationErrors.has(fieldName) ||
-                          // Check for nested errors in this field
-                          Array.from(validationErrors).some(error => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`))
-                        )}
+                        hasError={
+                          showValidation &&
+                          (validationErrors.has(fieldName) ||
+                            // Check for nested errors in this field
+                            Array.from(validationErrors).some(
+                              (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
+                            ))
+                        }
                         validationErrors={showValidation ? validationErrors : undefined}
                         fieldPath={fieldName}
                       />
@@ -201,13 +207,10 @@ export function NodeConfigurationModal({
             </div>
 
             <DialogFooter className="mt-6">
-              <Button variant="outline" onClick={handleClose}>
+              <Button data-testid="cancel-node-add-button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button
-                variant="default"
-                onClick={handleSave}
-              >
+              <Button data-testid="add-node-button" variant="default" onClick={handleSave}>
                 Add
               </Button>
             </DialogFooter>

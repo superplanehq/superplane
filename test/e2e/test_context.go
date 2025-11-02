@@ -1,20 +1,19 @@
 package e2e
 
 import (
-    "io"
-    "net/http"
-    "os"
-    "os/exec"
-    "strings"
-    "testing"
-    "time"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+	"time"
 
-    pw "github.com/playwright-community/playwright-go"
-    "github.com/superplanehq/superplane/pkg/server"
+	pw "github.com/playwright-community/playwright-go"
+	"github.com/superplanehq/superplane/pkg/server"
 )
 
 type TestContext struct {
-	t         *testing.T
 	runner    *pw.Playwright
 	browser   pw.Browser
 	context   pw.BrowserContext
@@ -24,7 +23,9 @@ type TestContext struct {
 	baseURL string
 }
 
-func NewTestContext(t *testing.T) *TestContext { return &TestContext{t: t, timeoutMs: 10000} }
+func NewTestContext(t *testing.M) *TestContext {
+	return &TestContext{timeoutMs: 10000}
+}
 
 func (s *TestContext) Start() {
 	os.Setenv("START_PUBLIC_API", "yes")
@@ -46,16 +47,13 @@ func (s *TestContext) Start() {
 	s.startAppServer()
 	s.startPlaywright()
 	s.launchBrowser()
-
 	s.setUpNavigationLogger()
-	s.streamBrowserLogs()
-
 }
 
 func (s *TestContext) startPlaywright() {
 	r, err := pw.Run()
 	if err != nil {
-		s.t.Fatalf("playwright: %v", err)
+		panic("playwright: " + err.Error())
 	}
 
 	s.runner = r
@@ -64,12 +62,12 @@ func (s *TestContext) startPlaywright() {
 func (s *TestContext) launchBrowser() {
 	b, err := s.runner.Chromium.Launch()
 	if err != nil {
-		s.t.Fatalf("browser: %v", err)
+		panic("browser launch: " + err.Error())
 	}
 
 	c, err := b.NewContext()
 	if err != nil {
-		s.t.Fatalf("context: %v", err)
+		panic("browser context: " + err.Error())
 	}
 
 	s.browser = b
@@ -104,7 +102,7 @@ func (s *TestContext) startVite() {
 	cmd.Stderr = io.Discard
 
 	if err := cmd.Start(); err != nil {
-		s.t.Fatalf("vite start: %v", err)
+		panic("start vite: " + err.Error())
 	}
 
 	s.viteCmd = cmd
@@ -121,9 +119,6 @@ func (s *TestContext) startVite() {
 }
 
 func (s *TestContext) setUpNavigationLogger() {
-	// Inject a script that hooks into the History API and URL change events
-	// to report client-side navigations (e.g., react-router). The receiver
-	// function (window._spNav) is exposed per-page in NewSession().
 	if err := s.context.AddInitScript(pw.Script{Content: pw.String(`
         (() => {
           try {
@@ -148,21 +143,19 @@ func (s *TestContext) setUpNavigationLogger() {
           } catch (_) { /* ignore */ }
         })();
     `)}); err != nil {
-		s.t.Fatalf("init script: %v", err)
+
+		panic("init script: " + err.Error())
 	}
-
-	// Note: page-level logging attached in NewSession()
 }
-func (s *TestContext) streamBrowserLogs() { /* per-session page handlers */ }
 
-// NewSession creates a new browser page bound to this context.
-func (s *TestContext) NewSession() *TestSession {
+func (s *TestContext) NewSession(t *testing.T) *TestSession {
 	p, err := s.context.NewPage()
 	if err != nil {
-		s.t.Fatalf("page: %v", err)
+		t.Fatalf("page: %v", err)
 	}
+
 	sess := &TestSession{
-		t:         s.t,
+		t:         t,
 		context:   s.context,
 		page:      p,
 		timeoutMs: s.timeoutMs,
@@ -173,37 +166,41 @@ func (s *TestContext) NewSession() *TestSession {
 	if err := p.ExposeFunction("_spNav", func(args ...interface{}) interface{} {
 		if len(args) > 0 {
 			if url, ok := args[0].(string); ok {
-				s.t.Logf("[Browser Logs] Navigated to %s", url)
+				t.Logf("[Browser Logs] Navigated to %s", url)
 			}
 		}
 		return nil
 	}); err != nil {
-		s.t.Fatalf("expose function: %v", err)
+		t.Fatalf("expose function: %v", err)
 	}
 
-	// Page-level logging hooks
 	p.OnFrameNavigated(func(f pw.Frame) {
 		if f.ParentFrame() == nil {
-			s.t.Logf("[Browser Logs] Navigated to %s", f.URL())
+			t.Logf("[Browser Logs] Navigated to %s", f.URL())
 		}
 	})
+
 	p.OnConsole(func(m pw.ConsoleMessage) {
-		s.t.Logf("[console.%s] %s", m.Type(), m.Text())
+		t.Logf("[console.%s] %s", m.Type(), m.Text())
 	})
-	p.OnPageError(func(err error) { s.t.Logf("[Browser Logs] %v", err) })
+
+	p.OnPageError(func(err error) {
+		t.Logf("[Browser Logs] %v", err)
+	})
+
 	p.OnRequestFailed(func(r pw.Request) {
 		if err := r.Failure(); err != nil {
 			if strings.Contains(err.Error(), "ERR_ABORTED") {
 				return
 			}
-			s.t.Logf("[Browser Logs] %s (%s)", r.URL(), err.Error())
+			t.Logf("[Browser Logs] %s (%s)", r.URL(), err.Error())
 			return
 		}
-		s.t.Logf("[Browser Logs] %s (request failed)", r.URL())
+		t.Logf("[Browser Logs] %s (request failed)", r.URL())
 	})
 	p.OnResponse(func(resp pw.Response) {
 		if status := resp.Status(); status >= 400 {
-			s.t.Logf("[Browser Logs] %d %s", status, resp.URL())
+			t.Logf("[Browser Logs] %d %s", status, resp.URL())
 		}
 	})
 

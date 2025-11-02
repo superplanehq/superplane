@@ -45,6 +45,8 @@ export const Approval: React.FC<ApprovalProps> = ({
   zeroStateText = "No events yet",
   selected = false,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onDuplicate,
   onDeactivate,
   onToggleView,
@@ -87,6 +89,8 @@ export const Approval: React.FC<ApprovalProps> = ({
           collapsedBackground={collapsedBackground}
           shape="rounded"
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onDuplicate={onDuplicate}
           onDeactivate={onDeactivate}
           onToggleView={onToggleView}
@@ -110,6 +114,8 @@ export const Approval: React.FC<ApprovalProps> = ({
           title={title}
           description={description}
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onDuplicate={onDuplicate}
           onDeactivate={onDeactivate}
           onToggleView={onToggleView}

@@ -35,6 +35,8 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
   selected = false,
   collapsedBackground,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onEdit,
   onDuplicate,
   onDeactivate,
@@ -87,6 +89,8 @@ export const SwitchComponent: React.FC<SwitchComponentProps> = ({
       collapsedBackground={collapsedBackground}
       selected={selected}
       onRun={onRun}
+      runDisabled={runDisabled}
+      runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}

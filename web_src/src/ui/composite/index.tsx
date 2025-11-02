@@ -60,7 +60,7 @@ export interface CompositeProps extends ComponentActionsProps {
   onViewMoreEvents?: () => void;
 }
 
-export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false, isMissing = false, onRun, onEdit, onConfigure, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
+export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, metadata, parameters = [], lastRunItem, lastRunItems, maxVisibleEvents = 5, nextInQueue, collapsed = false, collapsedBackground, onExpandChildEvents, onReRunChildEvents, onToggleCollapse, onViewMoreEvents, startLastValuesOpen = false, selected = false, isMissing = false, onRun, runDisabled, runDisabledTooltip, onEdit, onConfigure, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
   // All hooks must be called before any early returns
   const [showLastRunValues, setShowLastRunValues] = React.useState<Record<number, boolean>>(
     startLastValuesOpen ? { 0: true } : {}
@@ -159,6 +159,8 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           shape="rounded"
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onEdit={onEdit}
           onConfigure={onConfigure}
           onDuplicate={onDuplicate}
@@ -195,6 +197,8 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           description={description}
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onEdit={onEdit}
           onConfigure={onConfigure}
           onDuplicate={onDuplicate}

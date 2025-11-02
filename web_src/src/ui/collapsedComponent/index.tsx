@@ -26,6 +26,8 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   children,
   onDoubleClick,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onDuplicate,
   onEdit,
   onConfigure,
@@ -53,6 +55,8 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
       <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10">
         <SidebarActionsDropdown
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onDuplicate={onDuplicate}
           onEdit={onEdit}
           onConfigure={onConfigure}

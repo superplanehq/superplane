@@ -95,6 +95,9 @@ export interface CanvasPageProps {
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  // Disable running nodes when there are unsaved changes (with tooltip)
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -153,6 +156,8 @@ const nodeTypes = {
         data={blockData}
         nodeId={nodeProps.id}
         selected={nodeProps.selected}
+        runDisabled={callbacks?.runDisabled}
+        runDisabledTooltip={callbacks?.runDisabledTooltip}
         onExpand={callbacks.handleNodeExpand}
         onClick={() => callbacks.handleNodeClick(nodeProps.id)}
         onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
@@ -231,6 +236,8 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleNodeRun = useCallback(
     (nodeId: string) => {
+      // Hard guard: if running is disabled (e.g., unsaved changes), do nothing
+      if (props.runDisabled) return;
       // Find the node to get its name and channels
       const node = state.nodes.find((n) => n.id === nodeId);
       if (!node) return;
@@ -244,7 +251,7 @@ function CanvasPage(props: CanvasPageProps) {
         channels,
       });
     },
-    [state.nodes],
+    [state.nodes, props.runDisabled],
   );
 
   const handleEmit = useCallback(
@@ -257,17 +264,20 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props],
   );
 
-  const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
-    setNewNodeData({
-      buildingBlock: block,
-      nodeName: block.name || "",
-      displayLabel: block.label || block.name || "",
-      configuration: {},
-      position,
-    });
-    // Mark canvas as dirty immediately on drop
-    if (props.onDirty) props.onDirty();
-  }, [props]);
+  const handleBuildingBlockDrop = useCallback(
+    (block: BuildingBlock, position?: { x: number; y: number }) => {
+      setNewNodeData({
+        buildingBlock: block,
+        nodeName: block.name || "",
+        displayLabel: block.label || block.name || "",
+        configuration: {},
+        position,
+      });
+      // Mark canvas as dirty immediately on drop
+      if (props.onDirty) props.onDirty();
+    },
+    [props],
+  );
 
   const handleSidebarToggle = useCallback(
     (open: boolean) => {
@@ -335,7 +345,7 @@ function CanvasPage(props: CanvasPageProps) {
         />
 
         <div className="flex-1 relative">
-          <ReactFlowProvider key="canvas-flow-provider">
+          <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
             <CanvasContent
               state={state}
               onSave={props.onSave}
@@ -348,6 +358,8 @@ function CanvasPage(props: CanvasPageProps) {
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
+              runDisabled={props.runDisabled}
+              runDisabledTooltip={props.runDisabledTooltip}
               onBuildingBlockDrop={handleBuildingBlockDrop}
               onZoomChange={setCanvasZoom}
               hasFitToViewRef={hasFitToViewRef}
@@ -372,6 +384,8 @@ function CanvasPage(props: CanvasPageProps) {
             onConfigure={props.onConfigure}
             onDeactivate={props.onDeactivate}
             onDelete={handleNodeDelete}
+            runDisabled={props.runDisabled}
+            runDisabledTooltip={props.runDisabledTooltip}
           />
         </div>
       </div>
@@ -433,6 +447,8 @@ function Sidebar({
   onDeactivate,
   onToggleView,
   onDelete,
+  runDisabled,
+  runDisabledTooltip,
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
@@ -443,6 +459,8 @@ function Sidebar({
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
 }) {
   const sidebarData = useMemo(() => {
     if (!state.componentSidebar.selectedNodeId || !getSidebarData) {
@@ -500,6 +518,8 @@ function Sidebar({
         });
       }}
       onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
+      runDisabled={runDisabled}
+      runDisabledTooltip={runDisabledTooltip}
       onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
       onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
       onConfigure={onConfigure ? () => onConfigure(state.componentSidebar.selectedNodeId!) : undefined}
@@ -510,7 +530,21 @@ function Sidebar({
   );
 }
 
-function CanvasContentHeader({ state, onSave, organizationId, unsavedMessage, saveIsPrimary, saveButtonHidden }: { state: CanvasPageState; onSave?: (nodes: CanvasNode[]) => void; organizationId?: string; unsavedMessage?: string; saveIsPrimary?: boolean; saveButtonHidden?: boolean }) {
+function CanvasContentHeader({
+  state,
+  onSave,
+  organizationId,
+  unsavedMessage,
+  saveIsPrimary,
+  saveButtonHidden,
+}: {
+  state: CanvasPageState;
+  onSave?: (nodes: CanvasNode[]) => void;
+  organizationId?: string;
+  unsavedMessage?: string;
+  saveIsPrimary?: boolean;
+  saveButtonHidden?: boolean;
+}) {
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -555,6 +589,8 @@ function CanvasContent({
   onZoomChange,
   hasFitToViewRef,
   viewportRefProp,
+  runDisabled,
+  runDisabledTooltip,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -572,6 +608,8 @@ function CanvasContent({
   onZoomChange?: (zoom: number) => void;
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
 }) {
   const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
 
@@ -747,6 +785,8 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
     aiState: state.ai,
+    runDisabled,
+    runDisabledTooltip,
   });
   callbacksRef.current = {
     handleNodeExpand,
@@ -759,6 +799,8 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onToggleView: onToggleViewRef,
     aiState: state.ai,
+    runDisabled,
+    runDisabledTooltip,
   };
 
   // Just pass the state nodes directly - callbacks will be added in nodeTypes
@@ -772,9 +814,12 @@ function CanvasContent({
     }));
   }, [state.nodes]);
 
-  const edgeTypes = useMemo(() => ({
-    custom: CustomEdge,
-  }), []);
+  const edgeTypes = useMemo(
+    () => ({
+      custom: CustomEdge,
+    }),
+    [],
+  );
   const styledEdges = useMemo(() => state.edges?.map((e) => ({ ...e, ...EDGE_STYLE })), [state.edges]);
 
   return (

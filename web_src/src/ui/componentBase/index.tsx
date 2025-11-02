@@ -43,7 +43,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   selected?: boolean;
 }
 
-export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, spec, collapsed = false, collapsedBackground, eventSections, selected = false, onRun, onEdit, onConfigure, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
+export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug, iconColor, iconBackground, headerColor, title, description, spec, collapsed = false, collapsedBackground, eventSections, selected = false, onRun, runDisabled, runDisabledTooltip, onEdit, onConfigure, onDuplicate, onDeactivate, onToggleView, onDelete, isCompactView }) => {
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected}>
@@ -56,6 +56,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
           collapsedBackground={collapsedBackground}
           shape="circle"
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onEdit={onEdit}
           onDuplicate={onDuplicate}
           onConfigure={onConfigure}
@@ -87,6 +89,8 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
           title={title}
           description={description}
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onEdit={onEdit}
           onConfigure={onConfigure}
           onDuplicate={onDuplicate}

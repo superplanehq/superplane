@@ -36,6 +36,8 @@ export const If: React.FC<IfProps> = ({
   selected = false,
   collapsedBackground,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onEdit,
   onDuplicate,
   onDeactivate,
@@ -103,6 +105,8 @@ export const If: React.FC<IfProps> = ({
       collapsedBackground={collapsedBackground}
       selected={selected}
       onRun={onRun}
+      runDisabled={runDisabled}
+      runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}

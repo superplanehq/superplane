@@ -57,6 +57,8 @@ export const Http: React.FC<HttpProps> = ({
   hideLastRun = false,
   onToggleCollapse,
   onRun,
+  runDisabled,
+  runDisabledTooltip,
   onEdit,
   onConfigure,
   onDuplicate,
@@ -127,6 +129,8 @@ export const Http: React.FC<HttpProps> = ({
           shape="rounded"
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onEdit={onEdit}
           onConfigure={onConfigure}
           onDuplicate={onDuplicate}
@@ -158,6 +162,8 @@ export const Http: React.FC<HttpProps> = ({
           title={title}
           onDoubleClick={onToggleCollapse}
           onRun={onRun}
+          runDisabled={runDisabled}
+          runDisabledTooltip={runDisabledTooltip}
           onEdit={onEdit}
           onConfigure={onConfigure}
           onDuplicate={onDuplicate}

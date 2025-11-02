@@ -1,17 +1,17 @@
 package e2e
 
 import (
-    "fmt"
-    "os"
-    "testing"
-    "time"
+	"fmt"
+	"os"
+	"testing"
+	"time"
 
-    pw "github.com/playwright-community/playwright-go"
-    "github.com/superplanehq/superplane/pkg/authorization"
-    "github.com/superplanehq/superplane/pkg/database"
-    spjwt "github.com/superplanehq/superplane/pkg/jwt"
-    "github.com/superplanehq/superplane/pkg/models"
-    "github.com/superplanehq/superplane/test/e2e/queries"
+	pw "github.com/playwright-community/playwright-go"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
+	spjwt "github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/e2e/queries"
 )
 
 // TestSession handles per-test actions: db, auth, and page ops.
@@ -165,5 +165,69 @@ func (s *TestSession) FillIn(q queries.Query, value string) {
 }
 
 func (s *TestSession) VisitHomePage() {
-    s.Visit("/" + s.orgID + "/")
+	s.Visit("/" + s.orgID + "/")
+}
+
+func (s *TestSession) DragAndDrop(source queries.Query, target queries.Query, offsetX, offsetY int) {
+	s.t.Logf("Dragging element %q to %q with offset (%d, %d)", source.Describe(), target.Describe(), offsetX, offsetY)
+
+	srcEl := source.Run(s)
+	tgtEl := target.Run(s)
+
+	srcBox, err := srcEl.BoundingBox()
+	if err != nil || srcBox == nil {
+		s.t.Fatalf("getting bounding box of source %q: %v", source.Describe(), err)
+	}
+
+	tgtBox, err := tgtEl.BoundingBox()
+	if err != nil || tgtBox == nil {
+		s.t.Fatalf("getting bounding box of target %q: %v", target.Describe(), err)
+	}
+
+	startX := srcBox.X + srcBox.Width/2
+	startY := srcBox.Y + srcBox.Height/2
+	endX := tgtBox.X + float64(offsetX)
+	endY := tgtBox.Y + float64(offsetY)
+
+	if err := s.page.Mouse().Move(startX, startY); err != nil {
+		s.t.Fatalf("moving mouse to source %q: %v", source.Describe(), err)
+	}
+	if err := s.page.Mouse().Down(); err != nil {
+		s.t.Fatalf("mouse down on source %q: %v", source.Describe(), err)
+	}
+	if err := s.page.Mouse().Move(endX, endY, pw.MouseMoveOptions{Steps: pw.Int(10)}); err != nil {
+		s.t.Fatalf("moving mouse to target %q: %v", target.Describe(), err)
+	}
+	if err := s.page.Mouse().Up(); err != nil {
+		s.t.Fatalf("mouse up on target %q: %v", target.Describe(), err)
+	}
+}
+
+func (s *TestSession) AssertVisible(q queries.Query) {
+	s.t.Logf("Asserting visibility of %q", q.Describe())
+
+	if err := q.Run(s).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("asserting visibility of %q: %v", q.Describe(), err)
+	}
+}
+
+func (s *TestSession) AssertDisabled(q queries.Query) {
+	s.t.Logf("Asserting %q is disabled", q.Describe())
+
+	el := q.Run(s)
+	disabled, err := el.IsDisabled()
+	if err != nil {
+		s.t.Fatalf("checking if %q is disabled: %v", q.Describe(), err)
+	}
+	if !disabled {
+		s.t.Fatalf("expected %q to be disabled", q.Describe())
+	}
+}
+
+func (s *TestSession) HoverOver(q queries.Query) {
+	s.t.Logf("Hovering over %q", q.Describe())
+
+	if err := q.Run(s).Hover(pw.LocatorHoverOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
+		s.t.Fatalf("hover over %q: %v", q.Describe(), err)
+	}
 }
