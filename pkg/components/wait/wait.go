@@ -16,7 +16,12 @@ func init() {
 type Wait struct{}
 
 type Spec struct {
-	Until string `json:"until"`
+	Duration Duration `json:"duration"`
+}
+
+type Duration struct {
+	Value int    `json:"value"`
+	Unit  string `json:"unit"`
 }
 
 func (w *Wait) Name() string {
@@ -46,10 +51,46 @@ func (w *Wait) OutputChannels(configuration any) []components.OutputChannel {
 func (w *Wait) Configuration() []components.ConfigurationField {
 	return []components.ConfigurationField{
 		{
-			Name:     "until",
-			Label:    "Wait Until",
-			Type:     components.FieldTypeString,
+			Name:     "duration",
+			Label:    "Set wait interval",
+			Type:     components.FieldTypeObject,
 			Required: true,
+			TypeOptions: &components.TypeOptions{
+				Object: &components.ObjectTypeOptions{
+					Schema: []components.ConfigurationField{
+						{
+							Name:     "value",
+							Label:    "How long should I wait?",
+							Type:     components.FieldTypeNumber,
+							Required: true,
+						},
+						{
+							Name:     "unit",
+							Label:    "Unit",
+							Type:     components.FieldTypeSelect,
+							Required: true,
+							TypeOptions: &components.TypeOptions{
+								Select: &components.SelectTypeOptions{
+									Options: []components.FieldOption{
+										{
+											Label: "Seconds",
+											Value: "seconds",
+										},
+										{
+											Label: "Minutes",
+											Value: "minutes",
+										},
+										{
+											Label: "Hours",
+											Value: "hours",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -61,24 +102,12 @@ func (w *Wait) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
-	until, err := time.Parse(time.RFC3339, spec.Until)
-	if err != nil {
-		return fmt.Errorf("error parsing until time: %v", err)
+	interval := findInterval(spec)
+	if interval == 0 {
+		return fmt.Errorf("invalid interval: %v", spec.Duration)
 	}
 
-	//
-	// If we haven't reached the until time, schedule an action to run after the wait time.
-	//
-	if time.Now().Before(until) {
-		return ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, time.Until(until))
-	}
-
-	//
-	// Otherwise, just complete the execution.
-	//
-	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {ctx.Data},
-	})
+	return ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
 }
 
 func (w *Wait) Actions() []components.Action {
@@ -92,14 +121,24 @@ func (w *Wait) Actions() []components.Action {
 func (w *Wait) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
-		//
-		// TODO: we need to complete the execution with the proper data.
-		//
 		return ctx.ExecutionStateContext.Pass(map[string][]any{
 			components.DefaultOutputChannel.Name: {map[string]any{}},
 		})
 
 	default:
 		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+}
+
+func findInterval(spec Spec) time.Duration {
+	switch spec.Duration.Unit {
+	case "seconds":
+		return time.Duration(spec.Duration.Value) * time.Second
+	case "minutes":
+		return time.Duration(spec.Duration.Value) * time.Minute
+	case "hours":
+		return time.Duration(spec.Duration.Value) * time.Hour
+	default:
+		return 0
 	}
 }
