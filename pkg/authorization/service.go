@@ -94,9 +94,23 @@ func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, actio
 }
 
 func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
-	domain := prefixDomain(domainType, domainID)
-	prefixedUserID := prefixUserID(userID)
-	return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
+    domain := prefixDomain(domainType, domainID)
+    prefixedUserID := prefixUserID(userID)
+    allowed, err := a.enforcer.Enforce(prefixedUserID, domain, resource, action)
+    if err != nil {
+        return false, err
+    }
+    if allowed {
+        return true, nil
+    }
+    // Optional auto-reload for environments where policies may be
+    // written by another enforcer instance (e.g., e2e setup code).
+    if os.Getenv("CASBIN_AUTO_RELOAD") == "yes" {
+        if err := a.enforcer.LoadPolicy(); err == nil {
+            return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
+        }
+    }
+    return false, nil
 }
 
 func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string, displayName string, description string) error {

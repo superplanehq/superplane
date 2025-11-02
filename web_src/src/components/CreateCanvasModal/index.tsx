@@ -80,6 +80,7 @@ export function CreateCanvasModal({ isOpen, onClose, onSubmit, isLoading = false
           <Field>
             <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Canvas name *</Label>
             <Input
+              data-testid="canvas-name-input"
               type="text"
               autoComplete="off"
               value={name}

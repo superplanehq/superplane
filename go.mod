@@ -20,6 +20,7 @@ require (
 	github.com/markbates/goth v1.81.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.4.3
+	github.com/playwright-community/playwright-go v0.5200.1
 	github.com/renderedtext/go-tackle v0.0.0-20250220144338-fb4f71d1119e
 	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
 	github.com/sirupsen/logrus v1.9.3
@@ -70,7 +71,6 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28 // indirect
 	github.com/microsoft/go-mssqldb v1.7.2 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
-	github.com/playwright-community/playwright-go v0.5200.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rabbitmq/amqp091-go v1.9.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578 // indirect

@@ -27,7 +27,8 @@ type TestSession struct {
 	timeoutMs float64
 	viteCmd   *exec.Cmd
 
-	orgID   string
+    orgID   string
+    baseURL string
 	account *models.Account
 }
 
@@ -37,25 +38,36 @@ func NewTestSession(t *testing.T) *TestSession {
 
 func (s *TestSession) Start() {
 	os.Setenv("START_PUBLIC_API", "yes")
+	os.Setenv("START_INTERNAL_API", "yes")
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
 	os.Setenv("START_WEB_SERVER", "yes")
 	os.Setenv("WEB_BASE_PATH", "")
-	os.Setenv("START_GRPC_GATEWAY", "no")
+    // Enable gRPC gateway so REST /api/v1/* routes hit gRPC handlers
+    os.Setenv("START_GRPC_GATEWAY", "yes")
+    // Allow casbin to reload policies if tests create roles via another enforcer
+    os.Setenv("CASBIN_AUTO_RELOAD", "yes")
 	os.Setenv("START_EVENT_DISTRIBUTER", "no")
 	os.Setenv("NO_ENCRYPTION", "yes")
 	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
 	os.Setenv("JWT_SECRET", "test-jwt-secret")
-	os.Setenv("BASE_URL", "http://127.0.0.1:8000")
+    // Use a non-default API port to avoid clashing with a running dev server
+    os.Setenv("PUBLIC_API_PORT", "8001")
+    os.Setenv("BASE_URL", "http://127.0.0.1:8001")
 
 	os.Setenv("QUIET_PROXY_LOGS", "yes")
 	os.Setenv("QUIET_HTTP_LOGS", "yes")
 
 	os.Setenv("APP_ENV", "development")
 	_ = os.Unsetenv("ASSETS_ROOT")
-	s.startVite()
+    s.startVite()
 
-	go server.Start()
-	time.Sleep(500 * time.Millisecond)
+    go server.Start()
+    time.Sleep(500 * time.Millisecond)
+
+    s.baseURL = os.Getenv("BASE_URL")
+    if s.baseURL == "" {
+        s.baseURL = "http://127.0.0.1:8000"
+    }
 
 	r, err := pw.Run()
 	if err != nil {
@@ -88,10 +100,10 @@ func (s *TestSession) Start() {
 }
 
 func (s *TestSession) Visit(path string) {
-	_, err := s.page.Goto("http://127.0.0.1:8000"+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
-	if err != nil {
-		s.t.Fatalf("goto: %v", err)
-	}
+    _, err := s.page.Goto(s.baseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
+    if err != nil {
+        s.t.Fatalf("goto: %v", err)
+    }
 }
 
 func (s *TestSession) AssertText(text string) {
@@ -114,13 +126,17 @@ func (s *TestSession) Shutdown() {
 
 func (s *TestSession) TakeScreenshot() {
 	path := fmt.Sprintf("/app/tmp/screenshots/%s-%d.png", s.t.Name(), time.Now().UnixMilli())
+	s.t.Logf("Taking screenshot: %s", path)
+
 	if _, err := s.page.Screenshot(pw.PageScreenshotOptions{Path: pw.String(path), FullPage: pw.Bool(true), Type: pw.ScreenshotTypePng}); err != nil {
 		s.t.Fatalf("screenshot: %v", err)
 	}
 }
 
 func (s *TestSession) Sleep(ms int) {
+	s.t.Logf("Sleeping for %d ms", ms)
 	time.Sleep(time.Duration(ms) * time.Millisecond)
+	s.t.Logf("Woke up after %d ms", ms)
 }
 
 func (s *TestSession) resetDatabase() {
@@ -155,14 +171,14 @@ func (s *TestSession) Login() {
 		s.t.Fatalf("jwt: %v", err)
 	}
 
-	if err := s.context.AddCookies([]pw.OptionalCookie{{
-		Name:     "account_token",
-		Value:    token,
-		URL:      pw.String("http://127.0.0.1:8000/"),
-		HttpOnly: pw.Bool(true),
-	}}); err != nil {
-		s.t.Fatalf("add cookie: %v", err)
-	}
+    if err := s.context.AddCookies([]pw.OptionalCookie{{
+        Name:     "account_token",
+        Value:    token,
+        URL:      pw.String(s.baseURL + "/"),
+        HttpOnly: pw.Bool(true),
+    }}); err != nil {
+        s.t.Fatalf("add cookie: %v", err)
+    }
 }
 
 // setupUserAndOrganization ensures there is an account, an organization,
@@ -213,6 +229,8 @@ func (s *TestSession) setupUserAndOrganization() {
 }
 
 func (s *TestSession) ClickButton(text string) {
+	s.t.Logf("Clicking button: %q", text)
+
 	selector := fmt.Sprintf("button:has-text(\"%s\"), [role=button]:has-text(\"%s\")", text, text)
 	if err := s.page.Locator(selector).First().Click(pw.LocatorClickOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
 		s.t.Fatalf("click button %q: %v", text, err)
@@ -220,43 +238,26 @@ func (s *TestSession) ClickButton(text string) {
 }
 
 func (s *TestSession) FillIn(label, value string) {
-	// Try by accessible name via role=textbox
-	if el := s.page.GetByRole("textbox", pw.PageGetByRoleOptions{Name: label}); el != nil {
+	s.t.Logf("Filling in %q with %q", label, value)
+
+	if el := s.page.GetByTestId(label); el != nil {
 		if err := el.Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err == nil {
 			return
 		}
 	}
 
-	// Fallback: try input/textarea with matching placeholder
-	selector := fmt.Sprintf("input[placeholder=\"%s\"], textarea[placeholder=\"%s\"]", label, label)
-	if err := s.page.Locator(selector).First().Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err == nil {
-		return
-	}
-
-	// Fallback: try label text proximity (label immediately before input/textarea)
-	neighbor := fmt.Sprintf("label:has-text(\"%s\")", label)
-	loc := s.page.Locator(neighbor).First()
-	// Attempt to find the next input/textarea in DOM order
-	if err := s.page.Locator(neighbor+" >> xpath=following::input[1]").First().Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err == nil {
-		return
-	}
-	if err := s.page.Locator(neighbor+" >> xpath=following::textarea[1]").First().Fill(value, pw.LocatorFillOptions{Timeout: pw.Float(s.timeoutMs)}); err == nil {
-		return
-	}
-
-	// If we got here, we failed all strategies
-	box, _ := loc.TextContent()
-	s.t.Fatalf("fill in %q failed; last label text: %q", label, box)
+	s.t.Fatalf("fill in %q failed", label)
 }
 
 func (s *TestSession) VisitHomePage() {
-	s.Visit("/" + s.orgID + "/")
+    s.Visit("/" + s.orgID + "/")
 }
 
 func (s *TestSession) startVite() {
-	cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
-	cmd.Dir = "../../web_src"
-	cmd.Env = append(os.Environ(), "BROWSER=none")
+    cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
+    cmd.Dir = "../../web_src"
+    // Point Vite proxy at the test server's API port
+    cmd.Env = append(os.Environ(), "BROWSER=none", "API_PORT=8001")
 
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard

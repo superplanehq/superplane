@@ -18,13 +18,17 @@ export function useCreateCanvasModalState() {
   const onSubmit = async (data: { name: string; description?: string }) => {
     if (!organizationId) return;
 
+    console.log("Creating workflow with data:", JSON.stringify(data, null, 2));
+
     const result = await mutation.mutateAsync({
       name: data.name,
       description: data.description,
     });
 
+    console.log(JSON.stringify(result, null, 2));
     if (result?.data?.workflow?.id) {
       onClose();
+      console.log("Navigating to workflow:", result.data.workflow.id);
       navigate(`/${organizationId}/workflows/${result.data.workflow.id}`);
     }
   };
