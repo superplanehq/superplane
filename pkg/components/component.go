@@ -165,7 +165,6 @@ const (
 	FieldTypeMultiSelect         = "multi-select"
 	FieldTypeIntegration         = "integration"
 	FieldTypeIntegrationResource = "integration-resource"
-	FieldTypeURL                 = "url"
 	FieldTypeList                = "list"
 	FieldTypeObject              = "object"
 	FieldTypeTime                = "time"
