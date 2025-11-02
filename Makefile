@@ -46,11 +46,7 @@ test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.e2e:
-	$(GOTESTSUM) --packages="$(E2E_TEST_PACKAGES)" -- -p 1
-
-test.shell:
-	docker compose -f docker-compose.dev.yml run --rm -e DB_NAME=superplane_test -v /Users/shiroyasha/code/superplane/superplane/tmp/screenshots:/app/test/screenshots app /bin/bash
-
+	$(GOTESTSUM) --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -v
 
 #
 # Targets for dev environment
