@@ -5,7 +5,7 @@ import (
 )
 
 func TestHomePage(t *testing.T) {
-	s := NewTestSession(t)
+	s := NewTestContext(t)
 	defer s.Shutdown()
 
 	t.Run("creating a new canvas", func(t *testing.T) {

@@ -18,7 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/server"
 )
 
-type TestSession struct {
+type TestContext struct {
 	t         *testing.T
 	runner    *pw.Playwright
 	browser   pw.Browser
@@ -32,11 +32,11 @@ type TestSession struct {
 	account *models.Account
 }
 
-func NewTestSession(t *testing.T) *TestSession {
-	return &TestSession{t: t, timeoutMs: 10000}
+func NewTestContext(t *testing.T) *TestContext {
+	return &TestContext{t: t, timeoutMs: 10000}
 }
 
-func (s *TestSession) Start() {
+func (s *TestContext) Start() {
 	os.Setenv("START_PUBLIC_API", "yes")
 	os.Setenv("START_INTERNAL_API", "yes")
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
@@ -64,7 +64,7 @@ func (s *TestSession) Start() {
 
 }
 
-func (s *TestSession) startPlaywright() {
+func (s *TestContext) startPlaywright() {
 	r, err := pw.Run()
 	if err != nil {
 		s.t.Fatalf("playwright: %v", err)
@@ -73,7 +73,7 @@ func (s *TestSession) startPlaywright() {
 	s.runner = r
 }
 
-func (s *TestSession) launchBrowser() {
+func (s *TestContext) launchBrowser() {
 	b, err := s.runner.Chromium.Launch()
 	if err != nil {
 		s.t.Fatalf("browser: %v", err)
@@ -94,26 +94,26 @@ func (s *TestSession) launchBrowser() {
 	s.page = p
 }
 
-func (s *TestSession) startAppServer() {
+func (s *TestContext) startAppServer() {
 	go server.Start()
 	time.Sleep(500 * time.Millisecond)
 	s.baseURL = os.Getenv("BASE_URL")
 }
 
-func (s *TestSession) Visit(path string) {
+func (s *TestContext) Visit(path string) {
 	_, err := s.page.Goto(s.baseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
 	if err != nil {
 		s.t.Fatalf("goto: %v", err)
 	}
 }
 
-func (s *TestSession) AssertText(text string) {
+func (s *TestContext) AssertText(text string) {
 	if err := s.page.Locator("text=" + text).WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
 		s.t.Fatalf("text %q not found: %v", text, err)
 	}
 }
 
-func (s *TestSession) Shutdown() {
+func (s *TestContext) Shutdown() {
 	if s.browser != nil {
 		s.browser.Close()
 	}
@@ -125,7 +125,7 @@ func (s *TestSession) Shutdown() {
 	}
 }
 
-func (s *TestSession) TakeScreenshot() {
+func (s *TestContext) TakeScreenshot() {
 	path := fmt.Sprintf("/app/tmp/screenshots/%s-%d.png", s.t.Name(), time.Now().UnixMilli())
 	s.t.Logf("Taking screenshot: %s", path)
 
@@ -134,13 +134,13 @@ func (s *TestSession) TakeScreenshot() {
 	}
 }
 
-func (s *TestSession) Sleep(ms int) {
+func (s *TestContext) Sleep(ms int) {
 	s.t.Logf("Sleeping for %d ms", ms)
 	time.Sleep(time.Duration(ms) * time.Millisecond)
 	s.t.Logf("Woke up after %d ms", ms)
 }
 
-func (s *TestSession) resetDatabase() {
+func (s *TestContext) resetDatabase() {
 	//
 	// resetDatabase truncates all public tables (except migration tables),
 	// restarting identities and cascading to maintain referential integrity.
@@ -163,7 +163,7 @@ func (s *TestSession) resetDatabase() {
 	}
 }
 
-func (s *TestSession) Login() {
+func (s *TestContext) Login() {
 	// Authenticate via the account cookie
 	secret := os.Getenv("JWT_SECRET")
 	signer := spjwt.NewSigner(secret)
@@ -184,7 +184,7 @@ func (s *TestSession) Login() {
 
 // setupUserAndOrganization ensures there is an account, an organization,
 // and a user (member of that org), then authenticates the browser context.
-func (s *TestSession) setupUserAndOrganization() {
+func (s *TestContext) setupUserAndOrganization() {
 	// Ensure an account exists
 	email := "e2e@superplane.local"
 	name := "E2E User"
@@ -229,7 +229,7 @@ func (s *TestSession) setupUserAndOrganization() {
 	s.account = account
 }
 
-func (s *TestSession) ClickButton(text string) {
+func (s *TestContext) ClickButton(text string) {
 	s.t.Logf("Clicking button: %q", text)
 
 	selector := fmt.Sprintf("button:has-text(\"%s\"), [role=button]:has-text(\"%s\")", text, text)
@@ -238,7 +238,7 @@ func (s *TestSession) ClickButton(text string) {
 	}
 }
 
-func (s *TestSession) FillIn(label, value string) {
+func (s *TestContext) FillIn(label, value string) {
 	s.t.Logf("Filling in %q with %q", label, value)
 
 	if el := s.page.GetByTestId(label); el != nil {
@@ -250,11 +250,11 @@ func (s *TestSession) FillIn(label, value string) {
 	s.t.Fatalf("fill in %q failed", label)
 }
 
-func (s *TestSession) VisitHomePage() {
+func (s *TestContext) VisitHomePage() {
 	s.Visit("/" + s.orgID + "/")
 }
 
-func (s *TestSession) startVite() {
+func (s *TestContext) startVite() {
 	cmd := exec.Command("npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173")
 	cmd.Dir = "../../web_src"
 	// Point Vite proxy at the test server's API port
@@ -280,7 +280,7 @@ func (s *TestSession) startVite() {
 	}
 }
 
-func (s *TestSession) setUpNavigationLogger() {
+func (s *TestContext) setUpNavigationLogger() {
 	// Expose a logging function to capture SPA (client-side) URL changes
 	if err := s.page.ExposeFunction("_spNav", func(args ...interface{}) interface{} {
 		if len(args) > 0 {
@@ -330,7 +330,7 @@ func (s *TestSession) setUpNavigationLogger() {
 	})
 }
 
-func (s *TestSession) streamBrowserLogs() {
+func (s *TestContext) streamBrowserLogs() {
 	// Stream browser console and network issues to test output
 	s.page.OnConsole(func(m pw.ConsoleMessage) {
 		s.t.Logf("[console.%s] %s", m.Type(), m.Text())
