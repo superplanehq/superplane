@@ -10,10 +10,7 @@ import (
 )
 
 func TestCanvasPage(t *testing.T) {
-	ctx := NewTestContext(t)
-	ctx.Start()
-
-	steps := &CanvasPageSteps{ctx: ctx}
+	steps := &CanvasPageSteps{t: t}
 
 	t.Run("run is disabled when you have unsaved changes", func(t *testing.T) {
 		steps.Start()
@@ -27,14 +24,14 @@ func TestCanvasPage(t *testing.T) {
 }
 
 type CanvasPageSteps struct {
-	ctx        *TestContext
+	t          *testing.T
 	session    *TestSession
 	canvasName string
 	workflowID string
 }
 
 func (s *CanvasPageSteps) Start() {
-	s.session = s.ctx.NewSession()
+	s.session = ctx.NewSession(s.t)
 	s.session.Start()
 	s.session.Login()
 }
@@ -46,11 +43,11 @@ func (s *CanvasPageSteps) GivenACanvasExists() {
 	s.session.Click(q.Text("New Canvas"))
 	s.session.FillIn(q.TestID("canvas-name-input"), s.canvasName)
 	s.session.Click(q.Text("Create canvas"))
-	s.session.Sleep(500)
+	s.session.Sleep(300)
 
 	orgUUID := uuid.MustParse(s.session.orgID)
 	wf, err := models.FindWorkflowByName(s.canvasName, orgUUID)
-	require.NoError(s.ctx.t, err)
+	require.NoError(s.t, err)
 	s.workflowID = wf.ID.String()
 }
 
