@@ -159,10 +159,6 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(respBody))
-	}
-
 	var bodyData any
 	if len(respBody) > 0 {
 		err := json.Unmarshal(respBody, &bodyData)

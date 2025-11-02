@@ -1611,14 +1611,6 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 
 --
--- Name: workflow_node_requests workflow_node_requests_workflow_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflow_node_requests
-    ADD CONSTRAINT workflow_node_requests_workflow_id_node_id_fkey FOREIGN KEY (workflow_id, node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
-
-
---
 -- Name: workflow_nodes workflow_nodes_webhook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1666,7 +1658,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20251101121000	f
+20251102173731	f
 \.
 
 

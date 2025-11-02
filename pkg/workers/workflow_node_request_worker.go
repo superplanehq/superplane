@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -145,6 +146,14 @@ func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.W
 		return fmt.Errorf("execution %s not found: %w", request.ExecutionID, err)
 	}
 
+	if execution.ParentExecutionID == nil {
+		return w.invokeParentNodeComponentAction(tx, request, execution)
+	}
+
+	return w.invokeChildNodeComponentAction(tx, request, execution)
+}
+
+func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest, execution *models.WorkflowNodeExecution) error {
 	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, execution.WorkflowID)
 	if err != nil {
 		return fmt.Errorf("workflow %s not found: %w", execution.WorkflowID, err)
@@ -156,6 +165,69 @@ func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.W
 	}
 
 	component, err := w.registry.GetComponent(node.Ref.Data().Component.Name)
+	if err != nil {
+		return fmt.Errorf("component not found: %w", err)
+	}
+
+	spec := request.Spec.Data()
+	if spec.InvokeAction == nil {
+		return fmt.Errorf("spec is not specified")
+	}
+
+	actionName := spec.InvokeAction.ActionName
+	actionDef := findAction(component.Actions(), actionName)
+	if actionDef == nil {
+		return fmt.Errorf("action '%s' not found for component '%s'", actionName, component.Name())
+	}
+
+	actionCtx := components.ActionContext{
+		Name:                  actionName,
+		Parameters:            spec.InvokeAction.Parameters,
+		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
+		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
+	}
+
+	err = component.HandleAction(actionCtx)
+	if err != nil {
+		return fmt.Errorf("action execution failed: %w", err)
+	}
+
+	err = tx.Save(&execution).Error
+	if err != nil {
+		return fmt.Errorf("error saving execution after action handler: %v", err)
+	}
+
+	return request.Complete(tx)
+}
+
+func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest, execution *models.WorkflowNodeExecution) error {
+	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, execution.WorkflowID)
+	if err != nil {
+		return fmt.Errorf("workflow %s not found: %w", execution.WorkflowID, err)
+	}
+
+	parentExecution, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
+	if err != nil {
+		return fmt.Errorf("parent execution %s not found: %w", execution.ParentExecutionID, err)
+	}
+
+	parentNode, err := workflow.FindNode(parentExecution.NodeID)
+	if err != nil {
+		return fmt.Errorf("node not found: %w", err)
+	}
+
+	blueprint, err := models.FindUnscopedBlueprintInTransaction(tx, parentNode.Ref.Data().Blueprint.ID)
+	if err != nil {
+		return fmt.Errorf("blueprint not found: %w", err)
+	}
+
+	childNodeID := strings.Split(execution.NodeID, ":")[1]
+	childNode, err := blueprint.FindNode(childNodeID)
+	if err != nil {
+		return fmt.Errorf("node not found: %w", err)
+	}
+
+	component, err := w.registry.GetComponent(childNode.Ref.Component.Name)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}
