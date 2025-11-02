@@ -152,30 +152,6 @@ export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
         color: "blue",
       },
       {
-        name: "http-request",
-        label: "HTTP Request",
-        description: "Make an outbound HTTP request",
-        type: "component",
-        outputChannels: [
-          { id: "success", label: "Success" } as any,
-          { id: "error", label: "Error" } as any,
-        ],
-        configuration: [
-          { key: "url", label: "URL", type: "string", required: true },
-          {
-            key: "method",
-            label: "Method",
-            type: "enum",
-            values: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-            required: true,
-          },
-          { key: "headers", label: "Headers", type: "json", required: false },
-          { key: "body", label: "Body", type: "json", required: false },
-        ],
-        icon: "globe",
-        color: "gray",
-      },
-      {
         name: "ai-agent",
         label: "AI Agent",
         description: "Run an AI task to analyze or generate ops data",

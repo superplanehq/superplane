@@ -68,6 +68,7 @@ const getBlockType = (componentName: string): BlockData['type'] => {
     'filter': 'filter',
     'approval': 'approval',
     'noop': 'noop',
+    'http': 'http',
   }
   return typeMap[componentName] || 'noop' // Default to noop for unknown components
 }
@@ -125,6 +126,22 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         collapsedBackground: 'bg-orange-100',
         approvals: [],
         collapsed: false,
+      }
+      break
+    case 'http':
+      baseData.http = {
+        title: node.name,
+        iconSlug: component?.icon || 'globe',
+        iconColor: 'text-gray-700',
+        iconBackground: 'bg-gray-100',
+        headerColor: 'bg-gray-50',
+        collapsedBackground: 'bg-gray-100',
+        collapsed: false,
+        hideLastRun: true,
+        method: node.configuration?.method,
+        url: node.configuration?.url,
+        payload: node.configuration?.payload,
+        headers: node.configuration?.headers,
       }
       break
     case 'noop':
@@ -354,6 +371,9 @@ export const CustomComponent = () => {
         }
         if (nodeData.approval) {
           updatedData.approval = { ...nodeData.approval, title: nodeName.trim() }
+        }
+        if (nodeData.http) {
+          updatedData.http = { ...nodeData.http, title: nodeName.trim() }
         }
         if (nodeData.noop) {
           updatedData.noop = { ...nodeData.noop, title: nodeName.trim() }

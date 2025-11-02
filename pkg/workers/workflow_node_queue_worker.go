@@ -75,7 +75,6 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 	queueItem, err := node.FirstQueueItem(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			w.log("Nothing in queue for node=%s workflow=%s - skipping", node.NodeID, node.WorkflowID)
 			return nil
 		}
 

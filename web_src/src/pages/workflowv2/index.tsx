@@ -929,6 +929,8 @@ function prepareComponentNode(
       return prepareNoopNode(nodes, node, components, nodeExecutionsMap);
     case "filter":
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
+    case "http":
+      return prepareHttpNode(node, components, nodeExecutionsMap);
   }
 
   //
@@ -1237,6 +1239,55 @@ function prepareFilterNode(
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
         },
+        collapsedBackground: getBackgroundColorClass("white"),
+      },
+    },
+  };
+}
+
+function prepareHttpNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+): CanvasNode {
+  const metadata = components.find((c) => c.name === "http");
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Configuration always comes from the node, not the execution
+  const configuration = node.configuration as any;
+
+  let lastExecution;
+  if (execution) {
+    const outputs = execution.outputs as any;
+    const response = outputs?.default?.[0];
+
+    lastExecution = {
+      statusCode: response?.status,
+      receivedAt: new Date(execution.createdAt!),
+      state: getRunItemState(execution) === "success" ? ("success" as const) : getRunItemState(execution) === "running" ? ("running" as const) : ("failed" as const),
+    };
+  }
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "http",
+      label: node.name!,
+      state: "pending" as const,
+      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
+      http: {
+        iconSlug: metadata?.icon || "globe",
+        iconColor: getColorClass(metadata?.color || "gray"),
+        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
+        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
+        title: node.name!,
+        method: configuration?.method,
+        url: configuration?.url,
+        payload: configuration?.payload,
+        headers: configuration?.headers,
+        lastExecution,
         collapsedBackground: getBackgroundColorClass("white"),
       },
     },
