@@ -47,9 +47,7 @@ func (s *TestContext) Start() {
 	s.startAppServer()
 	s.startPlaywright()
 	s.launchBrowser()
-
 	s.setUpNavigationLogger()
-
 }
 
 func (s *TestContext) startPlaywright() {
@@ -121,9 +119,6 @@ func (s *TestContext) startVite() {
 }
 
 func (s *TestContext) setUpNavigationLogger() {
-	// Inject a script that hooks into the History API and URL change events
-	// to report client-side navigations (e.g., react-router). The receiver
-	// function (window._spNav) is exposed per-page in NewSession().
 	if err := s.context.AddInitScript(pw.Script{Content: pw.String(`
         (() => {
           try {
