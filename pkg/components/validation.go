@@ -2,7 +2,6 @@ package components
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 
 	"slices"
@@ -54,20 +53,6 @@ func validateNumber(field ConfigurationField, value any) error {
 
 	if options.Max != nil && num > float64(*options.Max) {
 		return fmt.Errorf("must be at most %d", *options.Max)
-	}
-
-	return nil
-}
-
-func validateURL(value any) error {
-	URL, ok := value.(string)
-	if !ok {
-		return fmt.Errorf("must be a string")
-	}
-
-	_, err := url.ParseRequestURI(URL)
-	if err != nil {
-		return fmt.Errorf("%s is not a valid URL", URL)
 	}
 
 	return nil
@@ -209,9 +194,6 @@ func validateFieldValue(field ConfigurationField, value any) error {
 		if _, ok := value.(bool); !ok {
 			return fmt.Errorf("must be a boolean")
 		}
-
-	case FieldTypeURL:
-		return validateURL(value)
 
 	case FieldTypeSelect:
 		return validateSelect(field, value)

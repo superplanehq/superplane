@@ -59,7 +59,7 @@ func (e *HTTP) Configuration() []components.ConfigurationField {
 		{
 			Name:     "url",
 			Label:    "URL",
-			Type:     components.FieldTypeURL,
+			Type:     components.FieldTypeString,
 			Required: true,
 		},
 		{
