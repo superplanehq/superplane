@@ -10,14 +10,14 @@ import (
 )
 
 type Workflow struct {
-    ID             uuid.UUID
-    OrganizationID uuid.UUID
-    Name           string
-    Description    string
-    CreatedBy      *uuid.UUID
-    CreatedAt      *time.Time
-    UpdatedAt      *time.Time
-    Edges          datatypes.JSONSlice[Edge]
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	Name           string
+	Description    string
+	CreatedBy      *uuid.UUID
+	CreatedAt      *time.Time
+	UpdatedAt      *time.Time
+	Edges          datatypes.JSONSlice[Edge]
 }
 
 func (w *Workflow) FindNode(id string) (*WorkflowNode, error) {
@@ -63,6 +63,20 @@ func (w *Workflow) FindEdges(sourceID string, channel string) []Edge {
 
 func FindWorkflow(orgID, id uuid.UUID) (*Workflow, error) {
 	return FindWorkflowInTransaction(database.Conn(), orgID, id)
+}
+
+func FindWorkflowByName(name string, organizationID uuid.UUID) (*Workflow, error) {
+	var workflow Workflow
+	err := database.Conn().
+		Where("name = ? AND organization_id = ?", name, organizationID).
+		First(&workflow).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &workflow, nil
 }
 
 func FindWorkflowInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Workflow, error) {

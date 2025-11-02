@@ -17,7 +17,7 @@ E2E_TEST_PACKAGES := ./test/e2e/...
 # - export junit report
 # - sets paralellism to 1
 #
-GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short-verbose --junitfile junit-report.xml 
+GOTESTSUM=docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
 
 #
 # Targets for test environment
@@ -36,6 +36,10 @@ test.setup:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
+test.e2e.setup:
+	$(MAKE) test.setup
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm ci"
+
 test.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
@@ -46,7 +50,7 @@ test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.e2e:
-	$(GOTESTSUM) --packages="$(E2E_TEST_PACKAGES)" -- -p 1
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app go test ./test/e2e/... -p 1 -v
 
 #
 # Targets for dev environment

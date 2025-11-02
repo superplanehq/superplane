@@ -25,6 +25,7 @@ const setHmrPortFromPortPlugin = {
 // https://vite.dev/config/
 export default defineConfig(({ command }: { command: string} ) => {
   const isDev = command !== "build";
+  const apiPort = process.env.API_PORT || "8000";
 
   return {
   plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
@@ -39,7 +40,7 @@ export default defineConfig(({ command }: { command: string} ) => {
     },
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: `http://localhost:${apiPort}`,
         changeOrigin: true,
         secure: false,
       },

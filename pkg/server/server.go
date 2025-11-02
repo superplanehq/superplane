@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"os"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -266,10 +267,24 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 		log.Println("Web server routes not registered (START_WEB_SERVER != yes)")
 	}
 
-	err = server.Serve("0.0.0.0", 8000)
+	err = server.Serve("0.0.0.0", lookupPublicAPIPort())
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func lookupPublicAPIPort() int {
+	port := 8000
+
+	if p := os.Getenv("PUBLIC_API_PORT"); p != "" {
+		if v, errConv := strconv.Atoi(p); errConv == nil && v > 0 {
+			port = v
+		} else {
+			log.Warnf("Invalid PUBLIC_API_PORT %q, falling back to 8000", p)
+		}
+	}
+
+	return port
 }
 
 func Start() {
