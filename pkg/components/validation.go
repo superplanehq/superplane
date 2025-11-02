@@ -130,21 +130,23 @@ func validateMultiSelect(field ConfigurationField, value any) error {
 }
 
 func validateObject(field ConfigurationField, value any) error {
-	obj, ok := value.(map[string]any)
-	if !ok {
-		return fmt.Errorf("must be an object")
+	if field.TypeOptions != nil && field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
+		obj, ok := value.(map[string]any)
+		if !ok {
+			return fmt.Errorf("must be an object")
+		}
+
+		return ValidateConfiguration(field.TypeOptions.Object.Schema, obj)
 	}
 
-	if field.TypeOptions == nil || field.TypeOptions.Object == nil {
+	switch value.(type) {
+	case map[string]any:
 		return nil
-	}
-
-	options := field.TypeOptions.Object
-	if len(options.Schema) == 0 {
+	case []any:
 		return nil
+	default:
+		return fmt.Errorf("must be an object or array")
 	}
-
-	return ValidateConfiguration(options.Schema, obj)
 }
 
 func validateList(field ConfigurationField, value any) error {
