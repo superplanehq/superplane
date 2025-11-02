@@ -163,9 +163,9 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
                   <p className="text-zinc-600 dark:text-zinc-400 text-sm">Loading events...</p>
                 </div>
               ) : allEvents.length > 0 ? (
-                allEvents.map((event: SuperplaneEvent) => (
+                allEvents.map((event: SuperplaneEvent, index: number) => (
                   <EventItem
-                    key={event.id}
+                    key={event.id || `event-${index}-${event.receivedAt}`}
                     eventId={event.id!}
                     timestamp={event.receivedAt!}
                     state={event.state}

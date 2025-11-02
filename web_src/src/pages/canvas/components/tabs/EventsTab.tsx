@@ -187,26 +187,28 @@ export const EventsTab = ({ selectedStage, canvasId, initialFilter }: EventsTabP
         ) : (
           <>
             {allEvents.map((event, index: number) => {
-              const eventId = event?.id || `event-${index}`;
-
               // Use RejectionItem for rejected events
               if (activeFilter === 'rejected') {
+                const rejection = event as SuperplaneEventRejection;
+                const rejectionKey = rejection.id || `rejection-${index}-${rejection.event?.receivedAt}`;
                 return (
                   <RejectionItem
-                    key={eventId}
-                    rejection={event as SuperplaneEventRejection}
+                    key={rejectionKey}
+                    rejection={rejection}
                   />
                 );
               }
 
               // Use EventItem for other event types
               const sourceEvent = event as SuperplaneEvent;
+              const eventId = sourceEvent?.id || `event-${index}`;
+              const eventKey = sourceEvent?.id || `event-${index}-${sourceEvent?.receivedAt}`;
               const plainEventPayload = sourceEvent?.raw;
               const plainEventHeaders = sourceEvent?.headers;
 
               return (
                 <EventItem
-                  key={eventId}
+                  key={eventKey}
                   eventId={eventId!}
                   timestamp={sourceEvent?.receivedAt as string}
                   state={sourceEvent?.state}
