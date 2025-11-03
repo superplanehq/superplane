@@ -29,17 +29,12 @@ export interface ChildEventsProps {
 export const ChildEvents: React.FC<ChildEventsProps> = ({
   childEventsInfo,
   className = "mt-1 ml-3 text-gray-500",
-  onExpandChildEvents,
   onReRunChildEvents,
 }) => {
   const [showDetails, setShowDetails] = React.useState(false);
 
   const ChildEventsArrowIcon = React.useMemo(() => {
     return resolveIcon("corner-down-right");
-  }, []);
-
-  const ExpandChildEventsIcon = React.useMemo(() => {
-    return resolveIcon("expand");
   }, []);
 
   const ReRunChildEventsIcon = React.useMemo(() => {
@@ -68,16 +63,6 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {onExpandChildEvents && (
-            <ExpandChildEventsIcon
-              size={18}
-              className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onExpandChildEvents(childEventsInfo);
-              }}
-            />
-          )}
           {onReRunChildEvents && (
             <ReRunChildEventsIcon
               size={18}
