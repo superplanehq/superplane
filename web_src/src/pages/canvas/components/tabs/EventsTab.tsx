@@ -54,7 +54,8 @@ export const EventsTab = ({ selectedStage, canvasId, initialFilter }: EventsTabP
       case 'emitted':
         return emittedEventsData?.pages.flatMap(page => page.events) || [];
       case 'received':
-        return receivedEventsData?.pages.flatMap(page => page.events.map((event: SuperplaneStageEvent) => event.triggerEvent).filter(Boolean)) || [];
+        // Keep full stage events so we can use a stable id (stageEvent.id)
+        return receivedEventsData?.pages.flatMap(page => page.events) || [];
       default:
         return [];
     }
@@ -186,40 +187,58 @@ export const EventsTab = ({ selectedStage, canvasId, initialFilter }: EventsTabP
           </div>
         ) : (
           <>
-            {allEvents.map((event, index: number) => {
-              const eventId = event?.id || `event-${index}`;
+            {activeFilter === 'rejected' && (
+              <>
+                {(allEvents as unknown as SuperplaneEventRejection[]).map((rejection) => (
+                  <RejectionItem key={rejection.id} rejection={rejection} />
+                ))}
+              </>
+            )}
 
-              // Use RejectionItem for rejected events
-              if (activeFilter === 'rejected') {
-                return (
-                  <RejectionItem
-                    key={eventId}
-                    rejection={event as SuperplaneEventRejection}
+            {activeFilter === 'emitted' && (
+              <>
+                {(allEvents as unknown as SuperplaneEvent[]).map((sourceEvent) => (
+                  <EventItem
+                    key={sourceEvent.id}
+                    eventId={sourceEvent.id!}
+                    timestamp={sourceEvent?.receivedAt as string}
+                    state={sourceEvent?.state}
+                    stateReason={sourceEvent?.stateReason}
+                    stateMessage={sourceEvent?.stateMessage}
+                    eventType={sourceEvent?.type}
+                    sourceName={sourceEvent?.sourceName}
+                    headers={sourceEvent?.headers}
+                    payload={sourceEvent?.raw}
+                    showStateLabel={false}
                   />
-                );
-              }
+                ))}
+              </>
+            )}
 
-              // Use EventItem for other event types
-              const sourceEvent = event as SuperplaneEvent;
-              const plainEventPayload = sourceEvent?.raw;
-              const plainEventHeaders = sourceEvent?.headers;
-
-              return (
-                <EventItem
-                  key={eventId}
-                  eventId={eventId!}
-                  timestamp={sourceEvent?.receivedAt as string}
-                  state={sourceEvent?.state}
-                  stateReason={sourceEvent?.stateReason}
-                  stateMessage={sourceEvent?.stateMessage}
-                  eventType={sourceEvent?.type}
-                  sourceName={sourceEvent?.sourceName}
-                  headers={plainEventHeaders}
-                  payload={plainEventPayload}
-                  showStateLabel={false}
-                />
-              );
-            })}
+            {activeFilter === 'received' && (
+              <>
+                {(allEvents as unknown as SuperplaneStageEvent[]).map((stageEvent) => {
+                  const sourceEvent = stageEvent.triggerEvent as SuperplaneEvent | undefined;
+                  if (!sourceEvent) return null;
+                  const stableId = (sourceEvent.id ?? stageEvent.id) as string;
+                  return (
+                    <EventItem
+                      key={stableId}
+                      eventId={stableId}
+                      timestamp={sourceEvent.receivedAt as string}
+                      state={sourceEvent.state}
+                      stateReason={sourceEvent.stateReason}
+                      stateMessage={sourceEvent.stateMessage}
+                      eventType={sourceEvent.type}
+                      sourceName={sourceEvent.sourceName}
+                      headers={sourceEvent.headers}
+                      payload={sourceEvent.raw}
+                      showStateLabel={false}
+                    />
+                  );
+                })}
+              </>
+            )}
 
             {hasNextPage && (
               <div className="flex justify-center pt-4">

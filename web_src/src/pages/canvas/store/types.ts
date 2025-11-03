@@ -73,6 +73,8 @@ export interface CanvasState {
     }
   | undefined;
   lockedNodes: boolean;
+  // Map of eventId -> expanded state for sidebar EventItem components
+  expandedEventItems: Record<string, boolean>;
   // flow actions
   syncToReactFlow: (options?: { autoLayout?: boolean }) => void;
   onNodesChange: OnNodesChange<AllNodeType>;
@@ -95,6 +97,7 @@ export interface CanvasState {
   updateEventSourceKey: (eventSourceId: string, key: string) => void;
   resetEventSourceKey: (eventSourceId: string) => void;
   setLockedNodes: (locked: boolean) => void;
+  setEventItemExpanded: (eventId: string, expanded: boolean) => void;
   updateConnectionSourceNames: (oldName: string, newName: string) => void;
   removeConnectionSourceNames: (deletedName: string) => void;
 }
