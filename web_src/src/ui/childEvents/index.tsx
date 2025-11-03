@@ -31,6 +31,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
   childEventsInfo,
   className = "mt-1 ml-3 text-gray-500",
   onReRunChildEvents,
+  onExpandChildEvents,
   showItems = true,
 }) => {
   const ChildEventsArrowIcon = React.useMemo(() => {
@@ -39,6 +40,9 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
 
   const ReRunChildEventsIcon = React.useMemo(() => {
     return resolveIcon("rotate-ccw");
+  }, []);
+  const ExpandIcon = React.useMemo(() => {
+    return resolveIcon("expand");
   }, []);
 
   return (
@@ -51,6 +55,16 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {onExpandChildEvents && (
+            <ExpandIcon
+              size={16}
+              className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer mt-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                onExpandChildEvents(childEventsInfo);
+              }}
+            />
+          )}
           {onReRunChildEvents && (
             <ReRunChildEventsIcon
               size={18}

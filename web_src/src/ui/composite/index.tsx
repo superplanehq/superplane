@@ -1,6 +1,5 @@
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
-import { Expand } from "lucide-react";
 import { ComponentHeader } from "../componentHeader";
 import { CollapsedComponent } from "../collapsedComponent";
 import { MetadataList, type MetadataItem } from "../metadataList";
@@ -194,7 +193,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white relative" >
+      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white" >
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -346,15 +345,6 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
             </div>
           </div>
         )}
-        {/* Expand button (bottom-right) */}
-        <button
-          type="button"
-          onClick={onExpandChildEvents}
-          aria-label="Expand run"
-          className="absolute -bottom-4 -right-4 bg-white border border-gray-200 rounded-md shadow-md p-2 hover:bg-gray-50"
-        >
-          <Expand className="text-gray-700" size={18} />
-        </button>
       </div>
     </SelectionWrapper>
   )
