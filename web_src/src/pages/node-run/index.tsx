@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header, type BreadcrumbItem } from '@/ui/CanvasPage/Header'
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { useWorkflow } from '@/hooks/useWorkflowData'
 import { useBlueprints, useComponents } from '@/hooks/useBlueprintData'
 import { useNodeExecutions } from '@/hooks/useWorkflowData'
@@ -47,16 +48,27 @@ export function NodeRunPage() {
 export function NodeRunPage() {
   const { organizationId, workflowId } = useParams()
 >>>>>>> 5e9ea6c4 (feat: Add new page for node execution)
+=======
+import { useWorkflow } from '@/hooks/useWorkflowData'
+
+export function NodeRunPage() {
+  const { organizationId, workflowId } = useParams()
+  const { data: workflow } = useWorkflow(organizationId || '', workflowId || '')
+>>>>>>> 5e9ef369 (Show proper name of the canvas and ability to go back)
   const navigate = useNavigate()
 
   const breadcrumbs: BreadcrumbItem[] = [
     { label: 'Canvases', href: `/${organizationId}` },
+<<<<<<< HEAD
 <<<<<<< HEAD
     { label: workflow?.name || 'Workflow', href: `/${organizationId}/workflows/${workflowId}` },
     { label: nodeName, iconSlug: iconSlug || 'boxes', iconColor: getColorClass(color || 'indigo'), iconBackground: getBackgroundColorClass(color || 'indigo') },
     ...(latestRunTitle ? [{ label: latestRunTitle }] as BreadcrumbItem[] : []),
 =======
     { label: workflowId || 'Workflow' },
+=======
+    { label: workflow?.name || 'Workflow', href: `/${organizationId}/workflows/${workflowId}` },
+>>>>>>> 5e9ef369 (Show proper name of the canvas and ability to go back)
     { label: 'Build/Test/Deploy Stage', iconSlug: 'git-branch', iconColor: 'text-purple-500' },
 >>>>>>> 5e9ea6c4 (feat: Add new page for node execution)
   ]
