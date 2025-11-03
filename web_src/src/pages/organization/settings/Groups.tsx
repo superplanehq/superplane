@@ -24,7 +24,7 @@ import {
 } from '../../../components/Table/table'
 import { useOrganizationGroups, useOrganizationRoles, useUpdateGroup, useDeleteGroup } from '../../../hooks/useOrganizationData'
 import debounce from 'lodash.debounce'
-import { formatRelativeTime } from '@/pages/canvas/utils/stageEventUtils'
+import { formatRelativeTime } from '@/utils/timezone'
 
 interface GroupsProps {
   organizationId: string

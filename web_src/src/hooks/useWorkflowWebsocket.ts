@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
 import useWebSocket from 'react-use-websocket';
-import { ServerEvent } from '@/pages/canvas/types/events';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
 
@@ -111,7 +110,7 @@ export function useWorkflowWebsocket(
     }
   }, [enqueueEventRefetch, enqueueExecutionRefetch, addRunningNode, removeRunningNode]);
 
-  useWebSocket<ServerEvent>(
+  useWebSocket(
     `${SOCKET_SERVER_URL}${workflowId}?organization_id=${organizationId}`,
     {
       shouldReconnect: () => true,
