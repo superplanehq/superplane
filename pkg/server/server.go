@@ -30,7 +30,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, cleanupService *workers.ResourceCleanupService, baseURL string) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -52,20 +52,6 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		} else {
 			log.Warn("Invitation Email Consumer not started - missing required environment variables (SENDGRID_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS, TEMPLATE_DIR)")
 		}
-	}
-
-	if os.Getenv("START_HARD_DELETION_WORKER") == "yes" {
-		log.Println("Starting Hard Deletion Worker")
-
-		w := workers.NewHardDeletionWorker(registry, cleanupService)
-		go w.Start()
-	}
-
-	if os.Getenv("START_EVENT_DELETION_WORKER") == "yes" {
-		log.Println("Starting Event Deletion Worker")
-
-		w := workers.NewEventDeletionWorker()
-		go w.Start()
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" {
@@ -238,7 +224,6 @@ func Start() {
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	oidcVerifier := crypto.NewOIDCVerifier()
 	registry := registry.NewRegistry(encryptorInstance)
-	cleanupService := workers.NewResourceCleanupService(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
@@ -248,7 +233,7 @@ func Start() {
 		go startInternalAPI(encryptorInstance, authService, registry)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance, registry, cleanupService, baseURL)
+	startWorkers(jwtSigner, encryptorInstance, registry, baseURL)
 
 	log.Println("Superplane is UP.")
 

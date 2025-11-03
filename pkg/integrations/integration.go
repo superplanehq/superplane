@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 )
 
 var ErrInvalidSignature = errors.New("invalid signature")
@@ -96,20 +95,6 @@ type WebhookOptionsV2 struct {
 	Secret        []byte
 	Configuration any
 	Metadata      any
-}
-
-type Executor interface {
-
-	//
-	// Validates the executor spec.
-	// Used during stage creation to validate that the executor spec is valid.
-	//
-	Validate(context.Context, []byte) error
-
-	//
-	// Triggers a new execution.
-	//
-	Execute([]byte, executors.ExecutionParameters) (StatefulResource, error)
 }
 
 type OIDCVerifier interface {

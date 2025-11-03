@@ -11,9 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/executors"
-	httpexec "github.com/superplanehq/superplane/pkg/executors/http"
-	"github.com/superplanehq/superplane/pkg/executors/noop"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
@@ -45,14 +42,12 @@ type Integration struct {
 	EventHandler       integrations.EventHandler
 	OIDCVerifier       integrations.OIDCVerifier
 	NewResourceManager func(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.ResourceManager, error)
-	NewExecutor        func(integrations.ResourceManager, integrations.Resource) (integrations.Executor, error)
 }
 
 type Registry struct {
 	httpClient   *http.Client
 	Encryptor    crypto.Encryptor
 	Integrations map[string]Integration
-	Executors    map[string]executors.Executor
 	Components   map[string]components.Component
 	Triggers     map[string]triggers.Trigger
 }
@@ -60,7 +55,6 @@ type Registry struct {
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
 	r := &Registry{
 		Encryptor:    encryptor,
-		Executors:    map[string]executors.Executor{},
 		Integrations: map[string]Integration{},
 		httpClient:   &http.Client{Timeout: 10 * time.Second},
 		Components:   map[string]components.Component{},
@@ -80,21 +74,13 @@ func (r *Registry) Init() {
 		EventHandler:       &semaphore.SemaphoreEventHandler{},
 		OIDCVerifier:       &semaphore.SemaphoreOIDCVerifier{},
 		NewResourceManager: semaphore.NewSemaphoreResourceManager,
-		NewExecutor:        semaphore.NewSemaphoreExecutor,
 	}
 
 	r.Integrations[models.IntegrationTypeGithub] = Integration{
 		EventHandler:       &github.GitHubEventHandler{},
 		OIDCVerifier:       &github.GitHubOIDCVerifier{},
 		NewResourceManager: github.NewGitHubResourceManager,
-		NewExecutor:        github.NewGitHubExecutor,
 	}
-
-	//
-	// Register the executors
-	//
-	r.Executors[models.ExecutorTypeHTTP] = httpexec.NewHTTPExecutor(r.httpClient)
-	r.Executors[models.ExecutorTypeNoOp] = noop.NewNoOpExecutor()
 
 	//
 	// Copy registered components and triggers
@@ -218,37 +204,6 @@ func (r *Registry) secretProvider(tx *gorm.DB, secretDef *models.ValueDefinition
 	}
 
 	return secrets.NewProvider(tx, r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
-}
-
-func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
-	return r.NewIntegrationExecutorWithTx(database.Conn(), integration, resource)
-}
-
-func (r *Registry) NewIntegrationExecutorWithTx(tx *gorm.DB, integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
-	if integration == nil {
-		return nil, fmt.Errorf("integration is required")
-	}
-
-	resourceManager, err := r.NewResourceManagerInTransaction(context.Background(), tx, integration)
-	if err != nil {
-		return nil, fmt.Errorf("error creating integration: %v", err)
-	}
-
-	registration, ok := r.Integrations[integration.Type]
-	if !ok {
-		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
-	}
-
-	return registration.NewExecutor(resourceManager, resource)
-}
-
-func (r *Registry) NewExecutor(executorType string) (executors.Executor, error) {
-	executor, ok := r.Executors[executorType]
-	if !ok {
-		return nil, fmt.Errorf("executor type %s not registered", executorType)
-	}
-
-	return executor, nil
 }
 
 func (r *Registry) ListTriggers() []triggers.Trigger {
