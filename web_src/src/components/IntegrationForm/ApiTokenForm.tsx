@@ -7,7 +7,7 @@ import { Link } from '../Link/link';
 import { Text } from '../Text/text';
 import type { Tab } from '../Tabs/tabs';
 import type { BaseIntegrationFormProps } from './types';
-import { useSecret } from '../../pages/canvas/hooks/useSecrets';
+import { useSecret } from '@/hooks/useSecrets';
 
 interface ApiTokenFormProps extends BaseIntegrationFormProps {
   organizationId: string;

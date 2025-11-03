@@ -5,9 +5,9 @@ import {
   integrationsDescribeIntegration,
   integrationsUpdateIntegration,
   integrationsListResources,
-} from '../../../api-client/sdk.gen'
-import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
-import type { IntegrationsCreateIntegrationData, IntegrationsUpdateIntegrationData } from '../../../api-client/types.gen'
+} from '@/api-client/sdk.gen'
+import { withOrganizationHeader } from '@/utils/withOrganizationHeader'
+import type { IntegrationsCreateIntegrationData, IntegrationsUpdateIntegrationData } from '@/api-client/types.gen'
 
 export const integrationKeys = {
   all: ['integrations'] as const,
@@ -40,8 +40,8 @@ export const useIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS
           domainId: domainId,
           domainType: domainType,
         },
-        path: { 
-          idOrName: integrationId 
+        path: {
+          idOrName: integrationId
         }
       }))
       return response.data?.integration || null
@@ -67,7 +67,7 @@ export interface UpdateIntegrationParams extends CreateIntegrationParams {
 
 export const useCreateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (params: CreateIntegrationParams) => {
       const integration: IntegrationsCreateIntegrationData['body'] = {
@@ -104,8 +104,8 @@ export const useCreateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_
       }))
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: integrationKeys.byDomain(domainId, domainType) 
+      queryClient.invalidateQueries({
+        queryKey: integrationKeys.byDomain(domainId, domainType)
       })
     }
   })

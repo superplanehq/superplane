@@ -10,8 +10,8 @@ import {
 import { Button } from '../Button/button';
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol';
 import { Link } from '../Link/link';
-import { useIntegrations, useCreateIntegration } from '../../pages/canvas/hooks/useIntegrations';
-import { useSecrets, useCreateSecret } from '../../pages/canvas/hooks/useSecrets';
+import { useIntegrations, useCreateIntegration } from '@/hooks/useIntegrations';
+import { useSecrets, useCreateSecret } from '@/hooks/useSecrets';
 import { GitHubIntegrationForm, SemaphoreIntegrationForm, ApiTokenForm, NEW_SECRET_NAME, useIntegrationForm } from '../IntegrationForm';
 
 interface IntegrationModalProps {

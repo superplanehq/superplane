@@ -1,6 +1,6 @@
 import React from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../select'
-import { useIntegrations, useIntegrationResources } from '../../pages/canvas/hooks/useIntegrations'
+import { useIntegrations, useIntegrationResources } from '@/hooks/useIntegrations'
 import { ComponentsConfigurationField } from '../../api-client'
 
 interface IntegrationResourceFieldRendererProps {
