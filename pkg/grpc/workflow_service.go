@@ -14,12 +14,17 @@ import (
 )
 
 type WorkflowService struct {
-	registry  *registry.Registry
-	encryptor crypto.Encryptor
+	registry    *registry.Registry
+	encryptor   crypto.Encryptor
+	authService authorization.Authorization
 }
 
-func NewWorkflowService(registry *registry.Registry, encryptor crypto.Encryptor) *WorkflowService {
-	return &WorkflowService{registry: registry, encryptor: encryptor}
+func NewWorkflowService(authService authorization.Authorization, registry *registry.Registry, encryptor crypto.Encryptor) *WorkflowService {
+	return &WorkflowService{
+		registry:    registry,
+		encryptor:   encryptor,
+		authService: authService,
+	}
 }
 
 func (s *WorkflowService) ListWorkflows(ctx context.Context, req *pb.ListWorkflowsRequest) (*pb.ListWorkflowsResponse, error) {
@@ -115,6 +120,7 @@ func (s *WorkflowService) InvokeNodeExecutionAction(ctx context.Context, req *pb
 
 	return workflows.InvokeNodeExecutionAction(
 		ctx,
+		s.authService,
 		s.registry,
 		uuid.MustParse(organizationID),
 		workflowID,

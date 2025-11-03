@@ -1,18 +1,28 @@
 package contexts
 
 import (
+	"fmt"
+	"log"
+	"slices"
+
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
 type AuthContext struct {
 	orgID             uuid.UUID
+	authService       authorization.Authorization
 	authenticatedUser *models.User
 }
 
-func NewAuthContext(orgID uuid.UUID, authenticatedUser *models.User) components.AuthContext {
-	return &AuthContext{orgID: orgID, authenticatedUser: authenticatedUser}
+func NewAuthContext(orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) components.AuthContext {
+	return &AuthContext{
+		orgID:             orgID,
+		authService:       authService,
+		authenticatedUser: authenticatedUser,
+	}
 }
 
 func (c *AuthContext) AuthenticatedUser() *components.User {
@@ -38,4 +48,44 @@ func (c *AuthContext) GetUser(id uuid.UUID) (*components.User, error) {
 		Name:  user.Name,
 		Email: user.Email,
 	}, nil
+}
+
+func (c *AuthContext) HasRole(role string) (bool, error) {
+	if c.authenticatedUser == nil {
+		return false, fmt.Errorf("user not authenticated")
+	}
+
+	userIDs, err := c.authService.GetOrgUsersForRole(c.orgID.String(), role)
+	if err != nil {
+		return false, fmt.Errorf("error finding users for role %s: %v", role, err)
+	}
+
+	log.Printf("HasRole - userIDs: %v", userIDs)
+	log.Printf("HasRole - authenticatedUser.ID: %v", c.authenticatedUser.ID.String())
+
+	if slices.Contains(userIDs, c.authenticatedUser.ID.String()) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (c *AuthContext) InGroup(group string) (bool, error) {
+	if c.authenticatedUser == nil {
+		return false, fmt.Errorf("user not authenticated")
+	}
+
+	userIDs, err := c.authService.GetGroupUsers(c.orgID.String(), models.DomainTypeOrganization, group)
+	if err != nil {
+		return false, fmt.Errorf("error finding users in group %s: %v", group, err)
+	}
+
+	log.Printf("InGroup - userIDs: %v", userIDs)
+	log.Printf("InGroup - authenticatedUser.ID: %v", c.authenticatedUser.ID.String())
+
+	if slices.Contains(userIDs, c.authenticatedUser.ID.String()) {
+		return true, nil
+	}
+
+	return false, nil
 }
