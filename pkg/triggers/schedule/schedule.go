@@ -18,9 +18,10 @@ func init() {
 }
 
 const (
-	TypeHourly = "hourly"
-	TypeDaily  = "daily"
-	TypeWeekly = "weekly"
+	TypeMinutes = "minutes"
+	TypeHourly  = "hourly"
+	TypeDaily   = "daily"
+	TypeWeekly  = "weekly"
 
 	WeekDayMonday    = "monday"
 	WeekDayTuesday   = "tuesday"
@@ -34,14 +35,16 @@ const (
 type Schedule struct{}
 
 type Metadata struct {
-	NextTrigger *string `json:"nextTrigger"`
+	NextTrigger   *string `json:"nextTrigger"`
+	ReferenceTime *string `json:"referenceTime"` // For minutes scheduling: time when schedule was first set up
 }
 
 type Configuration struct {
-	Type    string  `json:"type"`
-	Minute  *int    `json:"minute"`  // 0-59
-	Time    *string `json:"time"`    // Format: "HH:MM" UTC
-	WeekDay *string `json:"weekDay"` // Monday, Tuesday, etc.
+	Type     string  `json:"type"`
+	Interval *int    `json:"interval"` // For minutes type: interval in minutes
+	Minute   *int    `json:"minute"`   // 0-59
+	Time     *string `json:"time"`     // Format: "HH:MM" UTC
+	WeekDay  *string `json:"weekDay"`  // Monday, Tuesday, etc.
 }
 
 func (s *Schedule) Name() string {
@@ -79,10 +82,26 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 			TypeOptions: &components.TypeOptions{
 				Select: &components.SelectTypeOptions{
 					Options: []components.FieldOption{
+						{Label: "Every X minutes", Value: "minutes"},
 						{Label: "Hourly", Value: "hourly"},
 						{Label: "Daily", Value: "daily"},
 						{Label: "Weekly", Value: "weekly"},
 					},
+				},
+			},
+		},
+		{
+			Name:    "interval",
+			Label:   "Interval (minutes)",
+			Type:    components.FieldTypeNumber,
+			Default: intPtr(1),
+			VisibilityConditions: []components.VisibilityCondition{
+				{Field: "type", Values: []string{"minutes"}},
+			},
+			TypeOptions: &components.TypeOptions{
+				Number: &components.NumberTypeOptions{
+					Min: intPtr(1),
+					Max: intPtr(60 * 24),
 				},
 			},
 		},
@@ -153,7 +172,14 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	nextTrigger, err := getNextTrigger(config, time.Now())
+	now := time.Now()
+
+	if config.Type == TypeMinutes && metadata.ReferenceTime == nil {
+		referenceTime := now.Format(time.RFC3339)
+		metadata.ReferenceTime = &referenceTime
+	}
+
+	nextTrigger, err := getNextTrigger(config, now, metadata.ReferenceTime)
 	if err != nil {
 		return err
 	}
@@ -181,7 +207,10 @@ func (s *Schedule) Setup(ctx triggers.TriggerContext) error {
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	ctx.MetadataContext.Set(Metadata{NextTrigger: &formatted})
+	ctx.MetadataContext.Set(Metadata{
+		NextTrigger:   &formatted,
+		ReferenceTime: metadata.ReferenceTime,
+	})
 	return nil
 }
 
@@ -215,8 +244,14 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 		return err
 	}
 
+	var existingMetadata Metadata
+	err = mapstructure.Decode(ctx.MetadataContext.Get(), &existingMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to parse existing metadata: %w", err)
+	}
+
 	now := time.Now()
-	nextTrigger, err := getNextTrigger(spec, now)
+	nextTrigger, err := getNextTrigger(spec, now, existingMetadata.ReferenceTime)
 	if err != nil {
 		return err
 	}
@@ -227,12 +262,22 @@ func (s *Schedule) emitEvent(ctx triggers.TriggerActionContext) error {
 	}
 
 	formatted := nextTrigger.Format(time.RFC3339)
-	ctx.MetadataContext.Set(Metadata{NextTrigger: &formatted})
+	ctx.MetadataContext.Set(Metadata{
+		NextTrigger:   &formatted,
+		ReferenceTime: existingMetadata.ReferenceTime,
+	})
 	return nil
 }
 
-func getNextTrigger(config Configuration, now time.Time) (*time.Time, error) {
+func getNextTrigger(config Configuration, now time.Time, referenceTime *string) (*time.Time, error) {
 	switch config.Type {
+	case TypeMinutes:
+		if config.Interval == nil {
+			return nil, fmt.Errorf("interval is required for minutes schedule")
+		}
+
+		return nextMinutesTrigger(*config.Interval, now, referenceTime)
+
 	case TypeHourly:
 		if config.Minute == nil {
 			return nil, fmt.Errorf("minute is required for hourly schedule")
@@ -273,6 +318,42 @@ func nextHourlyTrigger(minute int, now time.Time) (*time.Time, error) {
 
 	if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
 		nextTrigger = nextTrigger.Add(time.Hour)
+	}
+
+	return &nextTrigger, nil
+}
+
+func nextMinutesTrigger(interval int, now time.Time, referenceTime *string) (*time.Time, error) {
+	if interval < 1 || interval > 1440 {
+		return nil, fmt.Errorf("interval must be between 1 and 1440 minutes, got: %d", interval)
+	}
+
+	nowUTC := now.UTC()
+
+	var reference time.Time
+	if referenceTime != nil {
+		var err error
+		reference, err = time.Parse(time.RFC3339, *referenceTime)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse reference time: %w", err)
+		}
+		reference = reference.UTC()
+	} else {
+		reference = nowUTC
+	}
+
+	minutesElapsed := int(nowUTC.Sub(reference).Minutes())
+
+	if minutesElapsed < 0 {
+		minutesElapsed = 0
+	}
+	completedIntervals := minutesElapsed / interval
+
+	nextTriggerMinutes := (completedIntervals + 1) * interval
+	nextTrigger := reference.Add(time.Duration(nextTriggerMinutes) * time.Minute)
+
+	if nextTrigger.Before(nowUTC) || nextTrigger.Equal(nowUTC) {
+		nextTrigger = nextTrigger.Add(time.Duration(interval) * time.Minute)
 	}
 
 	return &nextTrigger, nil
