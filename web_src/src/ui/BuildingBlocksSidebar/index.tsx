@@ -4,7 +4,7 @@ import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components
 import { resolveIcon } from "@/lib/utils";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { ChevronRight, GripVerticalIcon, Menu, PanelLeftClose, Settings2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toTestId } from "../../utils/testID";
 import { createNodeDragPreview } from "./createNodeDragPreview";
 
@@ -50,7 +50,20 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [showWip, setShowWip] = useState(true);
+
+  // Initialize showWip from localStorage
+  const [showWip, setShowWip] = useState(() => {
+    const storedShowWip = localStorage.getItem('buildingBlocksShowWip');
+    if (storedShowWip !== null) {
+      return JSON.parse(storedShowWip);
+    }
+    return true; // default value
+  });
+
+  // Save showWip to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('buildingBlocksShowWip', JSON.stringify(showWip));
+  }, [showWip]);
 
   const categoryOrder: Record<string, number> = {
     Primitives: 0,
