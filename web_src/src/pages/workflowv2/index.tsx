@@ -807,12 +807,15 @@ function prepareTriggerNode(
   const lastEvent = nodeEventsMap[node.id!]?.[0];
   const triggerProps = renderer.getTriggerProps(node, triggerMetadata!, lastEvent);
 
+  // Use trigger label (from metadata) if available, otherwise fall back to node name
+  const displayLabel = triggerMetadata?.label || node.name!;
+
   return {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
     data: {
       type: "trigger",
-      label: node.name!,
+      label: displayLabel,
       state: "pending" as const,
       outputChannels: ["default"],
       trigger: {
@@ -836,12 +839,15 @@ function prepareCompositeNode(
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
 
+  // Use blueprint name (from metadata) if available, otherwise fall back to node name
+  const displayLabel = blueprintMetadata?.name || node.name!;
+
   const canvasNode: CanvasNode = {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
     data: {
       type: "composite",
-      label: node.name!,
+      label: displayLabel,
       state: "pending" as const,
       outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       composite: {
@@ -851,7 +857,7 @@ function prepareCompositeNode(
         headerColor: getBackgroundColorClass(color),
         collapsedBackground: getBackgroundColorClass(color),
         collapsed: node.isCollapsed,
-        title: node.name!,
+        title: displayLabel,
         description: blueprintMetadata?.description,
         isMissing: isMissing,
         parameters: Object.keys(node.configuration!).map((key) => {
@@ -1154,12 +1160,15 @@ function prepareApprovalNode(
     };
   });
 
+  // Use component label (from metadata) if available, otherwise fall back to node name
+  const displayLabel = metadata?.label || node.name!;
+
   return {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
     data: {
       type: "approval",
-      label: node.name!,
+      label: displayLabel,
       state: "pending" as const,
       outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
       approval: {
@@ -1169,7 +1178,7 @@ function prepareApprovalNode(
         headerColor: getBackgroundColorClass(metadata?.color || "orange"),
         collapsedBackground: getBackgroundColorClass(metadata?.color || "orange"),
         collapsed: node.isCollapsed,
-        title: node.name!,
+        title: displayLabel,
         description: metadata?.description,
         receivedAt: execution ? new Date(execution.createdAt!) : undefined,
         approvals,
@@ -1246,11 +1255,12 @@ function prepareIfNode(
 function prepareNoopNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
-  _components: ComponentsComponent[],
+  components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
+  const metadata = components.find((c) => c.name === "noop");
 
   // Get last event data
   let lastEvent;
@@ -1267,15 +1277,18 @@ function prepareNoopNode(
     };
   }
 
+  // Use component label (from metadata) if available, otherwise fall back to node name
+  const displayLabel = metadata?.label || node.name!;
+
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
     data: {
       type: "noop",
-      label: node.name!,
+      label: displayLabel,
       state: "pending" as const,
       noop: {
-        title: node.name!,
+        title: displayLabel,
         lastEvent: lastEvent || {
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
@@ -1290,11 +1303,12 @@ function prepareNoopNode(
 function prepareFilterNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
-  _components: ComponentsComponent[],
+  components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
+  const metadata = components.find((c) => c.name === "filter");
 
   // Parse filters from node configuration
   const expression = node.configuration?.expression as string;
@@ -1313,15 +1327,18 @@ function prepareFilterNode(
     };
   }
 
+  // Use component label (from metadata) if available, otherwise fall back to node name
+  const displayLabel = metadata?.label || node.name!;
+
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
     data: {
       type: "filter",
-      label: node.name!,
+      label: displayLabel,
       state: "pending" as const,
       filter: {
-        title: node.name!,
+        title: displayLabel,
         expression,
         lastEvent: lastEvent || {
           eventTitle: "No events received yet",
@@ -1363,12 +1380,15 @@ function prepareHttpNode(
     };
   }
 
+  // Use component label (from metadata) if available, otherwise fall back to node name
+  const displayLabel = metadata?.label || node.name!;
+
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
     data: {
       type: "http",
-      label: node.name!,
+      label: displayLabel,
       state: "pending" as const,
       outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
       http: {
@@ -1376,7 +1396,7 @@ function prepareHttpNode(
         iconColor: getColorClass(metadata?.color || "gray"),
         iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
         headerColor: getBackgroundColorClass(metadata?.color || "gray"),
-        title: node.name!,
+        title: displayLabel,
         method: configuration?.method,
         url: configuration?.url,
         payload: configuration?.payload,
@@ -1407,16 +1427,19 @@ function prepareWaitNode(
     };
   }
 
+  // Use component label (from metadata) if available, otherwise fall back to node name
+  const displayLabel = metadata?.label || node.name!;
+
   return {
     id: node.id!,
     position: { x: node.position?.x || 0, y: node.position?.y || 0 },
     data: {
       type: "wait",
-      label: node.name!,
+      label: displayLabel,
       state: "pending" as const,
       outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
       wait: {
-        title: node.name!,
+        title: displayLabel,
         duration: configuration?.duration,
         lastExecution,
         iconColor: getColorClass(metadata?.color || "yellow"),
