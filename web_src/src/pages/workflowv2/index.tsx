@@ -76,7 +76,7 @@ export function WorkflowPageV2() {
    * This helps us avoid unnecessary loading states when nodes
    * are added to the workflow, but not persisted yet.
    */
-  const persistedNodeIdsRef = useRef<Set<string>>(new Set());
+  const [persistedNodeIds, setPersistedNodeIds] = useState<Set<string>>(new Set());
   const isInitialLoadRef = useRef(true);
 
   /**
@@ -132,7 +132,7 @@ export function WorkflowPageV2() {
    */
   if (workflow && isInitialLoadRef.current) {
     const nodeIds = workflow.nodes?.map((n) => n.id!) || [];
-    persistedNodeIdsRef.current = new Set(nodeIds);
+    setPersistedNodeIds(new Set(nodeIds));
     isInitialLoadRef.current = false;
   }
 
@@ -165,19 +165,19 @@ export function WorkflowPageV2() {
    * This prevents unnecessary loading states when new nodes are added locally.
    */
   const persistedTriggerNodes = useMemo(
-    () => triggerNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!)),
-    [triggerNodes],
+    () => triggerNodes.filter((node) => persistedNodeIds.has(node.id!)),
+    [triggerNodes, persistedNodeIds],
   );
 
   const persistedFilterNodes = useMemo(
-    () => filterComponentNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!)),
-    [filterComponentNodes],
+    () => filterComponentNodes.filter((node) => persistedNodeIds.has(node.id!)),
+    [filterComponentNodes, persistedNodeIds],
   );
 
   const persistedNodesWithExecutions = useMemo(() => {
     const allNodes = [...compositeNodes, ...componentNodes];
-    return allNodes.filter((node) => persistedNodeIdsRef.current.has(node.id!));
-  }, [compositeNodes, componentNodes]);
+    return allNodes.filter((node) => persistedNodeIds.has(node.id!));
+  }, [compositeNodes, componentNodes, persistedNodeIds]);
 
   const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(
     workflowId!,
@@ -366,10 +366,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              configuration: updatedConfiguration,
-              name: updatedNodeName,
-            }
+            ...node,
+            configuration: updatedConfiguration,
+            name: updatedNodeName,
+          }
           : node,
       );
 
@@ -415,8 +415,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-            ? "TYPE_BLUEPRINT"
-            : "TYPE_COMPONENT",
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: position || {
           x: (workflow.nodes?.length || 0) * 250,
@@ -557,12 +557,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
-            }
+            ...node,
+            position: {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            },
+          }
           : node,
       );
 
@@ -594,9 +594,9 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              isCollapsed: newIsCollapsed,
-            }
+            ...node,
+            isCollapsed: newIsCollapsed,
+          }
           : node,
       );
 
@@ -696,7 +696,7 @@ export function WorkflowPageV2() {
 
         // Update persisted node IDs after successful save
         const nodeIds = updatedNodes?.map((n) => n.id!) || [];
-        persistedNodeIdsRef.current = new Set(nodeIds);
+        setPersistedNodeIds(new Set(nodeIds));
 
         showSuccessToast("Canvas changes saved");
         setHasUnsavedChanges(false);
@@ -704,10 +704,6 @@ export function WorkflowPageV2() {
 
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
-
-        queryClient.invalidateQueries({
-          queryKey: workflowKeys.detail(organizationId, workflowId),
-        });
       } catch (error: any) {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
@@ -975,15 +971,15 @@ function prepareCompositeNode(
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
-                {
-                  icon: "cog",
-                  items: Object.keys(node.configuration!).reduce((acc, key) => {
-                    const displayKey = fieldLabelMap[key] || key;
-                    acc[displayKey] = `${node.configuration![key]}`;
-                    return acc;
-                  }, {} as Record<string, string>),
-                },
-              ]
+              {
+                icon: "cog",
+                items: Object.keys(node.configuration!).reduce((acc, key) => {
+                  const displayKey = fieldLabelMap[key] || key;
+                  acc[displayKey] = `${node.configuration![key]}`;
+                  return acc;
+                }, {} as Record<string, string>),
+              },
+            ]
             : [],
       },
     },
@@ -1015,8 +1011,8 @@ function prepareCompositeNode(
               ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
                 ? ("processed" as const)
                 : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-                ? ("discarded" as const)
-                : ("running" as const);
+                  ? ("discarded" as const)
+                  : ("running" as const);
             return { label, state, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
           })
           .sort((a, b) => {
@@ -1245,10 +1241,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-          ? record.role
-          : record.type === "group" && record.group
-          ? record.group
-          : "Unknown",
+            ? record.role
+            : record.type === "group" && record.group
+              ? record.group
+              : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -1258,16 +1254,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
+            {
+              label: "comment",
+              optional: true,
+            },
+          ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-            Comment: approvalComment,
-          }
+          Comment: approvalComment,
+        }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1353,41 +1349,41 @@ function prepareApprovalNode(
         spec:
           items.length > 0
             ? {
-                title: "approvals required",
-                tooltipTitle: "approvals required",
-                values: items.map((item) => {
-                  const type = (item.type || "").toString();
-                  let value =
-                    type === "user"
-                      ? item.user || ""
-                      : type === "role"
+              title: "approvals required",
+              tooltipTitle: "approvals required",
+              values: items.map((item) => {
+                const type = (item.type || "").toString();
+                let value =
+                  type === "user"
+                    ? item.user || ""
+                    : type === "role"
                       ? item.role || ""
                       : type === "group"
-                      ? item.group || ""
-                      : "";
-                  const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+                        ? item.group || ""
+                        : "";
+                const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
 
-                  // Pretty-print values
-                  if (type === "user" && value && usersById[value]) {
-                    value = usersById[value].email || usersById[value].name || value;
+                // Pretty-print values
+                if (type === "user" && value && usersById[value]) {
+                  value = usersById[value].email || usersById[value].name || value;
+                }
+                if (type === "role" && value) {
+                  value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
+                  // Fallback to simple suffix mapping when not found
+                  const suffix = (item.role || "").split("_").pop();
+                  if (!rolesByName[item.role || ""] && suffix) {
+                    const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
+                    value = map[suffix] || value;
                   }
-                  if (type === "role" && value) {
-                    value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
-                    // Fallback to simple suffix mapping when not found
-                    const suffix = (item.role || "").split("_").pop();
-                    if (!rolesByName[item.role || ""] && suffix) {
-                      const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
-                      value = map[suffix] || value;
-                    }
-                  }
-                  return {
-                    badges: [
-                      { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-                      { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
-                    ],
-                  };
-                }),
-              }
+                }
+                return {
+                  badges: [
+                    { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                    { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+                  ],
+                };
+              }),
+            }
             : undefined,
         awaitingEvent:
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
@@ -1396,16 +1392,16 @@ function prepareApprovalNode(
         lastRunData:
           execution && rootTriggerRenderer
             ? {
-                title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
-                subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
-                receivedAt: new Date(execution.createdAt!),
-                state:
-                  getRunItemState(execution) === "success"
-                    ? ("processed" as const)
-                    : getRunItemState(execution) === "running"
+              title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
+              subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
+              receivedAt: new Date(execution.createdAt!),
+              state:
+                getRunItemState(execution) === "success"
+                  ? ("processed" as const)
+                  : getRunItemState(execution) === "running"
                     ? ("running" as const)
                     : ("discarded" as const),
-              }
+            }
             : undefined,
       },
     },
@@ -1596,8 +1592,8 @@ function prepareHttpNode(
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
-          ? ("running" as const)
-          : ("failed" as const),
+            ? ("running" as const)
+            : ("failed" as const),
     };
   }
 
@@ -1648,8 +1644,8 @@ function prepareWaitNode(
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
-          ? ("running" as const)
-          : ("failed" as const),
+            ? ("running" as const)
+            : ("failed" as const),
     };
   }
 
@@ -1717,8 +1713,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
         ? ("processed" as const)
         : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-        ? ("discarded" as const)
-        : ("waiting" as const);
+          ? ("discarded" as const)
+          : ("waiting" as const);
 
     // Get root trigger information for better title/subtitle
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -1727,9 +1723,9 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-        };
+        title: execution.id || "Execution",
+        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+      };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
@@ -1751,8 +1747,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
               ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
                 ? ("processed" as const)
                 : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-                ? ("discarded" as const)
-                : ("running" as const);
+                  ? ("discarded" as const)
+                  : ("running" as const);
             return { label, state: st, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
           })
           .sort((a, b) => {
