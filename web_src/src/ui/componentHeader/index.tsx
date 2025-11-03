@@ -42,7 +42,8 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   return (
     <div
       className={
-        "text-left text-lg w-full px-2 flex flex-col border-b p-2 gap-2 rounded-t items-center relative " + headerColor
+        "canvas-node-drag-handle text-left text-lg w-full px-2 flex flex-col border-b p-2 gap-2 rounded-t items-center relative " +
+        headerColor
       }
       onDoubleClick={onDoubleClick}
     >
@@ -53,7 +54,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
           {iconSrc ? <img src={iconSrc} alt={title} className="w-5 h-5 " /> : <Icon size={20} className={iconColor} />}
         </div>
         <h2 className="font-semibold">{title}</h2>
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2 nodrag">
           <SidebarActionsDropdown
             dataTestId={toTestId(`node-${title}-header-dropdown`)}
             onRun={onRun}

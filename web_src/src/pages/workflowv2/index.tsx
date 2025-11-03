@@ -779,20 +779,25 @@ function prepareData(
   edges: CanvasEdge[];
 } {
   const edges = data?.edges!.map(prepareEdge);
-  const nodes = data?.nodes!.map((node) => {
-    return prepareNode(
-      data?.nodes!,
-      node,
-      triggers,
-      blueprints,
-      components,
-      nodeEventsMap,
-      nodeExecutionsMap,
-      nodeQueueItemsMap,
-      workflowId,
-      queryClient,
-    );
-  });
+  const nodes = data?.nodes!
+    .map((node) => {
+      return prepareNode(
+        data?.nodes!,
+        node,
+        triggers,
+        blueprints,
+        components,
+        nodeEventsMap,
+        nodeExecutionsMap,
+        nodeQueueItemsMap,
+        workflowId,
+        queryClient,
+      );
+    })
+    .map((node) => ({
+      ...node,
+      dragHandle: ".canvas-node-drag-handle",
+    }));
 
   return { nodes, edges };
 }

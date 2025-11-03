@@ -43,7 +43,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
 
   return (
     <div className="relative w-20 h-20" onDoubleClick={onDoubleClick}>
-      <div className={`flex h-20 w-20 items-center justify-center border border-border ${containerClass} ${collapsedBackground || ''}`}>
+      <div className={`canvas-node-drag-handle flex h-20 w-20 items-center justify-center border border-border ${containerClass} ${collapsedBackground || ''}`}>
         {iconSrc ? (
           <div className={`w-16 h-16 rounded-full overflow-hidden flex items-center justify-center ${iconBackground || ''}`}>
             <img src={iconSrc} alt={title} className="h-12 w-12 object-contain" />
@@ -52,7 +52,7 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
           <Icon size={30} className={iconColor} />
         )}
       </div>
-      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10">
+      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 -translate-y-2 z-10 nodrag">
         <SidebarActionsDropdown
           onRun={onRun}
           runDisabled={runDisabled}
