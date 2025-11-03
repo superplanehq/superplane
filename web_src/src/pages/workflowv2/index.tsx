@@ -1092,6 +1092,8 @@ function prepareApprovalNode(
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
   const executionMetadata = execution?.metadata as any;
+  const configuration = (node.configuration || {}) as any;
+  const items: any[] = Array.isArray(configuration.items) ? configuration.items : [];
 
   let rootTriggerRenderer: TriggerRenderer | null = null;
   if (execution) {
@@ -1217,6 +1219,22 @@ function prepareApprovalNode(
         description: metadata?.description,
         receivedAt: execution ? new Date(execution.createdAt!) : undefined,
         approvals,
+        // Display Approval settings similar to IF component specs
+        spec: items.length > 0 ? {
+          title: "approvals required",
+          tooltipTitle: "approvals required",
+          values: items.map((item) => {
+            const type = (item.type || "").toString();
+            const value = type === "user" ? (item.user || "") : type === "role" ? (item.role || "") : type === "group" ? (item.group || "") : "";
+            const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+            return {
+              badges: [
+                { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+              ],
+            };
+          })
+        } : undefined,
         awaitingEvent:
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
             ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!)

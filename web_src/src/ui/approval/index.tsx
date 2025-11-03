@@ -7,6 +7,9 @@ import { ItemGroup } from "../item";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { resolveIcon } from "@/lib/utils";
+import { ListFilter } from "lucide-react";
+import { SpecsTooltip } from "../componentBase/SpecsTooltip";
+import type { ComponentBaseSpecValue } from "../componentBase";
 
 export interface AwaitingEvent {
   title: string;
@@ -38,6 +41,11 @@ export interface ApprovalProps extends ComponentActionsProps {
   zeroStateText?: string;
   collapsed?: boolean;
   selected?: boolean;
+  spec?: {
+    title: string;
+    tooltipTitle?: string;
+    values: ComponentBaseSpecValue[];
+  };
 }
 
 export const Approval: React.FC<ApprovalProps> = ({
@@ -65,6 +73,7 @@ export const Approval: React.FC<ApprovalProps> = ({
   onDelete,
   onEdit,
   isCompactView,
+  spec,
 }) => {
   const calcRelativeTimeFromDiff = (diff: number) => {
     const seconds = Math.floor(diff / 1000);
@@ -149,7 +158,18 @@ export const Approval: React.FC<ApprovalProps> = ({
           onDelete={onDelete}
           onEdit={onEdit}
           isCompactView={isCompactView}
-        />
+        >
+          <div className="flex flex-col items-center gap-1">
+            {spec?.values?.length ? (
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <ListFilter size={12} />
+                <span>
+                  {spec.values.length} approvals required
+                </span>
+              </div>
+            ) : null}
+          </div>
+        </CollapsedComponent>
       </SelectionWrapper>
     );
   }
@@ -175,6 +195,19 @@ export const Approval: React.FC<ApprovalProps> = ({
           onEdit={onEdit}
           isCompactView={isCompactView}
         />
+
+        {spec && spec.values?.length > 0 && (
+          <div className="px-2 py-2 border-b text-gray-500 flex flex-col gap-2">
+            <div className="flex items-center gap-3 text-md text-gray-500">
+              <ListFilter size={18} />
+              <SpecsTooltip specTitle={spec.tooltipTitle || spec.title} specValues={spec.values}>
+                <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                  {spec.values.length} approvals required
+                </span>
+              </SpecsTooltip>
+            </div>
+          </div>
+        )}
 
         <div className="px-4 py-3">
           {lastRunData && !awaitingEvent && (
