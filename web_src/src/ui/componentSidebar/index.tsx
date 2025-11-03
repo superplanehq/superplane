@@ -177,13 +177,15 @@ export const ComponentSidebar = ({
     return (
       <div
         key={event.title + index}
-        onClick={(e) => {
-          e.stopPropagation();
-          onEventClick?.(event);
-        }}
-        className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md cursor-pointer ${EventBackground} ${EventColor}`}
+        className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md ${EventBackground} ${EventColor}`}
       >
-        <div className="flex items-center gap-3 rounded-md w-full min-w-0">
+        <div
+          className="flex items-center gap-3 rounded-md w-full min-w-0 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEventClick?.(event);
+          }}
+        >
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div
               className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor} ${animation}`}
