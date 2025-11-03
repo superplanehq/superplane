@@ -1,7 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { Header, type BreadcrumbItem } from '@/ui/CanvasPage/Header'
-<<<<<<< HEAD
-<<<<<<< HEAD
 import { useWorkflow } from '@/hooks/useWorkflowData'
 import { useBlueprints, useComponents } from '@/hooks/useBlueprintData'
 import { useNodeExecutions } from '@/hooks/useWorkflowData'
@@ -11,6 +9,28 @@ import { getBackgroundColorClass, getColorClass } from '@/utils/colors'
 export function NodeRunPage() {
   const { organizationId, workflowId, nodeId } = useParams()
   const { data: workflow } = useWorkflow(organizationId || '', workflowId || '')
+  const { data: blueprints = [] } = useBlueprints(organizationId || '')
+  const { data: components = [] } = useComponents(organizationId || '')
+
+  // Derive icon from metadata similar to canvas
+  const node = workflow?.nodes?.find(n => n.id === nodeId)
+  let iconSlug: string | undefined
+  let color: string | undefined
+  if (node?.blueprint?.id) {
+    const bp = blueprints.find(b => b.id === node.blueprint?.id)
+    iconSlug = bp?.icon || undefined
+    color = bp?.color || undefined
+  } else if (node?.component?.name) {
+    const comp = components.find(c => c.name === node.component?.name)
+    iconSlug = comp?.icon || undefined
+    color = comp?.color || undefined
+  } else if (node?.trigger?.name) {
+    // triggers not fetched here; fall back to default
+    iconSlug = 'bolt'
+    color = 'blue'
+  }
+
+export function NodeRunPage() {
   const { data: blueprints = [] } = useBlueprints(organizationId || '')
   const { data: components = [] } = useComponents(organizationId || '')
   const nodeName = workflow?.nodes?.find(n => n.id === nodeId)?.name || 'Component'
@@ -43,34 +63,15 @@ export function NodeRunPage() {
     iconSlug = 'bolt'
     color = 'blue'
   }
-=======
 
-export function NodeRunPage() {
-  const { organizationId, workflowId } = useParams()
->>>>>>> 5e9ea6c4 (feat: Add new page for node execution)
-=======
-import { useWorkflow } from '@/hooks/useWorkflowData'
-
-export function NodeRunPage() {
-  const { organizationId, workflowId } = useParams()
-  const { data: workflow } = useWorkflow(organizationId || '', workflowId || '')
->>>>>>> 5e9ef369 (Show proper name of the canvas and ability to go back)
   const navigate = useNavigate()
 
   const breadcrumbs: BreadcrumbItem[] = [
     { label: 'Canvases', href: `/${organizationId}` },
-<<<<<<< HEAD
-<<<<<<< HEAD
     { label: workflow?.name || 'Workflow', href: `/${organizationId}/workflows/${workflowId}` },
     { label: nodeName, iconSlug: iconSlug || 'boxes', iconColor: getColorClass(color || 'indigo'), iconBackground: getBackgroundColorClass(color || 'indigo') },
     ...(latestRunTitle ? [{ label: latestRunTitle }] as BreadcrumbItem[] : []),
-=======
-    { label: workflowId || 'Workflow' },
-=======
-    { label: workflow?.name || 'Workflow', href: `/${organizationId}/workflows/${workflowId}` },
->>>>>>> 5e9ef369 (Show proper name of the canvas and ability to go back)
     { label: 'Build/Test/Deploy Stage', iconSlug: 'git-branch', iconColor: 'text-purple-500' },
->>>>>>> 5e9ea6c4 (feat: Add new page for node execution)
   ]
 
   return (
@@ -84,4 +85,4 @@ export function NodeRunPage() {
   )
 }
 
-export default NodeRunPage
+export default NodeRunPage;
