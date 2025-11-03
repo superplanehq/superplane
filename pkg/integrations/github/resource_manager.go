@@ -13,15 +13,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var defaultEventTypes = []string{
-	"create",
-	"package",
-	"pull_request",
-	"push",
-	"registry_package",
-	"release",
-	"workflow_run",
-}
+const (
+	ResourceTypeRepository = "repository"
+	ResourceTypeWorkflow   = "workflow"
+)
 
 type GitHubResourceManager struct {
 	client *github.Client
@@ -97,7 +92,6 @@ func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions
 	return &Webhook{
 		ID:          createdHook.GetID(),
 		WebhookName: *createdHook.Name,
-		WebhookURL:  createdHook.GetURL(),
 	}, nil
 }
 
@@ -108,12 +102,7 @@ func (i *GitHubResourceManager) CleanupWebhook(options integrations.WebhookOptio
 		return fmt.Errorf("error decoding webhook metadata: %v", err)
 	}
 
-	hookID, err := strconv.ParseInt(webhook.Id(), 10, 64)
-	if err != nil {
-		return fmt.Errorf("error parsing webhook ID: %v", err)
-	}
-
-	_, err = i.client.Repositories.DeleteHook(context.Background(), i.Owner, options.Resource.Name(), hookID)
+	_, err = i.client.Repositories.DeleteHook(context.Background(), i.Owner, options.Resource.Name(), webhook.ID)
 	if err != nil {
 		return fmt.Errorf("error deleting webhook: %v", err)
 	}
@@ -182,24 +171,6 @@ func (i *GitHubResourceManager) listOrganizationRepositories() ([]integrations.R
 	return resources, nil
 }
 
-func (i *GitHubResourceManager) Status(resourceType, id string, parentResource integrations.Resource) (integrations.StatefulResource, error) {
-	switch resourceType {
-	case ResourceTypeWorkflow:
-		return i.getWorkflowRun(parentResource, id)
-	default:
-		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
-	}
-}
-
-func (i *GitHubResourceManager) Cancel(resourceType, id string, parentResource integrations.Resource) error {
-	switch resourceType {
-	case ResourceTypeWorkflow:
-		return i.stopWorkflowRun(parentResource, id)
-	default:
-		return fmt.Errorf("unsupported resource type %s", resourceType)
-	}
-}
-
 func (i *GitHubResourceManager) stopWorkflowRun(parentResource integrations.Resource, id string) error {
 	runID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -248,24 +219,6 @@ func (i *GitHubResourceManager) getRepositoryByID(id int64) (integrations.Resour
 	}, nil
 }
 
-func (i *GitHubResourceManager) getWorkflowRun(parentResource integrations.Resource, id string) (integrations.StatefulResource, error) {
-	runID, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	workflowRun, _, err := i.client.Actions.GetWorkflowRunByID(context.Background(), i.Owner, parentResource.Name(), runID)
-	if err != nil {
-		return nil, fmt.Errorf("error getting workflow run: %v", err)
-	}
-
-	return &WorkflowRun{
-		ID:         workflowRun.GetID(),
-		Status:     workflowRun.GetStatus(),
-		Conclusion: workflowRun.GetConclusion(),
-	}, nil
-}
-
 type Repository struct {
 	ID             int64
 	RepositoryName string
@@ -308,4 +261,9 @@ func (w *WorkflowRun) Finished() bool {
 
 func (w *WorkflowRun) Successful() bool {
 	return w.Conclusion == "success"
+}
+
+type Webhook struct {
+	ID          int64  `json:"id"`
+	WebhookName string `json:"name"`
 }

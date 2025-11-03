@@ -44,28 +44,6 @@ func NewSemaphoreResourceManager(ctx context.Context, URL string, authenticate i
 	}, nil
 }
 
-func (i *SemaphoreResourceManager) Status(resourceType, id string, _ integrations.Resource) (integrations.StatefulResource, error) {
-	switch resourceType {
-	case ResourceTypeWorkflow:
-		resource, err := i.getWorkflow(id)
-		if err != nil {
-			return nil, fmt.Errorf("workflow %s not found: %v", id, err)
-		}
-
-		workflow := resource.(*Workflow)
-		resource, err = i.getPipeline(workflow.InitialPplID)
-		if err != nil {
-			return nil, fmt.Errorf("pipeline %s not found: %v", workflow.InitialPplID, err)
-		}
-
-		pipeline := resource.(*Pipeline)
-		return pipeline, nil
-
-	default:
-		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
-	}
-}
-
 func (i *SemaphoreResourceManager) Cancel(resourceType, id string, _ integrations.Resource) error {
 	switch resourceType {
 	case ResourceTypeWorkflow:
@@ -314,60 +292,6 @@ type RunTaskRequest struct {
 
 type RunTaskResponse struct {
 	WorkflowID string `json:"workflow_id"`
-}
-
-func (i *SemaphoreResourceManager) runTask(params any) (integrations.StatefulResource, error) {
-	p, ok := params.(*RunTaskRequest)
-	if !ok {
-		return nil, fmt.Errorf("invalid params type %T", params)
-	}
-
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s/run_now", i.URL, p.TaskID)
-	body, err := json.Marshal(p)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling task trigger: %v", err)
-	}
-
-	responseBody, err := i.execRequest(http.MethodPost, URL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	var response RunTaskResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	return &Workflow{
-		WorkflowURL: fmt.Sprintf("%s/workflows/%s", i.URL, response.WorkflowID),
-		WfID:        response.WorkflowID,
-	}, nil
-}
-
-func (i *SemaphoreResourceManager) runWorkflow(params any) (integrations.StatefulResource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", i.URL)
-
-	body, err := json.Marshal(&params)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling create workflow params: %v", err)
-	}
-
-	responseBody, err := i.execRequest(http.MethodPost, URL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	var response CreateWorkflowResponse
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	return &Workflow{
-		WfID:        response.WorkflowID,
-		WorkflowURL: fmt.Sprintf("%s/workflows/%s", i.URL, response.WorkflowID),
-	}, nil
 }
 
 func (i *SemaphoreResourceManager) listTasks(parentIDs ...string) ([]integrations.Resource, error) {

@@ -39,7 +39,6 @@ func RegisterTrigger(name string, t triggers.Trigger) {
 }
 
 type Integration struct {
-	EventHandler       integrations.EventHandler
 	OIDCVerifier       integrations.OIDCVerifier
 	NewResourceManager func(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.ResourceManager, error)
 }
@@ -71,13 +70,11 @@ func (r *Registry) Init() {
 	// Register the integrations
 	//
 	r.Integrations[models.IntegrationTypeSemaphore] = Integration{
-		EventHandler:       &semaphore.SemaphoreEventHandler{},
 		OIDCVerifier:       &semaphore.SemaphoreOIDCVerifier{},
 		NewResourceManager: semaphore.NewSemaphoreResourceManager,
 	}
 
 	r.Integrations[models.IntegrationTypeGithub] = Integration{
-		EventHandler:       &github.GitHubEventHandler{},
 		OIDCVerifier:       &github.GitHubOIDCVerifier{},
 		NewResourceManager: github.NewGitHubResourceManager,
 	}
@@ -100,15 +97,6 @@ func (r *Registry) Init() {
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {
 	_, ok := r.Integrations[integrationType]
 	return ok
-}
-
-func (r *Registry) GetEventHandler(integrationType string) (integrations.EventHandler, error) {
-	registration, ok := r.Integrations[integrationType]
-	if !ok {
-		return nil, fmt.Errorf("integration type %s not registered", integrationType)
-	}
-
-	return registration.EventHandler, nil
 }
 
 func (r *Registry) HasOIDCVerifier(integrationType string) bool {
