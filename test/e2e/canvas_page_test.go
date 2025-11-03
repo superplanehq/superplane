@@ -69,7 +69,9 @@ func (s *CanvasPageSteps) AssertUnsavedChangesNoteIsVisible() {
 }
 
 func (s *CanvasPageSteps) AssertCantRunNode() {
-	dropdown := q.TestID("node-noop-header-dropdown")
+	// The dropdown testID is based on the component label, not the node name
+	// For noop component, the label is "No Operation"
+	dropdown := q.TestID("node-no-operation-header-dropdown")
 	runOption := q.Locator("button:has-text('Run')")
 
 	s.session.Click(dropdown)
