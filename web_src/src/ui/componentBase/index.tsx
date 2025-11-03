@@ -105,7 +105,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
             {spec?.title && spec?.values?.length > 0 && <div className="flex items-center gap-3 text-md text-gray-500">
               <ListFilter size={18} />
               <SpecsTooltip specTitle={spec.tooltipTitle || spec.title} specValues={spec.values}>
-                <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">{spec.values.length} {spec.title + (spec.values.length > 1 ? "s" : "")}</span>
+                <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium">{spec.values.length} {spec.title + (spec.values.length > 1 ? "s" : "")}</span>
               </SpecsTooltip>
             </div>}
           </div>}

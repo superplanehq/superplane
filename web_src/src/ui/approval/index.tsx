@@ -201,7 +201,7 @@ export const Approval: React.FC<ApprovalProps> = ({
             <div className="flex items-center gap-3 text-md text-gray-500">
               <ListFilter size={18} />
               <SpecsTooltip specTitle={spec.tooltipTitle || spec.title} specValues={spec.values}>
-                <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
+                <span className="text-sm bg-gray-500 px-2 py-1 rounded-md text-white font-mono font-medium">
                   {spec.values.length} approvals required
                 </span>
               </SpecsTooltip>
