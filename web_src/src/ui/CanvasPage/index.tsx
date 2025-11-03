@@ -292,10 +292,8 @@ function CanvasPage(props: CanvasPageProps) {
         configuration: {},
         position,
       });
-      // Mark canvas as dirty immediately on drop
-      if (props.onDirty) props.onDirty();
     },
-    [props],
+    [],
   );
 
   const handleSidebarToggle = useCallback(
