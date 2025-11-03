@@ -19,7 +19,7 @@ export const MainSubWorkflow = {
           headerColor: "bg-blue-100",
           collapsedBackground: "bg-blue-100",
           parameters: [
-            { icon: "code", items: ["POST", "/api/deploy"] }
+            { icon: "code", items: { "method": "POST", "endpoint": "/api/deploy" } }
           ],
           lastRunItem: {
             title: "Deploy to US West",
@@ -57,7 +57,7 @@ export const MainSubWorkflow = {
           headerColor: "bg-green-100",
           collapsedBackground: "bg-green-100",
           parameters: [
-            { icon: "list-checks", items: ["health-check", "smoke-test"] }
+            { icon: "list-checks", items: { "tests": "health-check, smoke-test" } }
           ],
           lastRunItem: {
             title: "Validation Suite",
@@ -100,7 +100,7 @@ export const MainSubWorkflow = {
           headerColor: "bg-red-100",
           collapsedBackground: "bg-red-100",
           parameters: [
-            { icon: "server", items: ["temp-storage", "build-cache"] }
+            { icon: "server", items: { "cleanup": "temp-storage, build-cache" } }
           ],
           lastRunItem: {
             title: "Resource Cleanup",
@@ -137,7 +137,7 @@ export const MainSubWorkflow = {
           headerColor: "bg-yellow-100",
           collapsedBackground: "bg-yellow-100",
           parameters: [
-            { icon: "mail", items: ["slack", "email"] }
+            { icon: "mail", items: { "channels": "slack, email" } }
           ],
           lastRunItem: {
             title: "Deployment Notifications",
@@ -199,7 +199,7 @@ export const DeployToUS = {
           headerColor: "bg-amber-100",
           collapsedBackground: 'bg-amber-100',
           parameters: [
-            { icon: "globe", items: ["us.example.com", "weight: 0%"] }
+            { icon: "globe", items: { "domain": "us.example.com", "weight": "0%" } }
           ],
           lastRunItem: {
             title: `Drain complete`,
@@ -227,7 +227,7 @@ export const DeployToUS = {
           headerColor: "bg-blue-100",
           collapsedBackground: 'bg-blue-100',
           parameters: [
-            { icon: "boxes", items: ["app: us-api", "strategy: canary"] }
+            { icon: "boxes", items: { "app": "us-api", "strategy": "canary" } }
           ],
           lastRunItem: {
             title: `Argo sync`,
@@ -255,7 +255,7 @@ export const DeployToUS = {
           headerColor: "bg-emerald-100",
           collapsedBackground: 'bg-emerald-100',
           parameters: [
-            { icon: "server-cog", items: ["job: migrate", "concurrency: 1"] }
+            { icon: "server-cog", items: { "job": "migrate", "concurrency": "1" } }
           ],
           lastRunItem: {
             title: `Migrations applied`,
@@ -283,7 +283,7 @@ export const DeployToUS = {
           headerColor: "bg-green-100",
           collapsedBackground: 'bg-green-100',
           parameters: [
-            { icon: "stethoscope", items: ["/healthz", "p95<250ms"] }
+            { icon: "stethoscope", items: { "endpoint": "/healthz", "threshold": "p95<250ms" } }
           ],
           lastRunItem: {
             title: `Probes`,
@@ -311,7 +311,7 @@ export const DeployToUS = {
           headerColor: "bg-purple-100",
           collapsedBackground: 'bg-purple-100',
           parameters: [
-            { icon: "globe", items: ["us.example.com", "weight: 100%"] }
+            { icon: "globe", items: { "domain": "us.example.com", "weight": "100%" } }
           ],
           lastRunItem: {
             title: `Cutover pending`,
@@ -365,7 +365,7 @@ export const DeployToEU = {
           headerColor: "bg-amber-100",
           collapsedBackground: 'bg-amber-100',
           parameters: [
-            { icon: "globe", items: ["eu.example.com", "weight: 0%"] }
+            { icon: "globe", items: { "domain": "eu.example.com", "weight": "0%" } }
           ],
           lastRunItem: {
             title: `Drain complete`,
@@ -393,7 +393,7 @@ export const DeployToEU = {
           headerColor: "bg-blue-100",
           collapsedBackground: 'bg-blue-100',
           parameters: [
-            { icon: "boxes", items: ["app: eu-api", "strategy: canary"] }
+            { icon: "boxes", items: { "app": "eu-api", "strategy": "canary" } }
           ],
           lastRunItem: {
             title: `Argo sync`,
@@ -421,7 +421,7 @@ export const DeployToEU = {
           headerColor: "bg-emerald-100",
           collapsedBackground: 'bg-emerald-100',
           parameters: [
-            { icon: "server-cog", items: ["job: migrate", "concurrency: 1"] }
+            { icon: "server-cog", items: { "job": "migrate", "concurrency": "1" } }
           ],
           lastRunItem: {
             title: `Migrations applied`,
@@ -449,7 +449,7 @@ export const DeployToEU = {
           headerColor: "bg-green-100",
           collapsedBackground: 'bg-green-100',
           parameters: [
-            { icon: "stethoscope", items: ["/healthz", "p95<250ms"] }
+            { icon: "stethoscope", items: { "endpoint": "/healthz", "threshold": "p95<250ms" } }
           ],
           lastRunItem: {
             title: `Probes`,
@@ -477,7 +477,7 @@ export const DeployToEU = {
           headerColor: "bg-purple-100",
           collapsedBackground: 'bg-purple-100',
           parameters: [
-            { icon: "globe", items: ["eu.example.com", "weight: 100%"] }
+            { icon: "globe", items: { "domain": "eu.example.com", "weight": "100%" } }
           ],
           lastRunItem: {
             title: "Cutover pending",
@@ -531,7 +531,7 @@ export const DeployToAsia = {
           headerColor: "bg-amber-100",
           collapsedBackground: 'bg-amber-100',
           parameters: [
-            { icon: "globe", items: ["asia.example.com", "weight: 0%"] }
+            { icon: "globe", items: { "domain": "asia.example.com", "weight": "0%" } }
           ],
           lastRunItem: {
             title: `Drain complete`,
@@ -559,7 +559,7 @@ export const DeployToAsia = {
           headerColor: "bg-blue-100",
           collapsedBackground: 'bg-blue-100',
           parameters: [
-            { icon: "boxes", items: ["app: asia-api", "strategy: canary"] }
+            { icon: "boxes", items: { "app": "asia-api", "strategy": "canary" } }
           ],
           lastRunItem: {
             title: `Argo sync`,
@@ -587,7 +587,7 @@ export const DeployToAsia = {
           headerColor: "bg-emerald-100",
           collapsedBackground: 'bg-emerald-100',
           parameters: [
-            { icon: "server-cog", items: ["job: migrate", "concurrency: 1"] }
+            { icon: "server-cog", items: { "job": "migrate", "concurrency": "1" } }
           ],
           lastRunItem: {
             title: `Migrations applied`,
@@ -615,7 +615,7 @@ export const DeployToAsia = {
           headerColor: "bg-green-100",
           collapsedBackground: 'bg-green-100',
           parameters: [
-            { icon: "stethoscope", items: ["/healthz", "p95<250ms"] }
+            { icon: "stethoscope", items: { "endpoint": "/healthz", "threshold": "p95<250ms" } }
           ],
           lastRunItem: {
             title: `Probes`,
@@ -643,7 +643,7 @@ export const DeployToAsia = {
           headerColor: "bg-purple-100",
           collapsedBackground: 'bg-purple-100',
           parameters: [
-            { icon: "globe", items: ["asia.example.com", "weight: 100%"] }
+            { icon: "globe", items: { "domain": "asia.example.com", "weight": "100%" } }
           ],
           lastRunItem: {
             title: "Cutover pending",

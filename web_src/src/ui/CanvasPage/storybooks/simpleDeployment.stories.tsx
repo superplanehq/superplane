@@ -261,7 +261,7 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [{ icon: "map", items: ["us-west-1", "us-east-1"] }],
+        parameters: [{ icon: "map", items: { "regions": "us-west-1, us-east-1" } }],
         lastRunItem: {
           title: "FEAT-984: Autocomplete",
           subtitle: "ef758d40",
@@ -336,7 +336,7 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [{ icon: "map", items: ["eu-global-1", "eu-global-2"] }],
+        parameters: [{ icon: "map", items: { "regions": "eu-global-1, eu-global-2" } }],
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
@@ -421,7 +421,7 @@ const sampleNodes: CanvasNode[] = [
           { icon: "package", label: "Image: v3.18.217" },
           { icon: "package", label: "Size: 971.5 MB" },
         ],
-        parameters: [{ icon: "map", items: ["asia-east-1"] }],
+        parameters: [{ icon: "map", items: { "region": "asia-east-1" } }],
         lastRunItem: {
           title: "fix: open rejected events",
           subtitle: "ef758d40",
