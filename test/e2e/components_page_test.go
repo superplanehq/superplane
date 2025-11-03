@@ -14,8 +14,7 @@ func TestCustomComponents(t *testing.T) {
 		steps.GivenADeploymentComponentExists()
 		steps.GivenACanvasWithComponentExists()
 		steps.GivenNodeHasOneExecution()
-		// steps.VisitCanvasPage()
-		// steps.ClickExpand()
+		steps.ClickExpand()
 		// steps.AssertNavigatedToNodeRunPage()
 	})
 }
@@ -66,7 +65,6 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 	s.session.DragAndDrop(source, target, 400, 250)
 	s.session.Click(q.TestID("add-node-button"))
 	s.session.Click(q.TestID("save-canvas-button"))
-	s.session.TakeScreenshot()
 }
 
 func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {
@@ -74,9 +72,12 @@ func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {
 	runOption := q.Locator("button:has-text('Run')")
 
 	s.session.Click(dropdown)
-	s.session.TakeScreenshot()
 	s.session.Click(runOption)
-	s.session.Sleep(300)
+	s.session.Click(q.TestID("emit-event-submit-button"))
+	s.session.Sleep(1000)
+	s.session.TakeScreenshot()
+	s.session.Visit("/" + s.session.orgID + "/canvases")
+	s.session.Click(q.Text(s.canvasName))
 }
 
 func (s *CustomComponentsSteps) VisitCanvasPage() {
@@ -84,7 +85,6 @@ func (s *CustomComponentsSteps) VisitCanvasPage() {
 }
 
 func (s *CustomComponentsSteps) ClickExpand() {
-	// Click the inline expand icon we render next to child events
 	s.session.Click(q.TestID("expand-run-button"))
 }
 
