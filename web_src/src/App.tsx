@@ -1,10 +1,10 @@
+import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "./App.css";
-import { TooltipProvider } from "@/ui/tooltip";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
@@ -14,7 +14,6 @@ import { useDarkMode } from "./hooks/useDarkMode";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import { CustomComponent } from "./pages/custom-component";
-import { Canvas } from "./pages/canvas";
 import HomePage from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
@@ -55,31 +54,15 @@ function App() {
         <TooltipProvider delayDuration={150}>
           <BrowserRouter>
             <Routes>
-            {/* Organization-scoped protected routes */}
-            <Route
-              path=":organizationId"
-              element={withAuthAndNavigation(HomePage)}
-            />
-            <Route
-              path=":organizationId/canvas/:canvasId"
-              element={withAuthOnly(Canvas)}
-            />
-            <Route
-              path=":organizationId/custom-components/:blueprintId"
-              element={withAuthOnly(CustomComponent)}
-            />
-            <Route
-              path=":organizationId/workflows/:workflowId"
-              element={withAuthOnly(WorkflowPageV2)}
-            />
-            <Route
-              path=":organizationId/settings/*"
-              element={withAuthAndNavigation(OrganizationSettings)}
-            />
+              {/* Organization-scoped protected routes */}
+              <Route path=":organizationId" element={withAuthAndNavigation(HomePage)} />
+              <Route path=":organizationId/custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
+              <Route path=":organizationId/workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
+              <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
 
-            {/* Organization selection and creation */}
-            <Route path="create" element={<OrganizationCreate />} />
-            <Route path="" element={<OrganizationSelect />} />
+              {/* Organization selection and creation */}
+              <Route path="create" element={<OrganizationCreate />} />
+              <Route path="" element={<OrganizationSelect />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
