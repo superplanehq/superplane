@@ -31,15 +31,76 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
   }
 }
 
-function formatNextTrigger(timestamp: string | undefined): string {
-  if (!timestamp) {
+function calculateNextTrigger(configuration: ScheduleConfiguration): Date | null {
+  const now = new Date()
+
+  switch (configuration.type) {
+    case 'hourly':
+      const nextHour = new Date(now)
+      nextHour.setMinutes(configuration.minute ?? 0)
+      nextHour.setSeconds(0)
+      nextHour.setMilliseconds(0)
+
+      if (nextHour <= now) {
+        nextHour.setHours(nextHour.getHours() + 1)
+      }
+      return nextHour
+
+    case 'daily':
+      if (!configuration.time) return null
+
+      const [hours, minutes] = configuration.time.split(':').map(Number)
+      const nextDay = new Date(now)
+      nextDay.setUTCHours(hours)
+      nextDay.setUTCMinutes(minutes)
+      nextDay.setSeconds(0)
+      nextDay.setMilliseconds(0)
+
+      if (nextDay <= now) {
+        nextDay.setDate(nextDay.getDate() + 1)
+      }
+      return nextDay
+
+    case 'weekly':
+      if (!configuration.time || !configuration.weekDay) return null
+
+      const [weekHours, weekMinutes] = configuration.time.split(':').map(Number)
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+      const targetDayIndex = dayNames.indexOf(configuration.weekDay.toLowerCase())
+
+      if (targetDayIndex === -1) return null
+
+      const nextWeek = new Date(now)
+      const currentDayIndex = nextWeek.getDay()
+      let daysUntilTarget = targetDayIndex - currentDayIndex
+
+      if (daysUntilTarget < 0 || (daysUntilTarget === 0 && now.getUTCHours() * 60 + now.getUTCMinutes() >= weekHours * 60 + weekMinutes)) {
+        daysUntilTarget += 7
+      }
+
+      nextWeek.setDate(nextWeek.getDate() + daysUntilTarget)
+      nextWeek.setUTCHours(weekHours)
+      nextWeek.setUTCMinutes(weekMinutes)
+      nextWeek.setSeconds(0)
+      nextWeek.setMilliseconds(0)
+
+      return nextWeek
+
+    default:
+      return null
+  }
+}
+
+function formatNextTrigger(configuration: ScheduleConfiguration): string {
+  const nextTrigger = calculateNextTrigger(configuration)
+
+  if (!nextTrigger) {
     return "-"
   }
 
   try {
-    const date = new Date(timestamp)
     const now = new Date()
-    const diffMs = date.getTime() - now.getTime()
+    const diffMs = nextTrigger.getTime() - now.getTime()
     const diffMins = Math.floor(diffMs / 60000)
 
     if (diffMins < 0) {
@@ -54,7 +115,7 @@ function formatNextTrigger(timestamp: string | undefined): string {
       return `Next: in ${Math.floor(diffMins / 60)}h`
     }
 
-    return formatTimestampInUserTimezone(timestamp)
+    return formatTimestampInUserTimezone(nextTrigger.toISOString())
   } catch (e) {
     return ""
   }
@@ -76,6 +137,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
   },
 
   getTriggerProps: (node: ComponentsNode, trigger: TriggersTrigger, lastEvent: any) => {
+
     const props: TriggerProps = {
       title: node.name!,
       iconSlug: trigger.icon,
@@ -89,7 +151,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
         },
         {
           icon: "arrow-big-right",
-          label: formatNextTrigger(node.metadata?.nextTrigger as string),
+          label: formatNextTrigger(node.configuration as unknown as ScheduleConfiguration),
         }
       ],
       zeroStateText: "This schedule has not been triggered yet.",
