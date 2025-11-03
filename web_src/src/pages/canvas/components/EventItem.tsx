@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useState } from 'react';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { SuperplaneEventState, SuperplaneEventStateReason } from '@/api-client';
 import { formatRelativeTime } from '../utils/stageEventUtils';
 import { PayloadDisplay } from './PayloadDisplay';
-import { useCanvasStore } from "../store/canvasStore";
 
 interface EventItemProps {
   eventId: string;
@@ -30,23 +29,11 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
   payload,
   showStateLabel = true,
 }) => {
-  const isExpanded = useCanvasStore(state => state.expandedEventItems[eventId] || false);
-  const setEventItemExpanded = useCanvasStore(state => state.setEventItemExpanded);
-  const toggleExpand = useCallback((): void => {
-    setEventItemExpanded(eventId, !isExpanded);
-  }, [eventId, isExpanded, setEventItemExpanded]);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
-  // Debug logs to trace mounting/unmounting and state changes
-  useEffect(() => {
-    console.log('[EventItem] mount', { eventId });
-    return () => {
-      console.log('[EventItem] unmount', { eventId });
-    };
-  }, [eventId]);
-
-  useEffect(() => {
-    console.log('[EventItem] expanded state', { eventId, isExpanded });
-  }, [eventId, isExpanded]);
+  const toggleExpand = (): void => {
+    setIsExpanded(!isExpanded);
+  };
 
   // Map SuperplaneEventState to EventStateItem format for the header display
   const getEventStateType = () => {

@@ -51,9 +51,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
 
   // Flatten all pages into a single array
   const allEvents = useMemo(() => {
-    const list = eventsData?.pages.flatMap(page => page.events) || [];
-    console.log('[EventSourceSidebar] allEvents computed', { count: list.length, filter: activeEventFilter });
-    return list;
+    return eventsData?.pages.flatMap(page => page.events) || [];
   }, [eventsData]);
 
   // Get total count from the first page
@@ -71,7 +69,6 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
   // Refetch when filter changes
   useEffect(() => {
     refetchEvents();
-    console.log('[EventSourceSidebar] filter changed -> refetch', { filter: activeEventFilter });
   }, [activeEventFilter, refetchEvents]);
 
   useEffect(() => {
@@ -108,10 +105,6 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
     }
     return "webhook";
   }, [canvasIntegrations, selectedEventSource.eventSourceType, selectedEventSource.spec?.integration?.name, selectedEventSource.spec?.schedule]);
-
-  useEffect(() => {
-    console.log('[EventSourceSidebar] render', { activeTab, totalCount });
-  }, [activeTab, totalCount]);
 
 
   return (

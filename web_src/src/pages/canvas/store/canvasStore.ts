@@ -44,8 +44,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   edges: [],
   handleDragging: undefined,
   lockedNodes: true,
-  // UI state persisted across canvas interactions
-  expandedEventItems: {},
 
 
   // Actions (equivalent to the reducer actions in the context implementation)
@@ -514,17 +512,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         [eventSourceId]: key
       }
     }));
-  },
-
-  // Persist expanded/collapsed state for sidebar events by id
-  setEventItemExpanded: (eventId: string, expanded: boolean) => {
-    set((state) => ({
-      expandedEventItems: {
-        ...state.expandedEventItems,
-        [eventId]: expanded,
-      }
-    }));
-    console.log('[CanvasStore] setEventItemExpanded', { eventId, expanded });
   },
 
   resetEventSourceKey: (eventSourceId: string) => {
