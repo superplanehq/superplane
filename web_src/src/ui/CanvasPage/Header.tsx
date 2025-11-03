@@ -2,7 +2,7 @@ import SuperplaneLogo from "@/assets/superplane.svg";
 import { resolveIcon } from "@/lib/utils";
 import { Button } from "../button";
 import { Avatar } from "@/components/Avatar/avatar";
-import { Save } from "lucide-react";
+import { Save, Undo2 } from "lucide-react";
 import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from "@/components/Dropdown/dropdown";
 import { Text } from "@/components/Text/text";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
@@ -22,6 +22,8 @@ export interface BreadcrumbItem {
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
   onSave?: () => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
   onLogoClick?: () => void;
   organizationId?: string;
   unsavedMessage?: string;
@@ -29,7 +31,7 @@ interface HeaderProps {
   saveButtonHidden?: boolean;
 }
 
-export function Header({ breadcrumbs, onSave, onLogoClick, organizationId, unsavedMessage, saveIsPrimary, saveButtonHidden }: HeaderProps) {
+export function Header({ breadcrumbs, onSave, onUndo, canUndo, onLogoClick, organizationId, unsavedMessage, saveIsPrimary, saveButtonHidden }: HeaderProps) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || '');
 
@@ -114,6 +116,16 @@ export function Header({ breadcrumbs, onSave, onLogoClick, organizationId, unsav
               <span className="text-sm text-amber-700 bg-amber-100 px-2 py-1 rounded-md hidden sm:inline">
                 {unsavedMessage}
               </span>
+            )}
+            {onUndo && canUndo && (
+              <Button
+                onClick={onUndo}
+                size="sm"
+                variant="outline"
+              >
+                <Undo2 />
+                Revert
+              </Button>
             )}
             {onSave && !saveButtonHidden && (
               <Button onClick={onSave} size="sm" variant={saveIsPrimary ? "default" : "outline"}>

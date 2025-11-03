@@ -96,6 +96,9 @@ export interface CanvasPageProps {
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  // Undo functionality
+  onUndo?: () => void;
+  canUndo?: boolean;
   // Disable running nodes when there are unsaved changes (with tooltip)
   runDisabled?: boolean;
   runDisabledTooltip?: string;
@@ -289,10 +292,8 @@ function CanvasPage(props: CanvasPageProps) {
         configuration: {},
         position,
       });
-      // Mark canvas as dirty immediately on drop
-      if (props.onDirty) props.onDirty();
     },
-    [props],
+    [],
   );
 
   const handleSidebarToggle = useCallback(
@@ -347,6 +348,8 @@ function CanvasPage(props: CanvasPageProps) {
         <CanvasContentHeader
           state={state}
           onSave={props.onSave}
+          onUndo={props.onUndo}
+          canUndo={props.canUndo}
           organizationId={props.organizationId}
           unsavedMessage={props.unsavedMessage}
           saveIsPrimary={props.saveIsPrimary}
@@ -553,6 +556,8 @@ function Sidebar({
 function CanvasContentHeader({
   state,
   onSave,
+  onUndo,
+  canUndo,
   organizationId,
   unsavedMessage,
   saveIsPrimary,
@@ -560,6 +565,8 @@ function CanvasContentHeader({
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
   organizationId?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
@@ -584,6 +591,8 @@ function CanvasContentHeader({
     <Header
       breadcrumbs={state.breadcrumbs}
       onSave={onSave ? handleSave : undefined}
+      onUndo={onUndo}
+      canUndo={canUndo}
       onLogoClick={organizationId ? handleLogoClick : undefined}
       organizationId={organizationId}
       unsavedMessage={unsavedMessage}
