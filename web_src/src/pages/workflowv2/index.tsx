@@ -883,16 +883,22 @@ function prepareCompositeNode(
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: [],
-        items: (execution.childExecutions || []).map((ce) => {
-          const label = friendlyChildLabel(ce, nodes);
-          const state =
-            ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
-              ? ("processed" as const)
-              : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-              ? ("discarded" as const)
-              : ("running" as const);
-          return { label, state, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
-        }),
+        items: (execution.childExecutions || [])
+          .map((ce) => {
+            const label = friendlyChildLabel(ce, nodes);
+            const state =
+              ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
+                ? ("processed" as const)
+                : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
+                ? ("discarded" as const)
+                : ("running" as const);
+            return { label, state, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
+          })
+          .sort((a, b) => {
+            if (!a.startedAt) return 1;
+            if (!b.startedAt) return -1;
+            return a.startedAt.getTime() - b.startedAt.getTime();
+          }),
       },
     };
   }
@@ -1489,16 +1495,22 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: [],
-        items: (execution.childExecutions || []).map((ce) => {
-          const label = friendlyChildLabel(ce, nodes);
-          const st =
-            ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
-              ? ("processed" as const)
-              : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-              ? ("discarded" as const)
-              : ("running" as const);
-          return { label, state: st, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
-        }),
+        items: (execution.childExecutions || [])
+          .map((ce) => {
+            const label = friendlyChildLabel(ce, nodes);
+            const st =
+              ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
+                ? ("processed" as const)
+                : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
+                ? ("discarded" as const)
+                : ("running" as const);
+            return { label, state: st, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
+          })
+          .sort((a, b) => {
+            if (!a.startedAt) return 1;
+            if (!b.startedAt) return -1;
+            return a.startedAt.getTime() - b.startedAt.getTime();
+          }),
       },
     };
   });
