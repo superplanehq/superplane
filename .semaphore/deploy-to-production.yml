@@ -1,0 +1,15 @@
+version: v1.0
+name: Deploy to production
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+blocks:
+  - name: "Trigger deployment task"
+    task:
+      secrets:
+        - name: semaphore-api-token
+      jobs:
+        - name: "Trigger deployment task"
+          commands:
+            - echo "Deploying $SEMAPHORE_GIT_BRANCH ($SEMAPHORE_GIT_SHA) to production"
