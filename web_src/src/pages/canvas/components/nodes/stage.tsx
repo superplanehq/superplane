@@ -5,8 +5,8 @@ import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useUpdateStage, useCreateStage, useDeleteStage, useAlertsBySourceId, useAcknowledgeAlert } from '@/hooks/useCanvasData';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent } from '@/api-client';
-import { useIntegrations } from '../../hooks/useIntegrations';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping, superplaneListEvents, superplaneCreateEvent, IntegrationsIntegration } from '@/api-client';
+import { useIntegrations } from '@/hooks/useIntegrations';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -182,8 +182,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       return true;
     }
 
-    const semaphoreIntegrations = availableIntegrations.filter(int => int.spec?.type === 'semaphore');
-    const githubIntegrations = availableIntegrations.filter(int => int.spec?.type === 'github');
+    const semaphoreIntegrations = availableIntegrations.filter((int: IntegrationsIntegration) => int.spec?.type === 'semaphore');
+    const githubIntegrations = availableIntegrations.filter((int: IntegrationsIntegration) => int.spec?.type === 'github');
 
     const hasRequiredIntegrations = (executorType === 'semaphore' && semaphoreIntegrations.length > 0) ||
       (executorType === 'github' && githubIntegrations.length > 0);

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 import { StageNodeType } from '@/canvas/types/flow';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping, SuperplaneStageEvent } from '@/api-client/types.gen';
-import { useSecrets } from '../hooks/useSecrets';
-import { useIntegrations } from '../hooks/useIntegrations';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping, SuperplaneStageEvent, SecretsSecret } from '@/api-client/types.gen';
+import { useSecrets } from '@/hooks/useSecrets';
+import { useIntegrations } from '@/hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
 import { useArrayEditor } from '../hooks/useArrayEditor';
 import { useConnectionManager } from '../hooks/useConnectionManager';
@@ -189,7 +189,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
   const getAllSecrets = () => {
     const allSecrets: Array<{ name: string; source: 'Canvas' | 'Organization'; data: Record<string, string> }> = [];
 
-    canvasSecrets.forEach(secret => {
+    canvasSecrets.forEach((secret: SecretsSecret) => {
       if (secret.metadata?.name) {
         allSecrets.push({
           name: secret.metadata.name,
@@ -199,7 +199,7 @@ export function StageEditModeContent({ data, currentStageId, canvasId, organizat
       }
     });
 
-    organizationSecrets.forEach(secret => {
+    organizationSecrets.forEach((secret: SecretsSecret) => {
       if (secret.metadata?.name) {
         allSecrets.push({
           name: secret.metadata.name,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef, EventSourceEventType, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneEventSourceSchedule } from '@/api-client/types.gen';
-import { useIntegrations } from '../hooks/useIntegrations';
+import { useIntegrations } from '@/hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
 import { useResetEventSourceKey } from '@/hooks/useCanvasData';
 import { EditableAccordionSection } from './shared/EditableAccordionSection';

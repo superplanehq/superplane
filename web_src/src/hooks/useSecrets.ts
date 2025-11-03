@@ -1,13 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { 
+import {
   secretsListSecrets,
   secretsCreateSecret,
   secretsDescribeSecret,
   secretsUpdateSecret,
   secretsDeleteSecret,
-} from '../../../api-client/sdk.gen'
-import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
-import type { SecretsCreateSecretData, SecretsUpdateSecretData } from '../../../api-client/types.gen'
+} from '@/api-client/sdk.gen'
+import { withOrganizationHeader } from '@/utils/withOrganizationHeader'
+import type { SecretsCreateSecretData, SecretsUpdateSecretData } from '@/api-client/types.gen'
 
 export const secretKeys = {
   all: ['secrets'] as const,
@@ -35,7 +35,7 @@ export const useSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "
     queryKey: secretKeys.detail(domainId, domainType, secretId),
     queryFn: async () => {
       const response = await secretsDescribeSecret(withOrganizationHeader({
-        query: { 
+        query: {
           domainType: domainType,
           domainId: domainId,
         },
@@ -56,7 +56,7 @@ export interface CreateSecretParams {
 
 export const useCreateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (params: CreateSecretParams) => {
       const data: { [key: string]: string } = {}
@@ -89,8 +89,8 @@ export const useCreateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
       }))
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: secretKeys.byDomain(domainId, domainType) 
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.byDomain(domainId, domainType)
       })
     }
   })
@@ -103,7 +103,7 @@ export interface UpdateSecretParams {
 
 export const useUpdateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", secretId: string) => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (params: UpdateSecretParams) => {
       const data: { [key: string]: string } = {}
@@ -143,11 +143,11 @@ export const useUpdateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
       }))
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: secretKeys.byDomain(domainId, domainType) 
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.byDomain(domainId, domainType)
       })
-      queryClient.invalidateQueries({ 
-        queryKey: secretKeys.detail(domainId, domainType, secretId) 
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.detail(domainId, domainType, secretId)
       })
     }
   })
@@ -155,7 +155,7 @@ export const useUpdateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
 
 export const useDeleteSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: async (secretId: string) => {
       return await secretsDeleteSecret(withOrganizationHeader({
@@ -169,8 +169,8 @@ export const useDeleteSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
       }))
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: secretKeys.byDomain(domainId, domainType) 
+      queryClient.invalidateQueries({
+        queryKey: secretKeys.byDomain(domainId, domainType)
       })
     }
   })
