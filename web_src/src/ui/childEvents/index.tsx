@@ -41,8 +41,6 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
     return resolveIcon("rotate-ccw");
   }, []);
 
-  // details list removed; no expandable content now
-
   return (
     <div className={className}>
       <div className="flex items-center justify-between gap-2">
