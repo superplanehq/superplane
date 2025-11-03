@@ -26,9 +26,9 @@ type WorkflowsWorkflowNodeExecution struct {
 	NodeId *string `json:"nodeId,omitempty"`
 	ParentExecutionId *string `json:"parentExecutionId,omitempty"`
 	PreviousExecutionId *string `json:"previousExecutionId,omitempty"`
-	State *WorkflowsWorkflowNodeExecutionState `json:"state,omitempty"`
-	Result *WorkflowsWorkflowNodeExecutionResult `json:"result,omitempty"`
-	ResultReason *WorkflowsWorkflowNodeExecutionResultReason `json:"resultReason,omitempty"`
+	State *WorkflowNodeExecutionState `json:"state,omitempty"`
+	Result *WorkflowNodeExecutionResult `json:"result,omitempty"`
+	ResultReason *WorkflowNodeExecutionResultReason `json:"resultReason,omitempty"`
 	ResultMessage *string `json:"resultMessage,omitempty"`
 	Input map[string]interface{} `json:"input,omitempty"`
 	Outputs map[string]interface{} `json:"outputs,omitempty"`
@@ -46,11 +46,11 @@ type WorkflowsWorkflowNodeExecution struct {
 // will change when the set of required properties is changed
 func NewWorkflowsWorkflowNodeExecution() *WorkflowsWorkflowNodeExecution {
 	this := WorkflowsWorkflowNodeExecution{}
-	var state WorkflowsWorkflowNodeExecutionState = WORKFLOWSWORKFLOWNODEEXECUTIONSTATE_STATE_UNKNOWN
+	var state WorkflowNodeExecutionState = WORKFLOWNODEEXECUTIONSTATE_STATE_UNKNOWN
 	this.State = &state
-	var result WorkflowsWorkflowNodeExecutionResult = WORKFLOWSWORKFLOWNODEEXECUTIONRESULT_RESULT_UNKNOWN
+	var result WorkflowNodeExecutionResult = WORKFLOWNODEEXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
-	var resultReason WorkflowsWorkflowNodeExecutionResultReason = WORKFLOWSWORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_OK
+	var resultReason WorkflowNodeExecutionResultReason = WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_OK
 	this.ResultReason = &resultReason
 	return &this
 }
@@ -60,11 +60,11 @@ func NewWorkflowsWorkflowNodeExecution() *WorkflowsWorkflowNodeExecution {
 // but it doesn't guarantee that properties required by API are set
 func NewWorkflowsWorkflowNodeExecutionWithDefaults() *WorkflowsWorkflowNodeExecution {
 	this := WorkflowsWorkflowNodeExecution{}
-	var state WorkflowsWorkflowNodeExecutionState = WORKFLOWSWORKFLOWNODEEXECUTIONSTATE_STATE_UNKNOWN
+	var state WorkflowNodeExecutionState = WORKFLOWNODEEXECUTIONSTATE_STATE_UNKNOWN
 	this.State = &state
-	var result WorkflowsWorkflowNodeExecutionResult = WORKFLOWSWORKFLOWNODEEXECUTIONRESULT_RESULT_UNKNOWN
+	var result WorkflowNodeExecutionResult = WORKFLOWNODEEXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
-	var resultReason WorkflowsWorkflowNodeExecutionResultReason = WORKFLOWSWORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_OK
+	var resultReason WorkflowNodeExecutionResultReason = WORKFLOWNODEEXECUTIONRESULTREASON_RESULT_REASON_OK
 	this.ResultReason = &resultReason
 	return &this
 }
@@ -230,9 +230,9 @@ func (o *WorkflowsWorkflowNodeExecution) SetPreviousExecutionId(v string) {
 }
 
 // GetState returns the State field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetState() WorkflowsWorkflowNodeExecutionState {
+func (o *WorkflowsWorkflowNodeExecution) GetState() WorkflowNodeExecutionState {
 	if o == nil || IsNil(o.State) {
-		var ret WorkflowsWorkflowNodeExecutionState
+		var ret WorkflowNodeExecutionState
 		return ret
 	}
 	return *o.State
@@ -240,7 +240,7 @@ func (o *WorkflowsWorkflowNodeExecution) GetState() WorkflowsWorkflowNodeExecuti
 
 // GetStateOk returns a tuple with the State field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetStateOk() (*WorkflowsWorkflowNodeExecutionState, bool) {
+func (o *WorkflowsWorkflowNodeExecution) GetStateOk() (*WorkflowNodeExecutionState, bool) {
 	if o == nil || IsNil(o.State) {
 		return nil, false
 	}
@@ -256,15 +256,15 @@ func (o *WorkflowsWorkflowNodeExecution) HasState() bool {
 	return false
 }
 
-// SetState gets a reference to the given WorkflowsWorkflowNodeExecutionState and assigns it to the State field.
-func (o *WorkflowsWorkflowNodeExecution) SetState(v WorkflowsWorkflowNodeExecutionState) {
+// SetState gets a reference to the given WorkflowNodeExecutionState and assigns it to the State field.
+func (o *WorkflowsWorkflowNodeExecution) SetState(v WorkflowNodeExecutionState) {
 	o.State = &v
 }
 
 // GetResult returns the Result field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetResult() WorkflowsWorkflowNodeExecutionResult {
+func (o *WorkflowsWorkflowNodeExecution) GetResult() WorkflowNodeExecutionResult {
 	if o == nil || IsNil(o.Result) {
-		var ret WorkflowsWorkflowNodeExecutionResult
+		var ret WorkflowNodeExecutionResult
 		return ret
 	}
 	return *o.Result
@@ -272,7 +272,7 @@ func (o *WorkflowsWorkflowNodeExecution) GetResult() WorkflowsWorkflowNodeExecut
 
 // GetResultOk returns a tuple with the Result field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetResultOk() (*WorkflowsWorkflowNodeExecutionResult, bool) {
+func (o *WorkflowsWorkflowNodeExecution) GetResultOk() (*WorkflowNodeExecutionResult, bool) {
 	if o == nil || IsNil(o.Result) {
 		return nil, false
 	}
@@ -288,15 +288,15 @@ func (o *WorkflowsWorkflowNodeExecution) HasResult() bool {
 	return false
 }
 
-// SetResult gets a reference to the given WorkflowsWorkflowNodeExecutionResult and assigns it to the Result field.
-func (o *WorkflowsWorkflowNodeExecution) SetResult(v WorkflowsWorkflowNodeExecutionResult) {
+// SetResult gets a reference to the given WorkflowNodeExecutionResult and assigns it to the Result field.
+func (o *WorkflowsWorkflowNodeExecution) SetResult(v WorkflowNodeExecutionResult) {
 	o.Result = &v
 }
 
 // GetResultReason returns the ResultReason field value if set, zero value otherwise.
-func (o *WorkflowsWorkflowNodeExecution) GetResultReason() WorkflowsWorkflowNodeExecutionResultReason {
+func (o *WorkflowsWorkflowNodeExecution) GetResultReason() WorkflowNodeExecutionResultReason {
 	if o == nil || IsNil(o.ResultReason) {
-		var ret WorkflowsWorkflowNodeExecutionResultReason
+		var ret WorkflowNodeExecutionResultReason
 		return ret
 	}
 	return *o.ResultReason
@@ -304,7 +304,7 @@ func (o *WorkflowsWorkflowNodeExecution) GetResultReason() WorkflowsWorkflowNode
 
 // GetResultReasonOk returns a tuple with the ResultReason field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflowNodeExecution) GetResultReasonOk() (*WorkflowsWorkflowNodeExecutionResultReason, bool) {
+func (o *WorkflowsWorkflowNodeExecution) GetResultReasonOk() (*WorkflowNodeExecutionResultReason, bool) {
 	if o == nil || IsNil(o.ResultReason) {
 		return nil, false
 	}
@@ -320,8 +320,8 @@ func (o *WorkflowsWorkflowNodeExecution) HasResultReason() bool {
 	return false
 }
 
-// SetResultReason gets a reference to the given WorkflowsWorkflowNodeExecutionResultReason and assigns it to the ResultReason field.
-func (o *WorkflowsWorkflowNodeExecution) SetResultReason(v WorkflowsWorkflowNodeExecutionResultReason) {
+// SetResultReason gets a reference to the given WorkflowNodeExecutionResultReason and assigns it to the ResultReason field.
+func (o *WorkflowsWorkflowNodeExecution) SetResultReason(v WorkflowNodeExecutionResultReason) {
 	o.ResultReason = &v
 }
 

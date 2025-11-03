@@ -31,81 +31,6 @@ var getCanvasCmd = &cobra.Command{
 	},
 }
 
-var getEventSourceCmd = &cobra.Command{
-	Use:     "event-source [ID_OR_NAME]",
-	Short:   "Get event source details",
-	Long:    `Get details about a specific event source`,
-	Aliases: []string{"event-sources", "eventsource", "eventsources"},
-	Args:    cobra.ExactArgs(1),
-
-	Run: func(cmd *cobra.Command, args []string) {
-		idOrName := args[0]
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
-
-		c := DefaultClient()
-		response, _, err := c.EventSourceAPI.SuperplaneDescribeEventSource(
-			context.Background(),
-			canvasIDOrName,
-			idOrName,
-		).Execute()
-		Check(err)
-
-		out, err := yaml.Marshal(response.EventSource)
-		Check(err)
-		fmt.Printf("%s", string(out))
-	},
-}
-
-var getConnectionGroupCmd = &cobra.Command{
-	Use:     "connection-group [ID_OR_NAME]",
-	Short:   "Get connection group details",
-	Long:    `Get details about a specific connection group`,
-	Aliases: []string{"connection-groups", "connectiongroups", "connectiongroup"},
-	Args:    cobra.ExactArgs(1),
-
-	Run: func(cmd *cobra.Command, args []string) {
-		idOrName := args[0]
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
-
-		c := DefaultClient()
-		response, _, err := c.ConnectionGroupAPI.SuperplaneDescribeConnectionGroup(
-			context.Background(),
-			canvasIDOrName,
-			idOrName,
-		).Execute()
-		Check(err)
-
-		out, err := yaml.Marshal(response.ConnectionGroup)
-		Check(err)
-		fmt.Printf("%s", string(out))
-	},
-}
-
-var getStageCmd = &cobra.Command{
-	Use:     "stage [ID_OR_NAME]",
-	Short:   "Get stage details",
-	Long:    `Get details about a specific stage`,
-	Aliases: []string{"stages"},
-	Args:    cobra.ExactArgs(1),
-
-	Run: func(cmd *cobra.Command, args []string) {
-		idOrName := args[0]
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
-
-		c := DefaultClient()
-		response, _, err := c.StageAPI.SuperplaneDescribeStage(
-			context.Background(),
-			canvasIDOrName,
-			idOrName,
-		).Execute()
-		Check(err)
-
-		out, err := yaml.Marshal(response.Stage)
-		Check(err)
-		fmt.Printf("%s", string(out))
-	},
-}
-
 var getSecretCmd = &cobra.Command{
 	Use:     "secret [ID_OR_NAME]",
 	Short:   "Get secret details",
@@ -184,21 +109,6 @@ func init() {
 	// Canvas command
 	getCmd.AddCommand(getCanvasCmd)
 	getCanvasCmd.Flags().String("name", "", "Name of the canvas (alternative to ID)")
-
-	// Event Source command
-	getCmd.AddCommand(getEventSourceCmd)
-	getEventSourceCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
-	getEventSourceCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
-
-	// Stage command
-	getCmd.AddCommand(getStageCmd)
-	getStageCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
-	getStageCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
-
-	// Connection group command
-	getCmd.AddCommand(getConnectionGroupCmd)
-	getConnectionGroupCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
-	getConnectionGroupCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
 
 	// Secret command
 	getCmd.AddCommand(getSecretCmd)
