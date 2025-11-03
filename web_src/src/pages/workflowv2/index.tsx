@@ -749,6 +749,9 @@ export function WorkflowPageV2() {
 
   return (
     <CanvasPage
+      onNodeExpand={(nodeId) => {
+        navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}`)
+      }}
       title={workflow.name!}
       nodes={nodes}
       edges={edges}
