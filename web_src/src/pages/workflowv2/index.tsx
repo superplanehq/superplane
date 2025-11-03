@@ -17,6 +17,7 @@ import {
   workflowsEmitNodeEvent,
   workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
+import { organizationKeys } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import {
@@ -240,6 +241,7 @@ export function WorkflowPageV2() {
       nodeQueueItemsMap,
       workflowId!,
       queryClient,
+      organizationId!,
     );
   }, [
     workflow,
@@ -798,6 +800,7 @@ function prepareData(
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
+  organizationId: string,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -816,6 +819,7 @@ function prepareData(
         nodeQueueItemsMap,
         workflowId,
         queryClient,
+        organizationId,
       );
     })
     .map((node) => ({
@@ -1004,6 +1008,7 @@ function prepareNode(
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
   queryClient: any,
+  organizationId: string,
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -1034,6 +1039,7 @@ function prepareNode(
         nodeQueueItemsMap,
         workflowId,
         queryClient,
+        organizationId,
       );
   }
 }
@@ -1047,10 +1053,11 @@ function prepareComponentNode(
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   workflowId: string,
   queryClient: any,
+  organizationId?: string,
 ): CanvasNode {
   switch (node.component?.name) {
     case "approval":
-      return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient);
+      return prepareApprovalNode(nodes, node, components, nodeExecutionsMap, workflowId, queryClient, organizationId);
     case "if":
       return prepareIfNode(nodes, node, nodeExecutionsMap);
     case "noop":
@@ -1091,11 +1098,38 @@ function prepareApprovalNode(
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   workflowId: string,
   queryClient: any,
+  organizationId?: string,
 ): CanvasNode {
   const metadata = components.find((c) => c.name === "approval");
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
   const executionMetadata = execution?.metadata as any;
+  const configuration = (node.configuration || {}) as any;
+  const items: any[] = Array.isArray(configuration.items) ? configuration.items : [];
+
+  // Try to enrich display values from cached org users/roles
+  let usersById: Record<string, { email?: string; name?: string }> = {};
+  let rolesByName: Record<string, string> = {};
+  if (organizationId) {
+    const usersResp: any = queryClient.getQueryData(organizationKeys.users(organizationId));
+    if (Array.isArray(usersResp)) {
+      usersResp.forEach((u: any) => {
+        const id = u.metadata?.id;
+        const email = u.metadata?.email;
+        const name = u.spec?.displayName;
+        if (id) usersById[id] = { email, name };
+      });
+    }
+
+    const rolesResp: any = queryClient.getQueryData(organizationKeys.roles(organizationId));
+    if (Array.isArray(rolesResp)) {
+      rolesResp.forEach((r: any) => {
+        const name = r.metadata?.name;
+        const display = r.spec?.displayName;
+        if (name) rolesByName[name] = display || name;
+      });
+    }
+  }
 
   let rootTriggerRenderer: TriggerRenderer | null = null;
   if (execution) {
@@ -1221,6 +1255,36 @@ function prepareApprovalNode(
         description: metadata?.description,
         receivedAt: execution ? new Date(execution.createdAt!) : undefined,
         approvals,
+        // Display Approval settings similar to IF component specs
+        spec: items.length > 0 ? {
+          title: "approvals required",
+          tooltipTitle: "approvals required",
+          values: items.map((item) => {
+            const type = (item.type || "").toString();
+            let value = type === "user" ? (item.user || "") : type === "role" ? (item.role || "") : type === "group" ? (item.group || "") : "";
+            const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+
+            // Pretty-print values
+            if (type === "user" && value && usersById[value]) {
+              value = usersById[value].email || usersById[value].name || value;
+            }
+            if (type === "role" && value) {
+              value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
+              // Fallback to simple suffix mapping when not found
+              const suffix = (item.role || '').split('_').pop();
+              if (!rolesByName[item.role || ''] && suffix) {
+                const map: any = { viewer: 'Viewer', admin: 'Admin', owner: 'Owner' };
+                value = map[suffix] || value;
+              }
+            }
+            return {
+              badges: [
+                { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+              ],
+            };
+          })
+        } : undefined,
         awaitingEvent:
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
             ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!)
