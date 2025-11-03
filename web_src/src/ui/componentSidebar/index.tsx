@@ -152,13 +152,15 @@ export const ComponentSidebar = ({
         iconSize = 8;
         break;
       case "waiting":
-        EventIcon = resolveIcon("circle-dashed");
-        EventColor = "text-orange-700";
-        EventBackground = "bg-orange-200";
+        EventIcon = resolveIcon("refresh-cw");
+        EventColor = "text-blue-700";
+        EventBackground = "bg-blue-100";
         iconBorderColor = "";
         iconSize = 17;
         iconContainerSize = 5;
         iconStrokeWidth = 2;
+        animation = "animate-spin";
+        break;
         break;
       case "running":
         EventIcon = resolveIcon("refresh-cw");
