@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -114,88 +113,6 @@ var createCmd = &cobra.Command{
 			Check(err)
 			fmt.Printf("%s", string(out))
 
-		case "EventSource":
-			// Parse YAML to map
-			var yamlData map[string]any
-			err = yaml.Unmarshal(data, &yamlData)
-			Check(err)
-
-			// Extract the metadata from the YAML
-			metadata, ok := yamlData["metadata"].(map[string]interface{})
-			if !ok {
-				Fail("Invalid EventSource YAML: metadata section missing")
-			}
-
-			canvasIDOrName, ok := metadata["canvasId"].(string)
-			if !ok {
-				canvasIDOrName, ok = metadata["canvasName"].(string)
-				if !ok {
-					Fail("Invalid EventSource YAML: canvasId or canvasName field missing")
-				}
-			}
-
-			// Create the event source request
-			var eventSource openapi_client.SuperplaneEventSource
-			err = yaml.Unmarshal(data, &eventSource)
-			Check(err)
-
-			body := openapi_client.SuperplaneCreateEventSourceBody{
-				EventSource: &eventSource,
-			}
-
-			response, httpResponse, err := c.EventSourceAPI.SuperplaneCreateEventSource(context.Background(), canvasIDOrName).Body(body).Execute()
-			if err != nil {
-				b, _ := io.ReadAll(httpResponse.Body)
-				fmt.Printf("%s\n", string(b))
-				os.Exit(1)
-			}
-
-			// Access the event source from response
-			es := response.GetEventSource()
-			fmt.Printf("Event Source '%s' created with ID '%s'.\n",
-				*es.GetMetadata().Name, *es.GetMetadata().Id)
-			fmt.Printf("Key: %s\n", *response.Key)
-			fmt.Println("! Save this key as it won't be shown again.")
-
-		case "ConnectionGroup":
-			// Parse YAML to map
-			var yamlData map[string]any
-			err = yaml.Unmarshal(data, &yamlData)
-			Check(err)
-
-			// Extract the metadata from the YAML
-			metadata, ok := yamlData["metadata"].(map[string]interface{})
-			if !ok {
-				Fail("Invalid ConnectionGroup YAML: metadata section missing")
-			}
-
-			canvasID, ok := metadata["canvasId"].(string)
-			if !ok {
-				Fail("Invalid ConnectionGroup YAML: canvasId or canvasName field missing")
-			}
-
-			var connectionGroup openapi_client.SuperplaneConnectionGroup
-			err = yaml.Unmarshal(data, &connectionGroup)
-			Check(err)
-
-			body := openapi_client.SuperplaneCreateConnectionGroupBody{
-				ConnectionGroup: &connectionGroup,
-			}
-
-			response, httpResponse, err := c.ConnectionGroupAPI.SuperplaneCreateConnectionGroup(context.Background(), canvasID).
-				Body(body).
-				Execute()
-
-			if err != nil {
-				b, _ := io.ReadAll(httpResponse.Body)
-				fmt.Printf("%s\n", string(b))
-				os.Exit(1)
-			}
-
-			out, err := yaml.Marshal(response.ConnectionGroup)
-			Check(err)
-			fmt.Printf("%s", string(out))
-
 		case "Integration":
 			// Parse YAML to map
 			var yamlData map[string]any
@@ -241,77 +158,6 @@ var createCmd = &cobra.Command{
 			}
 
 			out, err := yaml.Marshal(response.Integration)
-			Check(err)
-			fmt.Printf("%s", string(out))
-
-		case "Stage":
-			var yamlData map[string]any
-			err = yaml.Unmarshal(data, &yamlData)
-			Check(err)
-
-			metadata, ok := yamlData["metadata"].(map[string]any)
-			if !ok {
-				Fail("Invalid Stage YAML: metadata section missing")
-			}
-
-			name, ok := metadata["name"].(string)
-			if !ok {
-				Fail("Invalid Stage YAML: name missing")
-			}
-
-			canvasIDOrName, ok := metadata["canvasId"].(string)
-			if !ok {
-				canvasIDOrName, ok = metadata["canvasName"].(string)
-				if !ok {
-					Fail("Invalid Stage YAML: canvasId or canvasName field missing")
-				}
-			}
-
-			spec, ok := yamlData["spec"].(map[string]any)
-			if !ok {
-				Fail("Invalid Stage YAML: spec section missing")
-			}
-
-			// Convert to JSON not needed anymore
-			// We can use the spec map directly
-
-			// Keep using the original workflow for stages
-			// Parse the stage spec directly from YAML
-			// instead of trying to extract it from a nested map
-
-			// Create stage with metadata and spec
-			stage := openapi_client.NewSuperplaneStage()
-			stageMeta := openapi_client.NewSuperplaneStageMetadata()
-			stageMeta.SetName(name)
-			stageMeta.SetCanvasId(canvasIDOrName)
-			stage.SetMetadata(*stageMeta)
-
-			// Convert the spec to JSON
-			specData, err := json.Marshal(spec)
-			Check(err)
-
-			// Parse into the proper struct
-			var stageSpec openapi_client.SuperplaneStageSpec
-			err = json.Unmarshal(specData, &stageSpec)
-			Check(err)
-
-			// Set the spec
-			stage.SetSpec(stageSpec)
-
-			// Create request and set stage
-			request := openapi_client.NewSuperplaneCreateStageBody()
-			request.SetStage(*stage)
-			response, httpResponse, err := c.StageAPI.SuperplaneCreateStage(context.Background(), canvasIDOrName).
-				Body(*request).
-				Execute()
-
-			if err != nil {
-				b, _ := io.ReadAll(httpResponse.Body)
-				fmt.Printf("%s\n", string(b))
-				os.Exit(1)
-			}
-
-			out, err := yaml.Marshal(response.Stage)
 			Check(err)
 			fmt.Printf("%s", string(out))
 
