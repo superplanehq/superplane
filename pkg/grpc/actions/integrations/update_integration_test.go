@@ -4,11 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
@@ -241,46 +239,5 @@ func Test__UpdateIntegration(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Equal(t, "error finding secret does-not-exist: record not found", s.Message())
-	})
-
-	t.Run("integration with resources cannot be updated", func(t *testing.T) {
-		integrationUUID, err := uuid.Parse(createdIntegration.Integration.Metadata.Id)
-		require.NoError(t, err)
-
-		testResource := &models.Resource{
-			IntegrationID: integrationUUID,
-			ExternalID:    "test-resource-id",
-			ResourceName:  "test-resource",
-			ResourceType:  "project",
-		}
-
-		err = database.Conn().Create(testResource).Error
-		require.NoError(t, err)
-
-		integration := &protos.Integration{
-			Metadata: &protos.Integration_Metadata{
-				Name: "updated-name-with-resources",
-			},
-			Spec: &protos.Integration_Spec{
-				Type: models.IntegrationTypeSemaphore,
-				Auth: &protos.Integration_Auth{
-					Use: protos.Integration_AUTH_TYPE_TOKEN,
-					Token: &protos.Integration_Auth_Token{
-						ValueFrom: &protos.ValueFrom{
-							Secret: &protos.ValueFromSecret{
-								Name: canvasSecret.Name,
-								Key:  "key",
-							},
-						},
-					},
-				},
-			},
-		}
-
-		_, err = UpdateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), createdIntegration.Integration.Metadata.Id, integration)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Equal(t, "integration cannot be updated as it is being used by existing resources", s.Message())
 	})
 }

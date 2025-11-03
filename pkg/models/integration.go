@@ -41,6 +41,16 @@ type IntegrationAuthToken struct {
 	ValueFrom ValueDefinitionFrom `json:"value_from"`
 }
 
+type ValueDefinitionFrom struct {
+	Secret *ValueDefinitionFromSecret `json:"secret,omitempty"`
+}
+
+type ValueDefinitionFromSecret struct {
+	DomainType string `json:"domain_type"`
+	Name       string `json:"name"`
+	Key        string `json:"key"`
+}
+
 func CreateIntegration(integration *Integration) (*Integration, error) {
 	err := database.Conn().
 		Clauses(clause.Returning{}).
@@ -68,49 +78,6 @@ func (i *Integration) Update() error {
 	}
 
 	return err
-}
-
-func (i *Integration) ListResources(resourceType string) ([]*Resource, error) {
-	resources := []*Resource{}
-
-	err := database.Conn().
-		Where("integration_id = ?", i.ID).
-		Where("type = ?", resourceType).
-		Find(&resources).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return resources, nil
-}
-
-func (i *Integration) CreateResource(resourceType, externalID, name string) (*Resource, error) {
-	return i.CreateResourceInTransaction(database.Conn(), resourceType, externalID, name)
-}
-
-func (i *Integration) CreateResourceInTransaction(tx *gorm.DB, resourceType, externalID, name string) (*Resource, error) {
-	now := time.Now()
-
-	resource := Resource{
-		ExternalID:    externalID,
-		ResourceName:  name,
-		CreatedAt:     &now,
-		IntegrationID: i.ID,
-		ResourceType:  resourceType,
-	}
-
-	err := tx.
-		Clauses(clause.Returning{}).
-		Create(&resource).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &resource, nil
 }
 
 func FindIntegrationByName(domainType string, domainID uuid.UUID, name string) (*Integration, error) {

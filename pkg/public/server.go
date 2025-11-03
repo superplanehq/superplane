@@ -9,7 +9,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,7 +19,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -369,14 +367,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
-	//
-	// Endpoint for receiving execution outputs from execution resources.
-	//
-	publicRoute.
-		HandleFunc(s.BasePath+"/outputs", s.HandleExecutionOutputs).
-		Headers("Content-Type", "application/json").
-		Methods("POST")
-
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
@@ -555,149 +545,6 @@ func (s *Server) Close() {
 	if err := s.httpServer.Close(); err != nil {
 		log.Errorf("Error closing server: %v", err)
 	}
-}
-
-type OutputsRequest struct {
-	ExecutionID string         `json:"execution_id"`
-	Outputs     map[string]any `json:"outputs"`
-}
-
-func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, req *ExecutionOutputRequest) *models.StageExecution {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return nil
-	}
-
-	headerParts := strings.Split(authHeader, "Bearer ")
-	if len(headerParts) != 2 {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return nil
-	}
-
-	token := headerParts[1]
-	ID, err := uuid.Parse(req.ExecutionID)
-	if err != nil {
-		http.Error(w, "Execution not found", http.StatusNotFound)
-		return nil
-	}
-
-	execution, err := models.FindUnscopedExecutionByID(ID)
-	if err != nil {
-		http.Error(w, "Execution not found", http.StatusNotFound)
-		return nil
-	}
-
-	//
-	// Try to authenticate using the token issued by SuperPlane itself.
-	// It the integration does not support OIDC tokens, this is the method of authentication used.
-	//
-	err = s.jwt.Validate(token, req.ExecutionID)
-	if err == nil {
-		return execution
-	}
-
-	//
-	// If authenticating with the token issued by SuperPlane itself fails,
-	// try to authenticate expecting an OIDC ID token issued by the integration.
-	//
-	integrationResource, err := execution.IntegrationResource(req.ExternalID)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return nil
-	}
-
-	verifier, err := s.registry.GetOIDCVerifier(integrationResource.IntegrationType)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return nil
-	}
-
-	err = verifier.Verify(r.Context(), s.oidcVerifier, token, integrations.VerifyTokenOptions{
-		IntegrationURL: integrationResource.IntegrationURL,
-		ParentResource: integrationResource.ParentExternalID,
-		ChildResource:  integrationResource.ExecutionExternalID,
-	})
-
-	if err != nil {
-		log.Warnf("Invalid token for execution %s: %v", req.ExecutionID, err)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return nil
-	}
-
-	return execution
-}
-
-type ExecutionOutputRequest struct {
-	ExecutionID string         `json:"execution_id"`
-	ExternalID  string         `json:"external_id"`
-	Outputs     map[string]any `json:"outputs"`
-}
-
-func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, MaxExecutionOutputsSize)
-	defer r.Body.Close()
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		if _, ok := err.(*http.MaxBytesError); ok {
-			http.Error(
-				w,
-				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxExecutionOutputsSize),
-				http.StatusRequestEntityTooLarge,
-			)
-
-			return
-		}
-
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
-		return
-	}
-
-	var req ExecutionOutputRequest
-	err = json.Unmarshal(body, &req)
-	if err != nil {
-		http.Error(w, "Error decoding request body", http.StatusBadRequest)
-		return
-	}
-
-	execution := s.authenticateExecution(w, r, &req)
-	if execution == nil {
-		return
-	}
-
-	stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
-	if err != nil {
-		http.Error(w, "error finding stage", http.StatusInternalServerError)
-		return
-	}
-
-	outputs, err := s.parseExecutionOutputs(stage, req.Outputs)
-	if err != nil {
-		http.Error(w, "Error parsing outputs", http.StatusBadRequest)
-		return
-	}
-
-	err = execution.UpdateOutputs(outputs)
-	if err != nil {
-		http.Error(w, "Error updating outputs", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]any) (map[string]any, error) {
-	//
-	// We ignore outputs that were sent but are not defined in the stage.
-	//
-	for k := range outputs {
-		if !stage.HasOutputDefinition(k) {
-			delete(outputs, k)
-		}
-	}
-
-	return outputs, nil
 }
 
 func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {

@@ -7,7 +7,6 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -32,93 +31,6 @@ type Canvas struct {
 
 func (Canvas) TableName() string {
 	return "canvases"
-}
-
-func (c *Canvas) FindConnectionGroupByID(id uuid.UUID) (*ConnectionGroup, error) {
-	var connectionGroup ConnectionGroup
-
-	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
-		Where("id = ?", id).
-		First(&connectionGroup).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &connectionGroup, nil
-}
-
-func (c *Canvas) FindStageByID(id string) (*Stage, error) {
-	var stage Stage
-
-	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
-		Where("id = ?", id).
-		First(&stage).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &stage, nil
-}
-
-func (c *Canvas) CreateStage(
-	name, createdBy string,
-	conditions []StageCondition,
-	inputs []InputDefinition,
-	inputMappings []InputMapping,
-	outputs []OutputDefinition,
-	secrets []ValueDefinition,
-) (*Stage, error) {
-	return c.CreateStageInTransaction(
-		database.Conn(),
-		name,
-		createdBy,
-		conditions,
-		inputs,
-		inputMappings,
-		outputs,
-		secrets,
-	)
-}
-
-func (c *Canvas) CreateStageInTransaction(
-	tx *gorm.DB,
-	name, createdBy string,
-	conditions []StageCondition,
-	inputs []InputDefinition,
-	inputMappings []InputMapping,
-	outputs []OutputDefinition,
-	secrets []ValueDefinition,
-) (*Stage, error) {
-	now := time.Now()
-
-	stage := &Stage{
-		CanvasID:      c.ID,
-		Name:          name,
-		Conditions:    datatypes.NewJSONSlice(conditions),
-		CreatedAt:     &now,
-		CreatedBy:     uuid.Must(uuid.Parse(createdBy)),
-		Inputs:        datatypes.NewJSONSlice(inputs),
-		InputMappings: datatypes.NewJSONSlice(inputMappings),
-		Outputs:       datatypes.NewJSONSlice(outputs),
-		Secrets:       datatypes.NewJSONSlice(secrets),
-	}
-
-	err := tx.Clauses(clause.Returning{}).Create(&stage).Error
-	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return nil, ErrNameAlreadyUsed
-		}
-
-		return nil, err
-	}
-
-	return stage, nil
 }
 
 func (c *Canvas) DeleteInTransaction(tx *gorm.DB) error {
