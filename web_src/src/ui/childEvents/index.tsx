@@ -59,6 +59,7 @@ export const ChildEvents: React.FC<ChildEventsProps> = ({
             <ExpandIcon
               size={16}
               className="text-gray-500 hover:text-gray-700 hover:scale-110 cursor-pointer mt-1"
+              data-testid="expand-run-button"
               onClick={(e) => {
                 e.stopPropagation();
                 onExpandChildEvents(childEventsInfo);

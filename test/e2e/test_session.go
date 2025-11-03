@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,5 +230,13 @@ func (s *TestSession) HoverOver(q queries.Query) {
 
 	if err := q.Run(s).Hover(pw.LocatorHoverOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
 		s.t.Fatalf("hover over %q: %v", q.Describe(), err)
+	}
+}
+
+func (s *TestSession) AssertURLContains(part string) {
+	s.t.Logf("Asserting URL contains %q", part)
+	current := s.page.URL()
+	if !strings.Contains(current, part) {
+		s.t.Fatalf("expected URL to contain %q, got %q", part, current)
 	}
 }
