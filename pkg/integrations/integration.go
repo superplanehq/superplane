@@ -59,36 +59,21 @@ type ResourceManager interface {
 	Cancel(resourceType, id string, parentResource Resource) error
 
 	//
-	// DEPRECATED: will be removed once old canvas infrastructure is removed.
-	//
-	// Configure the webhook for a integration resource.
-	// This method might be called multiple times for the same parent resource,
-	// so it should also update webhook-related resources, if needed.
-	//
-	SetupWebhook(options WebhookOptions) ([]Resource, error)
-
-	//
-	// Clean up a webhook for an integration resource.
-	// Used when a stage's integration or resource changes to clean up the old webhook.
-	//
-	CleanupWebhook(parentResource Resource, webhook Resource) error
-
-	//
-	// New method for setting up webhooks.
+	// Set up webhooks in the integration.
 	// `any` type is used because the configuration and the metadata
 	// are integration-specific.
 	//
-	SetupWebhookV2(options WebhookOptionsV2) (any, error)
+	SetupWebhook(options WebhookOptions) (any, error)
 
 	//
-	// New method cleaning up a webhook.
+	// Clean up webhooks in the integration.
 	// `any` type is used because the configuration and the metadata
 	// are integration-specific.
 	//
-	CleanupWebhookV2(options WebhookOptionsV2) error
+	CleanupWebhook(options WebhookOptions) error
 }
 
-type WebhookOptionsV2 struct {
+type WebhookOptions struct {
 	ID            string
 	Resource      Resource
 	URL           string
@@ -137,14 +122,4 @@ type Event interface {
 	// X-*-Signature-256 HTTP header on the webhook request.
 	//
 	Signature() string
-}
-
-type WebhookOptions struct {
-	Parent     Resource
-	Children   []Resource
-	ID         string
-	URL        string
-	Key        []byte
-	EventTypes []string
-	Internal   bool
 }

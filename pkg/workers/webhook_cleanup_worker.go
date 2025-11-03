@@ -92,7 +92,7 @@ func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, webhook *models.Webho
 		return err
 	}
 
-	err = resourceManager.CleanupWebhookV2(integrations.WebhookOptionsV2{
+	err = resourceManager.CleanupWebhook(integrations.WebhookOptions{
 		Resource:      resource,
 		Configuration: webhook.Configuration.Data(),
 		Metadata:      webhook.Metadata.Data(),
