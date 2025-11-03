@@ -96,6 +96,9 @@ export interface CustomComponentBuilderPageProps {
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
+  // Undo functionality
+  onUndo?: () => void;
+  canUndo?: boolean;
 }
 
 // Canvas content component with ReactFlow hooks - defined outside to prevent re-creation
@@ -421,6 +424,8 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         <Header
           breadcrumbs={props.breadcrumbs || [{ label: props.customComponentName }]}
           onSave={props.isSaving ? undefined : props.onSave}
+          onUndo={props.onUndo}
+          canUndo={props.canUndo}
           onLogoClick={props.organizationId ? handleLogoClick : undefined}
           organizationId={props.organizationId}
           unsavedMessage={props.unsavedMessage}

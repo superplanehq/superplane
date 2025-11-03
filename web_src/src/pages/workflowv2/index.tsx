@@ -112,6 +112,9 @@ export function WorkflowPageV2() {
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Revert functionality - track initial workflow snapshot
+  const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
+
   /**
    * Initialize persisted node IDs when workflow is first loaded
    * This must happen during render (not in useEffect) to ensure it's available for the query hooks.
@@ -196,6 +199,26 @@ export function WorkflowPageV2() {
     },
     [queryClient, workflowId],
   );
+
+  const saveWorkflowSnapshot = useCallback((currentWorkflow: WorkflowsWorkflow) => {
+    if (!initialWorkflowSnapshot) {
+      setInitialWorkflowSnapshot(JSON.parse(JSON.stringify(currentWorkflow)));
+    }
+  }, [initialWorkflowSnapshot]);
+
+  // Revert to initial state
+  const handleRevert = useCallback(() => {
+    if (initialWorkflowSnapshot && organizationId && workflowId) {
+      // Restore the initial state
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), initialWorkflowSnapshot);
+
+      // Clear the snapshot since we're back to the initial state
+      setInitialWorkflowSnapshot(null);
+
+      // Mark as no unsaved changes since we're back to the saved state
+      setHasUnsavedChanges(false);
+    }
+  }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
 
   useWorkflowWebsocket(workflowId!, organizationId!, refetchEvents, refetchExecutions);
 
@@ -316,6 +339,9 @@ export function WorkflowPageV2() {
     (nodeId: string, updatedConfiguration: Record<string, any>, updatedNodeName: string) => {
       if (!workflow || !organizationId || !workflowId) return;
 
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
+
       // Update the node's configuration and name in local cache only
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
@@ -336,7 +362,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       setHasUnsavedChanges(true);
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot],
   );
 
   const generateNodeId = (blockName: string, nodeName: string) => {
@@ -349,6 +375,9 @@ export function WorkflowPageV2() {
   const handleNodeAdd = useCallback(
     (newNodeData: NewNodeData) => {
       if (!workflow || !organizationId || !workflowId) return;
+
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
 
       const { buildingBlock, nodeName, configuration, position } = newNodeData;
 
@@ -396,12 +425,16 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       setHasUnsavedChanges(true);
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot],
   );
 
   const handleEdgeCreate = useCallback(
     (sourceId: string, targetId: string, sourceHandle?: string | null) => {
       if (!workflow || !organizationId || !workflowId) return;
+
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
+
       // Create the new edge
       const newEdge: ComponentsEdge = {
         sourceId,
@@ -421,12 +454,15 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       setHasUnsavedChanges(true);
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot],
   );
 
   const handleNodeDelete = useCallback(
     (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
+
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
 
       // Remove the node from the workflow
       const updatedNodes = workflow.nodes?.filter((node) => node.id !== nodeId);
@@ -495,6 +531,9 @@ export function WorkflowPageV2() {
     (nodeId: string, position: { x: number; y: number }) => {
       if (!workflow || !organizationId || !workflowId) return;
 
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
+
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
@@ -515,12 +554,15 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       setHasUnsavedChanges(true);
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot],
   );
 
   const handleNodeCollapseChange = useCallback(
     (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
+
+      // Save snapshot before making changes
+      saveWorkflowSnapshot(workflow);
 
       // Find the current node to determine its collapsed state
       const currentNode = workflow.nodes?.find((node) => node.id === nodeId);
@@ -546,7 +588,7 @@ export function WorkflowPageV2() {
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
       setHasUnsavedChanges(true);
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, saveWorkflowSnapshot],
   );
 
   const handleConfigure = useCallback(
@@ -639,6 +681,9 @@ export function WorkflowPageV2() {
         showSuccessToast("Canvas changes saved");
         setHasUnsavedChanges(false);
 
+        // Clear the snapshot since changes are now saved
+        setInitialWorkflowSnapshot(null);
+
         queryClient.invalidateQueries({
           queryKey: workflowKeys.detail(organizationId, workflowId),
         });
@@ -707,6 +752,8 @@ export function WorkflowPageV2() {
       unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
       saveIsPrimary={hasUnsavedChanges}
       saveButtonHidden={!hasUnsavedChanges}
+      onUndo={handleRevert}
+      canUndo={initialWorkflowSnapshot !== null}
       runDisabled={hasUnsavedChanges}
       runDisabledTooltip={hasUnsavedChanges ? "Save canvas changes before running" : undefined}
       breadcrumbs={[
