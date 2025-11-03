@@ -860,12 +860,13 @@ function prepareCompositeNode(
         title: displayLabel,
         description: blueprintMetadata?.description,
         isMissing: isMissing,
-        parameters: Object.keys(node.configuration!).map((key) => {
-          return {
-            icon: "cog",
-            items: [`${node.configuration![key]}`],
-          };
-        }),
+        parameters: Object.keys(node.configuration!).length > 0 ? [{
+          icon: "cog",
+          items: Object.keys(node.configuration!).reduce((acc, key) => {
+            acc[key] = `${node.configuration![key]}`;
+            return acc;
+          }, {} as Record<string, string>),
+        }] : [],
       },
     },
   };
