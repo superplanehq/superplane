@@ -1202,6 +1202,12 @@ function prepareApprovalNode(
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
             ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!)
             : undefined,
+        lastRunData: execution && rootTriggerRenderer ? {
+          title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
+          subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
+          receivedAt: new Date(execution.createdAt!),
+          state: getRunItemState(execution) === "success" ? "processed" as const : getRunItemState(execution) === "running" ? "running" as const : "discarded" as const,
+        } : undefined,
       },
     },
   };
