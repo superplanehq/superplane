@@ -89,14 +89,9 @@ func connect() *gorm.DB {
 
 func TruncateTables() error {
 	return Conn().Exec(`
-		truncate table canvases, event_rejections, events, event_sources, stages,
-		stage_events, stage_event_approvals,
-		connections, stage_executions,
-		connection_groups, connection_group_field_sets, connection_group_field_set_events,
-		integrations, resources,
-		execution_resources,
+		truncate table canvases, integrations,
 		secrets, accounts, account_providers, users, organizations, organization_invitations,
-		casbin_rule, role_metadata, group_metadata, alerts,
+		casbin_rule, role_metadata, group_metadata,
 		blueprints, workflows, workflow_nodes, workflow_events, workflow_node_executions,
 		workflow_node_queue_items, workflow_node_requests, webhooks;
 	`).Error
