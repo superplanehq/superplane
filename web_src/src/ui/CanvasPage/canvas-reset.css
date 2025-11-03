@@ -4,4 +4,14 @@
   box-shadow: none !important;
   padding: 0 !important;
   width: auto !important;
+  cursor: default;
+}
+
+.sp-canvas .react-flow__node .canvas-node-drag-handle {
+  cursor: grab;
+}
+
+.sp-canvas .react-flow__node.dragging .canvas-node-drag-handle,
+.sp-canvas .react-flow__node .canvas-node-drag-handle:active {
+  cursor: grabbing;
 }
