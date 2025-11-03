@@ -1021,10 +1021,14 @@ function prepareCompositeNode(
   }
 
   if (queueItems.length > 0) {
+    const next = queueItems[0];
+    const subtitle = next.createdAt
+      ? formatTimeAgo(new Date(next.createdAt)).replace(" ago", "")
+      : "";
     (canvasNode.data.composite as CompositeProps).nextInQueue = {
-      title: "",
-      subtitle: "",
-      receivedAt: new Date(queueItems[0].createdAt!),
+      title: next.id || "Queued",
+      subtitle,
+      receivedAt: next.createdAt ? new Date(next.createdAt) : new Date(),
     };
   }
 
