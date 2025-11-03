@@ -250,12 +250,13 @@ export function WorkflowPageV2() {
         workflow?.nodes || [],
         blueprints,
         components,
+        triggers,
         nodeExecutionsMap,
         nodeQueueItemsMap,
         nodeEventsMap,
       );
     },
-    [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap],
+    [workflow, blueprints, components, triggers, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap],
   );
 
   const getNodeEditData = useCallback(
@@ -842,6 +843,14 @@ function prepareCompositeNode(
   // Use blueprint name (from metadata) if available, otherwise fall back to node name
   const displayLabel = blueprintMetadata?.name || node.name!;
 
+  const configurationFields = blueprintMetadata?.configuration || [];
+  const fieldLabelMap = configurationFields.reduce<Record<string, string>>((acc, field) => {
+    if (field.name) {
+      acc[field.name] = field.label || field.name;
+    }
+    return acc;
+  }, {});
+
   const canvasNode: CanvasNode = {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
@@ -863,7 +872,8 @@ function prepareCompositeNode(
         parameters: Object.keys(node.configuration!).length > 0 ? [{
           icon: "cog",
           items: Object.keys(node.configuration!).reduce((acc, key) => {
-            acc[key] = `${node.configuration![key]}`;
+            const displayKey = fieldLabelMap[key] || key;
+            acc[displayKey] = `${node.configuration![key]}`;
             return acc;
           }, {} as Record<string, string>),
         }] : [],
@@ -1545,6 +1555,7 @@ function prepareSidebarData(
   nodes: ComponentsNode[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
+  triggers: TriggersTrigger[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
@@ -1554,23 +1565,37 @@ function prepareSidebarData(
   const events = nodeEventsMap[node.id!] || [];
 
   // Get metadata based on node type
-  let metadata;
-  const nodeTitle = node.name || "Unknown";
+  const blueprintMetadata =
+    node.type === "TYPE_BLUEPRINT" ? blueprints.find((b) => b.id === node.blueprint?.id) : undefined;
+  const componentMetadata =
+    node.type === "TYPE_COMPONENT" ? components.find((c) => c.name === node.component?.name) : undefined;
+  const triggerMetadata =
+    node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.trigger?.name) : undefined;
+
+  const configurationFields =
+    blueprintMetadata?.configuration || componentMetadata?.configuration || triggerMetadata?.configuration || [];
+
+  const fieldLabelMap = configurationFields.reduce<Record<string, string>>((acc, field) => {
+    if (field.name) {
+      acc[field.name] = field.label || field.name;
+    }
+    return acc;
+  }, {});
+
+  const nodeTitle =
+    componentMetadata?.label || blueprintMetadata?.name || triggerMetadata?.label || node.name || "Unknown";
   let iconSlug = "boxes";
   let color = "indigo";
 
-  if (node.type === "TYPE_BLUEPRINT") {
-    metadata = blueprints.find((b) => b.id === node.blueprint?.id);
-    if (metadata) {
-      iconSlug = metadata.icon || "boxes";
-      color = metadata.color || "indigo";
-    }
-  } else if (node.type === "TYPE_COMPONENT") {
-    metadata = components.find((c) => c.name === node.component?.name);
-    if (metadata) {
-      iconSlug = metadata.icon || "boxes";
-      color = metadata.color || "indigo";
-    }
+  if (blueprintMetadata) {
+    iconSlug = blueprintMetadata.icon || iconSlug;
+    color = blueprintMetadata.color || color;
+  } else if (componentMetadata) {
+    iconSlug = componentMetadata.icon || iconSlug;
+    color = componentMetadata.color || color;
+  } else if (triggerMetadata) {
+    iconSlug = triggerMetadata.icon || iconSlug;
+    color = triggerMetadata.color || color;
   }
 
   const latestEvents =
@@ -1615,9 +1640,10 @@ function prepareSidebarData(
       const isSimpleType = valueType === "string" || valueType === "number" || valueType === "boolean";
 
       if (isSimpleType) {
+        const displayKey = fieldLabelMap[key] || key;
         metadataItems.push({
           icon: "settings",
-          label: `${key}: ${value}`,
+          label: `${displayKey}: ${value}`,
         });
       }
     });
