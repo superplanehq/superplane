@@ -30,7 +30,15 @@ import {
 } from "@/hooks/useWorkflowData";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import { CanvasEdge, CanvasNode, CanvasPage, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
+import {
+  CANVAS_SIDEBAR_STORAGE_KEY,
+  CanvasEdge,
+  CanvasNode,
+  CanvasPage,
+  NewNodeData,
+  NodeEditData,
+  SidebarData,
+} from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
@@ -79,6 +87,17 @@ export function WorkflowPageV2() {
    * This ref persists across re-renders to preserve sidebar state.
    */
   const isSidebarOpenRef = useRef<boolean | null>(null);
+  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+    const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
+    if (storedSidebarState !== null) {
+      try {
+        isSidebarOpenRef.current = JSON.parse(storedSidebarState);
+        hasUserToggledSidebarRef.current = true;
+      } catch (error) {
+        console.warn("Failed to parse sidebar state from local storage:", error);
+      }
+    }
+  }
   if (isSidebarOpenRef.current === null && workflow) {
     // Initialize on first render
     isSidebarOpenRef.current = workflow.nodes?.length === 0;
