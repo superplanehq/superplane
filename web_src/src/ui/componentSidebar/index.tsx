@@ -137,7 +137,7 @@ export const ComponentSidebar = ({
     }
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  const createEventItem = (event: SidebarEvent, index: number): JSX.Element => {
+  const createEventItem = (event: SidebarEvent, index: number, variant: 'latest' | 'queue' = 'latest'): JSX.Element => {
     let EventIcon = resolveIcon("check");
     let EventColor = "text-green-700";
     let EventBackground = "bg-green-200";
@@ -163,14 +163,26 @@ export const ComponentSidebar = ({
         iconSize = 8;
         break;
       case "waiting":
-        EventIcon = resolveIcon("refresh-cw");
-        EventColor = "text-blue-700";
-        EventBackground = "bg-blue-100";
-        iconBorderColor = "";
-        iconSize = 17;
-        iconContainerSize = 5;
-        iconStrokeWidth = 2;
-        animation = "animate-spin";
+        if (variant === 'queue') {
+          // Match node card styling (neutral grey + dashed icon)
+          EventIcon = resolveIcon("circle-dashed");
+          EventColor = "text-gray-500";
+          EventBackground = "bg-gray-100";
+          iconBorderColor = "";
+          iconSize = 20;
+          iconContainerSize = 5;
+          iconStrokeWidth = 2;
+          animation = "";
+        } else {
+          EventIcon = resolveIcon("refresh-cw");
+          EventColor = "text-blue-700";
+          EventBackground = "bg-blue-100";
+          iconBorderColor = "";
+          iconSize = 17;
+          iconContainerSize = 5;
+          iconStrokeWidth = 2;
+          animation = "animate-spin";
+        }
         break;
         break;
       case "running":
@@ -323,7 +335,7 @@ export const ComponentSidebar = ({
           ) : (
             <>
               {latestEvents.slice(0, 5).map((event, index) => {
-                return createEventItem(event, index);
+                return createEventItem(event, index, 'latest');
               })}
               {moreInQueueCount > 0 && (
                 <button
@@ -347,7 +359,7 @@ export const ComponentSidebar = ({
             ) : (
               <>
                 {nextInQueueEvents.slice(0, 5).map((event, index) => {
-                  return createEventItem(event, index);
+                  return createEventItem(event, index, 'queue');
                 })}
                 {moreInQueueCount > 0 && (
                   <button
