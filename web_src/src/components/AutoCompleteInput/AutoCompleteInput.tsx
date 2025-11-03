@@ -20,7 +20,22 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
 let blurTimeout: NodeJS.Timeout;
 
 export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputProps>(
-  ({ exampleObj, value = '', onChange, className, placeholder = 'Type to search...', disabled, prefix = '', suffix = '', startWord, inputSize = 'md', noExampleObjectText = 'No suggestions found', showValuePreview = false, ...props }, forwardedRef) => {
+  function AutoCompleteInputRender(props, forwardedRef) {
+    const {
+      exampleObj,
+      value = '',
+      onChange,
+      className,
+      placeholder = 'Type to search...',
+      disabled,
+      prefix = '',
+      suffix = '',
+      startWord,
+      inputSize = 'md',
+      noExampleObjectText = 'No suggestions found',
+      showValuePreview = false,
+      ...rest
+    } = props;
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<Array<{ suggestion: string; type: string }>>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -287,7 +302,7 @@ export const AutoCompleteInput = forwardRef<HTMLInputElement, AutoCompleteInputP
               inputSize === 'md' && 'px-3 py-2 text-base sm:px-3 sm:py-1.5 sm:text-sm',
               inputSize === 'lg' && 'px-4 py-3 text-lg',
             ])}
-            {...props}
+            {...rest}
           />
         </span>
 

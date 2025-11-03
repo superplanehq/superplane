@@ -26,6 +26,7 @@ import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 
 export interface SidebarEvent {
+  id: string;
   title: string;
   subtitle?: string;
   state: "processed" | "discarded" | "waiting";
@@ -504,7 +505,7 @@ function Sidebar({
       onEventClick={(event) => {
         setLatestEvents((prev) => {
           return prev.map((e) => {
-            if (e.title === event.title) {
+            if (e.id === event.id) {
               return { ...e, isOpen: !e.isOpen };
             }
             return e;

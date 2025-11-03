@@ -11,13 +11,8 @@ export const SelectionWrapper: React.FC<SelectionWrapperProps> = ({
   fullRounded = false,
   children,
 }) => {
-  if (selected) {
-    return (
-      <div className={"border-6 border-blue-200 bg-blue-200 " + (fullRounded ? "rounded-full" : "rounded-lg")}>
-        {children}
-      </div>
-    );
-  }
+  const baseClasses = fullRounded ? "rounded-full" : "rounded-lg";
+  const selectedClasses = selected ? " ring-[6px] ring-blue-200 ring-offset-0" : "";
 
-  return <>{children}</>;
+  return <div className={`${baseClasses}${selectedClasses}`}>{children}</div>;
 };
