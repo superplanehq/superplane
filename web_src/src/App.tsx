@@ -17,6 +17,7 @@ import { CustomComponent } from "./pages/custom-component";
 import HomePage from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
+import NodeRunPage from "./pages/node-run";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -58,6 +59,7 @@ function App() {
               <Route path=":organizationId" element={withAuthAndNavigation(HomePage)} />
               <Route path=":organizationId/custom-components/:blueprintId" element={withAuthOnly(CustomComponent)} />
               <Route path=":organizationId/workflows/:workflowId" element={withAuthOnly(WorkflowPageV2)} />
+              <Route path=":organizationId/workflows/:workflowId/nodes/:nodeId" element={withAuthOnly(NodeRunPage)} />
               <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
 
               {/* Organization selection and creation */}
