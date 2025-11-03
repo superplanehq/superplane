@@ -121,7 +121,7 @@ export function BuildingBlocksSidebar({ isOpen, onToggle, blocks, canvasZoom = 1
             <button
               className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
               onClick={() => {
-                setShowWip((v) => !v);
+                setShowWip((v: boolean) => !v);
                 setIsConfigOpen(false);
               }}
             >
