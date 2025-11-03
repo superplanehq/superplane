@@ -60,10 +60,18 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 	s.session.Click(q.Text("Create canvas"))
 	s.session.Sleep(300)
 
-	source := q.TestID("building-block-e2e-deployment-component")
-	target := q.TestID("rf__wrapper")
-	s.session.DragAndDrop(source, target, 400, 250)
+	source1 := q.TestID("building-block-start")
+	target1 := q.TestID("rf__wrapper")
+	s.session.DragAndDrop(source1, target1, 200, 250)
 	s.session.Click(q.TestID("add-node-button"))
+
+	source2 := q.TestID("building-block-e2e-deployment-component")
+	target2 := q.TestID("rf__wrapper")
+	s.session.DragAndDrop(source2, target2, 600, 250)
+	s.session.Click(q.TestID("add-node-button"))
+
+	// save canvas
+	s.session.TakeScreenshot()
 	s.session.Click(q.TestID("save-canvas-button"))
 }
 
@@ -76,8 +84,12 @@ func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {
 	s.session.Click(q.TestID("emit-event-submit-button"))
 	s.session.Sleep(1000)
 	s.session.TakeScreenshot()
-	s.session.Visit("/" + s.session.orgID + "/canvases")
+
+	// hack to refresh the page
+	s.session.Visit("/" + s.session.orgID + "/")
 	s.session.Click(q.Text(s.canvasName))
+	s.session.Sleep(500)
+	s.session.TakeScreenshot()
 }
 
 func (s *CustomComponentsSteps) VisitCanvasPage() {

@@ -28,6 +28,7 @@ func NewTestContext(t *testing.M) *TestContext {
 }
 
 func (s *TestContext) Start() {
+	os.Setenv("DB_NAME", "superplane_test")
 	os.Setenv("START_PUBLIC_API", "yes")
 	os.Setenv("START_INTERNAL_API", "yes")
 	os.Setenv("PUBLIC_API_BASE_PATH", "/api/v1")
@@ -35,7 +36,15 @@ func (s *TestContext) Start() {
 	os.Setenv("WEB_BASE_PATH", "")
 	os.Setenv("START_GRPC_GATEWAY", "yes")
 	os.Setenv("CASBIN_AUTO_RELOAD", "yes")
-	os.Setenv("START_EVENT_DISTRIBUTER", "no")
+	os.Setenv("START_EVENT_DISTRIBUTER", "yes")
+	os.Setenv("START_CONSUMERS", "yes")
+	os.Setenv("START_WORKFLOW_EVENT_ROUTER", "yes")
+	os.Setenv("START_WORKFLOW_NODE_EXECUTOR", "yes")
+	os.Setenv("START_BLUEPRINT_NODE_EXECUTOR", "yes")
+	os.Setenv("START_WORKFLOW_NODE_QUEUE_WORKER", "yes")
+	os.Setenv("START_NODE_REQUEST_WORKER", "yes")
+	os.Setenv("START_WEBHOOK_PROVISIONER", "yes")
+	os.Setenv("START_WEBHOOK_CLEANUP_WORKER", "yes")
 	os.Setenv("NO_ENCRYPTION", "yes")
 	os.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
 	os.Setenv("JWT_SECRET", "test-jwt-secret")
