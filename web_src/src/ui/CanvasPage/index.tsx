@@ -133,6 +133,8 @@ export interface CanvasPageProps {
   viewportRef?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
 }
 
+export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
+
 const EDGE_STYLE = {
   type: "custom",
   style: { stroke: "#C9D5E1", strokeWidth: 3 },
@@ -189,6 +191,18 @@ function CanvasPage(props: CanvasPageProps) {
   const hasFitToViewRef = props.hasFitToViewRef || useRef(false);
   const hasUserToggledSidebarRef = props.hasUserToggledSidebarRef || useRef(false);
   const isSidebarOpenRef = props.isSidebarOpenRef || useRef<boolean | null>(null);
+
+  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+    const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
+    if (storedSidebarState !== null) {
+      try {
+        isSidebarOpenRef.current = JSON.parse(storedSidebarState);
+        hasUserToggledSidebarRef.current = true;
+      } catch (error) {
+        console.warn("Failed to parse canvas sidebar state:", error);
+      }
+    }
+  }
 
   // Initialize sidebar state from ref if available, otherwise based on whether nodes exist
   const [isBuildingBlocksSidebarOpen, setIsBuildingBlocksSidebarOpen] = useState(() => {
@@ -286,6 +300,9 @@ function CanvasPage(props: CanvasPageProps) {
       hasUserToggledSidebarRef.current = true;
       isSidebarOpenRef.current = open;
       setIsBuildingBlocksSidebarOpen(open);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(CANVAS_SIDEBAR_STORAGE_KEY, JSON.stringify(open));
+      }
     },
     [hasUserToggledSidebarRef, isSidebarOpenRef],
   );
