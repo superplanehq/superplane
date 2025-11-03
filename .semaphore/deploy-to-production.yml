@@ -13,3 +13,7 @@ blocks:
         - name: "Trigger deployment task"
           commands:
             - echo "Deploying $SEMAPHORE_GIT_BRANCH ($SEMAPHORE_GIT_SHA) to production"
+            - curl -X POST --location "https://superplanehq.semaphoreci.com/api/v1alpha/tasks/5e7e092b-c533-4dee-9802-a3c877647de4/run_now" \
+                -H "Authorization: Token $API_TOKEN" \
+                -H "Content-Type: application/json" \
+                --data "{\"parameters\":{\"ENVIRONMENT\":\"staging\",\"BRANCH\":\"$SEMAPHORE_GIT_BRANCH\",\"COMMIT_SHA\":\"$SEMAPHORE_GIT_SHA\"}}"
