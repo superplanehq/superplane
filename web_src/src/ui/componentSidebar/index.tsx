@@ -84,6 +84,17 @@ export const ComponentSidebar = ({
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  // Keep expanded state stable across parent re-renders
+  const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
+
+  // Seed open ids from incoming props (without closing already open ones)
+  useEffect(() => {
+    const seeded = new Set(openEventIds);
+    latestEvents.forEach(e => { if (e.isOpen) seeded.add(e.id); });
+    nextInQueueEvents.forEach(e => { if (e.isOpen) seeded.add(e.id); });
+    if (seeded.size !== openEventIds.size) setOpenEventIds(seeded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestEvents, nextInQueueEvents]);
 
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -174,6 +185,7 @@ export const ComponentSidebar = ({
         break;
     }
 
+    const isOpen = openEventIds.has(event.id) || event.isOpen;
     return (
       <div
         key={event.title + index}
@@ -183,6 +195,12 @@ export const ComponentSidebar = ({
           className="flex items-center gap-3 rounded-md w-full min-w-0 cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
+            // Toggle local expanded state (persist across re-renders)
+            setOpenEventIds(prev => {
+              const next = new Set(prev);
+              if (next.has(event.id)) next.delete(event.id); else next.add(event.id);
+              return next;
+            });
             onEventClick?.(event);
           }}
         >
@@ -198,7 +216,7 @@ export const ComponentSidebar = ({
             <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
           )}
         </div>
-        {event.isOpen &&
+        {isOpen &&
           ((event.values && Object.entries(event.values).length > 0) ||
             (event.childEventsInfo && event.childEventsInfo.count > 0)) && (
             <div className="rounded-sm bg-white border-1 border-gray-200 text-gray-500 w-full">
