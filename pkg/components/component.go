@@ -149,6 +149,8 @@ type ActionContext struct {
 type AuthContext interface {
 	AuthenticatedUser() *User
 	GetUser(id uuid.UUID) (*User, error)
+	HasRole(role string) (bool, error)
+	InGroup(group string) (bool, error)
 }
 
 type User struct {

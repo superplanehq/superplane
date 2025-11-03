@@ -145,11 +145,27 @@ func (m *Metadata) validateAction(record *Record, ctx components.ActionContext) 
 		return nil
 
 	case ItemTypeRole:
-		// TODO: verify that authenticated user has role
+		hasRole, err := ctx.AuthContext.HasRole(*record.Role)
+		if err != nil {
+			return fmt.Errorf("error checking role %s: %v", *record.Role, err)
+		}
+
+		if !hasRole {
+			return fmt.Errorf("item must be approved by %s", *record.Role)
+		}
+
 		return nil
 
 	case ItemTypeGroup:
-		// TODO: verify that authenticated user is part of group
+		inGroup, err := ctx.AuthContext.InGroup(*record.Group)
+		if err != nil {
+			return fmt.Errorf("error checking group %s: %v", *record.Group, err)
+		}
+
+		if !inGroup {
+			return fmt.Errorf("item must be approved by %s", *record.Group)
+		}
+
 		return nil
 	}
 

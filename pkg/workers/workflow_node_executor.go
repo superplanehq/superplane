@@ -160,7 +160,7 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
 		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
-		AuthContext:           contexts.NewAuthContext(workflow.OrganizationID, nil),
+		AuthContext:           contexts.NewAuthContext(workflow.OrganizationID, nil, nil),
 	}
 
 	if err := component.Execute(ctx); err != nil {

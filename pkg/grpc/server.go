@@ -102,7 +102,7 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	workflowService := NewWorkflowService(registry, encryptor)
+	workflowService := NewWorkflowService(authService, registry, encryptor)
 	pbWorkflows.RegisterWorkflowsServer(grpcServer, workflowService)
 
 	reflection.Register(grpcServer)

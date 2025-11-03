@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,6 +19,7 @@ import (
 
 func InvokeNodeExecutionAction(
 	ctx context.Context,
+	authService authorization.Authorization,
 	registry *registry.Registry,
 	orgID uuid.UUID,
 	workflowID uuid.UUID,
@@ -78,7 +80,7 @@ func InvokeNodeExecutionAction(
 		Configuration:         node.Configuration.Data(),
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
-		AuthContext:           contexts.NewAuthContext(orgID, user),
+		AuthContext:           contexts.NewAuthContext(orgID, authService, user),
 	}
 
 	err = component.HandleAction(actionCtx)
