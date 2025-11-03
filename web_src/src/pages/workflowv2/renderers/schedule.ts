@@ -103,7 +103,7 @@ function formatNextTrigger(configuration: ScheduleConfiguration): string {
     const diffMs = nextTrigger.getTime() - now.getTime()
     const diffMins = Math.floor(diffMs / 60000)
 
-    if (diffMins < 0) {
+    if (diffMins <= 0) {
       return 'Triggering soon...'
     }
 
