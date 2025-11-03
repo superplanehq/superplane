@@ -85,6 +85,9 @@ func (e *HTTP) Configuration() []components.ConfigurationField {
 			Type:     components.FieldTypeObject,
 			Label:    "Payload",
 			Required: false,
+			VisibilityConditions: []components.VisibilityCondition{
+				{Field: "method", Values: []string{"POST", "PUT"}},
+			},
 		},
 		{
 			Name:     "headers",
@@ -131,13 +134,7 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
-	configMap, ok := ctx.Configuration.(map[string]any)
-	if !ok {
-		return fmt.Errorf("failed to parse configuration")
-	}
-	_, payloadProvided := configMap["payload"]
-
-	body, err := e.getBody(spec.Method, spec.Payload, payloadProvided)
+	body, err := e.getBody(spec.Method, spec.Payload)
 	if err != nil {
 		return err
 	}
@@ -184,17 +181,9 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 	})
 }
 
-func (e *HTTP) getBody(method string, payload any, payloadProvided bool) (io.Reader, error) {
-	if method == http.MethodGet {
+func (e *HTTP) getBody(method string, payload any) (io.Reader, error) {
+	if method == http.MethodGet || payload == nil {
 		return nil, nil
-	}
-
-	if !payloadProvided {
-		return nil, nil
-	}
-
-	if payload == nil {
-		return bytes.NewReader([]byte("null")), nil
 	}
 
 	bodyData, err := json.Marshal(payload)
