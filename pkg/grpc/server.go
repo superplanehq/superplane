@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
-	canvasPb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -69,9 +68,6 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	//
 	// Initialize services exposed by this server.
 	//
-	service := NewCanvasService(encryptor, authService, registry)
-	canvasPb.RegisterSuperplaneServer(grpcServer, service)
-
 	organizationService := NewOrganizationService(authService)
 	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 

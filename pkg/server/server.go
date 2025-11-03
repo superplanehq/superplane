@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/public"
@@ -39,45 +38,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		panic(err)
 	}
 
-	if os.Getenv("START_PENDING_EVENTS_WORKER") == "yes" {
-		log.Println("Starting Pending Events Worker")
-		w := workers.NewPendingEventsWorker(encryptor, registry)
-		go w.Start()
-	}
-
-	if os.Getenv("START_PENDING_STAGE_EVENTS_WORKER") == "yes" {
-		log.Println("Starting Pending Stage Events Worker")
-		w, err := workers.NewPendingStageEventsWorker(time.Now)
-		if err != nil {
-			panic(err)
-		}
-
-		go w.Start()
-	}
-
-	if os.Getenv("START_TIME_WINDOW_WORKER") == "yes" {
-		log.Println("Starting Time Window Worker")
-		w, err := workers.NewTimeWindowWorker(time.Now)
-		if err != nil {
-			panic(err)
-		}
-
-		go w.Start()
-	}
-
 	if os.Getenv("START_CONSUMERS") == "yes" {
-		log.Println("Starting Stage Event Approved Consumer")
-		stageEventApprovedConsumer := workers.NewStageEventApprovedConsumer(rabbitMQURL)
-		go stageEventApprovedConsumer.Start()
-
-		log.Println("Starting Event Source Updated Consumer")
-		eventSourceUpdatedConsumer := workers.NewEventSourceUpdatedConsumer(registry, rabbitMQURL, cleanupService)
-		go eventSourceUpdatedConsumer.Start()
-
-		log.Println("Starting Stage Updated Consumer")
-		stageUpdatedConsumer := workers.NewStageUpdatedConsumer(registry, rabbitMQURL, cleanupService)
-		go stageUpdatedConsumer.Start()
-
 		log.Println("Starting Invitation Email Consumer")
 		sendGridAPIKey := os.Getenv("SENDGRID_API_KEY")
 		fromName := os.Getenv("EMAIL_FROM_NAME")
@@ -93,43 +54,6 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		}
 	}
 
-	if os.Getenv("START_EXECUTIONS_POLLER") == "yes" {
-		log.Println("Starting Executions Poller")
-
-		w := workers.NewExecutionPoller(encryptor, registry)
-		go w.Start()
-	}
-
-	if os.Getenv("START_PENDING_EXECUTIONS_WORKER") == "yes" {
-		log.Println("Starting Pending Stage Events Worker")
-
-		w := workers.NewPendingExecutionsWorker(jwtSigner, encryptor, executors.SpecBuilder{}, registry)
-
-		go w.Start()
-	}
-
-	if os.Getenv("START_PENDING_FIELD_SETS_WORKER") == "yes" {
-		log.Println("Starting Pending Field Sets Worker")
-
-		w, err := workers.NewPendingFieldSetsWorker(time.Now)
-		if err != nil {
-			panic(err)
-		}
-
-		go w.Start()
-	}
-
-	if os.Getenv("START_PENDING_EVENT_SOURCES_WORKER") == "yes" {
-		log.Println("Starting Pending Event Sources Worker")
-
-		w, err := workers.NewPendingEventSourcesWorker(encryptor, registry, baseURL)
-		if err != nil {
-			panic(err)
-		}
-
-		go w.Start()
-	}
-
 	if os.Getenv("START_HARD_DELETION_WORKER") == "yes" {
 		log.Println("Starting Hard Deletion Worker")
 
@@ -137,28 +61,10 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 		go w.Start()
 	}
 
-	if os.Getenv("START_EVENT_SOURCE_SCHEDULE_WORKER") == "yes" {
-		log.Println("Starting Event Source Schedule Worker")
-
-		w, err := workers.NewEventSourceScheduleWorker(time.Now)
-		if err != nil {
-			panic(err)
-		}
-
-		go w.Start()
-	}
-
 	if os.Getenv("START_EVENT_DELETION_WORKER") == "yes" {
 		log.Println("Starting Event Deletion Worker")
 
 		w := workers.NewEventDeletionWorker()
-		go w.Start()
-	}
-
-	if os.Getenv("START_ALERT_WORKER") == "yes" {
-		log.Println("Starting Alerts Worker")
-
-		w := workers.NewAlertWorker()
 		go w.Start()
 	}
 
