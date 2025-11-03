@@ -982,6 +982,7 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 			Ref:           ProtoToNodeRef(node),
 			Configuration: node.Configuration.AsMap(),
 			Position:      ProtoToPosition(node.Position),
+			IsCollapsed:   node.IsCollapsed,
 		}
 	}
 	return result
@@ -991,10 +992,11 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 	result := make([]*componentpb.Node, len(nodes))
 	for i, node := range nodes {
 		result[i] = &componentpb.Node{
-			Id:       node.ID,
-			Name:     node.Name,
-			Type:     NodeTypeToProto(node.Type),
-			Position: PositionToProto(node.Position),
+			Id:          node.ID,
+			Name:        node.Name,
+			Type:        NodeTypeToProto(node.Type),
+			Position:    PositionToProto(node.Position),
+			IsCollapsed: node.IsCollapsed,
 		}
 
 		if node.Ref.Component != nil {

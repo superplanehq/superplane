@@ -127,6 +127,7 @@ type Node struct {
 	Configuration map[string]any `json:"configuration"`
 	Metadata      map[string]any `json:"metadata"`
 	Position      Position       `json:"position"`
+	IsCollapsed   bool           `json:"isCollapsed"`
 }
 
 type Position struct {

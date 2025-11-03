@@ -118,6 +118,7 @@ export interface CanvasPageProps {
   onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
+  onToggleCollapse?: () => void;
 
   ai?: AiProps;
 
@@ -355,6 +356,7 @@ function CanvasPage(props: CanvasPageProps) {
               onEdgeCreate={props.onEdgeCreate}
               hideHeader={true}
               onToggleView={handleToggleView}
+              onToggleCollapse={props.onToggleCollapse}
               onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
               onConfigure={props.onConfigure}
@@ -586,6 +588,7 @@ function CanvasContent({
   onConfigure,
   onDeactivate,
   onToggleView,
+  onToggleCollapse,
   onBuildingBlockDrop,
   onZoomChange,
   hasFitToViewRef,
@@ -604,6 +607,7 @@ function CanvasContent({
   onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
+  onToggleCollapse?: () => void;
   onDelete?: (nodeId: string) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onZoomChange?: (zoom: number) => void;
@@ -730,6 +734,11 @@ function CanvasContent({
     [onZoomChange, viewportRef],
   );
 
+  const handleToggleCollapse = useCallback(() => {
+    state.toggleCollapse();
+    onToggleCollapse?.();
+  }, [state.toggleCollapse, onToggleCollapse]);
+
   const handlePaneClick = useCallback(() => {
     stateRef.current.componentSidebar.close();
   }, []);
@@ -830,7 +839,7 @@ function CanvasContent({
 
       {/* Toggle button */}
       <div className={`absolute ${hideHeader ? "top-2" : "top-14"} left-1/2 transform -translate-x-1/2 z-10`}>
-        <ViewToggle isCollapsed={state.isCollapsed} onToggle={state.toggleCollapse} />
+        <ViewToggle isCollapsed={state.isCollapsed} onToggle={handleToggleCollapse} />
       </div>
 
       <div className={hideHeader ? "h-full" : "pt-12 h-full"}>

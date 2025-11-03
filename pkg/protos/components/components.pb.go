@@ -1268,6 +1268,7 @@ type Node struct {
 	Component     *Node_ComponentRef     `protobuf:"bytes,7,opt,name=component,proto3" json:"component,omitempty"`
 	Blueprint     *Node_BlueprintRef     `protobuf:"bytes,8,opt,name=blueprint,proto3" json:"blueprint,omitempty"`
 	Trigger       *Node_TriggerRef       `protobuf:"bytes,9,opt,name=trigger,proto3" json:"trigger,omitempty"`
+	IsCollapsed   bool                   `protobuf:"varint,10,opt,name=is_collapsed,json=isCollapsed,proto3" json:"is_collapsed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1363,6 +1364,13 @@ func (x *Node) GetTrigger() *Node_TriggerRef {
 		return x.Trigger
 	}
 	return nil
+}
+
+func (x *Node) GetIsCollapsed() bool {
+	if x != nil {
+		return x.IsCollapsed
+	}
+	return false
 }
 
 type Position struct {
@@ -1701,7 +1709,7 @@ const file_components_proto_rawDesc = "" +
 	"parameters\x18\x03 \x03(\v2).Superplane.Components.ConfigurationFieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
-	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\x8b\x05\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xae\x05\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
@@ -1711,7 +1719,9 @@ const file_components_proto_rawDesc = "" +
 	"\bposition\x18\x06 \x01(\v2\x1f.Superplane.Components.PositionR\bposition\x12F\n" +
 	"\tcomponent\x18\a \x01(\v2(.Superplane.Components.Node.ComponentRefR\tcomponent\x12F\n" +
 	"\tblueprint\x18\b \x01(\v2(.Superplane.Components.Node.BlueprintRefR\tblueprint\x12@\n" +
-	"\atrigger\x18\t \x01(\v2&.Superplane.Components.Node.TriggerRefR\atrigger\x1a\"\n" +
+	"\atrigger\x18\t \x01(\v2&.Superplane.Components.Node.TriggerRefR\atrigger\x12!\n" +
+	"\fis_collapsed\x18\n" +
+	" \x01(\bR\visCollapsed\x1a\"\n" +
 	"\fComponentRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a \n" +
 	"\n" +

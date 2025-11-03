@@ -35,6 +35,7 @@ export interface CanvasPageState {
 export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   const { nodes: initialNodes, edges: initialEdges, startCollapsed } = props;
 
+  const [loaded, setLoaded] = useState(false);
   const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(startCollapsed ?? false);
@@ -43,22 +44,33 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   // Sync nodes from props, but preserve collapsed state from collapsedNodeIds
   useEffect(() => {
     if (!initialNodes) return;
+    const newCollapsedNodeIds: string[] = [];
 
     setNodes(initialNodes.map((node) => {
       const nodeData = { ...node.data };
-      const isCollapsed = collapsedNodeIds.includes(node.id);
       const nodeType = nodeData.type as string;
-
+      
       if (nodeType && nodeData[nodeType]) {
+
+        const isCollapsed = loaded ? collapsedNodeIds.includes(node.id) : (nodeData[nodeType] as {collapsed: boolean}).collapsed;
         nodeData[nodeType] = {
           ...nodeData[nodeType],
           collapsed: isCollapsed,
         };
+
+        if (!loaded && isCollapsed) {
+          newCollapsedNodeIds.push(node.id);
+        }
       }
 
       return { ...node, data: nodeData };
     }));
-  }, [collapsedNodeIds]); // Only depend on collapsedNodeIds, not initialNodes
+
+    if (!loaded) {
+      setCollapsedNodeIds(newCollapsedNodeIds);
+      setLoaded(true);
+    }
+  }, [collapsedNodeIds, loaded]); // Only depend on collapsedNodeIds, not initialNodes
 
   // Sync node data changes from parent (but not collapsed state)
   useEffect(() => {
@@ -168,6 +180,7 @@ export function useCanvasState(props: CanvasPageProps) : CanvasPageState {
   const toggleNodeCollapse = useCallback((nodeId: string) => {
     setCollapsedNodeIds((prev) => {
       const isCurrentlyCollapsed = prev.includes(nodeId);
+
       return isCurrentlyCollapsed
         ? prev.filter((id) => id !== nodeId)
         : [...prev, nodeId];

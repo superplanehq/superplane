@@ -30,6 +30,7 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 			Configuration: wn.Configuration.Data(),
 			Metadata:      wn.Metadata.Data(),
 			Position:      wn.Position.Data(),
+			IsCollapsed:   wn.IsCollapsed,
 		}
 	}
 

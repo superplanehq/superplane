@@ -29,6 +29,7 @@ type WorkflowNode struct {
 	Ref           datatypes.JSONType[NodeRef]
 	Configuration datatypes.JSONType[map[string]any]
 	Metadata      datatypes.JSONType[map[string]any]
+	IsCollapsed   bool
 	WebhookID     *uuid.UUID
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time

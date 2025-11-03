@@ -108,6 +108,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		existingNode.Ref = datatypes.NewJSONType(node.Ref)
 		existingNode.Configuration = datatypes.NewJSONType(node.Configuration)
 		existingNode.Position = datatypes.NewJSONType(node.Position)
+		existingNode.IsCollapsed = node.IsCollapsed
 		existingNode.UpdatedAt = &now
 		err := tx.Save(&existingNode).Error
 		if err != nil {
@@ -129,6 +130,7 @@ func upsertNode(tx *gorm.DB, existingNodes []models.WorkflowNode, node models.No
 		Ref:           datatypes.NewJSONType(node.Ref),
 		Configuration: datatypes.NewJSONType(node.Configuration),
 		Position:      datatypes.NewJSONType(node.Position),
+		IsCollapsed:   node.IsCollapsed,
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
