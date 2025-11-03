@@ -3,19 +3,22 @@ package e2e
 import (
 	"testing"
 
+	uuid "github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 )
 
 func TestCustomComponents(t *testing.T) {
 	steps := &CustomComponentsSteps{t: t}
 
-	t.Run("component on canvas with a run; clicking expand navigates to node run page", func(t *testing.T) {
+	t.Run("expand last run", func(t *testing.T) {
 		steps.Start()
 		steps.GivenADeploymentComponentExists()
 		steps.GivenACanvasWithComponentExists()
 		steps.GivenNodeHasOneExecution()
 		steps.ClickExpand()
-		// steps.AssertNavigatedToNodeRunPage()
+		steps.AssertNavigatedToNodeRunPage()
 	})
 }
 
@@ -70,30 +73,30 @@ func (s *CustomComponentsSteps) GivenACanvasWithComponentExists() {
 	s.session.DragAndDrop(source2, target2, 600, 250)
 	s.session.Click(q.TestID("add-node-button"))
 
+	// connect: drag from Start node's output handle to the component's input handle
+	sourceHandle := q.Locator(`.react-flow__node:has-text("start") .react-flow__handle-right`)
+	targetHandle := q.Locator(`.react-flow__node:has-text("E2E Deployment Component") .react-flow__handle-left`)
+	s.session.DragAndDrop(sourceHandle, targetHandle, 6, 6)
+	s.session.Sleep(200)
+
 	// save canvas
-	s.session.TakeScreenshot()
 	s.session.Click(q.TestID("save-canvas-button"))
 }
 
 func (s *CustomComponentsSteps) GivenNodeHasOneExecution() {
-	dropdown := q.TestID("node-e2e-deployment-component-header-dropdown")
+	// Run the Start node instead of the component
+	dropdown := q.TestID("node-start-header-dropdown")
 	runOption := q.Locator("button:has-text('Run')")
 
 	s.session.Click(dropdown)
 	s.session.Click(runOption)
 	s.session.Click(q.TestID("emit-event-submit-button"))
 	s.session.Sleep(1000)
-	s.session.TakeScreenshot()
 
 	// hack to refresh the page
 	s.session.Visit("/" + s.session.orgID + "/")
 	s.session.Click(q.Text(s.canvasName))
 	s.session.Sleep(500)
-	s.session.TakeScreenshot()
-}
-
-func (s *CustomComponentsSteps) VisitCanvasPage() {
-	s.session.Visit("/" + s.session.orgID + "/workflows/" + s.workflowID)
 }
 
 func (s *CustomComponentsSteps) ClickExpand() {
@@ -101,6 +104,19 @@ func (s *CustomComponentsSteps) ClickExpand() {
 }
 
 func (s *CustomComponentsSteps) AssertNavigatedToNodeRunPage() {
-	// Expect URL to contain the node sub-route
+	orgUUID := uuid.MustParse(s.session.orgID)
+	wf, err := models.FindWorkflowByName(s.canvasName, orgUUID)
+	require.NoError(s.t, err)
+	s.workflowID = wf.ID.String()
+
+	nodes, err := models.FindWorkflowNodes(wf.ID)
+	require.NoError(s.t, err)
+	for _, n := range nodes {
+		if n.Name == "E2E Deployment Component" {
+			s.componentID = n.NodeID
+			break
+		}
+	}
+
 	s.session.AssertURLContains("/workflows/" + s.workflowID + "/nodes/" + s.componentID)
 }
