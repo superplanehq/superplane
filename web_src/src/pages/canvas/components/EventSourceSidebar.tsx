@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { SuperplaneEventSource, SuperplaneEvent, SuperplaneEventState } from "@/api-client";
+import { SuperplaneEventSource, SuperplaneEvent, SuperplaneEventState, IntegrationsIntegration } from "@/api-client";
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { SidebarHeader } from "./SidebarHeader";
 import { ResizeHandle } from "./ResizeHandle";
 import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
 import { EventItem } from "./EventItem";
-import { useIntegrations } from "../hooks/useIntegrations";
+import { useIntegrations } from "@/hooks/useIntegrations";
 import { useCanvasStore } from "../store/canvasStore";
 import { useEvents } from "@/hooks/useCanvasData";
 import { DEFAULT_SIDEBAR_WIDTH } from "../utils/constants";
@@ -99,7 +99,7 @@ export const EventSourceSidebar = ({ selectedEventSource, onClose, initialWidth 
     }
 
     const integrationName = selectedEventSource.spec?.integration?.name;
-    const integration = canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
+    const integration = canvasIntegrations.find((integration: IntegrationsIntegration) => integration.metadata?.name === integrationName);
     if (integration && integration.spec?.type) {
       return integration.spec?.type;
     }

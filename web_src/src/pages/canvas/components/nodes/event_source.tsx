@@ -4,7 +4,7 @@ import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useCreateEventSource, useUpdateEventSource, useDeleteEventSource, useAlertsBySourceId, useAcknowledgeAlert } from '@/hooks/useCanvasData';
-import { SuperplaneEventSource, SuperplaneEventSourceSpec, SuperplaneEventSourceType, superplaneCreateEvent } from '@/api-client';
+import { SuperplaneEventSource, SuperplaneEventSourceSpec, SuperplaneEventSourceType, superplaneCreateEvent, IntegrationsIntegration } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -14,7 +14,7 @@ import { useParams } from 'react-router-dom';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { twMerge } from 'tailwind-merge';
-import { useIntegrations } from '../../hooks/useIntegrations';
+import { useIntegrations } from '@/hooks/useIntegrations';
 import { EventStateItem } from '../EventStateItem';
 import { EventSourceBadges } from '../EventSourceBadges';
 import { EventSourceZeroState } from '../../../../components/EventSourceZeroState';
@@ -142,7 +142,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
     // Check if integrations are required but none are available for this source type
     if (!isRegularEventSource(sourceType)) {
-      const matchingIntegrations = canvasIntegrations.filter(int => int.spec?.type === sourceType);
+      const matchingIntegrations = canvasIntegrations.filter((int: IntegrationsIntegration) => int.spec?.type === sourceType);
       if (matchingIntegrations.length === 0) {
         setIntegrationError(true);
         setApiError(`${sourceType} integration is required but not configured. Please add a ${sourceType} integration to continue.`);
@@ -352,7 +352,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   const integration = useMemo(() => {
     const integrationName = props.data.integration?.name;
-    return canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
+    return canvasIntegrations.find((integration: IntegrationsIntegration) => integration.metadata?.name === integrationName);
   }, [canvasIntegrations, props.data.integration?.name]);
 
   const sourceType = useMemo(() => {
