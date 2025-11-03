@@ -1021,14 +1021,29 @@ function prepareCompositeNode(
   }
 
   if (queueItems.length > 0) {
-    const next = queueItems[0];
-    const subtitle = next.createdAt
-      ? formatTimeAgo(new Date(next.createdAt)).replace(" ago", "")
-      : "";
+    const next = queueItems[0] as any;
+    let inferredTitle =
+      next?.name ||
+      next?.input?.title ||
+      next?.input?.name ||
+      next?.input?.eventTitle ||
+      next?.id ||
+      "Queued";
+    // Heuristic: if the workflow has a single trigger and it is a schedule,
+    // show a friendly title consistent with executions.
+    const onlyTrigger = nodes.filter((n) => n.type === "TYPE_TRIGGER");
+    if (inferredTitle === next?.id || inferredTitle === "Queued") {
+      if (onlyTrigger.length === 1 && onlyTrigger[0]?.trigger?.name === "schedule") {
+        inferredTitle = "Event emitted by schedule";
+      }
+    }
+    const inferredSubtitle: string =
+      (typeof next?.input?.subtitle === "string" && next?.input?.subtitle) ||
+      (next?.createdAt ? formatTimeAgo(new Date(next.createdAt)).replace(" ago", "") : "");
     (canvasNode.data.composite as CompositeProps).nextInQueue = {
-      title: next.id || "Queued",
-      subtitle,
-      receivedAt: next.createdAt ? new Date(next.createdAt) : new Date(),
+      title: inferredTitle,
+      subtitle: inferredSubtitle,
+      receivedAt: next?.createdAt ? new Date(next.createdAt) : new Date(),
     };
   }
 
@@ -1775,12 +1790,27 @@ function prepareSidebarData(
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = queueItems.slice(0, 5).map((item) => {
+    const anyItem: any = item as any;
+    let title =
+      anyItem?.name ||
+      anyItem?.input?.title ||
+      anyItem?.input?.name ||
+      anyItem?.input?.eventTitle ||
+      item.id ||
+      "Queued";
+    const onlyTrigger = nodes.filter((n) => n.type === "TYPE_TRIGGER");
+    if (title === item.id || title === "Queued") {
+      if (onlyTrigger.length === 1 && onlyTrigger[0]?.trigger?.name === "schedule") {
+        title = "Event emitted by schedule";
+      }
+    }
     const timestamp = item.createdAt ? formatTimeAgo(new Date(item.createdAt)).replace(" ago", "") : "";
+    const subtitle: string = (typeof anyItem?.input?.subtitle === 'string' && anyItem.input.subtitle) || timestamp;
 
     return {
       id: item.id!,
-      title: item.id || "Queued",
-      subtitle: timestamp,
+      title,
+      subtitle,
       state: "waiting" as const,
       isOpen: false,
       receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
