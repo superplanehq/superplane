@@ -4,11 +4,11 @@ import { FieldRendererProps } from './types'
 import { ConfigurationFieldRenderer } from './index'
 
 export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, domainId, domainType, hasError }) => {
-  const objValue = (value as Record<string, unknown>) ?? {}
   const [isDarkMode, setIsDarkMode] = React.useState(false)
   const [jsonError, setJsonError] = React.useState<string | null>(null)
   const objectOptions = field.typeOptions?.object
   const schema = objectOptions?.schema
+  const hasSchema = !!schema && schema.length > 0
 
   // Detect dark mode
   React.useEffect(() => {
@@ -27,7 +27,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
     return () => observer.disconnect()
   }, [])
 
-  if (!schema || schema.length === 0) {
+  if (!hasSchema) {
     // Fallback to Monaco Editor if no schema defined
     const handleEditorChange = (value: string | undefined) => {
       const newValue = value || '{}'
@@ -46,7 +46,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
           <Editor
             height="100%"
             defaultLanguage="json"
-            value={JSON.stringify(objValue, null, 2)}
+            value={JSON.stringify(value === undefined ? {} : value, null, 2)}
             onChange={handleEditorChange}
             theme={isDarkMode ? 'vs-dark' : 'vs'}
             options={{
@@ -80,6 +80,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       </div>
     )
   }
+
+  const objValue = (value as Record<string, unknown>) ?? {}
 
   return (
     <div className="border border-gray-300 dark:border-zinc-700 rounded-md p-4 space-y-4">

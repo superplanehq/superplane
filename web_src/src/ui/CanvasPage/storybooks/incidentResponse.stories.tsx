@@ -176,7 +176,7 @@ const incidentResponseNodes: Node[] = [
         iconColor: "text-slate-700",
         headerColor: "bg-slate-200",
         collapsedBackground: "bg-slate-200",
-        parameters: [{ icon: "clock", items: ["Dedupe TTL: 10m"] }],
+        parameters: [{ icon: "clock", items: { "Dedupe TTL": "10m" } }],
         metadata: [
           {
             icon: "alert-triangle",

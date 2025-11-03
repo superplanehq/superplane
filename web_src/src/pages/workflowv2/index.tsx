@@ -30,7 +30,15 @@ import {
 } from "@/hooks/useWorkflowData";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import { CanvasEdge, CanvasNode, CanvasPage, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
+import {
+  CANVAS_SIDEBAR_STORAGE_KEY,
+  CanvasEdge,
+  CanvasNode,
+  CanvasPage,
+  NewNodeData,
+  NodeEditData,
+  SidebarData,
+} from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
@@ -79,6 +87,17 @@ export function WorkflowPageV2() {
    * This ref persists across re-renders to preserve sidebar state.
    */
   const isSidebarOpenRef = useRef<boolean | null>(null);
+  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+    const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
+    if (storedSidebarState !== null) {
+      try {
+        isSidebarOpenRef.current = JSON.parse(storedSidebarState);
+        hasUserToggledSidebarRef.current = true;
+      } catch (error) {
+        console.warn("Failed to parse sidebar state from local storage:", error);
+      }
+    }
+  }
   if (isSidebarOpenRef.current === null && workflow) {
     // Initialize on first render
     isSidebarOpenRef.current = workflow.nodes?.length === 0;
@@ -250,12 +269,13 @@ export function WorkflowPageV2() {
         workflow?.nodes || [],
         blueprints,
         components,
+        triggers,
         nodeExecutionsMap,
         nodeQueueItemsMap,
         nodeEventsMap,
       );
     },
-    [workflow, blueprints, components, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap],
+    [workflow, blueprints, components, triggers, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap],
   );
 
   const getNodeEditData = useCallback(
@@ -300,10 +320,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              configuration: updatedConfiguration,
-              name: updatedNodeName,
-            }
+            ...node,
+            configuration: updatedConfiguration,
+            name: updatedNodeName,
+          }
           : node,
       );
 
@@ -346,8 +366,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-            ? "TYPE_BLUEPRINT"
-            : "TYPE_COMPONENT",
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: position || {
           x: (workflow.nodes?.length || 0) * 250,
@@ -478,12 +498,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
-            }
+            ...node,
+            position: {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            },
+          }
           : node,
       );
 
@@ -618,6 +638,10 @@ export function WorkflowPageV2() {
 
         showSuccessToast("Canvas changes saved");
         setHasUnsavedChanges(false);
+
+        queryClient.invalidateQueries({
+          queryKey: workflowKeys.detail(organizationId, workflowId),
+        });
       } catch (error: any) {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
@@ -779,20 +803,25 @@ function prepareData(
   edges: CanvasEdge[];
 } {
   const edges = data?.edges!.map(prepareEdge);
-  const nodes = data?.nodes!.map((node) => {
-    return prepareNode(
-      data?.nodes!,
-      node,
-      triggers,
-      blueprints,
-      components,
-      nodeEventsMap,
-      nodeExecutionsMap,
-      nodeQueueItemsMap,
-      workflowId,
-      queryClient,
-    );
-  });
+  const nodes = data?.nodes!
+    .map((node) => {
+      return prepareNode(
+        data?.nodes!,
+        node,
+        triggers,
+        blueprints,
+        components,
+        nodeEventsMap,
+        nodeExecutionsMap,
+        nodeQueueItemsMap,
+        workflowId,
+        queryClient,
+      );
+    })
+    .map((node) => ({
+      ...node,
+      dragHandle: ".canvas-node-drag-handle",
+    }));
 
   return { nodes, edges };
 }
@@ -842,6 +871,14 @@ function prepareCompositeNode(
   // Use blueprint name (from metadata) if available, otherwise fall back to node name
   const displayLabel = blueprintMetadata?.name || node.name!;
 
+  const configurationFields = blueprintMetadata?.configuration || [];
+  const fieldLabelMap = configurationFields.reduce<Record<string, string>>((acc, field) => {
+    if (field.name) {
+      acc[field.name] = field.label || field.name;
+    }
+    return acc;
+  }, {});
+
   const canvasNode: CanvasNode = {
     id: node.id!,
     position: { x: node.position?.x!, y: node.position?.y! },
@@ -860,12 +897,14 @@ function prepareCompositeNode(
         title: displayLabel,
         description: blueprintMetadata?.description,
         isMissing: isMissing,
-        parameters: Object.keys(node.configuration!).map((key) => {
-          return {
-            icon: "cog",
-            items: [`${node.configuration![key]}`],
-          };
-        }),
+        parameters: Object.keys(node.configuration!).length > 0 ? [{
+          icon: "cog",
+          items: Object.keys(node.configuration!).reduce((acc, key) => {
+            const displayKey = fieldLabelMap[key] || key;
+            acc[displayKey] = `${node.configuration![key]}`;
+            return acc;
+          }, {} as Record<string, string>),
+        }] : [],
       },
     },
   };
@@ -896,8 +935,8 @@ function prepareCompositeNode(
               ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
                 ? ("processed" as const)
                 : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-                ? ("discarded" as const)
-                : ("running" as const);
+                  ? ("discarded" as const)
+                  : ("running" as const);
             return { label, state, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
           })
           .sort((a, b) => {
@@ -1078,10 +1117,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-          ? record.role
-          : record.type === "group" && record.group
-          ? record.group
-          : "Unknown",
+            ? record.role
+            : record.type === "group" && record.group
+              ? record.group
+              : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -1091,16 +1130,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
+            {
+              label: "comment",
+              optional: true,
+            },
+          ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-            Comment: approvalComment,
-          }
+          Comment: approvalComment,
+        }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1186,6 +1225,12 @@ function prepareApprovalNode(
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
             ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!)
             : undefined,
+        lastRunData: execution && rootTriggerRenderer ? {
+          title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
+          subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
+          receivedAt: new Date(execution.createdAt!),
+          state: getRunItemState(execution) === "success" ? "processed" as const : getRunItemState(execution) === "running" ? "running" as const : "discarded" as const,
+        } : undefined,
       },
     },
   };
@@ -1375,8 +1420,8 @@ function prepareHttpNode(
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
-          ? ("running" as const)
-          : ("failed" as const),
+            ? ("running" as const)
+            : ("failed" as const),
     };
   }
 
@@ -1491,8 +1536,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
         ? ("processed" as const)
         : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-        ? ("discarded" as const)
-        : ("waiting" as const);
+          ? ("discarded" as const)
+          : ("waiting" as const);
 
     // Get root trigger information for better title/subtitle
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -1501,9 +1546,9 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-        };
+        title: execution.id || "Execution",
+        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+      };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
@@ -1525,8 +1570,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
               ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
                 ? ("processed" as const)
                 : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-                ? ("discarded" as const)
-                : ("running" as const);
+                  ? ("discarded" as const)
+                  : ("running" as const);
             return { label, state: st, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
           })
           .sort((a, b) => {
@@ -1544,6 +1589,7 @@ function prepareSidebarData(
   nodes: ComponentsNode[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
+  triggers: TriggersTrigger[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
   nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
   nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>,
@@ -1553,23 +1599,37 @@ function prepareSidebarData(
   const events = nodeEventsMap[node.id!] || [];
 
   // Get metadata based on node type
-  let metadata;
-  const nodeTitle = node.name || "Unknown";
+  const blueprintMetadata =
+    node.type === "TYPE_BLUEPRINT" ? blueprints.find((b) => b.id === node.blueprint?.id) : undefined;
+  const componentMetadata =
+    node.type === "TYPE_COMPONENT" ? components.find((c) => c.name === node.component?.name) : undefined;
+  const triggerMetadata =
+    node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.trigger?.name) : undefined;
+
+  const configurationFields =
+    blueprintMetadata?.configuration || componentMetadata?.configuration || triggerMetadata?.configuration || [];
+
+  const fieldLabelMap = configurationFields.reduce<Record<string, string>>((acc, field) => {
+    if (field.name) {
+      acc[field.name] = field.label || field.name;
+    }
+    return acc;
+  }, {});
+
+  const nodeTitle =
+    componentMetadata?.label || blueprintMetadata?.name || triggerMetadata?.label || node.name || "Unknown";
   let iconSlug = "boxes";
   let color = "indigo";
 
-  if (node.type === "TYPE_BLUEPRINT") {
-    metadata = blueprints.find((b) => b.id === node.blueprint?.id);
-    if (metadata) {
-      iconSlug = metadata.icon || "boxes";
-      color = metadata.color || "indigo";
-    }
-  } else if (node.type === "TYPE_COMPONENT") {
-    metadata = components.find((c) => c.name === node.component?.name);
-    if (metadata) {
-      iconSlug = metadata.icon || "boxes";
-      color = metadata.color || "indigo";
-    }
+  if (blueprintMetadata) {
+    iconSlug = blueprintMetadata.icon || iconSlug;
+    color = blueprintMetadata.color || color;
+  } else if (componentMetadata) {
+    iconSlug = componentMetadata.icon || iconSlug;
+    color = componentMetadata.color || color;
+  } else if (triggerMetadata) {
+    iconSlug = triggerMetadata.icon || iconSlug;
+    color = triggerMetadata.color || color;
   }
 
   const latestEvents =
@@ -1614,9 +1674,10 @@ function prepareSidebarData(
       const isSimpleType = valueType === "string" || valueType === "number" || valueType === "boolean";
 
       if (isSimpleType) {
+        const displayKey = fieldLabelMap[key] || key;
         metadataItems.push({
           icon: "settings",
-          label: `${key}: ${value}`,
+          label: `${displayKey}: ${value}`,
         });
       }
     });

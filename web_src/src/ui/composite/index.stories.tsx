@@ -51,7 +51,7 @@ const DeployToEu: CompositeProps = createCompositeProps({
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
   parameters: [
-    { icon: "map", items: ["eu-global-1", "eu-global-2"] }
+    { icon: "map", items: { "region": "eu-global-1, eu-global-2" } }
   ],
   lastRunItem: {
     title: "fix: open rejected events",
@@ -96,7 +96,7 @@ const DeployToUS: CompositeProps = createCompositeProps({
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
   parameters: [
-    { icon: "map", items: ["us-west-1", "us-east-1"] }
+    { icon: "map", items: { "region": "us-west-1, us-east-1" } }
   ],
   lastRunItem: {
     title: "FEAT-984: Autocomplete",
@@ -126,7 +126,7 @@ const DeployToAsia: CompositeProps = createCompositeProps({
   headerColor: "bg-blue-100",
   iconBackground: "bg-blue-500",
   parameters: [
-    { icon: "map", items: ["asia-east-1"] }
+    { icon: "map", items: { "region": "asia-east-1" } }
   ],
   lastRunItem: {
     title: "fix: open rejected events",
@@ -152,7 +152,7 @@ const NoExecutionsZeroState: CompositeProps = createCompositeProps({
   iconColor: "text-gray-600",
   headerColor: "bg-gray-100",
   parameters: [
-    { icon: "settings", items: ["production"] }
+    { icon: "settings", items: { "environment": "production" } }
   ],
   collapsed: false
 });

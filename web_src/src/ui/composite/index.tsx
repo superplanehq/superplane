@@ -30,7 +30,7 @@ export interface LastRunItem extends QueueItem {
 
 export interface ParameterGroup {
   icon: string;
-  items: string[];
+  items: Record<string, string>;
 }
 
 export interface CompositeProps extends ComponentActionsProps {
@@ -170,14 +170,21 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
           isCompactView={isCompactView}
         >
           {parameters.length > 0 && (
-            <MetadataList
-              items={parameters.map(group => ({
-                icon: group.icon,
-                label: group.items.join(", ")
-              }))}
-              className="flex flex-col gap-1 text-gray-500 mt-1"
-              iconSize={16}
-            />
+            <div className="flex flex-col gap-1 text-gray-500 mt-1">
+              {parameters.map((group, groupIndex) => (
+                <React.Fragment key={groupIndex}>
+                  {Object.entries(group.items).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <div className="flex-shrink-0">
+                        {React.createElement(resolveIcon(group.icon), { size: 16 })}
+                      </div>
+                      <span className="text-xs font-medium flex-shrink-0">{key}:</span>
+                      <span className="text-xs truncate">{value}</span>
+                    </div>
+                  ))}
+                </React.Fragment>
+              ))}
+            </div>
           )}
         </CollapsedComponent>
       </SelectionWrapper>
@@ -220,13 +227,21 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
         )}
 
         {parameters.length > 0 && (
-          <MetadataList
-            items={parameters.map(group => ({
-              icon: group.icon,
-              label: group.items.join(", ")
-            }))}
-            className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2"
-          />
+          <div className="px-2 py-3 border-b text-gray-500 flex flex-col gap-2">
+            {parameters.map((group, groupIndex) => (
+              <React.Fragment key={groupIndex}>
+                {Object.entries(group.items).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <div className="flex-shrink-0">
+                      {React.createElement(resolveIcon(group.icon), { size: 16 })}
+                    </div>
+                    <span className="text-sm font-medium flex-shrink-0">{key}:</span>
+                    <span className="text-sm truncate">{value}</span>
+                  </div>
+                ))}
+              </React.Fragment>
+            ))}
+          </div>
         )}
 
         {metadata && metadata.length > 0 && (
@@ -287,6 +302,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
                         childEventsInfo={event.childEventsInfo}
                         onExpandChildEvents={onExpandChildEvents}
                         onReRunChildEvents={onReRunChildEvents}
+                        showItems={false}
                       />
                     )}
                   </div>

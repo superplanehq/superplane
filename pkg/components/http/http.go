@@ -22,10 +22,10 @@ type Header struct {
 }
 
 type Spec struct {
-	URL     string         `json:"url"`
-	Method  string         `json:"method"`
-	Payload map[string]any `json:"payload"`
-	Headers []Header       `json:"headers"`
+	URL     string   `json:"url"`
+	Method  string   `json:"method"`
+	Payload any      `json:"payload"`
+	Headers []Header `json:"headers"`
 }
 
 type HTTP struct{}
@@ -84,8 +84,10 @@ func (e *HTTP) Configuration() []components.ConfigurationField {
 			Name:     "payload",
 			Type:     components.FieldTypeObject,
 			Label:    "Payload",
-			Required: true,
-			Default:  "{}",
+			Required: false,
+			VisibilityConditions: []components.VisibilityCondition{
+				{Field: "method", Values: []string{"POST", "PUT"}},
+			},
 		},
 		{
 			Name:     "headers",
@@ -132,7 +134,7 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
-	body, err := e.getBody(spec)
+	body, err := e.getBody(spec.Method, spec.Payload)
 	if err != nil {
 		return err
 	}
@@ -179,12 +181,12 @@ func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 	})
 }
 
-func (e *HTTP) getBody(spec Spec) (io.Reader, error) {
-	if spec.Method == http.MethodGet {
+func (e *HTTP) getBody(method string, payload any) (io.Reader, error) {
+	if method == http.MethodGet || payload == nil {
 		return nil, nil
 	}
 
-	bodyData, err := json.Marshal(spec.Payload)
+	bodyData, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}

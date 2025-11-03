@@ -6,10 +6,20 @@ import { ComponentHeader } from "../componentHeader";
 import { ItemGroup } from "../item";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
+import { resolveIcon } from "@/lib/utils";
 
 export interface AwaitingEvent {
   title: string;
   subtitle?: string;
+}
+
+type LastRunState = "processed" | "discarded" | "running"
+
+interface ApprovalLastRunData {
+  title: string;
+  subtitle?: string;
+  receivedAt: Date;
+  state: LastRunState;
 }
 
 export interface ApprovalProps extends ComponentActionsProps {
@@ -22,6 +32,7 @@ export interface ApprovalProps extends ComponentActionsProps {
   description?: string;
   approvals: ApprovalItemProps[];
   awaitingEvent?: AwaitingEvent;
+  lastRunData?: ApprovalLastRunData;
   collapsedBackground?: string;
   receivedAt?: Date;
   zeroStateText?: string;
@@ -42,7 +53,8 @@ export const Approval: React.FC<ApprovalProps> = ({
   receivedAt,
   approvals,
   awaitingEvent,
-  zeroStateText = "No events yet",
+  lastRunData,
+  zeroStateText = "Awaiting events for approval",
   selected = false,
   onRun,
   runDisabled,
@@ -76,6 +88,46 @@ export const Approval: React.FC<ApprovalProps> = ({
     const diff = now.getTime() - receivedAt.getTime();
     return calcRelativeTimeFromDiff(diff);
   }, [receivedAt]);
+
+  const lastRunTimeAgo = React.useMemo(() => {
+    if (!lastRunData) return null;
+    const now = new Date()
+    const diff = now.getTime() - lastRunData.receivedAt.getTime()
+    return calcRelativeTimeFromDiff(diff)
+  }, [lastRunData])
+
+  const LastRunIcon = React.useMemo(() => {
+    if (!lastRunData) return null;
+    if (lastRunData.state === "processed") {
+      return resolveIcon("check")
+    } else if (lastRunData.state === "discarded") {
+      return resolveIcon("x")
+    } else {
+      return resolveIcon("loader-2")
+    }
+  }, [lastRunData])
+
+  const LastRunColor = React.useMemo(() => {
+    if (!lastRunData) return "text-gray-700";
+    if (lastRunData.state === "processed") {
+      return "text-green-700"
+    } else if (lastRunData.state === "discarded") {
+      return "text-red-700"
+    } else {
+      return "text-blue-700"
+    }
+  }, [lastRunData])
+
+  const LastRunBackground = React.useMemo(() => {
+    if (!lastRunData) return "bg-gray-200";
+    if (lastRunData.state === "processed") {
+      return "bg-green-200"
+    } else if (lastRunData.state === "discarded") {
+      return "bg-red-200"
+    } else {
+      return "bg-blue-200"
+    }
+  }, [lastRunData])
 
   if (collapsed) {
     return (
@@ -125,6 +177,43 @@ export const Approval: React.FC<ApprovalProps> = ({
         />
 
         <div className="px-4 py-3">
+          {lastRunData && !awaitingEvent && (
+            <>
+              <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+                <span className="uppercase text-sm font-medium">Last Run</span>
+                <span className="text-sm">{lastRunTimeAgo}</span>
+              </div>
+              <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastRunBackground} ${LastRunColor} mb-4`}>
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${lastRunData.state === "processed" ? "bg-green-600" : lastRunData.state === "discarded" ? "bg-red-600" : "bg-blue-600"}`}>
+                    {LastRunIcon && <LastRunIcon size={12} className="text-white" />}
+                  </div>
+                  <span className="truncate text-sm min-w-0">{lastRunData.title}</span>
+                </div>
+                {lastRunData.subtitle && (
+                  <span className="text-sm truncate flex-shrink-0 max-w-[40%]">{lastRunData.subtitle}</span>
+                )}
+              </div>
+            </>
+          )}
+
+          {!lastRunData && !awaitingEvent && (
+            <>
+              <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+                <span className="uppercase text-sm font-medium">Last Run</span>
+                <span className="text-sm"></span>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500 mb-4">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-gray-400 bg-gray-400">
+                    {resolveIcon("circle") && React.createElement(resolveIcon("circle")!, { size: 12, className: "text-white" })}
+                  </div>
+                  <span className="truncate text-sm">No events received yet</span>
+                </div>
+              </div>
+            </>
+          )}
+
           {awaitingEvent ? (
             <>
               <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
