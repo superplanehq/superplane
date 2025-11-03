@@ -48,6 +48,8 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
 
+type UnsavedChangeKind = "position" | "structural";
+
 export function WorkflowPageV2() {
   const { organizationId, workflowId } = useParams<{
     organizationId: string;
@@ -119,6 +121,17 @@ export function WorkflowPageV2() {
 
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [hasNonPositionalUnsavedChanges, setHasNonPositionalUnsavedChanges] = useState(false);
+
+  const markUnsavedChange = useCallback(
+    (kind: UnsavedChangeKind) => {
+      setHasUnsavedChanges(true);
+      if (kind === "structural") {
+        setHasNonPositionalUnsavedChanges(true);
+      }
+    },
+    [setHasUnsavedChanges, setHasNonPositionalUnsavedChanges],
+  );
 
   /**
    * Initialize persisted node IDs when workflow is first loaded
@@ -343,9 +356,9 @@ export function WorkflowPageV2() {
 
       // Update local cache without triggering API call
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      setHasUnsavedChanges(true);
+      markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
   );
 
   const generateNodeId = (blockName: string, nodeName: string) => {
@@ -403,9 +416,9 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      setHasUnsavedChanges(true);
+      markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
   );
 
   const handleEdgeCreate = useCallback(
@@ -428,9 +441,9 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      setHasUnsavedChanges(true);
+      markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
   );
 
   const handleNodeDelete = useCallback(
@@ -451,9 +464,9 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      setHasUnsavedChanges(true);
+      markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
   );
 
   const handleEdgeDelete = useCallback(
@@ -488,9 +501,9 @@ export function WorkflowPageV2() {
 
       // Update local cache
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      setHasUnsavedChanges(true);
+      markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
   );
 
   /**
@@ -522,9 +535,9 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      setHasUnsavedChanges(true);
+      markUnsavedChange("position");
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
   );
 
   const handleNodeCollapseChange = useCallback(
@@ -553,9 +566,9 @@ export function WorkflowPageV2() {
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-      setHasUnsavedChanges(true);
+      markUnsavedChange("structural");
     },
-    [workflow, organizationId, workflowId, queryClient],
+    [workflow, organizationId, workflowId, queryClient, markUnsavedChange],
   );
 
   const handleConfigure = useCallback(
@@ -647,6 +660,7 @@ export function WorkflowPageV2() {
 
         showSuccessToast("Canvas changes saved");
         setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
 
         queryClient.invalidateQueries({
           queryKey: workflowKeys.detail(organizationId, workflowId),
@@ -662,7 +676,7 @@ export function WorkflowPageV2() {
         }
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient],
+    [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient, setHasNonPositionalUnsavedChanges],
   );
 
   // Show loading indicator while data is being fetched
@@ -688,13 +702,15 @@ export function WorkflowPageV2() {
     return null;
   }
 
+  const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
+
   return (
     <CanvasPage
       title={workflow.name!}
       nodes={nodes}
       edges={edges}
       organizationId={organizationId}
-      onDirty={() => setHasUnsavedChanges(true)}
+      onDirty={() => markUnsavedChange("structural")}
       getSidebarData={getSidebarData}
       getNodeEditData={getNodeEditData}
       onNodeConfigurationSave={handleNodeConfigurationSave}
@@ -704,7 +720,7 @@ export function WorkflowPageV2() {
       onEdgeDelete={handleEdgeDelete}
       onNodePositionChange={handleNodePositionChange}
       onToggleView={handleNodeCollapseChange}
-      onToggleCollapse={() => setHasUnsavedChanges(true)}
+      onToggleCollapse={() => markUnsavedChange("structural")}
       onRun={handleRun}
       onConfigure={handleConfigure}
       buildingBlocks={buildingBlocks}
@@ -716,8 +732,8 @@ export function WorkflowPageV2() {
       unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
       saveIsPrimary={hasUnsavedChanges}
       saveButtonHidden={!hasUnsavedChanges}
-      runDisabled={hasUnsavedChanges}
-      runDisabledTooltip={hasUnsavedChanges ? "Save canvas changes before running" : undefined}
+      runDisabled={hasRunBlockingChanges}
+      runDisabledTooltip={hasRunBlockingChanges ? "Save canvas changes before running" : undefined}
       breadcrumbs={[
         {
           label: "Canvases",
