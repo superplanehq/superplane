@@ -669,35 +669,6 @@ func (p *Pipeline) Successful() bool {
 	return p.Result == PipelineResultPassed
 }
 
-func (i *SemaphoreResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
-	//
-	// Semaphore doesn't let us use UUIDs in secret names,
-	// so we sha256 the ID before creating the secret.
-	//
-	hash := sha256.New()
-	hash.Write([]byte(options.ID))
-	suffix := fmt.Sprintf("%x", hash.Sum(nil))
-	resourceName := fmt.Sprintf("superplane-webhook-%x", suffix[:16])
-
-	//
-	// Create Semaphore secret to store the event source key.
-	//
-	secret, err := i.createSemaphoreSecret(resourceName, options.Key)
-	if err != nil {
-		return nil, fmt.Errorf("error creating Semaphore secret: %v", err)
-	}
-
-	//
-	// Create a notification resource to receive events from Semaphore
-	//
-	notification, err := i.createSemaphoreNotification(resourceName, options.URL, options.Parent)
-	if err != nil {
-		return nil, fmt.Errorf("error creating Semaphore notification: %v", err)
-	}
-
-	return []integrations.Resource{secret, notification}, nil
-}
-
 type WebhookMetadata struct {
 	Secret       WebhookSecretMetadata       `json:"secret"`
 	Notification WebhookNotificationMetadata `json:"notification"`
@@ -713,7 +684,7 @@ type WebhookNotificationMetadata struct {
 	Name string `json:"name"`
 }
 
-func (i *SemaphoreResourceManager) SetupWebhookV2(options integrations.WebhookOptionsV2) (any, error) {
+func (i *SemaphoreResourceManager) SetupWebhook(options integrations.WebhookOptions) (any, error) {
 	//
 	// Semaphore doesn't let us use UUIDs in secret names,
 	// so we sha256 the ID before creating the secret.
@@ -809,33 +780,7 @@ func (i *SemaphoreResourceManager) createSemaphoreNotification(name string, URL 
 	return notification, nil
 }
 
-func (i *SemaphoreResourceManager) CleanupWebhook(parentResource integrations.Resource, webhook integrations.Resource) error {
-	// For Semaphore, we need to delete both the notification and the associated secret
-	// We'll use DELETE HTTP method to clean up the resources
-
-	// Delete notification
-	if webhook.Type() == ResourceTypeNotification {
-		notificationURL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", i.URL, webhook.Id())
-		_, err := i.execRequest(http.MethodDelete, notificationURL, nil)
-		if err != nil {
-			return fmt.Errorf("error deleting notification: %v", err)
-		}
-	}
-
-	// For secrets, we can attempt to delete them by name pattern
-	// Since we created secrets with a specific naming convention
-	if webhook.Type() == ResourceTypeSecret {
-		secretURL := fmt.Sprintf("%s/api/v1beta/secrets/%s", i.URL, webhook.Name())
-		_, err := i.execRequest(http.MethodDelete, secretURL, nil)
-		if err != nil {
-			return fmt.Errorf("error deleting secret: %v", err)
-		}
-	}
-
-	return nil
-}
-
-func (i *SemaphoreResourceManager) CleanupWebhookV2(options integrations.WebhookOptionsV2) error {
+func (i *SemaphoreResourceManager) CleanupWebhook(options integrations.WebhookOptions) error {
 	metadata := WebhookMetadata{}
 	err := mapstructure.Decode(options.Metadata, &metadata)
 	if err != nil {

@@ -102,7 +102,7 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 		return err
 	}
 
-	webhookMetadata, err := resourceManager.SetupWebhookV2(integrations.WebhookOptionsV2{
+	webhookMetadata, err := resourceManager.SetupWebhook(integrations.WebhookOptions{
 		Resource:      resource,
 		Configuration: webhook.Configuration,
 		URL:           fmt.Sprintf("%s/api/v1/webhooks/%s", w.baseURL, webhook.ID.String()),
