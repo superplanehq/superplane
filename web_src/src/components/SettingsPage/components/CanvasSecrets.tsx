@@ -5,7 +5,7 @@ import { Button } from '../../Button/button'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Input } from '../../Input/input'
 import { useSecrets, useCreateSecret, useDeleteSecret, useUpdateSecret, useSecret } from '@/hooks/useSecrets'
-import { formatRelativeTime } from '@/pages/canvas/utils/stageEventUtils'
+import { formatRelativeTime } from '@/utils/timezone'
 
 interface CanvasSecretsProps {
   canvasId: string
