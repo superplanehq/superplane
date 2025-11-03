@@ -159,11 +159,11 @@ func (m *Metadata) validateAction(record *Record, ctx components.ActionContext) 
 	case ItemTypeGroup:
 		inGroup, err := ctx.AuthContext.InGroup(*record.Group)
 		if err != nil {
-			return fmt.Errorf("error checking group %s: %v", *record.Role, err)
+			return fmt.Errorf("error checking group %s: %v", *record.Group, err)
 		}
 
 		if !inGroup {
-			return fmt.Errorf("item must be approved by %s", *record.Role)
+			return fmt.Errorf("item must be approved by %s", *record.Group)
 		}
 
 		return nil

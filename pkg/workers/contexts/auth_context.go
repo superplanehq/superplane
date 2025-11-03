@@ -2,7 +2,6 @@ package contexts
 
 import (
 	"fmt"
-	"log"
 	"slices"
 
 	"github.com/google/uuid"
@@ -55,16 +54,15 @@ func (c *AuthContext) HasRole(role string) (bool, error) {
 		return false, fmt.Errorf("user not authenticated")
 	}
 
-	userIDs, err := c.authService.GetOrgUsersForRole(c.orgID.String(), role)
+	roles, err := c.authService.GetUserRolesForOrg(c.authenticatedUser.ID.String(), c.orgID.String())
 	if err != nil {
 		return false, fmt.Errorf("error finding users for role %s: %v", role, err)
 	}
 
-	log.Printf("HasRole - userIDs: %v", userIDs)
-	log.Printf("HasRole - authenticatedUser.ID: %v", c.authenticatedUser.ID.String())
-
-	if slices.Contains(userIDs, c.authenticatedUser.ID.String()) {
-		return true, nil
+	for _, r := range roles {
+		if r.Name == role {
+			return true, nil
+		}
 	}
 
 	return false, nil
@@ -79,9 +77,6 @@ func (c *AuthContext) InGroup(group string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error finding users in group %s: %v", group, err)
 	}
-
-	log.Printf("InGroup - userIDs: %v", userIDs)
-	log.Printf("InGroup - authenticatedUser.ID: %v", c.authenticatedUser.ID.String())
 
 	if slices.Contains(userIDs, c.authenticatedUser.ID.String()) {
 		return true, nil
