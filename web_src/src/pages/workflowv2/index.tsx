@@ -505,6 +505,37 @@ export function WorkflowPageV2() {
     [workflow, organizationId, workflowId, queryClient],
   );
 
+  const handleNodeCollapseChange = useCallback(
+    (nodeId: string) => {
+      if (!workflow || !organizationId || !workflowId) return;
+
+      // Find the current node to determine its collapsed state
+      const currentNode = workflow.nodes?.find((node) => node.id === nodeId);
+      if (!currentNode) return;
+
+      // Toggle the collapsed state
+      const newIsCollapsed = !currentNode.isCollapsed;
+
+      const updatedNodes = workflow.nodes?.map((node) =>
+        node.id === nodeId
+          ? {
+            ...node,
+            isCollapsed: newIsCollapsed,
+          }
+          : node,
+      );
+
+      const updatedWorkflow = {
+        ...workflow,
+        nodes: updatedNodes,
+      };
+
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      setHasUnsavedChanges(true);
+    },
+    [workflow, organizationId, workflowId, queryClient],
+  );
+
   const handleConfigure = useCallback(
     (nodeId: string) => {
       const node = workflow?.nodes?.find((n) => n.id === nodeId);
@@ -555,6 +586,7 @@ export function WorkflowPageV2() {
       // Map canvas nodes back to ComponentsNode format with updated positions
       const updatedNodes = workflow.nodes?.map((node) => {
         const canvasNode = canvasNodes.find((cn) => cn.id === node.id);
+        const componentType = canvasNode?.data?.type as string || '';
         if (canvasNode) {
           return {
             ...node,
@@ -562,7 +594,7 @@ export function WorkflowPageV2() {
               x: Math.round(canvasNode.position.x),
               y: Math.round(canvasNode.position.y),
             },
-            isCollapsed: (canvasNode.data[node.type!] as { isCollapsed: boolean })?.isCollapsed || false,
+            isCollapsed: (canvasNode.data[componentType] as { collapsed: boolean })?.collapsed || false,
           };
         }
         return node;
@@ -645,6 +677,8 @@ export function WorkflowPageV2() {
       onNodeDelete={handleNodeDelete}
       onEdgeDelete={handleEdgeDelete}
       onNodePositionChange={handleNodePositionChange}
+      onToggleView={handleNodeCollapseChange}
+      onToggleCollapse={() => setHasUnsavedChanges(true)}
       onRun={handleRun}
       onConfigure={handleConfigure}
       buildingBlocks={buildingBlocks}
@@ -778,6 +812,7 @@ function prepareTriggerNode(
   const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
   const renderer = getTriggerRenderer(node.trigger?.name || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
+  const triggerProps = renderer.getTriggerProps(node, triggerMetadata!, lastEvent);
 
   return {
     id: node.id!,
@@ -787,7 +822,10 @@ function prepareTriggerNode(
       label: node.name!,
       state: "pending" as const,
       outputChannels: ["default"],
-      trigger: renderer.getTriggerProps(node, triggerMetadata!, lastEvent),
+      trigger: {
+        ...triggerProps,
+        collapsed: node.isCollapsed,
+      },
     },
   };
 }
@@ -819,6 +857,7 @@ function prepareCompositeNode(
         iconBackground: getBackgroundColorClass(color),
         headerColor: getBackgroundColorClass(color),
         collapsedBackground: getBackgroundColorClass(color),
+        collapsed: node.isCollapsed,
         title: node.name!,
         description: blueprintMetadata?.description,
         isMissing: isMissing,
@@ -1098,6 +1137,7 @@ function prepareApprovalNode(
         iconBackground: getBackgroundColorClass(metadata?.color || "orange"),
         headerColor: getBackgroundColorClass(metadata?.color || "orange"),
         collapsedBackground: getBackgroundColorClass(metadata?.color || "orange"),
+        collapsed: node.isCollapsed,
         title: node.name!,
         description: metadata?.description,
         receivedAt: execution ? new Date(execution.createdAt!) : undefined,
@@ -1166,6 +1206,7 @@ function prepareIfNode(
         trueSectionLabel: "TRUE",
         falseSectionLabel: "FALSE",
         collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
       },
     },
   };
@@ -1209,6 +1250,7 @@ function prepareNoopNode(
           eventState: "neutral" as const,
         },
         collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
       },
     },
   };
@@ -1255,6 +1297,7 @@ function prepareFilterNode(
           eventState: "neutral" as const,
         },
         collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
       },
     },
   };
@@ -1304,6 +1347,7 @@ function prepareHttpNode(
         headers: configuration?.headers,
         lastExecution,
         collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
       },
     },
   };
@@ -1343,6 +1387,7 @@ function prepareWaitNode(
         iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
         headerColor: getBackgroundColorClass(metadata?.color || "yellow"),
         collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
       },
     },
   };
