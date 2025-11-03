@@ -17,7 +17,7 @@ import {
   workflowsEmitNodeEvent,
   workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
-import { organizationKeys } from "@/hooks/useOrganizationData";
+import { organizationKeys, useOrganizationUsers, useOrganizationRoles } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import {
@@ -61,6 +61,13 @@ export function WorkflowPageV2() {
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
+
+  // Warm up org users and roles cache so approval specs can pretty-print
+  // user IDs as emails and role names as display names.
+  // We don't use the values directly here; loading them populates the
+  // react-query cache which prepareApprovalNode reads from.
+  useOrganizationUsers(organizationId!);
+  useOrganizationRoles(organizationId!);
 
   /**
    * Track which node IDs have been persisted to the server.
