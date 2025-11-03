@@ -287,6 +287,7 @@ export const Composite: React.FC<CompositeProps> = ({ iconSrc, iconSlug, iconCol
                         childEventsInfo={event.childEventsInfo}
                         onExpandChildEvents={onExpandChildEvents}
                         onReRunChildEvents={onReRunChildEvents}
+                        showItems={false}
                       />
                     )}
                   </div>
