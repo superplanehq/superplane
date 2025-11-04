@@ -1,5 +1,5 @@
 import React from "react";
-import { ComponentBase } from "../componentBase";
+import { ComponentBase, EventSection } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
 import { MetadataItem } from "../metadataList";
@@ -85,7 +85,7 @@ export const TimeGate: React.FC<TimeGateProps> = ({
     },
   ];
 
-  const eventSections = [];
+  const eventSections: EventSection[] = [];
 
   if (!hideLastRun) {
     if (lastExecution && lastExecution.state && lastExecution.receivedAt) {
