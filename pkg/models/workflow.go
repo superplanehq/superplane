@@ -50,29 +50,27 @@ func FindWorkflowNodes(workflowID uuid.UUID) ([]WorkflowNode, error) {
 }
 
 func (w *Workflow) FindEdges(sourceID string, channel string) []Edge {
-    edges := []Edge{}
+	edges := []Edge{}
 
-    for _, edge := range w.Edges {
-        if edge.SourceID == sourceID && edge.Channel == channel {
-            edges = append(edges, edge)
-        }
-    }
+	for _, edge := range w.Edges {
+		if edge.SourceID == sourceID && edge.Channel == channel {
+			edges = append(edges, edge)
+		}
+	}
 
-    return edges
+	return edges
 }
 
-// FindIncomingEdges returns all edges that target the given node ID,
-// regardless of channel. Useful for fan-in behavior like Merge.
 func (w *Workflow) FindIncomingEdges(targetID string) []Edge {
-    edges := []Edge{}
+	edges := []Edge{}
 
-    for _, edge := range w.Edges {
-        if edge.TargetID == targetID {
-            edges = append(edges, edge)
-        }
-    }
+	for _, edge := range w.Edges {
+		if edge.TargetID == targetID {
+			edges = append(edges, edge)
+		}
+	}
 
-    return edges
+	return edges
 }
 
 func FindWorkflow(orgID, id uuid.UUID) (*Workflow, error) {
