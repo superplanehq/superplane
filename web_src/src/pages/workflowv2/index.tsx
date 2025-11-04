@@ -3,6 +3,7 @@ import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 import {
   BlueprintsBlueprint,
@@ -1156,6 +1157,8 @@ function prepareComponentNode(
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
     case "http":
       return prepareHttpNode(node, components, nodeExecutionsMap);
+    case "semaphore":
+      return prepareSemaphoreNode(node, components, nodeExecutionsMap);
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap);
   }
@@ -1618,6 +1621,66 @@ function prepareHttpNode(
         url: configuration?.url,
         payload: configuration?.payload,
         headers: configuration?.headers,
+        lastExecution,
+        collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
+      },
+    },
+  };
+}
+
+function prepareSemaphoreNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+): CanvasNode {
+  const metadata = components.find((c) => c.name === "semaphore");
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Configuration always comes from the node, not the execution
+  const configuration = node.configuration as any;
+  const nodeMetadata = node.metadata as any;
+
+  let lastExecution;
+  if (execution) {
+    const outputs = execution.outputs as any;
+    const workflowId = outputs?.default?.[0]?.workflowId;
+
+    lastExecution = {
+      workflowId: workflowId,
+      receivedAt: new Date(execution.createdAt!),
+      state:
+        getRunItemState(execution) === "success"
+          ? ("success" as const)
+          : getRunItemState(execution) === "running"
+            ? ("running" as const)
+            : ("failed" as const),
+    };
+  }
+
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "semaphore",
+      label: displayLabel,
+      state: "pending" as const,
+      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
+      semaphore: {
+        iconSrc: SemaphoreLogo,
+        iconSlug: metadata?.icon || "workflow",
+        iconColor: getColorClass(metadata?.color || "gray"),
+        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
+        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
+        title: displayLabel,
+        project: nodeMetadata?.project.name,
+        ref: configuration?.ref,
+        pipelineFile: configuration?.pipelineFile,
+        parameters: configuration?.parameters,
         lastExecution,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,

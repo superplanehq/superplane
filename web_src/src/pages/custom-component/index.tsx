@@ -21,6 +21,7 @@ import { ComponentsComponent, ComponentsNode } from '../../api-client'
 import { showSuccessToast, showErrorToast } from '../../utils/toast'
 import { filterVisibleConfiguration } from '../../utils/components'
 import ELK from 'elkjs/lib/elk.bundled.js'
+import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
 
 const elk = new ELK()
 
@@ -69,6 +70,7 @@ const getBlockType = (componentName: string): BlockData['type'] => {
     'approval': 'approval',
     'noop': 'noop',
     'http': 'http',
+    'semaphore': 'semaphore',
     'wait': 'wait',
   }
   return typeMap[componentName] || 'noop' // Default to noop for unknown components
@@ -143,6 +145,23 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         url: node.configuration?.url,
         payload: node.configuration?.payload,
         headers: node.configuration?.headers,
+      }
+      break
+    case 'semaphore':
+      baseData.semaphore = {
+        title: node.name,
+        iconSrc: SemaphoreLogo,
+        iconSlug: component?.icon || 'workflow',
+        iconColor: 'text-gray-700',
+        iconBackground: 'bg-gray-100',
+        headerColor: 'bg-gray-50',
+        collapsedBackground: 'bg-gray-100',
+        collapsed: false,
+        hideLastRun: true,
+        project: node.configuration?.project,
+        ref: node.configuration?.ref,
+        pipelineFile: node.configuration?.pipelineFile,
+        parameters: node.configuration?.parameters,
       }
       break
     case 'wait':

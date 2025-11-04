@@ -323,6 +323,10 @@ func (a *Approval) Configuration() []components.ConfigurationField {
 	}
 }
 
+func (a *Approval) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
 func (a *Approval) Execute(ctx components.ExecutionContext) error {
 	config := Config{}
 	err := mapstructure.Decode(ctx.Configuration, &config)

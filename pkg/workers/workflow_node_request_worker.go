@@ -182,9 +182,12 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
+		Configuration:         node.Configuration.Data(),
 		Parameters:            spec.InvokeAction.Parameters,
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
+		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
+		IntegrationContext:    contexts.NewIntegrationContext(w.registry),
 	}
 
 	err = component.HandleAction(actionCtx)
@@ -245,9 +248,12 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
+		Configuration:         childNode.Configuration,
 		Parameters:            spec.InvokeAction.Parameters,
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
+		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
+		IntegrationContext:    contexts.NewIntegrationContext(w.registry),
 	}
 
 	err = component.HandleAction(actionCtx)

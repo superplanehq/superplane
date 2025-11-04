@@ -81,6 +81,8 @@ func InvokeNodeExecutionAction(
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
 		AuthContext:           contexts.NewAuthContext(orgID, authService, user),
+		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
+		IntegrationContext:    contexts.NewIntegrationContext(registry),
 	}
 
 	err = component.HandleAction(actionCtx)

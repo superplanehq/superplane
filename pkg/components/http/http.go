@@ -50,6 +50,10 @@ func (e *HTTP) Color() string {
 	return "blue"
 }
 
+func (e *HTTP) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
 func (e *HTTP) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }

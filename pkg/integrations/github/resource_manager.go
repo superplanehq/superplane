@@ -292,6 +292,7 @@ type WorkflowRun struct {
 	ID         int64
 	Status     string
 	Conclusion string
+	HTMLURL    string
 }
 
 func (w *WorkflowRun) Id() string {
@@ -308,4 +309,8 @@ func (w *WorkflowRun) Finished() bool {
 
 func (w *WorkflowRun) Successful() bool {
 	return w.Conclusion == "success"
+}
+
+func (w *WorkflowRun) URL() string {
+	return w.HTMLURL
 }

@@ -12,6 +12,7 @@ import { Filter, FilterProps } from "../filter";
 import { If, IfProps } from "../if";
 import { Noop, NoopProps } from "../noop";
 import { Http, HttpProps } from "../http";
+import { Semaphore, SemaphoreProps } from "../semaphore";
 import { Wait, WaitProps } from "../wait";
 import { ComponentActionsProps } from "../types/componentActions";
 
@@ -24,6 +25,7 @@ type BlockType =
   | "if"
   | "noop"
   | "http"
+  | "semaphore"
   | "wait"
   | "switch";
 
@@ -66,6 +68,9 @@ export interface BlockData {
 
   // http node specific props
   http?: HttpProps;
+
+  // semaphore node specific props
+  semaphore?: SemaphoreProps;
 
   // wait node specific props
   wait?: WaitProps;
@@ -129,6 +134,7 @@ function LeftHandle({ data }: BlockProps) {
     (data.type === "if" && data.if?.collapsed) ||
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
+    (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
@@ -155,6 +161,7 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "if" && data.if?.collapsed) ||
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
+    (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
@@ -364,6 +371,8 @@ function BlockContent({
       return <Noop {...(data.noop as NoopProps)} selected={selected} {...actionProps} />;
     case "http":
       return <Http {...(data.http as HttpProps)} selected={selected} {...actionProps} />;
+    case "semaphore":
+      return <Semaphore {...(data.semaphore as SemaphoreProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
     case "switch":

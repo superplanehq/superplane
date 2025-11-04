@@ -105,3 +105,7 @@ func (f *Filter) Actions() []components.Action {
 func (f *Filter) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("filter does not support actions")
 }
+
+func (f *Filter) Setup(ctx components.SetupContext) error {
+	return nil
+}
