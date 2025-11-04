@@ -1482,7 +1482,7 @@ function prepareNoopNode(
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
-  const metadata = components.find((c) => c.name === "noop");
+  const metadata = components.find((c) => c.name === "merge");
 
   // Get last event data
   let lastEvent;
