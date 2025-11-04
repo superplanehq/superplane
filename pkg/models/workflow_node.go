@@ -212,21 +212,3 @@ func CountNodeQueueItems(workflowID uuid.UUID, nodeID string) (int64, error) {
 
 	return totalCount, nil
 }
-
-func ListNodeQueueItemsForRoot(tx *gorm.DB, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID) ([]WorkflowNodeQueueItem, error) {
-	var queueItems []WorkflowNodeQueueItem
-
-	err := tx.
-		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeID).
-		Where("root_event_id = ?", rootEventID).
-		Order("created_at ASC").
-		Find(&queueItems).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return queueItems, nil
-}

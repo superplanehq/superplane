@@ -61,18 +61,6 @@ func (w *Workflow) FindEdges(sourceID string, channel string) []Edge {
 	return edges
 }
 
-func (w *Workflow) FindIncomingEdges(targetID string) []Edge {
-	edges := []Edge{}
-
-	for _, edge := range w.Edges {
-		if edge.TargetID == targetID {
-			edges = append(edges, edge)
-		}
-	}
-
-	return edges
-}
-
 func FindWorkflow(orgID, id uuid.UUID) (*Workflow, error) {
 	return FindWorkflowInTransaction(database.Conn(), orgID, id)
 }

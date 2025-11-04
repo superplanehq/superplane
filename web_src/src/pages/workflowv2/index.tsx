@@ -211,11 +211,14 @@ export function WorkflowPageV2() {
     [queryClient, workflowId],
   );
 
-  const saveWorkflowSnapshot = useCallback((currentWorkflow: WorkflowsWorkflow) => {
-    if (!initialWorkflowSnapshot) {
-      setInitialWorkflowSnapshot(JSON.parse(JSON.stringify(currentWorkflow)));
-    }
-  }, [initialWorkflowSnapshot]);
+  const saveWorkflowSnapshot = useCallback(
+    (currentWorkflow: WorkflowsWorkflow) => {
+      if (!initialWorkflowSnapshot) {
+        setInitialWorkflowSnapshot(JSON.parse(JSON.stringify(currentWorkflow)));
+      }
+    },
+    [initialWorkflowSnapshot],
+  );
 
   // Revert to initial state
   const markUnsavedChange = useCallback((kind: UnsavedChangeKind) => {
@@ -366,10 +369,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            configuration: updatedConfiguration,
-            name: updatedNodeName,
-          }
+              ...node,
+              configuration: updatedConfiguration,
+              name: updatedNodeName,
+            }
           : node,
       );
 
@@ -415,8 +418,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-              ? "TYPE_BLUEPRINT"
-              : "TYPE_COMPONENT",
+            ? "TYPE_BLUEPRINT"
+            : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: position || {
           x: (workflow.nodes?.length || 0) * 250,
@@ -557,12 +560,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            position: {
-              x: Math.round(position.x),
-              y: Math.round(position.y),
-            },
-          }
+              ...node,
+              position: {
+                x: Math.round(position.x),
+                y: Math.round(position.y),
+              },
+            }
           : node,
       );
 
@@ -594,9 +597,9 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-            ...node,
-            isCollapsed: newIsCollapsed,
-          }
+              ...node,
+              isCollapsed: newIsCollapsed,
+            }
           : node,
       );
 
@@ -746,7 +749,7 @@ export function WorkflowPageV2() {
   return (
     <CanvasPage
       onNodeExpand={(nodeId) => {
-        navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}`)
+        navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}`);
       }}
       title={workflow.name!}
       nodes={nodes}
@@ -971,15 +974,15 @@ function prepareCompositeNode(
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
-              {
-                icon: "cog",
-                items: Object.keys(node.configuration!).reduce((acc, key) => {
-                  const displayKey = fieldLabelMap[key] || key;
-                  acc[displayKey] = `${node.configuration![key]}`;
-                  return acc;
-                }, {} as Record<string, string>),
-              },
-            ]
+                {
+                  icon: "cog",
+                  items: Object.keys(node.configuration!).reduce((acc, key) => {
+                    const displayKey = fieldLabelMap[key] || key;
+                    acc[displayKey] = `${node.configuration![key]}`;
+                    return acc;
+                  }, {} as Record<string, string>),
+                },
+              ]
             : [],
       },
     },
@@ -1011,8 +1014,8 @@ function prepareCompositeNode(
               ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
                 ? ("processed" as const)
                 : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-                  ? ("discarded" as const)
-                  : ("running" as const);
+                ? ("discarded" as const)
+                : ("running" as const);
             return { label, state, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
           })
           .sort((a, b) => {
@@ -1158,6 +1161,8 @@ function prepareComponentNode(
       return prepareHttpNode(node, components, nodeExecutionsMap);
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap);
+    case "merge":
+      return prepareMergeNode(node, components, nodeExecutionsMap);
   }
 
   //
@@ -1241,10 +1246,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-            ? record.role
-            : record.type === "group" && record.group
-              ? record.group
-              : "Unknown",
+          ? record.role
+          : record.type === "group" && record.group
+          ? record.group
+          : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -1254,16 +1259,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-            {
-              label: "comment",
-              optional: true,
-            },
-          ]
+              {
+                label: "comment",
+                optional: true,
+              },
+            ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-          Comment: approvalComment,
-        }
+            Comment: approvalComment,
+          }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1349,41 +1354,41 @@ function prepareApprovalNode(
         spec:
           items.length > 0
             ? {
-              title: "approvals required",
-              tooltipTitle: "approvals required",
-              values: items.map((item) => {
-                const type = (item.type || "").toString();
-                let value =
-                  type === "user"
-                    ? item.user || ""
-                    : type === "role"
+                title: "approvals required",
+                tooltipTitle: "approvals required",
+                values: items.map((item) => {
+                  const type = (item.type || "").toString();
+                  let value =
+                    type === "user"
+                      ? item.user || ""
+                      : type === "role"
                       ? item.role || ""
                       : type === "group"
-                        ? item.group || ""
-                        : "";
-                const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+                      ? item.group || ""
+                      : "";
+                  const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
 
-                // Pretty-print values
-                if (type === "user" && value && usersById[value]) {
-                  value = usersById[value].email || usersById[value].name || value;
-                }
-                if (type === "role" && value) {
-                  value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
-                  // Fallback to simple suffix mapping when not found
-                  const suffix = (item.role || "").split("_").pop();
-                  if (!rolesByName[item.role || ""] && suffix) {
-                    const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
-                    value = map[suffix] || value;
+                  // Pretty-print values
+                  if (type === "user" && value && usersById[value]) {
+                    value = usersById[value].email || usersById[value].name || value;
                   }
-                }
-                return {
-                  badges: [
-                    { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-                    { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
-                  ],
-                };
-              }),
-            }
+                  if (type === "role" && value) {
+                    value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
+                    // Fallback to simple suffix mapping when not found
+                    const suffix = (item.role || "").split("_").pop();
+                    if (!rolesByName[item.role || ""] && suffix) {
+                      const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
+                      value = map[suffix] || value;
+                    }
+                  }
+                  return {
+                    badges: [
+                      { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                      { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+                    ],
+                  };
+                }),
+              }
             : undefined,
         awaitingEvent:
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
@@ -1392,16 +1397,16 @@ function prepareApprovalNode(
         lastRunData:
           execution && rootTriggerRenderer
             ? {
-              title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
-              subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
-              receivedAt: new Date(execution.createdAt!),
-              state:
-                getRunItemState(execution) === "success"
-                  ? ("processed" as const)
-                  : getRunItemState(execution) === "running"
+                title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
+                subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
+                receivedAt: new Date(execution.createdAt!),
+                state:
+                  getRunItemState(execution) === "success"
+                    ? ("processed" as const)
+                    : getRunItemState(execution) === "running"
                     ? ("running" as const)
                     : ("discarded" as const),
-            }
+              }
             : undefined,
       },
     },
@@ -1592,8 +1597,8 @@ function prepareHttpNode(
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
+          ? ("running" as const)
+          : ("failed" as const),
     };
   }
 
@@ -1626,6 +1631,52 @@ function prepareHttpNode(
   };
 }
 
+function prepareMergeNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+): CanvasNode {
+  const metadata = components.find((c) => c.name === "merge");
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  let lastExecution;
+  if (execution) {
+    lastExecution = {
+      receivedAt: new Date(execution.createdAt!),
+      state:
+        getRunItemState(execution) === "success"
+          ? ("success" as const)
+          : getRunItemState(execution) === "running"
+          ? ("running" as const)
+          : ("failed" as const),
+    };
+  }
+
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "merge",
+      label: displayLabel,
+      state: "pending" as const,
+      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
+      merge: {
+        title: displayLabel,
+        lastExecution,
+        iconColor: getColorClass(metadata?.color || "purple"),
+        iconBackground: getBackgroundColorClass(metadata?.color || "purple"),
+        headerColor: getBackgroundColorClass(metadata?.color || "purple"),
+        collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
+      },
+    },
+  };
+}
+
 function prepareWaitNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
@@ -1644,8 +1695,8 @@ function prepareWaitNode(
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
+          ? ("running" as const)
+          : ("failed" as const),
     };
   }
 
@@ -1713,8 +1764,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
         ? ("processed" as const)
         : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-          ? ("discarded" as const)
-          : ("waiting" as const);
+        ? ("discarded" as const)
+        : ("waiting" as const);
 
     // Get root trigger information for better title/subtitle
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -1723,9 +1774,9 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-        title: execution.id || "Execution",
-        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-      };
+          title: execution.id || "Execution",
+          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+        };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
@@ -1747,8 +1798,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
               ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
                 ? ("processed" as const)
                 : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-                  ? ("discarded" as const)
-                  : ("running" as const);
+                ? ("discarded" as const)
+                : ("running" as const);
             return { label, state: st, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
           })
           .sort((a, b) => {
