@@ -1,20 +1,20 @@
 package workers
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "log"
-    "time"
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"time"
 
-    "golang.org/x/sync/semaphore"
-    "gorm.io/datatypes"
-    "gorm.io/gorm"
+	"golang.org/x/sync/semaphore"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 
-    "github.com/superplanehq/superplane/pkg/database"
-    "github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-    "github.com/superplanehq/superplane/pkg/models"
-    "github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type WorkflowNodeQueueWorker struct {
@@ -72,39 +72,39 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(node models.WorkflowNode) e
 }
 
 func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.WorkflowNode) error {
-    queueItem, err := node.FirstQueueItem(tx)
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            return nil
-        }
+	queueItem, err := node.FirstQueueItem(tx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
 
-        return err
-    }
+		return err
+	}
 
-    // If this is a merge component, apply join semantics: wait for all parents for the same root
-    if isMergeNode(node) {
-        ready, err := w.tryCreateMergeExecution(tx, node, queueItem)
-        if err != nil {
-            return err
-        }
+	// If this is a merge component, apply join semantics: wait for all parents for the same root
+	if isMergeNode(node) {
+		ready, err := w.tryCreateMergeExecution(tx, node, queueItem)
+		if err != nil {
+			return err
+		}
 
-        // Not all parents have produced inputs yet; leave node ready and try later
-        if !ready {
-            return nil
-        }
+		// Not all parents have produced inputs yet; leave node ready and try later
+		if !ready {
+			return nil
+		}
 
-        return nil
-    }
+		return nil
+	}
 
-    w.log("De-queueing item %s for node=%s workflow=%s", queueItem.ID, node.NodeID, node.WorkflowID)
-    return w.createNodeExecution(tx, node, queueItem)
+	w.log("De-queueing item %s for node=%s workflow=%s", queueItem.ID, node.NodeID, node.WorkflowID)
+	return w.createNodeExecution(tx, node, queueItem)
 }
 
 func (w *WorkflowNodeQueueWorker) createNodeExecution(tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) error {
-    event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
-    if err != nil {
-        return fmt.Errorf("failed to event %s: %w", queueItem.EventID, err)
-    }
+	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
+	if err != nil {
+		return fmt.Errorf("failed to event %s: %w", queueItem.EventID, err)
+	}
 
 	config, err := contexts.NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithRootEvent(&queueItem.RootEventID).
@@ -141,159 +141,228 @@ func (w *WorkflowNodeQueueWorker) createNodeExecution(tx *gorm.DB, node *models.
 
 	messages.NewWorkflowExecutionCreatedMessage(nodeExecution.WorkflowID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
 
-    return node.UpdateState(tx, models.WorkflowNodeStateProcessing)
+	return node.UpdateState(tx, models.WorkflowNodeStateProcessing)
 }
 
 // isMergeNode returns true if the workflow node is a component of type "merge"
 func isMergeNode(node *models.WorkflowNode) bool {
-    if node.Type != models.NodeTypeComponent {
-        return false
-    }
-    ref := node.Ref.Data()
-    return ref.Component != nil && ref.Component.Name == "merge"
+	if node.Type != models.NodeTypeComponent {
+		return false
+	}
+	ref := node.Ref.Data()
+	return ref.Component != nil && ref.Component.Name == "merge"
 }
 
 // tryCreateMergeExecution checks if all parents for this merge node have queued items
 // for the same root event. If so, it aggregates their inputs and creates a single execution,
 // consuming one queue item per parent. Returns true if an execution was created.
 func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *models.WorkflowNode, firstItem *models.WorkflowNodeQueueItem) (bool, error) {
-    // Load workflow to inspect edges and determine parent set
-    workflow, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
-    if err != nil {
-        return false, fmt.Errorf("failed to find workflow: %w", err)
-    }
+	// Load workflow to inspect edges and determine parent set
+	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+	if err != nil {
+		return false, fmt.Errorf("failed to find workflow: %w", err)
+	}
 
-    // Build set of required parent node IDs (incoming edges to this node)
-    requiredParents := map[string]struct{}{}
-    for _, edge := range workflow.Edges {
-        if edge.TargetID == node.NodeID {
-            requiredParents[edge.SourceID] = struct{}{}
-        }
-    }
+	// Build set of required parent node IDs (incoming edges to this node)
+	requiredParents := map[string]struct{}{}
+	for _, edge := range workflow.Edges {
+		if edge.TargetID == node.NodeID {
+			requiredParents[edge.SourceID] = struct{}{}
+		}
+	}
 
-    if len(requiredParents) == 0 {
-        // No parents? Fallback to standard behavior
-        w.log("Merge node %s has no incoming edges; falling back to pass-through", node.NodeID)
-        return false, nil
-    }
+	if len(requiredParents) == 0 {
+		// No parents? Fallback to standard behavior
+		w.log("Merge node %s has no incoming edges; falling back to pass-through", node.NodeID)
+		return false, nil
+	}
 
-    // Fetch all queue items for this node with the same root_event_id as the first item
-    var queueItems []models.WorkflowNodeQueueItem
-    if err := tx.
-        Where("workflow_id = ?", node.WorkflowID).
-        Where("node_id = ?", node.NodeID).
-        Where("root_event_id = ?", firstItem.RootEventID).
-        Order("created_at ASC").
-        Find(&queueItems).Error; err != nil {
-        return false, fmt.Errorf("failed to list queue items for merge: %w", err)
-    }
+	// Fetch all queue items for this node with the same root_event_id as the first item
+	var queueItems []models.WorkflowNodeQueueItem
+	if err := tx.
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Where("root_event_id = ?", firstItem.RootEventID).
+		Order("created_at ASC").
+		Find(&queueItems).Error; err != nil {
+		return false, fmt.Errorf("failed to list queue items for merge: %w", err)
+	}
 
-    if len(queueItems) == 0 {
-        return false, nil
-    }
+	if len(queueItems) == 0 {
+		return false, nil
+	}
 
-    // Load events for the gathered queue items to know their source (parent) node IDs and payloads
-    eventIDs := make([]string, 0, len(queueItems))
-    for _, qi := range queueItems {
-        eventIDs = append(eventIDs, qi.EventID.String())
-    }
+	// Load events for the gathered queue items to know their source (parent) node IDs and payloads
+	eventIDs := make([]string, 0, len(queueItems))
+	for _, qi := range queueItems {
+		eventIDs = append(eventIDs, qi.EventID.String())
+	}
 
-    var events []models.WorkflowEvent
-    if err := tx.Where("id IN ?", eventIDs).Find(&events).Error; err != nil {
-        return false, fmt.Errorf("failed to load events for merge: %w", err)
-    }
+	var events []models.WorkflowEvent
+	if err := tx.Where("id IN ?", eventIDs).Find(&events).Error; err != nil {
+		return false, fmt.Errorf("failed to load events for merge: %w", err)
+	}
 
-    // Index events by ID for quick lookup
-    eventsByID := make(map[string]models.WorkflowEvent, len(events))
-    for _, e := range events {
-        eventsByID[e.ID.String()] = e
-    }
+	// Index events by ID for quick lookup
+	eventsByID := make(map[string]models.WorkflowEvent, len(events))
+	for _, e := range events {
+		eventsByID[e.ID.String()] = e
+	}
 
-    // Select earliest one queue item per required parent
-    selectedByParent := make(map[string]models.WorkflowNodeQueueItem)
-    selectedEventByParent := make(map[string]models.WorkflowEvent)
-    for _, qi := range queueItems {
-        e, ok := eventsByID[qi.EventID.String()]
-        if !ok {
-            continue
-        }
-        parentID := e.NodeID
-        if _, req := requiredParents[parentID]; !req {
-            // This event is not from a required parent (edge may have changed); skip
-            continue
-        }
-        if _, already := selectedByParent[parentID]; already {
-            continue
-        }
-        selectedByParent[parentID] = qi
-        selectedEventByParent[parentID] = e
-    }
+	// Select earliest one queue item per required parent (grouped by parent node ID across channels)
+	selectedByParent := make(map[string]models.WorkflowNodeQueueItem)
+	selectedEventByParent := make(map[string]models.WorkflowEvent)
+	for _, qi := range queueItems {
+		e, ok := eventsByID[qi.EventID.String()]
+		if !ok {
+			continue
+		}
+		parentID := e.NodeID
+		if _, req := requiredParents[parentID]; !req {
+			// This event is not from a required parent (edge may have changed); skip
+			continue
+		}
+		if _, already := selectedByParent[parentID]; already {
+			continue
+		}
+		selectedByParent[parentID] = qi
+		selectedEventByParent[parentID] = e
+	}
 
-    // Check coverage
-    if len(selectedByParent) != len(requiredParents) {
-        // Not all parents have provided inputs yet
-        return false, nil
-    }
+	// Determine if we can proceed even if not all parents produced inputs,
+	// by excluding parents that, for this root event instance, will not route to this merge.
+	coveredParents := make(map[string]struct{}, len(selectedByParent))
+	for pid := range selectedByParent {
+		coveredParents[pid] = struct{}{}
+	}
 
-    // Aggregate inputs into a single map keyed by parent node ID
-    aggregated := make(map[string]any, len(selectedByParent))
-    for parentID, ev := range selectedEventByParent {
-        aggregated[parentID] = ev.Data.Data()
-    }
+	if len(coveredParents) != len(requiredParents) {
+		// Pre-compute channels from each parent to this merge node
+		parentAllowedChannels := make(map[string]map[string]struct{})
+		for parentID := range requiredParents {
+			chans := map[string]struct{}{}
+			for _, edge := range workflow.Edges {
+				if edge.SourceID == parentID && edge.TargetID == node.NodeID {
+					chans[edge.Channel] = struct{}{}
+				}
+			}
+			parentAllowedChannels[parentID] = chans
+		}
 
-    // Create a synthetic input event for the merge execution, set as routed to avoid the router picking it up
-    now := time.Now()
-    aggEvent := models.WorkflowEvent{
-        WorkflowID: node.WorkflowID,
-        NodeID:     node.NodeID, // input for merge
-        Channel:    "default",
-        Data:       datatypes.NewJSONType(any(aggregated)),
-        State:      models.WorkflowEventStateRouted,
-        CreatedAt:  &now,
-    }
-    if err := tx.Create(&aggEvent).Error; err != nil {
-        return false, fmt.Errorf("failed to create aggregate event for merge: %w", err)
-    }
+		// For each missing parent, check if it has finished and emitted no events for channels to this merge
+		for parentID := range requiredParents {
+			if _, ok := coveredParents[parentID]; ok {
+				continue
+			}
 
-    // Build configuration with merged input
-    config, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
-        WithRootEvent(&firstItem.RootEventID).
-        WithInput(aggregated).
-        Build(node.Configuration.Data())
-    if err != nil {
-        return false, err
-    }
+			// Find latest execution for this parent and root event
+			var parentExec models.WorkflowNodeExecution
+			err := tx.
+				Where("workflow_id = ?", node.WorkflowID).
+				Where("node_id = ?", parentID).
+				Where("root_event_id = ?", firstItem.RootEventID).
+				Order("created_at DESC").
+				Take(&parentExec).Error
 
-    // Create the merge node execution
-    nodeExecution := models.WorkflowNodeExecution{
-        WorkflowID:    node.WorkflowID,
-        NodeID:        node.NodeID,
-        RootEventID:   firstItem.RootEventID,
-        EventID:       aggEvent.ID,
-        State:         models.WorkflowNodeExecutionStatePending,
-        Configuration: datatypes.NewJSONType(config),
-        CreatedAt:     &now,
-        UpdatedAt:     &now,
-    }
-    if err := tx.Create(&nodeExecution).Error; err != nil {
-        return false, fmt.Errorf("failed to create merge node execution: %w", err)
-    }
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					// Parent hasn't executed yet
+					return false, nil
+				}
+				return false, fmt.Errorf("failed to find parent execution for %s: %w", parentID, err)
+			}
 
-    // Delete the consumed queue items (one per parent)
-    for _, qi := range selectedByParent {
-        if err := qi.Delete(tx); err != nil {
-            return false, fmt.Errorf("failed to delete consumed queue item %s: %w", qi.ID, err)
-        }
-    }
+			// If not finished, keep waiting
+			if parentExec.State != models.WorkflowNodeExecutionStateFinished {
+				return false, nil
+			}
 
-    // Notify and set node as processing
-    messages.NewWorkflowExecutionCreatedMessage(nodeExecution.WorkflowID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
-    if err := node.UpdateState(tx, models.WorkflowNodeStateProcessing); err != nil {
-        return false, err
-    }
+			// Check outputs produced by this parent execution
+			outputs, err := parentExec.GetOutputs()
+			if err != nil {
+				return false, fmt.Errorf("failed to get outputs for parent %s: %w", parentID, err)
+			}
 
-    w.log("Created merge execution %s for node=%s workflow=%s with %d inputs", nodeExecution.ID, node.NodeID, node.WorkflowID, len(selectedByParent))
-    return true, nil
+			// If none of the outputs are on channels that go to this merge, exclude this parent
+			allowed := parentAllowedChannels[parentID]
+			routedToMerge := false
+			for _, ev := range outputs {
+				if _, ok := allowed[ev.Channel]; ok {
+					routedToMerge = true
+					break
+				}
+			}
+
+			if !routedToMerge {
+				coveredParents[parentID] = struct{}{}
+			}
+		}
+	}
+
+	// If still not covered, keep waiting
+	if len(coveredParents) != len(requiredParents) {
+		return false, nil
+	}
+
+	// Aggregate inputs into a single map keyed by parent node ID
+	aggregated := make(map[string]any, len(selectedByParent))
+	for parentID, ev := range selectedEventByParent {
+		aggregated[parentID] = ev.Data.Data()
+	}
+
+	// Create a synthetic input event for the merge execution, set as routed to avoid the router picking it up
+	now := time.Now()
+	aggEvent := models.WorkflowEvent{
+		WorkflowID: node.WorkflowID,
+		NodeID:     node.NodeID, // input for merge
+		Channel:    "default",
+		Data:       datatypes.NewJSONType(any(aggregated)),
+		State:      models.WorkflowEventStateRouted,
+		CreatedAt:  &now,
+	}
+	if err := tx.Create(&aggEvent).Error; err != nil {
+		return false, fmt.Errorf("failed to create aggregate event for merge: %w", err)
+	}
+
+	// Build configuration with merged input
+	config, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
+		WithRootEvent(&firstItem.RootEventID).
+		WithInput(aggregated).
+		Build(node.Configuration.Data())
+	if err != nil {
+		return false, err
+	}
+
+	// Create the merge node execution
+	nodeExecution := models.WorkflowNodeExecution{
+		WorkflowID:    node.WorkflowID,
+		NodeID:        node.NodeID,
+		RootEventID:   firstItem.RootEventID,
+		EventID:       aggEvent.ID,
+		State:         models.WorkflowNodeExecutionStatePending,
+		Configuration: datatypes.NewJSONType(config),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+	if err := tx.Create(&nodeExecution).Error; err != nil {
+		return false, fmt.Errorf("failed to create merge node execution: %w", err)
+	}
+
+	// Delete the consumed queue items (one per parent)
+	for _, qi := range selectedByParent {
+		if err := qi.Delete(tx); err != nil {
+			return false, fmt.Errorf("failed to delete consumed queue item %s: %w", qi.ID, err)
+		}
+	}
+
+	// Notify and set node as processing
+	messages.NewWorkflowExecutionCreatedMessage(nodeExecution.WorkflowID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
+	if err := node.UpdateState(tx, models.WorkflowNodeStateProcessing); err != nil {
+		return false, err
+	}
+
+	w.log("Created merge execution %s for node=%s workflow=%s with %d inputs", nodeExecution.ID, node.NodeID, node.WorkflowID, len(selectedByParent))
+	return true, nil
 }
 
 func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
