@@ -12,11 +12,20 @@ import (
 func TestCanvasPage(t *testing.T) {
 	steps := &CanvasPageSteps{t: t}
 
+	t.Run("adding a node to canvas displays custom node name", func(t *testing.T) {
+		steps.Start()
+		steps.GivenACanvasExists()
+		steps.VisitCanvasPage()
+		steps.AddNoopToCanvas("Hello")
+		steps.SaveCanvas()
+		steps.AssertNodeIsAdded("Hello")
+	})
+
 	t.Run("run is disabled when you have unsaved changes", func(t *testing.T) {
 		steps.Start()
 		steps.GivenACanvasExists()
 		steps.VisitCanvasPage()
-		steps.AddNoopToCanvas()
+		steps.AddNoopToCanvas("")
 		steps.AssertUnsavedChangesNoteIsVisible()
 		steps.AssertCantRunNode()
 		steps.AssertExplainationIsShownWhenHoverOverRun()
@@ -55,13 +64,21 @@ func (s *CanvasPageSteps) VisitCanvasPage() {
 	s.session.Visit("/" + s.session.orgID + "/workflows/" + s.workflowID)
 }
 
-func (s *CanvasPageSteps) AddNoopToCanvas() {
+func (s *CanvasPageSteps) AddNoopToCanvas(nodeName string) {
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(source, target, 400, 250)
 	s.session.Sleep(300)
+
+	// Use default name if empty string provided (node name is required)
+	if nodeName == "" {
+		nodeName = "noop"
+	}
+
+	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 	s.session.Click(q.TestID("add-node-button"))
+	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) AssertUnsavedChangesNoteIsVisible() {
@@ -69,9 +86,9 @@ func (s *CanvasPageSteps) AssertUnsavedChangesNoteIsVisible() {
 }
 
 func (s *CanvasPageSteps) AssertCantRunNode() {
-	// The dropdown testID is based on the component label, not the node name
-	// For noop component, the label is "No Operation"
-	dropdown := q.TestID("node-no-operation-header-dropdown")
+	// The dropdown testID is based on the node name
+	// Since we use "noop" as the default name, the testID is "node-noop-header-dropdown"
+	dropdown := q.TestID("node-noop-header-dropdown")
 	runOption := q.Locator("button:has-text('Run')")
 
 	s.session.Click(dropdown)
@@ -84,4 +101,15 @@ func (s *CanvasPageSteps) AssertExplainationIsShownWhenHoverOverRun() {
 
 	s.session.HoverOver(runOption)
 	s.session.AssertText("Save canvas changes before running")
+}
+
+func (s *CanvasPageSteps) SaveCanvas() {
+	s.session.Click(q.TestID("save-canvas-button"))
+	s.session.Sleep(500)
+	s.session.AssertText("Canvas changes saved")
+}
+
+func (s *CanvasPageSteps) AssertNodeIsAdded(nodeName string) {
+	// Verify the node displays the custom name, not the generic component label
+	s.session.AssertText(nodeName)
 }
