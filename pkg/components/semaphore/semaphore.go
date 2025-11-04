@@ -210,7 +210,7 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 		"project_id":    spec.Project,
 		"reference":     spec.Ref,
 		"pipeline_file": spec.PipelineFile,
-		"parameters":    spec.Parameters,
+		"parameters":    s.buildParameters(spec.Parameters),
 	}
 
 	wf, err := semaphore.RunWorkflow(params)
@@ -226,7 +226,7 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 		},
 	})
 
-	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 30*time.Second)
+	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 5*time.Second)
 }
 
 func (s *Semaphore) Actions() []components.Action {
@@ -280,7 +280,7 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 	// If not finished, poll again in 1min.
 	//
 	if !resource.Finished() {
-		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 30*time.Second)
+		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 5*time.Second)
 	}
 
 	result := "passed"
@@ -290,8 +290,8 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 
 	newMetadata := &ExecutionMetadata{
 		Workflow: &Workflow{
-			ID:     resource.Id(),
-			URL:    resource.URL(),
+			ID:     metadata.Workflow.ID,
+			URL:    metadata.Workflow.URL,
 			State:  "finished",
 			Result: result,
 		},
@@ -301,4 +301,13 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
 		components.DefaultOutputChannel.Name: {newMetadata},
 	})
+}
+
+func (s *Semaphore) buildParameters(params []Parameter) map[string]any {
+	result := make(map[string]any)
+	for _, param := range params {
+		result[param.Name] = param.Value
+	}
+
+	return result
 }

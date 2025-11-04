@@ -148,6 +148,18 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       }
       break
     case 'semaphore':
+      // Build metadata array
+      const metadataItems = []
+      if (node.configuration?.project) {
+        metadataItems.push({ icon: 'folder', label: node.configuration.project })
+      }
+      if (node.configuration?.ref) {
+        metadataItems.push({ icon: 'git-branch', label: node.configuration.ref })
+      }
+      if (node.configuration?.pipelineFile) {
+        metadataItems.push({ icon: 'file-code', label: node.configuration.pipelineFile })
+      }
+
       baseData.semaphore = {
         title: node.name,
         iconSrc: SemaphoreLogo,
@@ -158,9 +170,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         collapsedBackground: 'bg-gray-100',
         collapsed: false,
         hideLastRun: true,
-        project: node.configuration?.project,
-        ref: node.configuration?.ref,
-        pipelineFile: node.configuration?.pipelineFile,
+        metadata: metadataItems,
         parameters: node.configuration?.parameters,
       }
       break

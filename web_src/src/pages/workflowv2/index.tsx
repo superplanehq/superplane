@@ -1629,6 +1629,15 @@ function prepareHttpNode(
   };
 }
 
+interface ExecutionMetadata {
+  workflow?: {
+    id: string;
+    url: string;
+    state: string;
+    result: string;
+  };
+}
+
 function prepareSemaphoreNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
@@ -1644,11 +1653,10 @@ function prepareSemaphoreNode(
 
   let lastExecution;
   if (execution) {
-    const outputs = execution.outputs as any;
-    const workflowId = outputs?.default?.[0]?.workflowId;
+    const metadata = execution.metadata as ExecutionMetadata;
 
     lastExecution = {
-      workflowId: workflowId,
+      workflowId: metadata.workflow?.id,
       receivedAt: new Date(execution.createdAt!),
       state:
         getRunItemState(execution) === "success"
@@ -1661,6 +1669,18 @@ function prepareSemaphoreNode(
 
   // Use node name if available, otherwise fall back to component label (from metadata)
   const displayLabel = node.name || metadata?.label!;
+
+  // Build metadata array
+  const metadataItems = [];
+  if (nodeMetadata?.project?.name) {
+    metadataItems.push({ icon: "folder", label: nodeMetadata.project.name });
+  }
+  if (configuration?.ref) {
+    metadataItems.push({ icon: "git-branch", label: configuration.ref });
+  }
+  if (configuration?.pipelineFile) {
+    metadataItems.push({ icon: "file-code", label: configuration.pipelineFile });
+  }
 
   return {
     id: node.id!,
@@ -1677,9 +1697,7 @@ function prepareSemaphoreNode(
         iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
         headerColor: getBackgroundColorClass(metadata?.color || "gray"),
         title: displayLabel,
-        project: nodeMetadata?.project.name,
-        ref: configuration?.ref,
-        pipelineFile: configuration?.pipelineFile,
+        metadata: metadataItems,
         parameters: configuration?.parameters,
         lastExecution,
         collapsedBackground: getBackgroundColorClass("white"),

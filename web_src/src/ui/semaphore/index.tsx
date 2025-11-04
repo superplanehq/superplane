@@ -2,6 +2,7 @@ import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import React from "react";
 import { ComponentHeader } from "../componentHeader";
 import { CollapsedComponent } from "../collapsedComponent";
+import { MetadataList, type MetadataItem } from "../metadataList";
 import { SelectionWrapper } from "../selectionWrapper";
 import { ComponentActionsProps } from "../types/componentActions";
 import { SpecsTooltip } from "../componentBase/SpecsTooltip";
@@ -28,9 +29,7 @@ export interface SemaphoreProps extends ComponentActionsProps {
   headerColor: string;
   title: string;
   integration?: string;
-  project?: string;
-  ref?: string;
-  pipelineFile?: string;
+  metadata: MetadataItem[];
   parameters?: SemaphoreParameter[];
   lastExecution?: SemaphoreExecutionItem;
   collapsed?: boolean;
@@ -48,9 +47,7 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
   iconBackground,
   headerColor,
   title,
-  project,
-  ref,
-  pipelineFile,
+  metadata,
   parameters,
   lastExecution,
   collapsed = false,
@@ -141,12 +138,13 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
           onDelete={onDelete}
           isCompactView={isCompactView}
         >
-          {project && ref && (
-            <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-              <span className="font-medium">{project}</span>
-              <span className="truncate max-w-[150px]">{ref}</span>
-            </div>
-          )}
+          <div className="flex flex-col items-center gap-1">
+            <MetadataList
+              items={metadata}
+              className="flex flex-col gap-1 text-gray-500"
+              iconSize={12}
+            />
+          </div>
         </CollapsedComponent>
       </SelectionWrapper>
     );
@@ -175,52 +173,22 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
           isCompactView={isCompactView}
         />
 
-        {/* Workflow Details Section */}
-        {(project || ref || pipelineFile) && (
+        {/* Metadata Section */}
+        <MetadataList items={metadata} />
+
+        {/* Parameters Section */}
+        {parameterSpecValues.length > 0 && (
           <div className="px-4 py-3 border-b">
-            <div className="flex flex-col gap-2 text-sm">
-              {project && (
-                <div className="flex items-start gap-2">
-                  <span className="text-gray-500 text-xs font-medium w-24 text-left">Project:</span>
-                  <span className="text-gray-700 font-mono text-xs truncate">
-                    {project}
-                  </span>
-                </div>
-              )}
-
-              {ref && (
-                <div className="flex items-start gap-2">
-                  <span className="text-gray-500 text-xs font-medium w-24 text-left">Ref:</span>
-                  <span className="px-2 py-1 rounded-md text-xs font-mono font-medium bg-blue-100 text-blue-800">
-                    {ref}
-                  </span>
-                </div>
-              )}
-
-              {pipelineFile && (
-                <div className="flex items-start gap-2">
-                  <span className="text-gray-500 text-xs font-medium w-24 text-left">Pipeline File:</span>
-                  <span className="text-gray-700 font-mono text-xs truncate">
-                    {pipelineFile}
-                  </span>
-                </div>
-              )}
-
-              {/* Parameters Tooltip */}
-              {parameterSpecValues.length > 0 && (
-                <div className="flex items-start gap-2">
-                  <span className="text-gray-500 text-xs font-medium w-24 text-left">Parameters:</span>
-                  <SpecsTooltip
-                    specTitle="parameters"
-                    tooltipTitle="workflow parameters"
-                    specValues={parameterSpecValues}
-                  >
-                    <span className="text-xs bg-purple-500 px-2 py-1 rounded-md text-white font-mono font-medium cursor-help">
-                      {parameterSpecValues.length} parameter{parameterSpecValues.length > 1 ? "s" : ""}
-                    </span>
-                  </SpecsTooltip>
-                </div>
-              )}
+            <div className="flex items-start gap-2">
+              <SpecsTooltip
+                specTitle="parameters"
+                tooltipTitle="workflow parameters"
+                specValues={parameterSpecValues}
+              >
+                <span className="text-xs bg-gray-200 px-2 py-1 rounded-md text-gray-800 font-mono font-medium cursor-help">
+                  {parameterSpecValues.length} parameter{parameterSpecValues.length > 1 ? "s" : ""}
+                </span>
+              </SpecsTooltip>
             </div>
           </div>
         )}

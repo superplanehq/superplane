@@ -20,9 +20,11 @@ export const Success: Story = {
     title: "Run Semaphore Workflow",
     headerColor: "bg-gray-50",
     integration: "semaphore-prod",
-    project: "my-microservice",
-    ref: "main",
-    pipelineFile: ".semaphore/deployment.yml",
+    metadata: [
+      { icon: "folder", label: "my-microservice" },
+      { icon: "git-branch", label: "main" },
+      { icon: "file-code", label: ".semaphore/deployment.yml" }
+    ],
     parameters: [
       { name: "ENVIRONMENT", value: "production" },
       { name: "REGION", value: "us-west-2" },
@@ -41,9 +43,11 @@ export const Failed: Story = {
     iconSrc: SemaphoreLogo,
     title: "Run Semaphore Workflow",
     headerColor: "bg-gray-50",
-    project: "my-microservice",
-    ref: "feature/new-deploy",
-    pipelineFile: ".semaphore/ci.yml",
+    metadata: [
+      { icon: "folder", label: "my-microservice" },
+      { icon: "git-branch", label: "feature/new-deploy" },
+      { icon: "file-code", label: ".semaphore/ci.yml" }
+    ],
     parameters: [
       { name: "ENVIRONMENT", value: "staging" }
     ],
@@ -60,9 +64,11 @@ export const Running: Story = {
     iconSrc: SemaphoreLogo,
     title: "Run Semaphore Workflow",
     headerColor: "bg-gray-50",
-    project: "backend-api",
-    ref: "develop",
-    pipelineFile: ".semaphore/pipeline.yml",
+    metadata: [
+      { icon: "folder", label: "backend-api" },
+      { icon: "git-branch", label: "develop" },
+      { icon: "file-code", label: ".semaphore/pipeline.yml" }
+    ],
     parameters: [
       { name: "BUILD_TYPE", value: "debug" },
       { name: "RUN_TESTS", value: "true" }
@@ -79,9 +85,11 @@ export const NoExecution: Story = {
     iconSrc: SemaphoreLogo,
     title: "Run Semaphore Workflow",
     headerColor: "bg-gray-50",
-    project: "frontend-app",
-    ref: "main",
-    pipelineFile: ".semaphore/build.yml",
+    metadata: [
+      { icon: "folder", label: "frontend-app" },
+      { icon: "git-branch", label: "main" },
+      { icon: "file-code", label: ".semaphore/build.yml" }
+    ],
   },
 };
 
@@ -90,9 +98,11 @@ export const NoParameters: Story = {
     iconSrc: SemaphoreLogo,
     title: "Run Semaphore Workflow",
     headerColor: "bg-gray-50",
-    project: "data-pipeline",
-    ref: "main",
-    pipelineFile: ".semaphore/workflow.yml",
+    metadata: [
+      { icon: "folder", label: "data-pipeline" },
+      { icon: "git-branch", label: "main" },
+      { icon: "file-code", label: ".semaphore/workflow.yml" }
+    ],
     parameters: [],
     lastExecution: {
       workflowId: "def-456-ghi-789",
@@ -109,9 +119,11 @@ export const Collapsed: Story = {
     headerColor: "bg-gray-50",
     collapsed: true,
     collapsedBackground: "bg-gray-100",
-    project: "my-microservice",
-    ref: "main",
-    pipelineFile: ".semaphore/deployment.yml",
+    metadata: [
+      { icon: "folder", label: "my-microservice" },
+      { icon: "git-branch", label: "main" },
+      { icon: "file-code", label: ".semaphore/deployment.yml" }
+    ],
     parameters: [
       { name: "ENVIRONMENT", value: "production" }
     ],
