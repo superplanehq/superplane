@@ -1162,7 +1162,7 @@ function prepareComponentNode(
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap);
     case "merge":
-      return prepareMergeNode(node, components, nodeExecutionsMap);
+      return prepareMergeNode(nodes, node, components, nodeExecutionsMap);
   }
 
   //
@@ -1499,7 +1499,6 @@ function prepareNoopNode(
     };
   }
 
-  // Use node name if available, otherwise fall back to component label (from metadata)
   const displayLabel = node.name || metadata?.label!;
 
   return {
@@ -1510,6 +1509,52 @@ function prepareNoopNode(
       label: displayLabel,
       state: "pending" as const,
       noop: {
+        title: displayLabel,
+        lastEvent: lastEvent || {
+          eventTitle: "No events received yet",
+          eventState: "neutral" as const,
+        },
+        collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
+      },
+    },
+  };
+}
+
+function prepareMergeNode(
+  nodes: ComponentsNode[],
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+): CanvasNode {
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+  const metadata = components.find((c) => c.name === "noop");
+
+  let lastEvent;
+  if (execution) {
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    lastEvent = {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
+    };
+  }
+
+  const displayLabel = node.name || metadata?.label!;
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "merge",
+      label: displayLabel,
+      state: "pending" as const,
+      merge: {
         title: displayLabel,
         lastEvent: lastEvent || {
           eventTitle: "No events received yet",
@@ -1624,52 +1669,6 @@ function prepareHttpNode(
         payload: configuration?.payload,
         headers: configuration?.headers,
         lastExecution,
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-      },
-    },
-  };
-}
-
-function prepareMergeNode(
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-): CanvasNode {
-  const metadata = components.find((c) => c.name === "merge");
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-
-  let lastExecution;
-  if (execution) {
-    lastExecution = {
-      receivedAt: new Date(execution.createdAt!),
-      state:
-        getRunItemState(execution) === "success"
-          ? ("success" as const)
-          : getRunItemState(execution) === "running"
-          ? ("running" as const)
-          : ("failed" as const),
-    };
-  }
-
-  // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "merge",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      merge: {
-        title: displayLabel,
-        lastExecution,
-        iconColor: getColorClass(metadata?.color || "purple"),
-        iconBackground: getBackgroundColorClass(metadata?.color || "purple"),
-        headerColor: getBackgroundColorClass(metadata?.color || "purple"),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },

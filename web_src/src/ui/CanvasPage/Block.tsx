@@ -8,9 +8,9 @@ import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
 import { Http, HttpProps } from "../http";
 import { If, IfProps } from "../if";
+import MergeComponent, { type MergeComponentProps } from "../merge";
 import { Noop, NoopProps } from "../noop";
 import { ComponentActionsProps } from "../types/componentActions";
-import MergeComponent, { type MergeComponentProps } from "../merge";
 import { Wait, WaitProps } from "../wait";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";

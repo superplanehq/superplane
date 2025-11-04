@@ -10,7 +10,7 @@ export interface MergeComponentProps extends ComponentActionsProps {
 }
 
 export const MergeComponent: React.FC<MergeComponentProps> = ({
-  title = "Merge branches",
+  title = "Merge",
   lastEvent,
   collapsed = false,
   selected = false,
@@ -37,7 +37,7 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
     <ComponentBase
       title={title}
       iconSlug="git-merge"
-      headerColor="bg-indigo-50"
+      headerColor="bg-blue-100"
       eventSections={eventSections}
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
@@ -56,4 +56,3 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
 };
 
 export default MergeComponent;
-
