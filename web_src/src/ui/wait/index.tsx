@@ -19,6 +19,7 @@ export interface WaitProps extends ComponentActionsProps {
     unit: "seconds" | "minutes" | "hours";
   };
   lastExecution?: WaitExecutionItem;
+  nextInQueue?: { title: string; subtitle?: string };
   collapsed?: boolean;
   selected?: boolean;
   collapsedBackground?: string;
@@ -41,6 +42,7 @@ export const Wait: React.FC<WaitProps> = ({
   title = "Wait",
   duration,
   lastExecution,
+  nextInQueue,
   collapsed = false,
   selected = false,
   collapsedBackground,
@@ -180,6 +182,25 @@ export const Wait: React.FC<WaitProps> = ({
                 <span className="text-sm">No executions received yet</span>
               </div>
             )}
+          </div>
+        )}
+
+        {nextInQueue && (
+          <div className="px-4 pt-3 pb-6">
+            <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
+              <span className="uppercase text-sm font-medium">Next In Queue</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 min-w-0">
+              <div className="flex items-center gap-2 text-gray-500 min-w-0 flex-1">
+                <div className="w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center">
+                  {React.createElement(resolveIcon("circle-dashed"), { size: 20, className: "text-gray-500" })}
+                </div>
+                <span className="truncate text-sm">{nextInQueue.title}</span>
+              </div>
+              {nextInQueue.subtitle && (
+                <span className="text-sm truncate text-gray-500 flex-shrink-0 max-w-[40%]">{nextInQueue.subtitle}</span>
+              )}
+            </div>
           </div>
         )}
       </div>

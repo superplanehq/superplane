@@ -1,20 +1,18 @@
 import { Approval, type ApprovalProps } from "@/ui/approval";
 import { Composite, type CompositeProps } from "@/ui/composite";
-import {
-  SwitchComponent,
-  type SwitchComponentProps,
-} from "@/ui/switchComponent";
+import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
-import { If, IfProps } from "../if";
-import { Noop, NoopProps } from "../noop";
 import { Http, HttpProps } from "../http";
-import { Wait, WaitProps } from "../wait";
 import { TimeGate, TimeGateProps } from "../timeGate";
+import { If, IfProps } from "../if";
+import MergeComponent, { type MergeComponentProps } from "../merge";
+import { Noop, NoopProps } from "../noop";
 import { ComponentActionsProps } from "../types/componentActions";
+import { Wait, WaitProps } from "../wait";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
 type BlockType =
@@ -26,6 +24,7 @@ type BlockType =
   | "noop"
   | "http"
   | "wait"
+  | "merge"
   | "time_gate"
   | "switch";
 
@@ -77,6 +76,9 @@ export interface BlockData {
 
   // switch node specific props
   switch?: SwitchComponentProps;
+
+  // merge node specific props
+  merge?: MergeComponentProps;
 }
 
 interface BlockProps extends ComponentActionsProps {
@@ -194,72 +196,73 @@ function RightHandle({ data }: BlockProps) {
     );
   }
 
-
   const baseTop = isCollapsed ? 30 : 80; // Adjust starting position based on collapsed state
   const spacing = 40; // Space between handles
 
-  return <>
-    {channels.map((channel, index) => (
-      <div
-        key={channel}
-        className="absolute"
-        style={{
-          left: "100%",
-          top: baseTop + index * spacing,
-          transform: "translateY(-50%)",
-          paddingLeft: 4,
-        }}
-      >
-        <div className="relative flex items-center">
-          {/* Small line from node */}
-          <div
-            style={{
-              width: 20,
-              height: 3,
-              backgroundColor: "#C9D5E1",
-              pointerEvents: "none",
-              marginRight: 4,
-            }}
-          />
-          {/* Label text */}
-          <span
-            className="text-xs font-medium whitespace-nowrap"
-            style={{
-              color: "#8B9AAC",
-              pointerEvents: "none",
-              paddingLeft: 2,
-              paddingRight: 2,
-            }}
-          >
-            {channel}
-          </span>
-          {/* Small line to handle */}
-          <div
-            style={{
-              width: 16,
-              height: 3,
-              backgroundColor: "#C9D5E1",
-              pointerEvents: "none",
-              marginLeft: 4,
-            }}
-          />
-          {/* Handle (connection point) */}
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={channel}
-            style={{
-              ...HANDLE_STYLE,
-              position: "relative",
-              pointerEvents: "auto",
-              marginLeft: -6,
-              top: 5,
-            }}
-          />
+  return (
+    <>
+      {channels.map((channel, index) => (
+        <div
+          key={channel}
+          className="absolute"
+          style={{
+            left: "100%",
+            top: baseTop + index * spacing,
+            transform: "translateY(-50%)",
+            paddingLeft: 4,
+          }}
+        >
+          <div className="relative flex items-center">
+            {/* Small line from node */}
+            <div
+              style={{
+                width: 20,
+                height: 3,
+                backgroundColor: "#C9D5E1",
+                pointerEvents: "none",
+                marginRight: 4,
+              }}
+            />
+            {/* Label text */}
+            <span
+              className="text-xs font-medium whitespace-nowrap"
+              style={{
+                color: "#8B9AAC",
+                pointerEvents: "none",
+                paddingLeft: 2,
+                paddingRight: 2,
+              }}
+            >
+              {channel}
+            </span>
+            {/* Small line to handle */}
+            <div
+              style={{
+                width: 16,
+                height: 3,
+                backgroundColor: "#C9D5E1",
+                pointerEvents: "none",
+                marginLeft: 4,
+              }}
+            />
+            {/* Handle (connection point) */}
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={channel}
+              style={{
+                ...HANDLE_STYLE,
+                position: "relative",
+                pointerEvents: "auto",
+                marginLeft: -6,
+                top: 5,
+              }}
+            />
+          </div>
         </div>
-      </div>
-    ))}
-  </>
+      ))}
+    </>
+  );
 }
 
 function AiPopup({ show, suggestion, onApply, onDismiss }: BlockAi) {
@@ -287,21 +290,11 @@ function AiPopup({ show, suggestion, onApply, onDismiss }: BlockAi) {
         <div className="text-sm">{suggestion}</div>
 
         <div className="flex gap-2 mt-2">
-          <Button
-            size="sm"
-            variant="default"
-            className="mt-2"
-            onClick={handleApply}
-          >
+          <Button size="sm" variant="default" className="mt-2" onClick={handleApply}>
             Apply
           </Button>
 
-          <Button
-            size="sm"
-            variant="secondary"
-            className="mt-2"
-            onClick={handleDismiss}
-          >
+          <Button size="sm" variant="secondary" className="mt-2" onClick={handleDismiss}>
             Dismiss
           </Button>
         </div>
@@ -376,13 +369,9 @@ function BlockContent({
     case "time_gate":
       return <TimeGate {...(data.time_gate as TimeGateProps)} selected={selected} {...actionProps} />;
     case "switch":
-      return (
-        <SwitchComponent
-          {...(data.switch as SwitchComponentProps)}
-          selected={selected}
-          {...actionProps}
-        />
-      );
+      return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
+    case "merge":
+      return <MergeComponent {...(data.merge as MergeComponentProps)} selected={selected} {...actionProps} />;
     default:
       throw new Error(`Unknown block type: ${(data as BlockData).type}`);
   }

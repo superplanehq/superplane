@@ -72,7 +72,7 @@ services:
     volumes:
       - go-pkg-cache:/go
       - .:/app
-      - /tmp:/tmp
+      - ./tmp:/tmp
 
   db:
     image: postgres:17.5
