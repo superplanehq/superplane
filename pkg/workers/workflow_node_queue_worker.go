@@ -272,10 +272,25 @@ func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *mod
 				return false, fmt.Errorf("failed to find parent execution for %s: %w", parentID, err)
 			}
 
-			// If not finished, keep waiting
-			if parentExec.State != models.WorkflowNodeExecutionStateFinished {
-				return false, nil
-			}
+            // If not finished, keep waiting
+            if parentExec.State != models.WorkflowNodeExecutionStateFinished {
+                return false, nil
+            }
+
+            // If the parent execution failed, this merge can never be fulfilled for this root event.
+            // Clean up any queued items for this merge/root and stop processing.
+            if parentExec.Result == models.WorkflowNodeExecutionResultFailed {
+                if err := tx.
+                    Where("workflow_id = ?", node.WorkflowID).
+                    Where("node_id = ?", node.NodeID).
+                    Where("root_event_id = ?", firstItem.RootEventID).
+                    Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+                    return false, fmt.Errorf("failed to clean merge queue items after parent failure: %w", err)
+                }
+                w.log("Skipping merge for node=%s workflow=%s root_event=%s due to failed parent %s; cleaned pending items",
+                    node.NodeID, node.WorkflowID, firstItem.RootEventID, parentID)
+                return false, nil
+            }
 
 			// Check outputs produced by this parent execution
 			outputs, err := parentExec.GetOutputs()
@@ -293,9 +308,20 @@ func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *mod
 				}
 			}
 
-			if !routedToMerge {
-				coveredParents[parentID] = struct{}{}
-			}
+            if !routedToMerge {
+                // Parent finished but did not route to this merge along any connected channel.
+                // This join can never be fulfilled for this root event; clean pending items and stop.
+                if err := tx.
+                    Where("workflow_id = ?", node.WorkflowID).
+                    Where("node_id = ?", node.NodeID).
+                    Where("root_event_id = ?", firstItem.RootEventID).
+                    Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+                    return false, fmt.Errorf("failed to clean merge queue items after non-routing parent: %w", err)
+                }
+                w.log("Skipping merge for node=%s workflow=%s root_event=%s due to parent %s not routing to merge; cleaned pending items",
+                    node.NodeID, node.WorkflowID, firstItem.RootEventID, parentID)
+                return false, nil
+            }
 		}
 	}
 
