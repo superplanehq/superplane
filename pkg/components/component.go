@@ -92,6 +92,8 @@ type OutputChannel struct {
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
+	ID                    string
+	WorkflowID            string
 	Data                  any
 	Configuration         any
 	MetadataContext       MetadataContext

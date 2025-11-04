@@ -24,7 +24,8 @@ type NodeMetadata struct {
 }
 
 type ExecutionMetadata struct {
-	Workflow *Workflow `json:"workflow"`
+	Workflow *Workflow      `json:"workflow"`
+	Data     map[string]any `json:"data"`
 }
 
 type Workflow struct {
@@ -210,7 +211,7 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 		"project_id":    spec.Project,
 		"reference":     spec.Ref,
 		"pipeline_file": spec.PipelineFile,
-		"parameters":    s.buildParameters(spec.Parameters),
+		"parameters":    s.buildParameters(ctx, spec.Parameters),
 	}
 
 	wf, err := semaphore.RunWorkflow(params)
@@ -235,6 +236,18 @@ func (s *Semaphore) Actions() []components.Action {
 			Name:           "poll",
 			UserAccessible: false,
 		},
+		{
+			Name:           "finish",
+			UserAccessible: true,
+			Parameters: []components.ConfigurationField{
+				{
+					Name:     "data",
+					Type:     components.FieldTypeObject,
+					Required: false,
+					Default:  map[string]any{},
+				},
+			},
+		},
 	}
 }
 
@@ -242,6 +255,8 @@ func (s *Semaphore) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "poll":
 		return s.poll(ctx)
+	case "finish":
+		return s.finish(ctx)
 	}
 
 	return fmt.Errorf("unknown action: %s", ctx.Name)
@@ -258,6 +273,13 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
 	if err != nil {
 		return err
+	}
+
+	//
+	// If the execution already finished, we don't need to do anything.
+	//
+	if metadata.Workflow.State == "finished" {
+		return nil
 	}
 
 	integration, err := ctx.IntegrationContext.GetIntegration(spec.Integration)
@@ -297,11 +319,52 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 	})
 }
 
-func (s *Semaphore) buildParameters(params []Parameter) map[string]any {
-	result := make(map[string]any)
-	for _, param := range params {
-		result[param.Name] = param.Value
+func (s *Semaphore) finish(ctx components.ActionContext) error {
+	metadata := ExecutionMetadata{}
+	err := mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return err
 	}
 
-	return result
+	if metadata.Workflow.State == "finished" {
+		return fmt.Errorf("workflow already finished")
+	}
+
+	data, ok := ctx.Parameters["data"]
+	if !ok {
+		data = map[string]any{}
+	}
+
+	dataMap, ok := data.(map[string]any)
+	if !ok {
+		return fmt.Errorf("data is invalid")
+	}
+
+	newMetadata := &ExecutionMetadata{
+		Data: dataMap,
+		Workflow: &Workflow{
+			ID:     metadata.Workflow.ID,
+			URL:    metadata.Workflow.URL,
+			State:  "finished",
+			Result: "passed",
+		},
+	}
+
+	ctx.MetadataContext.Set(newMetadata)
+
+	return ctx.ExecutionStateContext.Pass(map[string][]any{
+		components.DefaultOutputChannel.Name: {metadata},
+	})
+}
+
+func (s *Semaphore) buildParameters(ctx components.ExecutionContext, params []Parameter) map[string]any {
+	parameters := make(map[string]any)
+	for _, param := range params {
+		parameters[param.Name] = param.Value
+	}
+
+	parameters["SUPERPLANE_EXECUTION_ID"] = ctx.ID
+	parameters["SUPERPLANE_CANVAS_ID"] = ctx.WorkflowID
+
+	return parameters
 }

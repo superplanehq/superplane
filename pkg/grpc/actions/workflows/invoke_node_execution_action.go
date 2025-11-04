@@ -87,7 +87,7 @@ func InvokeNodeExecutionAction(
 
 	err = component.HandleAction(actionCtx)
 	if err != nil {
-		return nil, fmt.Errorf("action execution failed: %w", err)
+		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
 	}
 
 	err = database.Conn().Save(&execution).Error

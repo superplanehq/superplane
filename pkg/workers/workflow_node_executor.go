@@ -155,6 +155,8 @@ func (w *WorkflowNodeExecutor) executeComponentNode(tx *gorm.DB, execution *mode
 	}
 
 	ctx := components.ExecutionContext{
+		ID:                    execution.ID.String(),
+		WorkflowID:            execution.WorkflowID.String(),
 		Configuration:         execution.Configuration.Data(),
 		Data:                  input,
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
