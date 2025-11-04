@@ -158,6 +158,7 @@ export function NodeConfigurationModal({
                   )}
                 </Label>
                 <Input
+                  data-testid="node-name-input"
                   type="text"
                   value={currentNodeName}
                   onChange={(e) => setCurrentNodeName(e.target.value)}

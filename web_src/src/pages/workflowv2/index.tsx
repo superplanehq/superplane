@@ -907,8 +907,8 @@ function prepareTriggerNode(
   const lastEvent = nodeEventsMap[node.id!]?.[0];
   const triggerProps = renderer.getTriggerProps(node, triggerMetadata!, lastEvent);
 
-  // Use trigger label (from metadata) if available, otherwise fall back to node name
-  const displayLabel = triggerMetadata?.label || node.name!;
+  // Use node name if available, otherwise fall back to trigger label (from metadata)
+  const displayLabel = node.name || triggerMetadata?.label!;
 
   return {
     id: node.id!,
@@ -939,8 +939,8 @@ function prepareCompositeNode(
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
 
-  // Use blueprint name (from metadata) if available, otherwise fall back to node name
-  const displayLabel = blueprintMetadata?.name || node.name!;
+  // Use node name if available, otherwise fall back to blueprint name (from metadata)
+  const displayLabel = node.name || blueprintMetadata?.name!;
 
   const configurationFields = blueprintMetadata?.configuration || [];
   const fieldLabelMap = configurationFields.reduce<Record<string, string>>((acc, field) => {
@@ -1323,8 +1323,8 @@ function prepareApprovalNode(
     };
   });
 
-  // Use component label (from metadata) if available, otherwise fall back to node name
-  const displayLabel = metadata?.label || node.name!;
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
 
   return {
     id: node.id!,
@@ -1494,8 +1494,8 @@ function prepareNoopNode(
     };
   }
 
-  // Use component label (from metadata) if available, otherwise fall back to node name
-  const displayLabel = metadata?.label || node.name!;
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
 
   return {
     id: node.id!,
@@ -1544,8 +1544,8 @@ function prepareFilterNode(
     };
   }
 
-  // Use component label (from metadata) if available, otherwise fall back to node name
-  const displayLabel = metadata?.label || node.name!;
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
 
   return {
     id: node.id!,
@@ -1597,8 +1597,8 @@ function prepareHttpNode(
     };
   }
 
-  // Use component label (from metadata) if available, otherwise fall back to node name
-  const displayLabel = metadata?.label || node.name!;
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
 
   return {
     id: node.id!,
@@ -1649,8 +1649,8 @@ function prepareWaitNode(
     };
   }
 
-  // Use component label (from metadata) if available, otherwise fall back to node name
-  const displayLabel = metadata?.label || node.name!;
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
 
   return {
     id: node.id!,
