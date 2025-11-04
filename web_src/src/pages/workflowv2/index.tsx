@@ -1158,6 +1158,8 @@ function prepareComponentNode(
       return prepareHttpNode(node, components, nodeExecutionsMap);
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap);
+    case "time_gate":
+      return prepareTimeGateNode(node, components, nodeExecutionsMap);
   }
 
   //
@@ -1667,6 +1669,81 @@ function prepareWaitNode(
         iconColor: getColorClass(metadata?.color || "yellow"),
         iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
         headerColor: getBackgroundColorClass(metadata?.color || "yellow"),
+        collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
+      },
+    },
+  };
+}
+
+function prepareTimeGateNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+): CanvasNode {
+  const metadata = components.find((c) => c.name === "time_gate");
+  const configuration = node.configuration as any;
+
+  // Format time gate configuration for display
+  const mode = configuration?.mode || "include";
+  const startTime = configuration?.startTime || "00:00";
+  const endTime = configuration?.endTime || "23:59";
+  const days = configuration?.days || [];
+  const timeWindow = `${startTime} - ${endTime}`;
+  const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
+
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  let lastExecution;
+  let awaitingEvent;
+
+  if (execution) {
+    const executionState = getRunItemState(execution);
+
+    lastExecution = {
+      receivedAt: new Date(execution.createdAt!),
+      state:
+        executionState === "success"
+          ? ("success" as const)
+          : executionState === "running"
+            ? ("running" as const)
+            : ("failed" as const),
+    };
+
+    // If execution is running, it means we're waiting for the time window
+    if (executionState === "running") {
+      const modeText = mode === "include" ? "Include" : "Exclude";
+      awaitingEvent = {
+        title: `Waiting for ${modeText.toLowerCase()} window: ${timeWindow}`,
+        subtitle: `${daysDisplay}`,
+      };
+      // Don't show lastExecution when actively waiting
+      lastExecution = undefined;
+    }
+  }
+
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "time_gate",
+      label: displayLabel,
+      state: "pending" as const,
+      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
+      time_gate: {
+        title: displayLabel,
+        mode,
+        timeWindow,
+        days: daysDisplay,
+        lastExecution,
+        awaitingEvent,
+        iconColor: getColorClass(metadata?.color || "blue"),
+        iconBackground: getBackgroundColorClass(metadata?.color || "blue"),
+        headerColor: getBackgroundColorClass(metadata?.color || "blue"),
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },

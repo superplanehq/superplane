@@ -23,6 +23,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/http"
 	_ "github.com/superplanehq/superplane/pkg/components/if"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
+	_ "github.com/superplanehq/superplane/pkg/components/time_gate"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
 	_ "github.com/superplanehq/superplane/pkg/triggers/github"
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
