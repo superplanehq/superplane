@@ -7,6 +7,7 @@ import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
 import { Http, HttpProps } from "../http";
+import { TimeGate, TimeGateProps } from "../timeGate";
 import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { Noop, NoopProps } from "../noop";
@@ -14,7 +15,18 @@ import { ComponentActionsProps } from "../types/componentActions";
 import { Wait, WaitProps } from "../wait";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "composite" | "approval" | "filter" | "if" | "noop" | "http" | "wait" | "merge" | "switch";
+type BlockType =
+  | "trigger"
+  | "composite"
+  | "approval"
+  | "filter"
+  | "if"
+  | "noop"
+  | "http"
+  | "wait"
+  | "merge"
+  | "time_gate"
+  | "switch";
 
 interface BlockAi {
   show: boolean;
@@ -59,6 +71,9 @@ export interface BlockData {
   // wait node specific props
   wait?: WaitProps;
 
+  // time_gate node specific props
+  time_gate?: TimeGateProps;
+
   // switch node specific props
   switch?: SwitchComponentProps;
 
@@ -82,8 +97,8 @@ export function Block(props: BlockProps) {
   const ai = props.ai || {
     show: false,
     suggestion: null,
-    onApply: () => {},
-    onDismiss: () => {},
+    onApply: () => { },
+    onDismiss: () => { },
   };
 
   return (
@@ -122,6 +137,7 @@ function LeftHandle({ data }: BlockProps) {
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
+    (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
   return (
@@ -148,6 +164,7 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
+    (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
   let channels = data.outputChannels || ["default"];
@@ -349,6 +366,8 @@ function BlockContent({
       return <Http {...(data.http as HttpProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
+    case "time_gate":
+      return <TimeGate {...(data.time_gate as TimeGateProps)} selected={selected} {...actionProps} />;
     case "switch":
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":
