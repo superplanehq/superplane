@@ -13,6 +13,11 @@ func init() {
 	registry.RegisterComponent("time_gate", &TimeGate{})
 }
 
+const (
+	TimeGateIncludeMode = "include"
+	TimeGateExcludeMode = "exclude"
+)
+
 type TimeGate struct{}
 
 type Metadata struct {
@@ -62,11 +67,11 @@ func (tg *TimeGate) Configuration() []components.ConfigurationField {
 					Options: []components.FieldOption{
 						{
 							Label: "Include",
-							Value: "include",
+							Value: TimeGateIncludeMode,
 						},
 						{
 							Label: "Exclude",
-							Value: "exclude",
+							Value: TimeGateExcludeMode,
 						},
 					},
 				},
@@ -176,8 +181,8 @@ func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 
 func (tg *TimeGate) validateSpec(spec Spec) error {
 
-	if spec.Mode != "include" && spec.Mode != "exclude" {
-		return fmt.Errorf("invalid mode '%s': must be 'include' or 'exclude'", spec.Mode)
+	if spec.Mode != TimeGateIncludeMode && spec.Mode != TimeGateExcludeMode {
+		return fmt.Errorf("invalid mode '%s': must be '%s' or '%s'", spec.Mode, TimeGateIncludeMode, TimeGateExcludeMode)
 	}
 
 	startTime, err := parseTimeString(spec.StartTime)
@@ -222,28 +227,6 @@ func (tg *TimeGate) Actions() []components.Action {
 func (tg *TimeGate) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
-		currentSpec := Spec{}
-		err := mapstructure.Decode(ctx.Configuration, &currentSpec)
-		if err != nil {
-			return err
-		}
-
-		err = tg.validateSpec(currentSpec)
-		if err != nil {
-			return fmt.Errorf("configuration validation failed: %w", err)
-		}
-
-		// Calculate and store the next valid time for future reference
-		now := time.Now().UTC()
-		nextValidTime := tg.findNextValidTime(now, currentSpec)
-
-		if !nextValidTime.IsZero() {
-			formatted := nextValidTime.Format(time.RFC3339)
-			ctx.MetadataContext.Set(Metadata{
-				NextValidTime: &formatted,
-			})
-		}
-
 		return ctx.ExecutionStateContext.Pass(map[string][]any{
 			components.DefaultOutputChannel.Name: {map[string]any{}},
 		})
@@ -283,9 +266,9 @@ func (tg *TimeGate) configEqual(a, b Spec) bool {
 
 func (tg *TimeGate) findNextValidTime(now time.Time, spec Spec) time.Time {
 	switch spec.Mode {
-	case "include":
+	case TimeGateIncludeMode:
 		return tg.findNextIncludeTime(now, spec)
-	case "exclude":
+	case TimeGateExcludeMode:
 		return tg.findNextExcludeEndTime(now, spec)
 	default:
 		return time.Time{}
