@@ -154,10 +154,10 @@ func (w *WorkflowNode) CreateRequest(tx *gorm.DB, reqType string, spec NodeExecu
 }
 
 type WorkflowNodeQueueItem struct {
-	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
-	WorkflowID uuid.UUID
-	NodeID     string
-	CreatedAt  *time.Time
+    ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
+    WorkflowID uuid.UUID
+    NodeID     string
+    CreatedAt  *time.Time
 
 	//
 	// Reference to the root WorkflowEvent record that started
@@ -172,7 +172,7 @@ type WorkflowNodeQueueItem struct {
 	// The reference to a WorkflowEvent record,
 	// which holds the input for this queue item.
 	//
-	EventID uuid.UUID
+    EventID uuid.UUID
 }
 
 func (i *WorkflowNodeQueueItem) Delete(tx *gorm.DB) error {
@@ -211,4 +211,23 @@ func CountNodeQueueItems(workflowID uuid.UUID, nodeID string) (int64, error) {
 	}
 
 	return totalCount, nil
+}
+
+// ListNodeQueueItemsForRoot returns all queue items for a specific
+// node that belong to the same root execution chain.
+func ListNodeQueueItemsForRoot(tx *gorm.DB, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID) ([]WorkflowNodeQueueItem, error) {
+    var queueItems []WorkflowNodeQueueItem
+    err := tx.
+        Where("workflow_id = ?", workflowID).
+        Where("node_id = ?", nodeID).
+        Where("root_event_id = ?", rootEventID).
+        Order("created_at ASC").
+        Find(&queueItems).
+        Error
+
+    if err != nil {
+        return nil, err
+    }
+
+    return queueItems, nil
 }
