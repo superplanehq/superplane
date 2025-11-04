@@ -1695,36 +1695,37 @@ function prepareTimeGateNode(
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
 
-  let lastExecution;
-  let awaitingEvent;
+  let lastExecution: {
+    receivedAt: Date;
+    state: "success" | "failed" | "running";
+    eventId?: string;
+    nextRunTime?: Date;
+  } | undefined;
 
   if (execution) {
     const executionState = getRunItemState(execution);
 
     lastExecution = {
       receivedAt: new Date(execution.createdAt!),
-      state:
-        executionState === "success"
-          ? ("success" as const)
-          : executionState === "running"
-            ? ("running" as const)
-            : ("failed" as const),
+      state: executionState === "success"
+        ? ("success" as const)
+        : executionState === "failed"
+          ? ("failed" as const)
+          : ("running" as const),
+      eventId: execution.rootEvent?.id || execution.id || "Event",
     };
 
-    // If execution is running, it means we're waiting for the time window
     if (executionState === "running") {
-      const modeText = mode === "include" ? "Include" : "Exclude";
-      awaitingEvent = {
-        title: `Waiting for ${modeText.toLowerCase()} window: ${timeWindow}`,
-        subtitle: `${daysDisplay}`,
-      };
-      // Don't show lastExecution when actively waiting
-      lastExecution = undefined;
+      // Get next run time from execution metadata
+      const executionMetadata = execution.metadata as { nextValidTime?: string };
+      if (executionMetadata?.nextValidTime) {
+        lastExecution.nextRunTime = new Date(executionMetadata.nextValidTime);
+      }
     }
   }
 
   // Use node name if available, otherwise fall back to component label (from metadata)
-  const displayLabel = node.name || metadata?.label!;
+  const displayLabel = node.name || metadata?.label || "Time Gate";
 
   return {
     id: node.id!,
@@ -1740,7 +1741,6 @@ function prepareTimeGateNode(
         timeWindow,
         days: daysDisplay,
         lastExecution,
-        awaitingEvent,
         iconColor: getColorClass(metadata?.color || "blue"),
         iconBackground: getBackgroundColorClass(metadata?.color || "blue"),
         headerColor: getBackgroundColorClass(metadata?.color || "blue"),
@@ -1750,6 +1750,7 @@ function prepareTimeGateNode(
     },
   };
 }
+
 
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
@@ -1893,7 +1894,7 @@ function prepareSidebarData(
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = queueItems.slice(0, 5).map((item) => {
-    const anyItem: any = item as any;
+    const anyItem = item as any;
     let title =
       anyItem?.name ||
       anyItem?.input?.title ||

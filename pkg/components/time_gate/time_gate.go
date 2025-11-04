@@ -15,6 +15,10 @@ func init() {
 
 type TimeGate struct{}
 
+type Metadata struct {
+	NextValidTime *string `json:"nextValidTime"`
+}
+
 type Spec struct {
 	Mode      string   `json:"mode"`
 	StartTime string   `json:"startTime"`
@@ -119,20 +123,31 @@ func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 		return err
 	}
 
-	var isConfigUpdate bool
-	if metadata := ctx.MetadataContext.Get(); metadata != nil {
-		if storedSpec, ok := metadata.(Spec); ok {
-			isConfigUpdate = !tg.configEqual(spec, storedSpec)
-		}
+	var metadata Metadata
+	err = mapstructure.Decode(ctx.MetadataContext.Get(), &metadata)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
-
-	ctx.MetadataContext.Set(spec)
 
 	now := time.Now().UTC()
 	nextValidTime := tg.findNextValidTime(now, spec)
 
 	if nextValidTime.IsZero() {
 		return fmt.Errorf("no valid time window found")
+	}
+
+	//
+	// If the configuration didn't change, don't schedule a new action.
+	//
+	if metadata.NextValidTime != nil {
+		currentValidTime, err := time.Parse(time.RFC3339, *metadata.NextValidTime)
+		if err != nil {
+			return fmt.Errorf("error parsing next valid time: %v", err)
+		}
+
+		if currentValidTime.Sub(nextValidTime).Abs() < time.Second {
+			return nil
+		}
 	}
 
 	interval := time.Until(nextValidTime)
@@ -143,11 +158,20 @@ func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 		})
 	}
 
-	if isConfigUpdate {
-
+	//
+	// Schedule the action and save the next valid time in metadata
+	//
+	err = ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
+	if err != nil {
+		return err
 	}
 
-	return ctx.RequestContext.ScheduleActionCall("timeReached", map[string]any{}, interval)
+	formatted := nextValidTime.Format(time.RFC3339)
+	ctx.MetadataContext.Set(Metadata{
+		NextValidTime: &formatted,
+	})
+
+	return nil
 }
 
 func (tg *TimeGate) validateSpec(spec Spec) error {
@@ -198,7 +222,6 @@ func (tg *TimeGate) Actions() []components.Action {
 func (tg *TimeGate) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "timeReached":
-
 		currentSpec := Spec{}
 		err := mapstructure.Decode(ctx.Configuration, &currentSpec)
 		if err != nil {
@@ -208,6 +231,17 @@ func (tg *TimeGate) HandleAction(ctx components.ActionContext) error {
 		err = tg.validateSpec(currentSpec)
 		if err != nil {
 			return fmt.Errorf("configuration validation failed: %w", err)
+		}
+
+		// Calculate and store the next valid time for future reference
+		now := time.Now().UTC()
+		nextValidTime := tg.findNextValidTime(now, currentSpec)
+
+		if !nextValidTime.IsZero() {
+			formatted := nextValidTime.Format(time.RFC3339)
+			ctx.MetadataContext.Set(Metadata{
+				NextValidTime: &formatted,
+			})
 		}
 
 		return ctx.ExecutionStateContext.Pass(map[string][]any{

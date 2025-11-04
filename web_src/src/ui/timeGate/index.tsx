@@ -1,20 +1,16 @@
 import React from "react";
-import { ComponentHeader } from "../componentHeader";
-import { CollapsedComponent } from "../collapsedComponent";
-import { SelectionWrapper } from "../selectionWrapper";
+import { ComponentBase } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
-import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
+import { calcRelativeTimeFromDiff } from "@/lib/utils";
+import { MetadataItem } from "../metadataList";
 
 export type TimeGateState = "success" | "failed" | "running";
 
 export interface TimeGateExecutionItem {
   receivedAt?: Date;
   state?: TimeGateState;
-}
-
-export interface AwaitingEvent {
-  title: string;
-  subtitle: string;
+  eventId?: string;
+  nextRunTime?: Date;
 }
 
 export interface TimeGateProps extends ComponentActionsProps {
@@ -23,7 +19,6 @@ export interface TimeGateProps extends ComponentActionsProps {
   timeWindow?: string;
   days?: string;
   lastExecution?: TimeGateExecutionItem;
-  awaitingEvent?: AwaitingEvent;
   collapsed?: boolean;
   selected?: boolean;
   collapsedBackground?: string;
@@ -33,13 +28,14 @@ export interface TimeGateProps extends ComponentActionsProps {
   hideLastRun?: boolean;
 }
 
+const daysOfWeekOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7 };
+
 export const TimeGate: React.FC<TimeGateProps> = ({
   title = "Time Gate",
   mode = "include",
   timeWindow,
   days,
   lastExecution,
-  awaitingEvent,
   collapsed = false,
   selected = false,
   collapsedBackground,
@@ -47,7 +43,6 @@ export const TimeGate: React.FC<TimeGateProps> = ({
   iconColor,
   headerColor,
   hideLastRun = false,
-  onToggleCollapse,
   onRun,
   onEdit,
   onDuplicate,
@@ -56,213 +51,92 @@ export const TimeGate: React.FC<TimeGateProps> = ({
   onDelete,
   isCompactView,
 }) => {
-  const getStateIcon = React.useCallback((state: TimeGateState) => {
-    if (state === "success") return resolveIcon("check");
-    if (state === "running") return resolveIcon("refresh-cw");
-    return resolveIcon("x");
-  }, []);
 
-  const getStateColor = React.useCallback((state: TimeGateState) => {
-    if (state === "success") return "text-green-700";
-    if (state === "running") return "text-blue-800";
-    return "text-red-700";
-  }, []);
+  const spec = days ? {
+    title: "day",
+    tooltipTitle: "Days of the week",
+    values: [
+      ...days.split(",").sort((a, b) => daysOfWeekOrder[a.trim() as keyof typeof daysOfWeekOrder] - daysOfWeekOrder[b.trim() as keyof typeof daysOfWeekOrder]).map(day => ({
+        badges: [
+          {
+            label: day.trim(),
+            bgColor: "bg-gray-100",
+            textColor: "text-gray-700"
+          }
+        ]
+      }))
+    ]
+  } : undefined;
 
-  const getStateBackground = React.useCallback((state: TimeGateState) => {
-    if (state === "success") return "bg-green-200";
-    if (state === "running") return "bg-sky-100";
-    return "bg-red-200";
-  }, []);
+  const metadata: MetadataItem[] = [
+    {
+      icon: "settings",
+      label: mode.toUpperCase()
+    },
+    {
+      icon: "calendar",
+      label: timeWindow || ""
+    },
+  ];
 
-  const getStateIconBackground = React.useCallback((state: TimeGateState) => {
-    if (state === "success") return "bg-green-600";
-    if (state === "running") return "bg-none animate-spin";
-    return "bg-red-600";
-  }, []);
+  const eventSections = [];
 
-  const getStateIconColor = React.useCallback((state: TimeGateState) => {
-    if (state === "success") return "text-white";
-    if (state === "running") return "text-blue-800";
-    return "text-white";
-  }, []);
+  if (!hideLastRun) {
+    if (lastExecution && lastExecution.state && lastExecution.receivedAt) {
+      let eventTitle: string;
+      let eventSubtitle: string | undefined;
 
-  const AwaitingIcon = React.useMemo(() => {
-    return resolveIcon("circle-dashed");
-  }, []);
+      if (lastExecution.state === "running" && lastExecution.eventId) {
+        // Show event ID and time remaining for running state
+        eventTitle = lastExecution.eventId;
+        if (lastExecution.nextRunTime) {
+          const now = new Date();
+          const timeDiff = lastExecution.nextRunTime.getTime() - now.getTime();
+          const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
+          eventSubtitle = `Runs in ${timeLeftText}`;
+        }
+      } else {
+        // Show standard messages for completed states
+        eventTitle = lastExecution.eventId || "Event";
+      }
 
-  if (collapsed) {
-    return (
-      <SelectionWrapper selected={selected}>
-        <CollapsedComponent
-          iconSlug="clock"
-          iconColor={iconColor || "text-blue-600"}
-          iconBackground={iconBackground || "bg-blue-100"}
-          title={title}
-          collapsedBackground={collapsedBackground}
-          shape="rounded"
-          onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
-          isCompactView={isCompactView}
-        >
-          <div className="flex flex-col gap-1 text-xs text-gray-500 mt-1">
-            <div className="flex items-center gap-2">
-              <span className="capitalize font-medium">{mode}</span>
-              {timeWindow && <span>{timeWindow}</span>}
-            </div>
-            {days && <span className="truncate">{days}</span>}
-          </div>
-        </CollapsedComponent>
-      </SelectionWrapper>
-    );
+      eventSections.push({
+        title: "LAST EVENT",
+        receivedAt: lastExecution.receivedAt,
+        eventState: lastExecution.state,
+        eventTitle,
+        eventSubtitle,
+      });
+    } else {
+      // Show placeholder if no events
+      eventSections.push({
+        title: "LAST EVENT",
+        eventState: "neutral" as const,
+        eventTitle: "No events received yet",
+      });
+    }
   }
 
-  const description = timeWindow
-    ? `${mode === "include" ? "Allow" : "Block"} events during ${timeWindow}`
-    : "No time window configured";
-
   return (
-    <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white">
-        <ComponentHeader
-          iconSlug="clock"
-          iconBackground={iconBackground || "bg-blue-100"}
-          iconColor={iconColor || "text-blue-600"}
-          headerColor={headerColor || "bg-blue-50"}
-          title={title}
-          description={description}
-          onDoubleClick={onToggleCollapse}
-          onRun={onRun}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          onDeactivate={onDeactivate}
-          onToggleView={onToggleView}
-          onDelete={onDelete}
-          isCompactView={isCompactView}
-        />
-
-        {/* Configuration Section */}
-        <div className="px-4 py-3 border-b bg-gray-50">
-          <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-            <span className="uppercase text-sm font-medium">Configuration</span>
-          </div>
-
-          <div className="flex flex-col gap-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">Mode:</span>
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                mode === "include"
-                  ? "bg-green-100 text-green-800"
-                  : "bg-red-100 text-red-800"
-              }`}>
-                {mode === "include" ? "Include" : "Exclude"}
-              </span>
-            </div>
-
-            {timeWindow && (
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Time Window:</span>
-                <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                  {timeWindow}
-                </span>
-              </div>
-            )}
-
-            {days && (
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-gray-600 flex-shrink-0">Days:</span>
-                <span className="text-xs text-right">{days}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Awaiting Section - Show when waiting for time window */}
-        <div className="px-4 py-3">
-          {awaitingEvent ? (
-            <>
-              <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-                <span className="uppercase text-sm font-medium">
-                  Waiting for Time Window
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-orange-200 mb-4">
-                <div className="flex items-center gap-2 min-w-0 flex-1 text-amber-800">
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center">
-                    <AwaitingIcon size={20} className="text-amber-800" />
-                  </div>
-                  <span className="truncate text-sm">{awaitingEvent.title}</span>
-                </div>
-                {awaitingEvent.subtitle && (
-                  <span className="truncate text-sm flex-shrink-0 text-amber-800">
-                    {awaitingEvent.subtitle}
-                  </span>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Last Run Section - Only show when not waiting */}
-              {!hideLastRun && lastExecution && lastExecution.state && lastExecution.receivedAt && (
-                <>
-                  <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-                    <span className="uppercase text-sm font-medium">Last Run</span>
-                  </div>
-
-                  <div className="flex flex-col gap-2 mb-4">
-                    <div
-                      className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${getStateBackground(lastExecution.state)} ${getStateColor(lastExecution.state)}`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div
-                          className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${getStateIconBackground(lastExecution.state)}`}
-                        >
-                          {React.createElement(getStateIcon(lastExecution.state), {
-                            size: lastExecution.state === "running" ? 16 : 12,
-                            className: getStateIconColor(lastExecution.state),
-                          })}
-                        </div>
-                        <span className="text-sm">
-                          {lastExecution.state === "running"
-                            ? "Processing..."
-                            : lastExecution.state === "success"
-                              ? "Event passed through"
-                              : "Event blocked"}
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {calcRelativeTimeFromDiff(
-                          new Date().getTime() - lastExecution.receivedAt.getTime()
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* No executions state */}
-              {(!lastExecution || !lastExecution.state || !lastExecution.receivedAt) && !hideLastRun && (
-                <>
-                  <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-                    <span className="uppercase text-sm font-medium">Last Run</span>
-                  </div>
-                  <div className="flex items-center gap-3 px-2 py-2 rounded-md bg-gray-100 text-gray-500 mb-4">
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center bg-gray-400">
-                      <div className="w-2 h-2 rounded-full bg-white"></div>
-                    </div>
-                    <span className="text-sm">No events received yet</span>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </SelectionWrapper>
+    <ComponentBase
+      iconSlug="clock"
+      iconBackground={iconBackground || "bg-blue-100"}
+      iconColor={iconColor || "text-blue-600"}
+      headerColor={headerColor || "bg-blue-50"}
+      title={title}
+      spec={spec}
+      eventSections={eventSections}
+      collapsed={collapsed}
+      selected={selected}
+      collapsedBackground={collapsedBackground}
+      onRun={onRun}
+      onEdit={onEdit}
+      onDuplicate={onDuplicate}
+      onDeactivate={onDeactivate}
+      onToggleView={onToggleView}
+      onDelete={onDelete}
+      isCompactView={isCompactView}
+      metadata={metadata}
+    />
   );
 };
