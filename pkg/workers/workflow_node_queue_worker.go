@@ -89,6 +89,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 		}
 
 		// Not all parents have produced inputs yet; leave node ready and try later
+		// TODO: Is this efficient?
 		if !ready {
 			return nil
 		}
@@ -144,20 +145,19 @@ func (w *WorkflowNodeQueueWorker) createNodeExecution(tx *gorm.DB, node *models.
 	return node.UpdateState(tx, models.WorkflowNodeStateProcessing)
 }
 
-// isMergeNode returns true if the workflow node is a component of type "merge"
+// TODO: This is a stupid way to check if it's a merge node
 func isMergeNode(node *models.WorkflowNode) bool {
 	if node.Type != models.NodeTypeComponent {
 		return false
 	}
+
 	ref := node.Ref.Data()
+
+	// TODO: Especially this part, ultra stupid
 	return ref.Component != nil && ref.Component.Name == "merge"
 }
 
-// tryCreateMergeExecution checks if all parents for this merge node have queued items
-// for the same root event. If so, it aggregates their inputs and creates a single execution,
-// consuming one queue item per parent. Returns true if an execution was created.
 func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *models.WorkflowNode, firstItem *models.WorkflowNodeQueueItem) (bool, error) {
-	// Load workflow to inspect edges and determine parent set
 	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
 	if err != nil {
 		return false, fmt.Errorf("failed to find workflow: %w", err)
@@ -172,20 +172,14 @@ func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *mod
 	}
 
 	if len(requiredParents) == 0 {
-		// No parents? Fallback to standard behavior
 		w.log("Merge node %s has no incoming edges; falling back to pass-through", node.NodeID)
 		return false, nil
 	}
 
-	// Fetch all queue items for this node with the same root_event_id as the first item
-	var queueItems []models.WorkflowNodeQueueItem
-	if err := tx.
-		Where("workflow_id = ?", node.WorkflowID).
-		Where("node_id = ?", node.NodeID).
-		Where("root_event_id = ?", firstItem.RootEventID).
-		Order("created_at ASC").
-		Find(&queueItems).Error; err != nil {
-		return false, fmt.Errorf("failed to list queue items for merge: %w", err)
+	queueItems, err := w.fetchMergableQueueItems(tx, node, firstItem)
+
+	if err != nil {
+		return false, err
 	}
 
 	if len(queueItems) == 0 {
@@ -203,28 +197,29 @@ func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *mod
 		return false, fmt.Errorf("failed to load events for merge: %w", err)
 	}
 
-	// Index events by ID for quick lookup
 	eventsByID := make(map[string]models.WorkflowEvent, len(events))
 	for _, e := range events {
 		eventsByID[e.ID.String()] = e
 	}
 
-	// Select earliest one queue item per required parent (grouped by parent node ID across channels)
 	selectedByParent := make(map[string]models.WorkflowNodeQueueItem)
 	selectedEventByParent := make(map[string]models.WorkflowEvent)
+
 	for _, qi := range queueItems {
 		e, ok := eventsByID[qi.EventID.String()]
 		if !ok {
 			continue
 		}
+
 		parentID := e.NodeID
 		if _, req := requiredParents[parentID]; !req {
-			// This event is not from a required parent (edge may have changed); skip
 			continue
 		}
+
 		if _, already := selectedByParent[parentID]; already {
 			continue
 		}
+
 		selectedByParent[parentID] = qi
 		selectedEventByParent[parentID] = e
 	}
@@ -272,25 +267,25 @@ func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *mod
 				return false, fmt.Errorf("failed to find parent execution for %s: %w", parentID, err)
 			}
 
-            // If not finished, keep waiting
-            if parentExec.State != models.WorkflowNodeExecutionStateFinished {
-                return false, nil
-            }
+			// If not finished, keep waiting
+			if parentExec.State != models.WorkflowNodeExecutionStateFinished {
+				return false, nil
+			}
 
-            // If the parent execution failed, this merge can never be fulfilled for this root event.
-            // Clean up any queued items for this merge/root and stop processing.
-            if parentExec.Result == models.WorkflowNodeExecutionResultFailed {
-                if err := tx.
-                    Where("workflow_id = ?", node.WorkflowID).
-                    Where("node_id = ?", node.NodeID).
-                    Where("root_event_id = ?", firstItem.RootEventID).
-                    Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
-                    return false, fmt.Errorf("failed to clean merge queue items after parent failure: %w", err)
-                }
-                w.log("Skipping merge for node=%s workflow=%s root_event=%s due to failed parent %s; cleaned pending items",
-                    node.NodeID, node.WorkflowID, firstItem.RootEventID, parentID)
-                return false, nil
-            }
+			// If the parent execution failed, this merge can never be fulfilled for this root event.
+			// Clean up any queued items for this merge/root and stop processing.
+			if parentExec.Result == models.WorkflowNodeExecutionResultFailed {
+				if err := tx.
+					Where("workflow_id = ?", node.WorkflowID).
+					Where("node_id = ?", node.NodeID).
+					Where("root_event_id = ?", firstItem.RootEventID).
+					Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+					return false, fmt.Errorf("failed to clean merge queue items after parent failure: %w", err)
+				}
+				w.log("Skipping merge for node=%s workflow=%s root_event=%s due to failed parent %s; cleaned pending items",
+					node.NodeID, node.WorkflowID, firstItem.RootEventID, parentID)
+				return false, nil
+			}
 
 			// Check outputs produced by this parent execution
 			outputs, err := parentExec.GetOutputs()
@@ -308,20 +303,20 @@ func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *mod
 				}
 			}
 
-            if !routedToMerge {
-                // Parent finished but did not route to this merge along any connected channel.
-                // This join can never be fulfilled for this root event; clean pending items and stop.
-                if err := tx.
-                    Where("workflow_id = ?", node.WorkflowID).
-                    Where("node_id = ?", node.NodeID).
-                    Where("root_event_id = ?", firstItem.RootEventID).
-                    Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
-                    return false, fmt.Errorf("failed to clean merge queue items after non-routing parent: %w", err)
-                }
-                w.log("Skipping merge for node=%s workflow=%s root_event=%s due to parent %s not routing to merge; cleaned pending items",
-                    node.NodeID, node.WorkflowID, firstItem.RootEventID, parentID)
-                return false, nil
-            }
+			if !routedToMerge {
+				// Parent finished but did not route to this merge along any connected channel.
+				// This join can never be fulfilled for this root event; clean pending items and stop.
+				if err := tx.
+					Where("workflow_id = ?", node.WorkflowID).
+					Where("node_id = ?", node.NodeID).
+					Where("root_event_id = ?", firstItem.RootEventID).
+					Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+					return false, fmt.Errorf("failed to clean merge queue items after non-routing parent: %w", err)
+				}
+				w.log("Skipping merge for node=%s workflow=%s root_event=%s due to parent %s not routing to merge; cleaned pending items",
+					node.NodeID, node.WorkflowID, firstItem.RootEventID, parentID)
+				return false, nil
+			}
 		}
 	}
 
@@ -389,6 +384,23 @@ func (w *WorkflowNodeQueueWorker) tryCreateMergeExecution(tx *gorm.DB, node *mod
 
 	w.log("Created merge execution %s for node=%s workflow=%s with %d inputs", nodeExecution.ID, node.NodeID, node.WorkflowID, len(selectedByParent))
 	return true, nil
+}
+
+func (w *WorkflowNodeQueueWorker) fetchMergableQueueItems(tx *gorm.DB, node *models.WorkflowNode, firstItem *models.WorkflowNodeQueueItem) ([]models.WorkflowNodeQueueItem, error) {
+	var queueItems []models.WorkflowNodeQueueItem
+
+	err := tx.
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Where("root_event_id = ?", firstItem.RootEventID).
+		Order("created_at ASC").
+		Find(&queueItems).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to list queue items for merge: %w", err)
+	}
+
+	return queueItems, nil
 }
 
 func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
