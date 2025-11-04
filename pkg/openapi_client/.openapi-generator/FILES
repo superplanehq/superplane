@@ -40,7 +40,6 @@ docs/ComponentsDescribeComponentResponse.md
 docs/ComponentsEdge.md
 docs/ComponentsIntegrationTypeOptions.md
 docs/ComponentsListComponentActionsResponse.md
-docs/ComponentsListComponentsResponse.md
 docs/ComponentsListItemDefinition.md
 docs/ComponentsListTypeOptions.md
 docs/ComponentsMultiSelectTypeOptions.md
@@ -131,10 +130,12 @@ docs/SuperplaneBlueprintsOutputChannel.md
 docs/SuperplaneBlueprintsUserRef.md
 docs/SuperplaneCanvas.md
 docs/SuperplaneCanvasMetadata.md
+docs/SuperplaneComponentsListComponentsResponse.md
 docs/SuperplaneComponentsOutputChannel.md
 docs/SuperplaneCreateCanvasRequest.md
 docs/SuperplaneCreateCanvasResponse.md
 docs/SuperplaneDescribeCanvasResponse.md
+docs/SuperplaneIntegrationsListComponentsResponse.md
 docs/SuperplaneIntegrationsValueFrom.md
 docs/SuperplaneIntegrationsValueFromSecret.md
 docs/SuperplaneListCanvasesResponse.md
@@ -198,7 +199,6 @@ model_components_describe_component_response.go
 model_components_edge.go
 model_components_integration_type_options.go
 model_components_list_component_actions_response.go
-model_components_list_components_response.go
 model_components_list_item_definition.go
 model_components_list_type_options.go
 model_components_multi_select_type_options.go
@@ -283,10 +283,12 @@ model_superplane_blueprints_output_channel.go
 model_superplane_blueprints_user_ref.go
 model_superplane_canvas.go
 model_superplane_canvas_metadata.go
+model_superplane_components_list_components_response.go
 model_superplane_components_output_channel.go
 model_superplane_create_canvas_request.go
 model_superplane_create_canvas_response.go
 model_superplane_describe_canvas_response.go
+model_superplane_integrations_list_components_response.go
 model_superplane_integrations_value_from.go
 model_superplane_integrations_value_from_secret.go
 model_superplane_list_canvases_response.go

@@ -5,6 +5,7 @@ import {
   integrationsDescribeIntegration,
   integrationsUpdateIntegration,
   integrationsListResources,
+  integrationsListComponents,
 } from '@/api-client/sdk.gen'
 import { withOrganizationHeader } from '@/utils/withOrganizationHeader'
 import type { IntegrationsCreateIntegrationData, IntegrationsUpdateIntegrationData } from '@/api-client/types.gen'
@@ -14,6 +15,7 @@ export const integrationKeys = {
   byDomain: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => [...integrationKeys.all, 'domain', domainId, domainType] as const,
   detail: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string) => [...integrationKeys.byDomain(domainId, domainType), 'detail', integrationId] as const,
   resources: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string, resourceType: string) => [...integrationKeys.detail(domainId, domainType, integrationId), 'resources', resourceType] as const,
+  componentsByType: (integrationType: string) => [...integrationKeys.all, 'components', 'byType', integrationType] as const,
 }
 
 export const useIntegrations = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
@@ -203,5 +205,22 @@ export const useIntegrationResources = (
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!domainId && !!domainType && !!integrationId && !!resourceType,
+  })
+}
+
+export const useIntegrationComponentsByType = (integrationType: string) => {
+  return useQuery({
+    queryKey: integrationKeys.componentsByType(integrationType),
+    queryFn: async () => {
+      const response = await integrationsListComponents(withOrganizationHeader({
+        path: {
+          type: integrationType
+        }
+      }))
+      return response.data?.components || []
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!integrationType,
   })
 }

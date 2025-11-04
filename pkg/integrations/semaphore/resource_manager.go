@@ -66,7 +66,7 @@ func (i *SemaphoreResourceManager) Get(resourceType, id string) (integrations.Re
 func (i *SemaphoreResourceManager) List(resourceTypes string) ([]integrations.Resource, error) {
 	switch resourceTypes {
 	case ResourceTypeProject:
-		return i.listProjects()
+		return i.ListProjects()
 	default:
 		return nil, fmt.Errorf("unsupported resource type %s", resourceTypes)
 	}
@@ -320,7 +320,7 @@ func (i *SemaphoreResourceManager) listTasks(parentIDs ...string) ([]integration
 	return resources, nil
 }
 
-func (i *SemaphoreResourceManager) listProjects() ([]integrations.Resource, error) {
+func (i *SemaphoreResourceManager) ListProjects() ([]integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/projects", i.URL)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
@@ -392,7 +392,7 @@ func (i *SemaphoreResourceManager) getProject(idOrName string) (integrations.Res
 		return i.getProjectByName(idOrName)
 	}
 
-	projects, err := i.listProjects()
+	projects, err := i.ListProjects()
 	if err != nil {
 		return nil, err
 	}

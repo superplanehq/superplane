@@ -53,3 +53,7 @@ func (s *IntegrationService) ListResources(ctx context.Context, req *pb.ListReso
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return integrations.ListResources(ctx, s.registry, domainType, domainID, req.IdOrName, req.Type)
 }
+
+func (s *IntegrationService) ListComponents(ctx context.Context, req *pb.ListComponentsRequest) (*pb.ListComponentsResponse, error) {
+	return integrations.ListComponents(ctx, s.registry, req.Type)
+}

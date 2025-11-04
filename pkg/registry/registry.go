@@ -41,6 +41,7 @@ func RegisterTrigger(name string, t triggers.Trigger) {
 type Integration struct {
 	OIDCVerifier       integrations.OIDCVerifier
 	NewResourceManager func(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.ResourceManager, error)
+	Components         []components.Component
 }
 
 type Registry struct {
@@ -72,11 +73,13 @@ func (r *Registry) Init() {
 	r.Integrations[models.IntegrationTypeSemaphore] = Integration{
 		OIDCVerifier:       &semaphore.SemaphoreOIDCVerifier{},
 		NewResourceManager: semaphore.NewSemaphoreResourceManager,
+		Components:         semaphore.Components(),
 	}
 
 	r.Integrations[models.IntegrationTypeGithub] = Integration{
 		OIDCVerifier:       &github.GitHubOIDCVerifier{},
 		NewResourceManager: github.NewGitHubResourceManager,
+		Components:         github.Components(),
 	}
 
 	//
@@ -229,6 +232,15 @@ func (r *Registry) ListComponents() []components.Component {
 	return components
 }
 
+func (r *Registry) ListIntegrationComponents(integrationType string) ([]components.Component, error) {
+	integration, ok := r.Integrations[integrationType]
+	if !ok {
+		return nil, fmt.Errorf("integration %s not registered", integrationType)
+	}
+
+	return integration.Components, nil
+}
+
 func (r *Registry) GetComponent(name string) (components.Component, error) {
 	component, ok := r.Components[name]
 	if !ok {
@@ -236,4 +248,19 @@ func (r *Registry) GetComponent(name string) (components.Component, error) {
 	}
 
 	return component, nil
+}
+
+func (r *Registry) GetIntegrationComponent(integrationType, componentName string) (components.Component, error) {
+	integration, ok := r.Integrations[integrationType]
+	if !ok {
+		return nil, fmt.Errorf("integration %s not registered", integrationType)
+	}
+
+	for _, component := range integration.Components {
+		if component.Name() == componentName {
+			return component, nil
+		}
+	}
+
+	return nil, fmt.Errorf("component %s not registered for integration %s", componentName, integrationType)
 }

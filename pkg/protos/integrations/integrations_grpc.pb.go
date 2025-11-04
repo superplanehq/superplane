@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Integrations_ListIntegrations_FullMethodName    = "/Superplane.Integrations.Integrations/ListIntegrations"
 	Integrations_ListResources_FullMethodName       = "/Superplane.Integrations.Integrations/ListResources"
+	Integrations_ListComponents_FullMethodName      = "/Superplane.Integrations.Integrations/ListComponents"
 	Integrations_DescribeIntegration_FullMethodName = "/Superplane.Integrations.Integrations/DescribeIntegration"
 	Integrations_CreateIntegration_FullMethodName   = "/Superplane.Integrations.Integrations/CreateIntegration"
 	Integrations_UpdateIntegration_FullMethodName   = "/Superplane.Integrations.Integrations/UpdateIntegration"
@@ -32,6 +33,7 @@ const (
 type IntegrationsClient interface {
 	ListIntegrations(ctx context.Context, in *ListIntegrationsRequest, opts ...grpc.CallOption) (*ListIntegrationsResponse, error)
 	ListResources(ctx context.Context, in *ListResourcesRequest, opts ...grpc.CallOption) (*ListResourcesResponse, error)
+	ListComponents(ctx context.Context, in *ListComponentsRequest, opts ...grpc.CallOption) (*ListComponentsResponse, error)
 	DescribeIntegration(ctx context.Context, in *DescribeIntegrationRequest, opts ...grpc.CallOption) (*DescribeIntegrationResponse, error)
 	CreateIntegration(ctx context.Context, in *CreateIntegrationRequest, opts ...grpc.CallOption) (*CreateIntegrationResponse, error)
 	UpdateIntegration(ctx context.Context, in *UpdateIntegrationRequest, opts ...grpc.CallOption) (*UpdateIntegrationResponse, error)
@@ -59,6 +61,16 @@ func (c *integrationsClient) ListResources(ctx context.Context, in *ListResource
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListResourcesResponse)
 	err := c.cc.Invoke(ctx, Integrations_ListResources_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *integrationsClient) ListComponents(ctx context.Context, in *ListComponentsRequest, opts ...grpc.CallOption) (*ListComponentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListComponentsResponse)
+	err := c.cc.Invoke(ctx, Integrations_ListComponents_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +113,7 @@ func (c *integrationsClient) UpdateIntegration(ctx context.Context, in *UpdateIn
 type IntegrationsServer interface {
 	ListIntegrations(context.Context, *ListIntegrationsRequest) (*ListIntegrationsResponse, error)
 	ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error)
+	ListComponents(context.Context, *ListComponentsRequest) (*ListComponentsResponse, error)
 	DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error)
 	CreateIntegration(context.Context, *CreateIntegrationRequest) (*CreateIntegrationResponse, error)
 	UpdateIntegration(context.Context, *UpdateIntegrationRequest) (*UpdateIntegrationResponse, error)
@@ -118,6 +131,9 @@ func (UnimplementedIntegrationsServer) ListIntegrations(context.Context, *ListIn
 }
 func (UnimplementedIntegrationsServer) ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListResources not implemented")
+}
+func (UnimplementedIntegrationsServer) ListComponents(context.Context, *ListComponentsRequest) (*ListComponentsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListComponents not implemented")
 }
 func (UnimplementedIntegrationsServer) DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribeIntegration not implemented")
@@ -180,6 +196,24 @@ func _Integrations_ListResources_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IntegrationsServer).ListResources(ctx, req.(*ListResourcesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Integrations_ListComponents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListComponentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IntegrationsServer).ListComponents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Integrations_ListComponents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IntegrationsServer).ListComponents(ctx, req.(*ListComponentsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -252,6 +286,10 @@ var Integrations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListResources",
 			Handler:    _Integrations_ListResources_Handler,
+		},
+		{
+			MethodName: "ListComponents",
+			Handler:    _Integrations_ListComponents_Handler,
 		},
 		{
 			MethodName: "DescribeIntegration",

@@ -21,6 +21,7 @@ var _ MappedNullable = &NodeComponentRef{}
 // NodeComponentRef struct for NodeComponentRef
 type NodeComponentRef struct {
 	Name *string `json:"name,omitempty"`
+	Integration *string `json:"integration,omitempty"`
 }
 
 // NewNodeComponentRef instantiates a new NodeComponentRef object
@@ -72,6 +73,38 @@ func (o *NodeComponentRef) SetName(v string) {
 	o.Name = &v
 }
 
+// GetIntegration returns the Integration field value if set, zero value otherwise.
+func (o *NodeComponentRef) GetIntegration() string {
+	if o == nil || IsNil(o.Integration) {
+		var ret string
+		return ret
+	}
+	return *o.Integration
+}
+
+// GetIntegrationOk returns a tuple with the Integration field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *NodeComponentRef) GetIntegrationOk() (*string, bool) {
+	if o == nil || IsNil(o.Integration) {
+		return nil, false
+	}
+	return o.Integration, true
+}
+
+// HasIntegration returns a boolean if a field has been set.
+func (o *NodeComponentRef) HasIntegration() bool {
+	if o != nil && !IsNil(o.Integration) {
+		return true
+	}
+
+	return false
+}
+
+// SetIntegration gets a reference to the given string and assigns it to the Integration field.
+func (o *NodeComponentRef) SetIntegration(v string) {
+	o.Integration = &v
+}
+
 func (o NodeComponentRef) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o NodeComponentRef) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
+	}
+	if !IsNil(o.Integration) {
+		toSerialize["integration"] = o.Integration
 	}
 	return toSerialize, nil
 }

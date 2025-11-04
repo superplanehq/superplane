@@ -251,7 +251,7 @@ type ApiComponentsListComponentsRequest struct {
 	ApiService *ComponentAPIService
 }
 
-func (r ApiComponentsListComponentsRequest) Execute() (*ComponentsListComponentsResponse, *http.Response, error) {
+func (r ApiComponentsListComponentsRequest) Execute() (*SuperplaneComponentsListComponentsResponse, *http.Response, error) {
 	return r.ApiService.ComponentsListComponentsExecute(r)
 }
 
@@ -271,13 +271,13 @@ func (a *ComponentAPIService) ComponentsListComponents(ctx context.Context) ApiC
 }
 
 // Execute executes the request
-//  @return ComponentsListComponentsResponse
-func (a *ComponentAPIService) ComponentsListComponentsExecute(r ApiComponentsListComponentsRequest) (*ComponentsListComponentsResponse, *http.Response, error) {
+//  @return SuperplaneComponentsListComponentsResponse
+func (a *ComponentAPIService) ComponentsListComponentsExecute(r ApiComponentsListComponentsRequest) (*SuperplaneComponentsListComponentsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *ComponentsListComponentsResponse
+		localVarReturnValue  *SuperplaneComponentsListComponentsResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "ComponentAPIService.ComponentsListComponents")

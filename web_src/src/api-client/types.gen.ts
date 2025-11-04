@@ -101,10 +101,6 @@ export type ComponentsListComponentActionsResponse = {
     actions?: Array<ComponentsComponentAction>;
 };
 
-export type ComponentsListComponentsResponse = {
-    components?: Array<ComponentsComponent>;
-};
-
 export type ComponentsListItemDefinition = {
     type?: string;
     schema?: Array<ComponentsConfigurationField>;
@@ -342,6 +338,7 @@ export type NodeBlueprintRef = {
 
 export type NodeComponentRef = {
     name?: string;
+    integration?: string;
 };
 
 export type NodeTriggerRef = {
@@ -564,6 +561,10 @@ export type SuperplaneCanvasMetadata = {
     createdAt?: string;
 };
 
+export type SuperplaneComponentsListComponentsResponse = {
+    components?: Array<ComponentsComponent>;
+};
+
 export type SuperplaneComponentsOutputChannel = {
     name?: string;
     label?: string;
@@ -584,6 +585,10 @@ export type SuperplaneDeleteCanvasResponse = {
 
 export type SuperplaneDescribeCanvasResponse = {
     canvas?: SuperplaneCanvas;
+};
+
+export type SuperplaneIntegrationsListComponentsResponse = {
+    components?: Array<ComponentsComponent>;
 };
 
 export type SuperplaneIntegrationsValueFrom = {
@@ -1186,10 +1191,10 @@ export type ComponentsListComponentsResponses = {
     /**
      * A successful response.
      */
-    200: ComponentsListComponentsResponse;
+    200: SuperplaneComponentsListComponentsResponse;
 };
 
-export type ComponentsListComponentsResponse2 = ComponentsListComponentsResponses[keyof ComponentsListComponentsResponses];
+export type ComponentsListComponentsResponse = ComponentsListComponentsResponses[keyof ComponentsListComponentsResponses];
 
 export type ComponentsDescribeComponentData = {
     body?: never;
@@ -1609,6 +1614,33 @@ export type IntegrationsListResourcesResponses = {
 };
 
 export type IntegrationsListResourcesResponse2 = IntegrationsListResourcesResponses[keyof IntegrationsListResourcesResponses];
+
+export type IntegrationsListComponentsData = {
+    body?: never;
+    path: {
+        type: string;
+    };
+    query?: never;
+    url: '/api/v1/integrations/{type}/components';
+};
+
+export type IntegrationsListComponentsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type IntegrationsListComponentsError = IntegrationsListComponentsErrors[keyof IntegrationsListComponentsErrors];
+
+export type IntegrationsListComponentsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneIntegrationsListComponentsResponse;
+};
+
+export type IntegrationsListComponentsResponse = IntegrationsListComponentsResponses[keyof IntegrationsListComponentsResponses];
 
 export type MeMeData = {
     body?: never;

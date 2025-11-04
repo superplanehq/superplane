@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-github/v74/github"
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"golang.org/x/oauth2"
 )
@@ -266,4 +267,8 @@ func (w *WorkflowRun) Successful() bool {
 type Webhook struct {
 	ID          int64  `json:"id"`
 	WebhookName string `json:"name"`
+}
+
+func (i *GitHubResourceManager) Components() []components.Component {
+	return []components.Component{}
 }

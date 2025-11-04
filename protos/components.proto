@@ -182,6 +182,7 @@ message Node {
 
   message ComponentRef {
     string name = 1;
+    string integration = 2;
   }
 
   message TriggerRef {

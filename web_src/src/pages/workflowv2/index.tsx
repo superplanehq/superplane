@@ -17,6 +17,7 @@ import {
   workflowsEmitNodeEvent,
   workflowsInvokeNodeExecutionAction,
 } from "@/api-client";
+import { integrationsListComponents } from "@/api-client";
 import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
@@ -30,7 +31,8 @@ import {
   workflowKeys,
 } from "@/hooks/useWorkflowData";
 import { useWorkflowWebsocket } from "@/hooks/useWorkflowWebsocket";
-import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
+import { useIntegrations } from "@/hooks/useIntegrations";
+import { buildBuildingBlockCategories, IntegrationWithComponents } from "@/ui/buildingBlocks";
 import {
   CANVAS_SIDEBAR_STORAGE_KEY,
   CanvasEdge,
@@ -63,6 +65,56 @@ export function WorkflowPageV2() {
   const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
   const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
   const { data: workflow, isLoading: workflowLoading } = useWorkflow(organizationId!, workflowId!);
+
+  // Fetch integrations and their components
+  const { data: integrations = [], isLoading: integrationsLoading } = useIntegrations(organizationId!, "DOMAIN_TYPE_ORGANIZATION");
+
+  // Get unique integration types
+  const uniqueIntegrationTypes = useMemo(() => {
+    const types = new Set<string>();
+    integrations.forEach((integration) => {
+      if (integration.spec?.type) {
+        types.add(integration.spec.type);
+      }
+    });
+    return Array.from(types);
+  }, [integrations]);
+
+  // Fetch components for each unique integration type
+  const integrationComponentsQueries = useQueries({
+    queries: uniqueIntegrationTypes.map((integrationType) => ({
+      queryKey: ['integrations', 'components', 'byType', integrationType],
+      queryFn: async () => {
+        const response = await integrationsListComponents(
+          withOrganizationHeader({
+            path: {
+              type: integrationType,
+            },
+          })
+        );
+        return {
+          integrationType,
+          components: response.data?.components || [],
+        };
+      },
+      enabled: !!integrationType,
+      staleTime: 2 * 60 * 1000,
+    })),
+  });
+
+  const integrationComponentsLoading = integrationComponentsQueries.some((q) => q.isLoading);
+
+  // Build IntegrationWithComponents array - one per integration type
+  const integrationsWithComponents: IntegrationWithComponents[] = useMemo(() => {
+    return integrationComponentsQueries
+      .filter((q) => q.data && q.data.components.length > 0)
+      .map((q) => ({
+        id: q.data!.integrationType,
+        name: q.data!.integrationType.charAt(0).toUpperCase() + q.data!.integrationType.slice(1),
+        type: q.data!.integrationType,
+        components: q.data!.components,
+      }));
+  }, [integrationComponentsQueries]);
 
   // Warm up org users and roles cache so approval specs can pretty-print
   // user IDs as emails and role names as display names.
@@ -255,8 +307,8 @@ export function WorkflowPageV2() {
   }, [hasUnsavedChanges]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, blueprints),
-    [triggers, components, blueprints],
+    () => buildBuildingBlockCategories(triggers, components, blueprints, integrationsWithComponents),
+    [triggers, components, blueprints, integrationsWithComponents],
   );
 
   const { nodes, edges } = useMemo(() => {
@@ -267,6 +319,8 @@ export function WorkflowPageV2() {
       triggersLoading ||
       blueprintsLoading ||
       componentsLoading ||
+      integrationsLoading ||
+      integrationComponentsLoading ||
       nodeEventsLoading ||
       nodeDataLoading
     ) {
@@ -298,6 +352,8 @@ export function WorkflowPageV2() {
     triggersLoading,
     blueprintsLoading,
     componentsLoading,
+    integrationsLoading,
+    integrationComponentsLoading,
     nodeEventsLoading,
     nodeDataLoading,
   ]);
@@ -728,6 +784,8 @@ export function WorkflowPageV2() {
     triggersLoading ||
     blueprintsLoading ||
     componentsLoading ||
+    integrationsLoading ||
+    integrationComponentsLoading ||
     nodeEventsLoading ||
     nodeDataLoading
   ) {

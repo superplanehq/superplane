@@ -2,11 +2,19 @@ import { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
 import { TriggersTrigger, ComponentsComponent, BlueprintsBlueprint } from "@/api-client";
 import { mockBuildingBlockCategories } from "@/ui/CanvasPage/storybooks/buildingBlocks";
 
+export interface IntegrationWithComponents {
+  id: string;
+  name: string;
+  type: string;
+  components: ComponentsComponent[];
+}
+
 // Build categories of building blocks from live data and merge with mocks (deduped)
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
   components: ComponentsComponent[],
   blueprints: BlueprintsBlueprint[],
+  integrations: IntegrationWithComponents[] = [],
 ): BuildingBlockCategory[] {
   const liveCategories: BuildingBlockCategory[] = [
     {
@@ -56,6 +64,23 @@ export function buildBuildingBlockCategories(
         }),
       ),
     },
+    // Add integration component categories
+    ...integrations.map((integration): BuildingBlockCategory => ({
+      name: integration.name,
+      blocks: integration.components.map(
+        (c): BuildingBlock => ({
+          name: c.name!,
+          label: c.label,
+          description: c.description,
+          type: "component",
+          outputChannels: c.outputChannels,
+          configuration: c.configuration,
+          icon: c.icon,
+          color: c.color,
+          isLive: true,
+        }),
+      ),
+    })),
   ];
 
   // Merge mock building blocks with live ones while avoiding duplicates

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
@@ -92,6 +93,11 @@ type ExecutionContext struct {
 	ExecutionStateContext ExecutionStateContext
 	RequestContext        RequestContext
 	AuthContext           AuthContext
+	IntegrationContext    IntegrationContext
+}
+
+type IntegrationContext interface {
+	GetIntegration(ID string) (integrations.ResourceManager, error)
 }
 
 /*

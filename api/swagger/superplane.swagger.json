@@ -427,7 +427,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/ComponentsListComponentsResponse"
+              "$ref": "#/definitions/SuperplaneComponentsListComponentsResponse"
             }
           },
           "default": {
@@ -1058,6 +1058,38 @@
             "name": "type",
             "in": "query",
             "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      }
+    },
+    "/api/v1/integrations/{type}/components": {
+      "get": {
+        "summary": "List integration components",
+        "description": "List integration components",
+        "operationId": "Integrations_ListComponents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneIntegrationsListComponentsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
             "type": "string"
           }
         ],
@@ -2917,18 +2949,6 @@
         }
       }
     },
-    "ComponentsListComponentsResponse": {
-      "type": "object",
-      "properties": {
-        "components": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsComponent"
-          }
-        }
-      }
-    },
     "ComponentsListItemDefinition": {
       "type": "object",
       "properties": {
@@ -3489,6 +3509,9 @@
       "properties": {
         "name": {
           "type": "string"
+        },
+        "integration": {
+          "type": "string"
         }
       }
     },
@@ -3971,6 +3994,18 @@
         }
       }
     },
+    "SuperplaneComponentsListComponentsResponse": {
+      "type": "object",
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsComponent"
+          }
+        }
+      }
+    },
     "SuperplaneComponentsOutputChannel": {
       "type": "object",
       "properties": {
@@ -4009,6 +4044,18 @@
       "properties": {
         "canvas": {
           "$ref": "#/definitions/SuperplaneCanvas"
+        }
+      }
+    },
+    "SuperplaneIntegrationsListComponentsResponse": {
+      "type": "object",
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsComponent"
+          }
         }
       }
     },

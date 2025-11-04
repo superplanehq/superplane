@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane.Integrations;
 
+import "components.proto";
 import "authorization.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
@@ -45,6 +46,17 @@ service Integrations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List integration resources";
       description: "List integration resources";
+      tags: "Integration";
+    };
+  }
+
+  rpc ListComponents(ListComponentsRequest) returns (ListComponentsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/integrations/{type}/components"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integration components";
+      description: "List integration components";
       tags: "Integration";
     };
   }
@@ -124,6 +136,14 @@ message ListResourcesRequest {
 
 message ListResourcesResponse {
   repeated ResourceRef resources = 1;
+}
+
+message ListComponentsRequest {
+  string type = 3;
+}
+
+message ListComponentsResponse {
+  repeated Components.Component components = 1;
 }
 
 message DescribeIntegrationRequest {

@@ -651,3 +651,33 @@ func CheckForCycles(nodes []*componentpb.Node, edges []*componentpb.Edge) error 
 
 	return nil
 }
+
+func SerializeComponents(in []components.Component) []*componentpb.Component {
+	out := make([]*componentpb.Component, len(in))
+	for i, component := range in {
+		outputChannels := component.OutputChannels(nil)
+		channels := make([]*componentpb.OutputChannel, len(outputChannels))
+		for j, channel := range outputChannels {
+			channels[j] = &componentpb.OutputChannel{
+				Name: channel.Name,
+			}
+		}
+
+		configFields := component.Configuration()
+		configuration := make([]*componentpb.ConfigurationField, len(configFields))
+		for j, field := range configFields {
+			configuration[j] = ConfigurationFieldToProto(field)
+		}
+
+		out[i] = &componentpb.Component{
+			Name:           component.Name(),
+			Label:          component.Label(),
+			Description:    component.Description(),
+			Icon:           component.Icon(),
+			Color:          component.Color(),
+			OutputChannels: channels,
+			Configuration:  configuration,
+		}
+	}
+	return out
+}

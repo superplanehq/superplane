@@ -1488,6 +1488,7 @@ func (x *Edge) GetChannel() string {
 type Node_ComponentRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Integration   string                 `protobuf:"bytes,2,opt,name=integration,proto3" json:"integration,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1525,6 +1526,13 @@ func (*Node_ComponentRef) Descriptor() ([]byte, []int) {
 func (x *Node_ComponentRef) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *Node_ComponentRef) GetIntegration() string {
+	if x != nil {
+		return x.Integration
 	}
 	return ""
 }
@@ -1709,7 +1717,7 @@ const file_components_proto_rawDesc = "" +
 	"parameters\x18\x03 \x03(\v2).Superplane.Components.ConfigurationFieldR\n" +
 	"parameters\"`\n" +
 	"\x1cListComponentActionsResponse\x12@\n" +
-	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xae\x05\n" +
+	"\aactions\x18\x01 \x03(\v2&.Superplane.Components.ComponentActionR\aactions\"\xd0\x05\n" +
 	"\x04Node\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
@@ -1721,9 +1729,10 @@ const file_components_proto_rawDesc = "" +
 	"\tblueprint\x18\b \x01(\v2(.Superplane.Components.Node.BlueprintRefR\tblueprint\x12@\n" +
 	"\atrigger\x18\t \x01(\v2&.Superplane.Components.Node.TriggerRefR\atrigger\x12!\n" +
 	"\fis_collapsed\x18\n" +
-	" \x01(\bR\visCollapsed\x1a\"\n" +
+	" \x01(\bR\visCollapsed\x1aD\n" +
 	"\fComponentRef\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x1a \n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vintegration\x18\x02 \x01(\tR\vintegration\x1a \n" +
 	"\n" +
 	"TriggerRef\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x1a\x1e\n" +

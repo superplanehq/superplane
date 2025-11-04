@@ -142,7 +142,8 @@ type NodeRef struct {
 }
 
 type ComponentRef struct {
-	Name string `json:"name"`
+	Name        string  `json:"name"`
+	Integration *string `json:"integration,omitempty"`
 }
 
 type TriggerRef struct {
