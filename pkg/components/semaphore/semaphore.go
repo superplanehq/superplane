@@ -232,12 +232,6 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 func (s *Semaphore) Actions() []components.Action {
 	return []components.Action{
 		{
-			Name:           "cancel",
-			Description:    "Cancel Semaphore workflow",
-			UserAccessible: true,
-			Parameters:     []components.ConfigurationField{},
-		},
-		{
 			Name:           "poll",
 			UserAccessible: false,
 		},
