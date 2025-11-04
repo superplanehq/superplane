@@ -8,6 +8,7 @@ import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
 import { Http, HttpProps } from "../http";
 import { Semaphore, SemaphoreProps } from "../semaphore";
+import { TimeGate, TimeGateProps } from "../timeGate";
 import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
 import { Noop, NoopProps } from "../noop";
@@ -26,6 +27,7 @@ type BlockType =
   | "semaphore"
   | "wait"
   | "merge"
+  | "time_gate"
   | "switch";
 
 interface BlockAi {
@@ -74,6 +76,9 @@ export interface BlockData {
   // wait node specific props
   wait?: WaitProps;
 
+  // time_gate node specific props
+  time_gate?: TimeGateProps;
+
   // switch node specific props
   switch?: SwitchComponentProps;
 
@@ -97,8 +102,8 @@ export function Block(props: BlockProps) {
   const ai = props.ai || {
     show: false,
     suggestion: null,
-    onApply: () => {},
-    onDismiss: () => {},
+    onApply: () => { },
+    onDismiss: () => { },
   };
 
   return (
@@ -138,6 +143,7 @@ function LeftHandle({ data }: BlockProps) {
     (data.type === "http" && data.http?.collapsed) ||
     (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
+    (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
   return (
@@ -165,6 +171,7 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "http" && data.http?.collapsed) ||
     (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
+    (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
 
   let channels = data.outputChannels || ["default"];
@@ -368,6 +375,8 @@ function BlockContent({
       return <Semaphore {...(data.semaphore as SemaphoreProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
+    case "time_gate":
+      return <TimeGate {...(data.time_gate as TimeGateProps)} selected={selected} {...actionProps} />;
     case "switch":
       return <SwitchComponent {...(data.switch as SwitchComponentProps)} selected={selected} {...actionProps} />;
     case "merge":

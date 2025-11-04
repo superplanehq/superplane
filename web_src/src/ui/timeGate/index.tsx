@@ -1,0 +1,142 @@
+import React from "react";
+import { ComponentBase } from "../componentBase";
+import { ComponentActionsProps } from "../types/componentActions";
+import { calcRelativeTimeFromDiff } from "@/lib/utils";
+import { MetadataItem } from "../metadataList";
+
+export type TimeGateState = "success" | "failed" | "running";
+
+export interface TimeGateExecutionItem {
+  receivedAt?: Date;
+  state?: TimeGateState;
+  eventId?: string;
+  nextRunTime?: Date;
+}
+
+export interface TimeGateProps extends ComponentActionsProps {
+  title?: string;
+  mode?: "include" | "exclude";
+  timeWindow?: string;
+  days?: string;
+  lastExecution?: TimeGateExecutionItem;
+  collapsed?: boolean;
+  selected?: boolean;
+  collapsedBackground?: string;
+  iconBackground?: string;
+  iconColor?: string;
+  headerColor?: string;
+  hideLastRun?: boolean;
+}
+
+const daysOfWeekOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7 };
+
+export const TimeGate: React.FC<TimeGateProps> = ({
+  title = "Time Gate",
+  mode = "include",
+  timeWindow,
+  days,
+  lastExecution,
+  collapsed = false,
+  selected = false,
+  collapsedBackground,
+  iconBackground,
+  iconColor,
+  headerColor,
+  hideLastRun = false,
+  onRun,
+  onEdit,
+  onDuplicate,
+  onDeactivate,
+  onToggleView,
+  onDelete,
+  isCompactView,
+}) => {
+
+  const spec = days ? {
+    title: "day",
+    tooltipTitle: "Days of the week",
+    values: [
+      ...days.split(",").sort((a, b) => daysOfWeekOrder[a.trim() as keyof typeof daysOfWeekOrder] - daysOfWeekOrder[b.trim() as keyof typeof daysOfWeekOrder]).map(day => ({
+        badges: [
+          {
+            label: day.trim(),
+            bgColor: "bg-gray-100",
+            textColor: "text-gray-700"
+          }
+        ]
+      }))
+    ]
+  } : undefined;
+
+  const metadata: MetadataItem[] = [
+    {
+      icon: "settings",
+      label: mode.toUpperCase()
+    },
+    {
+      icon: "calendar",
+      label: timeWindow || ""
+    },
+  ];
+
+  const eventSections = [];
+
+  if (!hideLastRun) {
+    if (lastExecution && lastExecution.state && lastExecution.receivedAt) {
+      let eventTitle: string;
+      let eventSubtitle: string | undefined;
+
+      if (lastExecution.state === "running" && lastExecution.eventId) {
+        // Show event ID and time remaining for running state
+        eventTitle = lastExecution.eventId;
+        if (lastExecution.nextRunTime) {
+          const now = new Date();
+          const timeDiff = lastExecution.nextRunTime.getTime() - now.getTime();
+          const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
+          eventSubtitle = `Runs in ${timeLeftText}`;
+        }
+      } else {
+        // Show standard messages for completed states
+        eventTitle = lastExecution.eventId || "Event";
+      }
+
+      eventSections.push({
+        title: "LAST EVENT",
+        receivedAt: lastExecution.receivedAt,
+        eventState: lastExecution.state,
+        eventTitle,
+        eventSubtitle,
+      });
+    } else {
+      // Show placeholder if no events
+      eventSections.push({
+        title: "LAST EVENT",
+        eventState: "neutral" as const,
+        eventTitle: "No events received yet",
+      });
+    }
+  }
+
+  return (
+    <ComponentBase
+      iconSlug="clock"
+      iconBackground={iconBackground || "bg-blue-100"}
+      iconColor={iconColor || "text-blue-600"}
+      headerColor={headerColor || "bg-blue-50"}
+      title={title}
+      spec={spec}
+      eventSections={eventSections}
+      collapsed={collapsed}
+      selected={selected}
+      collapsedBackground={collapsedBackground}
+      onRun={onRun}
+      onEdit={onEdit}
+      onDuplicate={onDuplicate}
+      onDeactivate={onDeactivate}
+      onToggleView={onToggleView}
+      onDelete={onDelete}
+      isCompactView={isCompactView}
+      metadata={metadata}
+    />
+  );
+};

@@ -370,10 +370,10 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              configuration: updatedConfiguration,
-              name: updatedNodeName,
-            }
+            ...node,
+            configuration: updatedConfiguration,
+            name: updatedNodeName,
+          }
           : node,
       );
 
@@ -419,8 +419,8 @@ export function WorkflowPageV2() {
           buildingBlock.type === "trigger"
             ? "TYPE_TRIGGER"
             : buildingBlock.type === "blueprint"
-            ? "TYPE_BLUEPRINT"
-            : "TYPE_COMPONENT",
+              ? "TYPE_BLUEPRINT"
+              : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: position || {
           x: (workflow.nodes?.length || 0) * 250,
@@ -561,12 +561,12 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              position: {
-                x: Math.round(position.x),
-                y: Math.round(position.y),
-              },
-            }
+            ...node,
+            position: {
+              x: Math.round(position.x),
+              y: Math.round(position.y),
+            },
+          }
           : node,
       );
 
@@ -598,9 +598,9 @@ export function WorkflowPageV2() {
       const updatedNodes = workflow.nodes?.map((node) =>
         node.id === nodeId
           ? {
-              ...node,
-              isCollapsed: newIsCollapsed,
-            }
+            ...node,
+            isCollapsed: newIsCollapsed,
+          }
           : node,
       );
 
@@ -975,15 +975,15 @@ function prepareCompositeNode(
         parameters:
           Object.keys(node.configuration!).length > 0
             ? [
-                {
-                  icon: "cog",
-                  items: Object.keys(node.configuration!).reduce((acc, key) => {
-                    const displayKey = fieldLabelMap[key] || key;
-                    acc[displayKey] = `${node.configuration![key]}`;
-                    return acc;
-                  }, {} as Record<string, string>),
-                },
-              ]
+              {
+                icon: "cog",
+                items: Object.keys(node.configuration!).reduce((acc, key) => {
+                  const displayKey = fieldLabelMap[key] || key;
+                  acc[displayKey] = `${node.configuration![key]}`;
+                  return acc;
+                }, {} as Record<string, string>),
+              },
+            ]
             : [],
       },
     },
@@ -1015,8 +1015,8 @@ function prepareCompositeNode(
               ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
                 ? ("processed" as const)
                 : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-                ? ("discarded" as const)
-                : ("running" as const);
+                  ? ("discarded" as const)
+                  : ("running" as const);
             return { label, state, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
           })
           .sort((a, b) => {
@@ -1164,6 +1164,8 @@ function prepareComponentNode(
       return prepareSemaphoreNode(node, components, nodeExecutionsMap);
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
+    case "time_gate":
+      return prepareTimeGateNode(node, components, nodeExecutionsMap);
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -1249,10 +1251,10 @@ function prepareApprovalNode(
         record.type === "user" && record.user
           ? record.user.name || record.user.email
           : record.type === "role" && record.role
-          ? record.role
-          : record.type === "group" && record.group
-          ? record.group
-          : "Unknown",
+            ? record.role
+            : record.type === "group" && record.group
+              ? record.group
+              : "Unknown",
       approved: record.state === "approved",
       rejected: record.state === "rejected",
       approverName: record.user?.name,
@@ -1262,16 +1264,16 @@ function prepareApprovalNode(
       requireArtifacts:
         isPending && isExecutionActive
           ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
+            {
+              label: "comment",
+              optional: true,
+            },
+          ]
           : undefined,
       artifacts: hasApprovalArtifacts
         ? {
-            Comment: approvalComment,
-          }
+          Comment: approvalComment,
+        }
         : undefined,
       artifactCount: hasApprovalArtifacts ? 1 : undefined,
       onApprove: async (artifacts?: Record<string, string>) => {
@@ -1357,41 +1359,41 @@ function prepareApprovalNode(
         spec:
           items.length > 0
             ? {
-                title: "approvals required",
-                tooltipTitle: "approvals required",
-                values: items.map((item) => {
-                  const type = (item.type || "").toString();
-                  let value =
-                    type === "user"
-                      ? item.user || ""
-                      : type === "role"
+              title: "approvals required",
+              tooltipTitle: "approvals required",
+              values: items.map((item) => {
+                const type = (item.type || "").toString();
+                let value =
+                  type === "user"
+                    ? item.user || ""
+                    : type === "role"
                       ? item.role || ""
                       : type === "group"
-                      ? item.group || ""
-                      : "";
-                  const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+                        ? item.group || ""
+                        : "";
+                const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
 
-                  // Pretty-print values
-                  if (type === "user" && value && usersById[value]) {
-                    value = usersById[value].email || usersById[value].name || value;
+                // Pretty-print values
+                if (type === "user" && value && usersById[value]) {
+                  value = usersById[value].email || usersById[value].name || value;
+                }
+                if (type === "role" && value) {
+                  value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
+                  // Fallback to simple suffix mapping when not found
+                  const suffix = (item.role || "").split("_").pop();
+                  if (!rolesByName[item.role || ""] && suffix) {
+                    const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
+                    value = map[suffix] || value;
                   }
-                  if (type === "role" && value) {
-                    value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
-                    // Fallback to simple suffix mapping when not found
-                    const suffix = (item.role || "").split("_").pop();
-                    if (!rolesByName[item.role || ""] && suffix) {
-                      const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
-                      value = map[suffix] || value;
-                    }
-                  }
-                  return {
-                    badges: [
-                      { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-                      { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
-                    ],
-                  };
-                }),
-              }
+                }
+                return {
+                  badges: [
+                    { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+                    { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+                  ],
+                };
+              }),
+            }
             : undefined,
         awaitingEvent:
           execution?.state === "STATE_STARTED" && rootTriggerRenderer
@@ -1400,16 +1402,16 @@ function prepareApprovalNode(
         lastRunData:
           execution && rootTriggerRenderer
             ? {
-                title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
-                subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
-                receivedAt: new Date(execution.createdAt!),
-                state:
-                  getRunItemState(execution) === "success"
-                    ? ("processed" as const)
-                    : getRunItemState(execution) === "running"
+              title: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).title,
+              subtitle: rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!).subtitle,
+              receivedAt: new Date(execution.createdAt!),
+              state:
+                getRunItemState(execution) === "success"
+                  ? ("processed" as const)
+                  : getRunItemState(execution) === "running"
                     ? ("running" as const)
                     : ("discarded" as const),
-              }
+            }
             : undefined,
       },
     },
@@ -1568,17 +1570,17 @@ function prepareMergeNode(
         nextInQueue:
           nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
             ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
+              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+              const title =
+                item?.name ||
+                item?.input?.title ||
+                item?.input?.name ||
+                item?.input?.eventTitle ||
+                item?.id ||
+                "Queued";
+              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+              return { title, subtitle };
+            })()
             : undefined,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
@@ -1662,8 +1664,8 @@ function prepareHttpNode(
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
-          ? ("running" as const)
-          : ("failed" as const),
+            ? ("running" as const)
+            : ("failed" as const),
     };
   }
 
@@ -1793,8 +1795,8 @@ function prepareWaitNode(
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
-          ? ("running" as const)
-          : ("failed" as const),
+            ? ("running" as const)
+            : ("failed" as const),
     };
   }
 
@@ -1816,17 +1818,17 @@ function prepareWaitNode(
         nextInQueue:
           nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
             ? (() => {
-                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
-                const title =
-                  item?.name ||
-                  item?.input?.title ||
-                  item?.input?.name ||
-                  item?.input?.eventTitle ||
-                  item?.id ||
-                  "Queued";
-                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
-                return { title, subtitle };
-              })()
+              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+              const title =
+                item?.name ||
+                item?.input?.title ||
+                item?.input?.name ||
+                item?.input?.eventTitle ||
+                item?.id ||
+                "Queued";
+              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+              return { title, subtitle };
+            })()
             : undefined,
         iconColor: getColorClass(metadata?.color || "yellow"),
         iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
@@ -1837,6 +1839,82 @@ function prepareWaitNode(
     },
   };
 }
+
+function prepareTimeGateNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+): CanvasNode {
+  const metadata = components.find((c) => c.name === "time_gate");
+  const configuration = node.configuration as any;
+
+  // Format time gate configuration for display
+  const mode = configuration?.mode || "include";
+  const startTime = configuration?.startTime || "00:00";
+  const endTime = configuration?.endTime || "23:59";
+  const days = configuration?.days || [];
+  const timeWindow = `${startTime} - ${endTime}`;
+  const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
+
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  let lastExecution: {
+    receivedAt: Date;
+    state: "success" | "failed" | "running";
+    eventId?: string;
+    nextRunTime?: Date;
+  } | undefined;
+
+  if (execution) {
+    const executionState = getRunItemState(execution);
+
+    lastExecution = {
+      receivedAt: new Date(execution.createdAt!),
+      state: executionState === "success"
+        ? ("success" as const)
+        : executionState === "failed"
+          ? ("failed" as const)
+          : ("running" as const),
+      eventId: execution.rootEvent?.id || execution.id || "Event",
+    };
+
+    if (executionState === "running") {
+      // Get next run time from execution metadata
+      const executionMetadata = execution.metadata as { nextValidTime?: string };
+      if (executionMetadata?.nextValidTime) {
+        lastExecution.nextRunTime = new Date(executionMetadata.nextValidTime);
+      }
+    }
+  }
+
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label || "Time Gate";
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "time_gate",
+      label: displayLabel,
+      state: "pending" as const,
+      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
+      time_gate: {
+        title: displayLabel,
+        mode,
+        timeWindow,
+        days: daysDisplay,
+        lastExecution,
+        iconColor: getColorClass(metadata?.color || "blue"),
+        iconBackground: getBackgroundColorClass(metadata?.color || "blue"),
+        headerColor: getBackgroundColorClass(metadata?.color || "blue"),
+        collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
+      },
+    },
+  };
+}
+
 
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
   const id = `${edge.sourceId!}--${edge.targetId!}--${edge.channel!}`;
@@ -1877,8 +1955,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
       execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED"
         ? ("processed" as const)
         : execution.state === "STATE_FINISHED" && execution.result === "RESULT_FAILED"
-        ? ("discarded" as const)
-        : ("waiting" as const);
+          ? ("discarded" as const)
+          : ("waiting" as const);
 
     // Get root trigger information for better title/subtitle
     const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -1887,9 +1965,9 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
     const { title, subtitle } = execution.rootEvent
       ? rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent)
       : {
-          title: execution.id || "Execution",
-          subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
-        };
+        title: execution.id || "Execution",
+        subtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)).replace(" ago", "") : "",
+      };
 
     const values = execution.rootEvent ? rootTriggerRenderer.getRootEventValues(execution.rootEvent) : {};
 
@@ -1911,8 +1989,8 @@ function mapExecutionsToSidebarEvents(executions: WorkflowsWorkflowNodeExecution
               ce.state === "STATE_FINISHED" && ce.result === "RESULT_PASSED"
                 ? ("processed" as const)
                 : ce.state === "STATE_FINISHED" && ce.result === "RESULT_FAILED"
-                ? ("discarded" as const)
-                : ("running" as const);
+                  ? ("discarded" as const)
+                  : ("running" as const);
             return { label, state: st, startedAt: ce.createdAt ? new Date(ce.createdAt) : undefined };
           })
           .sort((a, b) => {
@@ -1980,7 +2058,7 @@ function prepareSidebarData(
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = queueItems.slice(0, 5).map((item) => {
-    const anyItem: any = item as any;
+    const anyItem = item as any;
     let title =
       anyItem?.name ||
       anyItem?.input?.title ||

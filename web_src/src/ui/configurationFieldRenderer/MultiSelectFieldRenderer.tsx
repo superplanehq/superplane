@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { FieldRendererProps } from './types'
 import { MultiCombobox, MultiComboboxLabel } from '@/components/MultiCombobox/multi-combobox'
 
@@ -18,8 +18,18 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
     value: opt.value!,
   }))
 
+  // Set initial value on first render if no value is present but there's a default
+  useEffect(() => {
+    if ((value === undefined || value === null) && field.defaultValue !== undefined) {
+      const defaultVal = Array.isArray(field.defaultValue) ? field.defaultValue : (field.defaultValue ? JSON.parse(field.defaultValue as string) : [])
+      if (Array.isArray(defaultVal) && defaultVal.length > 0) {
+        onChange(defaultVal)
+      }
+    }
+  }, [value, field.defaultValue, onChange])
+
   // Get current selected values
-  const currentValue = value ?? (field.defaultValue ? JSON.parse(field.defaultValue) : [])
+  const currentValue = value ?? (field.defaultValue ? (Array.isArray(field.defaultValue) ? field.defaultValue : JSON.parse(field.defaultValue as string)) : [])
 
   // Convert selected values to SelectOption objects
   const selectedOptions: SelectOption[] = currentValue.map((val: string) => {
