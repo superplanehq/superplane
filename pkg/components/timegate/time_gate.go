@@ -1,4 +1,4 @@
-package time_gate
+package timegate
 
 import (
 	"fmt"

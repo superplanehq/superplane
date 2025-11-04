@@ -1,4 +1,4 @@
-package time_gate
+package timegate
 
 import (
 	"testing"
@@ -82,7 +82,7 @@ func TestParseTimeString(t *testing.T) {
 		expected int
 		hasError bool
 	}{
-		{"valid morning time", "09:30", 570, false}, // 9*60 + 30
+		{"valid morning time", "09:30", 570, false},   // 9*60 + 30
 		{"valid afternoon time", "14:45", 885, false}, // 14*60 + 45
 		{"midnight", "00:00", 0, false},
 		{"end of day", "23:59", 1439, false}, // 23*60 + 59
@@ -119,12 +119,12 @@ func TestIsTimeInRange(t *testing.T) {
 		endTime     int
 		expected    bool
 	}{
-		{"within normal range", 600, 540, 720, true},   // 10:00 between 09:00-12:00
-		{"at start time", 540, 540, 720, true},         // 09:00 at 09:00-12:00
-		{"at end time", 720, 540, 720, true},           // 12:00 at 09:00-12:00
-		{"before range", 480, 540, 720, false},         // 08:00 before 09:00-12:00
-		{"after range", 780, 540, 720, false},          // 13:00 after 09:00-12:00
-		{"overnight range - in first part", 60, 1320, 120, true},   // 01:00 in 22:00-02:00
+		{"within normal range", 600, 540, 720, true},                // 10:00 between 09:00-12:00
+		{"at start time", 540, 540, 720, true},                      // 09:00 at 09:00-12:00
+		{"at end time", 720, 540, 720, true},                        // 12:00 at 09:00-12:00
+		{"before range", 480, 540, 720, false},                      // 08:00 before 09:00-12:00
+		{"after range", 780, 540, 720, false},                       // 13:00 after 09:00-12:00
+		{"overnight range - in first part", 60, 1320, 120, true},    // 01:00 in 22:00-02:00
 		{"overnight range - in second part", 1380, 1320, 120, true}, // 23:00 in 22:00-02:00
 		{"overnight range - outside", 600, 1320, 120, false},        // 10:00 outside 22:00-02:00
 	}
@@ -326,7 +326,7 @@ func TestConfigEqual(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "same content different order days",
+			name:  "same content different order days",
 			specA: baseSpec,
 			specB: Spec{
 				Mode:      "include",
@@ -337,7 +337,7 @@ func TestConfigEqual(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "different mode",
+			name:  "different mode",
 			specA: baseSpec,
 			specB: Spec{
 				Mode:      "exclude", // different mode
@@ -348,7 +348,7 @@ func TestConfigEqual(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "different start time",
+			name:  "different start time",
 			specA: baseSpec,
 			specB: Spec{
 				Mode:      "include",
@@ -359,7 +359,7 @@ func TestConfigEqual(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "different end time",
+			name:  "different end time",
 			specA: baseSpec,
 			specB: Spec{
 				Mode:      "include",
@@ -370,7 +370,7 @@ func TestConfigEqual(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "different days",
+			name:  "different days",
 			specA: baseSpec,
 			specB: Spec{
 				Mode:      "include",
@@ -381,7 +381,7 @@ func TestConfigEqual(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "different number of days",
+			name:  "different number of days",
 			specA: baseSpec,
 			specB: Spec{
 				Mode:      "include",
@@ -408,11 +408,11 @@ func TestFindNextIncludeTime(t *testing.T) {
 	testTime := time.Date(2024, 11, 5, 10, 0, 0, 0, time.UTC) // Tuesday
 
 	tests := []struct {
-		name            string
-		spec            Spec
-		expectedIsNow   bool
+		name             string
+		spec             Spec
+		expectedIsNow    bool
 		expectedIsFuture bool
-		description     string
+		description      string
 	}{
 		{
 			name: "currently in include window",
@@ -481,11 +481,11 @@ func TestFindNextExcludeEndTime(t *testing.T) {
 	testTime := time.Date(2024, 11, 5, 14, 0, 0, 0, time.UTC) // Tuesday 2 PM
 
 	tests := []struct {
-		name            string
-		spec            Spec
-		expectedIsNow   bool
+		name             string
+		spec             Spec
+		expectedIsNow    bool
 		expectedIsFuture bool
-		description     string
+		description      string
 	}{
 		{
 			name: "outside exclude window",
@@ -554,11 +554,11 @@ func TestFindNextValidTime(t *testing.T) {
 	testTime := time.Date(2024, 11, 5, 10, 0, 0, 0, time.UTC) // Tuesday
 
 	tests := []struct {
-		name        string
-		spec        Spec
-		expectNow   bool
+		name         string
+		spec         Spec
+		expectNow    bool
 		expectFuture bool
-		description string
+		description  string
 	}{
 		{
 			name: "include mode - in window",
