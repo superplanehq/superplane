@@ -107,8 +107,44 @@ type MetadataContext interface {
  * ExecutionStateContext allows components to control execution lifecycle.
  */
 type ExecutionStateContext interface {
-	Pass(outputs map[string][]any) error
-	Fail(reason, message string) error
+    Pass(outputs map[string][]any) error
+    Fail(reason, message string) error
+}
+
+// PreExecutionPolicy allows a component to opt into generic
+// pre-execution gating/aggregation before an execution is created.
+// If a component implements this interface, the queue worker will
+// consult it to determine readiness and to aggregate inputs.
+type PreExecutionPolicy interface {
+    // WantsPreExecution indicates whether the component wants gating
+    // for the current node/configuration.
+    WantsPreExecution(nodeConfiguration any) bool
+
+    // StateKey returns a stable key to correlate queued items that should
+    // be joined together into one execution (e.g., by root event id).
+    StateKey(rootEventID string, nodeConfiguration any) string
+
+    // Expected returns the set of expected condition IDs that must be
+    // observed before execution is ready.
+    Expected(incoming []IncomingEdge, nodeConfiguration any) []string
+
+    // Observe maps a queued item (its source node and channel) to a condition ID
+    // and extracts the payload to aggregate. Returns empty id to indicate no match.
+    Observe(sourceNodeID string, channel string, payload any, nodeConfiguration any) (conditionID string, observation any)
+
+    // Ready decides if execution can start given the set of observed condition IDs.
+    Ready(expected []string, observed map[string]any, nodeConfiguration any) bool
+
+    // Aggregate builds the input passed into Execute from the observed payloads.
+    // The observed map is keyed by condition ID.
+    Aggregate(expected []string, observed map[string]any, nodeConfiguration any) any
+}
+
+// IncomingEdge is a minimal description of an inbound connection
+// to a node, provided to PreExecutionPolicy implementations.
+type IncomingEdge struct {
+    SourceNodeID string
+    Channel      string
 }
 
 /*
