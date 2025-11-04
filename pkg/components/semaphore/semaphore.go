@@ -58,7 +58,7 @@ func (s *Semaphore) Name() string {
 }
 
 func (s *Semaphore) Label() string {
-	return "Run Semaphore Workflow"
+	return "Semaphore"
 }
 
 func (s *Semaphore) Description() string {
