@@ -226,7 +226,7 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 		},
 	})
 
-	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 5*time.Second)
+	return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
 }
 
 func (s *Semaphore) Actions() []components.Action {
@@ -280,7 +280,7 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 	// If not finished, poll again in 1min.
 	//
 	if !resource.Finished() {
-		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 5*time.Second)
+		return ctx.RequestContext.ScheduleActionCall("poll", map[string]any{}, 15*time.Second)
 	}
 
 	result := "passed"
