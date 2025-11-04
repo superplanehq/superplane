@@ -1,15 +1,15 @@
 package models
 
 import (
-	"errors"
-	"fmt"
-	"time"
+    "errors"
+    "fmt"
+    "time"
 
-	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+    "github.com/google/uuid"
+    "github.com/superplanehq/superplane/pkg/database"
+    "gorm.io/datatypes"
+    "gorm.io/gorm"
+    "gorm.io/gorm/clause"
 )
 
 const (
@@ -383,7 +383,7 @@ func (e *WorkflowNodeExecution) Fail(reason, message string) error {
 }
 
 func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message string) error {
-	now := time.Now()
+    now := time.Now()
 
 	err := tx.Model(e).
 		Updates(map[string]interface{}{
@@ -418,16 +418,69 @@ func (e *WorkflowNodeExecution) FailInTransaction(tx *gorm.DB, reason, message s
 	// we need to update the parent execution here too,
 	// if this execution is a child one.
 	//
-	if e.ParentExecutionID != nil {
-		parent, err := FindNodeExecution(e.WorkflowID, *e.ParentExecutionID)
-		if err != nil {
-			return err
-		}
+    if e.ParentExecutionID != nil {
+        parent, err := FindNodeExecution(e.WorkflowID, *e.ParentExecutionID)
+        if err != nil {
+            return err
+        }
 
-		return parent.FailInTransaction(tx, reason, message)
-	}
+        return parent.FailInTransaction(tx, reason, message)
+    }
 
-	return nil
+    // Prune merge queue items downstream of this node for this root event.
+    // If this node failed and it is an upstream parent of any merge node,
+    // those merges can never be fulfilled for this root event.
+    if err := pruneMergeQueueItemsForFailedPath(tx, e); err != nil {
+        return err
+    }
+
+    return nil
+}
+
+// pruneMergeQueueItemsForFailedPath removes queued items for merge nodes that have this node
+// as a direct upstream parent, for the same root event. This prevents merge nodes from
+// lingering with unfulfillable queue items when a required parent fails.
+func pruneMergeQueueItemsForFailedPath(tx *gorm.DB, e *WorkflowNodeExecution) error {
+    // Load workflow edges and identify merges with incoming edge from e.NodeID
+    workflow, err := FindUnscopedWorkflowInTransaction(tx, e.WorkflowID)
+    if err != nil {
+        return err
+    }
+
+    for _, edge := range workflow.Edges {
+        if edge.SourceID != e.NodeID {
+            continue
+        }
+
+        targetNode, err := FindWorkflowNode(tx, workflow.ID, edge.TargetID)
+        if err != nil {
+            // If target not found, skip
+            if errors.Is(err, gorm.ErrRecordNotFound) {
+                continue
+            }
+            return err
+        }
+
+        if targetNode.Type != NodeTypeComponent {
+            continue
+        }
+
+        ref := targetNode.Ref.Data()
+        if ref.Component == nil || ref.Component.Name != "merge" {
+            continue
+        }
+
+        // Delete all queue items for the merge node for this root event
+        if err := tx.
+            Where("workflow_id = ?", targetNode.WorkflowID).
+            Where("node_id = ?", targetNode.NodeID).
+            Where("root_event_id = ?", e.RootEventID).
+            Delete(&WorkflowNodeQueueItem{}).Error; err != nil {
+            return err
+        }
+    }
+
+    return nil
 }
 
 func (e *WorkflowNodeExecution) GetInput(tx *gorm.DB) (any, error) {
