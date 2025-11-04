@@ -4,6 +4,11 @@ import { ComponentActionsProps } from "../types/componentActions";
 export interface MergeComponentProps extends ComponentActionsProps {
   title?: string;
   lastEvent?: Omit<EventSection, "title">;
+  // Show the next queued item for this merge node
+  nextInQueue?: {
+    title: string;
+    subtitle?: string;
+  };
   collapsed?: boolean;
   selected?: boolean;
   collapsedBackground?: string;
@@ -12,6 +17,7 @@ export interface MergeComponentProps extends ComponentActionsProps {
 export const MergeComponent: React.FC<MergeComponentProps> = ({
   title = "Merge",
   lastEvent,
+  nextInQueue,
   collapsed = false,
   selected = false,
   collapsedBackground,
@@ -30,6 +36,16 @@ export const MergeComponent: React.FC<MergeComponentProps> = ({
     eventSections.push({
       title: "Last Event",
       ...lastEvent,
+    });
+  }
+  if (nextInQueue) {
+    eventSections.push({
+      title: "Next In Queue",
+      eventTitle: nextInQueue.title,
+      eventState: "neutral",
+      handleComponent: nextInQueue.subtitle ? (
+        <div className="mt-2 text-right text-xs text-gray-500">{nextInQueue.subtitle}</div>
+      ) : undefined,
     });
   }
 

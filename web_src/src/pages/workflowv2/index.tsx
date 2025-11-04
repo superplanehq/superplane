@@ -1160,9 +1160,9 @@ function prepareComponentNode(
     case "http":
       return prepareHttpNode(node, components, nodeExecutionsMap);
     case "wait":
-      return prepareWaitNode(node, components, nodeExecutionsMap);
+      return prepareWaitNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
-      return prepareMergeNode(nodes, node, components, nodeExecutionsMap);
+      return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
 
   //
@@ -1526,6 +1526,8 @@ function prepareMergeNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  // Include queue items map to surface next item in merge component
+  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
@@ -1560,6 +1562,21 @@ function prepareMergeNode(
           eventTitle: "No events received yet",
           eventState: "neutral" as const,
         },
+        nextInQueue:
+          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
+            ? (() => {
+                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+                const title =
+                  item?.name ||
+                  item?.input?.title ||
+                  item?.input?.name ||
+                  item?.input?.eventTitle ||
+                  item?.id ||
+                  "Queued";
+                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+                return { title, subtitle };
+              })()
+            : undefined,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },
@@ -1680,6 +1697,7 @@ function prepareWaitNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const metadata = components.find((c) => c.name === "wait");
   const configuration = node.configuration as any;
@@ -1714,6 +1732,21 @@ function prepareWaitNode(
         title: displayLabel,
         duration: configuration?.duration,
         lastExecution,
+        nextInQueue:
+          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
+            ? (() => {
+                const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+                const title =
+                  item?.name ||
+                  item?.input?.title ||
+                  item?.input?.name ||
+                  item?.input?.eventTitle ||
+                  item?.id ||
+                  "Queued";
+                const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+                return { title, subtitle };
+              })()
+            : undefined,
         iconColor: getColorClass(metadata?.color || "yellow"),
         iconBackground: getBackgroundColorClass(metadata?.color || "yellow"),
         headerColor: getBackgroundColorClass(metadata?.color || "yellow"),
