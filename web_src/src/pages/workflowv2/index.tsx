@@ -1161,7 +1161,7 @@ function prepareComponentNode(
     case "http":
       return prepareHttpNode(node, components, nodeExecutionsMap);
     case "semaphore":
-      return prepareSemaphoreNode(node, components, nodeExecutionsMap);
+      return prepareSemaphoreNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
@@ -1711,6 +1711,7 @@ function prepareSemaphoreNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const metadata = components.find((c) => c.name === "semaphore");
   const executions = nodeExecutionsMap[node.id!] || [];
@@ -1769,6 +1770,21 @@ function prepareSemaphoreNode(
         metadata: metadataItems,
         parameters: configuration?.parameters,
         lastExecution,
+        nextInQueue:
+          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
+            ? (() => {
+              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+              const title =
+                item?.name ||
+                item?.input?.title ||
+                item?.input?.name ||
+                item?.input?.eventTitle ||
+                item?.id ||
+                "Queued";
+              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+              return { title, subtitle };
+            })()
+            : undefined,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },
