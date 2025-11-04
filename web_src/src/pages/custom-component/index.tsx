@@ -70,6 +70,7 @@ const getBlockType = (componentName: string): BlockData['type'] => {
     'noop': 'noop',
     'http': 'http',
     'wait': 'wait',
+    'time_gate': 'time_gate',
   }
   return typeMap[componentName] || 'noop' // Default to noop for unknown components
 }
@@ -164,6 +165,28 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
           eventTitle: "No events received yet",
           eventState: "neutral" as const
         },
+        collapsed: false,
+      }
+      break
+    case 'time_gate':
+      const mode = node.configuration?.mode || "include";
+      const startTime = node.configuration?.startTime || "00:00";
+      const endTime = node.configuration?.endTime || "23:59";
+      const days = node.configuration?.days || [];
+      const timeWindow = `${startTime} - ${endTime}`;
+      const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
+
+      baseData.time_gate = {
+        title: node.name,
+        mode,
+        timeWindow,
+        days: daysDisplay,
+        lastExecution: undefined,
+        nextInQueue: undefined,
+        iconColor: 'text-blue-600',
+        iconBackground: 'bg-blue-100',
+        headerColor: 'bg-blue-50',
+        collapsedBackground: 'bg-white',
         collapsed: false,
       }
       break
