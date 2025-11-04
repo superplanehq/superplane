@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -147,6 +148,8 @@ func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, reg
 	switch node.Type {
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node)
+	case models.NodeTypeComponent:
+		return setupComponent(tx, registry, node)
 	}
 
 	return nil
@@ -166,6 +169,27 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		IntegrationContext: contexts.NewIntegrationContext(registry),
 		EventContext:       contexts.NewEventContext(tx, &node),
 		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Save(&node).Error
+}
+
+func setupComponent(tx *gorm.DB, registry *registry.Registry, node models.WorkflowNode) error {
+	ref := node.Ref.Data()
+	component, err := registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		return err
+	}
+
+	err = component.Setup(components.SetupContext{
+		Configuration:      node.Configuration.Data(),
+		MetadataContext:    contexts.NewNodeMetadataContext(&node),
+		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
+		IntegrationContext: contexts.NewIntegrationContext(registry),
 	})
 
 	if err != nil {

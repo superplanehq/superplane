@@ -103,6 +103,7 @@ type Resource interface {
 // Similar to Resource, but with additional state information.
 type StatefulResource interface {
 	Id() string
+	URL() string
 	Type() string
 	Finished() bool
 	Successful() bool

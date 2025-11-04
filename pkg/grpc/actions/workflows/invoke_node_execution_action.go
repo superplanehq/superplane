@@ -81,11 +81,13 @@ func InvokeNodeExecutionAction(
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
 		AuthContext:           contexts.NewAuthContext(orgID, authService, user),
+		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
+		IntegrationContext:    contexts.NewIntegrationContext(registry),
 	}
 
 	err = component.HandleAction(actionCtx)
 	if err != nil {
-		return nil, fmt.Errorf("action execution failed: %w", err)
+		return nil, status.Errorf(codes.InvalidArgument, "action execution failed: %v", err)
 	}
 
 	err = database.Conn().Save(&execution).Error

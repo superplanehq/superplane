@@ -54,7 +54,7 @@ func (s *Semaphore) Icon() string {
 }
 
 func (s *Semaphore) Color() string {
-	return "blue"
+	return "gray"
 }
 
 func (s *Semaphore) Configuration() []components.ConfigurationField {

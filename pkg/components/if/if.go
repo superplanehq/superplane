@@ -115,3 +115,7 @@ func (f *If) Actions() []components.Action {
 func (f *If) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("if does not support actions")
 }
+
+func (f *If) Setup(ctx components.SetupContext) error {
+	return nil
+}

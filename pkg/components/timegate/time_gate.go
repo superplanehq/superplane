@@ -116,6 +116,10 @@ func (tg *TimeGate) Configuration() []components.ConfigurationField {
 	}
 }
 
+func (tg *TimeGate) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
 func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)

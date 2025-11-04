@@ -345,7 +345,7 @@ func (i *SemaphoreResourceManager) runTask(params any) (integrations.StatefulRes
 	}, nil
 }
 
-func (i *SemaphoreResourceManager) runWorkflow(params any) (integrations.StatefulResource, error) {
+func (i *SemaphoreResourceManager) RunWorkflow(params any) (integrations.StatefulResource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", i.URL)
 
 	body, err := json.Marshal(&params)
@@ -458,7 +458,7 @@ func (i *SemaphoreResourceManager) getPipeline(id string) (integrations.Resource
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	pipelineResponse.Pipeline.PipelineURL = fmt.Sprintf("%s/workflows/%s=pipeline_id=%s", i.URL, pipelineResponse.Pipeline.WorkflowID, id)
+	pipelineResponse.Pipeline.PipelineURL = fmt.Sprintf("%s/workflows/%s?pipeline_id=%s", i.URL, pipelineResponse.Pipeline.WorkflowID, id)
 	return pipelineResponse.Pipeline, nil
 }
 

@@ -79,6 +79,7 @@ func (i *GitHubEventHandler) Status(eventType string, eventPayload []byte) (inte
 			ID:         e.GetWorkflowRun().GetID(),
 			Status:     e.GetWorkflowRun().GetStatus(),
 			Conclusion: e.GetWorkflowRun().GetConclusion(),
+			HTMLURL:    e.GetWorkflowRun().GetHTMLURL(),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported event type %T", event)

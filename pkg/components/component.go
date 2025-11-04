@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}
@@ -52,6 +53,11 @@ type Component interface {
 	Configuration() []ConfigurationField
 
 	/*
+	 * Setup the component.
+	 */
+	Setup(ctx SetupContext) error
+
+	/*
 	 * Passes full execution control to the component.
 	 *
 	 * Component execution has full control over the execution state,
@@ -86,12 +92,34 @@ type OutputChannel struct {
  * to control the state and metadata of each execution of it.
  */
 type ExecutionContext struct {
+	ID                    string
+	WorkflowID            string
 	Data                  any
 	Configuration         any
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
 	RequestContext        RequestContext
 	AuthContext           AuthContext
+	IntegrationContext    IntegrationContext
+}
+
+/*
+ * ExecutionContext allows the component
+ * to control the state and metadata of each execution of it.
+ */
+type SetupContext struct {
+	Configuration      any
+	MetadataContext    MetadataContext
+	RequestContext     RequestContext
+	AuthContext        AuthContext
+	IntegrationContext IntegrationContext
+}
+
+/*
+ * IntegrationContext allows components to access integrations.
+ */
+type IntegrationContext interface {
+	GetIntegration(ID string) (integrations.ResourceManager, error)
 }
 
 /*
@@ -144,6 +172,8 @@ type ActionContext struct {
 	MetadataContext       MetadataContext
 	ExecutionStateContext ExecutionStateContext
 	AuthContext           AuthContext
+	RequestContext        RequestContext
+	IntegrationContext    IntegrationContext
 }
 
 type AuthContext interface {

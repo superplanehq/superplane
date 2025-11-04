@@ -3,6 +3,7 @@ import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 
 import {
   BlueprintsBlueprint,
@@ -1159,6 +1160,8 @@ function prepareComponentNode(
       return prepareFilterNode(nodes, node, components, nodeExecutionsMap);
     case "http":
       return prepareHttpNode(node, components, nodeExecutionsMap);
+    case "semaphore":
+      return prepareSemaphoreNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
@@ -1688,6 +1691,100 @@ function prepareHttpNode(
         payload: configuration?.payload,
         headers: configuration?.headers,
         lastExecution,
+        collapsedBackground: getBackgroundColorClass("white"),
+        collapsed: node.isCollapsed,
+      },
+    },
+  };
+}
+
+interface ExecutionMetadata {
+  workflow?: {
+    id: string;
+    url: string;
+    state: string;
+    result: string;
+  };
+}
+
+function prepareSemaphoreNode(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
+): CanvasNode {
+  const metadata = components.find((c) => c.name === "semaphore");
+  const executions = nodeExecutionsMap[node.id!] || [];
+  const execution = executions.length > 0 ? executions[0] : null;
+
+  // Configuration always comes from the node, not the execution
+  const configuration = node.configuration as any;
+  const nodeMetadata = node.metadata as any;
+
+  let lastExecution;
+  if (execution) {
+    const metadata = execution.metadata as ExecutionMetadata;
+
+    lastExecution = {
+      workflowId: metadata.workflow?.id,
+      receivedAt: new Date(execution.createdAt!),
+      state:
+        getRunItemState(execution) === "success"
+          ? ("success" as const)
+          : getRunItemState(execution) === "running"
+            ? ("running" as const)
+            : ("failed" as const),
+    };
+  }
+
+  // Use node name if available, otherwise fall back to component label (from metadata)
+  const displayLabel = node.name || metadata?.label!;
+
+  // Build metadata array
+  const metadataItems = [];
+  if (nodeMetadata?.project?.name) {
+    metadataItems.push({ icon: "folder", label: nodeMetadata.project.name });
+  }
+  if (configuration?.ref) {
+    metadataItems.push({ icon: "git-branch", label: configuration.ref });
+  }
+  if (configuration?.pipelineFile) {
+    metadataItems.push({ icon: "file-code", label: configuration.pipelineFile });
+  }
+
+  return {
+    id: node.id!,
+    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
+    data: {
+      type: "semaphore",
+      label: displayLabel,
+      state: "pending" as const,
+      outputChannels: metadata?.outputChannels?.map((c) => c.name!) || ["default"],
+      semaphore: {
+        iconSrc: SemaphoreLogo,
+        iconSlug: metadata?.icon || "workflow",
+        iconColor: getColorClass(metadata?.color || "gray"),
+        iconBackground: getBackgroundColorClass(metadata?.color || "gray"),
+        headerColor: getBackgroundColorClass(metadata?.color || "gray"),
+        title: displayLabel,
+        metadata: metadataItems,
+        parameters: configuration?.parameters,
+        lastExecution,
+        nextInQueue:
+          nodeQueueItemsMap && (nodeQueueItemsMap[node.id!] || []).length > 0
+            ? (() => {
+              const item: any = (nodeQueueItemsMap[node.id!] || [])[0] as any;
+              const title =
+                item?.name ||
+                item?.input?.title ||
+                item?.input?.name ||
+                item?.input?.eventTitle ||
+                item?.id ||
+                "Queued";
+              const subtitle = typeof item?.input?.subtitle === "string" ? item.input.subtitle : undefined;
+              return { title, subtitle };
+            })()
+            : undefined,
         collapsedBackground: getBackgroundColorClass("white"),
         collapsed: node.isCollapsed,
       },

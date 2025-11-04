@@ -32,6 +32,10 @@ func (m *Merge) Configuration() []components.ConfigurationField {
 
 func (m *Merge) Actions() []components.Action { return []components.Action{} }
 
+func (m *Merge) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
 func (m *Merge) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("merge does not support actions")
 }

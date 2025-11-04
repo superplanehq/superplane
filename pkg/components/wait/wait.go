@@ -130,6 +130,10 @@ func (w *Wait) HandleAction(ctx components.ActionContext) error {
 	}
 }
 
+func (w *Wait) Setup(ctx components.SetupContext) error {
+	return nil
+}
+
 func findInterval(spec Spec) time.Duration {
 	switch spec.Duration.Unit {
 	case "seconds":

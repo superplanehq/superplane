@@ -7,6 +7,7 @@ import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
 import { Filter, FilterProps } from "../filter";
 import { Http, HttpProps } from "../http";
+import { Semaphore, SemaphoreProps } from "../semaphore";
 import { TimeGate, TimeGateProps } from "../timeGate";
 import { If, IfProps } from "../if";
 import MergeComponent, { type MergeComponentProps } from "../merge";
@@ -23,6 +24,7 @@ type BlockType =
   | "if"
   | "noop"
   | "http"
+  | "semaphore"
   | "wait"
   | "merge"
   | "time_gate"
@@ -67,6 +69,9 @@ export interface BlockData {
 
   // http node specific props
   http?: HttpProps;
+
+  // semaphore node specific props
+  semaphore?: SemaphoreProps;
 
   // wait node specific props
   wait?: WaitProps;
@@ -136,6 +141,7 @@ function LeftHandle({ data }: BlockProps) {
     (data.type === "if" && data.if?.collapsed) ||
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
+    (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
@@ -163,6 +169,7 @@ function RightHandle({ data }: BlockProps) {
     (data.type === "if" && data.if?.collapsed) ||
     (data.type === "noop" && data.noop?.collapsed) ||
     (data.type === "http" && data.http?.collapsed) ||
+    (data.type === "semaphore" && data.semaphore?.collapsed) ||
     (data.type === "wait" && data.wait?.collapsed) ||
     (data.type === "time_gate" && data.time_gate?.collapsed) ||
     (data.type === "switch" && data.switch?.collapsed);
@@ -364,6 +371,8 @@ function BlockContent({
       return <Noop {...(data.noop as NoopProps)} selected={selected} {...actionProps} />;
     case "http":
       return <Http {...(data.http as HttpProps)} selected={selected} {...actionProps} />;
+    case "semaphore":
+      return <Semaphore {...(data.semaphore as SemaphoreProps)} selected={selected} {...actionProps} />;
     case "wait":
       return <Wait {...(data.wait as WaitProps)} selected={selected} {...actionProps} />;
     case "time_gate":

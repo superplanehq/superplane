@@ -56,3 +56,7 @@ func (c *NoOp) Actions() []components.Action {
 func (c *NoOp) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("noop does not support actions")
 }
+
+func (c *NoOp) Setup(ctx components.SetupContext) error {
+	return nil
+}
