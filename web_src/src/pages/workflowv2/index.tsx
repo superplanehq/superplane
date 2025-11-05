@@ -1744,7 +1744,10 @@ function prepareSemaphoreNode(
   const metadataItems = [];
   if (nodeMetadata?.project?.name) {
     metadataItems.push({ icon: "folder", label: nodeMetadata.project.name });
+  } else if (configuration.project) {
+    metadataItems.push({ icon: "folder", label: configuration.project });
   }
+
   if (configuration?.ref) {
     metadataItems.push({ icon: "git-branch", label: configuration.ref });
   }

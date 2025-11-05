@@ -519,6 +519,26 @@ export const CustomComponent = () => {
         if (nodeData.http) {
           updatedData.http = { ...nodeData.http, title: nodeName.trim() }
         }
+        if (nodeData.semaphore) {
+          // Rebuild metadata array from configuration
+          const metadataItems = []
+          if (filteredConfiguration.project) {
+            metadataItems.push({ icon: 'folder', label: filteredConfiguration.project })
+          }
+          if (filteredConfiguration.ref) {
+            metadataItems.push({ icon: 'git-branch', label: filteredConfiguration.ref })
+          }
+          if (filteredConfiguration.pipelineFile) {
+            metadataItems.push({ icon: 'file-code', label: filteredConfiguration.pipelineFile })
+          }
+
+          updatedData.semaphore = {
+            ...nodeData.semaphore,
+            title: nodeName.trim(),
+            metadata: metadataItems,
+            parameters: filteredConfiguration.parameters,
+          }
+        }
         if (nodeData.wait) {
           updatedData.wait = {
             ...nodeData.wait,
