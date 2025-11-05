@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 )
@@ -34,8 +35,8 @@ func (s *Start) Color() string {
 	return "purple"
 }
 
-func (s *Start) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{}
+func (s *Start) Configuration() []configuration.Field {
+	return []configuration.Field{}
 }
 
 func (s *Start) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) {

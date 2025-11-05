@@ -1,9 +1,9 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../select'
 import { useOrganizationGroups } from '../../hooks/useOrganizationData'
-import { ComponentsConfigurationField } from '../../api-client'
+import { ConfigurationField } from '../../api-client'
 
 interface GroupFieldRendererProps {
-  field: ComponentsConfigurationField
+  field: ConfigurationField
   value: string
   onChange: (value: string | undefined) => void
   domainId: string

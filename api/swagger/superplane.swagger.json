@@ -2714,7 +2714,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
+            "$ref": "#/definitions/ConfigurationField"
           }
         },
         "outputChannels": {
@@ -2806,7 +2806,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
+            "$ref": "#/definitions/ConfigurationField"
           }
         },
         "outputChannels": {
@@ -2837,41 +2837,8 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
+            "$ref": "#/definitions/ConfigurationField"
           }
-        }
-      }
-    },
-    "ComponentsConfigurationField": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "type": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "required": {
-          "type": "boolean"
-        },
-        "defaultValue": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "visibilityConditions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsVisibilityCondition"
-          }
-        },
-        "typeOptions": {
-          "$ref": "#/definitions/ComponentsTypeOptions"
         }
       }
     },
@@ -2897,14 +2864,6 @@
         }
       }
     },
-    "ComponentsIntegrationTypeOptions": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        }
-      }
-    },
     "ComponentsListComponentActionsResponse": {
       "type": "object",
       "properties": {
@@ -2925,41 +2884,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/ComponentsComponent"
-          }
-        }
-      }
-    },
-    "ComponentsListItemDefinition": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "schema": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
-          }
-        }
-      }
-    },
-    "ComponentsListTypeOptions": {
-      "type": "object",
-      "properties": {
-        "itemDefinition": {
-          "$ref": "#/definitions/ComponentsListItemDefinition"
-        }
-      }
-    },
-    "ComponentsMultiSelectTypeOptions": {
-      "type": "object",
-      "properties": {
-        "options": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsSelectOption"
           }
         }
       }
@@ -3008,31 +2932,6 @@
       ],
       "default": "TYPE_COMPONENT"
     },
-    "ComponentsNumberTypeOptions": {
-      "type": "object",
-      "properties": {
-        "min": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "max": {
-          "type": "integer",
-          "format": "int32"
-        }
-      }
-    },
-    "ComponentsObjectTypeOptions": {
-      "type": "object",
-      "properties": {
-        "schema": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
-          }
-        }
-      }
-    },
     "ComponentsPosition": {
       "type": "object",
       "properties": {
@@ -3046,7 +2945,40 @@
         }
       }
     },
-    "ComponentsResourceTypeOptions": {
+    "ConfigurationField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "defaultValue": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "visibilityConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationVisibilityCondition"
+          }
+        },
+        "typeOptions": {
+          "$ref": "#/definitions/ConfigurationTypeOptions"
+        }
+      }
+    },
+    "ConfigurationIntegrationTypeOptions": {
       "type": "object",
       "properties": {
         "type": {
@@ -3054,7 +2986,75 @@
         }
       }
     },
-    "ComponentsSelectOption": {
+    "ConfigurationListItemDefinition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
+          }
+        }
+      }
+    },
+    "ConfigurationListTypeOptions": {
+      "type": "object",
+      "properties": {
+        "itemDefinition": {
+          "$ref": "#/definitions/ConfigurationListItemDefinition"
+        }
+      }
+    },
+    "ConfigurationMultiSelectTypeOptions": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationSelectOption"
+          }
+        }
+      }
+    },
+    "ConfigurationNumberTypeOptions": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "max": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "ConfigurationObjectTypeOptions": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationField"
+          }
+        }
+      }
+    },
+    "ConfigurationResourceTypeOptions": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "ConfigurationSelectOption": {
       "type": "object",
       "properties": {
         "label": {
@@ -3065,19 +3065,19 @@
         }
       }
     },
-    "ComponentsSelectTypeOptions": {
+    "ConfigurationSelectTypeOptions": {
       "type": "object",
       "properties": {
         "options": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsSelectOption"
+            "$ref": "#/definitions/ConfigurationSelectOption"
           }
         }
       }
     },
-    "ComponentsTimeTypeOptions": {
+    "ConfigurationTimeTypeOptions": {
       "type": "object",
       "properties": {
         "format": {
@@ -3085,36 +3085,36 @@
         }
       }
     },
-    "ComponentsTypeOptions": {
+    "ConfigurationTypeOptions": {
       "type": "object",
       "properties": {
         "number": {
-          "$ref": "#/definitions/ComponentsNumberTypeOptions"
+          "$ref": "#/definitions/ConfigurationNumberTypeOptions"
         },
         "select": {
-          "$ref": "#/definitions/ComponentsSelectTypeOptions"
+          "$ref": "#/definitions/ConfigurationSelectTypeOptions"
         },
         "multiSelect": {
-          "$ref": "#/definitions/ComponentsMultiSelectTypeOptions"
+          "$ref": "#/definitions/ConfigurationMultiSelectTypeOptions"
         },
         "integration": {
-          "$ref": "#/definitions/ComponentsIntegrationTypeOptions"
+          "$ref": "#/definitions/ConfigurationIntegrationTypeOptions"
         },
         "list": {
-          "$ref": "#/definitions/ComponentsListTypeOptions"
+          "$ref": "#/definitions/ConfigurationListTypeOptions"
         },
         "object": {
-          "$ref": "#/definitions/ComponentsObjectTypeOptions"
+          "$ref": "#/definitions/ConfigurationObjectTypeOptions"
         },
         "resource": {
-          "$ref": "#/definitions/ComponentsResourceTypeOptions"
+          "$ref": "#/definitions/ConfigurationResourceTypeOptions"
         },
         "time": {
-          "$ref": "#/definitions/ComponentsTimeTypeOptions"
+          "$ref": "#/definitions/ConfigurationTimeTypeOptions"
         }
       }
     },
-    "ComponentsVisibilityCondition": {
+    "ConfigurationVisibilityCondition": {
       "type": "object",
       "properties": {
         "field": {
@@ -4140,7 +4140,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsConfigurationField"
+            "$ref": "#/definitions/ConfigurationField"
           }
         }
       }

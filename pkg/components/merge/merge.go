@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -26,8 +27,8 @@ func (m *Merge) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
-func (m *Merge) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{}
+func (m *Merge) Configuration() []configuration.Field {
+	return []configuration.Field{}
 }
 
 func (m *Merge) Actions() []components.Action { return []components.Action{} }

@@ -2,7 +2,7 @@
  * Functions for rendering forms with proper labels and placeholders.
  */
 
-import type { ComponentsConfigurationField } from '../api-client'
+import type { ConfigurationField } from '../api-client'
 
 export function getDefaultEventType(sourceType: string): string {
   switch (sourceType) {
@@ -88,7 +88,7 @@ export function isRegularEventSource(sourceType: string): boolean {
  * Checks if a field is visible based on its visibility conditions
  */
 export function isFieldVisible(
-  field: ComponentsConfigurationField,
+  field: ConfigurationField,
   allValues: Record<string, any>
 ): boolean {
   if (!field.visibilityConditions || field.visibilityConditions.length === 0) {
@@ -130,7 +130,7 @@ export function isFieldVisible(
  */
 export function filterVisibleConfiguration(
   configuration: Record<string, any>,
-  fields: ComponentsConfigurationField[]
+  fields: ConfigurationField[]
 ): Record<string, any> {
   const filtered: Record<string, any> = {}
 

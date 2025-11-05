@@ -15,40 +15,40 @@ import (
 	"encoding/json"
 )
 
-// checks if the ComponentsConfigurationField type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ComponentsConfigurationField{}
+// checks if the ConfigurationField type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ConfigurationField{}
 
-// ComponentsConfigurationField struct for ComponentsConfigurationField
-type ComponentsConfigurationField struct {
+// ConfigurationField struct for ConfigurationField
+type ConfigurationField struct {
 	Name *string `json:"name,omitempty"`
 	Type *string `json:"type,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Required *bool `json:"required,omitempty"`
 	DefaultValue *string `json:"defaultValue,omitempty"`
 	Label *string `json:"label,omitempty"`
-	VisibilityConditions []ComponentsVisibilityCondition `json:"visibilityConditions,omitempty"`
-	TypeOptions *ComponentsTypeOptions `json:"typeOptions,omitempty"`
+	VisibilityConditions []ConfigurationVisibilityCondition `json:"visibilityConditions,omitempty"`
+	TypeOptions *ConfigurationTypeOptions `json:"typeOptions,omitempty"`
 }
 
-// NewComponentsConfigurationField instantiates a new ComponentsConfigurationField object
+// NewConfigurationField instantiates a new ConfigurationField object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewComponentsConfigurationField() *ComponentsConfigurationField {
-	this := ComponentsConfigurationField{}
+func NewConfigurationField() *ConfigurationField {
+	this := ConfigurationField{}
 	return &this
 }
 
-// NewComponentsConfigurationFieldWithDefaults instantiates a new ComponentsConfigurationField object
+// NewConfigurationFieldWithDefaults instantiates a new ConfigurationField object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewComponentsConfigurationFieldWithDefaults() *ComponentsConfigurationField {
-	this := ComponentsConfigurationField{}
+func NewConfigurationFieldWithDefaults() *ConfigurationField {
+	this := ConfigurationField{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetName() string {
+func (o *ConfigurationField) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -58,7 +58,7 @@ func (o *ComponentsConfigurationField) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetNameOk() (*string, bool) {
+func (o *ConfigurationField) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -66,7 +66,7 @@ func (o *ComponentsConfigurationField) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasName() bool {
+func (o *ConfigurationField) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -75,12 +75,12 @@ func (o *ComponentsConfigurationField) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *ComponentsConfigurationField) SetName(v string) {
+func (o *ConfigurationField) SetName(v string) {
 	o.Name = &v
 }
 
 // GetType returns the Type field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetType() string {
+func (o *ConfigurationField) GetType() string {
 	if o == nil || IsNil(o.Type) {
 		var ret string
 		return ret
@@ -90,7 +90,7 @@ func (o *ComponentsConfigurationField) GetType() string {
 
 // GetTypeOk returns a tuple with the Type field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetTypeOk() (*string, bool) {
+func (o *ConfigurationField) GetTypeOk() (*string, bool) {
 	if o == nil || IsNil(o.Type) {
 		return nil, false
 	}
@@ -98,7 +98,7 @@ func (o *ComponentsConfigurationField) GetTypeOk() (*string, bool) {
 }
 
 // HasType returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasType() bool {
+func (o *ConfigurationField) HasType() bool {
 	if o != nil && !IsNil(o.Type) {
 		return true
 	}
@@ -107,12 +107,12 @@ func (o *ComponentsConfigurationField) HasType() bool {
 }
 
 // SetType gets a reference to the given string and assigns it to the Type field.
-func (o *ComponentsConfigurationField) SetType(v string) {
+func (o *ConfigurationField) SetType(v string) {
 	o.Type = &v
 }
 
 // GetDescription returns the Description field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetDescription() string {
+func (o *ConfigurationField) GetDescription() string {
 	if o == nil || IsNil(o.Description) {
 		var ret string
 		return ret
@@ -122,7 +122,7 @@ func (o *ComponentsConfigurationField) GetDescription() string {
 
 // GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetDescriptionOk() (*string, bool) {
+func (o *ConfigurationField) GetDescriptionOk() (*string, bool) {
 	if o == nil || IsNil(o.Description) {
 		return nil, false
 	}
@@ -130,7 +130,7 @@ func (o *ComponentsConfigurationField) GetDescriptionOk() (*string, bool) {
 }
 
 // HasDescription returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasDescription() bool {
+func (o *ConfigurationField) HasDescription() bool {
 	if o != nil && !IsNil(o.Description) {
 		return true
 	}
@@ -139,12 +139,12 @@ func (o *ComponentsConfigurationField) HasDescription() bool {
 }
 
 // SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *ComponentsConfigurationField) SetDescription(v string) {
+func (o *ConfigurationField) SetDescription(v string) {
 	o.Description = &v
 }
 
 // GetRequired returns the Required field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetRequired() bool {
+func (o *ConfigurationField) GetRequired() bool {
 	if o == nil || IsNil(o.Required) {
 		var ret bool
 		return ret
@@ -154,7 +154,7 @@ func (o *ComponentsConfigurationField) GetRequired() bool {
 
 // GetRequiredOk returns a tuple with the Required field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetRequiredOk() (*bool, bool) {
+func (o *ConfigurationField) GetRequiredOk() (*bool, bool) {
 	if o == nil || IsNil(o.Required) {
 		return nil, false
 	}
@@ -162,7 +162,7 @@ func (o *ComponentsConfigurationField) GetRequiredOk() (*bool, bool) {
 }
 
 // HasRequired returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasRequired() bool {
+func (o *ConfigurationField) HasRequired() bool {
 	if o != nil && !IsNil(o.Required) {
 		return true
 	}
@@ -171,12 +171,12 @@ func (o *ComponentsConfigurationField) HasRequired() bool {
 }
 
 // SetRequired gets a reference to the given bool and assigns it to the Required field.
-func (o *ComponentsConfigurationField) SetRequired(v bool) {
+func (o *ConfigurationField) SetRequired(v bool) {
 	o.Required = &v
 }
 
 // GetDefaultValue returns the DefaultValue field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetDefaultValue() string {
+func (o *ConfigurationField) GetDefaultValue() string {
 	if o == nil || IsNil(o.DefaultValue) {
 		var ret string
 		return ret
@@ -186,7 +186,7 @@ func (o *ComponentsConfigurationField) GetDefaultValue() string {
 
 // GetDefaultValueOk returns a tuple with the DefaultValue field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetDefaultValueOk() (*string, bool) {
+func (o *ConfigurationField) GetDefaultValueOk() (*string, bool) {
 	if o == nil || IsNil(o.DefaultValue) {
 		return nil, false
 	}
@@ -194,7 +194,7 @@ func (o *ComponentsConfigurationField) GetDefaultValueOk() (*string, bool) {
 }
 
 // HasDefaultValue returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasDefaultValue() bool {
+func (o *ConfigurationField) HasDefaultValue() bool {
 	if o != nil && !IsNil(o.DefaultValue) {
 		return true
 	}
@@ -203,12 +203,12 @@ func (o *ComponentsConfigurationField) HasDefaultValue() bool {
 }
 
 // SetDefaultValue gets a reference to the given string and assigns it to the DefaultValue field.
-func (o *ComponentsConfigurationField) SetDefaultValue(v string) {
+func (o *ConfigurationField) SetDefaultValue(v string) {
 	o.DefaultValue = &v
 }
 
 // GetLabel returns the Label field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetLabel() string {
+func (o *ConfigurationField) GetLabel() string {
 	if o == nil || IsNil(o.Label) {
 		var ret string
 		return ret
@@ -218,7 +218,7 @@ func (o *ComponentsConfigurationField) GetLabel() string {
 
 // GetLabelOk returns a tuple with the Label field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetLabelOk() (*string, bool) {
+func (o *ConfigurationField) GetLabelOk() (*string, bool) {
 	if o == nil || IsNil(o.Label) {
 		return nil, false
 	}
@@ -226,7 +226,7 @@ func (o *ComponentsConfigurationField) GetLabelOk() (*string, bool) {
 }
 
 // HasLabel returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasLabel() bool {
+func (o *ConfigurationField) HasLabel() bool {
 	if o != nil && !IsNil(o.Label) {
 		return true
 	}
@@ -235,14 +235,14 @@ func (o *ComponentsConfigurationField) HasLabel() bool {
 }
 
 // SetLabel gets a reference to the given string and assigns it to the Label field.
-func (o *ComponentsConfigurationField) SetLabel(v string) {
+func (o *ConfigurationField) SetLabel(v string) {
 	o.Label = &v
 }
 
 // GetVisibilityConditions returns the VisibilityConditions field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetVisibilityConditions() []ComponentsVisibilityCondition {
+func (o *ConfigurationField) GetVisibilityConditions() []ConfigurationVisibilityCondition {
 	if o == nil || IsNil(o.VisibilityConditions) {
-		var ret []ComponentsVisibilityCondition
+		var ret []ConfigurationVisibilityCondition
 		return ret
 	}
 	return o.VisibilityConditions
@@ -250,7 +250,7 @@ func (o *ComponentsConfigurationField) GetVisibilityConditions() []ComponentsVis
 
 // GetVisibilityConditionsOk returns a tuple with the VisibilityConditions field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetVisibilityConditionsOk() ([]ComponentsVisibilityCondition, bool) {
+func (o *ConfigurationField) GetVisibilityConditionsOk() ([]ConfigurationVisibilityCondition, bool) {
 	if o == nil || IsNil(o.VisibilityConditions) {
 		return nil, false
 	}
@@ -258,7 +258,7 @@ func (o *ComponentsConfigurationField) GetVisibilityConditionsOk() ([]Components
 }
 
 // HasVisibilityConditions returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasVisibilityConditions() bool {
+func (o *ConfigurationField) HasVisibilityConditions() bool {
 	if o != nil && !IsNil(o.VisibilityConditions) {
 		return true
 	}
@@ -266,15 +266,15 @@ func (o *ComponentsConfigurationField) HasVisibilityConditions() bool {
 	return false
 }
 
-// SetVisibilityConditions gets a reference to the given []ComponentsVisibilityCondition and assigns it to the VisibilityConditions field.
-func (o *ComponentsConfigurationField) SetVisibilityConditions(v []ComponentsVisibilityCondition) {
+// SetVisibilityConditions gets a reference to the given []ConfigurationVisibilityCondition and assigns it to the VisibilityConditions field.
+func (o *ConfigurationField) SetVisibilityConditions(v []ConfigurationVisibilityCondition) {
 	o.VisibilityConditions = v
 }
 
 // GetTypeOptions returns the TypeOptions field value if set, zero value otherwise.
-func (o *ComponentsConfigurationField) GetTypeOptions() ComponentsTypeOptions {
+func (o *ConfigurationField) GetTypeOptions() ConfigurationTypeOptions {
 	if o == nil || IsNil(o.TypeOptions) {
-		var ret ComponentsTypeOptions
+		var ret ConfigurationTypeOptions
 		return ret
 	}
 	return *o.TypeOptions
@@ -282,7 +282,7 @@ func (o *ComponentsConfigurationField) GetTypeOptions() ComponentsTypeOptions {
 
 // GetTypeOptionsOk returns a tuple with the TypeOptions field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsConfigurationField) GetTypeOptionsOk() (*ComponentsTypeOptions, bool) {
+func (o *ConfigurationField) GetTypeOptionsOk() (*ConfigurationTypeOptions, bool) {
 	if o == nil || IsNil(o.TypeOptions) {
 		return nil, false
 	}
@@ -290,7 +290,7 @@ func (o *ComponentsConfigurationField) GetTypeOptionsOk() (*ComponentsTypeOption
 }
 
 // HasTypeOptions returns a boolean if a field has been set.
-func (o *ComponentsConfigurationField) HasTypeOptions() bool {
+func (o *ConfigurationField) HasTypeOptions() bool {
 	if o != nil && !IsNil(o.TypeOptions) {
 		return true
 	}
@@ -298,12 +298,12 @@ func (o *ComponentsConfigurationField) HasTypeOptions() bool {
 	return false
 }
 
-// SetTypeOptions gets a reference to the given ComponentsTypeOptions and assigns it to the TypeOptions field.
-func (o *ComponentsConfigurationField) SetTypeOptions(v ComponentsTypeOptions) {
+// SetTypeOptions gets a reference to the given ConfigurationTypeOptions and assigns it to the TypeOptions field.
+func (o *ConfigurationField) SetTypeOptions(v ConfigurationTypeOptions) {
 	o.TypeOptions = &v
 }
 
-func (o ComponentsConfigurationField) MarshalJSON() ([]byte, error) {
+func (o ConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -311,7 +311,7 @@ func (o ComponentsConfigurationField) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ComponentsConfigurationField) ToMap() (map[string]interface{}, error) {
+func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -340,38 +340,38 @@ func (o ComponentsConfigurationField) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableComponentsConfigurationField struct {
-	value *ComponentsConfigurationField
+type NullableConfigurationField struct {
+	value *ConfigurationField
 	isSet bool
 }
 
-func (v NullableComponentsConfigurationField) Get() *ComponentsConfigurationField {
+func (v NullableConfigurationField) Get() *ConfigurationField {
 	return v.value
 }
 
-func (v *NullableComponentsConfigurationField) Set(val *ComponentsConfigurationField) {
+func (v *NullableConfigurationField) Set(val *ConfigurationField) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableComponentsConfigurationField) IsSet() bool {
+func (v NullableConfigurationField) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableComponentsConfigurationField) Unset() {
+func (v *NullableConfigurationField) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableComponentsConfigurationField(val *ComponentsConfigurationField) *NullableComponentsConfigurationField {
-	return &NullableComponentsConfigurationField{value: val, isSet: true}
+func NewNullableConfigurationField(val *ConfigurationField) *NullableConfigurationField {
+	return &NullableConfigurationField{value: val, isSet: true}
 }
 
-func (v NullableComponentsConfigurationField) MarshalJSON() ([]byte, error) {
+func (v NullableConfigurationField) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableComponentsConfigurationField) UnmarshalJSON(src []byte) error {
+func (v *NullableConfigurationField) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

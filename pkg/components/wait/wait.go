@@ -6,6 +6,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -48,30 +49,30 @@ func (w *Wait) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
-func (w *Wait) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (w *Wait) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:     "duration",
 			Label:    "Set wait interval",
-			Type:     components.FieldTypeObject,
+			Type:     configuration.FieldTypeObject,
 			Required: true,
-			TypeOptions: &components.TypeOptions{
-				Object: &components.ObjectTypeOptions{
-					Schema: []components.ConfigurationField{
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
 						{
 							Name:     "value",
 							Label:    "How long should I wait?",
-							Type:     components.FieldTypeNumber,
+							Type:     configuration.FieldTypeNumber,
 							Required: true,
 						},
 						{
 							Name:     "unit",
 							Label:    "Unit",
-							Type:     components.FieldTypeSelect,
+							Type:     configuration.FieldTypeSelect,
 							Required: true,
-							TypeOptions: &components.TypeOptions{
-								Select: &components.SelectTypeOptions{
-									Options: []components.FieldOption{
+							TypeOptions: &configuration.TypeOptions{
+								Select: &configuration.SelectTypeOptions{
+									Options: []configuration.FieldOption{
 										{
 											Label: "Seconds",
 											Value: "seconds",

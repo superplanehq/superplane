@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -39,8 +40,8 @@ func (c *NoOp) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
-func (c *NoOp) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{}
+func (c *NoOp) Configuration() []configuration.Field {
+	return []configuration.Field{}
 }
 
 func (c *NoOp) Execute(ctx components.ExecutionContext) error {

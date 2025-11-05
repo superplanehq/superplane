@@ -23,7 +23,7 @@ type ComponentsComponent struct {
 	Name *string `json:"name,omitempty"`
 	Label *string `json:"label,omitempty"`
 	Description *string `json:"description,omitempty"`
-	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
+	Configuration []ConfigurationField `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneComponentsOutputChannel `json:"outputChannels,omitempty"`
 	Icon *string `json:"icon,omitempty"`
 	Color *string `json:"color,omitempty"`
@@ -143,9 +143,9 @@ func (o *ComponentsComponent) SetDescription(v string) {
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *ComponentsComponent) GetConfiguration() []ComponentsConfigurationField {
+func (o *ComponentsComponent) GetConfiguration() []ConfigurationField {
 	if o == nil || IsNil(o.Configuration) {
-		var ret []ComponentsConfigurationField
+		var ret []ConfigurationField
 		return ret
 	}
 	return o.Configuration
@@ -153,7 +153,7 @@ func (o *ComponentsComponent) GetConfiguration() []ComponentsConfigurationField 
 
 // GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsComponent) GetConfigurationOk() ([]ComponentsConfigurationField, bool) {
+func (o *ComponentsComponent) GetConfigurationOk() ([]ConfigurationField, bool) {
 	if o == nil || IsNil(o.Configuration) {
 		return nil, false
 	}
@@ -169,8 +169,8 @@ func (o *ComponentsComponent) HasConfiguration() bool {
 	return false
 }
 
-// SetConfiguration gets a reference to the given []ComponentsConfigurationField and assigns it to the Configuration field.
-func (o *ComponentsComponent) SetConfiguration(v []ComponentsConfigurationField) {
+// SetConfiguration gets a reference to the given []ConfigurationField and assigns it to the Configuration field.
+func (o *ComponentsComponent) SetConfiguration(v []ConfigurationField) {
 	o.Configuration = v
 }
 

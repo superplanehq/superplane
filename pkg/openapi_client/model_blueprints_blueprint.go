@@ -29,7 +29,7 @@ type BlueprintsBlueprint struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Nodes []ComponentsNode `json:"nodes,omitempty"`
 	Edges []ComponentsEdge `json:"edges,omitempty"`
-	Configuration []ComponentsConfigurationField `json:"configuration,omitempty"`
+	Configuration []ConfigurationField `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneBlueprintsOutputChannel `json:"outputChannels,omitempty"`
 	Icon *string `json:"icon,omitempty"`
 	Color *string `json:"color,omitempty"`
@@ -310,9 +310,9 @@ func (o *BlueprintsBlueprint) SetEdges(v []ComponentsEdge) {
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *BlueprintsBlueprint) GetConfiguration() []ComponentsConfigurationField {
+func (o *BlueprintsBlueprint) GetConfiguration() []ConfigurationField {
 	if o == nil || IsNil(o.Configuration) {
-		var ret []ComponentsConfigurationField
+		var ret []ConfigurationField
 		return ret
 	}
 	return o.Configuration
@@ -320,7 +320,7 @@ func (o *BlueprintsBlueprint) GetConfiguration() []ComponentsConfigurationField 
 
 // GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprint) GetConfigurationOk() ([]ComponentsConfigurationField, bool) {
+func (o *BlueprintsBlueprint) GetConfigurationOk() ([]ConfigurationField, bool) {
 	if o == nil || IsNil(o.Configuration) {
 		return nil, false
 	}
@@ -336,8 +336,8 @@ func (o *BlueprintsBlueprint) HasConfiguration() bool {
 	return false
 }
 
-// SetConfiguration gets a reference to the given []ComponentsConfigurationField and assigns it to the Configuration field.
-func (o *BlueprintsBlueprint) SetConfiguration(v []ComponentsConfigurationField) {
+// SetConfiguration gets a reference to the given []ConfigurationField and assigns it to the Configuration field.
+func (o *BlueprintsBlueprint) SetConfiguration(v []ConfigurationField) {
 	o.Configuration = v
 }
 

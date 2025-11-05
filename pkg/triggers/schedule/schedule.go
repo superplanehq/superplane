@@ -9,6 +9,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
 )
@@ -71,17 +72,17 @@ func (s *Schedule) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error
 	return http.StatusOK, nil
 }
 
-func (s *Schedule) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (s *Schedule) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:     "type",
 			Label:    "Schedule Type",
-			Type:     components.FieldTypeSelect,
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			Default:  TypeDaily,
-			TypeOptions: &components.TypeOptions{
-				Select: &components.SelectTypeOptions{
-					Options: []components.FieldOption{
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
 						{Label: "Every X minutes", Value: "minutes"},
 						{Label: "Hourly", Value: "hourly"},
 						{Label: "Daily", Value: "daily"},
@@ -93,13 +94,13 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 		{
 			Name:    "interval",
 			Label:   "Interval (minutes)",
-			Type:    components.FieldTypeNumber,
+			Type:    configuration.FieldTypeNumber,
 			Default: intPtr(1),
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "type", Values: []string{"minutes"}},
 			},
-			TypeOptions: &components.TypeOptions{
-				Number: &components.NumberTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(1),
 					Max: intPtr(60 * 24),
 				},
@@ -108,13 +109,13 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 		{
 			Name:    "minute",
 			Label:   "Minute of the hour",
-			Type:    components.FieldTypeNumber,
+			Type:    configuration.FieldTypeNumber,
 			Default: intPtr(0),
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "type", Values: []string{"hourly"}},
 			},
-			TypeOptions: &components.TypeOptions{
-				Number: &components.NumberTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(0),
 					Max: intPtr(59),
 				},
@@ -123,14 +124,14 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 		{
 			Name:    "weekDay",
 			Label:   "Day of the week",
-			Type:    components.FieldTypeSelect,
+			Type:    configuration.FieldTypeSelect,
 			Default: WeekDayMonday,
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "type", Values: []string{"weekly"}},
 			},
-			TypeOptions: &components.TypeOptions{
-				Select: &components.SelectTypeOptions{
-					Options: []components.FieldOption{
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
 						{Label: "Monday", Value: "Monday"},
 						{Label: "Tuesday", Value: "Tuesday"},
 						{Label: "Wednesday", Value: "Wednesday"},
@@ -145,13 +146,13 @@ func (s *Schedule) Configuration() []components.ConfigurationField {
 		{
 			Name:        "time",
 			Label:       "Time",
-			Type:        components.FieldTypeTime,
+			Type:        configuration.FieldTypeTime,
 			Description: "Time of the day in UTC",
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "type", Values: []string{"daily", "weekly"}},
 			},
-			TypeOptions: &components.TypeOptions{
-				Time: &components.TimeTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Time: &configuration.TimeTypeOptions{
 					Format: "HH:MM",
 				},
 			},

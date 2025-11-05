@@ -1,4 +1,4 @@
-import { ComponentsConfigurationField } from "@/api-client";
+import { ConfigurationField } from "@/api-client";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCallback, useEffect, useState } from "react";
 
@@ -14,7 +14,7 @@ interface NodeConfigurationModalProps {
   nodeName: string;
   nodeLabel?: string;
   configuration: Record<string, unknown>;
-  configurationFields: ComponentsConfigurationField[];
+  configurationFields: ConfigurationField[];
   onSave: (updatedConfiguration: Record<string, unknown>, updatedNodeName: string) => void;
   domainId?: string;
   domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION";
@@ -46,7 +46,7 @@ export function NodeConfigurationModal({
 
   // Recursively validate nested fields in objects and lists
   const validateNestedFields = useCallback(
-    (fields: ComponentsConfigurationField[], values: Record<string, unknown>, parentPath: string = ""): Set<string> => {
+    (fields: ConfigurationField[], values: Record<string, unknown>, parentPath: string = ""): Set<string> => {
       const errors = new Set<string>();
 
       fields.forEach((field) => {

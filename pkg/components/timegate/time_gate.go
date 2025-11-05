@@ -6,6 +6,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -55,16 +56,16 @@ func (tg *TimeGate) OutputChannels(configuration any) []components.OutputChannel
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
-func (tg *TimeGate) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (tg *TimeGate) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:     "mode",
 			Label:    "Mode",
-			Type:     components.FieldTypeSelect,
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
-			TypeOptions: &components.TypeOptions{
-				Select: &components.SelectTypeOptions{
-					Options: []components.FieldOption{
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
 						{
 							Label: "Include",
 							Value: TimeGateIncludeMode,
@@ -80,7 +81,7 @@ func (tg *TimeGate) Configuration() []components.ConfigurationField {
 		{
 			Name:        "startTime",
 			Label:       "Start Time (HH:MM)",
-			Type:        components.FieldTypeTime,
+			Type:        configuration.FieldTypeTime,
 			Required:    true,
 			Description: "Start time in HH:MM format (24-hour), e.g., 09:30",
 			Default:     "09:00",
@@ -88,7 +89,7 @@ func (tg *TimeGate) Configuration() []components.ConfigurationField {
 		{
 			Name:        "endTime",
 			Label:       "End Time (HH:MM)",
-			Type:        components.FieldTypeTime,
+			Type:        configuration.FieldTypeTime,
 			Required:    true,
 			Description: "End time in HH:MM format (24-hour), e.g., 17:30",
 			Default:     "17:00",
@@ -96,12 +97,12 @@ func (tg *TimeGate) Configuration() []components.ConfigurationField {
 		{
 			Name:     "days",
 			Label:    "Days of Week",
-			Type:     components.FieldTypeMultiSelect,
+			Type:     configuration.FieldTypeMultiSelect,
 			Required: true,
 			Default:  []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"},
-			TypeOptions: &components.TypeOptions{
-				MultiSelect: &components.MultiSelectTypeOptions{
-					Options: []components.FieldOption{
+			TypeOptions: &configuration.TypeOptions{
+				MultiSelect: &configuration.MultiSelectTypeOptions{
+					Options: []configuration.FieldOption{
 						{Label: "Monday", Value: "monday"},
 						{Label: "Tuesday", Value: "tuesday"},
 						{Label: "Wednesday", Value: "wednesday"},

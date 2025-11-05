@@ -9,7 +9,7 @@ import {
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ComponentsConfigurationField } from "@/api-client";
+import { ConfigurationField } from "@/api-client";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import type { ChildEventsInfo } from "../childEvents";
@@ -74,7 +74,7 @@ export interface NodeEditData {
   nodeName: string;
   displayLabel?: string;
   configuration: Record<string, any>;
-  configurationFields: ComponentsConfigurationField[];
+  configurationFields: ConfigurationField[];
 }
 
 export interface NewNodeData {

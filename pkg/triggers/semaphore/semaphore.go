@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
@@ -57,15 +58,15 @@ func (s *Semaphore) Color() string {
 	return "gray"
 }
 
-func (s *Semaphore) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (s *Semaphore) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:     "integration",
 			Label:    "Semaphore integration",
-			Type:     components.FieldTypeIntegration,
+			Type:     configuration.FieldTypeIntegration,
 			Required: true,
-			TypeOptions: &components.TypeOptions{
-				Integration: &components.IntegrationTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Integration: &configuration.IntegrationTypeOptions{
 					Type: "semaphore",
 				},
 			},
@@ -73,16 +74,16 @@ func (s *Semaphore) Configuration() []components.ConfigurationField {
 		{
 			Name:     "project",
 			Label:    "Project",
-			Type:     components.FieldTypeIntegrationResource,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "integration",
 					Values: []string{"*"},
 				},
 			},
-			TypeOptions: &components.TypeOptions{
-				Resource: &components.ResourceTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
 					Type: "project",
 				},
 			},

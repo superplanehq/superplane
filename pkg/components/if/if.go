@@ -7,6 +7,7 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -51,11 +52,11 @@ func (f *If) OutputChannels(configuration any) []components.OutputChannel {
 	}
 }
 
-func (f *If) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (f *If) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:        "expression",
-			Type:        components.FieldTypeString,
+			Type:        configuration.FieldTypeString,
 			Description: "Boolean expression to evaluate",
 			Required:    true,
 		},

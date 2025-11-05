@@ -24,13 +24,12 @@ import {
 import {
   CustomComponentConfigurationSidebar,
   BlueprintMetadata,
-  ConfigurationField,
   OutputChannel,
 } from "../CustomComponentConfigurationSidebar";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
 import { OutputChannelConfigurationModal } from "./OutputChannelConfigurationModal";
 import {
-  ComponentsConfigurationField,
+  ConfigurationField,
   SuperplaneBlueprintsOutputChannel,
 } from "@/api-client";
 import { NodeConfigurationModal } from "../CanvasPage/NodeConfigurationModal";
@@ -41,7 +40,7 @@ export interface NodeEditData {
   nodeName: string;
   displayLabel?: string;
   configuration: Record<string, any>;
-  configurationFields: ComponentsConfigurationField[];
+  configurationFields: ConfigurationField[];
 }
 
 export interface NewNodeData {
@@ -249,7 +248,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
   }, []);
 
   const handleSaveConfigField = useCallback(
-    (field: ComponentsConfigurationField) => {
+    (field: ConfigurationField) => {
       if (editingConfigFieldIndex !== null) {
         // Update existing field
         const newFields = [...props.configurationFields];
@@ -488,7 +487,7 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
         }}
         field={
           editingConfigFieldIndex !== null
-            ? (props.configurationFields[editingConfigFieldIndex] as ComponentsConfigurationField)
+            ? (props.configurationFields[editingConfigFieldIndex] as ConfigurationField)
             : undefined
         }
         onSave={handleSaveConfigField}

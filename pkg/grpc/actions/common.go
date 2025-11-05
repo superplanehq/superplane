@@ -6,11 +6,12 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
@@ -146,12 +147,12 @@ func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.
 	return models.DomainTypeOrganization, &canvas.OrganizationID, nil
 }
 
-func numberTypeOptionsToProto(opts *components.NumberTypeOptions) *componentpb.NumberTypeOptions {
+func numberTypeOptionsToProto(opts *configuration.NumberTypeOptions) *configpb.NumberTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	pbOpts := &componentpb.NumberTypeOptions{}
+	pbOpts := &configpb.NumberTypeOptions{}
 	if opts.Min != nil {
 		min := int32(*opts.Min)
 		pbOpts.Min = &min
@@ -163,16 +164,16 @@ func numberTypeOptionsToProto(opts *components.NumberTypeOptions) *componentpb.N
 	return pbOpts
 }
 
-func selectTypeOptionsToProto(opts *components.SelectTypeOptions) *componentpb.SelectTypeOptions {
+func selectTypeOptionsToProto(opts *configuration.SelectTypeOptions) *configpb.SelectTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	pbOpts := &componentpb.SelectTypeOptions{
-		Options: make([]*componentpb.SelectOption, len(opts.Options)),
+	pbOpts := &configpb.SelectTypeOptions{
+		Options: make([]*configpb.SelectOption, len(opts.Options)),
 	}
 	for i, opt := range opts.Options {
-		pbOpts.Options[i] = &componentpb.SelectOption{
+		pbOpts.Options[i] = &configpb.SelectOption{
 			Label: opt.Label,
 			Value: opt.Value,
 		}
@@ -180,16 +181,16 @@ func selectTypeOptionsToProto(opts *components.SelectTypeOptions) *componentpb.S
 	return pbOpts
 }
 
-func multiSelectTypeOptionsToProto(opts *components.MultiSelectTypeOptions) *componentpb.MultiSelectTypeOptions {
+func multiSelectTypeOptionsToProto(opts *configuration.MultiSelectTypeOptions) *configpb.MultiSelectTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	pbOpts := &componentpb.MultiSelectTypeOptions{
-		Options: make([]*componentpb.SelectOption, len(opts.Options)),
+	pbOpts := &configpb.MultiSelectTypeOptions{
+		Options: make([]*configpb.SelectOption, len(opts.Options)),
 	}
 	for i, opt := range opts.Options {
-		pbOpts.Options[i] = &componentpb.SelectOption{
+		pbOpts.Options[i] = &configpb.SelectOption{
 			Label: opt.Label,
 			Value: opt.Value,
 		}
@@ -197,39 +198,39 @@ func multiSelectTypeOptionsToProto(opts *components.MultiSelectTypeOptions) *com
 	return pbOpts
 }
 
-func integrationTypeOptionsToProto(opts *components.IntegrationTypeOptions) *componentpb.IntegrationTypeOptions {
+func integrationTypeOptionsToProto(opts *configuration.IntegrationTypeOptions) *configpb.IntegrationTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	return &componentpb.IntegrationTypeOptions{
+	return &configpb.IntegrationTypeOptions{
 		Type: opts.Type,
 	}
 }
 
-func resourceTypeOptionsToProto(opts *components.ResourceTypeOptions) *componentpb.ResourceTypeOptions {
+func resourceTypeOptionsToProto(opts *configuration.ResourceTypeOptions) *configpb.ResourceTypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	return &componentpb.ResourceTypeOptions{
+	return &configpb.ResourceTypeOptions{
 		Type: opts.Type,
 	}
 }
 
-func listTypeOptionsToProto(opts *components.ListTypeOptions) *componentpb.ListTypeOptions {
+func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListTypeOptions {
 	if opts == nil || opts.ItemDefinition == nil {
 		return nil
 	}
 
-	pbOpts := &componentpb.ListTypeOptions{
-		ItemDefinition: &componentpb.ListItemDefinition{
+	pbOpts := &configpb.ListTypeOptions{
+		ItemDefinition: &configpb.ListItemDefinition{
 			Type: opts.ItemDefinition.Type,
 		},
 	}
 
 	if len(opts.ItemDefinition.Schema) > 0 {
-		pbOpts.ItemDefinition.Schema = make([]*componentpb.ConfigurationField, len(opts.ItemDefinition.Schema))
+		pbOpts.ItemDefinition.Schema = make([]*configpb.Field, len(opts.ItemDefinition.Schema))
 		for i, schemaField := range opts.ItemDefinition.Schema {
 			pbOpts.ItemDefinition.Schema[i] = ConfigurationFieldToProto(schemaField)
 		}
@@ -238,13 +239,13 @@ func listTypeOptionsToProto(opts *components.ListTypeOptions) *componentpb.ListT
 	return pbOpts
 }
 
-func objectTypeOptionsToProto(opts *components.ObjectTypeOptions) *componentpb.ObjectTypeOptions {
+func objectTypeOptionsToProto(opts *configuration.ObjectTypeOptions) *configpb.ObjectTypeOptions {
 	if opts == nil || len(opts.Schema) == 0 {
 		return nil
 	}
 
-	pbOpts := &componentpb.ObjectTypeOptions{
-		Schema: make([]*componentpb.ConfigurationField, len(opts.Schema)),
+	pbOpts := &configpb.ObjectTypeOptions{
+		Schema: make([]*configpb.Field, len(opts.Schema)),
 	}
 	for i, schemaField := range opts.Schema {
 		pbOpts.Schema[i] = ConfigurationFieldToProto(schemaField)
@@ -253,12 +254,12 @@ func objectTypeOptionsToProto(opts *components.ObjectTypeOptions) *componentpb.O
 	return pbOpts
 }
 
-func typeOptionsToProto(opts *components.TypeOptions) *componentpb.TypeOptions {
+func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 	if opts == nil {
 		return nil
 	}
 
-	return &componentpb.TypeOptions{
+	return &configpb.TypeOptions{
 		Number:      numberTypeOptionsToProto(opts.Number),
 		Select:      selectTypeOptionsToProto(opts.Select),
 		MultiSelect: multiSelectTypeOptionsToProto(opts.MultiSelect),
@@ -269,8 +270,8 @@ func typeOptionsToProto(opts *components.TypeOptions) *componentpb.TypeOptions {
 	}
 }
 
-func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb.ConfigurationField {
-	pbField := &componentpb.ConfigurationField{
+func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
+	pbField := &configpb.Field{
 		Name:        field.Name,
 		Label:       field.Label,
 		Type:        field.Type,
@@ -288,9 +289,9 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb
 	}
 
 	if len(field.VisibilityConditions) > 0 {
-		pbField.VisibilityConditions = make([]*componentpb.VisibilityCondition, len(field.VisibilityConditions))
+		pbField.VisibilityConditions = make([]*configpb.VisibilityCondition, len(field.VisibilityConditions))
 		for i, cond := range field.VisibilityConditions {
-			pbField.VisibilityConditions[i] = &componentpb.VisibilityCondition{
+			pbField.VisibilityConditions[i] = &configpb.VisibilityCondition{
 				Field:  cond.Field,
 				Values: cond.Values,
 			}
@@ -300,12 +301,12 @@ func ConfigurationFieldToProto(field components.ConfigurationField) *componentpb
 	return pbField
 }
 
-func protoToNumberTypeOptions(pbOpts *componentpb.NumberTypeOptions) *components.NumberTypeOptions {
+func protoToNumberTypeOptions(pbOpts *configpb.NumberTypeOptions) *configuration.NumberTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	opts := &components.NumberTypeOptions{}
+	opts := &configuration.NumberTypeOptions{}
 	if pbOpts.Min != nil {
 		min := int(*pbOpts.Min)
 		opts.Min = &min
@@ -317,16 +318,16 @@ func protoToNumberTypeOptions(pbOpts *componentpb.NumberTypeOptions) *components
 	return opts
 }
 
-func protoToSelectTypeOptions(pbOpts *componentpb.SelectTypeOptions) *components.SelectTypeOptions {
+func protoToSelectTypeOptions(pbOpts *configpb.SelectTypeOptions) *configuration.SelectTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	opts := &components.SelectTypeOptions{
-		Options: make([]components.FieldOption, len(pbOpts.Options)),
+	opts := &configuration.SelectTypeOptions{
+		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
 	}
 	for i, pbOpt := range pbOpts.Options {
-		opts.Options[i] = components.FieldOption{
+		opts.Options[i] = configuration.FieldOption{
 			Label: pbOpt.Label,
 			Value: pbOpt.Value,
 		}
@@ -334,16 +335,16 @@ func protoToSelectTypeOptions(pbOpts *componentpb.SelectTypeOptions) *components
 	return opts
 }
 
-func protoToMultiSelectTypeOptions(pbOpts *componentpb.MultiSelectTypeOptions) *components.MultiSelectTypeOptions {
+func protoToMultiSelectTypeOptions(pbOpts *configpb.MultiSelectTypeOptions) *configuration.MultiSelectTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	opts := &components.MultiSelectTypeOptions{
-		Options: make([]components.FieldOption, len(pbOpts.Options)),
+	opts := &configuration.MultiSelectTypeOptions{
+		Options: make([]configuration.FieldOption, len(pbOpts.Options)),
 	}
 	for i, pbOpt := range pbOpts.Options {
-		opts.Options[i] = components.FieldOption{
+		opts.Options[i] = configuration.FieldOption{
 			Label: pbOpt.Label,
 			Value: pbOpt.Value,
 		}
@@ -351,39 +352,39 @@ func protoToMultiSelectTypeOptions(pbOpts *componentpb.MultiSelectTypeOptions) *
 	return opts
 }
 
-func protoToIntegrationTypeOptions(pbOpts *componentpb.IntegrationTypeOptions) *components.IntegrationTypeOptions {
+func protoToIntegrationTypeOptions(pbOpts *configpb.IntegrationTypeOptions) *configuration.IntegrationTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	return &components.IntegrationTypeOptions{
+	return &configuration.IntegrationTypeOptions{
 		Type: pbOpts.Type,
 	}
 }
 
-func protoToResourceTypeOptions(pbOpts *componentpb.ResourceTypeOptions) *components.ResourceTypeOptions {
+func protoToResourceTypeOptions(pbOpts *configpb.ResourceTypeOptions) *configuration.ResourceTypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	return &components.ResourceTypeOptions{
+	return &configuration.ResourceTypeOptions{
 		Type: pbOpts.Type,
 	}
 }
 
-func protoToListTypeOptions(pbOpts *componentpb.ListTypeOptions) *components.ListTypeOptions {
+func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.ListTypeOptions {
 	if pbOpts == nil || pbOpts.ItemDefinition == nil {
 		return nil
 	}
 
-	opts := &components.ListTypeOptions{
-		ItemDefinition: &components.ListItemDefinition{
+	opts := &configuration.ListTypeOptions{
+		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
 	}
 
 	if len(pbOpts.ItemDefinition.Schema) > 0 {
-		opts.ItemDefinition.Schema = make([]components.ConfigurationField, len(pbOpts.ItemDefinition.Schema))
+		opts.ItemDefinition.Schema = make([]configuration.Field, len(pbOpts.ItemDefinition.Schema))
 		for i, pbSchemaField := range pbOpts.ItemDefinition.Schema {
 			opts.ItemDefinition.Schema[i] = ProtoToConfigurationField(pbSchemaField)
 		}
@@ -392,13 +393,13 @@ func protoToListTypeOptions(pbOpts *componentpb.ListTypeOptions) *components.Lis
 	return opts
 }
 
-func protoToObjectTypeOptions(pbOpts *componentpb.ObjectTypeOptions) *components.ObjectTypeOptions {
+func protoToObjectTypeOptions(pbOpts *configpb.ObjectTypeOptions) *configuration.ObjectTypeOptions {
 	if pbOpts == nil || len(pbOpts.Schema) == 0 {
 		return nil
 	}
 
-	opts := &components.ObjectTypeOptions{
-		Schema: make([]components.ConfigurationField, len(pbOpts.Schema)),
+	opts := &configuration.ObjectTypeOptions{
+		Schema: make([]configuration.Field, len(pbOpts.Schema)),
 	}
 	for i, pbSchemaField := range pbOpts.Schema {
 		opts.Schema[i] = ProtoToConfigurationField(pbSchemaField)
@@ -407,12 +408,12 @@ func protoToObjectTypeOptions(pbOpts *componentpb.ObjectTypeOptions) *components
 	return opts
 }
 
-func protoToTypeOptions(pbOpts *componentpb.TypeOptions) *components.TypeOptions {
+func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions {
 	if pbOpts == nil {
 		return nil
 	}
 
-	return &components.TypeOptions{
+	return &configuration.TypeOptions{
 		Number:      protoToNumberTypeOptions(pbOpts.Number),
 		Select:      protoToSelectTypeOptions(pbOpts.Select),
 		MultiSelect: protoToMultiSelectTypeOptions(pbOpts.MultiSelect),
@@ -423,8 +424,8 @@ func protoToTypeOptions(pbOpts *componentpb.TypeOptions) *components.TypeOptions
 	}
 }
 
-func ProtoToConfigurationField(pbField *componentpb.ConfigurationField) components.ConfigurationField {
-	field := components.ConfigurationField{
+func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
+	field := configuration.Field{
 		Name:        pbField.Name,
 		Label:       pbField.Label,
 		Type:        pbField.Type,
@@ -438,9 +439,9 @@ func ProtoToConfigurationField(pbField *componentpb.ConfigurationField) componen
 	}
 
 	if len(pbField.VisibilityConditions) > 0 {
-		field.VisibilityConditions = make([]components.VisibilityCondition, len(pbField.VisibilityConditions))
+		field.VisibilityConditions = make([]configuration.VisibilityCondition, len(pbField.VisibilityConditions))
 		for i, pbCond := range pbField.VisibilityConditions {
-			field.VisibilityConditions[i] = components.VisibilityCondition{
+			field.VisibilityConditions[i] = configuration.VisibilityCondition{
 				Field:  pbCond.Field,
 				Values: pbCond.Values,
 			}

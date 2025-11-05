@@ -19,15 +19,15 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import {
-  ComponentsConfigurationField,
-  ComponentsSelectOption,
+  ConfigurationField,
+  ConfigurationSelectOption,
 } from "@/api-client";
 
 interface ConfigurationFieldModalProps {
   isOpen: boolean;
   onClose: () => void;
-  field?: ComponentsConfigurationField;
-  onSave: (field: ComponentsConfigurationField) => void;
+  field?: ConfigurationField;
+  onSave: (field: ConfigurationField) => void;
 }
 
 export function ConfigurationFieldModal({
@@ -37,7 +37,7 @@ export function ConfigurationFieldModal({
   onSave,
 }: ConfigurationFieldModalProps) {
   const [configFieldForm, setConfigFieldForm] = useState<
-    Partial<ComponentsConfigurationField>
+    Partial<ConfigurationField>
   >({
     name: "",
     label: "",
@@ -109,7 +109,7 @@ export function ConfigurationFieldModal({
       }
     }
 
-    onSave(configFieldForm as ComponentsConfigurationField);
+    onSave(configFieldForm as ConfigurationField);
     handleClose();
   };
 
@@ -118,7 +118,7 @@ export function ConfigurationFieldModal({
     ? configFieldForm.typeOptions?.select?.options || []
     : configFieldForm.typeOptions?.multiSelect?.options || [];
 
-  const updateOptions = (newOptions: ComponentsSelectOption[]) => {
+  const updateOptions = (newOptions: ConfigurationSelectOption[]) => {
     if (isSelect) {
       setConfigFieldForm({
         ...configFieldForm,

@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the ComponentsNumberTypeOptions type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ComponentsNumberTypeOptions{}
+// checks if the ConfigurationNumberTypeOptions type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ConfigurationNumberTypeOptions{}
 
-// ComponentsNumberTypeOptions struct for ComponentsNumberTypeOptions
-type ComponentsNumberTypeOptions struct {
+// ConfigurationNumberTypeOptions struct for ConfigurationNumberTypeOptions
+type ConfigurationNumberTypeOptions struct {
 	Min *int32 `json:"min,omitempty"`
 	Max *int32 `json:"max,omitempty"`
 }
 
-// NewComponentsNumberTypeOptions instantiates a new ComponentsNumberTypeOptions object
+// NewConfigurationNumberTypeOptions instantiates a new ConfigurationNumberTypeOptions object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewComponentsNumberTypeOptions() *ComponentsNumberTypeOptions {
-	this := ComponentsNumberTypeOptions{}
+func NewConfigurationNumberTypeOptions() *ConfigurationNumberTypeOptions {
+	this := ConfigurationNumberTypeOptions{}
 	return &this
 }
 
-// NewComponentsNumberTypeOptionsWithDefaults instantiates a new ComponentsNumberTypeOptions object
+// NewConfigurationNumberTypeOptionsWithDefaults instantiates a new ConfigurationNumberTypeOptions object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewComponentsNumberTypeOptionsWithDefaults() *ComponentsNumberTypeOptions {
-	this := ComponentsNumberTypeOptions{}
+func NewConfigurationNumberTypeOptionsWithDefaults() *ConfigurationNumberTypeOptions {
+	this := ConfigurationNumberTypeOptions{}
 	return &this
 }
 
 // GetMin returns the Min field value if set, zero value otherwise.
-func (o *ComponentsNumberTypeOptions) GetMin() int32 {
+func (o *ConfigurationNumberTypeOptions) GetMin() int32 {
 	if o == nil || IsNil(o.Min) {
 		var ret int32
 		return ret
@@ -52,7 +52,7 @@ func (o *ComponentsNumberTypeOptions) GetMin() int32 {
 
 // GetMinOk returns a tuple with the Min field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsNumberTypeOptions) GetMinOk() (*int32, bool) {
+func (o *ConfigurationNumberTypeOptions) GetMinOk() (*int32, bool) {
 	if o == nil || IsNil(o.Min) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *ComponentsNumberTypeOptions) GetMinOk() (*int32, bool) {
 }
 
 // HasMin returns a boolean if a field has been set.
-func (o *ComponentsNumberTypeOptions) HasMin() bool {
+func (o *ConfigurationNumberTypeOptions) HasMin() bool {
 	if o != nil && !IsNil(o.Min) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *ComponentsNumberTypeOptions) HasMin() bool {
 }
 
 // SetMin gets a reference to the given int32 and assigns it to the Min field.
-func (o *ComponentsNumberTypeOptions) SetMin(v int32) {
+func (o *ConfigurationNumberTypeOptions) SetMin(v int32) {
 	o.Min = &v
 }
 
 // GetMax returns the Max field value if set, zero value otherwise.
-func (o *ComponentsNumberTypeOptions) GetMax() int32 {
+func (o *ConfigurationNumberTypeOptions) GetMax() int32 {
 	if o == nil || IsNil(o.Max) {
 		var ret int32
 		return ret
@@ -84,7 +84,7 @@ func (o *ComponentsNumberTypeOptions) GetMax() int32 {
 
 // GetMaxOk returns a tuple with the Max field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsNumberTypeOptions) GetMaxOk() (*int32, bool) {
+func (o *ConfigurationNumberTypeOptions) GetMaxOk() (*int32, bool) {
 	if o == nil || IsNil(o.Max) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *ComponentsNumberTypeOptions) GetMaxOk() (*int32, bool) {
 }
 
 // HasMax returns a boolean if a field has been set.
-func (o *ComponentsNumberTypeOptions) HasMax() bool {
+func (o *ConfigurationNumberTypeOptions) HasMax() bool {
 	if o != nil && !IsNil(o.Max) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *ComponentsNumberTypeOptions) HasMax() bool {
 }
 
 // SetMax gets a reference to the given int32 and assigns it to the Max field.
-func (o *ComponentsNumberTypeOptions) SetMax(v int32) {
+func (o *ConfigurationNumberTypeOptions) SetMax(v int32) {
 	o.Max = &v
 }
 
-func (o ComponentsNumberTypeOptions) MarshalJSON() ([]byte, error) {
+func (o ConfigurationNumberTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o ComponentsNumberTypeOptions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ComponentsNumberTypeOptions) ToMap() (map[string]interface{}, error) {
+func (o ConfigurationNumberTypeOptions) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Min) {
 		toSerialize["min"] = o.Min
@@ -124,38 +124,38 @@ func (o ComponentsNumberTypeOptions) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableComponentsNumberTypeOptions struct {
-	value *ComponentsNumberTypeOptions
+type NullableConfigurationNumberTypeOptions struct {
+	value *ConfigurationNumberTypeOptions
 	isSet bool
 }
 
-func (v NullableComponentsNumberTypeOptions) Get() *ComponentsNumberTypeOptions {
+func (v NullableConfigurationNumberTypeOptions) Get() *ConfigurationNumberTypeOptions {
 	return v.value
 }
 
-func (v *NullableComponentsNumberTypeOptions) Set(val *ComponentsNumberTypeOptions) {
+func (v *NullableConfigurationNumberTypeOptions) Set(val *ConfigurationNumberTypeOptions) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableComponentsNumberTypeOptions) IsSet() bool {
+func (v NullableConfigurationNumberTypeOptions) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableComponentsNumberTypeOptions) Unset() {
+func (v *NullableConfigurationNumberTypeOptions) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableComponentsNumberTypeOptions(val *ComponentsNumberTypeOptions) *NullableComponentsNumberTypeOptions {
-	return &NullableComponentsNumberTypeOptions{value: val, isSet: true}
+func NewNullableConfigurationNumberTypeOptions(val *ConfigurationNumberTypeOptions) *NullableConfigurationNumberTypeOptions {
+	return &NullableConfigurationNumberTypeOptions{value: val, isSet: true}
 }
 
-func (v NullableComponentsNumberTypeOptions) MarshalJSON() ([]byte, error) {
+func (v NullableConfigurationNumberTypeOptions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableComponentsNumberTypeOptions) UnmarshalJSON(src []byte) error {
+func (v *NullableConfigurationNumberTypeOptions) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

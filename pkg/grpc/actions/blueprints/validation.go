@@ -5,6 +5,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -49,7 +50,7 @@ func validateConfiguration(nodeID string, config any, component components.Compo
 	}
 
 	// Validate configuration using the components validation function
-	if err := components.ValidateConfiguration(configFields, configMap); err != nil {
+	if err := configuration.ValidateConfiguration(configFields, configMap); err != nil {
 		return fmt.Errorf("node %s: %w", nodeID, err)
 	}
 

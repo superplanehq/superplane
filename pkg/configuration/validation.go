@@ -1,13 +1,12 @@
-package components
+package configuration
 
 import (
 	"fmt"
-	"strings"
-
 	"slices"
+	"strings"
 )
 
-func ValidateConfiguration(fields []ConfigurationField, config map[string]any) error {
+func ValidateConfiguration(fields []Field, config map[string]any) error {
 	for _, field := range fields {
 		value, exists := config[field.Name]
 		if field.Required && (!exists || value == nil) {
@@ -27,7 +26,7 @@ func ValidateConfiguration(fields []ConfigurationField, config map[string]any) e
 	return nil
 }
 
-func validateNumber(field ConfigurationField, value any) error {
+func validateNumber(field Field, value any) error {
 	var num float64
 	switch v := value.(type) {
 	case float64:
@@ -58,7 +57,7 @@ func validateNumber(field ConfigurationField, value any) error {
 	return nil
 }
 
-func validateSelect(field ConfigurationField, value any) error {
+func validateSelect(field Field, value any) error {
 	selected, ok := value.(string)
 	if !ok {
 		return fmt.Errorf("must be a string")
@@ -89,7 +88,7 @@ func validateSelect(field ConfigurationField, value any) error {
 	return nil
 }
 
-func validateMultiSelect(field ConfigurationField, value any) error {
+func validateMultiSelect(field Field, value any) error {
 	selectedValues, ok := value.([]any)
 	if !ok {
 		return fmt.Errorf("must be a list of values")
@@ -129,7 +128,7 @@ func validateMultiSelect(field ConfigurationField, value any) error {
 	return nil
 }
 
-func validateObject(field ConfigurationField, value any) error {
+func validateObject(field Field, value any) error {
 	if field.TypeOptions != nil && field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
 		obj, ok := value.(map[string]any)
 		if !ok {
@@ -149,7 +148,7 @@ func validateObject(field ConfigurationField, value any) error {
 	}
 }
 
-func validateList(field ConfigurationField, value any) error {
+func validateList(field Field, value any) error {
 	list, ok := value.([]any)
 	if !ok {
 		return fmt.Errorf("must be a list of values")
@@ -182,7 +181,7 @@ func validateList(field ConfigurationField, value any) error {
 	return nil
 }
 
-func validateFieldValue(field ConfigurationField, value any) error {
+func validateFieldValue(field Field, value any) error {
 	switch field.Type {
 	case FieldTypeString:
 		if _, ok := value.(string); !ok {
