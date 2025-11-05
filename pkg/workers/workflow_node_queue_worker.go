@@ -19,13 +19,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
-func asMap(v any) map[string]any {
-	if m, ok := v.(map[string]any); ok {
-		return m
-	}
-	return map[string]any{}
-}
-
 type WorkflowNodeQueueWorker struct {
 	registry  *registry.Registry
 	semaphore *semaphore.Weighted
@@ -126,7 +119,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 			EventID:             event.ID,
 			PreviousExecutionID: event.ExecutionID,
 			State:               models.WorkflowNodeExecutionStatePending,
-			Configuration:       datatypes.NewJSONType(asMap(config)),
+			Configuration:       datatypes.NewJSONType(config),
 			CreatedAt:           &now,
 			UpdatedAt:           &now,
 		}
@@ -180,7 +173,7 @@ func (w *WorkflowNodeQueueWorker) findEvent(tx *gorm.DB, queueItem *models.Workf
 	return event, nil
 }
 
-func (w *WorkflowNodeQueueWorker) buildNodeConfig(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem, node *models.WorkflowNode, event *models.WorkflowEvent) (any, error) {
+func (w *WorkflowNodeQueueWorker) buildNodeConfig(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem, node *models.WorkflowNode, event *models.WorkflowEvent) (map[string]any, error) {
 	config, err := contexts.NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
