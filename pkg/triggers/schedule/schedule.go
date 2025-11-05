@@ -153,7 +153,7 @@ func (s *Schedule) Configuration() []configuration.Field {
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Time: &configuration.TimeTypeOptions{
-					Format: "HH:MM",
+					Format: "15:04",
 				},
 			},
 		},
