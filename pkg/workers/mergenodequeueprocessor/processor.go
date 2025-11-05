@@ -16,22 +16,24 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/workers/workflow_node_queue_worker/contexts"
-	"github.com/superplanehq/superplane/pkg/workers/workflow_node_queue_worker/models"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 func Process(tx *gorm.DB, node *models.WorkflowNode) (bool, error) {
 	p := &MergeNodeProcessor{tx: tx, node: node}
 
-	p.findFirstQueueItem()
 	p.loadWorkflow()
+	p.findFirstQueueItem()
 	p.buildRequiredParents()
 	p.fetchMergableQueueItems()
 	p.loadEvents()
 	p.selectItemsByParent()
 	p.validateMissingParents()
 	p.aggregateInputs()
+	p.buildMergedEvent()
 	p.createExecution()
+	p.deleteConsumedItems()
 
 	if p.err != nil {
 		return false, p.err
@@ -55,6 +57,7 @@ type MergeNodeProcessor struct {
 	selectedEventByParent map[string]models.WorkflowEvent
 	coveredParents        map[string]struct{}
 	aggregated            map[string]any
+	aggEvent              *models.WorkflowEvent
 }
 
 func (p *MergeNodeProcessor) findFirstQueueItem() *MergeNodeProcessor {
@@ -65,7 +68,7 @@ func (p *MergeNodeProcessor) findFirstQueueItem() *MergeNodeProcessor {
 	var queueItem models.WorkflowNodeQueueItem
 	err := p.tx.
 		Where("workflow_id = ?", p.workflow.ID).
-		Where("node_id = ?", p.node.ID).
+		Where("node_id = ?", p.node.NodeID).
 		Order("created_at ASC").
 		First(&queueItem).
 		Error
@@ -74,7 +77,9 @@ func (p *MergeNodeProcessor) findFirstQueueItem() *MergeNodeProcessor {
 		p.err = fmt.Errorf("failed to find first queue item for merge: %w", err)
 	}
 
-	return &queueItem, nil
+	p.firstItem = &queueItem
+
+	return p
 }
 
 func (p *MergeNodeProcessor) loadWorkflow() *MergeNodeProcessor {
@@ -105,7 +110,7 @@ func (p *MergeNodeProcessor) buildRequiredParents() *MergeNodeProcessor {
 	}
 
 	if len(p.requiredParents) == 0 {
-		p.w.log("Merge node %s has no incoming edges; falling back to pass-through", p.node.NodeID)
+		p.log("Merge node %s has no incoming edges; falling back to pass-through", p.node.NodeID)
 		p.err = fmt.Errorf("no required parents")
 		return p
 	}
@@ -227,6 +232,12 @@ func (p *MergeNodeProcessor) validateMissingParents() *MergeNodeProcessor {
 			p.err = err
 			return p
 		}
+
+		// After direct-parent checks, run transitive failed-ancestor dominance check.
+		if err := p.checkTransitiveFailureDominates(parentID); err != nil {
+			p.err = err
+			return p
+		}
 	}
 
 	// If still not covered, keep waiting
@@ -238,9 +249,109 @@ func (p *MergeNodeProcessor) validateMissingParents() *MergeNodeProcessor {
 	return p
 }
 
+// checkTransitiveFailureDominates walks upstream from the missing direct parent and
+// checks if there exists a failed ancestor whose failure dominates all paths from that
+// ancestor to the merge (i.e., every path to the merge must pass through the missing parent).
+// If such an ancestor is found (based on latest execution for this root event), drop
+// the pending merge queue items for this root event and return an error to stop processing.
+func (p *MergeNodeProcessor) checkTransitiveFailureDominates(missingParentID string) error {
+	rev := map[string][]string{}
+	fwd := map[string][]string{}
+	for _, e := range p.workflow.Edges {
+		rev[e.TargetID] = append(rev[e.TargetID], e.SourceID)
+		fwd[e.SourceID] = append(fwd[e.SourceID], e.TargetID)
+	}
+
+	// Helper: latest execution failed for a node for this root event?
+	latestFailed := func(nodeID string) (bool, error) {
+		var exec models.WorkflowNodeExecution
+		err := p.tx.
+			Where("workflow_id = ?", p.node.WorkflowID).
+			Where("node_id = ?", nodeID).
+			Where("root_event_id = ?", p.firstItem.RootEventID).
+			Order("created_at DESC").
+			Take(&exec).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return false, nil
+			}
+			return false, err
+		}
+		return exec.State == models.WorkflowNodeExecutionStateFinished && exec.Result == models.WorkflowNodeExecutionResultFailed, nil
+	}
+
+	// Helper: does every path from ancestor to this merge pass through missingParentID?
+	// BFS from ancestor forward; if we can reach the merge node without visiting missingParentID, then it does not dominate.
+	dominates := func(ancestorID string) bool {
+		mergeID := p.node.NodeID
+		q := []string{ancestorID}
+		seen := map[string]struct{}{}
+		for len(q) > 0 {
+			n := q[0]
+			q = q[1:]
+			if _, ok := seen[n]; ok {
+				continue
+			}
+			seen[n] = struct{}{}
+
+			if n == mergeID {
+				// Reached merge without passing through missing parent (starting at ancestor which may equal missing parent)
+				// Only consider paths that do not include missingParentID; so if n==merge and missing not seen on path, fail dominance.
+				if _, ok := seen[missingParentID]; !ok && ancestorID != missingParentID {
+					return false
+				}
+			}
+
+			for _, nxt := range fwd[n] {
+				if nxt == missingParentID {
+					// Paths through missing parent are allowed; continue exploring beyond it
+					// but mark it seen so merge detection above knows it was traversed.
+				}
+				q = append(q, nxt)
+			}
+		}
+		// If every way to merge necessarily touches missingParentID, then ancestor dominates.
+		return true
+	}
+
+	// Walk ancestors transitively and check for failed ones that dominate.
+	stack := []string{missingParentID}
+	visited := map[string]struct{}{}
+	for len(stack) > 0 {
+		cur := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if _, ok := visited[cur]; ok {
+			continue
+		}
+		visited[cur] = struct{}{}
+
+		// For each ancestor of cur
+		for _, anc := range rev[cur] {
+			failed, err := latestFailed(anc)
+			if err != nil {
+				return fmt.Errorf("failed checking ancestor %s: %w", anc, err)
+			}
+			if failed && dominates(anc) {
+				if err := p.tx.
+					Where("workflow_id = ?", p.node.WorkflowID).
+					Where("node_id = ?", p.node.NodeID).
+					Where("root_event_id = ?", p.firstItem.RootEventID).
+					Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+					return fmt.Errorf("failed to clean merge queue items after transitive failed ancestor %s: %w", anc, err)
+				}
+				return fmt.Errorf("unfulfillable due to failed ancestor %s", anc)
+			}
+
+			stack = append(stack, anc)
+		}
+	}
+
+	return nil
+}
+
 func (p *MergeNodeProcessor) validateMissingParent(parentID string, allowedChannels map[string]struct{}) error {
-	// Find latest execution for this parent and root event
 	var parentExec models.WorkflowNodeExecution
+
 	err := p.tx.
 		Where("workflow_id = ?", p.node.WorkflowID).
 		Where("node_id = ?", parentID).
@@ -250,39 +361,40 @@ func (p *MergeNodeProcessor) validateMissingParent(parentID string, allowedChann
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Parent hasn't executed yet
-			return fmt.Errorf("parent hasn't executed yet")
+			// Parent hasn't executed yet; allow transitive check to decide
+			return nil
 		}
+
 		return fmt.Errorf("failed to find parent execution for %s: %w", parentID, err)
 	}
 
-	// If not finished, keep waiting
 	if parentExec.State != models.WorkflowNodeExecutionStateFinished {
-		return fmt.Errorf("parent not finished")
+		// Not finished yet; allow transitive check and overall wait handling
+		return nil
 	}
 
-	// If the parent execution failed, this merge can never be fulfilled for this root event.
-	// Clean up any queued items for this merge/root and stop processing.
 	if parentExec.Result == models.WorkflowNodeExecutionResultFailed {
-		if err := p.tx.
+		// If the parent execution failed, this merge can never be fulfilled for this root event.
+		// Clean up any queued items for this merge/root and stop processing.
+		err := p.tx.
 			Where("workflow_id = ?", p.node.WorkflowID).
 			Where("node_id = ?", p.node.NodeID).
 			Where("root_event_id = ?", p.firstItem.RootEventID).
-			Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+			Delete(&models.WorkflowNodeQueueItem{}).Error
+
+		if err != nil {
 			return fmt.Errorf("failed to clean merge queue items after parent failure: %w", err)
 		}
-		p.w.log("Skipping merge for node=%s workflow=%s root_event=%s due to failed parent %s; cleaned pending items",
-			p.node.NodeID, p.node.WorkflowID, p.firstItem.RootEventID, parentID)
+
+		p.log("Skipping merge for node=%s workflow=%s root_event=%s due to failed parent %s; cleaned pending items", p.node.NodeID, p.node.WorkflowID, p.firstItem.RootEventID, parentID)
 		return fmt.Errorf("parent failed")
 	}
 
-	// Check outputs produced by this parent execution
 	outputs, err := parentExec.GetOutputs()
 	if err != nil {
 		return fmt.Errorf("failed to get outputs for parent %s: %w", parentID, err)
 	}
 
-	// If none of the outputs are on channels that go to this merge, exclude this parent
 	routedToMerge := false
 	for _, ev := range outputs {
 		if _, ok := allowedChannels[ev.Channel]; ok {
@@ -292,17 +404,18 @@ func (p *MergeNodeProcessor) validateMissingParent(parentID string, allowedChann
 	}
 
 	if !routedToMerge {
-		// Parent finished but did not route to this merge along any connected channel.
-		// This join can never be fulfilled for this root event; clean pending items and stop.
-		if err := p.tx.
+		err := p.tx.
 			Where("workflow_id = ?", p.node.WorkflowID).
 			Where("node_id = ?", p.node.NodeID).
 			Where("root_event_id = ?", p.firstItem.RootEventID).
-			Delete(&models.WorkflowNodeQueueItem{}).Error; err != nil {
+			Delete(&models.WorkflowNodeQueueItem{}).Error
+
+		if err != nil {
 			return fmt.Errorf("failed to clean merge queue items after non-routing parent: %w", err)
 		}
-		p.w.log("Skipping merge for node=%s workflow=%s root_event=%s due to parent %s not routing to merge; cleaned pending items",
-			p.node.NodeID, p.node.WorkflowID, p.firstItem.RootEventID, parentID)
+
+		p.log("Skipping merge for node=%s workflow=%s root_event=%s due to parent %s not routing to merge; cleaned pending items", p.node.NodeID, p.node.WorkflowID, p.firstItem.RootEventID, parentID)
+
 		return fmt.Errorf("parent not routing to merge")
 	}
 
@@ -322,53 +435,88 @@ func (p *MergeNodeProcessor) aggregateInputs() *MergeNodeProcessor {
 	return p
 }
 
-func (p *MergeNodeProcessor) createExecution() *MergeNodeProcessor {
+func (p *MergeNodeProcessor) buildMergedEvent() *MergeNodeProcessor {
 	if p.err != nil {
 		return p
 	}
 
-	// Create a synthetic input event for the merge execution, set as routed to avoid the router picking it up
 	now := time.Now()
+
 	aggEvent := models.WorkflowEvent{
 		WorkflowID: p.node.WorkflowID,
-		NodeID:     p.node.NodeID, // input for merge
+		NodeID:     p.node.NodeID,
 		Channel:    "default",
 		Data:       datatypes.NewJSONType(any(p.aggregated)),
 		State:      models.WorkflowEventStateRouted,
 		CreatedAt:  &now,
 	}
-	if err := p.tx.Create(&aggEvent).Error; err != nil {
+
+	err := p.tx.Create(&aggEvent).Error
+
+	if err != nil {
 		p.err = fmt.Errorf("failed to create aggregate event for merge: %w", err)
 		return p
 	}
 
-	// Build configuration with merged input
+	p.aggEvent = &aggEvent
+
+	return p
+}
+
+func (p *MergeNodeProcessor) createExecution() *MergeNodeProcessor {
+	if p.err != nil {
+		return p
+	}
+
+	if p.aggEvent == nil {
+		p.err = fmt.Errorf("aggregate event not built")
+		return p
+	}
 	config, err := contexts.NewNodeConfigurationBuilder(p.tx, p.node.WorkflowID).
 		WithRootEvent(&p.firstItem.RootEventID).
 		WithInput(p.aggregated).
 		Build(p.node.Configuration.Data())
+
 	if err != nil {
 		p.err = err
 		return p
 	}
 
-	// Create the merge node execution
+	now := time.Now()
+
 	nodeExecution := models.WorkflowNodeExecution{
 		WorkflowID:    p.node.WorkflowID,
 		NodeID:        p.node.NodeID,
 		RootEventID:   p.firstItem.RootEventID,
-		EventID:       aggEvent.ID,
+		EventID:       p.aggEvent.ID,
 		State:         models.WorkflowNodeExecutionStatePending,
 		Configuration: datatypes.NewJSONType(config),
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
-	if err := p.tx.Create(&nodeExecution).Error; err != nil {
+
+	err = p.tx.Create(&nodeExecution).Error
+
+	if err != nil {
 		p.err = fmt.Errorf("failed to create merge node execution: %w", err)
 		return p
 	}
 
-	// Delete the consumed queue items (one per parent)
+	messages.NewWorkflowExecutionCreatedMessage(nodeExecution.WorkflowID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
+	if err := p.node.UpdateState(p.tx, models.WorkflowNodeStateProcessing); err != nil {
+		p.err = err
+		return p
+	}
+
+	p.log("Created merge execution %s for node=%s workflow=%s with %d inputs", nodeExecution.ID, p.node.NodeID, p.node.WorkflowID, len(p.selectedByParent))
+	return p
+}
+
+func (p *MergeNodeProcessor) deleteConsumedItems() *MergeNodeProcessor {
+	if p.err != nil {
+		return p
+	}
+
 	for _, qi := range p.selectedByParent {
 		if err := qi.Delete(p.tx); err != nil {
 			p.err = fmt.Errorf("failed to delete consumed queue item %s: %w", qi.ID, err)
@@ -376,22 +524,9 @@ func (p *MergeNodeProcessor) createExecution() *MergeNodeProcessor {
 		}
 	}
 
-	// Notify and set node as processing
-	messages.NewWorkflowExecutionCreatedMessage(nodeExecution.WorkflowID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
-	if err := p.node.UpdateState(p.tx, models.WorkflowNodeStateProcessing); err != nil {
-		p.err = err
-		return p
-	}
-
-	p.w.log("Created merge execution %s for node=%s workflow=%s with %d inputs", nodeExecution.ID, p.node.NodeID, p.node.WorkflowID, len(p.selectedByParent))
 	return p
 }
 
-func processMergeNode(tx *gorm.DB, node *models.WorkflowNode, firstItem *models.WorkflowNodeQueueItem) (bool, error) {
-	// Note: 'w' needs to be passed in or accessed differently since it's not available in this scope
-	// This assumes the WorkflowNodeQueueWorker instance is available
-	var w *WorkflowNodeQueueWorker // This needs to be properly injected
-
-	processor := newMergeNodeProcessor(w, tx, node, firstItem)
-	return processor.process()
+func (p *MergeNodeProcessor) log(format string, args ...any) {
+	fmt.Printf("[MergeNodeProcessor] "+format+"\n", args...)
 }

@@ -85,6 +85,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 
 	if isMergeNode(node) {
 		w.log("Processing merge node %s for workflow=%s", node.NodeID, node.WorkflowID)
+		w.log("De-queueing item %s for node=%s workflow=%s", queueItem.ID, node.NodeID, node.WorkflowID)
 		_, err := mergenodequeueprocessor.Process(tx, node)
 		if err != nil {
 			return err
