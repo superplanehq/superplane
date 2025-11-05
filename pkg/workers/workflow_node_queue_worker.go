@@ -188,14 +188,22 @@ func (w *WorkflowNodeQueueWorker) buildNodeConfig(tx *gorm.DB, queueItem *models
 }
 
 func (w *WorkflowNodeQueueWorker) findComponent(node *models.WorkflowNode) (components.Component, error) {
-	ref := node.Ref.Data()
+    ref := node.Ref.Data()
 
-	comp, err := w.registry.GetComponent(ref.Component.Name)
-	if err != nil {
-		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
-	}
+    if w.registry == nil {
+        return nil, fmt.Errorf("registry is not initialized")
+    }
 
-	return comp, nil
+    if ref.Component == nil || ref.Component.Name == "" {
+        return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
+    }
+
+    comp, err := w.registry.GetComponent(ref.Component.Name)
+    if err != nil {
+        return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+    }
+
+    return comp, nil
 }
 
 func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
