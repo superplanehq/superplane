@@ -43,39 +43,39 @@ func TestTimeGate_OutputChannels(t *testing.T) {
 func TestTimeGate_Configuration(t *testing.T) {
 	tg := &TimeGate{}
 	config := tg.Configuration()
-	assert.Len(t, config, 7) // mode, startTime, endTime, days, startDayInYear, endDayInYear, timezone
+	assert.Len(t, config, 7) // mode, days, startDayInYear, startTime, endDayInYear, endTime, timezone
 
 	// Check mode field
 	assert.Equal(t, "mode", config[0].Name)
 	assert.Equal(t, "Mode", config[0].Label)
 	assert.True(t, config[0].Required)
 
-	// Check startTime field
-	assert.Equal(t, "startTime", config[1].Name)
-	assert.Equal(t, "Start Time (HH:MM)", config[1].Label)
-	assert.True(t, config[1].Required) // Now required for all modes
-	assert.Equal(t, "09:00", config[1].Default)
-
-	// Check endTime field
-	assert.Equal(t, "endTime", config[2].Name)
-	assert.Equal(t, "End Time (HH:MM)", config[2].Label)
-	assert.True(t, config[2].Required) // Now required for all modes
-	assert.Equal(t, "17:00", config[2].Default)
-
 	// Check days field
-	assert.Equal(t, "days", config[3].Name)
-	assert.Equal(t, "Days of Week", config[3].Label)
-	assert.False(t, config[3].Required)
+	assert.Equal(t, "days", config[1].Name)
+	assert.Equal(t, "Days of Week", config[1].Label)
+	assert.False(t, config[1].Required) // Not required because of visibility conditions
 
 	// Check startDayInYear field
-	assert.Equal(t, "startDayInYear", config[4].Name)
-	assert.Equal(t, "Start Day (MM/DD)", config[4].Label)
-	assert.False(t, config[4].Required) // Not required because of visibility conditions
+	assert.Equal(t, "startDayInYear", config[2].Name)
+	assert.Equal(t, "Start Day (MM/DD)", config[2].Label)
+	assert.False(t, config[2].Required) // Not required because of visibility conditions
+
+	// Check startTime field
+	assert.Equal(t, "startTime", config[3].Name)
+	assert.Equal(t, "Start Time (HH:MM)", config[3].Label)
+	assert.True(t, config[3].Required) // Required for all modes
+	assert.Equal(t, "09:00", config[3].Default)
 
 	// Check endDayInYear field
-	assert.Equal(t, "endDayInYear", config[5].Name)
-	assert.Equal(t, "End Day (MM/DD)", config[5].Label)
-	assert.False(t, config[5].Required) // Not required because of visibility conditions
+	assert.Equal(t, "endDayInYear", config[4].Name)
+	assert.Equal(t, "End Day (MM/DD)", config[4].Label)
+	assert.False(t, config[4].Required) // Not required because of visibility conditions
+
+	// Check endTime field
+	assert.Equal(t, "endTime", config[5].Name)
+	assert.Equal(t, "End Time (HH:MM)", config[5].Label)
+	assert.True(t, config[5].Required) // Required for all modes
+	assert.Equal(t, "17:00", config[5].Default)
 }
 
 func TestTimeGate_Actions(t *testing.T) {
