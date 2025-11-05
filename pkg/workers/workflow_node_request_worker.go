@@ -92,12 +92,7 @@ func (w *NodeRequestWorker) invokeAction(tx *gorm.DB, request *models.WorkflowNo
 }
 
 func (w *NodeRequestWorker) invokeTriggerAction(tx *gorm.DB, request *models.WorkflowNodeRequest) error {
-	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, request.WorkflowID)
-	if err != nil {
-		return fmt.Errorf("workflow %s not found: %w", request.WorkflowID, err)
-	}
-
-	node, err := workflow.FindNode(request.NodeID)
+	node, err := models.FindWorkflowNode(tx, request.WorkflowID, request.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
@@ -154,12 +149,7 @@ func (w *NodeRequestWorker) invokeComponentAction(tx *gorm.DB, request *models.W
 }
 
 func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest, execution *models.WorkflowNodeExecution) error {
-	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, execution.WorkflowID)
-	if err != nil {
-		return fmt.Errorf("workflow %s not found: %w", execution.WorkflowID, err)
-	}
-
-	node, err := workflow.FindNode(execution.NodeID)
+	node, err := models.FindWorkflowNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
@@ -185,9 +175,9 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 		Configuration:         node.Configuration.Data(),
 		Parameters:            spec.InvokeAction.Parameters,
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
-		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
-		IntegrationContext:    contexts.NewIntegrationContext(w.registry),
+		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
+		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
+		IntegrationContext:    contexts.NewIntegrationContext(tx, w.registry),
 	}
 
 	err = component.HandleAction(actionCtx)
@@ -204,17 +194,12 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(tx *gorm.DB, request
 }
 
 func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request *models.WorkflowNodeRequest, execution *models.WorkflowNodeExecution) error {
-	workflow, err := models.FindUnscopedWorkflowInTransaction(tx, execution.WorkflowID)
-	if err != nil {
-		return fmt.Errorf("workflow %s not found: %w", execution.WorkflowID, err)
-	}
-
 	parentExecution, err := models.FindNodeExecutionInTransaction(tx, execution.WorkflowID, *execution.ParentExecutionID)
 	if err != nil {
 		return fmt.Errorf("parent execution %s not found: %w", execution.ParentExecutionID, err)
 	}
 
-	parentNode, err := workflow.FindNode(parentExecution.NodeID)
+	parentNode, err := models.FindWorkflowNode(tx, execution.WorkflowID, parentExecution.NodeID)
 	if err != nil {
 		return fmt.Errorf("node not found: %w", err)
 	}
@@ -251,9 +236,9 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(tx *gorm.DB, request 
 		Configuration:         childNode.Configuration,
 		Parameters:            spec.InvokeAction.Parameters,
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
-		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
-		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
-		IntegrationContext:    contexts.NewIntegrationContext(w.registry),
+		ExecutionStateContext: contexts.NewExecutionStateContext(tx, execution),
+		RequestContext:        contexts.NewExecutionRequestContext(tx, execution),
+		IntegrationContext:    contexts.NewIntegrationContext(tx, w.registry),
 	}
 
 	err = component.HandleAction(actionCtx)

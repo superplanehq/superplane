@@ -295,19 +295,21 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 	outputs := make(map[string][]any)
 	for _, outputChannel := range blueprint.OutputChannels {
 		fullNodeID := parentNode.NodeID + ":" + outputChannel.NodeID
-		childExecution := w.findChild(finishedChildren, fullNodeID)
-		if childExecution == nil {
+		childExecutions := w.findChildrenForNode(finishedChildren, fullNodeID)
+		if len(childExecutions) == 0 {
 			continue
 		}
 
-		outputEvents, err := childExecution.GetOutputs()
-		if err != nil {
-			return fmt.Errorf("error finding output events for %s: %v", fullNodeID, err)
-		}
+		for _, childExecution := range childExecutions {
+			outputEvents, err := childExecution.GetOutputsInTransaction(tx)
+			if err != nil {
+				return fmt.Errorf("error finding output events for %s: %v", fullNodeID, err)
+			}
 
-		for _, outputEvent := range outputEvents {
-			if outputEvent.Channel == outputChannel.NodeOutputChannel {
-				outputs[outputChannel.Name] = append(outputs[outputChannel.Name], outputEvent.Data.Data())
+			for _, outputEvent := range outputEvents {
+				if outputEvent.Channel == outputChannel.NodeOutputChannel {
+					outputs[outputChannel.Name] = append(outputs[outputChannel.Name], outputEvent.Data.Data())
+				}
 			}
 		}
 	}
@@ -324,14 +326,15 @@ func (w *WorkflowEventRouter) completeParentExecutionIfNeeded(
 	return event.RoutedInTransaction(tx)
 }
 
-func (w *WorkflowEventRouter) findChild(children []models.WorkflowNodeExecution, nodeID string) *models.WorkflowNodeExecution {
-	for _, child := range children {
+func (w *WorkflowEventRouter) findChildrenForNode(allChildren []models.WorkflowNodeExecution, nodeID string) []models.WorkflowNodeExecution {
+	var childrenForNode []models.WorkflowNodeExecution
+	for _, child := range allChildren {
 		if child.NodeID == nodeID {
-			return &child
+			childrenForNode = append(childrenForNode, child)
 		}
 	}
 
-	return nil
+	return childrenForNode
 }
 
 func (w *WorkflowEventRouter) log(format string, v ...any) {

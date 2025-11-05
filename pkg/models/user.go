@@ -90,9 +90,13 @@ func FindMaybeDeletedUserByID(orgID, id string) (*User, error) {
 }
 
 func FindActiveUserByID(orgID, id string) (*User, error) {
+	return FindActiveUserByIDInTransaction(database.Conn(), orgID, id)
+}
+
+func FindActiveUserByIDInTransaction(tx *gorm.DB, orgID, id string) (*User, error) {
 	var user User
 
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", id).
 		Where("organization_id = ?", orgID).
 		First(&user).

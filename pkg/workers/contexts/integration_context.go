@@ -8,14 +8,17 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/triggers"
+	"gorm.io/gorm"
 )
 
 type IntegrationContext struct {
+	tx       *gorm.DB
 	registry *registry.Registry
 }
 
-func NewIntegrationContext(registry *registry.Registry) triggers.IntegrationContext {
+func NewIntegrationContext(tx *gorm.DB, registry *registry.Registry) triggers.IntegrationContext {
 	return &IntegrationContext{
+		tx:       tx,
 		registry: registry,
 	}
 }
@@ -26,7 +29,7 @@ func (c *IntegrationContext) GetIntegration(ID string) (integrations.ResourceMan
 		return nil, err
 	}
 
-	integration, err := models.FindIntegrationByID(integrationID)
+	integration, err := models.FindIntegrationByIDInTransaction(c.tx, integrationID)
 	if err != nil {
 		return nil, err
 	}
