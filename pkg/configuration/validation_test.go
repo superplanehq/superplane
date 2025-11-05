@@ -150,20 +150,20 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 		{
 			name: "valid time range",
 			config: map[string]any{
-				"startTime":      "09:00",
-				"endTime":        "17:00",
-				"startDateTime":  "2024-12-31T09:00",
-				"endDateTime":    "2024-12-31T17:00",
+				"startTime":     "09:00",
+				"endTime":       "17:00",
+				"startDateTime": "2024-12-31T09:00",
+				"endDateTime":   "2024-12-31T17:00",
 			},
 			expectError: false,
 		},
 		{
 			name: "invalid time range - start after end",
 			config: map[string]any{
-				"startTime":      "17:00",
-				"endTime":        "09:00",
-				"startDateTime":  "2024-12-31T09:00",
-				"endDateTime":    "2024-12-31T17:00",
+				"startTime":     "17:00",
+				"endTime":       "09:00",
+				"startDateTime": "2024-12-31T09:00",
+				"endDateTime":   "2024-12-31T17:00",
 			},
 			expectError: true,
 			errorMsg:    "start time must be before end time",
@@ -171,10 +171,10 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 		{
 			name: "invalid datetime range - start after end",
 			config: map[string]any{
-				"startTime":      "09:00",
-				"endTime":        "17:00",
-				"startDateTime":  "2024-12-31T17:00",
-				"endDateTime":    "2024-12-31T09:00",
+				"startTime":     "09:00",
+				"endTime":       "17:00",
+				"startDateTime": "2024-12-31T17:00",
+				"endDateTime":   "2024-12-31T09:00",
 			},
 			expectError: true,
 			errorMsg:    "start date & time must be before end date & time",
@@ -182,10 +182,10 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 		{
 			name: "equal times - should fail",
 			config: map[string]any{
-				"startTime":      "09:00",
-				"endTime":        "09:00",
-				"startDateTime":  "2024-12-31T09:00",
-				"endDateTime":    "2024-12-31T17:00",
+				"startTime":     "09:00",
+				"endTime":       "09:00",
+				"startDateTime": "2024-12-31T09:00",
+				"endDateTime":   "2024-12-31T17:00",
 			},
 			expectError: true,
 			errorMsg:    "start time must be before end time",
@@ -262,6 +262,84 @@ func TestValidateTime_CustomFormat(t *testing.T) {
 			}
 
 			err := ValidateConfiguration([]Field{field}, config)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateDayInYearComparison(t *testing.T) {
+	fields := []Field{
+		{
+			Name:     "startDayInYear",
+			Type:     FieldTypeDayInYear,
+			Required: true,
+			ValidationRules: []ValidationRule{
+				{
+					Type:        ValidationRuleLessThan,
+					CompareWith: "endDayInYear",
+					Message:     "start day must be before end day",
+				},
+			},
+		},
+		{
+			Name:     "endDayInYear",
+			Type:     FieldTypeDayInYear,
+			Required: true,
+		},
+	}
+
+	tests := []struct {
+		name        string
+		config      map[string]any
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid day range",
+			config: map[string]any{
+				"startDayInYear": "12/25",
+				"endDayInYear":   "12/31",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid day range - start after end",
+			config: map[string]any{
+				"startDayInYear": "12/31",
+				"endDayInYear":   "12/25",
+			},
+			expectError: true,
+			errorMsg:    "start day must be before end day",
+		},
+		{
+			name: "cross-year range - valid",
+			config: map[string]any{
+				"startDayInYear": "12/25",
+				"endDayInYear":   "01/05",
+			},
+			expectError: false, // Cross-year ranges are allowed
+		},
+		{
+			name: "same day - valid",
+			config: map[string]any{
+				"startDayInYear": "07/04",
+				"endDayInYear":   "07/04",
+			},
+			expectError: true, // Same day should fail for less_than comparison
+			errorMsg:    "start day must be before end day",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConfiguration(fields, tt.config)
 			if tt.expectError {
 				assert.Error(t, err)
 				if tt.errorMsg != "" {

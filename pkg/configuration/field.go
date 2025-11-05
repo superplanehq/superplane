@@ -13,6 +13,7 @@ const (
 	FieldTypeTime                = "time"
 	FieldTypeDate                = "date"
 	FieldTypeDateTime            = "datetime"
+	FieldTypeDayInYear           = "day-in-year"
 	FieldTypeUser                = "user"
 	FieldTypeRole                = "role"
 	FieldTypeGroup               = "group"
@@ -86,6 +87,7 @@ type TypeOptions struct {
 	Time        *TimeTypeOptions        `json:"time,omitempty"`
 	Date        *DateTypeOptions        `json:"date,omitempty"`
 	DateTime    *DateTimeTypeOptions    `json:"datetime,omitempty"`
+	DayInYear   *DayInYearTypeOptions   `json:"day_in_year,omitempty"`
 }
 
 /*
@@ -122,6 +124,13 @@ type DateTypeOptions struct {
  */
 type DateTimeTypeOptions struct {
 	Format string `json:"format,omitempty"` // Expected format, e.g., "2006-01-02T15:04", "YYYY-MM-DDTHH:MM"
+}
+
+/*
+ * DayInYearTypeOptions specifies format and constraints for day-in-year fields
+ */
+type DayInYearTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, defaults to "MM/DD", e.g., "12/25"
 }
 
 /*

@@ -43,39 +43,39 @@ func TestTimeGate_OutputChannels(t *testing.T) {
 func TestTimeGate_Configuration(t *testing.T) {
 	tg := &TimeGate{}
 	config := tg.Configuration()
-	assert.Len(t, config, 7) // mode, startTime, endTime, days, startDateTime, endDateTime, timezone
+	assert.Len(t, config, 7) // mode, days, startDayInYear, startTime, endDayInYear, endTime, timezone
 
 	// Check mode field
 	assert.Equal(t, "mode", config[0].Name)
 	assert.Equal(t, "Mode", config[0].Label)
 	assert.True(t, config[0].Required)
 
-	// Check startTime field
-	assert.Equal(t, "startTime", config[1].Name)
-	assert.Equal(t, "Start Time (HH:MM)", config[1].Label)
-	assert.False(t, config[1].Required) // Not required because of visibility conditions
-	assert.Equal(t, "09:00", config[1].Default)
-
-	// Check endTime field
-	assert.Equal(t, "endTime", config[2].Name)
-	assert.Equal(t, "End Time (HH:MM)", config[2].Label)
-	assert.False(t, config[2].Required) // Not required because of visibility conditions
-	assert.Equal(t, "17:00", config[2].Default)
-
 	// Check days field
-	assert.Equal(t, "days", config[3].Name)
-	assert.Equal(t, "Days of Week", config[3].Label)
-	assert.True(t, config[3].Required)
+	assert.Equal(t, "days", config[1].Name)
+	assert.Equal(t, "Days of Week", config[1].Label)
+	assert.False(t, config[1].Required) // Not required because of visibility conditions
 
-	// Check startDateTime field
-	assert.Equal(t, "startDateTime", config[4].Name)
-	assert.Equal(t, "Start Date & Time", config[4].Label)
+	// Check startDayInYear field
+	assert.Equal(t, "startDayInYear", config[2].Name)
+	assert.Equal(t, "Start Day (MM/DD)", config[2].Label)
+	assert.False(t, config[2].Required) // Not required because of visibility conditions
+
+	// Check startTime field
+	assert.Equal(t, "startTime", config[3].Name)
+	assert.Equal(t, "Start Time (HH:MM)", config[3].Label)
+	assert.True(t, config[3].Required) // Required for all modes
+	assert.Equal(t, "09:00", config[3].Default)
+
+	// Check endDayInYear field
+	assert.Equal(t, "endDayInYear", config[4].Name)
+	assert.Equal(t, "End Day (MM/DD)", config[4].Label)
 	assert.False(t, config[4].Required) // Not required because of visibility conditions
 
-	// Check endDateTime field
-	assert.Equal(t, "endDateTime", config[5].Name)
-	assert.Equal(t, "End Date & Time", config[5].Label)
-	assert.False(t, config[5].Required) // Not required because of visibility conditions
+	// Check endTime field
+	assert.Equal(t, "endTime", config[5].Name)
+	assert.Equal(t, "End Time (HH:MM)", config[5].Label)
+	assert.True(t, config[5].Required) // Required for all modes
+	assert.Equal(t, "17:00", config[5].Default)
 }
 
 func TestTimeGate_Actions(t *testing.T) {
@@ -224,24 +224,22 @@ func TestValidateSpec(t *testing.T) {
 		{
 			name: "valid include specific spec",
 			spec: Spec{
-				Mode:          "include_specific",
-				StartTime:     "00:00",
-				EndTime:       "23:59",
-				Days:          []string{"monday", "tuesday"},
-				StartDateTime: "2024-12-31T00:00",
-				EndDateTime:   "2025-01-01T23:59",
+				Mode:           "include_specific",
+				StartTime:      "00:00",
+				EndTime:        "23:59",
+				StartDayInYear: "12/31",
+				EndDayInYear:   "01/01",
 			},
 			hasError: false,
 		},
 		{
 			name: "valid exclude specific spec",
 			spec: Spec{
-				Mode:          "exclude_specific",
-				StartTime:     "12:00",
-				EndTime:       "13:00",
-				Days:          []string{"friday"},
-				StartDateTime: "2024-07-04T12:00",
-				EndDateTime:   "2024-07-04T13:00",
+				Mode:           "exclude_specific",
+				StartTime:      "12:00",
+				EndTime:        "13:00",
+				StartDayInYear: "07/04",
+				EndDayInYear:   "07/04",
 			},
 			hasError: false,
 		},
@@ -257,41 +255,38 @@ func TestValidateSpec(t *testing.T) {
 			errorMsg: "invalid mode",
 		},
 		{
-			name: "missing datetimes for specific mode",
+			name: "missing days for specific mode",
 			spec: Spec{
 				Mode:      "include_specific",
 				StartTime: "09:00",
 				EndTime:   "17:00",
-				Days:      []string{"monday"},
 			},
 			hasError: true,
-			errorMsg: "startDateTime and endDateTime are required",
+			errorMsg: "startDayInYear and endDayInYear are required",
 		},
 		{
-			name: "invalid start datetime format",
+			name: "invalid start day format",
 			spec: Spec{
-				Mode:          "include_specific",
-				StartTime:     "09:00",
-				EndTime:       "17:00",
-				Days:          []string{"monday"},
-				StartDateTime: "invalid-datetime",
-				EndDateTime:   "2025-01-01T23:59",
+				Mode:           "include_specific",
+				StartTime:      "09:00",
+				EndTime:        "17:00",
+				StartDayInYear: "invalid-day",
+				EndDayInYear:   "01/01",
 			},
 			hasError: true,
-			errorMsg: "invalid startDateTime format",
+			errorMsg: "startDayInYear error",
 		},
 		{
-			name: "start datetime after end datetime",
+			name: "start day after end day in same month",
 			spec: Spec{
-				Mode:          "include_specific",
-				StartTime:     "10:00",
-				EndTime:       "11:00",
-				Days:          []string{"monday"},
-				StartDateTime: "2025-01-02T10:00",
-				EndDateTime:   "2025-01-01T11:00",
+				Mode:           "include_specific",
+				StartTime:      "10:00",
+				EndTime:        "11:00",
+				StartDayInYear: "01/15",
+				EndDayInYear:   "01/10",
 			},
 			hasError: true,
-			errorMsg: "start datetime",
+			errorMsg: "start day",
 		},
 		{
 			name: "invalid start time",
@@ -613,6 +608,76 @@ func TestFindNextExcludeEndTime(t *testing.T) {
 			} else if tt.expectedIsFuture {
 				assert.True(t, result.After(testTime), tt.description)
 				assert.False(t, result.IsZero(), "Should not return zero time")
+			}
+		})
+	}
+}
+
+func TestParseDayInYear(t *testing.T) {
+	tg := &TimeGate{}
+
+	tests := []struct {
+		name         string
+		input        string
+		expectedMonth int
+		expectedDay   int
+		hasError     bool
+	}{
+		{"valid Christmas", "12/25", 12, 25, false},
+		{"valid New Year", "01/01", 1, 1, false},
+		{"valid leap day", "02/29", 2, 29, false},
+		{"valid July 4th", "07/04", 7, 4, false},
+		{"single digit month and day", "1/1", 1, 1, false},
+		{"empty string", "", 0, 0, true},
+		{"invalid format", "abc", 0, 0, true},
+		{"invalid month", "13/01", 0, 0, true},
+		{"invalid day", "01/32", 0, 0, true},
+		{"negative month", "-1/15", 0, 0, true},
+		{"negative day", "06/-5", 0, 0, true},
+		{"missing slash", "1225", 0, 0, true},
+		{"extra parts", "12/25/2024", 0, 0, true},
+		{"zero month", "00/15", 0, 0, true},
+		{"zero day", "06/00", 0, 0, true},
+		{"invalid day for February", "02/30", 0, 0, true},
+		{"invalid day for April", "04/31", 0, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			month, day, err := tg.parseDayInYear(tt.input)
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedMonth, month)
+				assert.Equal(t, tt.expectedDay, day)
+			}
+		})
+	}
+}
+
+func TestValidateDayInYear(t *testing.T) {
+	tg := &TimeGate{}
+
+	tests := []struct {
+		name     string
+		input    string
+		hasError bool
+	}{
+		{"valid Christmas", "12/25", false},
+		{"valid New Year", "01/01", false},
+		{"invalid format", "invalid", true},
+		{"invalid month", "13/01", true},
+		{"invalid day", "01/32", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tg.validateDayInYear(tt.input)
+			if tt.hasError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
