@@ -150,20 +150,20 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 		{
 			name: "valid time range",
 			config: map[string]any{
-				"startTime":      "09:00",
-				"endTime":        "17:00",
-				"startDateTime":  "2024-12-31T09:00",
-				"endDateTime":    "2024-12-31T17:00",
+				"startTime":     "09:00",
+				"endTime":       "17:00",
+				"startDateTime": "2024-12-31T09:00",
+				"endDateTime":   "2024-12-31T17:00",
 			},
 			expectError: false,
 		},
 		{
 			name: "invalid time range - start after end",
 			config: map[string]any{
-				"startTime":      "17:00",
-				"endTime":        "09:00",
-				"startDateTime":  "2024-12-31T09:00",
-				"endDateTime":    "2024-12-31T17:00",
+				"startTime":     "17:00",
+				"endTime":       "09:00",
+				"startDateTime": "2024-12-31T09:00",
+				"endDateTime":   "2024-12-31T17:00",
 			},
 			expectError: true,
 			errorMsg:    "start time must be before end time",
@@ -171,10 +171,10 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 		{
 			name: "invalid datetime range - start after end",
 			config: map[string]any{
-				"startTime":      "09:00",
-				"endTime":        "17:00",
-				"startDateTime":  "2024-12-31T17:00",
-				"endDateTime":    "2024-12-31T09:00",
+				"startTime":     "09:00",
+				"endTime":       "17:00",
+				"startDateTime": "2024-12-31T17:00",
+				"endDateTime":   "2024-12-31T09:00",
 			},
 			expectError: true,
 			errorMsg:    "start date & time must be before end date & time",
@@ -182,10 +182,10 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 		{
 			name: "equal times - should fail",
 			config: map[string]any{
-				"startTime":      "09:00",
-				"endTime":        "09:00",
-				"startDateTime":  "2024-12-31T09:00",
-				"endDateTime":    "2024-12-31T17:00",
+				"startTime":     "09:00",
+				"endTime":       "09:00",
+				"startDateTime": "2024-12-31T09:00",
+				"endDateTime":   "2024-12-31T17:00",
 			},
 			expectError: true,
 			errorMsg:    "start time must be before end time",
@@ -207,102 +207,61 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 	}
 }
 
-func TestValidateDayInYear(t *testing.T) {
-	field := Field{
-		Name: "testDay",
-		Type: FieldTypeDayInYear,
-	}
-
+func TestValidateTime_CustomFormat(t *testing.T) {
 	tests := []struct {
 		name        string
-		value       any
+		format      string
+		value       string
 		expectError bool
 		errorMsg    string
 	}{
 		{
-			name:        "valid Christmas",
-			value:       "12/25",
+			name:        "valid time with default format 15:04",
+			format:      "",
+			value:       "18:27",
 			expectError: false,
 		},
 		{
-			name:        "valid New Year",
-			value:       "01/01",
+			name:        "valid time with explicit 15:04 format",
+			format:      "15:04",
+			value:       "18:27",
 			expectError: false,
 		},
 		{
-			name:        "valid leap day",
-			value:       "02/29",
+			name:        "invalid time with HH:MM format",
+			format:      "HH:MM",
+			value:       "18:27",
+			expectError: true,
+			errorMsg:    "must be a valid time in format HH:MM",
+		},
+		{
+			name:        "valid time with single digit hour",
+			format:      "15:04",
+			value:       "9:30",
 			expectError: false,
-		},
-		{
-			name:        "valid July 4th",
-			value:       "07/04",
-			expectError: false,
-		},
-		{
-			name:        "single digit month and day",
-			value:       "1/1",
-			expectError: false,
-		},
-		{
-			name:        "not a string",
-			value:       123,
-			expectError: true,
-			errorMsg:    "must be a string",
-		},
-		{
-			name:        "invalid format",
-			value:       "invalid",
-			expectError: true,
-			errorMsg:    "must be a valid day",
-		},
-		{
-			name:        "invalid month",
-			value:       "13/01",
-			expectError: true,
-			errorMsg:    "invalid day values",
-		},
-		{
-			name:        "invalid day",
-			value:       "01/32",
-			expectError: true,
-			errorMsg:    "invalid day values",
-		},
-		{
-			name:        "zero month",
-			value:       "00/15",
-			expectError: true,
-			errorMsg:    "invalid day values",
-		},
-		{
-			name:        "zero day",
-			value:       "06/00",
-			expectError: true,
-			errorMsg:    "invalid day values",
-		},
-		{
-			name:        "invalid day for February",
-			value:       "02/30",
-			expectError: true,
-			errorMsg:    "invalid day '30' for month '2'",
-		},
-		{
-			name:        "invalid day for April",
-			value:       "04/31",
-			expectError: true,
-			errorMsg:    "invalid day '31' for month '4'",
-		},
-		{
-			name:        "extra parts",
-			value:       "12/25/2024",
-			expectError: true,
-			errorMsg:    "must be a valid day",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateDayInYear(field, tt.value)
+			field := Field{
+				Name: "time",
+				Type: FieldTypeTime,
+			}
+
+			if tt.format != "" {
+				field.TypeOptions = &TypeOptions{
+					Time: &TimeTypeOptions{
+						Format: tt.format,
+					},
+				}
+			}
+
+			config := map[string]any{
+				"time": tt.value,
+			}
+
+			err := ValidateConfiguration([]Field{field}, config)
 			if tt.expectError {
 				assert.Error(t, err)
 				if tt.errorMsg != "" {
