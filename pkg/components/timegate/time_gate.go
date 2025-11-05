@@ -285,7 +285,6 @@ func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	// Parse timezone offset and create timezone-aware current time
 	timezone := tg.parseTimezone(spec.Timezone)
 	now := time.Now().In(timezone)
 	nextValidTime := tg.findNextValidTime(now, spec)
@@ -532,22 +531,17 @@ func (tg *TimeGate) findNextExcludeEndTime(now time.Time, spec Spec) time.Time {
 	return now
 }
 
-// parseTimezone converts a timezone offset string to a time.Location
 func (tg *TimeGate) parseTimezone(timezoneStr string) *time.Location {
 	if timezoneStr == "" {
-		return time.UTC // Default to UTC if no timezone specified
+		return time.UTC
 	}
 
-	// Parse offset as float to handle half-hour timezones like +5.5
 	offsetHours, err := strconv.ParseFloat(timezoneStr, 64)
 	if err != nil {
-		return time.UTC // Fallback to UTC on parse error
+		return time.UTC
 	}
-
-	// Convert hours to seconds (Go uses seconds for timezone offsets)
 	offsetSeconds := int(offsetHours * 3600)
 
-	// Create fixed timezone with the offset
 	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
 }
 
@@ -598,7 +592,6 @@ func contains(slice []string, item string) bool {
 }
 
 func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, spec Spec) time.Time {
-	// Parse datetime strings in the same timezone as 'now' (configured timezone)
 	startDateTime, err := time.ParseInLocation("2006-01-02T15:04", spec.StartDateTime, now.Location())
 	if err != nil {
 		return time.Time{}
@@ -609,23 +602,18 @@ func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, spec Spec) time.T
 		return time.Time{}
 	}
 
-	// Check if we're currently in the datetime window
 	if now.After(startDateTime) && now.Before(endDateTime) {
 		currentDay := getDayString(now.Weekday())
 		if contains(spec.Days, currentDay) {
 			return now
 		}
-		// If current time is in datetime range but wrong day, look for next valid day
-		// Fall through to the search logic below
 	}
 
-	// If we're before the start time, check if the start day is in selected days
 	if now.Before(startDateTime) {
 		startDay := getDayString(startDateTime.Weekday())
 		if contains(spec.Days, startDay) {
 			return startDateTime
 		}
-		// If start day is not selected, fall through to search for next valid day
 	}
 
 	// Search for the next occurrence of this datetime on a selected day
@@ -635,17 +623,14 @@ func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, spec Spec) time.T
 		candidateDay := getDayString(candidateDate.Weekday())
 
 		if contains(spec.Days, candidateDay) {
-			// Found a selected day, return the start time on that day
 			return candidateDate
 		}
 	}
 
-	// If no valid day found within a week, no valid time
 	return time.Time{}
 }
 
 func (tg *TimeGate) findNextExcludeSpecificEndTime(now time.Time, spec Spec) time.Time {
-	// Parse datetime strings in the same timezone as 'now' (configured timezone)
 	startDateTime, err := time.ParseInLocation("2006-01-02T15:04", spec.StartDateTime, now.Location())
 	if err != nil {
 		return time.Time{}
@@ -656,19 +641,15 @@ func (tg *TimeGate) findNextExcludeSpecificEndTime(now time.Time, spec Spec) tim
 		return time.Time{}
 	}
 
-	// Check if we're outside the datetime window OR the current day is not selected
 	currentDay := getDayString(now.Weekday())
 
-	// If current day is not in selected days, allow execution now
 	if !contains(spec.Days, currentDay) {
 		return now
 	}
 
-	// If current day is selected, check datetime range
 	if now.Before(startDateTime) || now.After(endDateTime) {
 		return now
 	}
 
-	// We're in exclude range on a selected day, wait until end of range
 	return endDateTime
 }
