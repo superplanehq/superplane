@@ -8,38 +8,25 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type WorkflowNodeQueueWorker struct {
-    semaphore *semaphore.Weighted
+	registry  *registry.Registry
+	semaphore *semaphore.Weighted
 }
 
-// ProcessQueueContext holds the information a node needs to process a queue item.
-// It propagates the transaction context per our DB transaction guidelines.
-type ProcessQueueContext struct {
-    Tx          *gorm.DB
-    Node        *models.WorkflowNode
-    QueueItem   *models.WorkflowNodeQueueItem
-    Event       *models.WorkflowEvent
-    Config      map[string]any
-}
-
-// NodeProcessor is implemented by component handlers to process queue items.
-type NodeProcessor interface {
-    ProcessQueueItem(ctx ProcessQueueContext) error
-}
-
-func NewWorkflowNodeQueueWorker() *WorkflowNodeQueueWorker {
-    return &WorkflowNodeQueueWorker{
-        semaphore: semaphore.NewWeighted(25),
-    }
+func NewWorkflowNodeQueueWorker(registry *registry.Registry) *WorkflowNodeQueueWorker {
+	return &WorkflowNodeQueueWorker{
+		registry:  registry,
+		semaphore: semaphore.NewWeighted(25),
+	}
 }
 
 func (w *WorkflowNodeQueueWorker) Start(ctx context.Context) {
@@ -87,77 +74,78 @@ func (w *WorkflowNodeQueueWorker) LockAndProcessNode(node models.WorkflowNode) e
 }
 
 func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.WorkflowNode) error {
-    queueItem, err := node.FirstQueueItem(tx)
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            return nil
-        }
+	queueItem, err := node.FirstQueueItem(tx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
 
-        return err
-    }
+		return err
+	}
 
-    w.log("De-queueing item %s for node=%s workflow=%s", queueItem.ID, node.NodeID, node.WorkflowID)
-    return w.processOrCreateExecution(tx, node, queueItem)
+	event, err := w.findEvent(tx, queueItem)
+	if err != nil {
+		return err
+	}
+
+	config, err := w.buildNodeConfig(tx, queueItem, node, event)
+	if err != nil {
+		return err
+	}
+
+	comp, err := w.findComponent(node)
+	if err != nil {
+		return err
+	}
+
+	ctx := components.ProcessQueueContext{
+		WorkflowID:    node.WorkflowID.String(),
+		NodeID:        node.NodeID,
+		Configuration: config,
+		RootEventID:   queueItem.RootEventID.String(),
+		EventID:       event.ID.String(),
+		Input:         event.Data.Data(),
+	}
+
+	if err := comp.ProcessQueueItem(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (w *WorkflowNodeQueueWorker) processOrCreateExecution(tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) error {
-    event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
-    if err != nil {
-        return fmt.Errorf("failed to event %s: %w", queueItem.EventID, err)
-    }
+func (w *WorkflowNodeQueueWorker) findEvent(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem) (*models.WorkflowEvent, error) {
+	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find event %s: %w", queueItem.EventID, err)
+	}
 
-    config, err := contexts.NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
-        WithRootEvent(&queueItem.RootEventID).
-        WithPreviousExecution(event.ExecutionID).
-        WithInput(event.Data.Data()).
-        Build(node.Configuration.Data())
+	return event, nil
+}
 
-    if err != nil {
-        return err
-    }
+func (w *WorkflowNodeQueueWorker) buildNodeConfig(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem, node *models.WorkflowNode, event *models.WorkflowEvent) (any, error) {
+	config, err := contexts.NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+		WithRootEvent(&queueItem.RootEventID).
+		WithPreviousExecution(event.ExecutionID).
+		WithInput(event.Data.Data()).
+		Build(node.Configuration.Data())
 
-    // Lookup component by node ref (for component/blueprint handling, component processes its own queue item)
-    // Currently, we expect all nodes to implement processing through their component.
-    if processor, ok := any(node).(NodeProcessor); ok {
-        pctx := ProcessQueueContext{
-            Tx:        tx,
-            Node:      node,
-            QueueItem: queueItem,
-            Event:     event,
-            Config:    config,
-        }
-        if err := processor.ProcessQueueItem(pctx); err != nil {
-            return err
-        }
-        return nil
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    now := time.Now()
-    nodeExecution := models.WorkflowNodeExecution{
-        WorkflowID:          queueItem.WorkflowID,
-        NodeID:              node.NodeID,
-        RootEventID:         queueItem.RootEventID,
-        EventID:             event.ID,
-        PreviousExecutionID: event.ExecutionID,
-        State:               models.WorkflowNodeExecutionStatePending,
-        Configuration:       datatypes.NewJSONType(config),
-        CreatedAt:           &now,
-        UpdatedAt:           &now,
-    }
+	return config, nil
+}
 
-    err = tx.Create(&nodeExecution).Error
-    if err != nil {
-        return err
-    }
+func (w *WorkflowNodeQueueWorker) findComponent(node *models.WorkflowNode) (components.Component, error) {
+	ref := node.Ref.Data()
 
-    err = queueItem.Delete(tx)
-    if err != nil {
-        return err
-    }
+	comp, err := w.registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+	}
 
-    messages.NewWorkflowExecutionCreatedMessage(nodeExecution.WorkflowID.String(), &nodeExecution).PublishWithDelay(1 * time.Second)
-
-    return node.UpdateState(tx, models.WorkflowNodeStateProcessing)
+	return comp, nil
 }
 
 func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
