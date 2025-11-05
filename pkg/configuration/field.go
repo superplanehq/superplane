@@ -11,6 +11,8 @@ const (
 	FieldTypeList                = "list"
 	FieldTypeObject              = "object"
 	FieldTypeTime                = "time"
+	FieldTypeDate                = "date"
+	FieldTypeDateTime            = "datetime"
 	FieldTypeUser                = "user"
 	FieldTypeRole                = "role"
 	FieldTypeGroup               = "group"
@@ -70,6 +72,8 @@ type TypeOptions struct {
 	List        *ListTypeOptions        `json:"list,omitempty"`
 	Object      *ObjectTypeOptions      `json:"object,omitempty"`
 	Time        *TimeTypeOptions        `json:"time,omitempty"`
+	Date        *DateTypeOptions        `json:"date,omitempty"`
+	DateTime    *DateTimeTypeOptions    `json:"datetime,omitempty"`
 }
 
 /*
@@ -92,6 +96,20 @@ type NumberTypeOptions struct {
  */
 type TimeTypeOptions struct {
 	Format string `json:"format,omitempty"` // Expected format, e.g., "HH:MM", "HH:MM:SS"
+}
+
+/*
+ * DateTypeOptions specifies format and constraints for date fields
+ */
+type DateTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, e.g., "YYYY-MM-DD", "MM/DD/YYYY"
+}
+
+/*
+ * DateTimeTypeOptions specifies format and constraints for datetime fields
+ */
+type DateTimeTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, e.g., "2006-01-02T15:04", "YYYY-MM-DDTHH:MM"
 }
 
 /*

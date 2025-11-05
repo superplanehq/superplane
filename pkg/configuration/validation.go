@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
 func ValidateConfiguration(fields []Field, config map[string]any) error {
@@ -181,6 +182,66 @@ func validateList(field Field, value any) error {
 	return nil
 }
 
+func validateTime(field Field, value any) error {
+	timeStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	// Default time format is HH:MM
+	format := "15:04"
+	if field.TypeOptions != nil && field.TypeOptions.Time != nil && field.TypeOptions.Time.Format != "" {
+		format = field.TypeOptions.Time.Format
+	}
+
+	_, err := time.Parse(format, timeStr)
+	if err != nil {
+		return fmt.Errorf("must be a valid time in format %s", format)
+	}
+
+	return nil
+}
+
+func validateDate(field Field, value any) error {
+	dateStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	// Default date format is YYYY-MM-DD
+	format := "2006-01-02"
+	if field.TypeOptions != nil && field.TypeOptions.Date != nil && field.TypeOptions.Date.Format != "" {
+		format = field.TypeOptions.Date.Format
+	}
+
+	_, err := time.Parse(format, dateStr)
+	if err != nil {
+		return fmt.Errorf("must be a valid date in format %s", format)
+	}
+
+	return nil
+}
+
+func validateDateTime(field Field, value any) error {
+	dateTimeStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	// Default datetime format is YYYY-MM-DDTHH:MM
+	format := "2006-01-02T15:04"
+	if field.TypeOptions != nil && field.TypeOptions.DateTime != nil && field.TypeOptions.DateTime.Format != "" {
+		format = field.TypeOptions.DateTime.Format
+	}
+
+	_, err := time.Parse(format, dateTimeStr)
+	if err != nil {
+		return fmt.Errorf("must be a valid datetime in format %s", format)
+	}
+
+	return nil
+}
+
 func validateFieldValue(field Field, value any) error {
 	switch field.Type {
 	case FieldTypeString:
@@ -232,6 +293,15 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeObject:
 		return validateObject(field, value)
+
+	case FieldTypeTime:
+		return validateTime(field, value)
+
+	case FieldTypeDate:
+		return validateDate(field, value)
+
+	case FieldTypeDateTime:
+		return validateDateTime(field, value)
 	}
 
 	return nil

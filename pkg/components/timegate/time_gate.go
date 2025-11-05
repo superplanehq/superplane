@@ -15,8 +15,10 @@ func init() {
 }
 
 const (
-	TimeGateIncludeMode = "include"
-	TimeGateExcludeMode = "exclude"
+	TimeGateIncludeRangeMode    = "include_range"
+	TimeGateExcludeRangeMode    = "exclude_range"
+	TimeGateIncludeSpecificMode = "include_specific"
+	TimeGateExcludeSpecificMode = "exclude_specific"
 )
 
 type TimeGate struct{}
@@ -26,10 +28,12 @@ type Metadata struct {
 }
 
 type Spec struct {
-	Mode      string   `json:"mode"`
-	StartTime string   `json:"startTime"`
-	EndTime   string   `json:"endTime"`
-	Days      []string `json:"days"`
+	Mode          string   `json:"mode"`
+	StartTime     string   `json:"startTime"`
+	EndTime       string   `json:"endTime"`
+	Days          []string `json:"days"`
+	StartDateTime string   `json:"startDateTime,omitempty"`
+	EndDateTime   string   `json:"endDateTime,omitempty"`
 }
 
 func (tg *TimeGate) Name() string {
@@ -67,12 +71,20 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{
-							Label: "Include",
-							Value: TimeGateIncludeMode,
+							Label: "Include Range",
+							Value: TimeGateIncludeRangeMode,
 						},
 						{
-							Label: "Exclude",
-							Value: TimeGateExcludeMode,
+							Label: "Exclude Range",
+							Value: TimeGateExcludeRangeMode,
+						},
+						{
+							Label: "Include Specific Times",
+							Value: TimeGateIncludeSpecificMode,
+						},
+						{
+							Label: "Exclude Specific Times",
+							Value: TimeGateExcludeSpecificMode,
 						},
 					},
 				},
@@ -82,17 +94,29 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			Name:        "startTime",
 			Label:       "Start Time (HH:MM)",
 			Type:        configuration.FieldTypeTime,
-			Required:    true,
+			Required:    false,
 			Description: "Start time in HH:MM format (24-hour), e.g., 09:30",
 			Default:     "09:00",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
 		},
 		{
 			Name:        "endTime",
 			Label:       "End Time (HH:MM)",
 			Type:        configuration.FieldTypeTime,
-			Required:    true,
+			Required:    false,
 			Description: "End time in HH:MM format (24-hour), e.g., 17:30",
 			Default:     "17:00",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
 		},
 		{
 			Name:     "days",
@@ -111,6 +135,32 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 						{Label: "Saturday", Value: "saturday"},
 						{Label: "Sunday", Value: "sunday"},
 					},
+				},
+			},
+		},
+		{
+			Name:        "startDateTime",
+			Label:       "Start Date & Time",
+			Type:        configuration.FieldTypeDateTime,
+			Required:    false,
+			Description: "Start date and time for specific time window (e.g., 2024-12-31T00:00)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
+				},
+			},
+		},
+		{
+			Name:        "endDateTime",
+			Label:       "End Date & Time",
+			Type:        configuration.FieldTypeDateTime,
+			Required:    false,
+			Description: "End date and time for specific time window (e.g., 2025-01-01T23:59)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
 				},
 			},
 		},
@@ -185,23 +235,51 @@ func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 }
 
 func (tg *TimeGate) validateSpec(spec Spec) error {
-
-	if spec.Mode != TimeGateIncludeMode && spec.Mode != TimeGateExcludeMode {
-		return fmt.Errorf("invalid mode '%s': must be '%s' or '%s'", spec.Mode, TimeGateIncludeMode, TimeGateExcludeMode)
+	validModes := map[string]bool{
+		TimeGateIncludeRangeMode:    true,
+		TimeGateExcludeRangeMode:    true,
+		TimeGateIncludeSpecificMode: true,
+		TimeGateExcludeSpecificMode: true,
 	}
 
-	startTime, err := parseTimeString(spec.StartTime)
-	if err != nil {
-		return fmt.Errorf("startTime error: %w", err)
+	if !validModes[spec.Mode] {
+		return fmt.Errorf("invalid mode '%s': must be one of include_range, exclude_range, include_specific, exclude_specific", spec.Mode)
 	}
 
-	endTime, err := parseTimeString(spec.EndTime)
-	if err != nil {
-		return fmt.Errorf("endTime error: %w", err)
+	if spec.Mode == TimeGateIncludeRangeMode || spec.Mode == TimeGateExcludeRangeMode {
+		startTime, err := parseTimeString(spec.StartTime)
+		if err != nil {
+			return fmt.Errorf("startTime error: %w", err)
+		}
+
+		endTime, err := parseTimeString(spec.EndTime)
+		if err != nil {
+			return fmt.Errorf("endTime error: %w", err)
+		}
+
+		if startTime >= endTime {
+			return fmt.Errorf("start time (%s) must be before end time (%s)", spec.StartTime, spec.EndTime)
+		}
 	}
 
-	if startTime >= endTime {
-		return fmt.Errorf("start time (%s) must be before end time (%s)", spec.StartTime, spec.EndTime)
+	if spec.Mode == TimeGateIncludeSpecificMode || spec.Mode == TimeGateExcludeSpecificMode {
+		if spec.StartDateTime == "" || spec.EndDateTime == "" {
+			return fmt.Errorf("startDateTime and endDateTime are required for specific time modes")
+		}
+
+		startDateTime, err := time.Parse("2006-01-02T15:04", spec.StartDateTime)
+		if err != nil {
+			return fmt.Errorf("invalid startDateTime format '%s': expected YYYY-MM-DDTHH:MM", spec.StartDateTime)
+		}
+
+		endDateTime, err := time.Parse("2006-01-02T15:04", spec.EndDateTime)
+		if err != nil {
+			return fmt.Errorf("invalid endDateTime format '%s': expected YYYY-MM-DDTHH:MM", spec.EndDateTime)
+		}
+
+		if !startDateTime.Before(endDateTime) {
+			return fmt.Errorf("start datetime (%s) must be before end datetime (%s)", spec.StartDateTime, spec.EndDateTime)
+		}
 	}
 
 	if len(spec.Days) == 0 {
@@ -271,10 +349,14 @@ func (tg *TimeGate) configEqual(a, b Spec) bool {
 
 func (tg *TimeGate) findNextValidTime(now time.Time, spec Spec) time.Time {
 	switch spec.Mode {
-	case TimeGateIncludeMode:
+	case TimeGateIncludeRangeMode:
 		return tg.findNextIncludeTime(now, spec)
-	case TimeGateExcludeMode:
+	case TimeGateExcludeRangeMode:
 		return tg.findNextExcludeEndTime(now, spec)
+	case TimeGateIncludeSpecificMode:
+		return tg.findNextIncludeSpecificTime(now, spec)
+	case TimeGateExcludeSpecificMode:
+		return tg.findNextExcludeSpecificEndTime(now, spec)
 	default:
 		return time.Time{}
 	}
@@ -389,4 +471,50 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, spec Spec) time.Time {
+	startDateTime, err := time.Parse("2006-01-02T15:04", spec.StartDateTime)
+	if err != nil {
+		return time.Time{}
+	}
+
+	endDateTime, err := time.Parse("2006-01-02T15:04", spec.EndDateTime)
+	if err != nil {
+		return time.Time{}
+	}
+
+	startDateTime = startDateTime.In(now.Location())
+	endDateTime = endDateTime.In(now.Location())
+
+	if now.After(startDateTime) && now.Before(endDateTime) {
+		return now
+	}
+
+	if now.Before(startDateTime) {
+		return startDateTime
+	}
+
+	return time.Time{}
+}
+
+func (tg *TimeGate) findNextExcludeSpecificEndTime(now time.Time, spec Spec) time.Time {
+	startDateTime, err := time.Parse("2006-01-02T15:04", spec.StartDateTime)
+	if err != nil {
+		return time.Time{}
+	}
+
+	endDateTime, err := time.Parse("2006-01-02T15:04", spec.EndDateTime)
+	if err != nil {
+		return time.Time{}
+	}
+
+	startDateTime = startDateTime.In(now.Location())
+	endDateTime = endDateTime.In(now.Location())
+
+	if now.Before(startDateTime) || now.After(endDateTime) {
+		return now
+	}
+
+	return endDateTime
 }

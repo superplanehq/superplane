@@ -19,9 +19,11 @@ export interface NextInQueueItem {
 
 export interface TimeGateProps extends ComponentActionsProps {
   title?: string;
-  mode?: "include" | "exclude";
+  mode?: "include_range" | "exclude_range" | "include_specific" | "exclude_specific";
   timeWindow?: string;
   days?: string;
+  startDateTime?: string;
+  endDateTime?: string;
   lastExecution?: TimeGateExecutionItem;
   nextInQueue?: NextInQueueItem;
   collapsed?: boolean;
@@ -37,9 +39,11 @@ const daysOfWeekOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday":
 
 export const TimeGate: React.FC<TimeGateProps> = ({
   title = "Time Gate",
-  mode = "include",
+  mode = "include_range",
   timeWindow,
   days,
+  startDateTime,
+  endDateTime,
   lastExecution,
   nextInQueue,
   collapsed = false,
@@ -74,16 +78,62 @@ export const TimeGate: React.FC<TimeGateProps> = ({
     ]
   } : undefined;
 
-  const metadata: MetadataItem[] = [
-    {
-      icon: "settings",
-      label: mode.toUpperCase()
-    },
-    {
-      icon: "calendar",
-      label: timeWindow || ""
-    },
-  ];
+  const getModeLabel = (mode: string) => {
+    switch (mode) {
+      case "include_range":
+        return "Include Range";
+      case "exclude_range":
+        return "Exclude Range";
+      case "include_specific":
+        return "Include Specific";
+      case "exclude_specific":
+        return "Exclude Specific";
+      default:
+        return mode.charAt(0).toUpperCase() + mode.slice(1).replace(/_/g, ' ');
+    }
+  };
+
+  const formatDateTime = (dateTimeStr: string) => {
+    try {
+      const date = new Date(dateTimeStr);
+      return date.toLocaleString();
+    } catch {
+      return dateTimeStr;
+    }
+  };
+
+  const getMetadataItems = () => {
+    const items: MetadataItem[] = [
+      {
+        icon: "settings",
+        label: getModeLabel(mode)
+      }
+    ];
+
+    if (mode === "include_specific" || mode === "exclude_specific") {
+      if (startDateTime) {
+        items.push({
+          icon: "calendar",
+          label: `Start: ${formatDateTime(startDateTime)}`
+        });
+      }
+      if (endDateTime) {
+        items.push({
+          icon: "calendar",
+          label: `End: ${formatDateTime(endDateTime)}`
+        });
+      }
+    } else if (timeWindow) {
+      items.push({
+        icon: "clock",
+        label: timeWindow
+      });
+    }
+
+    return items;
+  };
+
+  const metadata: MetadataItem[] = getMetadataItems();
 
   const eventSections: EventSection[] = [];
 

@@ -9,6 +9,7 @@ import { BooleanFieldRenderer } from './BooleanFieldRenderer'
 import { SelectFieldRenderer } from './SelectFieldRenderer'
 import { MultiSelectFieldRenderer } from './MultiSelectFieldRenderer'
 import { DateFieldRenderer } from './DateFieldRenderer'
+import { DateTimeFieldRenderer } from './DateTimeFieldRenderer'
 import { UrlFieldRenderer } from './UrlFieldRenderer'
 import { ListFieldRenderer } from './ListFieldRenderer'
 import { ObjectFieldRenderer } from './ObjectFieldRenderer'
@@ -68,6 +69,9 @@ export const ConfigurationFieldRenderer = ({
 
       case 'date':
         return <DateFieldRenderer {...commonProps} />
+
+      case 'datetime':
+        return <DateTimeFieldRenderer {...commonProps} />
 
       case 'url':
         return <UrlFieldRenderer {...commonProps} />

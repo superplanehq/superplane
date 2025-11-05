@@ -1866,12 +1866,32 @@ function prepareTimeGateNode(
   const configuration = node.configuration as any;
 
   // Format time gate configuration for display
-  const mode = configuration?.mode || "include";
-  const startTime = configuration?.startTime || "00:00";
-  const endTime = configuration?.endTime || "23:59";
+  const mode = configuration?.mode || "include_range";
   const days = configuration?.days || [];
-  const timeWindow = `${startTime} - ${endTime}`;
   const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
+
+  // Handle different time window formats based on mode
+  let timeWindow = "";
+  let startDateTime: string | undefined;
+  let endDateTime: string | undefined;
+
+  if (mode === "include_specific" || mode === "exclude_specific") {
+    // For specific modes, use datetime fields
+    startDateTime = configuration?.startDateTime;
+    endDateTime = configuration?.endDateTime;
+
+    if (startDateTime && endDateTime) {
+      // Format datetime range for display
+      const startDate = new Date(startDateTime);
+      const endDate = new Date(endDateTime);
+      timeWindow = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
+    }
+  } else {
+    // For range modes, use time fields
+    const startTime = configuration?.startTime || "00:00";
+    const endTime = configuration?.endTime || "23:59";
+    timeWindow = `${startTime} - ${endTime}`;
+  }
 
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
@@ -1921,6 +1941,8 @@ function prepareTimeGateNode(
         mode,
         timeWindow,
         days: daysDisplay,
+        startDateTime,
+        endDateTime,
         lastExecution,
         nextInQueue: nodeQueueItemsMap[node.id!]?.[0] ? { title: nodeQueueItemsMap[node.id!]?.[0].id } : undefined,
         iconColor: getColorClass(metadata?.color || "blue"),
