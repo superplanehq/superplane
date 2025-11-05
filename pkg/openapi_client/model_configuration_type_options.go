@@ -28,6 +28,8 @@ type ConfigurationTypeOptions struct {
 	Object *ConfigurationObjectTypeOptions `json:"object,omitempty"`
 	Resource *ConfigurationResourceTypeOptions `json:"resource,omitempty"`
 	Time *ConfigurationTimeTypeOptions `json:"time,omitempty"`
+	Date *ConfigurationDateTypeOptions `json:"date,omitempty"`
+	Datetime *ConfigurationDateTimeTypeOptions `json:"datetime,omitempty"`
 }
 
 // NewConfigurationTypeOptions instantiates a new ConfigurationTypeOptions object
@@ -303,6 +305,70 @@ func (o *ConfigurationTypeOptions) SetTime(v ConfigurationTimeTypeOptions) {
 	o.Time = &v
 }
 
+// GetDate returns the Date field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetDate() ConfigurationDateTypeOptions {
+	if o == nil || IsNil(o.Date) {
+		var ret ConfigurationDateTypeOptions
+		return ret
+	}
+	return *o.Date
+}
+
+// GetDateOk returns a tuple with the Date field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetDateOk() (*ConfigurationDateTypeOptions, bool) {
+	if o == nil || IsNil(o.Date) {
+		return nil, false
+	}
+	return o.Date, true
+}
+
+// HasDate returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasDate() bool {
+	if o != nil && !IsNil(o.Date) {
+		return true
+	}
+
+	return false
+}
+
+// SetDate gets a reference to the given ConfigurationDateTypeOptions and assigns it to the Date field.
+func (o *ConfigurationTypeOptions) SetDate(v ConfigurationDateTypeOptions) {
+	o.Date = &v
+}
+
+// GetDatetime returns the Datetime field value if set, zero value otherwise.
+func (o *ConfigurationTypeOptions) GetDatetime() ConfigurationDateTimeTypeOptions {
+	if o == nil || IsNil(o.Datetime) {
+		var ret ConfigurationDateTimeTypeOptions
+		return ret
+	}
+	return *o.Datetime
+}
+
+// GetDatetimeOk returns a tuple with the Datetime field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationTypeOptions) GetDatetimeOk() (*ConfigurationDateTimeTypeOptions, bool) {
+	if o == nil || IsNil(o.Datetime) {
+		return nil, false
+	}
+	return o.Datetime, true
+}
+
+// HasDatetime returns a boolean if a field has been set.
+func (o *ConfigurationTypeOptions) HasDatetime() bool {
+	if o != nil && !IsNil(o.Datetime) {
+		return true
+	}
+
+	return false
+}
+
+// SetDatetime gets a reference to the given ConfigurationDateTimeTypeOptions and assigns it to the Datetime field.
+func (o *ConfigurationTypeOptions) SetDatetime(v ConfigurationDateTimeTypeOptions) {
+	o.Datetime = &v
+}
+
 func (o ConfigurationTypeOptions) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -336,6 +402,12 @@ func (o ConfigurationTypeOptions) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Time) {
 		toSerialize["time"] = o.Time
+	}
+	if !IsNil(o.Date) {
+		toSerialize["date"] = o.Date
+	}
+	if !IsNil(o.Datetime) {
+		toSerialize["datetime"] = o.Datetime
 	}
 	return toSerialize, nil
 }

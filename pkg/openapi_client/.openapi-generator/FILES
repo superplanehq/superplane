@@ -42,6 +42,8 @@ docs/ComponentsListComponentsResponse.md
 docs/ComponentsNode.md
 docs/ComponentsNodeType.md
 docs/ComponentsPosition.md
+docs/ConfigurationDateTimeTypeOptions.md
+docs/ConfigurationDateTypeOptions.md
 docs/ConfigurationField.md
 docs/ConfigurationIntegrationTypeOptions.md
 docs/ConfigurationListItemDefinition.md
@@ -49,11 +51,13 @@ docs/ConfigurationListTypeOptions.md
 docs/ConfigurationMultiSelectTypeOptions.md
 docs/ConfigurationNumberTypeOptions.md
 docs/ConfigurationObjectTypeOptions.md
+docs/ConfigurationRequiredCondition.md
 docs/ConfigurationResourceTypeOptions.md
 docs/ConfigurationSelectOption.md
 docs/ConfigurationSelectTypeOptions.md
 docs/ConfigurationTimeTypeOptions.md
 docs/ConfigurationTypeOptions.md
+docs/ConfigurationValidationRule.md
 docs/ConfigurationVisibilityCondition.md
 docs/GooglerpcStatus.md
 docs/GroupsAPI.md
@@ -200,6 +204,8 @@ model_components_list_components_response.go
 model_components_node.go
 model_components_node_type.go
 model_components_position.go
+model_configuration_date_time_type_options.go
+model_configuration_date_type_options.go
 model_configuration_field.go
 model_configuration_integration_type_options.go
 model_configuration_list_item_definition.go
@@ -207,11 +213,13 @@ model_configuration_list_type_options.go
 model_configuration_multi_select_type_options.go
 model_configuration_number_type_options.go
 model_configuration_object_type_options.go
+model_configuration_required_condition.go
 model_configuration_resource_type_options.go
 model_configuration_select_option.go
 model_configuration_select_type_options.go
 model_configuration_time_type_options.go
 model_configuration_type_options.go
+model_configuration_validation_rule.go
 model_configuration_visibility_condition.go
 model_googlerpc_status.go
 model_groups_add_user_to_group_body.go

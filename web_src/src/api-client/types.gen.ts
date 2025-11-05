@@ -114,6 +114,14 @@ export type ComponentsPosition = {
     y?: number;
 };
 
+export type ConfigurationDateTimeTypeOptions = {
+    format?: string;
+};
+
+export type ConfigurationDateTypeOptions = {
+    format?: string;
+};
+
 export type ConfigurationField = {
     name?: string;
     type?: string;
@@ -123,6 +131,8 @@ export type ConfigurationField = {
     label?: string;
     visibilityConditions?: Array<ConfigurationVisibilityCondition>;
     typeOptions?: ConfigurationTypeOptions;
+    requiredConditions?: Array<ConfigurationRequiredCondition>;
+    validationRules?: Array<ConfigurationValidationRule>;
 };
 
 export type ConfigurationIntegrationTypeOptions = {
@@ -151,6 +161,11 @@ export type ConfigurationObjectTypeOptions = {
     schema?: Array<ConfigurationField>;
 };
 
+export type ConfigurationRequiredCondition = {
+    field?: string;
+    values?: Array<string>;
+};
+
 export type ConfigurationResourceTypeOptions = {
     type?: string;
 };
@@ -177,6 +192,14 @@ export type ConfigurationTypeOptions = {
     object?: ConfigurationObjectTypeOptions;
     resource?: ConfigurationResourceTypeOptions;
     time?: ConfigurationTimeTypeOptions;
+    date?: ConfigurationDateTypeOptions;
+    datetime?: ConfigurationDateTimeTypeOptions;
+};
+
+export type ConfigurationValidationRule = {
+    type?: string;
+    compareWith?: string;
+    message?: string;
 };
 
 export type ConfigurationVisibilityCondition = {

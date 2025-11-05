@@ -2945,6 +2945,22 @@
         }
       }
     },
+    "ConfigurationDateTimeTypeOptions": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        }
+      }
+    },
+    "ConfigurationDateTypeOptions": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        }
+      }
+    },
     "ConfigurationField": {
       "type": "object",
       "properties": {
@@ -2975,6 +2991,20 @@
         },
         "typeOptions": {
           "$ref": "#/definitions/ConfigurationTypeOptions"
+        },
+        "requiredConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationRequiredCondition"
+          }
+        },
+        "validationRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ConfigurationValidationRule"
+          }
         }
       }
     },
@@ -3046,6 +3076,20 @@
         }
       }
     },
+    "ConfigurationRequiredCondition": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "ConfigurationResourceTypeOptions": {
       "type": "object",
       "properties": {
@@ -3111,6 +3155,26 @@
         },
         "time": {
           "$ref": "#/definitions/ConfigurationTimeTypeOptions"
+        },
+        "date": {
+          "$ref": "#/definitions/ConfigurationDateTypeOptions"
+        },
+        "datetime": {
+          "$ref": "#/definitions/ConfigurationDateTimeTypeOptions"
+        }
+      }
+    },
+    "ConfigurationValidationRule": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "compareWith": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
         }
       }
     },

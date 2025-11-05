@@ -103,6 +103,19 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
 				},
 			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:        configuration.ValidationRuleLessThan,
+					CompareWith: "endTime",
+					Message:     "start time must be before end time",
+				},
+			},
 		},
 		{
 			Name:        "endTime",
@@ -115,6 +128,19 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 				{
 					Field:  "mode",
 					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:        configuration.ValidationRuleGreaterThan,
+					CompareWith: "startTime",
+					Message:     "end time must be after start time",
 				},
 			},
 		},
@@ -150,6 +176,19 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
 				},
 			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:        configuration.ValidationRuleLessThan,
+					CompareWith: "endDateTime",
+					Message:     "start date & time must be before end date & time",
+				},
+			},
 		},
 		{
 			Name:        "endDateTime",
@@ -161,6 +200,19 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 				{
 					Field:  "mode",
 					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
+				},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:        configuration.ValidationRuleGreaterThan,
+					CompareWith: "startDateTime",
+					Message:     "end date & time must be after start date & time",
 				},
 			},
 		},
