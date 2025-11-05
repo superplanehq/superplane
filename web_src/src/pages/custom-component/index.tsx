@@ -212,28 +212,18 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       };
       const timezoneDisplay = getTimezoneDisplay(timezone);
 
-      // Handle different time window formats based on mode
-      let timeWindow = "";
-      let startDateTime: string | undefined;
-      let endDateTime: string | undefined;
+      let startTime = "00:00";
+      let endTime = "23:59";
 
       if (mode === "include_specific" || mode === "exclude_specific") {
-        // For specific modes, use datetime fields
-        startDateTime = node.configuration?.startDateTime;
-        endDateTime = node.configuration?.endDateTime;
-
-        if (startDateTime && endDateTime) {
-          // Format datetime range for display
-          const startDate = new Date(startDateTime);
-          const endDate = new Date(endDateTime);
-          timeWindow = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
-        }
+        startTime = `${node.configuration.startDayInYear} ${node.configuration.startTime}`;
+        endTime = `${node.configuration.endDayInYear} ${node.configuration.endTime}`;
       } else {
-        // For range modes, use time fields
-        const startTime = node.configuration?.startTime || "00:00";
-        const endTime = node.configuration?.endTime || "23:59";
-        timeWindow = `${startTime} - ${endTime}`;
+        startTime = `${node.configuration.startTime}`;
+        endTime = `${node.configuration.endTime}`;
       }
+
+      const timeWindow = `${startTime} - ${endTime}`;
 
       baseData.time_gate = {
         title: node.name,
@@ -241,8 +231,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
         timeWindow,
         days: daysDisplay,
         timezone: timezoneDisplay,
-        startDateTime,
-        endDateTime,
         lastExecution: undefined,
         nextInQueue: undefined,
         iconColor: 'text-blue-600',
