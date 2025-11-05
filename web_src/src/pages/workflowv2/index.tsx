@@ -1165,7 +1165,7 @@ function prepareComponentNode(
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
-      return prepareTimeGateNode(node, components, nodeExecutionsMap);
+      return prepareTimeGateNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -1860,6 +1860,7 @@ function prepareTimeGateNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
+  nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const metadata = components.find((c) => c.name === "time_gate");
   const configuration = node.configuration as any;
@@ -1921,6 +1922,7 @@ function prepareTimeGateNode(
         timeWindow,
         days: daysDisplay,
         lastExecution,
+        nextInQueue: nodeQueueItemsMap[node.id!]?.[0] ? { title: nodeQueueItemsMap[node.id!]?.[0].id } : undefined,
         iconColor: getColorClass(metadata?.color || "blue"),
         iconBackground: getBackgroundColorClass(metadata?.color || "blue"),
         headerColor: getBackgroundColorClass(metadata?.color || "blue"),

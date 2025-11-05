@@ -20,7 +20,7 @@ export interface ComponentBaseSpecValue {
 export interface EventSection {
   title: string;
   receivedAt?: Date;
-  eventState?: "success" | "failed" | "neutral" | "running";
+  eventState?: "success" | "failed" | "neutral" | "next-in-queue" | "running";
   eventTitle?: string;
   eventSubtitle?: string;
   handleComponent?: React.ReactNode;
@@ -125,30 +125,41 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
             ? resolveIcon("check")
             : section.eventState === "neutral"
               ? resolveIcon("circle")
-              : section.eventState === "running"
-                ? resolveIcon("refresh-cw")
-                : resolveIcon("x")
+              : section.eventState === "next-in-queue"
+                ? resolveIcon("circle-dashed")
+                : section.eventState === "running"
+                  ? resolveIcon("refresh-cw")
+                  : resolveIcon("x")
           const LastEventColor = section.eventState === "success"
             ? "text-green-700"
             : section.eventState === "neutral"
               ? "text-gray-500"
-              : section.eventState === "running"
-                ? "text-blue-800"
-                : "text-red-700"
+              : section.eventState === "next-in-queue"
+                ? "text-gray-500"
+                : section.eventState === "running"
+                  ? "text-blue-800"
+                  : "text-red-700"
           const LastEventBackground = section.eventState === "success"
             ? "bg-green-200"
             : section.eventState === "neutral"
               ? "bg-gray-100"
-              : section.eventState === "running"
-                ? "bg-sky-100"
-                : "bg-red-200"
+              : section.eventState === "next-in-queue"
+                ? "bg-gray-100"
+                : section.eventState === "running"
+                  ? "bg-sky-100"
+                  : "bg-red-200"
           const LastEventIconColor = section.eventState === "success"
             ? "text-green-600 bg-green-600"
             : section.eventState === "neutral"
               ? "text-gray-400 bg-gray-400"
-              : section.eventState === "running"
-                ? "text-blue-800"
-                : "text-red-600 bg-red-600"
+              : section.eventState === "next-in-queue"
+                ? "text-gray-500"
+                : section.eventState === "running"
+                  ? "text-blue-800"
+                  : "text-red-600 bg-red-600"
+
+          const iconSize = ["next-in-queue", "running"].includes(section.eventState || '') ? 16 : 12
+          const iconClassName = section.eventState === "running" ? "animate-spin" : section.eventState === "next-in-queue" ? "" : "text-white"
 
           return (
             <div key={index} className={"px-4 pt-2 pb-6 relative" + (index < eventSections.length - 1 ? " border-b" : "")}>
@@ -159,7 +170,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({ iconSrc, iconSlug,
               <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}>
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <div className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center ${LastEventIconColor}`}>
-                    <LastEventIcon size={section.eventState === "running" ? 16 : 12} className={section.eventState === "running" ? "animate-spin" : "text-white"} />
+                    <LastEventIcon size={iconSize} className={iconClassName} />
                   </div>
                   <span className="truncate text-sm min-w-0">{section.eventTitle}</span>
                 </div>

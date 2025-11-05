@@ -1,5 +1,5 @@
 import React from "react";
-import { ComponentBase } from "../componentBase";
+import { ComponentBase, EventSection } from "../componentBase";
 import { ComponentActionsProps } from "../types/componentActions";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
 import { MetadataItem } from "../metadataList";
@@ -13,12 +13,17 @@ export interface TimeGateExecutionItem {
   nextRunTime?: Date;
 }
 
+export interface NextInQueueItem {
+  title: string;
+}
+
 export interface TimeGateProps extends ComponentActionsProps {
   title?: string;
   mode?: "include" | "exclude";
   timeWindow?: string;
   days?: string;
   lastExecution?: TimeGateExecutionItem;
+  nextInQueue?: NextInQueueItem;
   collapsed?: boolean;
   selected?: boolean;
   collapsedBackground?: string;
@@ -36,6 +41,7 @@ export const TimeGate: React.FC<TimeGateProps> = ({
   timeWindow,
   days,
   lastExecution,
+  nextInQueue,
   collapsed = false,
   selected = false,
   collapsedBackground,
@@ -79,7 +85,7 @@ export const TimeGate: React.FC<TimeGateProps> = ({
     },
   ];
 
-  const eventSections = [];
+  const eventSections: EventSection[] = [];
 
   if (!hideLastRun) {
     if (lastExecution && lastExecution.state && lastExecution.receivedAt) {
@@ -115,6 +121,14 @@ export const TimeGate: React.FC<TimeGateProps> = ({
         eventTitle: "No events received yet",
       });
     }
+  }
+
+  if (nextInQueue) {
+    eventSections.push({
+      title: "NEXT IN QUEUE",
+      eventState: "next-in-queue",
+      eventTitle: nextInQueue.title,
+    });
   }
 
   return (
