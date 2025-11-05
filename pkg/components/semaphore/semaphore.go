@@ -13,6 +13,8 @@ import (
 )
 
 const ComponentName = "semaphore"
+const PassedOutputChannel = "passed"
+const FailedOutputChannel = "failed"
 
 func init() {
 	registry.RegisterComponent(ComponentName, &Semaphore{})
@@ -76,7 +78,16 @@ func (s *Semaphore) Color() string {
 }
 
 func (s *Semaphore) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+	return []components.OutputChannel{
+		{
+			Name:  PassedOutputChannel,
+			Label: "Passed",
+		},
+		{
+			Name:  FailedOutputChannel,
+			Label: "Failed",
+		},
+	}
 }
 
 func (s *Semaphore) Configuration() []configuration.Field {
@@ -315,8 +326,15 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 	}
 
 	ctx.MetadataContext.Set(newMetadata)
+
+	if result == "passed" {
+		return ctx.ExecutionStateContext.Pass(map[string][]any{
+			PassedOutputChannel: {newMetadata},
+		})
+	}
+
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {newMetadata},
+		FailedOutputChannel: {newMetadata},
 	})
 }
 
@@ -354,7 +372,7 @@ func (s *Semaphore) finish(ctx components.ActionContext) error {
 	ctx.MetadataContext.Set(newMetadata)
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {metadata},
+		PassedOutputChannel: {newMetadata},
 	})
 }
 
