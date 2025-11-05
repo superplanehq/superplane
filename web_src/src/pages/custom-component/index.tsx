@@ -520,7 +520,7 @@ export const CustomComponent = () => {
         }
         if (nodeData.time_gate) {
           const mode = filteredConfiguration.mode || "include_range";
-          const days = filteredConfiguration.days || [];
+          const days = (filteredConfiguration.days as string[]) || [];
           const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
 
           // Handle different time window formats based on mode
@@ -530,8 +530,8 @@ export const CustomComponent = () => {
 
           if (mode === "include_specific" || mode === "exclude_specific") {
             // For specific modes, use datetime fields
-            startDateTime = filteredConfiguration.startDateTime;
-            endDateTime = filteredConfiguration.endDateTime;
+            startDateTime = filteredConfiguration.startDateTime as string | undefined;
+            endDateTime = filteredConfiguration.endDateTime as string | undefined;
 
             if (startDateTime && endDateTime) {
               // Format datetime range for display

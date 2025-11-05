@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
+import { isFieldRequired, validateFieldValue } from "@/utils/components";
 
 interface NodeConfigurationModalProps {
   isOpen: boolean;
@@ -55,9 +56,20 @@ export function NodeConfigurationModal({
         const fieldPath = parentPath ? `${parentPath}.${field.name}` : field.name;
         const value = values[field.name];
 
-        // Check if this field itself is required and empty
-        if (field.required && isFieldEmpty(value)) {
+        // Check if field is required (either always or conditionally)
+        const fieldIsRequired = field.required || isFieldRequired(field, values);
+        if (fieldIsRequired && isFieldEmpty(value)) {
           errors.add(fieldPath);
+        }
+
+        // Check validation rules (cross-field validation)
+        if (value !== undefined && value !== null && value !== "") {
+          const validationErrors = validateFieldValue(field, value, values);
+
+          if (validationErrors.length > 0) {
+            // Add validation rule errors to the error set
+            errors.add(fieldPath);
+          }
         }
 
         // Handle nested validation for different field types
@@ -101,7 +113,6 @@ export function NodeConfigurationModal({
     if (isFieldEmpty(currentNodeName)) {
       errors.add("nodeName");
     }
-
     setValidationErrors(errors);
     setShowValidation(true);
     return errors.size === 0;
@@ -147,9 +158,8 @@ export function NodeConfigurationModal({
               {/* Node identification section */}
               <div className="flex flex-col  gap-2 h-[60px]">
                 <Label
-                  className={`min-w-[100px] text-left ${
-                    showValidation && validationErrors.has("nodeName") ? "text-red-600 dark:text-red-400" : ""
-                  }`}
+                  className={`min-w-[100px] text-left ${showValidation && validationErrors.has("nodeName") ? "text-red-600 dark:text-red-400" : ""
+                    }`}
                 >
                   Node Name
                   <span className="text-red-500 ml-1">*</span>
@@ -164,9 +174,8 @@ export function NodeConfigurationModal({
                   onChange={(e) => setCurrentNodeName(e.target.value)}
                   placeholder="Enter a name for this node"
                   autoFocus
-                  className={`flex-1 ${
-                    showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
-                  }`}
+                  className={`flex-1 ${showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
+                    }`}
                 />
               </div>
 
