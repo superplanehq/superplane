@@ -200,7 +200,7 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
     case 'time_gate':
       const mode = node.configuration?.mode || "include_range";
       const days = node.configuration?.days || [];
-      const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
+      const daysDisplay = days.length > 0 ? days.join(", ") : "";
 
       // Get timezone information
       const timezone = node.configuration?.timezone || "0";
@@ -532,30 +532,21 @@ export const CustomComponent = () => {
         if (nodeData.time_gate) {
           const mode = filteredConfiguration.mode || "include_range";
           const days = (filteredConfiguration.days as string[]) || [];
-          const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
+          const daysDisplay = days.length > 0 ? days.join(", ") : "";
 
           // Handle different time window formats based on mode
-          let timeWindow = "";
-          let startDateTime: string | undefined;
-          let endDateTime: string | undefined;
+          let startTime = "00:00";
+          let endTime = "23:59";
 
           if (mode === "include_specific" || mode === "exclude_specific") {
-            // For specific modes, use datetime fields
-            startDateTime = filteredConfiguration.startDateTime as string | undefined;
-            endDateTime = filteredConfiguration.endDateTime as string | undefined;
-
-            if (startDateTime && endDateTime) {
-              // Format datetime range for display
-              const startDate = new Date(startDateTime);
-              const endDate = new Date(endDateTime);
-              timeWindow = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
-            }
+            startTime = `${filteredConfiguration.startDayInYear} ${filteredConfiguration.startTime}`;
+            endTime = `${filteredConfiguration.endDayInYear} ${filteredConfiguration.endTime}`;
           } else {
-            // For range modes, use time fields
-            const startTime = filteredConfiguration.startTime || "00:00";
-            const endTime = filteredConfiguration.endTime || "23:59";
-            timeWindow = `${startTime} - ${endTime}`;
+            startTime = `${filteredConfiguration.startTime}`;
+            endTime = `${filteredConfiguration.endTime}`;
           }
+
+          const timeWindow = `${startTime} - ${endTime}`;
 
           updatedData.time_gate = {
             ...nodeData.time_gate,
@@ -563,8 +554,6 @@ export const CustomComponent = () => {
             mode,
             timeWindow,
             days: daysDisplay,
-            startDateTime,
-            endDateTime,
           }
         }
 

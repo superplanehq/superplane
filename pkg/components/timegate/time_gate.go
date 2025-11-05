@@ -29,13 +29,13 @@ type Metadata struct {
 }
 
 type Spec struct {
-	Mode            string   `json:"mode"`
-	StartTime       string   `json:"startTime"`
-	EndTime         string   `json:"endTime"`
-	Days            []string `json:"days"`
-	StartDayInYear  string   `json:"startDayInYear,omitempty"`
-	EndDayInYear    string   `json:"endDayInYear,omitempty"`
-	Timezone        string   `json:"timezone,omitempty"`
+	Mode           string   `json:"mode"`
+	StartTime      string   `json:"startTime"`
+	EndTime        string   `json:"endTime"`
+	Days           []string `json:"days"`
+	StartDayInYear string   `json:"startDayInYear,omitempty"`
+	EndDayInYear   string   `json:"endDayInYear,omitempty"`
+	Timezone       string   `json:"timezone,omitempty"`
 }
 
 func (tg *TimeGate) Name() string {
@@ -93,36 +93,6 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "startTime",
-			Label:       "Start Time (HH:MM)",
-			Type:        configuration.FieldTypeTime,
-			Required:    true,
-			Description: "Start time in HH:MM format (24-hour), e.g., 09:30",
-			Default:     "09:00",
-			ValidationRules: []configuration.ValidationRule{
-				{
-					Type:        configuration.ValidationRuleLessThan,
-					CompareWith: "endTime",
-					Message:     "start time must be before end time",
-				},
-			},
-		},
-		{
-			Name:        "endTime",
-			Label:       "End Time (HH:MM)",
-			Type:        configuration.FieldTypeTime,
-			Required:    true,
-			Description: "End time in HH:MM format (24-hour), e.g., 17:30",
-			Default:     "17:00",
-			ValidationRules: []configuration.ValidationRule{
-				{
-					Type:        configuration.ValidationRuleGreaterThan,
-					CompareWith: "startTime",
-					Message:     "end time must be after start time",
-				},
-			},
-		},
-		{
 			Name:  "days",
 			Label: "Days of Week",
 			Type:  configuration.FieldTypeMultiSelect,
@@ -171,11 +141,19 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
 				},
 			},
+		},
+		{
+			Name:        "startTime",
+			Label:       "Start Time (HH:MM)",
+			Type:        configuration.FieldTypeTime,
+			Required:    true,
+			Description: "Start time in HH:MM format (24-hour), e.g., 09:30",
+			Default:     "09:00",
 			ValidationRules: []configuration.ValidationRule{
 				{
 					Type:        configuration.ValidationRuleLessThan,
-					CompareWith: "endDayInYear",
-					Message:     "start day must be before end day",
+					CompareWith: "endTime",
+					Message:     "start time must be before end time",
 				},
 			},
 		},
@@ -197,11 +175,19 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
 				},
 			},
+		},
+		{
+			Name:        "endTime",
+			Label:       "End Time (HH:MM)",
+			Type:        configuration.FieldTypeTime,
+			Required:    true,
+			Description: "End time in HH:MM format (24-hour), e.g., 17:30",
+			Default:     "17:00",
 			ValidationRules: []configuration.ValidationRule{
 				{
 					Type:        configuration.ValidationRuleGreaterThan,
-					CompareWith: "startDayInYear",
-					Message:     "end day must be after start day",
+					CompareWith: "startTime",
+					Message:     "end time must be after start time",
 				},
 			},
 		},

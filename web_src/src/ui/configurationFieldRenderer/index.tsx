@@ -16,6 +16,7 @@ import { ObjectFieldRenderer } from './ObjectFieldRenderer'
 import { IntegrationFieldRenderer } from './IntegrationFieldRenderer'
 import { IntegrationResourceFieldRenderer } from './IntegrationResourceFieldRenderer'
 import { TimeFieldRenderer } from './TimeFieldRenderer'
+import { DayInYearFieldRenderer } from './DayInYearFieldRenderer'
 import { UserFieldRenderer } from './UserFieldRenderer'
 import { RoleFieldRenderer } from './RoleFieldRenderer'
 import { GroupFieldRenderer } from './GroupFieldRenderer'
@@ -134,6 +135,9 @@ export const ConfigurationFieldRenderer = ({
 
       case 'time':
         return <TimeFieldRenderer {...commonProps} />
+
+      case 'day-in-year':
+        return <DayInYearFieldRenderer {...commonProps} />
 
       case 'integration':
         return <IntegrationFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} domainType={domainType} />

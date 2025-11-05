@@ -1868,7 +1868,7 @@ function prepareTimeGateNode(
   // Format time gate configuration for display
   const mode = configuration?.mode || "include_range";
   const days = configuration?.days || [];
-  const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
+  const daysDisplay = days.length > 0 ? days.join(", ") : "";
 
   // Get timezone information
   const timezone = configuration?.timezone || "0";
@@ -1881,27 +1881,19 @@ function prepareTimeGateNode(
   const timezoneDisplay = getTimezoneDisplay(timezone);
 
   // Handle different time window formats based on mode
-  let timeWindow = "";
-  let startDateTime: string | undefined;
-  let endDateTime: string | undefined;
+  let startTime = "00:00";
+  let endTime = "23:59";
 
   if (mode === "include_specific" || mode === "exclude_specific") {
-    // For specific modes, use datetime fields
-    startDateTime = configuration?.startDateTime;
-    endDateTime = configuration?.endDateTime;
-
-    if (startDateTime && endDateTime) {
-      // Format datetime range for display
-      const startDate = new Date(startDateTime);
-      const endDate = new Date(endDateTime);
-      timeWindow = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
-    }
+    startTime = `${configuration.startDayInYear} ${configuration.startTime}`;
+    endTime = `${configuration.endDayInYear} ${configuration.endTime}`;
   } else {
-    // For range modes, use time fields
-    const startTime = configuration?.startTime || "00:00";
-    const endTime = configuration?.endTime || "23:59";
-    timeWindow = `${startTime} - ${endTime}`;
+    startTime = `${configuration.startTime}`;
+    endTime = `${configuration.endTime}`;
   }
+
+  const timeWindow = `${startTime} - ${endTime}`;
+
 
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
@@ -1952,8 +1944,6 @@ function prepareTimeGateNode(
         timeWindow,
         days: daysDisplay,
         timezone: timezoneDisplay,
-        startDateTime,
-        endDateTime,
         lastExecution,
         nextInQueue: nodeQueueItemsMap[node.id!]?.[0] ? { title: nodeQueueItemsMap[node.id!]?.[0].id } : undefined,
         iconColor: getColorClass(metadata?.color || "blue"),

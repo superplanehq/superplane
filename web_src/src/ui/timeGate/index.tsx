@@ -23,8 +23,6 @@ export interface TimeGateProps extends ComponentActionsProps {
   timeWindow?: string;
   days?: string;
   timezone?: string;
-  startDateTime?: string;
-  endDateTime?: string;
   lastExecution?: TimeGateExecutionItem;
   nextInQueue?: NextInQueueItem;
   collapsed?: boolean;
@@ -44,8 +42,6 @@ export const TimeGate: React.FC<TimeGateProps> = ({
   timeWindow,
   days,
   timezone,
-  startDateTime,
-  endDateTime,
   lastExecution,
   nextInQueue,
   collapsed = false,
@@ -95,15 +91,6 @@ export const TimeGate: React.FC<TimeGateProps> = ({
     }
   };
 
-  const formatDateTime = (dateTimeStr: string) => {
-    try {
-      const date = new Date(dateTimeStr);
-      return date.toLocaleString();
-    } catch {
-      return dateTimeStr;
-    }
-  };
-
   const getMetadataItems = () => {
     const items: MetadataItem[] = [
       {
@@ -112,20 +99,7 @@ export const TimeGate: React.FC<TimeGateProps> = ({
       }
     ];
 
-    if (mode === "include_specific" || mode === "exclude_specific") {
-      if (startDateTime) {
-        items.push({
-          icon: "calendar",
-          label: `Start: ${formatDateTime(startDateTime)}`
-        });
-      }
-      if (endDateTime) {
-        items.push({
-          icon: "calendar",
-          label: `End: ${formatDateTime(endDateTime)}`
-        });
-      }
-    } else if (timeWindow) {
+    if (timeWindow) {
       items.push({
         icon: "clock",
         label: timeWindow
