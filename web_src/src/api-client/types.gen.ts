@@ -21,7 +21,7 @@ export type BlueprintsBlueprint = {
     updatedAt?: string;
     nodes?: Array<ComponentsNode>;
     edges?: Array<ComponentsEdge>;
-    configuration?: Array<ComponentsConfigurationField>;
+    configuration?: Array<ConfigurationField>;
     outputChannels?: Array<SuperplaneBlueprintsOutputChannel>;
     icon?: string;
     color?: string;
@@ -60,7 +60,7 @@ export type ComponentsComponent = {
     name?: string;
     label?: string;
     description?: string;
-    configuration?: Array<ComponentsConfigurationField>;
+    configuration?: Array<ConfigurationField>;
     outputChannels?: Array<SuperplaneComponentsOutputChannel>;
     icon?: string;
     color?: string;
@@ -69,18 +69,7 @@ export type ComponentsComponent = {
 export type ComponentsComponentAction = {
     name?: string;
     description?: string;
-    parameters?: Array<ComponentsConfigurationField>;
-};
-
-export type ComponentsConfigurationField = {
-    name?: string;
-    type?: string;
-    description?: string;
-    required?: boolean;
-    defaultValue?: string;
-    label?: string;
-    visibilityConditions?: Array<ComponentsVisibilityCondition>;
-    typeOptions?: ComponentsTypeOptions;
+    parameters?: Array<ConfigurationField>;
 };
 
 export type ComponentsDescribeComponentResponse = {
@@ -93,29 +82,12 @@ export type ComponentsEdge = {
     channel?: string;
 };
 
-export type ComponentsIntegrationTypeOptions = {
-    type?: string;
-};
-
 export type ComponentsListComponentActionsResponse = {
     actions?: Array<ComponentsComponentAction>;
 };
 
 export type ComponentsListComponentsResponse = {
     components?: Array<ComponentsComponent>;
-};
-
-export type ComponentsListItemDefinition = {
-    type?: string;
-    schema?: Array<ComponentsConfigurationField>;
-};
-
-export type ComponentsListTypeOptions = {
-    itemDefinition?: ComponentsListItemDefinition;
-};
-
-export type ComponentsMultiSelectTypeOptions = {
-    options?: Array<ComponentsSelectOption>;
 };
 
 export type ComponentsNode = {
@@ -137,49 +109,77 @@ export type ComponentsNode = {
 
 export type ComponentsNodeType = 'TYPE_COMPONENT' | 'TYPE_BLUEPRINT' | 'TYPE_TRIGGER';
 
-export type ComponentsNumberTypeOptions = {
-    min?: number;
-    max?: number;
-};
-
-export type ComponentsObjectTypeOptions = {
-    schema?: Array<ComponentsConfigurationField>;
-};
-
 export type ComponentsPosition = {
     x?: number;
     y?: number;
 };
 
-export type ComponentsResourceTypeOptions = {
+export type ConfigurationField = {
+    name?: string;
+    type?: string;
+    description?: string;
+    required?: boolean;
+    defaultValue?: string;
+    label?: string;
+    visibilityConditions?: Array<ConfigurationVisibilityCondition>;
+    typeOptions?: ConfigurationTypeOptions;
+};
+
+export type ConfigurationIntegrationTypeOptions = {
     type?: string;
 };
 
-export type ComponentsSelectOption = {
+export type ConfigurationListItemDefinition = {
+    type?: string;
+    schema?: Array<ConfigurationField>;
+};
+
+export type ConfigurationListTypeOptions = {
+    itemDefinition?: ConfigurationListItemDefinition;
+};
+
+export type ConfigurationMultiSelectTypeOptions = {
+    options?: Array<ConfigurationSelectOption>;
+};
+
+export type ConfigurationNumberTypeOptions = {
+    min?: number;
+    max?: number;
+};
+
+export type ConfigurationObjectTypeOptions = {
+    schema?: Array<ConfigurationField>;
+};
+
+export type ConfigurationResourceTypeOptions = {
+    type?: string;
+};
+
+export type ConfigurationSelectOption = {
     label?: string;
     value?: string;
 };
 
-export type ComponentsSelectTypeOptions = {
-    options?: Array<ComponentsSelectOption>;
+export type ConfigurationSelectTypeOptions = {
+    options?: Array<ConfigurationSelectOption>;
 };
 
-export type ComponentsTimeTypeOptions = {
+export type ConfigurationTimeTypeOptions = {
     format?: string;
 };
 
-export type ComponentsTypeOptions = {
-    number?: ComponentsNumberTypeOptions;
-    select?: ComponentsSelectTypeOptions;
-    multiSelect?: ComponentsMultiSelectTypeOptions;
-    integration?: ComponentsIntegrationTypeOptions;
-    list?: ComponentsListTypeOptions;
-    object?: ComponentsObjectTypeOptions;
-    resource?: ComponentsResourceTypeOptions;
-    time?: ComponentsTimeTypeOptions;
+export type ConfigurationTypeOptions = {
+    number?: ConfigurationNumberTypeOptions;
+    select?: ConfigurationSelectTypeOptions;
+    multiSelect?: ConfigurationMultiSelectTypeOptions;
+    integration?: ConfigurationIntegrationTypeOptions;
+    list?: ConfigurationListTypeOptions;
+    object?: ConfigurationObjectTypeOptions;
+    resource?: ConfigurationResourceTypeOptions;
+    time?: ConfigurationTimeTypeOptions;
 };
 
-export type ComponentsVisibilityCondition = {
+export type ConfigurationVisibilityCondition = {
     field?: string;
     values?: Array<string>;
 };
@@ -641,7 +641,7 @@ export type TriggersTrigger = {
     description?: string;
     icon?: string;
     color?: string;
-    configuration?: Array<ComponentsConfigurationField>;
+    configuration?: Array<ConfigurationField>;
 };
 
 export type UsersAccountProvider = {

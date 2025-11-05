@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the ComponentsVisibilityCondition type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ComponentsVisibilityCondition{}
+// checks if the ConfigurationVisibilityCondition type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &ConfigurationVisibilityCondition{}
 
-// ComponentsVisibilityCondition struct for ComponentsVisibilityCondition
-type ComponentsVisibilityCondition struct {
+// ConfigurationVisibilityCondition struct for ConfigurationVisibilityCondition
+type ConfigurationVisibilityCondition struct {
 	Field *string `json:"field,omitempty"`
 	Values []string `json:"values,omitempty"`
 }
 
-// NewComponentsVisibilityCondition instantiates a new ComponentsVisibilityCondition object
+// NewConfigurationVisibilityCondition instantiates a new ConfigurationVisibilityCondition object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewComponentsVisibilityCondition() *ComponentsVisibilityCondition {
-	this := ComponentsVisibilityCondition{}
+func NewConfigurationVisibilityCondition() *ConfigurationVisibilityCondition {
+	this := ConfigurationVisibilityCondition{}
 	return &this
 }
 
-// NewComponentsVisibilityConditionWithDefaults instantiates a new ComponentsVisibilityCondition object
+// NewConfigurationVisibilityConditionWithDefaults instantiates a new ConfigurationVisibilityCondition object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewComponentsVisibilityConditionWithDefaults() *ComponentsVisibilityCondition {
-	this := ComponentsVisibilityCondition{}
+func NewConfigurationVisibilityConditionWithDefaults() *ConfigurationVisibilityCondition {
+	this := ConfigurationVisibilityCondition{}
 	return &this
 }
 
 // GetField returns the Field field value if set, zero value otherwise.
-func (o *ComponentsVisibilityCondition) GetField() string {
+func (o *ConfigurationVisibilityCondition) GetField() string {
 	if o == nil || IsNil(o.Field) {
 		var ret string
 		return ret
@@ -52,7 +52,7 @@ func (o *ComponentsVisibilityCondition) GetField() string {
 
 // GetFieldOk returns a tuple with the Field field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsVisibilityCondition) GetFieldOk() (*string, bool) {
+func (o *ConfigurationVisibilityCondition) GetFieldOk() (*string, bool) {
 	if o == nil || IsNil(o.Field) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *ComponentsVisibilityCondition) GetFieldOk() (*string, bool) {
 }
 
 // HasField returns a boolean if a field has been set.
-func (o *ComponentsVisibilityCondition) HasField() bool {
+func (o *ConfigurationVisibilityCondition) HasField() bool {
 	if o != nil && !IsNil(o.Field) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *ComponentsVisibilityCondition) HasField() bool {
 }
 
 // SetField gets a reference to the given string and assigns it to the Field field.
-func (o *ComponentsVisibilityCondition) SetField(v string) {
+func (o *ConfigurationVisibilityCondition) SetField(v string) {
 	o.Field = &v
 }
 
 // GetValues returns the Values field value if set, zero value otherwise.
-func (o *ComponentsVisibilityCondition) GetValues() []string {
+func (o *ConfigurationVisibilityCondition) GetValues() []string {
 	if o == nil || IsNil(o.Values) {
 		var ret []string
 		return ret
@@ -84,7 +84,7 @@ func (o *ComponentsVisibilityCondition) GetValues() []string {
 
 // GetValuesOk returns a tuple with the Values field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ComponentsVisibilityCondition) GetValuesOk() ([]string, bool) {
+func (o *ConfigurationVisibilityCondition) GetValuesOk() ([]string, bool) {
 	if o == nil || IsNil(o.Values) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *ComponentsVisibilityCondition) GetValuesOk() ([]string, bool) {
 }
 
 // HasValues returns a boolean if a field has been set.
-func (o *ComponentsVisibilityCondition) HasValues() bool {
+func (o *ConfigurationVisibilityCondition) HasValues() bool {
 	if o != nil && !IsNil(o.Values) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *ComponentsVisibilityCondition) HasValues() bool {
 }
 
 // SetValues gets a reference to the given []string and assigns it to the Values field.
-func (o *ComponentsVisibilityCondition) SetValues(v []string) {
+func (o *ConfigurationVisibilityCondition) SetValues(v []string) {
 	o.Values = v
 }
 
-func (o ComponentsVisibilityCondition) MarshalJSON() ([]byte, error) {
+func (o ConfigurationVisibilityCondition) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o ComponentsVisibilityCondition) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ComponentsVisibilityCondition) ToMap() (map[string]interface{}, error) {
+func (o ConfigurationVisibilityCondition) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Field) {
 		toSerialize["field"] = o.Field
@@ -124,38 +124,38 @@ func (o ComponentsVisibilityCondition) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableComponentsVisibilityCondition struct {
-	value *ComponentsVisibilityCondition
+type NullableConfigurationVisibilityCondition struct {
+	value *ConfigurationVisibilityCondition
 	isSet bool
 }
 
-func (v NullableComponentsVisibilityCondition) Get() *ComponentsVisibilityCondition {
+func (v NullableConfigurationVisibilityCondition) Get() *ConfigurationVisibilityCondition {
 	return v.value
 }
 
-func (v *NullableComponentsVisibilityCondition) Set(val *ComponentsVisibilityCondition) {
+func (v *NullableConfigurationVisibilityCondition) Set(val *ConfigurationVisibilityCondition) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableComponentsVisibilityCondition) IsSet() bool {
+func (v NullableConfigurationVisibilityCondition) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableComponentsVisibilityCondition) Unset() {
+func (v *NullableConfigurationVisibilityCondition) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableComponentsVisibilityCondition(val *ComponentsVisibilityCondition) *NullableComponentsVisibilityCondition {
-	return &NullableComponentsVisibilityCondition{value: val, isSet: true}
+func NewNullableConfigurationVisibilityCondition(val *ConfigurationVisibilityCondition) *NullableConfigurationVisibilityCondition {
+	return &NullableConfigurationVisibilityCondition{value: val, isSet: true}
 }
 
-func (v NullableComponentsVisibilityCondition) MarshalJSON() ([]byte, error) {
+func (v NullableConfigurationVisibilityCondition) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableComponentsVisibilityCondition) UnmarshalJSON(src []byte) error {
+func (v *NullableConfigurationVisibilityCondition) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

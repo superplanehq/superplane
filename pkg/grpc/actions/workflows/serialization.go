@@ -3,7 +3,7 @@ package workflows
 import (
 	"fmt"
 
-	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	compb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -125,7 +125,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			return fmt.Errorf("component %s not found", node.Component.Name)
 		}
 
-		return components.ValidateConfiguration(component.Configuration(), node.Configuration.AsMap())
+		return configuration.ValidateConfiguration(component.Configuration(), node.Configuration.AsMap())
 
 	case compb.Node_TYPE_BLUEPRINT:
 		if node.Blueprint == nil {
@@ -157,7 +157,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 			return fmt.Errorf("trigger %s not found", node.Trigger.Name)
 		}
 
-		return components.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
+		return configuration.ValidateConfiguration(trigger.Configuration(), node.Configuration.AsMap())
 
 	default:
 		return fmt.Errorf("invalid node type: %s", node.Type)

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	compb "github.com/superplanehq/superplane/pkg/protos/components"
+	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/triggers"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -16,7 +16,7 @@ func DescribeTrigger(ctx context.Context, registry *registry.Registry, name stri
 	}
 
 	configFields := trigger.Configuration()
-	configuration := make([]*compb.ConfigurationField, len(configFields))
+	configuration := make([]*configpb.Field, len(configFields))
 	for i, field := range configFields {
 		configuration[i] = actions.ConfigurationFieldToProto(field)
 	}

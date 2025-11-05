@@ -1,7 +1,7 @@
-import { ComponentsConfigurationField } from '../../api-client'
+import { ConfigurationField } from '../../api-client'
 
 export interface FieldRendererProps {
-  field: ComponentsConfigurationField
+  field: ConfigurationField
   value: unknown
   onChange: (value: unknown) => void
   allValues?: Record<string, unknown>

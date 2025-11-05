@@ -7,6 +7,7 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -46,12 +47,12 @@ func (f *Filter) Color() string {
 	return "red"
 }
 
-func (f *Filter) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (f *Filter) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:        "expression",
 			Label:       "Filter Expression",
-			Type:        components.FieldTypeString,
+			Type:        configuration.FieldTypeString,
 			Description: "Boolean expression to filter data",
 			Required:    true,
 		},

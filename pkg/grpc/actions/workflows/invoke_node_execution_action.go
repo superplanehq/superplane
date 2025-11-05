@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/workflows"
@@ -65,7 +66,7 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("action '%s' not found for component '%s'", actionName, node.Ref.Data().Component.Name)
 	}
 
-	if err := components.ValidateConfiguration(actionDef.Parameters, parameters); err != nil {
+	if err := configuration.ValidateConfiguration(actionDef.Parameters, parameters); err != nil {
 		return nil, fmt.Errorf("action parameter validation failed: %w", err)
 	}
 

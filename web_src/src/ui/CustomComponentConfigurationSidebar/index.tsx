@@ -1,3 +1,4 @@
+import { ConfigurationField } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,15 +11,6 @@ export interface BlueprintMetadata {
   description: string;
   icon: string;
   color: string;
-}
-
-export interface ConfigurationField {
-  name: string;
-  label?: string;
-  type: string;
-  description?: string;
-  required?: boolean;
-  typeOptions?: any;
 }
 
 export interface OutputChannel {

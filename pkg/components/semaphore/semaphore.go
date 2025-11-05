@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -78,15 +79,15 @@ func (s *Semaphore) OutputChannels(configuration any) []components.OutputChannel
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }
 
-func (s *Semaphore) Configuration() []components.ConfigurationField {
-	return []components.ConfigurationField{
+func (s *Semaphore) Configuration() []configuration.Field {
+	return []configuration.Field{
 		{
 			Name:     "integration",
 			Label:    "Semaphore integration",
-			Type:     components.FieldTypeIntegration,
+			Type:     configuration.FieldTypeIntegration,
 			Required: true,
-			TypeOptions: &components.TypeOptions{
-				Integration: &components.IntegrationTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Integration: &configuration.IntegrationTypeOptions{
 					Type: "semaphore",
 				},
 			},
@@ -94,16 +95,16 @@ func (s *Semaphore) Configuration() []components.ConfigurationField {
 		{
 			Name:     "project",
 			Label:    "Project",
-			Type:     components.FieldTypeIntegrationResource,
+			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
-			VisibilityConditions: []components.VisibilityCondition{
+			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "integration",
 					Values: []string{"*"},
 				},
 			},
-			TypeOptions: &components.TypeOptions{
-				Resource: &components.ResourceTypeOptions{
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
 					Type: "project",
 				},
 			},
@@ -111,34 +112,34 @@ func (s *Semaphore) Configuration() []components.ConfigurationField {
 		{
 			Name:     "ref",
 			Label:    "Workflow ref",
-			Type:     components.FieldTypeString,
+			Type:     configuration.FieldTypeString,
 			Required: true,
 		},
 		{
 			Name:     "pipelineFile",
 			Label:    "Pipeline File",
-			Type:     components.FieldTypeString,
+			Type:     configuration.FieldTypeString,
 			Required: true,
 		},
 		{
 			Name:  "parameters",
 			Label: "Parameters",
-			Type:  components.FieldTypeList,
-			TypeOptions: &components.TypeOptions{
-				List: &components.ListTypeOptions{
-					ItemDefinition: &components.ListItemDefinition{
-						Type: components.FieldTypeObject,
-						Schema: []components.ConfigurationField{
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
 							{
 								Name:     "name",
 								Label:    "Name",
-								Type:     components.FieldTypeString,
+								Type:     configuration.FieldTypeString,
 								Required: true,
 							},
 							{
 								Name:     "value",
 								Label:    "Value",
-								Type:     components.FieldTypeString,
+								Type:     configuration.FieldTypeString,
 								Required: true,
 							},
 						},
@@ -239,10 +240,10 @@ func (s *Semaphore) Actions() []components.Action {
 		{
 			Name:           "finish",
 			UserAccessible: true,
-			Parameters: []components.ConfigurationField{
+			Parameters: []configuration.Field{
 				{
 					Name:     "data",
-					Type:     components.FieldTypeObject,
+					Type:     configuration.FieldTypeObject,
 					Required: false,
 					Default:  map[string]any{},
 				},
