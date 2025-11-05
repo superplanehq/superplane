@@ -206,3 +206,70 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateTime_CustomFormat(t *testing.T) {
+	tests := []struct {
+		name        string
+		format      string
+		value       string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "valid time with default format 15:04",
+			format:      "",
+			value:       "18:27",
+			expectError: false,
+		},
+		{
+			name:        "valid time with explicit 15:04 format",
+			format:      "15:04",
+			value:       "18:27",
+			expectError: false,
+		},
+		{
+			name:        "invalid time with HH:MM format",
+			format:      "HH:MM",
+			value:       "18:27",
+			expectError: true,
+			errorMsg:    "must be a valid time in format HH:MM",
+		},
+		{
+			name:        "valid time with single digit hour",
+			format:      "15:04",
+			value:       "9:30",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			field := Field{
+				Name: "time",
+				Type: FieldTypeTime,
+			}
+
+			if tt.format != "" {
+				field.TypeOptions = &TypeOptions{
+					Time: &TimeTypeOptions{
+						Format: tt.format,
+					},
+				}
+			}
+
+			config := map[string]any{
+				"time": tt.value,
+			}
+
+			err := ValidateConfiguration([]Field{field}, config)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
