@@ -28,6 +28,8 @@ type ConfigurationField struct {
 	Label *string `json:"label,omitempty"`
 	VisibilityConditions []ConfigurationVisibilityCondition `json:"visibilityConditions,omitempty"`
 	TypeOptions *ConfigurationTypeOptions `json:"typeOptions,omitempty"`
+	RequiredConditions []ConfigurationRequiredCondition `json:"requiredConditions,omitempty"`
+	ValidationRules []ConfigurationValidationRule `json:"validationRules,omitempty"`
 }
 
 // NewConfigurationField instantiates a new ConfigurationField object
@@ -303,6 +305,70 @@ func (o *ConfigurationField) SetTypeOptions(v ConfigurationTypeOptions) {
 	o.TypeOptions = &v
 }
 
+// GetRequiredConditions returns the RequiredConditions field value if set, zero value otherwise.
+func (o *ConfigurationField) GetRequiredConditions() []ConfigurationRequiredCondition {
+	if o == nil || IsNil(o.RequiredConditions) {
+		var ret []ConfigurationRequiredCondition
+		return ret
+	}
+	return o.RequiredConditions
+}
+
+// GetRequiredConditionsOk returns a tuple with the RequiredConditions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationField) GetRequiredConditionsOk() ([]ConfigurationRequiredCondition, bool) {
+	if o == nil || IsNil(o.RequiredConditions) {
+		return nil, false
+	}
+	return o.RequiredConditions, true
+}
+
+// HasRequiredConditions returns a boolean if a field has been set.
+func (o *ConfigurationField) HasRequiredConditions() bool {
+	if o != nil && !IsNil(o.RequiredConditions) {
+		return true
+	}
+
+	return false
+}
+
+// SetRequiredConditions gets a reference to the given []ConfigurationRequiredCondition and assigns it to the RequiredConditions field.
+func (o *ConfigurationField) SetRequiredConditions(v []ConfigurationRequiredCondition) {
+	o.RequiredConditions = v
+}
+
+// GetValidationRules returns the ValidationRules field value if set, zero value otherwise.
+func (o *ConfigurationField) GetValidationRules() []ConfigurationValidationRule {
+	if o == nil || IsNil(o.ValidationRules) {
+		var ret []ConfigurationValidationRule
+		return ret
+	}
+	return o.ValidationRules
+}
+
+// GetValidationRulesOk returns a tuple with the ValidationRules field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ConfigurationField) GetValidationRulesOk() ([]ConfigurationValidationRule, bool) {
+	if o == nil || IsNil(o.ValidationRules) {
+		return nil, false
+	}
+	return o.ValidationRules, true
+}
+
+// HasValidationRules returns a boolean if a field has been set.
+func (o *ConfigurationField) HasValidationRules() bool {
+	if o != nil && !IsNil(o.ValidationRules) {
+		return true
+	}
+
+	return false
+}
+
+// SetValidationRules gets a reference to the given []ConfigurationValidationRule and assigns it to the ValidationRules field.
+func (o *ConfigurationField) SetValidationRules(v []ConfigurationValidationRule) {
+	o.ValidationRules = v
+}
+
 func (o ConfigurationField) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -336,6 +402,12 @@ func (o ConfigurationField) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.TypeOptions) {
 		toSerialize["typeOptions"] = o.TypeOptions
+	}
+	if !IsNil(o.RequiredConditions) {
+		toSerialize["requiredConditions"] = o.RequiredConditions
+	}
+	if !IsNil(o.ValidationRules) {
+		toSerialize["validationRules"] = o.ValidationRules
 	}
 	return toSerialize, nil
 }

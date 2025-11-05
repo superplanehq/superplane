@@ -2,6 +2,7 @@ package timegate
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -15,8 +16,10 @@ func init() {
 }
 
 const (
-	TimeGateIncludeMode = "include"
-	TimeGateExcludeMode = "exclude"
+	TimeGateIncludeRangeMode    = "include_range"
+	TimeGateExcludeRangeMode    = "exclude_range"
+	TimeGateIncludeSpecificMode = "include_specific"
+	TimeGateExcludeSpecificMode = "exclude_specific"
 )
 
 type TimeGate struct{}
@@ -26,10 +29,13 @@ type Metadata struct {
 }
 
 type Spec struct {
-	Mode      string   `json:"mode"`
-	StartTime string   `json:"startTime"`
-	EndTime   string   `json:"endTime"`
-	Days      []string `json:"days"`
+	Mode          string   `json:"mode"`
+	StartTime     string   `json:"startTime"`
+	EndTime       string   `json:"endTime"`
+	Days          []string `json:"days"`
+	StartDateTime string   `json:"startDateTime,omitempty"`
+	EndDateTime   string   `json:"endDateTime,omitempty"`
+	Timezone      string   `json:"timezone,omitempty"`
 }
 
 func (tg *TimeGate) Name() string {
@@ -67,12 +73,20 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{
-							Label: "Include",
-							Value: TimeGateIncludeMode,
+							Label: "Include Range",
+							Value: TimeGateIncludeRangeMode,
 						},
 						{
-							Label: "Exclude",
-							Value: TimeGateExcludeMode,
+							Label: "Exclude Range",
+							Value: TimeGateExcludeRangeMode,
+						},
+						{
+							Label: "Include Specific Times",
+							Value: TimeGateIncludeSpecificMode,
+						},
+						{
+							Label: "Exclude Specific Times",
+							Value: TimeGateExcludeSpecificMode,
 						},
 					},
 				},
@@ -82,17 +96,55 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 			Name:        "startTime",
 			Label:       "Start Time (HH:MM)",
 			Type:        configuration.FieldTypeTime,
-			Required:    true,
+			Required:    false,
 			Description: "Start time in HH:MM format (24-hour), e.g., 09:30",
 			Default:     "09:00",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:        configuration.ValidationRuleLessThan,
+					CompareWith: "endTime",
+					Message:     "start time must be before end time",
+				},
+			},
 		},
 		{
 			Name:        "endTime",
 			Label:       "End Time (HH:MM)",
 			Type:        configuration.FieldTypeTime,
-			Required:    true,
+			Required:    false,
 			Description: "End time in HH:MM format (24-hour), e.g., 17:30",
 			Default:     "17:00",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeRangeMode, TimeGateExcludeRangeMode},
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:        configuration.ValidationRuleGreaterThan,
+					CompareWith: "startTime",
+					Message:     "end time must be after start time",
+				},
+			},
 		},
 		{
 			Name:     "days",
@@ -110,6 +162,100 @@ func (tg *TimeGate) Configuration() []configuration.Field {
 						{Label: "Friday", Value: "friday"},
 						{Label: "Saturday", Value: "saturday"},
 						{Label: "Sunday", Value: "sunday"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "startDateTime",
+			Label:       "Start Date & Time",
+			Type:        configuration.FieldTypeDateTime,
+			Required:    false,
+			Description: "Start date and time for specific time window (e.g., 2024-12-31T00:00)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
+				},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:        configuration.ValidationRuleLessThan,
+					CompareWith: "endDateTime",
+					Message:     "start date & time must be before end date & time",
+				},
+			},
+		},
+		{
+			Name:        "endDateTime",
+			Label:       "End Date & Time",
+			Type:        configuration.FieldTypeDateTime,
+			Required:    false,
+			Description: "End date and time for specific time window (e.g., 2025-01-01T23:59)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
+				},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{
+					Field:  "mode",
+					Values: []string{TimeGateIncludeSpecificMode, TimeGateExcludeSpecificMode},
+				},
+			},
+			ValidationRules: []configuration.ValidationRule{
+				{
+					Type:        configuration.ValidationRuleGreaterThan,
+					CompareWith: "startDateTime",
+					Message:     "end date & time must be after start date & time",
+				},
+			},
+		},
+		{
+			Name:        "timezone",
+			Label:       "Timezone",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Description: "Timezone offset for time-based calculations (default: UTC)",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "GMT-12 (Baker Island)", Value: "-12"},
+						{Label: "GMT-11 (American Samoa)", Value: "-11"},
+						{Label: "GMT-10 (Hawaii)", Value: "-10"},
+						{Label: "GMT-9 (Alaska)", Value: "-9"},
+						{Label: "GMT-8 (Los Angeles, Vancouver)", Value: "-8"},
+						{Label: "GMT-7 (Denver, Phoenix)", Value: "-7"},
+						{Label: "GMT-6 (Chicago, Mexico City)", Value: "-6"},
+						{Label: "GMT-5 (New York, Toronto)", Value: "-5"},
+						{Label: "GMT-4 (Santiago, Atlantic)", Value: "-4"},
+						{Label: "GMT-3 (São Paulo, Buenos Aires)", Value: "-3"},
+						{Label: "GMT-2 (South Georgia)", Value: "-2"},
+						{Label: "GMT-1 (Azores)", Value: "-1"},
+						{Label: "GMT+0 (London, Dublin, UTC)", Value: "0"},
+						{Label: "GMT+1 (Paris, Berlin, Rome)", Value: "1"},
+						{Label: "GMT+2 (Cairo, Helsinki, Athens)", Value: "2"},
+						{Label: "GMT+3 (Moscow, Istanbul, Riyadh)", Value: "3"},
+						{Label: "GMT+4 (Dubai, Baku)", Value: "4"},
+						{Label: "GMT+5 (Karachi, Tashkent)", Value: "5"},
+						{Label: "GMT+5:30 (Mumbai, Delhi)", Value: "5.5"},
+						{Label: "GMT+6 (Dhaka, Almaty)", Value: "6"},
+						{Label: "GMT+7 (Bangkok, Jakarta)", Value: "7"},
+						{Label: "GMT+8 (Beijing, Singapore, Perth)", Value: "8"},
+						{Label: "GMT+9 (Tokyo, Seoul)", Value: "9"},
+						{Label: "GMT+9:30 (Adelaide)", Value: "9.5"},
+						{Label: "GMT+10 (Sydney, Melbourne)", Value: "10"},
+						{Label: "GMT+11 (Solomon Islands)", Value: "11"},
+						{Label: "GMT+12 (Auckland, Fiji)", Value: "12"},
+						{Label: "GMT+13 (Tonga, Samoa)", Value: "13"},
+						{Label: "GMT+14 (Kiribati)", Value: "14"},
 					},
 				},
 			},
@@ -139,11 +285,19 @@ func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 		return fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	now := time.Now().UTC()
+	timezone := tg.parseTimezone(spec.Timezone)
+	now := time.Now().In(timezone)
 	nextValidTime := tg.findNextValidTime(now, spec)
 
 	if nextValidTime.IsZero() {
-		return fmt.Errorf("no valid time window found")
+		switch spec.Mode {
+		case TimeGateIncludeSpecificMode:
+			return fmt.Errorf("no valid time window found: the specified datetime range (%s to %s) has already passed", spec.StartDateTime, spec.EndDateTime)
+		case TimeGateExcludeSpecificMode:
+			return fmt.Errorf("no valid time window found: the specified datetime range (%s to %s) has already passed", spec.StartDateTime, spec.EndDateTime)
+		default:
+			return fmt.Errorf("no valid time window found: check your time configuration and selected days")
+		}
 	}
 
 	//
@@ -185,23 +339,51 @@ func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 }
 
 func (tg *TimeGate) validateSpec(spec Spec) error {
-
-	if spec.Mode != TimeGateIncludeMode && spec.Mode != TimeGateExcludeMode {
-		return fmt.Errorf("invalid mode '%s': must be '%s' or '%s'", spec.Mode, TimeGateIncludeMode, TimeGateExcludeMode)
+	validModes := map[string]bool{
+		TimeGateIncludeRangeMode:    true,
+		TimeGateExcludeRangeMode:    true,
+		TimeGateIncludeSpecificMode: true,
+		TimeGateExcludeSpecificMode: true,
 	}
 
-	startTime, err := parseTimeString(spec.StartTime)
-	if err != nil {
-		return fmt.Errorf("startTime error: %w", err)
+	if !validModes[spec.Mode] {
+		return fmt.Errorf("invalid mode '%s': must be one of include_range, exclude_range, include_specific, exclude_specific", spec.Mode)
 	}
 
-	endTime, err := parseTimeString(spec.EndTime)
-	if err != nil {
-		return fmt.Errorf("endTime error: %w", err)
+	if spec.Mode == TimeGateIncludeRangeMode || spec.Mode == TimeGateExcludeRangeMode {
+		startTime, err := parseTimeString(spec.StartTime)
+		if err != nil {
+			return fmt.Errorf("startTime error: %w", err)
+		}
+
+		endTime, err := parseTimeString(spec.EndTime)
+		if err != nil {
+			return fmt.Errorf("endTime error: %w", err)
+		}
+
+		if startTime >= endTime {
+			return fmt.Errorf("start time (%s) must be before end time (%s)", spec.StartTime, spec.EndTime)
+		}
 	}
 
-	if startTime >= endTime {
-		return fmt.Errorf("start time (%s) must be before end time (%s)", spec.StartTime, spec.EndTime)
+	if spec.Mode == TimeGateIncludeSpecificMode || spec.Mode == TimeGateExcludeSpecificMode {
+		if spec.StartDateTime == "" || spec.EndDateTime == "" {
+			return fmt.Errorf("startDateTime and endDateTime are required for specific time modes")
+		}
+
+		startDateTime, err := time.Parse("2006-01-02T15:04", spec.StartDateTime)
+		if err != nil {
+			return fmt.Errorf("invalid startDateTime format '%s': expected YYYY-MM-DDTHH:MM", spec.StartDateTime)
+		}
+
+		endDateTime, err := time.Parse("2006-01-02T15:04", spec.EndDateTime)
+		if err != nil {
+			return fmt.Errorf("invalid endDateTime format '%s': expected YYYY-MM-DDTHH:MM", spec.EndDateTime)
+		}
+
+		if !startDateTime.Before(endDateTime) {
+			return fmt.Errorf("start datetime (%s) must be before end datetime (%s)", spec.StartDateTime, spec.EndDateTime)
+		}
 	}
 
 	if len(spec.Days) == 0 {
@@ -271,10 +453,14 @@ func (tg *TimeGate) configEqual(a, b Spec) bool {
 
 func (tg *TimeGate) findNextValidTime(now time.Time, spec Spec) time.Time {
 	switch spec.Mode {
-	case TimeGateIncludeMode:
+	case TimeGateIncludeRangeMode:
 		return tg.findNextIncludeTime(now, spec)
-	case TimeGateExcludeMode:
+	case TimeGateExcludeRangeMode:
 		return tg.findNextExcludeEndTime(now, spec)
+	case TimeGateIncludeSpecificMode:
+		return tg.findNextIncludeSpecificTime(now, spec)
+	case TimeGateExcludeSpecificMode:
+		return tg.findNextExcludeSpecificEndTime(now, spec)
 	default:
 		return time.Time{}
 	}
@@ -345,6 +531,20 @@ func (tg *TimeGate) findNextExcludeEndTime(now time.Time, spec Spec) time.Time {
 	return now
 }
 
+func (tg *TimeGate) parseTimezone(timezoneStr string) *time.Location {
+	if timezoneStr == "" {
+		return time.UTC
+	}
+
+	offsetHours, err := strconv.ParseFloat(timezoneStr, 64)
+	if err != nil {
+		return time.UTC
+	}
+	offsetSeconds := int(offsetHours * 3600)
+
+	return time.FixedZone(fmt.Sprintf("GMT%+.1f", offsetHours), offsetSeconds)
+}
+
 func parseTimeString(timeStr string) (int, error) {
 	if timeStr == "" {
 		return 0, fmt.Errorf("time string is empty")
@@ -389,4 +589,67 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func (tg *TimeGate) findNextIncludeSpecificTime(now time.Time, spec Spec) time.Time {
+	startDateTime, err := time.ParseInLocation("2006-01-02T15:04", spec.StartDateTime, now.Location())
+	if err != nil {
+		return time.Time{}
+	}
+
+	endDateTime, err := time.ParseInLocation("2006-01-02T15:04", spec.EndDateTime, now.Location())
+	if err != nil {
+		return time.Time{}
+	}
+
+	if now.After(startDateTime) && now.Before(endDateTime) {
+		currentDay := getDayString(now.Weekday())
+		if contains(spec.Days, currentDay) {
+			return now
+		}
+	}
+
+	if now.Before(startDateTime) {
+		startDay := getDayString(startDateTime.Weekday())
+		if contains(spec.Days, startDay) {
+			return startDateTime
+		}
+	}
+
+	// Search for the next occurrence of this datetime on a selected day
+	// Look up to 7 days ahead to find a matching day
+	for daysAhead := 1; daysAhead <= 7; daysAhead++ {
+		candidateDate := startDateTime.AddDate(0, 0, daysAhead)
+		candidateDay := getDayString(candidateDate.Weekday())
+
+		if contains(spec.Days, candidateDay) {
+			return candidateDate
+		}
+	}
+
+	return time.Time{}
+}
+
+func (tg *TimeGate) findNextExcludeSpecificEndTime(now time.Time, spec Spec) time.Time {
+	startDateTime, err := time.ParseInLocation("2006-01-02T15:04", spec.StartDateTime, now.Location())
+	if err != nil {
+		return time.Time{}
+	}
+
+	endDateTime, err := time.ParseInLocation("2006-01-02T15:04", spec.EndDateTime, now.Location())
+	if err != nil {
+		return time.Time{}
+	}
+
+	currentDay := getDayString(now.Weekday())
+
+	if !contains(spec.Days, currentDay) {
+		return now
+	}
+
+	if now.Before(startDateTime) || now.After(endDateTime) {
+		return now
+	}
+
+	return endDateTime
 }

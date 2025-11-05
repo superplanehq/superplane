@@ -11,6 +11,8 @@ const (
 	FieldTypeList                = "list"
 	FieldTypeObject              = "object"
 	FieldTypeTime                = "time"
+	FieldTypeDate                = "date"
+	FieldTypeDateTime            = "datetime"
 	FieldTypeUser                = "user"
 	FieldTypeRole                = "role"
 	FieldTypeGroup               = "group"
@@ -56,6 +58,18 @@ type Field struct {
 	 * No visibility conditions - always visible.
 	 */
 	VisibilityConditions []VisibilityCondition `json:"visibility_conditions,omitempty"`
+
+	/*
+	 * Used for controlling when the field is required based on other field values.
+	 * If specified, the field is only required when these conditions are met.
+	 */
+	RequiredConditions []RequiredCondition `json:"required_conditions,omitempty"`
+
+	/*
+	 * Used for defining validation rules that compare this field with other fields.
+	 * For example, ensuring startTime < endTime or startDateTime < endDateTime.
+	 */
+	ValidationRules []ValidationRule `json:"validation_rules,omitempty"`
 }
 
 /*
@@ -70,6 +84,8 @@ type TypeOptions struct {
 	List        *ListTypeOptions        `json:"list,omitempty"`
 	Object      *ObjectTypeOptions      `json:"object,omitempty"`
 	Time        *TimeTypeOptions        `json:"time,omitempty"`
+	Date        *DateTypeOptions        `json:"date,omitempty"`
+	DateTime    *DateTimeTypeOptions    `json:"datetime,omitempty"`
 }
 
 /*
@@ -92,6 +108,20 @@ type NumberTypeOptions struct {
  */
 type TimeTypeOptions struct {
 	Format string `json:"format,omitempty"` // Expected format, e.g., "HH:MM", "HH:MM:SS"
+}
+
+/*
+ * DateTypeOptions specifies format and constraints for date fields
+ */
+type DateTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, e.g., "YYYY-MM-DD", "MM/DD/YYYY"
+}
+
+/*
+ * DateTimeTypeOptions specifies format and constraints for datetime fields
+ */
+type DateTimeTypeOptions struct {
+	Format string `json:"format,omitempty"` // Expected format, e.g., "2006-01-02T15:04", "YYYY-MM-DDTHH:MM"
 }
 
 /*
@@ -148,4 +178,22 @@ type ListItemDefinition struct {
 type VisibilityCondition struct {
 	Field  string   `json:"field"`
 	Values []string `json:"values"`
+}
+
+type RequiredCondition struct {
+	Field  string   `json:"field"`
+	Values []string `json:"values"`
+}
+
+const (
+	ValidationRuleLessThan    = "less_than"
+	ValidationRuleGreaterThan = "greater_than"
+	ValidationRuleEqual       = "equal"
+	ValidationRuleNotEqual    = "not_equal"
+)
+
+type ValidationRule struct {
+	Type        string `json:"type"`         // less_than, greater_than, equal, not_equal
+	CompareWith string `json:"compare_with"` // field name to compare with
+	Message     string `json:"message"`      // custom error message
 }
