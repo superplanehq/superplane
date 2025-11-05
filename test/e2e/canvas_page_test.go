@@ -30,6 +30,16 @@ func TestCanvasPage(t *testing.T) {
 		steps.AssertCantRunNode()
 		steps.AssertExplainationIsShownWhenHoverOverRun()
 	})
+
+	t.Run("adding an approval component to canvas and testing add item to list 3 times", func(t *testing.T) {
+		steps.Start()
+		steps.GivenACanvasExists()
+		steps.VisitCanvasPage()
+		steps.AddApprovalToCanvas("Test Approval")
+		steps.ClickAddItemButton()
+		steps.ClickAddItemButton()
+		steps.ClickAddItemButton()
+	})
 }
 
 type CanvasPageSteps struct {
@@ -107,6 +117,28 @@ func (s *CanvasPageSteps) SaveCanvas() {
 	s.session.Click(q.TestID("save-canvas-button"))
 	s.session.Sleep(500)
 	s.session.AssertText("Canvas changes saved")
+}
+
+func (s *CanvasPageSteps) AddApprovalToCanvas(nodeName string) {
+	source := q.TestID("building-block-approval")
+	target := q.TestID("rf__wrapper")
+
+	s.session.DragAndDrop(source, target, 400, 250)
+	s.session.Sleep(300)
+
+	// Use default name if empty string provided (node name is required)
+	if nodeName == "" {
+		nodeName = "approval"
+	}
+
+	s.session.FillIn(q.TestID("node-name-input"), nodeName)
+	s.session.Sleep(300)
+}
+
+func (s *CanvasPageSteps) ClickAddItemButton() {
+	// Click the "Add Item" button to test the list functionality
+	s.session.Click(q.Text("Add Item"))
+	s.session.Sleep(300)
 }
 
 func (s *CanvasPageSteps) AssertNodeIsAdded(nodeName string) {
