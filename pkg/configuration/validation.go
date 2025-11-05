@@ -255,6 +255,41 @@ func validateDateTime(field Field, value any) error {
 	return nil
 }
 
+func validateDayInYear(field Field, value any) error {
+	dayStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	format := "MM/DD"
+	if field.TypeOptions != nil && field.TypeOptions.DayInYear != nil && field.TypeOptions.DayInYear.Format != "" {
+		format = field.TypeOptions.DayInYear.Format
+	}
+
+	var month, day int
+	var extra string
+	n, err := fmt.Sscanf(dayStr, "%d/%d%s", &month, &day, &extra)
+
+	if n < 2 || n > 2 {
+		return fmt.Errorf("must be a valid day in format %s (e.g., 12/25)", format)
+	}
+
+	if err != nil && n < 2 {
+		return fmt.Errorf("must be a valid day in format %s (e.g., 12/25)", format)
+	}
+
+	if month < 1 || month > 12 || day < 1 || day > 31 {
+		return fmt.Errorf("invalid day values: month must be 1-12, day must be 1-31")
+	}
+
+	daysInMonth := []int{0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if day > daysInMonth[month] {
+		return fmt.Errorf("invalid day '%d' for month '%d'", day, month)
+	}
+
+	return nil
+}
+
 func validateFieldValue(field Field, value any) error {
 	switch field.Type {
 	case FieldTypeString:
@@ -315,6 +350,9 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeDateTime:
 		return validateDateTime(field, value)
+
+	case FieldTypeDayInYear:
+		return validateDayInYear(field, value)
 	}
 
 	return nil
@@ -366,6 +404,8 @@ func validateComparisonRule(field Field, value any, compareValue any, rule Valid
 		return validateDateTimeComparison(value, compareValue, rule)
 	case FieldTypeDate:
 		return validateDateComparison(value, compareValue, rule)
+	case FieldTypeDayInYear:
+		return validateDayInYearComparison(value, compareValue, rule)
 	case FieldTypeNumber:
 		return validateNumberComparison(value, compareValue, rule)
 	default:
@@ -422,6 +462,35 @@ func validateDateComparison(value any, compareValue any, rule ValidationRule) er
 	}
 
 	return compareTimeValues(valueTime, compareTime, rule)
+}
+
+func validateDayInYearComparison(value any, compareValue any, rule ValidationRule) error {
+	valueStr, ok1 := value.(string)
+	compareStr, ok2 := compareValue.(string)
+	if !ok1 || !ok2 {
+		return fmt.Errorf("day-in-year values must be strings")
+	}
+
+	var valueMonth, valueDay int
+	var compareMonth, compareDay int
+
+	n1, err1 := fmt.Sscanf(valueStr, "%d/%d", &valueMonth, &valueDay)
+	n2, err2 := fmt.Sscanf(compareStr, "%d/%d", &compareMonth, &compareDay)
+
+	if n1 != 2 || n2 != 2 || err1 != nil || err2 != nil {
+		return fmt.Errorf("invalid day-in-year format")
+	}
+
+	valueDayOfYear := (valueMonth-1)*31 + valueDay
+	compareDayOfYear := (compareMonth-1)*31 + compareDay
+
+	if valueMonth > compareMonth {
+		if rule.Type == ValidationRuleLessThan {
+			return nil
+		}
+	}
+
+	return compareDayInYearValues(valueDayOfYear, compareDayOfYear, valueStr, compareStr, rule)
 }
 
 // validateNumberComparison validates number field comparisons
@@ -528,6 +597,30 @@ func compareStringValues(value, compareValue string, rule ValidationRule) error 
 	case ValidationRuleNotEqual:
 		if value == compareValue {
 			return fmt.Errorf("must not be equal to %s", compareValue)
+		}
+	default:
+		return fmt.Errorf("unknown validation rule type: %s", rule.Type)
+	}
+	return nil
+}
+
+func compareDayInYearValues(valueDayOfYear, compareDayOfYear int, valueStr, compareStr string, rule ValidationRule) error {
+	switch rule.Type {
+	case ValidationRuleLessThan:
+		if valueDayOfYear >= compareDayOfYear {
+			return fmt.Errorf("must be before %s", compareStr)
+		}
+	case ValidationRuleGreaterThan:
+		if valueDayOfYear <= compareDayOfYear {
+			return fmt.Errorf("must be after %s", compareStr)
+		}
+	case ValidationRuleEqual:
+		if valueDayOfYear != compareDayOfYear {
+			return fmt.Errorf("must be equal to %s", compareStr)
+		}
+	case ValidationRuleNotEqual:
+		if valueDayOfYear == compareDayOfYear {
+			return fmt.Errorf("must not be equal to %s", compareStr)
 		}
 	default:
 		return fmt.Errorf("unknown validation rule type: %s", rule.Type)

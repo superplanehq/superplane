@@ -206,3 +206,189 @@ func TestValidateConfiguration_ValidationRules(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateDayInYear(t *testing.T) {
+	field := Field{
+		Name: "testDay",
+		Type: FieldTypeDayInYear,
+	}
+
+	tests := []struct {
+		name        string
+		value       any
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "valid Christmas",
+			value:       "12/25",
+			expectError: false,
+		},
+		{
+			name:        "valid New Year",
+			value:       "01/01",
+			expectError: false,
+		},
+		{
+			name:        "valid leap day",
+			value:       "02/29",
+			expectError: false,
+		},
+		{
+			name:        "valid July 4th",
+			value:       "07/04",
+			expectError: false,
+		},
+		{
+			name:        "single digit month and day",
+			value:       "1/1",
+			expectError: false,
+		},
+		{
+			name:        "not a string",
+			value:       123,
+			expectError: true,
+			errorMsg:    "must be a string",
+		},
+		{
+			name:        "invalid format",
+			value:       "invalid",
+			expectError: true,
+			errorMsg:    "must be a valid day",
+		},
+		{
+			name:        "invalid month",
+			value:       "13/01",
+			expectError: true,
+			errorMsg:    "invalid day values",
+		},
+		{
+			name:        "invalid day",
+			value:       "01/32",
+			expectError: true,
+			errorMsg:    "invalid day values",
+		},
+		{
+			name:        "zero month",
+			value:       "00/15",
+			expectError: true,
+			errorMsg:    "invalid day values",
+		},
+		{
+			name:        "zero day",
+			value:       "06/00",
+			expectError: true,
+			errorMsg:    "invalid day values",
+		},
+		{
+			name:        "invalid day for February",
+			value:       "02/30",
+			expectError: true,
+			errorMsg:    "invalid day '30' for month '2'",
+		},
+		{
+			name:        "invalid day for April",
+			value:       "04/31",
+			expectError: true,
+			errorMsg:    "invalid day '31' for month '4'",
+		},
+		{
+			name:        "extra parts",
+			value:       "12/25/2024",
+			expectError: true,
+			errorMsg:    "must be a valid day",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateDayInYear(field, tt.value)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateDayInYearComparison(t *testing.T) {
+	fields := []Field{
+		{
+			Name:     "startDayInYear",
+			Type:     FieldTypeDayInYear,
+			Required: true,
+			ValidationRules: []ValidationRule{
+				{
+					Type:        ValidationRuleLessThan,
+					CompareWith: "endDayInYear",
+					Message:     "start day must be before end day",
+				},
+			},
+		},
+		{
+			Name:     "endDayInYear",
+			Type:     FieldTypeDayInYear,
+			Required: true,
+		},
+	}
+
+	tests := []struct {
+		name        string
+		config      map[string]any
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid day range",
+			config: map[string]any{
+				"startDayInYear": "12/25",
+				"endDayInYear":   "12/31",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid day range - start after end",
+			config: map[string]any{
+				"startDayInYear": "12/31",
+				"endDayInYear":   "12/25",
+			},
+			expectError: true,
+			errorMsg:    "start day must be before end day",
+		},
+		{
+			name: "cross-year range - valid",
+			config: map[string]any{
+				"startDayInYear": "12/25",
+				"endDayInYear":   "01/05",
+			},
+			expectError: false, // Cross-year ranges are allowed
+		},
+		{
+			name: "same day - valid",
+			config: map[string]any{
+				"startDayInYear": "07/04",
+				"endDayInYear":   "07/04",
+			},
+			expectError: true, // Same day should fail for less_than comparison
+			errorMsg:    "start day must be before end day",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConfiguration(fields, tt.config)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
