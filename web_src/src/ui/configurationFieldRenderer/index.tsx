@@ -78,7 +78,7 @@ export const ConfigurationFieldRenderer = ({
 
       return hasError ? [{
         field: fieldName,
-        message: 'Validation error',
+        message: '',
         type: 'validation_rule' as const
       }] : []
     } else {
