@@ -50,6 +50,10 @@ func (c *NoOp) Execute(ctx components.ExecutionContext) error {
 	})
 }
 
+func (c *NoOp) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	return ctx.DefaultProcessing()
+}
+
 func (c *NoOp) Actions() []components.Action {
 	return []components.Action{}
 }

@@ -110,3 +110,7 @@ func (f *Filter) HandleAction(ctx components.ActionContext) error {
 func (f *Filter) Setup(ctx components.SetupContext) error {
 	return nil
 }
+
+func (f *Filter) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	return ctx.DefaultProcessing()
+}

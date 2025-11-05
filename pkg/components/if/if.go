@@ -120,3 +120,7 @@ func (f *If) HandleAction(ctx components.ActionContext) error {
 func (f *If) Setup(ctx components.SetupContext) error {
 	return nil
 }
+
+func (f *If) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	return ctx.DefaultProcessing()
+}

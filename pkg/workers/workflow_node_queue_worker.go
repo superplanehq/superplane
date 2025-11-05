@@ -8,14 +8,23 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
+
+func asMap(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return map[string]any{}
+}
 
 type WorkflowNodeQueueWorker struct {
 	registry  *registry.Registry
@@ -107,11 +116,59 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 		Input:         event.Data.Data(),
 	}
 
-	if err := comp.ProcessQueueItem(ctx); err != nil {
-		return err
+	ctx.CreateExecution = func() error {
+		now := time.Now()
+
+		execution := models.WorkflowNodeExecution{
+			WorkflowID:          queueItem.WorkflowID,
+			NodeID:              node.NodeID,
+			RootEventID:         queueItem.RootEventID,
+			EventID:             event.ID,
+			PreviousExecutionID: event.ExecutionID,
+			State:               models.WorkflowNodeExecutionStatePending,
+			Configuration:       datatypes.NewJSONType(asMap(config)),
+			CreatedAt:           &now,
+			UpdatedAt:           &now,
+		}
+
+		err := tx.Create(&execution).Error
+		if err != nil {
+			return err
+		}
+
+		messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).PublishWithDelay(1 * time.Second)
+		return nil
 	}
 
-	return nil
+	ctx.DequeueItem = func() error {
+		return queueItem.Delete(tx)
+	}
+
+	ctx.UpdateNodeState = func(state string) error {
+		return node.UpdateState(tx, state)
+	}
+
+	ctx.UpdateNodeState = func(state string) error {
+		return node.UpdateState(tx, state)
+	}
+
+	ctx.DefaultProcessing = func() error {
+		var err error
+
+		err = ctx.CreateExecution()
+		if err != nil {
+			return err
+		}
+
+		err = ctx.DequeueItem()
+		if err != nil {
+			return err
+		}
+
+		return ctx.UpdateNodeState(models.WorkflowNodeStateProcessing)
+	}
+
+	return comp.ProcessQueueItem(ctx)
 }
 
 func (w *WorkflowNodeQueueWorker) findEvent(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem) (*models.WorkflowEvent, error) {

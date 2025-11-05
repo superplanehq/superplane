@@ -46,3 +46,9 @@ func (m *Merge) Execute(ctx components.ExecutionContext) error {
 		components.DefaultOutputChannel.Name: {ctx.Data},
 	})
 }
+
+func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	// This will become 10x more complex when we add support for
+	// merging strategies, timeouts, etc.
+	return ctx.DefaultProcessing()
+}

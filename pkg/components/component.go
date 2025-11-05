@@ -198,6 +198,20 @@ type ProcessQueueContext struct {
 	RootEventID string
 	EventID     string
 	Input       any
+
+	// CreateExecution creates a pending execution for this queue item.
+	CreateExecution func() error
+
+	// DequeueItem marks the queue item as processed.
+	DequeueItem func() error
+
+	// UpdateNodeState updates the state of the node.
+	UpdateNodeState func(state string) error
+
+	// DefaultProcessing performs the default processing for the queue item.
+	// Convenience method to avoid boilerplate in components that just want default behavior,
+	// where an execution is created and the item is dequeued.
+	DefaultProcessing func() error
 }
 
 type AuthContext interface {
