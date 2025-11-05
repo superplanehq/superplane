@@ -1870,6 +1870,16 @@ function prepareTimeGateNode(
   const days = configuration?.days || [];
   const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
 
+  // Get timezone information
+  const timezone = configuration?.timezone || "0";
+  const getTimezoneDisplay = (timezoneOffset: string) => {
+    const offset = parseFloat(timezoneOffset);
+    if (offset === 0) return "GMT+0 (UTC)";
+    if (offset > 0) return `GMT+${offset}`;
+    return `GMT${offset}`; // Already has the minus sign
+  };
+  const timezoneDisplay = getTimezoneDisplay(timezone);
+
   // Handle different time window formats based on mode
   let timeWindow = "";
   let startDateTime: string | undefined;
@@ -1941,6 +1951,7 @@ function prepareTimeGateNode(
         mode,
         timeWindow,
         days: daysDisplay,
+        timezone: timezoneDisplay,
         startDateTime,
         endDateTime,
         lastExecution,

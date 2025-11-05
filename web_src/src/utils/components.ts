@@ -266,7 +266,7 @@ function validateTimeComparison(
     return 'Invalid time format'
   }
 
-  return compareValues(valueTime, compareTime, rule)
+  return compareTimeValues(valueTime, compareTime, rule, valueStr, compareStr)
 }
 
 /**
@@ -339,6 +339,44 @@ function validateStringComparison(
   const compareStr = String(compareValue)
 
   return compareValues(valueStr, compareStr, rule)
+}
+
+/**
+ * Performs time value comparison and returns appropriate error message
+ */
+function compareTimeValues(
+  value: number,
+  compareValue: number,
+  rule: ConfigurationValidationRule,
+  _valueStr: string,
+  compareStr: string
+): string | null {
+  switch (rule.type) {
+    case 'less_than':
+      if (value >= compareValue) {
+        return `must be less than ${compareStr}`
+      }
+      break
+    case 'greater_than':
+      if (value <= compareValue) {
+        return `must be greater than ${compareStr}`
+      }
+      break
+    case 'equal':
+      if (value !== compareValue) {
+        return `must be equal to ${compareStr}`
+      }
+      break
+    case 'not_equal':
+      if (value === compareValue) {
+        return `must not be equal to ${compareStr}`
+      }
+      break
+    default:
+      return `unknown validation rule type: ${rule.type}`
+  }
+
+  return null
 }
 
 /**

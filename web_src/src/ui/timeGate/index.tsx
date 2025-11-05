@@ -22,6 +22,7 @@ export interface TimeGateProps extends ComponentActionsProps {
   mode?: "include_range" | "exclude_range" | "include_specific" | "exclude_specific";
   timeWindow?: string;
   days?: string;
+  timezone?: string;
   startDateTime?: string;
   endDateTime?: string;
   lastExecution?: TimeGateExecutionItem;
@@ -42,6 +43,7 @@ export const TimeGate: React.FC<TimeGateProps> = ({
   mode = "include_range",
   timeWindow,
   days,
+  timezone,
   startDateTime,
   endDateTime,
   lastExecution,
@@ -127,6 +129,14 @@ export const TimeGate: React.FC<TimeGateProps> = ({
       items.push({
         icon: "clock",
         label: timeWindow
+      });
+    }
+
+    // Add timezone if provided
+    if (timezone) {
+      items.push({
+        icon: "globe",
+        label: `Timezone: ${timezone}`
       });
     }
 

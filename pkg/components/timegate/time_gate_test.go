@@ -43,7 +43,7 @@ func TestTimeGate_OutputChannels(t *testing.T) {
 func TestTimeGate_Configuration(t *testing.T) {
 	tg := &TimeGate{}
 	config := tg.Configuration()
-	assert.Len(t, config, 6) // mode, startTime, endTime, days, startDateTime, endDateTime
+	assert.Len(t, config, 7) // mode, startTime, endTime, days, startDateTime, endDateTime, timezone
 
 	// Check mode field
 	assert.Equal(t, "mode", config[0].Name)
@@ -614,6 +614,60 @@ func TestFindNextExcludeEndTime(t *testing.T) {
 				assert.True(t, result.After(testTime), tt.description)
 				assert.False(t, result.IsZero(), "Should not return zero time")
 			}
+		})
+	}
+}
+
+func TestParseTimezone(t *testing.T) {
+	tg := &TimeGate{}
+
+	tests := []struct {
+		name           string
+		timezoneStr    string
+		expectedOffset int // offset in seconds
+	}{
+		{
+			name:           "UTC",
+			timezoneStr:    "0",
+			expectedOffset: 0,
+		},
+		{
+			name:           "EST (GMT-5)",
+			timezoneStr:    "-5",
+			expectedOffset: -5 * 3600,
+		},
+		{
+			name:           "JST (GMT+9)",
+			timezoneStr:    "9",
+			expectedOffset: 9 * 3600,
+		},
+		{
+			name:           "India (GMT+5.5)",
+			timezoneStr:    "5.5",
+			expectedOffset: int(5.5 * 3600),
+		},
+		{
+			name:           "Empty string defaults to UTC",
+			timezoneStr:    "",
+			expectedOffset: 0,
+		},
+		{
+			name:           "Invalid string defaults to UTC",
+			timezoneStr:    "invalid",
+			expectedOffset: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			location := tg.parseTimezone(tt.timezoneStr)
+
+			// Test with a known time to verify offset
+			testTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+			localTime := testTime.In(location)
+
+			_, offset := localTime.Zone()
+			assert.Equal(t, tt.expectedOffset, offset)
 		})
 	}
 }
