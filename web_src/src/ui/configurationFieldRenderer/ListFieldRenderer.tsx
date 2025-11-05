@@ -53,7 +53,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
               <div className="border border-gray-300 dark:border-zinc-700 rounded-md p-4 space-y-4">
                 {itemDefinition.schema.map((schemaField) => {
                   const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`
-                  const hasNestedError = React.useMemo(() => {
+                  const hasNestedError = (() => {
                     if (!validationErrors) return false
 
                     if (validationErrors instanceof Set) {
@@ -61,7 +61,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                     } else {
                       return validationErrors.some(error => error.field === nestedFieldPath)
                     }
-                  }, [validationErrors, nestedFieldPath])
+                  })()
 
                   return (
                     <ConfigurationFieldRenderer
