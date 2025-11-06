@@ -8,8 +8,12 @@ import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 export type WaitState = "success" | "failed" | "running";
 
 export interface WaitExecutionItem {
+  title: string;
   receivedAt?: Date;
+  completedAt?: Date;
   state?: WaitState;
+  values?: Record<string, string>;
+  expectedDuration?: number; // Expected wait duration in milliseconds
 }
 
 export interface WaitProps extends ComponentActionsProps {
@@ -89,6 +93,40 @@ export const Wait: React.FC<WaitProps> = ({
     return "text-white";
   }, []);
 
+  // Live countdown timer for running waits
+  const [timeLeft, setTimeLeft] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (
+      lastExecution?.state === "running" &&
+      lastExecution.receivedAt &&
+      lastExecution.expectedDuration
+    ) {
+      const receivedAt = lastExecution.receivedAt;
+      const expectedDuration = lastExecution.expectedDuration;
+
+      // Calculate initial time left
+      const elapsed = Date.now() - receivedAt.getTime();
+      setTimeLeft(Math.max(0, expectedDuration - elapsed));
+
+      // Update every second
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - receivedAt.getTime();
+        const remaining = Math.max(0, expectedDuration - elapsed);
+        setTimeLeft(remaining);
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setTimeLeft(null);
+    }
+  }, [lastExecution?.state, lastExecution?.receivedAt, lastExecution?.expectedDuration]);
+
+  // Format timestamp for "Done at"
+  const formatTimestamp = (date: Date): string => {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected}>
@@ -163,14 +201,16 @@ export const Wait: React.FC<WaitProps> = ({
                         className: getStateIconColor(lastExecution.state),
                       })}
                     </div>
-                    <span className="text-sm">
-                      {lastExecution.state === "running" ? "Running..." : lastExecution.state === "success" ? "Completed" : "Failed"}
+                    <span className="text-sm font-medium truncate">
+                      {lastExecution.title}
                     </span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    {calcRelativeTimeFromDiff(
-                      new Date().getTime() - lastExecution.receivedAt.getTime()
-                    )}
+                    {lastExecution.state === "running" && timeLeft !== null
+                      ? `Time left: ${calcRelativeTimeFromDiff(timeLeft)}`
+                      : lastExecution.completedAt
+                        ? `Done at: ${formatTimestamp(lastExecution.completedAt)}`
+                        : ""}
                   </span>
                 </div>
               </div>

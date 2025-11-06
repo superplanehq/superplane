@@ -1163,7 +1163,7 @@ function prepareComponentNode(
     case "semaphore":
       return prepareSemaphoreNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
-      return prepareWaitNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
       return prepareTimeGateNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
@@ -1814,6 +1814,7 @@ function prepareSemaphoreNode(
 }
 
 function prepareWaitNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -1826,14 +1827,31 @@ function prepareWaitNode(
 
   let lastExecution;
   if (execution) {
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    // Calculate expected duration from configuration
+    let expectedDuration: number | undefined;
+    if (configuration?.duration) {
+      const { value, unit } = configuration.duration;
+      const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
+      expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
+    }
+
     lastExecution = {
+      title: title,
       receivedAt: new Date(execution.createdAt!),
+      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
       state:
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
             ? ("running" as const)
             : ("failed" as const),
+      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
+      expectedDuration: expectedDuration,
     };
   }
 
