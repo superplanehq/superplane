@@ -102,7 +102,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-2 border-border rounded-md w-[23rem] bg-white" >
+      <div className="flex flex-col border-1 border-border rounded-md w-[23rem] bg-white overflow-hidden" >
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -126,7 +126,7 @@ export const Trigger: React.FC<TriggerProps> = ({ iconSrc, iconSlug, iconColor, 
           {lastEventData ? (
             <>
               <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-                <span className="uppercase text-sm font-medium">Last Event</span>
+                <span className="uppercase text-xs font-semibold tracking-wide">Last Event</span>
                 <span className="text-sm">{timeAgo}</span>
               </div>
               <div className={`flex items-center justify-between gap-3 px-2 py-2 rounded-md ${LastEventBackground} ${LastEventColor}`}>

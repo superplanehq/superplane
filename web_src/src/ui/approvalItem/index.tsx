@@ -209,7 +209,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <div className="flex-1">
                   <Label
                     htmlFor="rejection-comment"
-                    className="text-sm font-semibold text-neutral-900"
+                    className="text-sm font-semibold text-gray-900"
                   >
                     Comment
                   </Label>
@@ -217,7 +217,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
               </div>
               <Input
                 id="rejection-comment"
-                placeholder="Enter the reason for rejection..."
+                placeholder="Reason for rejection…"
                 value={rejectionCommentInput}
                 onChange={(e) => setRejectionCommentInput(e.target.value)}
                 className="w-full outline-none focus-visible:ring-0 focus-visible:ring-offset-0 "

@@ -15,7 +15,7 @@ const approveRelease: ApprovalProps = createApprovalProps({
   title: "Approve Release",
   description: "New releases are deployed to staging for testing and require approvals.",
   iconSlug: "hand",
-  iconColor: "text-orange-500",
+  iconColor: "text-orange-800",
   headerColor: "bg-orange-100",
   approvals: [
     {

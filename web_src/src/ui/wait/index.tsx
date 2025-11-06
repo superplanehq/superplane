@@ -162,7 +162,7 @@ export const Wait: React.FC<WaitProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white">
+      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white overflow-hidden">
         <ComponentHeader
           iconSlug="alarm-clock"
           iconBackground={iconBackground || "bg-yellow-100"}
@@ -184,7 +184,7 @@ export const Wait: React.FC<WaitProps> = ({
         {!hideLastRun && (
           <div className="px-4 py-3 border-b">
             <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-              <span className="uppercase text-sm font-medium">Last Run</span>
+              <span className="uppercase text-xs font-semibold tracking-wide">Last Run</span>
             </div>
 
             {lastExecution && lastExecution.state && lastExecution.receivedAt ? (
@@ -228,7 +228,7 @@ export const Wait: React.FC<WaitProps> = ({
         {nextInQueue && (
           <div className="px-4 pt-3 pb-6">
             <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-              <span className="uppercase text-sm font-medium">Next In Queue</span>
+              <span className="uppercase text-xs font-semibold tracking-wide">Next In Queue</span>
             </div>
             <div className="flex items-center justify-between gap-3 px-2 py-2 rounded-md bg-gray-100 min-w-0">
               <div className="flex items-center gap-2 text-gray-500 min-w-0 flex-1">
