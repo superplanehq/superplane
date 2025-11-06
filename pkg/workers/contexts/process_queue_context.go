@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -68,6 +69,73 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 			return err
 		}
 		return ctx.UpdateNodeState(models.WorkflowNodeStateProcessing)
+	}
+
+	ctx.GetExecutionMetadata = func(execID uuid.UUID) (map[string]any, error) {
+		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
+		if err != nil {
+			return nil, err
+		}
+
+		return exec.Metadata.Data(), nil
+	}
+
+	ctx.SetExecutionMetadata = func(execID uuid.UUID, metadata any) error {
+		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
+		if err != nil {
+			return err
+		}
+
+		b, err := json.Marshal(metadata)
+		if err != nil {
+			return err
+		}
+
+		var v map[string]any
+		err = json.Unmarshal(b, &v)
+		if err != nil {
+			return err
+		}
+
+		exec.Metadata = datatypes.NewJSONType(v)
+		return tx.Save(exec).Error
+	}
+
+	ctx.CountIncomingEdges = func() (int, error) {
+		wf, err := models.FindUnscopedWorkflowInTransaction(tx, node.WorkflowID)
+		if err != nil {
+			return 0, err
+		}
+
+		count := 0
+
+		for _, edge := range wf.Edges {
+			if edge.TargetID == node.NodeID {
+				count++
+			}
+		}
+
+		return count, nil
+	}
+
+	ctx.FinishExecution = func(execID uuid.UUID, outputs map[string][]any) error {
+		exec, err := models.FindNodeExecutionInTransaction(tx, node.WorkflowID, execID)
+		if err != nil {
+			return err
+		}
+
+		exec.PassInTransaction(tx, outputs)
+		messages.NewWorkflowExecutionFinishedMessage(exec.WorkflowID.String(), exec).PublishWithDelay(1 * time.Second)
+
+		return nil
+	}
+
+	ctx.FindExecutionIDByKV = func(key string, value string) (uuid.UUID, bool, error) {
+		return uuid.Nil, false, nil
+	}
+
+	ctx.SetExecutionKV = func(execID uuid.UUID, key string, value string) error {
+		return models.CreateWorkflowNodeExecutionKVInTransaction(tx, execID, key, value)
 	}
 
 	return ctx, nil

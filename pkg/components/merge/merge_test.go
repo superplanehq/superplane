@@ -26,7 +26,7 @@ func Test_Merge(t *testing.T) {
 	steps.ProcessFirstEvent(m)
 	steps.ProcessSecondEvent(m)
 
-	steps.AssertTwoExecutionsCreated()
+	steps.AssertOneExecutionCreated()
 }
 
 type MergeTestSteps struct {
@@ -196,8 +196,8 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	require.NoError(s.t, err)
 }
 
-func (s *MergeTestSteps) AssertTwoExecutionsCreated() {
+func (s *MergeTestSteps) AssertOneExecutionCreated() {
 	var executions []models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).Find(&executions).Error)
-	assert.Equal(s.t, 2, len(executions))
+	assert.Equal(s.t, 1, len(executions))
 }
