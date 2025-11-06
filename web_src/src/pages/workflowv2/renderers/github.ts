@@ -26,6 +26,16 @@ interface GitHubEventData {
       username: string
     }
   };
+  pull_request?: {
+    title?: string;
+    id?: string;
+    url?: string;
+    merge_commit_sha?: string;
+    user?: {
+      id: string;
+      login: string;
+    }
+  };
 }
 
 /**
@@ -34,18 +44,35 @@ interface GitHubEventData {
 export const githubTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (event: WorkflowsWorkflowEvent): { title: string; subtitle: string } => {
     const eventData = event.data as GitHubEventData;
+
+    if (eventData.pull_request) {
+      return {
+        title: eventData?.pull_request?.title || "",
+        subtitle: eventData?.pull_request?.merge_commit_sha || "",
+      }
+    }
+
     return {
-      title: eventData?.head_commit?.message!,
-      subtitle: eventData?.head_commit?.id!,
+      title: eventData?.head_commit?.message || "",
+      subtitle: eventData?.head_commit?.id || "",
     };
   },
 
   getRootEventValues: (lastEvent: WorkflowsWorkflowEvent): Record<string, string> => {
     const eventData = lastEvent.data as GitHubEventData;
+
+    if (eventData.pull_request) {
+      return {
+        "Commit": eventData?.pull_request?.title || "",
+        "SHA": eventData?.pull_request?.merge_commit_sha || "",
+        "Author": eventData?.pull_request?.user?.login || "",
+      }
+    }
+
     return {
-      "Commit": eventData?.head_commit?.message!,
-      "SHA": eventData?.head_commit?.id!,
-      "Author": eventData?.head_commit?.author?.name!,
+      "Commit": eventData?.head_commit?.message || "",
+      "SHA": eventData?.head_commit?.id || "",
+      "Author": eventData?.head_commit?.author?.name || "",
     };
   },
 
