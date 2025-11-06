@@ -85,22 +85,65 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 		return err
 	}
 
-	event, err := w.findEvent(tx, queueItem)
+	ctx, err := w.buildProcessQueueContext(tx, node, queueItem)
 	if err != nil {
 		return err
+	}
+
+	switch node.Type {
+	case models.NodeTypeComponent:
+		/*
+		* For component nodes, delegate to the component's ProcessQueueItem implementation to handle
+		* the processing.
+		 */
+		return w.processComponentNode(ctx, node)
+	case models.NodeTypeBlueprint:
+		/*
+		* For blueprint nodes, use the default processing logic.
+		* Blueprint nodes do not have custom processing logic.
+		 */
+		return ctx.DefaultProcessing()
+	default:
+		return fmt.Errorf("unsupported node type: %s", node.Type)
+	}
+}
+
+func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQueueContext, node *models.WorkflowNode) error {
+	ref := node.Ref.Data()
+
+	if ref.Component == nil || ref.Component.Name == "" {
+		return fmt.Errorf("node %s has no component reference", node.NodeID)
+	}
+
+	comp, err := w.registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		return fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+	}
+
+	return comp.ProcessQueueItem(*ctx)
+}
+
+func (w *WorkflowNodeQueueWorker) findEvent(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem) (*models.WorkflowEvent, error) {
+	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find event %s: %w", queueItem.EventID, err)
+	}
+
+	return event, nil
+}
+
+func (w *WorkflowNodeQueueWorker) buildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) (*components.ProcessQueueContext, error) {
+	event, err := w.findEvent(tx, queueItem)
+	if err != nil {
+		return nil, err
 	}
 
 	config, err := w.buildNodeConfig(tx, queueItem, node, event)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	comp, err := w.findComponent(node)
-	if err != nil {
-		return err
-	}
-
-	ctx := components.ProcessQueueContext{
+	ctx := &components.ProcessQueueContext{
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: config,
@@ -157,49 +200,16 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 		return ctx.UpdateNodeState(models.WorkflowNodeStateProcessing)
 	}
 
-	return comp.ProcessQueueItem(ctx)
-}
-
-func (w *WorkflowNodeQueueWorker) findEvent(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem) (*models.WorkflowEvent, error) {
-	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find event %s: %w", queueItem.EventID, err)
-	}
-
-	return event, nil
+	return ctx, nil
 }
 
 func (w *WorkflowNodeQueueWorker) buildNodeConfig(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem, node *models.WorkflowNode, event *models.WorkflowEvent) (map[string]any, error) {
-	config, err := contexts.NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+	return contexts.
+		NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
 		WithInput(event.Data.Data()).
 		Build(node.Configuration.Data())
-
-	if err != nil {
-		return nil, err
-	}
-
-	return config, nil
-}
-
-func (w *WorkflowNodeQueueWorker) findComponent(node *models.WorkflowNode) (components.Component, error) {
-	ref := node.Ref.Data()
-
-	if w.registry == nil {
-		return nil, fmt.Errorf("registry is not initialized")
-	}
-
-	if ref.Component == nil || ref.Component.Name == "" {
-		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
-	}
-
-	comp, err := w.registry.GetComponent(ref.Component.Name)
-	if err != nil {
-		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
-	}
-
-	return comp, nil
 }
 
 func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
