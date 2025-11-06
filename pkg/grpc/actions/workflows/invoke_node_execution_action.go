@@ -75,15 +75,16 @@ func InvokeNodeExecutionAction(
 		return nil, fmt.Errorf("user not found: %w", err)
 	}
 
+	tx := database.Conn()
 	actionCtx := components.ActionContext{
 		Name:                  actionName,
 		Parameters:            parameters,
 		Configuration:         node.Configuration.Data(),
 		MetadataContext:       contexts.NewExecutionMetadataContext(execution),
 		ExecutionStateContext: contexts.NewExecutionStateContext(database.Conn(), execution),
-		AuthContext:           contexts.NewAuthContext(orgID, authService, user),
+		AuthContext:           contexts.NewAuthContext(tx, orgID, authService, user),
 		RequestContext:        contexts.NewExecutionRequestContext(database.Conn(), execution),
-		IntegrationContext:    contexts.NewIntegrationContext(registry),
+		IntegrationContext:    contexts.NewIntegrationContext(tx, registry),
 	}
 
 	err = component.HandleAction(actionCtx)

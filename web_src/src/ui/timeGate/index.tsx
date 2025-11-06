@@ -7,9 +7,10 @@ import { MetadataItem } from "../metadataList";
 export type TimeGateState = "success" | "failed" | "running";
 
 export interface TimeGateExecutionItem {
+  title: string;
   receivedAt?: Date;
   state?: TimeGateState;
-  eventId?: string;
+  values?: Record<string, string>;
   nextRunTime?: Date;
 }
 
@@ -19,9 +20,10 @@ export interface NextInQueueItem {
 
 export interface TimeGateProps extends ComponentActionsProps {
   title?: string;
-  mode?: "include" | "exclude";
+  mode?: "include_range" | "exclude_range" | "include_specific" | "exclude_specific";
   timeWindow?: string;
   days?: string;
+  timezone?: string;
   lastExecution?: TimeGateExecutionItem;
   nextInQueue?: NextInQueueItem;
   collapsed?: boolean;
@@ -37,9 +39,10 @@ const daysOfWeekOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday":
 
 export const TimeGate: React.FC<TimeGateProps> = ({
   title = "Time Gate",
-  mode = "include",
+  mode = "include_range",
   timeWindow,
   days,
+  timezone,
   lastExecution,
   nextInQueue,
   collapsed = false,
@@ -74,16 +77,48 @@ export const TimeGate: React.FC<TimeGateProps> = ({
     ]
   } : undefined;
 
-  const metadata: MetadataItem[] = [
-    {
-      icon: "settings",
-      label: mode.toUpperCase()
-    },
-    {
-      icon: "calendar",
-      label: timeWindow || ""
-    },
-  ];
+  const getModeLabel = (mode: string) => {
+    switch (mode) {
+      case "include_range":
+        return "Include Range";
+      case "exclude_range":
+        return "Exclude Range";
+      case "include_specific":
+        return "Include Specific";
+      case "exclude_specific":
+        return "Exclude Specific";
+      default:
+        return mode.charAt(0).toUpperCase() + mode.slice(1).replace(/_/g, ' ');
+    }
+  };
+
+  const getMetadataItems = () => {
+    const items: MetadataItem[] = [
+      {
+        icon: "settings",
+        label: getModeLabel(mode)
+      }
+    ];
+
+    if (timeWindow) {
+      items.push({
+        icon: "clock",
+        label: timeWindow
+      });
+    }
+
+    // Add timezone if provided
+    if (timezone) {
+      items.push({
+        icon: "globe",
+        label: `Timezone: ${timezone}`
+      });
+    }
+
+    return items;
+  };
+
+  const metadata: MetadataItem[] = getMetadataItems();
 
   const eventSections: EventSection[] = [];
 
@@ -92,18 +127,15 @@ export const TimeGate: React.FC<TimeGateProps> = ({
       let eventTitle: string;
       let eventSubtitle: string | undefined;
 
-      if (lastExecution.state === "running" && lastExecution.eventId) {
-        // Show event ID and time remaining for running state
-        eventTitle = lastExecution.eventId;
-        if (lastExecution.nextRunTime) {
-          const now = new Date();
-          const timeDiff = lastExecution.nextRunTime.getTime() - now.getTime();
-          const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
-          eventSubtitle = `Runs in ${timeLeftText}`;
-        }
-      } else {
-        // Show standard messages for completed states
-        eventTitle = lastExecution.eventId || "Event";
+      // Use trigger-based title
+      eventTitle = lastExecution.title;
+
+      if (lastExecution.state === "running" && lastExecution.nextRunTime) {
+        // Show time remaining for running state
+        const now = new Date();
+        const timeDiff = lastExecution.nextRunTime.getTime() - now.getTime();
+        const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
+        eventSubtitle = `Runs in ${timeLeftText}`;
       }
 
       eventSections.push({

@@ -36,3 +36,25 @@
 - GoLang: when checking for the existence of an item on a list, use `slice.Contains` or `slice.ContainsFunc`
 - When naming variables, avoid names like `*Str` or `*UUID`; Go is a typed language, we don't need types in the variables names
 - When writing tests that require specific timestamps to be used, always use timestamps based off of `time.Now()`, instead of absolute times created with `time.Date`
+
+## Database Transaction Guidelines
+
+When working with database transactions, follow these rules to ensure data consistency:
+
+- **NEVER** call `database.Conn()` inside a function that receives a `tx *gorm.DB` parameter
+  - ❌ Bad: `func process(tx *gorm.DB) { user, _ := models.FindUser(id) }` where FindUser calls `database.Conn()`
+  - ✅ Good: `func process(tx *gorm.DB) { user, _ := models.FindUserInTransaction(tx, id) }`
+
+- **Always propagate** the transaction context through the entire call chain
+  - Pass `tx` as the first parameter to all functions that need database access
+  - If a model method is used within a transaction, create an `*InTransaction()` variant that accepts `tx`
+
+- **Context constructors** must accept `tx *gorm.DB` if they perform database queries
+  - ❌ Bad: `NewAuthContext(orgID, service)` that internally calls `database.Conn()`
+  - ✅ Good: `NewAuthContext(tx, orgID, service)` that uses the passed transaction
+
+- **When creating new model methods**:
+  - Create both variants: `FindUser()` and `FindUserInTransaction(tx *gorm.DB)`
+  - The non-transaction variant should call the transaction variant: `return FindUserInTransaction(database.Conn(), ...)`
+
+**Why this matters**: Using `database.Conn()` inside transaction contexts breaks isolation, causes data inconsistency on rollback, and can lead to race conditions.

@@ -11,9 +11,11 @@ import { ComponentBaseSpecValue } from "../componentBase";
 export type SemaphoreState = "success" | "failed" | "running";
 
 export interface SemaphoreExecutionItem {
-  workflowId?: string;
+  title: string;
   receivedAt?: Date;
   state?: SemaphoreState;
+  values?: Record<string, string>;
+  duration?: number; // Duration in milliseconds (for finished executions)
 }
 
 export interface SemaphoreParameter {
@@ -115,6 +117,35 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
     }));
   }, [parameters]);
 
+  // Live timer for running executions
+  const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (lastExecution?.state === "running" && lastExecution.receivedAt) {
+      const receivedAt = lastExecution.receivedAt;
+
+      // Calculate initial duration
+      setLiveDuration(Date.now() - receivedAt.getTime());
+
+      // Update every second
+      const interval = setInterval(() => {
+        setLiveDuration(Date.now() - receivedAt.getTime());
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setLiveDuration(null);
+    }
+  }, [lastExecution?.state, lastExecution?.receivedAt]);
+
+  // Calculate display duration
+  const displayDuration = React.useMemo(() => {
+    if (lastExecution?.state === "running" && liveDuration !== null) {
+      return liveDuration;
+    }
+    return lastExecution?.duration;
+  }, [lastExecution?.state, lastExecution?.duration, liveDuration]);
+
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected}>
@@ -152,7 +183,7 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white overflow-hidden">
+      <div className="flex flex-col border-1 border-border rounded-md w-[23rem] bg-white overflow-hidden">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -214,20 +245,14 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
                         className: getStateIconColor(lastExecution.state),
                       })}
                     </div>
-                    {lastExecution.workflowId ? (
-                      <span className="text-sm font-medium truncate">
-                        Workflow: {lastExecution.workflowId}
-                      </span>
-                    ) : (
-                      <span className="text-sm">
-                        {lastExecution.state === "running" ? "Running..." : "Failed"}
-                      </span>
-                    )}
+                    <span className="text-sm font-medium truncate">
+                      {lastExecution.title}
+                    </span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    {calcRelativeTimeFromDiff(
-                      new Date().getTime() - lastExecution.receivedAt.getTime()
-                    )}
+                    {displayDuration !== undefined && displayDuration !== null
+                      ? `Running for: ${calcRelativeTimeFromDiff(displayDuration)}`
+                      : ""}
                   </span>
                 </div>
               </div>

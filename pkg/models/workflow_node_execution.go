@@ -244,7 +244,7 @@ func FindChildExecutions(parentExecutionID uuid.UUID, states []string) ([]Workfl
 
 func FindChildExecutionsInTransaction(tx *gorm.DB, parentExecutionID uuid.UUID, states []string) ([]WorkflowNodeExecution, error) {
 	var executions []WorkflowNodeExecution
-	err := database.Conn().
+	err := tx.
 		Where("parent_execution_id = ?", parentExecutionID).
 		Where("state IN ?", states).
 		Find(&executions).
@@ -442,6 +442,20 @@ func (e *WorkflowNodeExecution) GetInput(tx *gorm.DB) (any, error) {
 func (e *WorkflowNodeExecution) GetOutputs() ([]WorkflowEvent, error) {
 	var events []WorkflowEvent
 	err := database.Conn().
+		Where("execution_id = ?", e.ID).
+		Find(&events).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+func (e *WorkflowNodeExecution) GetOutputsInTransaction(tx *gorm.DB) ([]WorkflowEvent, error) {
+	var events []WorkflowEvent
+	err := tx.
 		Where("execution_id = ?", e.ID).
 		Find(&events).
 		Error

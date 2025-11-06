@@ -188,7 +188,7 @@ func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, er
 				return nil, fmt.Errorf("no root event found")
 			}
 
-			e, err := models.FindWorkflowEvent(*b.rootEventID)
+			e, err := models.FindWorkflowEventInTransaction(b.tx, *b.rootEventID)
 			if err != nil {
 				return nil, err
 			}

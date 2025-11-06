@@ -166,7 +166,7 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
-		IntegrationContext: contexts.NewIntegrationContext(registry),
+		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
 		EventContext:       contexts.NewEventContext(tx, &node),
 		WebhookContext:     contexts.NewWebhookContext(ctx, tx, encryptor, &node),
 	})
@@ -189,7 +189,7 @@ func setupComponent(tx *gorm.DB, registry *registry.Registry, node models.Workfl
 		Configuration:      node.Configuration.Data(),
 		MetadataContext:    contexts.NewNodeMetadataContext(&node),
 		RequestContext:     contexts.NewNodeRequestContext(tx, &node),
-		IntegrationContext: contexts.NewIntegrationContext(registry),
+		IntegrationContext: contexts.NewIntegrationContext(tx, registry),
 	})
 
 	if err != nil {

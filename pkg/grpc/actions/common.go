@@ -254,6 +254,42 @@ func objectTypeOptionsToProto(opts *configuration.ObjectTypeOptions) *configpb.O
 	return pbOpts
 }
 
+func timeTypeOptionsToProto(opts *configuration.TimeTypeOptions) *configpb.TimeTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.TimeTypeOptions{}
+	if opts.Format != "" {
+		pbOpts.Format = &opts.Format
+	}
+	return pbOpts
+}
+
+func dateTypeOptionsToProto(opts *configuration.DateTypeOptions) *configpb.DateTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.DateTypeOptions{}
+	if opts.Format != "" {
+		pbOpts.Format = &opts.Format
+	}
+	return pbOpts
+}
+
+func dateTimeTypeOptionsToProto(opts *configuration.DateTimeTypeOptions) *configpb.DateTimeTypeOptions {
+	if opts == nil {
+		return nil
+	}
+
+	pbOpts := &configpb.DateTimeTypeOptions{}
+	if opts.Format != "" {
+		pbOpts.Format = &opts.Format
+	}
+	return pbOpts
+}
+
 func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 	if opts == nil {
 		return nil
@@ -267,6 +303,9 @@ func typeOptionsToProto(opts *configuration.TypeOptions) *configpb.TypeOptions {
 		Resource:    resourceTypeOptionsToProto(opts.Resource),
 		List:        listTypeOptionsToProto(opts.List),
 		Object:      objectTypeOptionsToProto(opts.Object),
+		Time:        timeTypeOptionsToProto(opts.Time),
+		Date:        dateTypeOptionsToProto(opts.Date),
+		Datetime:    dateTimeTypeOptionsToProto(opts.DateTime),
 	}
 }
 
@@ -294,6 +333,29 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 			pbField.VisibilityConditions[i] = &configpb.VisibilityCondition{
 				Field:  cond.Field,
 				Values: cond.Values,
+			}
+		}
+	}
+
+	if len(field.RequiredConditions) > 0 {
+		pbField.RequiredConditions = make([]*configpb.RequiredCondition, len(field.RequiredConditions))
+		for i, cond := range field.RequiredConditions {
+			pbField.RequiredConditions[i] = &configpb.RequiredCondition{
+				Field:  cond.Field,
+				Values: cond.Values,
+			}
+		}
+	}
+
+	if len(field.ValidationRules) > 0 {
+		pbField.ValidationRules = make([]*configpb.ValidationRule, len(field.ValidationRules))
+		for i, rule := range field.ValidationRules {
+			pbField.ValidationRules[i] = &configpb.ValidationRule{
+				Type:        rule.Type,
+				CompareWith: rule.CompareWith,
+			}
+			if rule.Message != "" {
+				pbField.ValidationRules[i].Message = &rule.Message
 			}
 		}
 	}
@@ -408,6 +470,42 @@ func protoToObjectTypeOptions(pbOpts *configpb.ObjectTypeOptions) *configuration
 	return opts
 }
 
+func protoToTimeTypeOptions(pbOpts *configpb.TimeTypeOptions) *configuration.TimeTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.TimeTypeOptions{}
+	if pbOpts.Format != nil {
+		opts.Format = *pbOpts.Format
+	}
+	return opts
+}
+
+func protoToDateTypeOptions(pbOpts *configpb.DateTypeOptions) *configuration.DateTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.DateTypeOptions{}
+	if pbOpts.Format != nil {
+		opts.Format = *pbOpts.Format
+	}
+	return opts
+}
+
+func protoToDateTimeTypeOptions(pbOpts *configpb.DateTimeTypeOptions) *configuration.DateTimeTypeOptions {
+	if pbOpts == nil {
+		return nil
+	}
+
+	opts := &configuration.DateTimeTypeOptions{}
+	if pbOpts.Format != nil {
+		opts.Format = *pbOpts.Format
+	}
+	return opts
+}
+
 func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions {
 	if pbOpts == nil {
 		return nil
@@ -421,6 +519,9 @@ func protoToTypeOptions(pbOpts *configpb.TypeOptions) *configuration.TypeOptions
 		Resource:    protoToResourceTypeOptions(pbOpts.Resource),
 		List:        protoToListTypeOptions(pbOpts.List),
 		Object:      protoToObjectTypeOptions(pbOpts.Object),
+		Time:        protoToTimeTypeOptions(pbOpts.Time),
+		Date:        protoToDateTypeOptions(pbOpts.Date),
+		DateTime:    protoToDateTimeTypeOptions(pbOpts.Datetime),
 	}
 }
 
@@ -444,6 +545,29 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 			field.VisibilityConditions[i] = configuration.VisibilityCondition{
 				Field:  pbCond.Field,
 				Values: pbCond.Values,
+			}
+		}
+	}
+
+	if len(pbField.RequiredConditions) > 0 {
+		field.RequiredConditions = make([]configuration.RequiredCondition, len(pbField.RequiredConditions))
+		for i, pbCond := range pbField.RequiredConditions {
+			field.RequiredConditions[i] = configuration.RequiredCondition{
+				Field:  pbCond.Field,
+				Values: pbCond.Values,
+			}
+		}
+	}
+
+	if len(pbField.ValidationRules) > 0 {
+		field.ValidationRules = make([]configuration.ValidationRule, len(pbField.ValidationRules))
+		for i, pbRule := range pbField.ValidationRules {
+			field.ValidationRules[i] = configuration.ValidationRule{
+				Type:        pbRule.Type,
+				CompareWith: pbRule.CompareWith,
+			}
+			if pbRule.Message != nil {
+				field.ValidationRules[i].Message = *pbRule.Message
 			}
 		}
 	}

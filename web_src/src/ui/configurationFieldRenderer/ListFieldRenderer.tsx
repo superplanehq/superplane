@@ -2,11 +2,11 @@ import React from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '../button'
 import { Input } from '../input'
-import { FieldRendererProps } from './types'
+import { FieldRendererProps, ValidationError } from './types'
 import { ConfigurationFieldRenderer } from './index'
 
 interface ExtendedFieldRendererProps extends FieldRendererProps {
-  validationErrors?: Set<string>
+  validationErrors?: ValidationError[] | Set<string>
   fieldPath?: string
 }
 
@@ -53,7 +53,15 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
               <div className="border border-gray-300 dark:border-zinc-700 rounded-md p-4 space-y-4">
                 {itemDefinition.schema.map((schemaField) => {
                   const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`
-                  const hasNestedError = validationErrors?.has(nestedFieldPath) || false
+                  const hasNestedError = (() => {
+                    if (!validationErrors) return false
+
+                    if (validationErrors instanceof Set) {
+                      return validationErrors.has(nestedFieldPath)
+                    } else {
+                      return validationErrors.some(error => error.field === nestedFieldPath)
+                    }
+                  })()
 
                   return (
                     <ConfigurationFieldRenderer

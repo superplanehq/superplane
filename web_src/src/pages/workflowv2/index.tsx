@@ -1161,11 +1161,11 @@ function prepareComponentNode(
     case "http":
       return prepareHttpNode(node, components, nodeExecutionsMap);
     case "semaphore":
-      return prepareSemaphoreNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareSemaphoreNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
-      return prepareWaitNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
-      return prepareTimeGateNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareTimeGateNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -1708,6 +1708,7 @@ interface ExecutionMetadata {
 }
 
 function prepareSemaphoreNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -1724,16 +1725,33 @@ function prepareSemaphoreNode(
   let lastExecution;
   if (execution) {
     const metadata = execution.metadata as ExecutionMetadata;
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    // Determine state based on workflow result for finished executions
+    let state: "success" | "failed" | "running";
+    if (metadata.workflow?.state === "finished") {
+      // Use workflow result to determine color/icon when finished
+      state = metadata.workflow?.result === "passed" ? "success" : "failed";
+    } else {
+      // Use execution state for running/pending states
+      state = getRunItemState(execution) === "running" ? "running" : "failed";
+    }
+
+    // Calculate duration for finished executions
+    let duration: number | undefined;
+    if (state !== "running" && execution.updatedAt && execution.createdAt) {
+      duration = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
+    }
 
     lastExecution = {
-      workflowId: metadata.workflow?.id,
+      title: title,
       receivedAt: new Date(execution.createdAt!),
-      state:
-        getRunItemState(execution) === "success"
-          ? ("success" as const)
-          : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
+      state: state,
+      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
+      duration: duration,
     };
   }
 
@@ -1744,7 +1762,10 @@ function prepareSemaphoreNode(
   const metadataItems = [];
   if (nodeMetadata?.project?.name) {
     metadataItems.push({ icon: "folder", label: nodeMetadata.project.name });
+  } else if (configuration.project) {
+    metadataItems.push({ icon: "folder", label: configuration.project });
   }
+
   if (configuration?.ref) {
     metadataItems.push({ icon: "git-branch", label: configuration.ref });
   }
@@ -1793,6 +1814,7 @@ function prepareSemaphoreNode(
 }
 
 function prepareWaitNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -1805,14 +1827,31 @@ function prepareWaitNode(
 
   let lastExecution;
   if (execution) {
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
+
+    // Calculate expected duration from configuration
+    let expectedDuration: number | undefined;
+    if (configuration?.duration) {
+      const { value, unit } = configuration.duration;
+      const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
+      expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
+    }
+
     lastExecution = {
+      title: title,
       receivedAt: new Date(execution.createdAt!),
+      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
       state:
         getRunItemState(execution) === "success"
           ? ("success" as const)
           : getRunItemState(execution) === "running"
             ? ("running" as const)
             : ("failed" as const),
+      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
+      expectedDuration: expectedDuration,
     };
   }
 
@@ -1857,6 +1896,7 @@ function prepareWaitNode(
 }
 
 function prepareTimeGateNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -1866,34 +1906,62 @@ function prepareTimeGateNode(
   const configuration = node.configuration as any;
 
   // Format time gate configuration for display
-  const mode = configuration?.mode || "include";
-  const startTime = configuration?.startTime || "00:00";
-  const endTime = configuration?.endTime || "23:59";
+  const mode = configuration?.mode || "include_range";
   const days = configuration?.days || [];
+  const daysDisplay = days.length > 0 ? days.join(", ") : "";
+
+  // Get timezone information
+  const timezone = configuration?.timezone || "0";
+  const getTimezoneDisplay = (timezoneOffset: string) => {
+    const offset = parseFloat(timezoneOffset);
+    if (offset === 0) return "GMT+0 (UTC)";
+    if (offset > 0) return `GMT+${offset}`;
+    return `GMT${offset}`; // Already has the minus sign
+  };
+  const timezoneDisplay = getTimezoneDisplay(timezone);
+
+  // Handle different time window formats based on mode
+  let startTime = "00:00";
+  let endTime = "23:59";
+
+  if (mode === "include_specific" || mode === "exclude_specific") {
+    startTime = `${configuration.startDayInYear} ${configuration.startTime}`;
+    endTime = `${configuration.endDayInYear} ${configuration.endTime}`;
+  } else {
+    startTime = `${configuration.startTime}`;
+    endTime = `${configuration.endTime}`;
+  }
+
   const timeWindow = `${startTime} - ${endTime}`;
-  const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
+
 
   const executions = nodeExecutionsMap[node.id!] || [];
   const execution = executions.length > 0 ? executions[0] : null;
 
   let lastExecution: {
+    title: string;
     receivedAt: Date;
     state: "success" | "failed" | "running";
-    eventId?: string;
+    values?: Record<string, string>;
     nextRunTime?: Date;
   } | undefined;
 
   if (execution) {
     const executionState = getRunItemState(execution);
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
     lastExecution = {
+      title: title,
       receivedAt: new Date(execution.createdAt!),
       state: executionState === "success"
         ? ("success" as const)
         : executionState === "failed"
           ? ("failed" as const)
           : ("running" as const),
-      eventId: execution.rootEvent?.id || execution.id || "Event",
+      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
     };
 
     if (executionState === "running") {
@@ -1921,6 +1989,7 @@ function prepareTimeGateNode(
         mode,
         timeWindow,
         days: daysDisplay,
+        timezone: timezoneDisplay,
         lastExecution,
         nextInQueue: nodeQueueItemsMap[node.id!]?.[0] ? { title: nodeQueueItemsMap[node.id!]?.[0].id } : undefined,
         iconColor: getColorClass(metadata?.color || "blue"),

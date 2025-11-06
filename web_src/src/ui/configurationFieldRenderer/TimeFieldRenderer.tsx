@@ -2,7 +2,22 @@ import React from 'react'
 import { Input } from '../input'
 import { FieldRendererProps } from './types'
 
-export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
+export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError, allValues = {} }) => {
+  // Calculate min/max based on other fields for time gates
+  const getTimeConstraints = React.useMemo(() => {
+    // For endTime field in time gates, prevent selecting times before startTime
+    if (field.name === 'endTime' && allValues.startTime) {
+      return { min: allValues.startTime as string }
+    }
+
+    // For startTime field in time gates, prevent selecting times after endTime
+    if (field.name === 'startTime' && allValues.endTime) {
+      return { max: allValues.endTime as string }
+    }
+
+    return {}
+  }, [field.name, allValues.startTime, allValues.endTime])
+
   return (
     <Input
       type="time"
@@ -10,6 +25,8 @@ export const TimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder={field.typeOptions?.time?.format || 'HH:MM'}
       className={hasError ? 'border-red-500 border-2' : ''}
+      min={getTimeConstraints.min}
+      max={getTimeConstraints.max}
     />
   )
 }

@@ -9,22 +9,25 @@ import { BooleanFieldRenderer } from './BooleanFieldRenderer'
 import { SelectFieldRenderer } from './SelectFieldRenderer'
 import { MultiSelectFieldRenderer } from './MultiSelectFieldRenderer'
 import { DateFieldRenderer } from './DateFieldRenderer'
+import { DateTimeFieldRenderer } from './DateTimeFieldRenderer'
 import { UrlFieldRenderer } from './UrlFieldRenderer'
 import { ListFieldRenderer } from './ListFieldRenderer'
 import { ObjectFieldRenderer } from './ObjectFieldRenderer'
 import { IntegrationFieldRenderer } from './IntegrationFieldRenderer'
 import { IntegrationResourceFieldRenderer } from './IntegrationResourceFieldRenderer'
 import { TimeFieldRenderer } from './TimeFieldRenderer'
+import { DayInYearFieldRenderer } from './DayInYearFieldRenderer'
 import { UserFieldRenderer } from './UserFieldRenderer'
 import { RoleFieldRenderer } from './RoleFieldRenderer'
 import { GroupFieldRenderer } from './GroupFieldRenderer'
-import { isFieldVisible } from '../../utils/components'
+import { isFieldVisible, isFieldRequired, validateFieldValue } from '../../utils/components'
+import { ValidationError } from './types'
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   domainId?: string
   domainType?: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION"
   hasError?: boolean
-  validationErrors?: Set<string>
+  validationErrors?: ValidationError[] | Set<string>
   fieldPath?: string
 }
 
@@ -44,11 +47,66 @@ export const ConfigurationFieldRenderer = ({
     return isFieldVisible(field, allValues)
   }, [field, allValues])
 
+  // Check if field is conditionally required
+  const isRequired = React.useMemo(() => {
+    return isFieldRequired(field, allValues)
+  }, [field, allValues])
+
+  // Validate field value (only when validation is explicitly requested)
+  const fieldValidationErrors = React.useMemo(() => {
+    if (!field.name || !validationErrors) return []
+
+    const errors = validateFieldValue(field, value, allValues)
+    return errors.map(error => ({
+      field: field.name!,
+      message: error,
+      type: 'validation_rule' as const
+    }))
+  }, [field, value, allValues, validationErrors])
+
+  // Get field-specific validation errors
+  const fieldErrors = React.useMemo(() => {
+    if (!field.name || !validationErrors) return []
+
+    if (validationErrors instanceof Set) {
+      // Handle legacy Set<string> format
+      const fieldName = field.name
+      const fieldPathName = fieldPath || fieldName
+      const hasError = validationErrors.has(fieldName) ||
+        Array.from(validationErrors).some(error =>
+          error.startsWith(`${fieldPathName}.`) || error.startsWith(`${fieldPathName}[`)
+        )
+
+      return hasError ? [{
+        field: fieldName,
+        message: '',
+        type: 'validation_rule' as const
+      }] : []
+    } else {
+      // Handle new ValidationError[] format
+      return validationErrors.filter(error =>
+        error.field === field.name || error.field.startsWith(`${fieldPath || field.name}.`)
+      )
+    }
+  }, [validationErrors, field.name, fieldPath])
+
+  // Combine all errors
+  const allFieldErrors = React.useMemo(() => {
+    return [...fieldErrors, ...fieldValidationErrors]
+  }, [fieldErrors, fieldValidationErrors])
+
+  // Check if there are any errors or if required field is empty (only when validation is requested)
+  const hasFieldError = React.useMemo(() => {
+    if (allFieldErrors.length > 0) return true
+    if (validationErrors && isRequired && (value === undefined || value === null || value === '')) return true
+    return hasError
+  }, [allFieldErrors, isRequired, value, hasError, validationErrors])
+
   if (!isVisible) {
     return null
   }
   const renderField = () => {
-    const commonProps = { field, value, onChange, allValues, hasError }
+    const commonProps = { field, value, onChange, allValues, hasError: hasFieldError }
 
     switch (field.type) {
       case 'string':
@@ -69,11 +127,17 @@ export const ConfigurationFieldRenderer = ({
       case 'date':
         return <DateFieldRenderer {...commonProps} />
 
+      case 'datetime':
+        return <DateTimeFieldRenderer {...commonProps} />
+
       case 'url':
         return <UrlFieldRenderer {...commonProps} />
 
       case 'time':
         return <TimeFieldRenderer {...commonProps} />
+
+      case 'day-in-year':
+        return <DayInYearFieldRenderer {...commonProps} />
 
       case 'integration':
         return <IntegrationFieldRenderer field={field} value={value as string} onChange={onChange} domainId={domainId} domainType={domainType} />
@@ -113,10 +177,10 @@ export const ConfigurationFieldRenderer = ({
 
   return (
     <div className="space-y-2">
-      <Label className={`block text-left ${hasError ? 'text-red-600 dark:text-red-400' : ''}`}>
+      <Label className={`block text-left ${hasFieldError ? 'text-red-600 dark:text-red-400' : ''}`}>
         {field.label || field.name}
-        {field.required && <span className="text-red-500 ml-1">*</span>}
-        {hasError && field.required && (
+        {isRequired && <span className="text-red-500 ml-1">*</span>}
+        {hasFieldError && validationErrors && isRequired && (value === undefined || value === null || value === '') && (
           <span className="text-red-500 text-xs ml-2">- required field</span>
         )}
       </Label>
@@ -137,6 +201,19 @@ export const ConfigurationFieldRenderer = ({
           </Tooltip>
         )}
       </div>
+
+      {/* Display validation errors */}
+      {allFieldErrors.length > 0 && (
+        <div className="space-y-1">
+          {allFieldErrors.map((error, index) => (
+            <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
+              {error.message}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Display type-specific help text */}
       {field.typeOptions?.number?.min !== undefined && field.typeOptions?.number?.max !== undefined && (
         <p className="text-xs text-gray-500 dark:text-zinc-400 text-left">
           Range: {field.typeOptions.number.min} - {field.typeOptions.number.max}

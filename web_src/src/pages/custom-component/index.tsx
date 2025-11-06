@@ -198,18 +198,39 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
       }
       break
     case 'time_gate':
-      const mode = node.configuration?.mode || "include";
-      const startTime = node.configuration?.startTime || "00:00";
-      const endTime = node.configuration?.endTime || "23:59";
+      const mode = node.configuration?.mode || "include_range";
       const days = node.configuration?.days || [];
+      const daysDisplay = days.length > 0 ? days.join(", ") : "";
+
+      // Get timezone information
+      const timezone = node.configuration?.timezone || "0";
+      const getTimezoneDisplay = (timezoneOffset: string) => {
+        const offset = parseFloat(timezoneOffset);
+        if (offset === 0) return "GMT+0 (UTC)";
+        if (offset > 0) return `GMT+${offset}`;
+        return `GMT${offset}`; // Already has the minus sign
+      };
+      const timezoneDisplay = getTimezoneDisplay(timezone);
+
+      let startTime = "00:00";
+      let endTime = "23:59";
+
+      if (mode === "include_specific" || mode === "exclude_specific") {
+        startTime = `${node.configuration.startDayInYear} ${node.configuration.startTime}`;
+        endTime = `${node.configuration.endDayInYear} ${node.configuration.endTime}`;
+      } else {
+        startTime = `${node.configuration.startTime}`;
+        endTime = `${node.configuration.endTime}`;
+      }
+
       const timeWindow = `${startTime} - ${endTime}`;
-      const daysDisplay = days.length > 0 ? days.join(", ") : "No days selected";
 
       baseData.time_gate = {
         title: node.name,
         mode,
         timeWindow,
         days: daysDisplay,
+        timezone: timezoneDisplay,
         lastExecution: undefined,
         nextInQueue: undefined,
         iconColor: 'text-blue-600',
@@ -486,6 +507,26 @@ export const CustomComponent = () => {
         if (nodeData.http) {
           updatedData.http = { ...nodeData.http, title: nodeName.trim() }
         }
+        if (nodeData.semaphore) {
+          // Rebuild metadata array from configuration
+          const metadataItems = []
+          if (filteredConfiguration.project) {
+            metadataItems.push({ icon: 'folder', label: filteredConfiguration.project })
+          }
+          if (filteredConfiguration.ref) {
+            metadataItems.push({ icon: 'git-branch', label: filteredConfiguration.ref })
+          }
+          if (filteredConfiguration.pipelineFile) {
+            metadataItems.push({ icon: 'file-code', label: filteredConfiguration.pipelineFile })
+          }
+
+          updatedData.semaphore = {
+            ...nodeData.semaphore,
+            title: nodeName.trim(),
+            metadata: metadataItems,
+            parameters: filteredConfiguration.parameters,
+          }
+        }
         if (nodeData.wait) {
           updatedData.wait = {
             ...nodeData.wait,
@@ -495,6 +536,33 @@ export const CustomComponent = () => {
         }
         if (nodeData.noop) {
           updatedData.noop = { ...nodeData.noop, title: nodeName.trim() }
+        }
+        if (nodeData.time_gate) {
+          const mode = filteredConfiguration.mode || "include_range";
+          const days = (filteredConfiguration.days as string[]) || [];
+          const daysDisplay = days.length > 0 ? days.join(", ") : "";
+
+          // Handle different time window formats based on mode
+          let startTime = "00:00";
+          let endTime = "23:59";
+
+          if (mode === "include_specific" || mode === "exclude_specific") {
+            startTime = `${filteredConfiguration.startDayInYear} ${filteredConfiguration.startTime}`;
+            endTime = `${filteredConfiguration.endDayInYear} ${filteredConfiguration.endTime}`;
+          } else {
+            startTime = `${filteredConfiguration.startTime}`;
+            endTime = `${filteredConfiguration.endTime}`;
+          }
+
+          const timeWindow = `${startTime} - ${endTime}`;
+
+          updatedData.time_gate = {
+            ...nodeData.time_gate,
+            title: nodeName.trim(),
+            mode,
+            timeWindow,
+            days: daysDisplay,
+          }
         }
 
         return {

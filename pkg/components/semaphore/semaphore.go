@@ -13,6 +13,8 @@ import (
 )
 
 const ComponentName = "semaphore"
+const PassedOutputChannel = "passed"
+const FailedOutputChannel = "failed"
 
 func init() {
 	registry.RegisterComponent(ComponentName, &Semaphore{})
@@ -76,7 +78,16 @@ func (s *Semaphore) Color() string {
 }
 
 func (s *Semaphore) OutputChannels(configuration any) []components.OutputChannel {
-	return []components.OutputChannel{components.DefaultOutputChannel}
+	return []components.OutputChannel{
+		{
+			Name:  PassedOutputChannel,
+			Label: "Passed",
+		},
+		{
+			Name:  FailedOutputChannel,
+			Label: "Failed",
+		},
+	}
 }
 
 func (s *Semaphore) Configuration() []configuration.Field {
@@ -95,17 +106,12 @@ func (s *Semaphore) Configuration() []configuration.Field {
 		{
 			Name:     "project",
 			Label:    "Project",
-			Type:     configuration.FieldTypeIntegrationResource,
+			Type:     configuration.FieldTypeString,
 			Required: true,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
 					Field:  "integration",
 					Values: []string{"*"},
-				},
-			},
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: "project",
 				},
 			},
 		},
@@ -203,13 +209,18 @@ func (s *Semaphore) Execute(ctx components.ExecutionContext) error {
 		return fmt.Errorf("failed to get integration: %w", err)
 	}
 
+	project, err := integration.Get("project", spec.Project)
+	if err != nil {
+		return fmt.Errorf("failed to find project %s: %w", spec.Project, err)
+	}
+
 	semaphore, ok := integration.(*semaphore.SemaphoreResourceManager)
 	if !ok {
 		return fmt.Errorf("integration is not a semaphore integration")
 	}
 
 	params := map[string]any{
-		"project_id":    spec.Project,
+		"project_id":    project.Id(),
 		"reference":     spec.Ref,
 		"pipeline_file": spec.PipelineFile,
 		"parameters":    s.buildParameters(ctx, spec.Parameters),
@@ -315,8 +326,15 @@ func (s *Semaphore) poll(ctx components.ActionContext) error {
 	}
 
 	ctx.MetadataContext.Set(newMetadata)
+
+	if result == "passed" {
+		return ctx.ExecutionStateContext.Pass(map[string][]any{
+			PassedOutputChannel: {newMetadata},
+		})
+	}
+
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {newMetadata},
+		FailedOutputChannel: {newMetadata},
 	})
 }
 
@@ -354,7 +372,7 @@ func (s *Semaphore) finish(ctx components.ActionContext) error {
 	ctx.MetadataContext.Set(newMetadata)
 
 	return ctx.ExecutionStateContext.Pass(map[string][]any{
-		components.DefaultOutputChannel.Name: {metadata},
+		PassedOutputChannel: {newMetadata},
 	})
 }
 

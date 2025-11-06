@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
 func ValidateConfiguration(fields []Field, config map[string]any) error {
 	for _, field := range fields {
 		value, exists := config[field.Name]
-		if field.Required && (!exists || value == nil) {
+
+		// Check if field is required (either always or conditionally)
+		isRequired := field.Required
+		if !isRequired && len(field.RequiredConditions) > 0 {
+			isRequired = isRequiredByCondition(field, config)
+		}
+
+		if isRequired && (!exists || value == nil) {
 			return fmt.Errorf("field '%s' is required", field.Name)
 		}
 
@@ -18,6 +26,12 @@ func ValidateConfiguration(fields []Field, config map[string]any) error {
 		}
 
 		err := validateFieldValue(field, value)
+		if err != nil {
+			return fmt.Errorf("field '%s': %w", field.Name, err)
+		}
+
+		// Validate field comparison rules
+		err = validateFieldRules(field, value, config)
 		if err != nil {
 			return fmt.Errorf("field '%s': %w", field.Name, err)
 		}
@@ -181,6 +195,101 @@ func validateList(field Field, value any) error {
 	return nil
 }
 
+func validateTime(field Field, value any) error {
+	timeStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	// Default time format is HH:MM
+	format := "15:04"
+	if field.TypeOptions != nil && field.TypeOptions.Time != nil && field.TypeOptions.Time.Format != "" {
+		format = field.TypeOptions.Time.Format
+	}
+
+	_, err := time.Parse(format, timeStr)
+	if err != nil {
+		return fmt.Errorf("must be a valid time in format %s", format)
+	}
+
+	return nil
+}
+
+func validateDate(field Field, value any) error {
+	dateStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	// Default date format is YYYY-MM-DD
+	format := "2006-01-02"
+	if field.TypeOptions != nil && field.TypeOptions.Date != nil && field.TypeOptions.Date.Format != "" {
+		format = field.TypeOptions.Date.Format
+	}
+
+	_, err := time.Parse(format, dateStr)
+	if err != nil {
+		return fmt.Errorf("must be a valid date in format %s", format)
+	}
+
+	return nil
+}
+
+func validateDateTime(field Field, value any) error {
+	dateTimeStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	// Default datetime format is YYYY-MM-DDTHH:MM
+	format := "2006-01-02T15:04"
+	if field.TypeOptions != nil && field.TypeOptions.DateTime != nil && field.TypeOptions.DateTime.Format != "" {
+		format = field.TypeOptions.DateTime.Format
+	}
+
+	_, err := time.Parse(format, dateTimeStr)
+	if err != nil {
+		return fmt.Errorf("must be a valid datetime in format %s", format)
+	}
+
+	return nil
+}
+
+func validateDayInYear(field Field, value any) error {
+	dayStr, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("must be a string")
+	}
+
+	format := "MM/DD"
+	if field.TypeOptions != nil && field.TypeOptions.DayInYear != nil && field.TypeOptions.DayInYear.Format != "" {
+		format = field.TypeOptions.DayInYear.Format
+	}
+
+	var month, day int
+	var extra string
+	n, err := fmt.Sscanf(dayStr, "%d/%d%s", &month, &day, &extra)
+
+	if n < 2 || n > 2 {
+		return fmt.Errorf("must be a valid day in format %s (e.g., 12/25)", format)
+	}
+
+	if err != nil && n < 2 {
+		return fmt.Errorf("must be a valid day in format %s (e.g., 12/25)", format)
+	}
+
+	if month < 1 || month > 12 || day < 1 || day > 31 {
+		return fmt.Errorf("invalid day values: month must be 1-12, day must be 1-31")
+	}
+
+	daysInMonth := []int{0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if day > daysInMonth[month] {
+		return fmt.Errorf("invalid day '%d' for month '%d'", day, month)
+	}
+
+	return nil
+}
+
 func validateFieldValue(field Field, value any) error {
 	switch field.Type {
 	case FieldTypeString:
@@ -232,7 +341,289 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeObject:
 		return validateObject(field, value)
+
+	case FieldTypeTime:
+		return validateTime(field, value)
+
+	case FieldTypeDate:
+		return validateDate(field, value)
+
+	case FieldTypeDateTime:
+		return validateDateTime(field, value)
+
+	case FieldTypeDayInYear:
+		return validateDayInYear(field, value)
 	}
 
+	return nil
+}
+
+// isRequiredByCondition checks if a field should be required based on RequiredConditions
+func isRequiredByCondition(field Field, config map[string]any) bool {
+	for _, condition := range field.RequiredConditions {
+		conditionValue, exists := config[condition.Field]
+		if !exists {
+			continue
+		}
+
+		conditionValueStr := fmt.Sprintf("%v", conditionValue)
+		for _, requiredValue := range condition.Values {
+			if conditionValueStr == requiredValue {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// validateFieldRules validates comparison rules between fields
+func validateFieldRules(field Field, value any, config map[string]any) error {
+	for _, rule := range field.ValidationRules {
+		compareValue, exists := config[rule.CompareWith]
+		if !exists || compareValue == nil {
+			continue // Skip validation if comparison field doesn't exist
+		}
+
+		err := validateComparisonRule(field, value, compareValue, rule)
+		if err != nil {
+			if rule.Message != "" {
+				return fmt.Errorf("%s", rule.Message)
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+// validateComparisonRule validates a single comparison rule
+func validateComparisonRule(field Field, value any, compareValue any, rule ValidationRule) error {
+	switch field.Type {
+	case FieldTypeTime:
+		return validateTimeComparison(value, compareValue, rule)
+	case FieldTypeDateTime:
+		return validateDateTimeComparison(value, compareValue, rule)
+	case FieldTypeDate:
+		return validateDateComparison(value, compareValue, rule)
+	case FieldTypeDayInYear:
+		return validateDayInYearComparison(value, compareValue, rule)
+	case FieldTypeNumber:
+		return validateNumberComparison(value, compareValue, rule)
+	default:
+		return validateStringComparison(value, compareValue, rule)
+	}
+}
+
+// validateTimeComparison validates time field comparisons
+func validateTimeComparison(value any, compareValue any, rule ValidationRule) error {
+	valueStr, ok1 := value.(string)
+	compareStr, ok2 := compareValue.(string)
+	if !ok1 || !ok2 {
+		return fmt.Errorf("time values must be strings")
+	}
+
+	valueTime, err1 := time.Parse("15:04", valueStr)
+	compareTime, err2 := time.Parse("15:04", compareStr)
+	if err1 != nil || err2 != nil {
+		return fmt.Errorf("invalid time format")
+	}
+
+	return compareTimeValues(valueTime, compareTime, rule)
+}
+
+// validateDateTimeComparison validates datetime field comparisons
+func validateDateTimeComparison(value any, compareValue any, rule ValidationRule) error {
+	valueStr, ok1 := value.(string)
+	compareStr, ok2 := compareValue.(string)
+	if !ok1 || !ok2 {
+		return fmt.Errorf("datetime values must be strings")
+	}
+
+	valueTime, err1 := time.Parse("2006-01-02T15:04", valueStr)
+	compareTime, err2 := time.Parse("2006-01-02T15:04", compareStr)
+	if err1 != nil || err2 != nil {
+		return fmt.Errorf("invalid datetime format")
+	}
+
+	return compareTimeValues(valueTime, compareTime, rule)
+}
+
+// validateDateComparison validates date field comparisons
+func validateDateComparison(value any, compareValue any, rule ValidationRule) error {
+	valueStr, ok1 := value.(string)
+	compareStr, ok2 := compareValue.(string)
+	if !ok1 || !ok2 {
+		return fmt.Errorf("date values must be strings")
+	}
+
+	valueTime, err1 := time.Parse("2006-01-02", valueStr)
+	compareTime, err2 := time.Parse("2006-01-02", compareStr)
+	if err1 != nil || err2 != nil {
+		return fmt.Errorf("invalid date format")
+	}
+
+	return compareTimeValues(valueTime, compareTime, rule)
+}
+
+func validateDayInYearComparison(value any, compareValue any, rule ValidationRule) error {
+	valueStr, ok1 := value.(string)
+	compareStr, ok2 := compareValue.(string)
+	if !ok1 || !ok2 {
+		return fmt.Errorf("day-in-year values must be strings")
+	}
+
+	var valueMonth, valueDay int
+	var compareMonth, compareDay int
+
+	n1, err1 := fmt.Sscanf(valueStr, "%d/%d", &valueMonth, &valueDay)
+	n2, err2 := fmt.Sscanf(compareStr, "%d/%d", &compareMonth, &compareDay)
+
+	if n1 != 2 || n2 != 2 || err1 != nil || err2 != nil {
+		return fmt.Errorf("invalid day-in-year format")
+	}
+
+	valueDayOfYear := (valueMonth-1)*31 + valueDay
+	compareDayOfYear := (compareMonth-1)*31 + compareDay
+
+	if valueMonth > compareMonth {
+		if rule.Type == ValidationRuleLessThan {
+			return nil
+		}
+	}
+
+	return compareDayInYearValues(valueDayOfYear, compareDayOfYear, valueStr, compareStr, rule)
+}
+
+// validateNumberComparison validates number field comparisons
+func validateNumberComparison(value any, compareValue any, rule ValidationRule) error {
+	var num1, num2 float64
+
+	switch v := value.(type) {
+	case float64:
+		num1 = v
+	case int:
+		num1 = float64(v)
+	default:
+		return fmt.Errorf("value must be a number")
+	}
+
+	switch v := compareValue.(type) {
+	case float64:
+		num2 = v
+	case int:
+		num2 = float64(v)
+	default:
+		return fmt.Errorf("comparison value must be a number")
+	}
+
+	return compareNumericValues(num1, num2, rule)
+}
+
+// validateStringComparison validates string field comparisons
+func validateStringComparison(value any, compareValue any, rule ValidationRule) error {
+	str1, ok1 := value.(string)
+	str2, ok2 := compareValue.(string)
+	if !ok1 || !ok2 {
+		return fmt.Errorf("values must be strings")
+	}
+
+	return compareStringValues(str1, str2, rule)
+}
+
+// compareTimeValues compares time values based on the rule type
+func compareTimeValues(value, compareValue time.Time, rule ValidationRule) error {
+	switch rule.Type {
+	case ValidationRuleLessThan:
+		if !value.Before(compareValue) {
+			return fmt.Errorf("must be before %v", compareValue.Format("15:04"))
+		}
+	case ValidationRuleGreaterThan:
+		if !value.After(compareValue) {
+			return fmt.Errorf("must be after %v", compareValue.Format("15:04"))
+		}
+	case ValidationRuleEqual:
+		if !value.Equal(compareValue) {
+			return fmt.Errorf("must be equal to %v", compareValue.Format("15:04"))
+		}
+	case ValidationRuleNotEqual:
+		if value.Equal(compareValue) {
+			return fmt.Errorf("must not be equal to %v", compareValue.Format("15:04"))
+		}
+	default:
+		return fmt.Errorf("unknown validation rule type: %s", rule.Type)
+	}
+	return nil
+}
+
+// compareNumericValues compares numeric values based on the rule type
+func compareNumericValues(value, compareValue float64, rule ValidationRule) error {
+	switch rule.Type {
+	case ValidationRuleLessThan:
+		if value >= compareValue {
+			return fmt.Errorf("must be less than %v", compareValue)
+		}
+	case ValidationRuleGreaterThan:
+		if value <= compareValue {
+			return fmt.Errorf("must be greater than %v", compareValue)
+		}
+	case ValidationRuleEqual:
+		if value != compareValue {
+			return fmt.Errorf("must be equal to %v", compareValue)
+		}
+	case ValidationRuleNotEqual:
+		if value == compareValue {
+			return fmt.Errorf("must not be equal to %v", compareValue)
+		}
+	default:
+		return fmt.Errorf("unknown validation rule type: %s", rule.Type)
+	}
+	return nil
+}
+
+// compareStringValues compares string values based on the rule type
+func compareStringValues(value, compareValue string, rule ValidationRule) error {
+	switch rule.Type {
+	case ValidationRuleLessThan:
+		if value >= compareValue {
+			return fmt.Errorf("must be less than %s", compareValue)
+		}
+	case ValidationRuleGreaterThan:
+		if value <= compareValue {
+			return fmt.Errorf("must be greater than %s", compareValue)
+		}
+	case ValidationRuleEqual:
+		if value != compareValue {
+			return fmt.Errorf("must be equal to %s", compareValue)
+		}
+	case ValidationRuleNotEqual:
+		if value == compareValue {
+			return fmt.Errorf("must not be equal to %s", compareValue)
+		}
+	default:
+		return fmt.Errorf("unknown validation rule type: %s", rule.Type)
+	}
+	return nil
+}
+
+func compareDayInYearValues(valueDayOfYear, compareDayOfYear int, valueStr, compareStr string, rule ValidationRule) error {
+	switch rule.Type {
+	case ValidationRuleLessThan:
+		if valueDayOfYear >= compareDayOfYear {
+			return fmt.Errorf("must be before %s", compareStr)
+		}
+	case ValidationRuleGreaterThan:
+		if valueDayOfYear <= compareDayOfYear {
+			return fmt.Errorf("must be after %s", compareStr)
+		}
+	case ValidationRuleEqual:
+		if valueDayOfYear != compareDayOfYear {
+			return fmt.Errorf("must be equal to %s", compareStr)
+		}
+	case ValidationRuleNotEqual:
+		if valueDayOfYear == compareDayOfYear {
+			return fmt.Errorf("must not be equal to %s", compareStr)
+		}
+	default:
+		return fmt.Errorf("unknown validation rule type: %s", rule.Type)
+	}
 	return nil
 }
