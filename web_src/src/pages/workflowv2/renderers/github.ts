@@ -30,7 +30,10 @@ interface GitHubEventData {
     title?: string;
     id?: string;
     url?: string;
-    merge_commit_sha?: string;
+    head?: {
+      sha: string;
+      ref: string;
+    },
     user?: {
       id: string;
       login: string;
@@ -48,7 +51,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
     if (eventData.pull_request) {
       return {
         title: eventData?.pull_request?.title || "",
-        subtitle: eventData?.pull_request?.merge_commit_sha || "",
+        subtitle: eventData?.pull_request?.head?.sha || "",
       }
     }
 
@@ -64,7 +67,7 @@ export const githubTriggerRenderer: TriggerRenderer = {
     if (eventData.pull_request) {
       return {
         "Commit": eventData?.pull_request?.title || "",
-        "SHA": eventData?.pull_request?.merge_commit_sha || "",
+        "SHA": eventData?.pull_request?.head?.sha || "",
         "Author": eventData?.pull_request?.user?.login || "",
       }
     }
@@ -111,12 +114,22 @@ export const githubTriggerRenderer: TriggerRenderer = {
 
     if (lastEvent) {
       const eventData = lastEvent.data as GitHubEventData;
-      props.lastEventData = {
-        title: eventData?.head_commit?.message!,
-        subtitle: eventData?.head_commit?.id,
-        receivedAt: new Date(lastEvent.createdAt!),
-        state: "processed",
-      };
+
+      if (eventData.pull_request) {
+        props.lastEventData = {
+          title: eventData?.pull_request?.title || "",
+          subtitle: eventData?.pull_request?.head?.sha || "",
+          receivedAt: new Date(lastEvent.createdAt!),
+          state: "processed",
+        };
+      } else {
+        props.lastEventData = {
+          title: eventData?.head_commit?.message || "",
+          subtitle: eventData?.head_commit?.id || "",
+          receivedAt: new Date(lastEvent.createdAt!),
+          state: "processed",
+        };
+      }
     }
 
     return props;
