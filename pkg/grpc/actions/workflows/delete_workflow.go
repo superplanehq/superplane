@@ -25,19 +25,19 @@ func DeleteWorkflow(ctx context.Context, registry *registry.Registry, organizati
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		nodes, err := models.FindWorkflowNodes(workflow.ID)
+		nodes, err := models.FindWorkflowNodesInTransaction(tx, workflow.ID)
 		if err != nil {
 			return err
 		}
 
 		for _, node := range nodes {
-			err = models.DeleteWorkflowNode(database.Conn(), node)
+			err = models.DeleteWorkflowNode(tx, node)
 			if err != nil {
 				return err
 			}
 		}
 
-		err = database.Conn().Delete(&workflow).Error
+		err = tx.Delete(&workflow).Error
 		if err != nil {
 			return err
 		}

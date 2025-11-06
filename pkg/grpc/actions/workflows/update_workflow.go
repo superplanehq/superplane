@@ -54,7 +54,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		//
 		// Update the workflow node records
 		//
-		existingNodes, err := models.FindWorkflowNodes(existingWorkflow.ID)
+		existingNodes, err := models.FindWorkflowNodesInTransaction(tx, existingWorkflow.ID)
 		if err != nil {
 			return err
 		}

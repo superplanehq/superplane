@@ -45,7 +45,7 @@ func DeleteWorkflowNode(tx *gorm.DB, node WorkflowNode) error {
 		return nil
 	}
 
-	webhook, err := FindWebhook(*node.WebhookID)
+	webhook, err := FindWebhookInTransaction(tx, *node.WebhookID)
 	if err != nil {
 		return err
 	}
