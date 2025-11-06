@@ -183,7 +183,7 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-1 border-border rounded-md w-[23rem] bg-white overflow-hidden">
+      <div className="flex flex-col border-1 border-border rounded-md w-[23rem] bg-white">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
