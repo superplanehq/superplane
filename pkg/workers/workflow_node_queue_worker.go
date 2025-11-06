@@ -141,10 +141,6 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 		return node.UpdateState(tx, state)
 	}
 
-	ctx.UpdateNodeState = func(state string) error {
-		return node.UpdateState(tx, state)
-	}
-
 	ctx.DefaultProcessing = func() error {
 		var err error
 
@@ -188,22 +184,22 @@ func (w *WorkflowNodeQueueWorker) buildNodeConfig(tx *gorm.DB, queueItem *models
 }
 
 func (w *WorkflowNodeQueueWorker) findComponent(node *models.WorkflowNode) (components.Component, error) {
-    ref := node.Ref.Data()
+	ref := node.Ref.Data()
 
-    if w.registry == nil {
-        return nil, fmt.Errorf("registry is not initialized")
-    }
+	if w.registry == nil {
+		return nil, fmt.Errorf("registry is not initialized")
+	}
 
-    if ref.Component == nil || ref.Component.Name == "" {
-        return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
-    }
+	if ref.Component == nil || ref.Component.Name == "" {
+		return nil, fmt.Errorf("node %s has no component reference", node.NodeID)
+	}
 
-    comp, err := w.registry.GetComponent(ref.Component.Name)
-    if err != nil {
-        return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
-    }
+	comp, err := w.registry.GetComponent(ref.Component.Name)
+	if err != nil {
+		return nil, fmt.Errorf("component %s not found: %w", ref.Component.Name, err)
+	}
 
-    return comp, nil
+	return comp, nil
 }
 
 func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
