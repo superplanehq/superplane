@@ -12,7 +12,6 @@ export type SemaphoreState = "success" | "failed" | "running";
 
 export interface SemaphoreExecutionItem {
   title: string;
-  subtitle: string;
   receivedAt?: Date;
   state?: SemaphoreState;
   values?: Record<string, string>;
@@ -216,16 +215,9 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
                         className: getStateIconColor(lastExecution.state),
                       })}
                     </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-sm font-medium truncate">
-                        {lastExecution.title}
-                      </span>
-                      {lastExecution.subtitle && (
-                        <span className="text-xs truncate">
-                          {lastExecution.subtitle}
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-sm font-medium truncate">
+                      {lastExecution.title}
+                    </span>
                   </div>
                   <span className="text-xs text-gray-500">
                     {calcRelativeTimeFromDiff(
