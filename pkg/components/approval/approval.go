@@ -328,6 +328,10 @@ func (a *Approval) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
+func (a *Approval) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	return ctx.DefaultProcessing()
+}
+
 func (a *Approval) Execute(ctx components.ExecutionContext) error {
 	config := Config{}
 	err := mapstructure.Decode(ctx.Configuration, &config)

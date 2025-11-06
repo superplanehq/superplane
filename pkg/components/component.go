@@ -59,6 +59,13 @@ type Component interface {
 	Setup(ctx SetupContext) error
 
 	/*
+	 * ProcessQueueItem is called when a queue item for this component's node
+	 * is ready to be processed. Implementations should create the appropriate
+	 * execution or handle the item synchronously using the provided context.
+	 */
+	ProcessQueueItem(ctx ProcessQueueContext) error
+
+	/*
 	 * Passes full execution control to the component.
 	 *
 	 * Component execution has full control over the execution state,
@@ -175,6 +182,36 @@ type ActionContext struct {
 	AuthContext           AuthContext
 	RequestContext        RequestContext
 	IntegrationContext    IntegrationContext
+}
+
+/*
+ * ProcessQueueContext is provided to components to process a node's queue item.
+ * It mirrors the data the queue worker would otherwise use to create executions.
+ */
+type ProcessQueueContext struct {
+	// IDs and configuration
+	WorkflowID    string
+	NodeID        string
+	Configuration any
+
+	// Input event data and references
+	RootEventID string
+	EventID     string
+	Input       any
+
+	// CreateExecution creates a pending execution for this queue item.
+	CreateExecution func() error
+
+	// DequeueItem marks the queue item as processed.
+	DequeueItem func() error
+
+	// UpdateNodeState updates the state of the node.
+	UpdateNodeState func(state string) error
+
+	// DefaultProcessing performs the default processing for the queue item.
+	// Convenience method to avoid boilerplate in components that just want default behavior,
+	// where an execution is created and the item is dequeued.
+	DefaultProcessing func() error
 }
 
 type AuthContext interface {

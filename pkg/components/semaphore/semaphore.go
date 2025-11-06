@@ -156,6 +156,10 @@ func (s *Semaphore) Configuration() []configuration.Field {
 	}
 }
 
+func (s *Semaphore) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	return ctx.DefaultProcessing()
+}
+
 func (s *Semaphore) Setup(ctx components.SetupContext) error {
 	config := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
