@@ -821,6 +821,7 @@ export const CustomComponent = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDuplicate={handleNodeDuplicate}
         onNodeDelete={handleNodeDelete}
         getNodeEditData={getNodeEditData}
         onNodeConfigurationSave={handleNodeConfigurationSave}

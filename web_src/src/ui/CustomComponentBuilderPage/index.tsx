@@ -379,6 +379,13 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [props.onNodeDelete]
   );
 
+  const handleNodeDuplicate = useCallback(
+    (nodeId: string) => {
+      props.onNodeDuplicate?.(nodeId);
+    },
+    [props.onNodeDuplicate]
+  );
+
   const nodeTypes = useMemo(
     () => ({
       default: (nodeProps: {
@@ -391,11 +398,12 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           nodeId={nodeProps.id}
           onEdit={() => handleNodeEdit(nodeProps.id)}
           onDelete={() => handleNodeDelete(nodeProps.id)}
+          onDuplicate={() => handleNodeDuplicate(nodeProps.id)}
           selected={nodeProps.selected}
         />
       ),
     }),
-    [handleNodeEdit, handleNodeDelete]
+    [handleNodeEdit, handleNodeDelete, handleNodeDuplicate]
   );
 
   const edgeTypes = useMemo(() => ({
