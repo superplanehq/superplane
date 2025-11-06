@@ -75,6 +75,7 @@ export interface CustomComponentBuilderPageProps {
   onNodeDoubleClick?: (event: any, node: Node) => void;
   onNodeClick?: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
+  onNodeDuplicate?: (nodeId: string) => void;
 
   // Node configuration
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
