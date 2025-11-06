@@ -11,9 +11,10 @@ import (
 )
 
 func ListComponents(ctx context.Context, registry *registry.Registry) (*pb.ListComponentsResponse, error) {
-	return &pb.ListComponentsResponse{
-		Components: serializeComponents(registry.ListComponents()),
-	}, nil
+	components := registry.ListUserVisibleComponents()
+	serialized := serializeComponents(components)
+
+	return &pb.ListComponentsResponse{Components: serialized}, nil
 }
 
 func serializeComponents(in []components.Component) []*pb.Component {

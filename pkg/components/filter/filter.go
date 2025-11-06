@@ -47,6 +47,8 @@ func (f *Filter) Color() string {
 	return "red"
 }
 
+func (f *Filter) IsUserVisible() bool { return true }
+
 func (f *Filter) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

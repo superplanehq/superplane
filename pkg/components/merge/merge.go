@@ -22,6 +22,7 @@ func (m *Merge) Label() string       { return "Merge" }
 func (m *Merge) Description() string { return "Merge multiple upstream inputs and forward" }
 func (m *Merge) Icon() string        { return "arrow-right-from-line" }
 func (m *Merge) Color() string       { return "gray" }
+func (m *Merge) IsUserVisible() bool { return true }
 
 func (m *Merge) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}

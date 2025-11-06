@@ -228,19 +228,6 @@ func (r *Registry) GetTrigger(name string) (triggers.Trigger, error) {
 	return trigger, nil
 }
 
-func (r *Registry) ListComponents() []components.Component {
-	components := make([]components.Component, 0, len(r.Components))
-	for _, component := range r.Components {
-		components = append(components, component)
-	}
-
-	sort.Slice(components, func(i, j int) bool {
-		return components[i].Name() < components[j].Name()
-	})
-
-	return components
-}
-
 func (r *Registry) GetComponent(name string) (components.Component, error) {
 	component, ok := r.Components[name]
 	if !ok {
@@ -248,4 +235,28 @@ func (r *Registry) GetComponent(name string) (components.Component, error) {
 	}
 
 	return component, nil
+}
+
+func (r *Registry) ListUserVisibleComponents() []components.Component {
+	return r.listComponents(func(c components.Component) bool { return c.IsUserVisible() })
+}
+
+func (r *Registry) ListAllComponents() []components.Component {
+	return r.listComponents(func(c components.Component) bool { return true })
+}
+
+func (r *Registry) listComponents(filter func(components.Component) bool) []components.Component {
+	components := make([]components.Component, 0, len(r.Components))
+
+	for _, component := range r.Components {
+		if filter(component) {
+			components = append(components, component)
+		}
+	}
+
+	sort.Slice(components, func(i, j int) bool {
+		return components[i].Name() < components[j].Name()
+	})
+
+	return components
 }

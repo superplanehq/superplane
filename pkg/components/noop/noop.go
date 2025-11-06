@@ -36,6 +36,8 @@ func (c *NoOp) Color() string {
 	return "blue"
 }
 
+func (c *NoOp) IsUserVisible() bool { return true }
+
 func (c *NoOp) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }

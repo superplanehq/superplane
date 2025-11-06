@@ -58,6 +58,8 @@ func (tg *TimeGate) Color() string {
 	return "blue"
 }
 
+func (tg *TimeGate) IsUserVisible() bool { return true }
+
 func (tg *TimeGate) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }

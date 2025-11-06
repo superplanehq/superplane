@@ -17,6 +17,10 @@ func init() {
 	registry.RegisterComponent("blueprint", &Blueprint{})
 }
 
+func (b *Blueprint) IsUserVisible() bool {
+	return false
+}
+
 /*
  * We have to implement the Name, Label, Description, Icon, Color,
  * but in practice blueprints are configured via their own blueprint definition,

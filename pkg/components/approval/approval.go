@@ -253,6 +253,8 @@ func (a *Approval) Color() string {
 	return "orange"
 }
 
+func (a *Approval) IsUserVisible() bool { return true }
+
 func (a *Approval) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }

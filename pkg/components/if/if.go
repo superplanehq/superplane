@@ -45,6 +45,8 @@ func (f *If) Color() string {
 	return "red"
 }
 
+func (f *If) IsUserVisible() bool { return true }
+
 func (f *If) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{
 		{Name: "true", Label: "True"},

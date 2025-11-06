@@ -77,6 +77,8 @@ func (s *Semaphore) Color() string {
 	return "gray"
 }
 
+func (s *Semaphore) IsUserVisible() bool { return true }
+
 func (s *Semaphore) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{
 		{

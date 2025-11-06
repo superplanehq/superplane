@@ -45,6 +45,8 @@ func (w *Wait) Color() string {
 	return "yellow"
 }
 
+func (w *Wait) IsUserVisible() bool { return true }
+
 func (w *Wait) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
 }

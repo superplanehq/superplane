@@ -51,6 +51,8 @@ func (e *HTTP) Color() string {
 	return "blue"
 }
 
+func (e *HTTP) IsUserVisible() bool { return true }
+
 func (e *HTTP) Setup(ctx components.SetupContext) error {
 	return nil
 }

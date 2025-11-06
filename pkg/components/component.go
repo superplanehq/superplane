@@ -43,6 +43,12 @@ type Component interface {
 	Color() string
 
 	/*
+	 * Whether the component is visible to users
+	 * when selecting components for their workflows.
+	 */
+	IsUserVisible() bool
+
+	/*
 	 * The output channels used by the component.
 	 * If none is returned, the 'default' one is used.
 	 */
