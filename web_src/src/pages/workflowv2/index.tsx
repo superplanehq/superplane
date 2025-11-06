@@ -1749,6 +1749,7 @@ function prepareSemaphoreNode(
     lastExecution = {
       title: title,
       receivedAt: new Date(execution.createdAt!),
+      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
       state: state,
       values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
       duration: duration,
