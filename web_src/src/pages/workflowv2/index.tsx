@@ -1730,16 +1730,20 @@ function prepareSemaphoreNode(
 
     const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
+    // Determine state based on workflow result for finished executions
+    let state: "success" | "failed" | "running";
+    if (metadata.workflow?.state === "finished") {
+      // Use workflow result to determine color/icon when finished
+      state = metadata.workflow?.result === "passed" ? "success" : "failed";
+    } else {
+      // Use execution state for running/pending states
+      state = getRunItemState(execution) === "running" ? "running" : "failed";
+    }
+
     lastExecution = {
       title: title,
-      subtitle: metadata.workflow?.result || "",
       receivedAt: new Date(execution.createdAt!),
-      state:
-        getRunItemState(execution) === "success"
-          ? ("success" as const)
-          : getRunItemState(execution) === "running"
-            ? ("running" as const)
-            : ("failed" as const),
+      state: state,
       values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
     };
   }
