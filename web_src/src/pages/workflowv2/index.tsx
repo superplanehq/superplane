@@ -1740,11 +1740,18 @@ function prepareSemaphoreNode(
       state = getRunItemState(execution) === "running" ? "running" : "failed";
     }
 
+    // Calculate duration for finished executions
+    let duration: number | undefined;
+    if (state !== "running" && execution.updatedAt && execution.createdAt) {
+      duration = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
+    }
+
     lastExecution = {
       title: title,
       receivedAt: new Date(execution.createdAt!),
       state: state,
       values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
+      duration: duration,
     };
   }
 

@@ -15,6 +15,7 @@ export interface SemaphoreExecutionItem {
   receivedAt?: Date;
   state?: SemaphoreState;
   values?: Record<string, string>;
+  duration?: number; // Duration in milliseconds (for finished executions)
 }
 
 export interface SemaphoreParameter {
@@ -115,6 +116,35 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
       ]
     }));
   }, [parameters]);
+
+  // Live timer for running executions
+  const [liveDuration, setLiveDuration] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    if (lastExecution?.state === "running" && lastExecution.receivedAt) {
+      const receivedAt = lastExecution.receivedAt;
+
+      // Calculate initial duration
+      setLiveDuration(Date.now() - receivedAt.getTime());
+
+      // Update every second
+      const interval = setInterval(() => {
+        setLiveDuration(Date.now() - receivedAt.getTime());
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setLiveDuration(null);
+    }
+  }, [lastExecution?.state, lastExecution?.receivedAt]);
+
+  // Calculate display duration
+  const displayDuration = React.useMemo(() => {
+    if (lastExecution?.state === "running" && liveDuration !== null) {
+      return liveDuration;
+    }
+    return lastExecution?.duration;
+  }, [lastExecution?.state, lastExecution?.duration, liveDuration]);
 
   if (collapsed) {
     return (
@@ -220,9 +250,9 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
                     </span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    {calcRelativeTimeFromDiff(
-                      new Date().getTime() - lastExecution.receivedAt.getTime()
-                    )}
+                    {displayDuration !== undefined && displayDuration !== null
+                      ? `Running for: ${calcRelativeTimeFromDiff(displayDuration)}`
+                      : ""}
                   </span>
                 </div>
               </div>
