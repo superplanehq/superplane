@@ -11,9 +11,11 @@ import { ComponentBaseSpecValue } from "../componentBase";
 export type SemaphoreState = "success" | "failed" | "running";
 
 export interface SemaphoreExecutionItem {
-  workflowId?: string;
+  title: string;
+  subtitle: string;
   receivedAt?: Date;
   state?: SemaphoreState;
+  values?: Record<string, string>;
 }
 
 export interface SemaphoreParameter {
@@ -214,15 +216,16 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
                         className: getStateIconColor(lastExecution.state),
                       })}
                     </div>
-                    {lastExecution.workflowId ? (
+                    <div className="flex flex-col min-w-0 flex-1">
                       <span className="text-sm font-medium truncate">
-                        Workflow: {lastExecution.workflowId}
+                        {lastExecution.title}
                       </span>
-                    ) : (
-                      <span className="text-sm">
-                        {lastExecution.state === "running" ? "Running..." : "Failed"}
-                      </span>
-                    )}
+                      {lastExecution.subtitle && (
+                        <span className="text-xs truncate">
+                          {lastExecution.subtitle}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className="text-xs text-gray-500">
                     {calcRelativeTimeFromDiff(
