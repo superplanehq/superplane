@@ -75,6 +75,7 @@ export interface CustomComponentBuilderPageProps {
   onNodeDoubleClick?: (event: any, node: Node) => void;
   onNodeClick?: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
+  onNodeDuplicate?: (nodeId: string) => void;
 
   // Node configuration
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
@@ -378,6 +379,13 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
     [props.onNodeDelete]
   );
 
+  const handleNodeDuplicate = useCallback(
+    (nodeId: string) => {
+      props.onNodeDuplicate?.(nodeId);
+    },
+    [props.onNodeDuplicate]
+  );
+
   const nodeTypes = useMemo(
     () => ({
       default: (nodeProps: {
@@ -390,11 +398,12 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
           nodeId={nodeProps.id}
           onEdit={() => handleNodeEdit(nodeProps.id)}
           onDelete={() => handleNodeDelete(nodeProps.id)}
+          onDuplicate={() => handleNodeDuplicate(nodeProps.id)}
           selected={nodeProps.selected}
         />
       ),
     }),
-    [handleNodeEdit, handleNodeDelete]
+    [handleNodeEdit, handleNodeDelete, handleNodeDuplicate]
   );
 
   const edgeTypes = useMemo(() => ({
