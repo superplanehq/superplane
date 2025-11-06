@@ -62,6 +62,19 @@ func FindWebhook(id uuid.UUID) (*Webhook, error) {
 	return &webhook, nil
 }
 
+func FindWebhookInTransaction(tx *gorm.DB, id uuid.UUID) (*Webhook, error) {
+	var webhook Webhook
+	err := tx.
+		First(&webhook, id).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &webhook, nil
+}
+
 func FindWebhookNodes(webhookID uuid.UUID) ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
 	err := database.Conn().

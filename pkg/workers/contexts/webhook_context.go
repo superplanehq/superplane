@@ -34,7 +34,7 @@ func (c *WebhookContext) GetSecret() ([]byte, error) {
 		return nil, fmt.Errorf("node does not have a webhook")
 	}
 
-	webhook, err := models.FindWebhook(*c.node.WebhookID)
+	webhook, err := models.FindWebhookInTransaction(c.tx, *c.node.WebhookID)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *WebhookContext) findOrCreateWebhook(options *triggers.WebhookSetupOptio
 	// If webhook already exists, just return it
 	//
 	if c.node.WebhookID != nil {
-		return models.FindWebhook(*c.node.WebhookID)
+		return models.FindWebhookInTransaction(c.tx, *c.node.WebhookID)
 	}
 
 	//

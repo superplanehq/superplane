@@ -34,5 +34,5 @@ func (c *IntegrationContext) GetIntegration(ID string) (integrations.ResourceMan
 		return nil, err
 	}
 
-	return c.registry.NewResourceManager(context.Background(), integration)
+	return c.registry.NewResourceManagerInTransaction(context.Background(), c.tx, integration)
 }
