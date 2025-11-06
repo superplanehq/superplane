@@ -1161,7 +1161,7 @@ function prepareComponentNode(
     case "http":
       return prepareHttpNode(node, components, nodeExecutionsMap);
     case "semaphore":
-      return prepareSemaphoreNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareSemaphoreNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "wait":
       return prepareWaitNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
@@ -1708,6 +1708,7 @@ interface ExecutionMetadata {
 }
 
 function prepareSemaphoreNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -1724,9 +1725,14 @@ function prepareSemaphoreNode(
   let lastExecution;
   if (execution) {
     const metadata = execution.metadata as ExecutionMetadata;
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
     lastExecution = {
-      workflowId: metadata.workflow?.id,
+      title: title,
+      subtitle: metadata.workflow?.result || "",
       receivedAt: new Date(execution.createdAt!),
       state:
         getRunItemState(execution) === "success"
@@ -1734,6 +1740,7 @@ function prepareSemaphoreNode(
           : getRunItemState(execution) === "running"
             ? ("running" as const)
             : ("failed" as const),
+      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
     };
   }
 
