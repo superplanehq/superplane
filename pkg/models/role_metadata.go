@@ -100,7 +100,12 @@ func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description
 
 func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID, displayName, description string) error {
 	var metadata RoleMetadata
-	err := tx.Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
+	err := tx.
+		Where("role_name = ?", roleName).
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
+		First(&metadata).
+		Error
 
 	if err == gorm.ErrRecordNotFound {
 		metadata = RoleMetadata{
@@ -111,7 +116,9 @@ func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID
 			Description: description,
 		}
 		return metadata.CreateInTransaction(tx)
-	} else if err != nil {
+	}
+
+	if err != nil {
 		return err
 	}
 

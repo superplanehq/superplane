@@ -165,11 +165,9 @@ func RandomName(prefix string) string {
 func AuthService(t *testing.T) *authorization.AuthService {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	authService.EnableCache(false)
 	return authService
 }
 
-// TODO: this needs to be refactored
 func CreateOrganization(t *testing.T, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
 	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"))
 	require.NoError(t, err)

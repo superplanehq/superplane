@@ -3,8 +3,8 @@ module github.com/superplanehq/superplane
 go 1.25
 
 require (
-	github.com/casbin/casbin/v2 v2.106.0
-	github.com/casbin/gorm-adapter/v3 v3.32.0
+	github.com/casbin/casbin/v2 v2.132.0
+	github.com/casbin/gorm-adapter/v3 v3.37.0
 	github.com/coreos/go-oidc/v3 v3.14.1
 	github.com/expr-lang/expr v1.17.2
 	github.com/ghodss/yaml v1.0.0
@@ -34,7 +34,7 @@ require (
 	google.golang.org/protobuf v1.36.6
 	gorm.io/datatypes v1.2.5
 	gorm.io/driver/postgres v1.5.11
-	gorm.io/gorm v1.25.12
+	gorm.io/gorm v1.26.0
 )
 
 require (
@@ -71,6 +71,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28 // indirect
 	github.com/microsoft/go-mssqldb v1.7.2 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rabbitmq/amqp091-go v1.9.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578 // indirect
@@ -93,7 +94,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/mysql v1.5.7 // indirect
 	gorm.io/driver/sqlserver v1.5.4 // indirect
-	gorm.io/plugin/dbresolver v1.5.3 // indirect
+	gorm.io/plugin/dbresolver v1.6.0 // indirect
 	modernc.org/libc v1.22.2 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
 	modernc.org/memory v1.5.0 // indirect
