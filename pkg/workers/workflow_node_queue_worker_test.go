@@ -207,7 +207,7 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 		r.Organization.ID,
 		[]models.WorkflowNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
-			{NodeID: componentNode, Type: models.NodeTypeComponent},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
 		[]models.Edge{
 			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
@@ -298,7 +298,7 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 		r.Organization.ID,
 		[]models.WorkflowNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
-			{NodeID: componentNode, Type: models.NodeTypeComponent},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
 		[]models.Edge{
 			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
@@ -342,7 +342,7 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 		r.Organization.ID,
 		[]models.WorkflowNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
-			{NodeID: componentNode, Type: models.NodeTypeComponent},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
 		[]models.Edge{
 			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
