@@ -1165,7 +1165,7 @@ function prepareComponentNode(
     case "wait":
       return prepareWaitNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "time_gate":
-      return prepareTimeGateNode(node, components, nodeExecutionsMap, nodeQueueItemsMap);
+      return prepareTimeGateNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
     case "merge":
       return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap);
   }
@@ -1896,6 +1896,7 @@ function prepareWaitNode(
 }
 
 function prepareTimeGateNode(
+  nodes: ComponentsNode[],
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
@@ -1938,23 +1939,29 @@ function prepareTimeGateNode(
   const execution = executions.length > 0 ? executions[0] : null;
 
   let lastExecution: {
+    title: string;
     receivedAt: Date;
     state: "success" | "failed" | "running";
-    eventId?: string;
+    values?: Record<string, string>;
     nextRunTime?: Date;
   } | undefined;
 
   if (execution) {
     const executionState = getRunItemState(execution);
+    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+
+    const { title } = rootTriggerRenderer.getTitleAndSubtitle(execution.rootEvent!);
 
     lastExecution = {
+      title: title,
       receivedAt: new Date(execution.createdAt!),
       state: executionState === "success"
         ? ("success" as const)
         : executionState === "failed"
           ? ("failed" as const)
           : ("running" as const),
-      eventId: execution.rootEvent?.id || execution.id || "Event",
+      values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
     };
 
     if (executionState === "running") {

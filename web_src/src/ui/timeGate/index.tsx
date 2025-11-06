@@ -7,9 +7,10 @@ import { MetadataItem } from "../metadataList";
 export type TimeGateState = "success" | "failed" | "running";
 
 export interface TimeGateExecutionItem {
+  title: string;
   receivedAt?: Date;
   state?: TimeGateState;
-  eventId?: string;
+  values?: Record<string, string>;
   nextRunTime?: Date;
 }
 
@@ -126,18 +127,15 @@ export const TimeGate: React.FC<TimeGateProps> = ({
       let eventTitle: string;
       let eventSubtitle: string | undefined;
 
-      if (lastExecution.state === "running" && lastExecution.eventId) {
-        // Show event ID and time remaining for running state
-        eventTitle = lastExecution.eventId;
-        if (lastExecution.nextRunTime) {
-          const now = new Date();
-          const timeDiff = lastExecution.nextRunTime.getTime() - now.getTime();
-          const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
-          eventSubtitle = `Runs in ${timeLeftText}`;
-        }
-      } else {
-        // Show standard messages for completed states
-        eventTitle = lastExecution.eventId || "Event";
+      // Use trigger-based title
+      eventTitle = lastExecution.title;
+
+      if (lastExecution.state === "running" && lastExecution.nextRunTime) {
+        // Show time remaining for running state
+        const now = new Date();
+        const timeDiff = lastExecution.nextRunTime.getTime() - now.getTime();
+        const timeLeftText = timeDiff > 0 ? calcRelativeTimeFromDiff(timeDiff) : "Ready to run";
+        eventSubtitle = `Runs in ${timeLeftText}`;
       }
 
       eventSections.push({
