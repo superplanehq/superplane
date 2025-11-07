@@ -69,7 +69,7 @@ func parseOwnerFromURL(URL string) (string, error) {
 }
 
 type WebhookConfiguration struct {
-	Events []string `json:"events"`
+	EventType string `json:"eventType"`
 }
 
 func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions) (any, error) {
@@ -81,7 +81,7 @@ func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions
 
 	hook := &github.Hook{
 		Active: github.Ptr(true),
-		Events: config.Events,
+		Events: []string{config.EventType},
 		Config: &github.HookConfig{
 			URL:         &options.URL,
 			Secret:      github.Ptr(string(options.Secret)),

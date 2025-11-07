@@ -13,7 +13,7 @@ interface GitHubMetadata {
 }
 
 interface GithubConfiguration {
-  events: string[];
+  eventType: string;
 }
 
 interface GitHubEventData {
@@ -94,10 +94,10 @@ export const githubTriggerRenderer: TriggerRenderer = {
     }
 
     // Only add events metadata if configuration exists
-    if (configuration?.events && Array.isArray(configuration.events)) {
+    if (configuration?.eventType) {
       metadataItems.push({
         icon: "funnel",
-        label: configuration.events.join(", "),
+        label: configuration.eventType,
       });
     }
 
