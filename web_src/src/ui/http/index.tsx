@@ -152,7 +152,7 @@ export const Http: React.FC<HttpProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      <div className="flex flex-col border-2 border-border rounded-md w-[26rem] bg-white">
+      <div className="flex flex-col border-1 border-border rounded-md w-[26rem] bg-white">
         <ComponentHeader
           iconSrc={iconSrc}
           iconSlug={iconSlug}
@@ -244,7 +244,7 @@ export const Http: React.FC<HttpProps> = ({
         {!hideLastRun && (
           <div className="px-4 py-3 border-b">
             <div className="flex items-center justify-between gap-3 text-gray-500 mb-2">
-              <span className="uppercase text-sm font-medium">Last Run</span>
+              <span className="uppercase text-xs font-semibold tracking-wide">Last Run</span>
             </div>
 
             {lastExecution && lastExecution.state && lastExecution.receivedAt ? (

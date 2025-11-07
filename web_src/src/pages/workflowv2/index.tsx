@@ -768,6 +768,61 @@ export function WorkflowPageV2() {
     [workflowId],
   );
 
+  const handleNodeDuplicate = useCallback(
+    (nodeId: string) => {
+      if (!workflow || !organizationId || !workflowId) return;
+
+      const nodeToDuplicate = workflow.nodes?.find((node) => node.id === nodeId);
+      if (!nodeToDuplicate) return;
+
+      saveWorkflowSnapshot(workflow);
+
+      const originalName = nodeToDuplicate.name || "node";
+      const duplicateName = `${originalName} copy`;
+
+      let blockName = "node";
+      if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
+        blockName = nodeToDuplicate.trigger.name;
+      } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
+        blockName = nodeToDuplicate.component.name;
+      } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
+        // For blueprints, we need to find the blueprint metadata to get the name
+        const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
+        blockName = blueprintMetadata?.name || "blueprint";
+      }
+
+      const newNodeId = generateNodeId(blockName, duplicateName);
+
+      const offsetX = 50;
+      const offsetY = 50;
+
+      const duplicateNode: ComponentsNode = {
+        ...nodeToDuplicate,
+        id: newNodeId,
+        name: duplicateName,
+        position: {
+          x: (nodeToDuplicate.position?.x || 0) + offsetX,
+          y: (nodeToDuplicate.position?.y || 0) + offsetY,
+        },
+        // Reset collapsed state for the duplicate
+        isCollapsed: false,
+      };
+
+      // Add the duplicate node to the workflow
+      const updatedNodes = [...(workflow.nodes || []), duplicateNode];
+
+      const updatedWorkflow = {
+        ...workflow,
+        nodes: updatedNodes,
+      };
+
+      // Update local cache
+      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
+      markUnsavedChange("structural");
+    },
+    [workflow, organizationId, workflowId, blueprints, queryClient, saveWorkflowSnapshot, markUnsavedChange],
+  );
+
   const handleSave = useCallback(
     async (canvasNodes: CanvasNode[]) => {
       if (!workflow || !organizationId || !workflowId) return;
@@ -879,6 +934,7 @@ export function WorkflowPageV2() {
       onToggleView={handleNodeCollapseChange}
       onToggleCollapse={() => markUnsavedChange("structural")}
       onRun={handleRun}
+      onDuplicate={handleNodeDuplicate}
       onConfigure={handleConfigure}
       buildingBlocks={buildingBlocks}
       onNodeAdd={handleNodeAdd}

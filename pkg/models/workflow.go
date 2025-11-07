@@ -36,8 +36,12 @@ func (w *Workflow) FindNode(id string) (*WorkflowNode, error) {
 }
 
 func FindWorkflowNodes(workflowID uuid.UUID) ([]WorkflowNode, error) {
+	return FindWorkflowNodesInTransaction(database.Conn(), workflowID)
+}
+
+func FindWorkflowNodesInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]WorkflowNode, error) {
 	var nodes []WorkflowNode
-	err := database.Conn().
+	err := tx.
 		Where("workflow_id = ?", workflowID).
 		Find(&nodes).
 		Error

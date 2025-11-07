@@ -10,11 +10,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
-func Test__WorkflowNodeQueueWorker_HappyPath(t *testing.T) {
-	worker := NewWorkflowNodeQueueWorker()
+func Test__WorkflowNodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	r := support.Setup(t)
+	defer r.Close()
+	worker := NewWorkflowNodeQueueWorker(r.Registry)
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -25,8 +27,16 @@ func Test__WorkflowNodeQueueWorker_HappyPath(t *testing.T) {
 		t,
 		r.Organization.ID,
 		[]models.WorkflowNode{
-			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
-			{NodeID: componentNode, Type: models.NodeTypeComponent},
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
 		},
 		[]models.Edge{
 			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
@@ -78,9 +88,114 @@ func Test__WorkflowNodeQueueWorker_HappyPath(t *testing.T) {
 	assert.Len(t, queueItems, 0)
 }
 
-func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
-	worker := NewWorkflowNodeQueueWorker()
+func Test__WorkflowNodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	r := support.Setup(t)
+
+	//
+	// Create a simple blueprint with two sequential nodes
+	//
+	blueprint := support.CreateBlueprint(
+		t,
+		r.Organization.ID,
+		[]models.Node{
+			{
+				ID:   "noop1",
+				Type: models.NodeTypeComponent,
+				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+			},
+			{
+				ID:   "noop2",
+				Type: models.NodeTypeComponent,
+				Ref:  models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+			},
+		},
+		[]models.Edge{
+			{SourceID: "noop1", TargetID: "noop2", Channel: "default"},
+		},
+		[]models.BlueprintOutputChannel{
+			{
+				Name:              "default",
+				NodeID:            "noop2",
+				NodeOutputChannel: "default",
+			},
+		},
+	)
+
+	//
+	// Create a simple workflow with a trigger and a blueprint node.
+	//
+	triggerNode := "trigger-1"
+	blueprintNode := "blueprint-1"
+	workflow, _ := support.CreateWorkflow(
+		t,
+		r.Organization.ID,
+		[]models.WorkflowNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: blueprintNode,
+				Type:   models.NodeTypeBlueprint,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Blueprint: &models.BlueprintRef{ID: blueprint.ID.String()}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: blueprintNode, Channel: "default"},
+		},
+	)
+
+	//
+	// Create a root event and a queue item for the blueprint node.
+	//
+	rootEvent := support.EmitWorkflowEventForNode(t, workflow.ID, triggerNode, "default", nil)
+	support.CreateWorkflowQueueItem(t, workflow.ID, blueprintNode, rootEvent.ID, rootEvent.ID)
+
+	//
+	// Verify initial state - node should be ready and queue should have 1 item.
+	//
+	node, err := models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.WorkflowNodeStateReady, node.State)
+
+	queueItems, err := models.ListNodeQueueItems(workflow.ID, blueprintNode, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, queueItems, 1)
+
+	//
+	// Process the node and verify the happy path:
+	// - Pending execution is created
+	// - Node state is updated to processing
+	// - Queue item is deleted
+	//
+	worker := NewWorkflowNodeQueueWorker(r.Registry)
+	err = worker.LockAndProcessNode(*node)
+	require.NoError(t, err)
+
+	// Verify execution was created with pending state
+	executions, err := models.ListNodeExecutions(workflow.ID, blueprintNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, executions, 1)
+	assert.Equal(t, models.WorkflowNodeExecutionStatePending, executions[0].State)
+	assert.Equal(t, rootEvent.ID, executions[0].EventID)
+	assert.Equal(t, rootEvent.ID, executions[0].RootEventID)
+
+	// Verify node state was updated to processing
+	node, err = models.FindWorkflowNode(database.Conn(), workflow.ID, blueprintNode)
+	require.NoError(t, err)
+	assert.Equal(t, models.WorkflowNodeStateProcessing, node.State)
+
+	// Verify queue item was deleted
+	queueItems, err = models.ListNodeQueueItems(workflow.ID, blueprintNode, 10, nil)
+	require.NoError(t, err)
+	assert.Len(t, queueItems, 0)
+}
+
+func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewWorkflowNodeQueueWorker(r.Registry)
 
 	//
 	// Create a simple workflow with a trigger and a component node.
@@ -92,7 +207,7 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 		r.Organization.ID,
 		[]models.WorkflowNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
-			{NodeID: componentNode, Type: models.NodeTypeComponent},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
 		[]models.Edge{
 			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
@@ -169,20 +284,21 @@ func Test__WorkflowNodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 }
 
 func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
-	worker := NewWorkflowNodeQueueWorker()
 	r := support.Setup(t)
+	defer r.Close()
+	worker := NewWorkflowNodeQueueWorker(r.Registry)
 
 	//
 	// Create a simple workflow with a trigger and a component node.
 	//
 	triggerNode := "trigger-1"
-	componentNode := "component-1"
+	componentNode := "noop"
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
 		[]models.WorkflowNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
-			{NodeID: componentNode, Type: models.NodeTypeComponent},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
 		[]models.Edge{
 			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
@@ -214,18 +330,19 @@ func Test__WorkflowNodeQueueWorker_EmptyQueue(t *testing.T) {
 
 func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	r := support.Setup(t)
+	defer r.Close()
 
 	//
 	// Create a simple workflow with a trigger and a component node.
 	//
 	triggerNode := "trigger-1"
-	componentNode := "component-1"
+	componentNode := "noop"
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
 		[]models.WorkflowNode{
 			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
-			{NodeID: componentNode, Type: models.NodeTypeComponent},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
 		},
 		[]models.Edge{
 			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
@@ -251,12 +368,12 @@ func Test__WorkflowNodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	// Create two workers and have them try to process the node concurrently.
 	//
 	go func() {
-		worker1 := NewWorkflowNodeQueueWorker()
+		worker1 := NewWorkflowNodeQueueWorker(r.Registry)
 		results <- worker1.LockAndProcessNode(*node)
 	}()
 
 	go func() {
-		worker2 := NewWorkflowNodeQueueWorker()
+		worker2 := NewWorkflowNodeQueueWorker(r.Registry)
 		results <- worker2.LockAndProcessNode(*node)
 	}()
 

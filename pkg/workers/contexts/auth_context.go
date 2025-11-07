@@ -20,6 +20,7 @@ type AuthContext struct {
 
 func NewAuthContext(tx *gorm.DB, orgID uuid.UUID, authService authorization.Authorization, authenticatedUser *models.User) components.AuthContext {
 	return &AuthContext{
+		tx:                tx,
 		orgID:             orgID,
 		authService:       authService,
 		authenticatedUser: authenticatedUser,

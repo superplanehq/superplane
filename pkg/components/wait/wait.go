@@ -135,6 +135,10 @@ func (w *Wait) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
+func (w *Wait) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	return ctx.DefaultProcessing()
+}
+
 func findInterval(spec Spec) time.Duration {
 	switch spec.Duration.Unit {
 	case "seconds":

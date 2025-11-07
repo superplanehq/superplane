@@ -33,6 +33,7 @@ import (
 
 type ResourceRegistry struct {
 	User             uuid.UUID
+	UserModel        *models.User
 	Canvas           *models.Canvas
 	Organization     *models.Organization
 	Account          *models.Account
@@ -99,6 +100,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 
 	r.Account = account
 	r.User = user.ID
+	r.UserModel = user
 	r.Organization = organization
 
 	//
@@ -230,7 +232,40 @@ func CreateWorkflowQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, 
 	require.NoError(t, err)
 }
 
-func CreateWorkflowNodeExecution(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID, parentExecutionID *uuid.UUID) *models.WorkflowNodeExecution {
+func CreateNodeExecutionWithConfiguration(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	rootEventID uuid.UUID,
+	eventID uuid.UUID,
+	parentExecutionID *uuid.UUID,
+	configuration map[string]any,
+) *models.WorkflowNodeExecution {
+	now := time.Now()
+	execution := models.WorkflowNodeExecution{
+		WorkflowID:        workflowID,
+		NodeID:            nodeID,
+		RootEventID:       rootEventID,
+		EventID:           eventID,
+		ParentExecutionID: parentExecutionID,
+		State:             models.WorkflowNodeExecutionStatePending,
+		Configuration:     datatypes.NewJSONType(configuration),
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
+	}
+
+	require.NoError(t, database.Conn().Create(&execution).Error)
+	return &execution
+}
+
+func CreateWorkflowNodeExecution(
+	t *testing.T,
+	workflowID uuid.UUID,
+	nodeID string,
+	rootEventID uuid.UUID,
+	eventID uuid.UUID,
+	parentExecutionID *uuid.UUID,
+) *models.WorkflowNodeExecution {
 	now := time.Now()
 	execution := models.WorkflowNodeExecution{
 		WorkflowID:        workflowID,

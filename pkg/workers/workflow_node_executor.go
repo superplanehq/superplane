@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -16,6 +17,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
+
+var ErrRecordLocked = errors.New("record locked")
 
 type WorkflowNodeExecutor struct {
 	registry  *registry.Registry
@@ -52,9 +55,16 @@ func (w *WorkflowNodeExecutor) Start(ctx context.Context) {
 				go func(execution models.WorkflowNodeExecution) {
 					defer w.semaphore.Release(1)
 
-					if err := w.LockAndProcessNodeExecution(execution); err != nil {
-						w.log("Error processing execution %s - workflow=%s, node=%s: %v", execution.ID, execution.WorkflowID, execution.NodeID, err)
+					err := w.LockAndProcessNodeExecution(execution)
+					if err == nil {
+						return
 					}
+
+					if err == ErrRecordLocked {
+						return
+					}
+
+					w.log("Error processing execution %s - workflow=%s, node=%s: %v", execution.ID, execution.WorkflowID, execution.NodeID, err)
 				}(execution)
 			}
 		}
@@ -66,7 +76,7 @@ func (w *WorkflowNodeExecutor) LockAndProcessNodeExecution(execution models.Work
 		e, err := models.LockWorkflowNodeExecution(tx, execution.ID)
 		if err != nil {
 			w.log("Node already being processed - skipping")
-			return nil
+			return ErrRecordLocked
 		}
 
 		return w.processNodeExecution(tx, e)

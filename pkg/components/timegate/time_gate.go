@@ -240,6 +240,10 @@ func (tg *TimeGate) Setup(ctx components.SetupContext) error {
 	return nil
 }
 
+func (tg *TimeGate) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	return ctx.DefaultProcessing()
+}
+
 func (tg *TimeGate) Execute(ctx components.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)

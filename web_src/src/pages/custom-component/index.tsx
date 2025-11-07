@@ -617,6 +617,93 @@ export const CustomComponent = () => {
     setHasUnsavedChanges(true)
   }, [saveSnapshot])
 
+  const handleNodeDuplicate = useCallback((nodeId: string) => {
+    const nodeToDuplicate = nodesRef.current.find((node) => node.id === nodeId)
+    if (!nodeToDuplicate) return
+
+    // Save snapshot before making changes
+    saveSnapshot()
+
+    // Generate a new unique node ID
+    const nodeData = nodeToDuplicate.data as any
+    const originalName = nodeData.label || "node"
+    const duplicateName = `${originalName} copy`
+
+    // Get component name for ID generation
+    const componentName = nodeData._originalComponent || "component"
+    const newNodeId = generateNodeId(componentName, duplicateName)
+
+    // Create the duplicate node with offset position
+    const offsetX = 50 // Offset to the right
+    const offsetY = 50 // Offset down
+
+    const duplicateNode: Node = {
+      ...nodeToDuplicate,
+      id: newNodeId,
+      position: {
+        x: nodeToDuplicate.position.x + offsetX,
+        y: nodeToDuplicate.position.y + offsetY,
+      },
+      data: {
+        ...nodeData,
+        label: duplicateName,
+        // Update type-specific props with new title
+        ...(nodeData.if && {
+          if: {
+            ...nodeData.if,
+            title: duplicateName,
+          }
+        }),
+        ...(nodeData.filter && {
+          filter: {
+            ...nodeData.filter,
+            title: duplicateName,
+          }
+        }),
+        ...(nodeData.approval && {
+          approval: {
+            ...nodeData.approval,
+            title: duplicateName,
+          }
+        }),
+        ...(nodeData.http && {
+          http: {
+            ...nodeData.http,
+            title: duplicateName,
+          }
+        }),
+        ...(nodeData.semaphore && {
+          semaphore: {
+            ...nodeData.semaphore,
+            title: duplicateName,
+          }
+        }),
+        ...(nodeData.wait && {
+          wait: {
+            ...nodeData.wait,
+            title: duplicateName,
+          }
+        }),
+        ...(nodeData.noop && {
+          noop: {
+            ...nodeData.noop,
+            title: duplicateName,
+          }
+        }),
+        ...(nodeData.time_gate && {
+          time_gate: {
+            ...nodeData.time_gate,
+            title: duplicateName,
+          }
+        }),
+      },
+    }
+
+    // Add the duplicate node to the nodes array
+    setNodes((nds) => [...nds, duplicateNode])
+    setHasUnsavedChanges(true)
+  }, [saveSnapshot])
+
   const handleConfigurationFieldsChange = useCallback((fields: any[]) => {
     saveSnapshot()
     setBlueprintConfiguration(fields)
@@ -734,6 +821,7 @@ export const CustomComponent = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDuplicate={handleNodeDuplicate}
         onNodeDelete={handleNodeDelete}
         getNodeEditData={getNodeEditData}
         onNodeConfigurationSave={handleNodeConfigurationSave}

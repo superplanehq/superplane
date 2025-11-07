@@ -132,6 +132,10 @@ func (e *HTTP) HandleAction(ctx components.ActionContext) error {
 	return fmt.Errorf("http does not support actions")
 }
 
+func (e *HTTP) ProcessQueueItem(ctx components.ProcessQueueContext) error {
+	return ctx.DefaultProcessing()
+}
+
 func (e *HTTP) Execute(ctx components.ExecutionContext) error {
 	spec := Spec{}
 	err := mapstructure.Decode(ctx.Configuration, &spec)
