@@ -83,7 +83,7 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 	}
 
 	return &pb.UpdateWorkflowResponse{
-		Workflow: SerializeWorkflow(existingWorkflow),
+		Workflow: SerializeWorkflow(existingWorkflow, true),
 	}, nil
 }
 

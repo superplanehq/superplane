@@ -81,6 +81,6 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 	}
 
 	return &pb.CreateWorkflowResponse{
-		Workflow: SerializeWorkflow(&workflow),
+		Workflow: SerializeWorkflow(&workflow, false),
 	}, nil
 }
