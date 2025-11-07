@@ -22,6 +22,7 @@ var _ MappedNullable = &WorkflowsWorkflow{}
 type WorkflowsWorkflow struct {
 	Metadata *WorkflowsWorkflowMetadata `json:"metadata,omitempty"`
 	Spec *WorkflowsWorkflowSpec `json:"spec,omitempty"`
+	Status *WorkflowsWorkflowStatus `json:"status,omitempty"`
 }
 
 // NewWorkflowsWorkflow instantiates a new WorkflowsWorkflow object
@@ -105,6 +106,38 @@ func (o *WorkflowsWorkflow) SetSpec(v WorkflowsWorkflowSpec) {
 	o.Spec = &v
 }
 
+// GetStatus returns the Status field value if set, zero value otherwise.
+func (o *WorkflowsWorkflow) GetStatus() WorkflowsWorkflowStatus {
+	if o == nil || IsNil(o.Status) {
+		var ret WorkflowsWorkflowStatus
+		return ret
+	}
+	return *o.Status
+}
+
+// GetStatusOk returns a tuple with the Status field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflow) GetStatusOk() (*WorkflowsWorkflowStatus, bool) {
+	if o == nil || IsNil(o.Status) {
+		return nil, false
+	}
+	return o.Status, true
+}
+
+// HasStatus returns a boolean if a field has been set.
+func (o *WorkflowsWorkflow) HasStatus() bool {
+	if o != nil && !IsNil(o.Status) {
+		return true
+	}
+
+	return false
+}
+
+// SetStatus gets a reference to the given WorkflowsWorkflowStatus and assigns it to the Status field.
+func (o *WorkflowsWorkflow) SetStatus(v WorkflowsWorkflowStatus) {
+	o.Status = &v
+}
+
 func (o WorkflowsWorkflow) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o WorkflowsWorkflow) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Spec) {
 		toSerialize["spec"] = o.Spec
+	}
+	if !IsNil(o.Status) {
+		toSerialize["status"] = o.Status
 	}
 	return toSerialize, nil
 }

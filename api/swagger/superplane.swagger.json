@@ -4601,6 +4601,9 @@
         },
         "spec": {
           "$ref": "#/definitions/WorkflowsWorkflowSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/WorkflowsWorkflowStatus"
         }
       }
     },
@@ -4754,6 +4757,25 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/ComponentsEdge"
+          }
+        }
+      }
+    },
+    "WorkflowsWorkflowStatus": {
+      "type": "object",
+      "properties": {
+        "lastExecutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
+          }
+        },
+        "nextQueueItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeQueueItem"
           }
         }
       }
