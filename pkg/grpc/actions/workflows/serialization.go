@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
+func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workflow {
 	workflowNodes, err := models.FindWorkflowNodes(workflow.ID)
 	if err != nil {
 		return nil
@@ -42,6 +42,25 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 			name = user.Name
 		}
 		createdBy = &pb.UserRef{Id: idStr, Name: name}
+	}
+
+	if !includeStatus {
+		return &pb.Workflow{
+			Metadata: &pb.Workflow_Metadata{
+				Id:             workflow.ID.String(),
+				OrganizationId: workflow.OrganizationID.String(),
+				Name:           workflow.Name,
+				Description:    workflow.Description,
+				CreatedAt:      timestamppb.New(*workflow.CreatedAt),
+				UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
+				CreatedBy:      createdBy,
+			},
+			Spec: &pb.Workflow_Spec{
+				Nodes: actions.NodesToProto(nodes),
+				Edges: actions.EdgesToProto(workflow.Edges),
+			},
+			Status: nil,
+		}
 	}
 
 	// Fetch last executions per node
