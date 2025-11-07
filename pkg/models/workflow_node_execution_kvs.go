@@ -41,20 +41,21 @@ func CreateWorkflowNodeExecutionKVInTransaction(tx *gorm.DB, workflowID uuid.UUI
 	return tx.Create(&rec).Error
 }
 
-func FindNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID *uuid.UUID, nodeID, key, value string) (*WorkflowNodeExecutionKV, error) {
-	var rec WorkflowNodeExecutionKV
+func FindNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID *uuid.UUID, nodeID, key, value string) (*WorkflowNodeExecution, error) {
+	var execution WorkflowNodeExecution
 
 	err := tx.
-		Where("key = ? AND value = ?", key, value).
-		Where("workflow_id = ?", *workflowID).
-		Where("node_id = ?", nodeID).
-		Order("created_at ASC").
-		First(&rec).
+		Joins("JOIN workflow_node_execution_kvs AS kvs ON workflow_node_executions.id = workflow_node_execution_kvs.execution_id").
+		Where("kvs.key = ? AND kvs.value = ?", key, value).
+		Where("kvs.workflow_id = ?", *workflowID).
+		Where("kvs.node_id = ?", nodeID).
+		Order("kvs.created_at ASC").
+		First(&execution).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &rec, nil
+	return &execution, nil
 }
