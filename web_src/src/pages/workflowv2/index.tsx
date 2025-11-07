@@ -488,7 +488,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       // Update local cache without triggering API call
@@ -551,7 +554,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       // Update local cache
@@ -580,7 +586,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        edges: updatedEdges,
+        spec: {
+          ...workflow.spec,
+          edges: updatedEdges,
+        },
       };
 
       // Update local cache
@@ -605,8 +614,11 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
-        edges: updatedEdges,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+          edges: updatedEdges,
+        },
       };
 
       // Update local cache
@@ -643,7 +655,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        edges: updatedEdges,
+        spec: {
+          ...workflow.spec,
+          edges: updatedEdges,
+        },
       };
 
       // Update local cache
@@ -681,7 +696,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
@@ -715,7 +733,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
@@ -812,7 +833,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       // Update local cache
