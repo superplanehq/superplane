@@ -79,12 +79,12 @@ const HomePage = () => {
   }));
 
   const workflows: WorkflowCardData[] = (workflowsData || []).map((workflow: any) => ({
-    id: workflow.id!,
-    name: workflow.name!,
-    description: workflow.description,
-    createdAt: workflow.createdAt ? new Date(workflow.createdAt).toLocaleDateString() : "Unknown",
+    id: workflow.metadata?.id!,
+    name: workflow.metadata?.name!,
+    description: workflow.metadata?.description,
+    createdAt: workflow.metadata?.createdAt ? new Date(workflow.metadata.createdAt).toLocaleDateString() : "Unknown",
     type: "workflow" as const,
-    createdBy: workflow.createdBy,
+    createdBy: workflow.metadata?.createdBy,
   }));
 
   const filteredBlueprints = blueprints.filter((blueprint) => {

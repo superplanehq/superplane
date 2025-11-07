@@ -4596,43 +4596,14 @@
     "WorkflowsWorkflow": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
+        "metadata": {
+          "$ref": "#/definitions/WorkflowsWorkflowMetadata"
         },
-        "organizationId": {
-          "type": "string"
+        "spec": {
+          "$ref": "#/definitions/WorkflowsWorkflowSpec"
         },
-        "name": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "nodes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsNode"
-          }
-        },
-        "edges": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/ComponentsEdge"
-          }
-        },
-        "createdBy": {
-          "$ref": "#/definitions/SuperplaneWorkflowsUserRef",
-          "title": "Creator reference"
+        "status": {
+          "$ref": "#/definitions/WorkflowsWorkflowStatus"
         }
       }
     },
@@ -4657,6 +4628,34 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsWorkflowMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "$ref": "#/definitions/SuperplaneWorkflowsUserRef"
         }
       }
     },
@@ -4740,6 +4739,44 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "WorkflowsWorkflowSpec": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/ComponentsEdge"
+          }
+        }
+      }
+    },
+    "WorkflowsWorkflowStatus": {
+      "type": "object",
+      "properties": {
+        "lastExecutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeExecution"
+          }
+        },
+        "nextQueueItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowNodeQueueItem"
+          }
         }
       }
     },

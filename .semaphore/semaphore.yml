@@ -23,6 +23,7 @@ blocks:
         - name: "\U0001F9EA Test"
           commands:
             - make test.setup
+            - make check.db.structure
             - make test
         - name: "\U0001F9EA Lint"
           commands:

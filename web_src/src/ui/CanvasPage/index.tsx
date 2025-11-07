@@ -8,6 +8,7 @@ import {
 } from "@xyflow/react";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { ConfigurationField } from "@/api-client";
 import { AiSidebar } from "../ai";
@@ -54,6 +55,7 @@ export interface SidebarData {
   iconBackground?: string;
   moreInQueueCount: number;
   hideQueueEvents?: boolean;
+  isLoading?: boolean;
 }
 
 export interface CanvasNode extends ReactFlowNode {
@@ -112,6 +114,7 @@ export interface CanvasPageProps {
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
   onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
@@ -409,6 +412,7 @@ function CanvasPage(props: CanvasPageProps) {
           <Sidebar
             state={state}
             getSidebarData={props.getSidebarData}
+            loadSidebarData={props.loadSidebarData}
             getTabData={props.getTabData}
             onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
@@ -472,6 +476,7 @@ function CanvasPage(props: CanvasPageProps) {
 function Sidebar({
   state,
   getSidebarData,
+  loadSidebarData,
   getTabData,
   onRun,
   onDuplicate,
@@ -485,6 +490,7 @@ function Sidebar({
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
@@ -506,6 +512,13 @@ function Sidebar({
   const [latestEvents, setLatestEvents] = useState<SidebarEvent[]>(sidebarData?.latestEvents || []);
   const [nextInQueueEvents, setNextInQueueEvents] = useState<SidebarEvent[]>(sidebarData?.nextInQueueEvents || []);
 
+  // Trigger data loading when sidebar opens for a node
+  useEffect(() => {
+    if (state.componentSidebar.selectedNodeId && loadSidebarData) {
+      loadSidebarData(state.componentSidebar.selectedNodeId);
+    }
+  }, [state.componentSidebar.selectedNodeId, loadSidebarData]);
+
   useEffect(() => {
     if (sidebarData?.latestEvents) {
       setLatestEvents(sidebarData.latestEvents);
@@ -517,6 +530,20 @@ function Sidebar({
 
   if (!sidebarData) {
     return null;
+  }
+
+  // Show loading state when data is being fetched
+  if (sidebarData.isLoading) {
+    return (
+      <div className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl" style={{ width: '420px' }}>
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            <p className="text-sm text-gray-500">Loading events...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

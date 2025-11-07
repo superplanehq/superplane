@@ -13,7 +13,7 @@ export function NodeRunPage() {
 
   const isSidebarOpenRef = useRef<boolean | null>(false);
   const breadcrumbs = useBreadcrumbs();
-  const workflowName = workflow?.name || "Workflow";
+  const workflowName = workflow?.metadata?.name || "Workflow";
 
   return (
     <div className="h-screen w-screen bg-slate-50">
@@ -37,13 +37,13 @@ function useBreadcrumbs() {
   const { data: blueprints = [] } = useBlueprints(organizationId || "");
   const { data: components = [] } = useComponents(organizationId || "");
 
-  const nodeName = workflow?.nodes?.find((n) => n.id === nodeId)?.name || "Component";
+  const nodeName = workflow?.spec?.nodes?.find((n) => n.id === nodeId)?.name || "Component";
   const latestExecution = nodeExecs?.executions?.[0];
-  const node = workflow?.nodes?.find((n) => n.id === nodeId);
+  const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
 
   const latestRunTitle = (() => {
     if (!latestExecution) return undefined;
-    const rootNode = workflow?.nodes?.find((n) => n.id === latestExecution.rootEvent?.nodeId);
+    const rootNode = workflow?.spec?.nodes?.find((n) => n.id === latestExecution.rootEvent?.nodeId);
     const renderer = getTriggerRenderer(rootNode?.trigger?.name || "");
     if (latestExecution.rootEvent) {
       return renderer.getTitleAndSubtitle(latestExecution.rootEvent).title;
@@ -69,7 +69,7 @@ function useBreadcrumbs() {
 
   return [
     { label: "Canvases", href: `/${organizationId}` },
-    { label: workflow?.name || "Workflow", href: `/${organizationId}/workflows/${workflowId}` },
+    { label: workflow?.metadata?.name || "Workflow", href: `/${organizationId}/workflows/${workflowId}` },
     {
       label: nodeName,
       iconSlug: iconSlug || "boxes",

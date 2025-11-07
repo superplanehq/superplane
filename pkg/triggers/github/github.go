@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -35,9 +34,9 @@ type Repository struct {
 }
 
 type Configuration struct {
-	Integration string   `json:"integration"`
-	Repository  string   `json:"repository"`
-	Events      []string `json:"events"`
+	Integration string `json:"integration"`
+	Repository  string `json:"repository"`
+	EventType   string `json:"eventType"`
 }
 
 func (g *GitHub) Name() string {
@@ -91,9 +90,9 @@ func (g *GitHub) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:     "events",
-			Label:    "Events",
-			Type:     configuration.FieldTypeMultiSelect,
+			Name:     "eventType",
+			Label:    "Event Type",
+			Type:     configuration.FieldTypeSelect,
 			Required: true,
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{
@@ -102,7 +101,7 @@ func (g *GitHub) Configuration() []configuration.Field {
 				},
 			},
 			TypeOptions: &configuration.TypeOptions{
-				MultiSelect: &configuration.MultiSelectTypeOptions{
+				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{
 							Value: "push",
@@ -211,9 +210,7 @@ func (g *GitHub) HandleWebhook(ctx triggers.WebhookRequestContext) (int, error) 
 	//
 	// If event is not in the list of chosen events, ignore it.
 	//
-	if !slices.ContainsFunc(config.Events, func(event string) bool {
-		return event == eventType
-	}) {
+	if config.EventType != eventType {
 		return http.StatusOK, nil
 	}
 

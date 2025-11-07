@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
+import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 
 import {
   BlueprintsBlueprint,
@@ -24,8 +25,6 @@ import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import {
   eventExecutionsQueryOptions,
   nodeEventsQueryOptions,
-  nodeExecutionsQueryOptions,
-  nodeQueueItemsQueryOptions,
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
@@ -115,7 +114,7 @@ export function WorkflowPageV2() {
   }
   if (isSidebarOpenRef.current === null && workflow) {
     // Initialize on first render
-    isSidebarOpenRef.current = workflow.nodes?.length === 0;
+    isSidebarOpenRef.current = workflow.spec?.nodes?.length === 0;
   }
 
   /**
@@ -136,7 +135,7 @@ export function WorkflowPageV2() {
    * This must happen during render (not in useEffect) to ensure it's available for the query hooks.
    */
   if (workflow && isInitialLoadRef.current) {
-    const nodeIds = workflow.nodes?.map((n) => n.id!) || [];
+    const nodeIds = workflow.spec?.nodes?.map((n) => n.id!) || [];
     setPersistedNodeIds(new Set(nodeIds));
     isInitialLoadRef.current = false;
   }
@@ -146,18 +145,13 @@ export function WorkflowPageV2() {
   // Memoize to prevent unnecessary re-renders and query recreations
   //
   const triggerNodes = useMemo(
-    () => workflow?.nodes?.filter((node) => node.type === "TYPE_TRIGGER") || [],
-    [workflow?.nodes],
-  );
-
-  const compositeNodes = useMemo(
-    () => workflow?.nodes?.filter((node) => node.type === "TYPE_BLUEPRINT") || [],
-    [workflow?.nodes],
+    () => workflow?.spec?.nodes?.filter((node) => node.type === "TYPE_TRIGGER") || [],
+    [workflow?.spec?.nodes],
   );
 
   const componentNodes = useMemo(
-    () => workflow?.nodes?.filter((node) => node.type === "TYPE_COMPONENT") || [],
-    [workflow?.nodes],
+    () => workflow?.spec?.nodes?.filter((node) => node.type === "TYPE_COMPONENT") || [],
+    [workflow?.spec?.nodes],
   );
 
   const filterComponentNodes = useMemo(
@@ -179,53 +173,57 @@ export function WorkflowPageV2() {
     [filterComponentNodes, persistedNodeIds],
   );
 
-  const persistedNodesWithExecutions = useMemo(() => {
-    const allNodes = [...compositeNodes, ...componentNodes];
-    return allNodes.filter((node) => persistedNodeIds.has(node.id!));
-  }, [compositeNodes, componentNodes, persistedNodeIds]);
-
   const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(
     workflowId!,
     persistedTriggerNodes.concat(persistedFilterNodes),
   );
-  const {
-    nodeExecutionsMap,
-    nodeQueueItemsMap,
-    isLoading: nodeDataLoading,
-  } = useCompositeNodeData(workflowId!, persistedNodesWithExecutions);
 
+  // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
+  // Subscribe to version to ensure React detects all updates
+  const storeVersion = useNodeExecutionStore((state) => state.version);
+  const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
+  const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
+  const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
+
+  // Initialize store from workflow.status on workflow load (only once per workflow)
+  const hasInitializedStoreRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (workflow?.metadata?.id && hasInitializedStoreRef.current !== workflow.metadata.id) {
+      initializeFromWorkflow(workflow);
+      hasInitializedStoreRef.current = workflow.metadata.id;
+    }
+  }, [workflow, initializeFromWorkflow]);
+
+  // Build maps from store for canvas display (using initial data from workflow.status)
+  // Rebuild whenever store version changes (indicates data was updated)
+  const { nodeExecutionsMap, nodeQueueItemsMap } = useMemo<{
+    nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>;
+    nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>;
+  }>(() => {
+    const executionsMap: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
+    const queueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]> = {};
+
+    // Get current store data
+    const storeData = useNodeExecutionStore.getState().data;
+
+    storeData.forEach((data, nodeId) => {
+      if (data.executions.length > 0) {
+        executionsMap[nodeId] = data.executions;
+      }
+      if (data.queueItems.length > 0) {
+        queueItemsMap[nodeId] = data.queueItems;
+      }
+    });
+
+    return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap };
+  }, [storeVersion]);
+
+  // Execution chain data based on node executions from store
   const {
     executionChainMap,
     isLoading: executionChainLoading,
   } = useExecutionChainData(workflowId!, nodeExecutionsMap);
 
-  const refetchEvents = useCallback(
-    (nodeId: string) => {
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.nodeEvent(workflowId!, nodeId, 10),
-      });
-    },
-    [queryClient, workflowId],
-  );
-
-  const refetchExecutions = useCallback(
-    (nodeId: string) => {
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.nodeExecution(workflowId!, nodeId),
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.nodeQueueItem(workflowId!, nodeId),
-      });
-
-      // Invalidate all execution chain queries since they depend on root events
-      // which can be affected by any node execution changes
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.eventExecutions(),
-      });
-    },
-    [queryClient, workflowId],
-  );
 
   const saveWorkflowSnapshot = useCallback(
     (currentWorkflow: WorkflowsWorkflow) => {
@@ -258,7 +256,7 @@ export function WorkflowPageV2() {
     }
   }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
 
-  useWorkflowWebsocket(workflowId!, organizationId!, refetchEvents, refetchExecutions);
+  useWorkflowWebsocket(workflowId!, organizationId!);
 
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
@@ -287,7 +285,6 @@ export function WorkflowPageV2() {
       blueprintsLoading ||
       componentsLoading ||
       nodeEventsLoading ||
-      nodeDataLoading ||
       executionChainLoading
     ) {
       return { nodes: [], edges: [] };
@@ -319,33 +316,64 @@ export function WorkflowPageV2() {
     blueprintsLoading,
     componentsLoading,
     nodeEventsLoading,
-    nodeDataLoading,
     executionChainLoading,
     organizationId,
   ]);
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
-      const node = workflow?.nodes?.find((n) => n.id === nodeId);
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
-      return prepareSidebarData(
+      // Get current data from store (don't trigger load here - that's done in useEffect)
+      const nodeData = getNodeData(nodeId);
+
+      // Build maps with current node data for sidebar
+      const executionsMap = nodeData.executions.length > 0 ? { [nodeId]: nodeData.executions } : {};
+      const queueItemsMap = nodeData.queueItems.length > 0 ? { [nodeId]: nodeData.queueItems } : {};
+      const eventsMapForSidebar = nodeData.events.length > 0
+        ? { [nodeId]: nodeData.events }
+        : nodeEventsMap; // Fall back to existing events map for trigger nodes
+
+      const sidebarData = prepareSidebarData(
         node,
-        workflow?.nodes || [],
+        workflow?.spec?.nodes || [],
         blueprints,
         components,
         triggers,
-        nodeExecutionsMap,
-        nodeQueueItemsMap,
-        nodeEventsMap,
+        executionsMap,
+        queueItemsMap,
+        eventsMapForSidebar,
       );
+
+      // Add loading state to sidebar data
+      return {
+        ...sidebarData,
+        isLoading: nodeData.isLoading,
+      };
     },
-    [workflow, blueprints, components, triggers, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap],
+    [workflow, blueprints, components, triggers, nodeEventsMap, getNodeData],
+  );
+
+  // Trigger data loading when sidebar opens for a node
+  const loadSidebarData = useCallback(
+    (nodeId: string) => {
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
+      if (!node) return;
+
+      const nodeData = getNodeData(nodeId);
+
+      // Trigger load if not already loaded or loading
+      if (!nodeData.isLoaded && !nodeData.isLoading) {
+        loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
+      }
+    },
+    [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
   );
 
   const getTabData = useCallback(
     (nodeId: string, event: SidebarEvent): TabData | undefined => {
-      const node = workflow?.nodes?.find((n) => n.id === nodeId);
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return undefined;
 
       if (node.type === "TYPE_TRIGGER") {
@@ -396,8 +424,8 @@ export function WorkflowPageV2() {
           tabData.current = {
             ...flattened,
             'Execution ID': execution.id,
-            'Execution State': execution.state.replace("STATE_", "").toLowerCase(),
-            'Execution Result': execution.result.replace("RESULT_", "").toLowerCase(),
+            'Execution State': execution.state?.replace("STATE_", "").toLowerCase(),
+            'Execution Result': execution.result?.replace("RESULT_", "").toLowerCase(),
             'Execution Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
           };
         }
@@ -413,7 +441,7 @@ export function WorkflowPageV2() {
 
       // Root tab: root event data
       if (execution.rootEvent) {
-        const rootTriggerNode = workflow?.nodes?.find((n) => n.id === execution.rootEvent?.nodeId);
+        const rootTriggerNode = workflow?.spec?.nodes?.find((n) => n.id === execution.rootEvent?.nodeId);
         const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
         const rootEventValues = rootTriggerRenderer.getRootEventValues(execution.rootEvent);
 
@@ -428,8 +456,8 @@ export function WorkflowPageV2() {
       // Payload tab: execution inputs and outputs (raw data)
       const payload: Record<string, unknown> = {};
 
-      if (execution.inputs) {
-        payload.inputs = execution.inputs;
+      if (execution.input) {
+        payload.input = execution.input;
       }
 
       if (execution.outputs) {
@@ -490,7 +518,7 @@ export function WorkflowPageV2() {
 
 
             // Get the main execution (earliest one)
-            const nodeInfo = workflow?.nodes?.find(n => n.id === exec.nodeId);
+            const nodeInfo = workflow?.spec?.nodes?.find((n: any) => n.id === exec.nodeId);
 
             // Map execution state to completion status
             const getCompletionStatus = (exec: WorkflowsWorkflowNodeExecution) => {
@@ -501,12 +529,12 @@ export function WorkflowPageV2() {
             };
 
             const mainItem = {
-              name: nodeInfo?.name || exec.nodeId,
+              name: nodeInfo?.name || exec.nodeId || 'Unknown',
               completed: getCompletionStatus(exec),
               children: exec?.childExecutions && exec.childExecutions.length > 1 ? exec.childExecutions.map(childExec => {
-                const childNodeInfo = workflow?.nodes?.find(n => n.id === childExec.nodeId);
+                const childNodeInfo = workflow?.spec?.nodes?.find((n: any) => n.id === childExec.nodeId);
                 return {
-                  name: childNodeInfo?.name || childExec.nodeId,
+                  name: childNodeInfo?.name || childExec.nodeId || 'Unknown',
                   completed: getCompletionStatus(childExec)
                 }
               }) : undefined
@@ -528,7 +556,7 @@ export function WorkflowPageV2() {
 
   const getNodeEditData = useCallback(
     (nodeId: string): NodeEditData | null => {
-      const node = workflow?.nodes?.find((n) => n.id === nodeId);
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return null;
 
       // Get configuration fields from metadata based on node type
@@ -568,7 +596,7 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(workflow);
 
       // Update the node's configuration and name in local cache only
-      const updatedNodes = workflow.nodes?.map((node) =>
+      const updatedNodes = workflow?.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
             ...node,
@@ -580,7 +608,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       // Update local cache without triggering API call
@@ -624,7 +655,7 @@ export function WorkflowPageV2() {
               : "TYPE_COMPONENT",
         configuration: filteredConfiguration,
         position: position || {
-          x: (workflow.nodes?.length || 0) * 250,
+          x: (workflow?.spec?.nodes?.length || 0) * 250,
           y: 100,
         },
       };
@@ -639,11 +670,14 @@ export function WorkflowPageV2() {
       }
 
       // Add the new node to the workflow
-      const updatedNodes = [...(workflow.nodes || []), newNode];
+      const updatedNodes = [...(workflow.spec?.nodes || []), newNode];
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       // Update local cache
@@ -668,11 +702,14 @@ export function WorkflowPageV2() {
       };
 
       // Add the new edge to the workflow
-      const updatedEdges = [...(workflow.edges || []), newEdge];
+      const updatedEdges = [...(workflow.spec?.edges || []), newEdge];
 
       const updatedWorkflow = {
         ...workflow,
-        edges: updatedEdges,
+        spec: {
+          ...workflow.spec,
+          edges: updatedEdges,
+        },
       };
 
       // Update local cache
@@ -690,15 +727,18 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(workflow);
 
       // Remove the node from the workflow
-      const updatedNodes = workflow.nodes?.filter((node) => node.id !== nodeId);
+      const updatedNodes = workflow.spec?.nodes?.filter((node) => node.id !== nodeId);
 
       // Remove any edges connected to this node
-      const updatedEdges = workflow.edges?.filter((edge) => edge.sourceId !== nodeId && edge.targetId !== nodeId);
+      const updatedEdges = workflow.spec?.edges?.filter((edge) => edge.sourceId !== nodeId && edge.targetId !== nodeId);
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
-        edges: updatedEdges,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+          edges: updatedEdges,
+        },
       };
 
       // Update local cache
@@ -724,7 +764,7 @@ export function WorkflowPageV2() {
       });
 
       // Remove the edges from the workflow
-      const updatedEdges = workflow.edges?.filter((edge) => {
+      const updatedEdges = workflow.spec?.edges?.filter((edge) => {
         return !edgesToRemove.some(
           (toRemove) =>
             edge.sourceId === toRemove.sourceId &&
@@ -735,7 +775,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        edges: updatedEdges,
+        spec: {
+          ...workflow.spec,
+          edges: updatedEdges,
+        },
       };
 
       // Update local cache
@@ -759,7 +802,7 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(workflow);
 
-      const updatedNodes = workflow.nodes?.map((node) =>
+      const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
             ...node,
@@ -773,7 +816,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
@@ -790,13 +836,13 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(workflow);
 
       // Find the current node to determine its collapsed state
-      const currentNode = workflow.nodes?.find((node) => node.id === nodeId);
+      const currentNode = workflow.spec?.nodes?.find((node) => node.id === nodeId);
       if (!currentNode) return;
 
       // Toggle the collapsed state
       const newIsCollapsed = !currentNode.isCollapsed;
 
-      const updatedNodes = workflow.nodes?.map((node) =>
+      const updatedNodes = workflow.spec?.nodes?.map((node) =>
         node.id === nodeId
           ? {
             ...node,
@@ -807,7 +853,10 @@ export function WorkflowPageV2() {
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
@@ -818,13 +867,13 @@ export function WorkflowPageV2() {
 
   const handleConfigure = useCallback(
     (nodeId: string) => {
-      const node = workflow?.nodes?.find((n) => n.id === nodeId);
+      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return;
       if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id && organizationId && workflow) {
         // Pass workflow info as URL parameters
         const params = new URLSearchParams({
           fromWorkflow: workflowId!,
-          workflowName: workflow.name || "Canvas",
+          workflowName: workflow.metadata?.name || "Canvas",
         });
         navigate(`/${organizationId}/custom-components/${node.blueprint.id}?${params.toString()}`);
       }
@@ -863,7 +912,7 @@ export function WorkflowPageV2() {
     (nodeId: string) => {
       if (!workflow || !organizationId || !workflowId) return;
 
-      const nodeToDuplicate = workflow.nodes?.find((node) => node.id === nodeId);
+      const nodeToDuplicate = workflow.spec?.nodes?.find((node) => node.id === nodeId);
       if (!nodeToDuplicate) return;
 
       saveWorkflowSnapshot(workflow);
@@ -900,11 +949,14 @@ export function WorkflowPageV2() {
       };
 
       // Add the duplicate node to the workflow
-      const updatedNodes = [...(workflow.nodes || []), duplicateNode];
+      const updatedNodes = [...(workflow.spec?.nodes || []), duplicateNode];
 
       const updatedWorkflow = {
         ...workflow,
-        nodes: updatedNodes,
+        spec: {
+          ...workflow.spec,
+          nodes: updatedNodes,
+        },
       };
 
       // Update local cache
@@ -919,7 +971,7 @@ export function WorkflowPageV2() {
       if (!workflow || !organizationId || !workflowId) return;
 
       // Map canvas nodes back to ComponentsNode format with updated positions
-      const updatedNodes = workflow.nodes?.map((node) => {
+      const updatedNodes = workflow.spec?.nodes?.map((node) => {
         const canvasNode = canvasNodes.find((cn) => cn.id === node.id);
         const componentType = (canvasNode?.data?.type as string) || "";
         if (canvasNode) {
@@ -948,10 +1000,10 @@ export function WorkflowPageV2() {
 
       try {
         await updateWorkflowMutation.mutateAsync({
-          name: workflow.name!,
-          description: workflow.description,
+          name: workflow.metadata?.name!,
+          description: workflow.metadata?.description,
           nodes: updatedNodes,
-          edges: workflow.edges,
+          edges: workflow.spec?.edges,
         });
 
         // Update persisted node IDs after successful save
@@ -985,7 +1037,6 @@ export function WorkflowPageV2() {
     blueprintsLoading ||
     componentsLoading ||
     nodeEventsLoading ||
-    nodeDataLoading ||
     executionChainLoading
   ) {
     return (
@@ -1009,12 +1060,13 @@ export function WorkflowPageV2() {
       onNodeExpand={(nodeId) => {
         navigate(`/${organizationId}/workflows/${workflowId}/nodes/${nodeId}`);
       }}
-      title={workflow.name!}
+      title={workflow.metadata?.name!}
       nodes={nodes}
       edges={edges}
       organizationId={organizationId}
       onDirty={() => markUnsavedChange("structural")}
       getSidebarData={getSidebarData}
+      loadSidebarData={loadSidebarData}
       getTabData={getTabData}
       getNodeEditData={getNodeEditData}
       onNodeConfigurationSave={handleNodeConfigurationSave}
@@ -1047,7 +1099,7 @@ export function WorkflowPageV2() {
           href: `/${organizationId}`,
         },
         {
-          label: workflow.name!,
+          label: workflow.metadata?.name!,
         },
       ]}
     />
@@ -1078,47 +1130,6 @@ function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]
   return { eventsMap, isLoading };
 }
 
-function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode[]) {
-  // Fetch last executions for each composite node
-  const executionResults = useQueries({
-    queries: compositeNodes.map((node) => nodeExecutionsQueryOptions(workflowId, node.id!, { limit: 1 })),
-  });
-
-  // Fetch queue items for each composite node
-  const queueItemResults = useQueries({
-    queries: compositeNodes.map((node) => nodeQueueItemsQueryOptions(workflowId, node.id!)),
-  });
-
-  // Check if any queries are still loading
-  const isLoading =
-    executionResults.some((result) => result.isLoading) || queueItemResults.some((result) => result.isLoading);
-
-  // Build maps of nodeId -> data
-  // Memoize to prevent unnecessary re-renders downstream
-  const nodeExecutionsMap = useMemo(() => {
-    const map: Record<string, any> = {};
-    compositeNodes.forEach((node, index) => {
-      const result = executionResults[index];
-      if (result.data?.executions && result.data.executions.length > 0) {
-        map[node.id!] = result.data.executions;
-      }
-    });
-    return map;
-  }, [executionResults, compositeNodes]);
-
-  const nodeQueueItemsMap = useMemo(() => {
-    const map: Record<string, any> = {};
-    compositeNodes.forEach((node, index) => {
-      const result = queueItemResults[index];
-      if (result.data?.items && result.data.items.length > 0) {
-        map[node.id!] = result.data.items;
-      }
-    });
-    return map;
-  }, [queueItemResults, compositeNodes]);
-
-  return { nodeExecutionsMap, nodeQueueItemsMap, isLoading };
-}
 
 function useExecutionChainData(workflowId: string, nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>) {
   // Get all unique root event IDs from executions
@@ -1158,7 +1169,7 @@ function useExecutionChainData(workflowId: string, nodeExecutionsMap: Record<str
 }
 
 function prepareData(
-  data: WorkflowsWorkflow,
+  workflow: WorkflowsWorkflow,
   triggers: TriggersTrigger[],
   blueprints: BlueprintsBlueprint[],
   components: ComponentsComponent[],
@@ -1172,11 +1183,11 @@ function prepareData(
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 } {
-  const edges = data?.edges!.map(prepareEdge);
-  const nodes = data
-    ?.nodes!.map((node) => {
+  const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
+  const nodes = workflow?.spec?.nodes
+    ?.map((node) => {
       return prepareNode(
-        data?.nodes!,
+        workflow?.spec?.nodes!,
         node,
         triggers,
         blueprints,
@@ -1192,7 +1203,7 @@ function prepareData(
     .map((node) => ({
       ...node,
       dragHandle: ".canvas-node-drag-handle",
-    }));
+    })) || [];
 
   return { nodes, edges };
 }
@@ -1297,10 +1308,6 @@ function prepareCompositeNode(
       receivedAt: new Date(execution.createdAt!),
       state: getRunItemState(execution),
       values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-
-      //
-      // TODO: what is ChildEventsInfo.waitingInfos supposed to be???
-      //
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: [],
@@ -2045,6 +2052,7 @@ function prepareSemaphoreNode(
     lastExecution = {
       title: title,
       receivedAt: new Date(execution.createdAt!),
+      completedAt: execution.updatedAt ? new Date(execution.updatedAt) : undefined,
       state: state,
       values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
       duration: duration,

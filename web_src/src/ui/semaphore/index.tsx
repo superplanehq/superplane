@@ -13,6 +13,7 @@ export type SemaphoreState = "success" | "failed" | "running";
 export interface SemaphoreExecutionItem {
   title: string;
   receivedAt?: Date;
+  completedAt?: Date;
   state?: SemaphoreState;
   values?: Record<string, string>;
   duration?: number; // Duration in milliseconds (for finished executions)
@@ -146,6 +147,11 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
     return lastExecution?.duration;
   }, [lastExecution?.state, lastExecution?.duration, liveDuration]);
 
+  // Format timestamp for "Done at"
+  const formatTimestamp = (date: Date): string => {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
   if (collapsed) {
     return (
       <SelectionWrapper selected={selected}>
@@ -250,9 +256,11 @@ export const Semaphore: React.FC<SemaphoreProps> = ({
                     </span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    {displayDuration !== undefined && displayDuration !== null
+                    {lastExecution.state === "running" && displayDuration !== undefined && displayDuration !== null
                       ? `Running for: ${calcRelativeTimeFromDiff(displayDuration)}`
-                      : ""}
+                      : lastExecution.completedAt
+                        ? `Done at: ${formatTimestamp(lastExecution.completedAt)}`
+                        : ""}
                   </span>
                 </div>
               </div>

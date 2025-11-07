@@ -22,6 +22,7 @@ func Test__WorkflowEventRouter_ProcessRootEvent(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{NodeID: node1, Type: models.NodeTypeTrigger},
 			{NodeID: node2, Type: models.NodeTypeComponent},
@@ -63,6 +64,7 @@ func Test__WorkflowEventRouter_ProcessExecutionEvent(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{NodeID: trigger1, Type: models.NodeTypeTrigger},
 			{NodeID: node1, Type: models.NodeTypeComponent},
@@ -132,6 +134,7 @@ func Test__WorkflowEventRouter_CustomComponent_RespectsOutputChannels(t *testing
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: "trigger-1",
@@ -225,6 +228,7 @@ func TestWorkflowEventRouter__CustomComponent_MultipleOutputs(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: "trigger-1",
