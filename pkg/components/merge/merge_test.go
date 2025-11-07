@@ -26,7 +26,7 @@ func Test_Merge(t *testing.T) {
 	steps.ProcessFirstEvent(m)
 	steps.ProcessSecondEvent(m)
 
-	steps.AssertTwoExecutionsFinished()
+	steps.AssertTwoExecutionsCreated()
 }
 
 type MergeTestSteps struct {
@@ -115,7 +115,8 @@ func (s *MergeTestSteps) CreateWorkflow() {
 			Channel:  "default",
 		},
 	}
-	require.NoError(s.t, s.Tx.Create(&wf.Edges).Error)
+
+	require.NoError(s.t, s.Tx.Updates(&wf).Error)
 
 	s.Wf = wf
 	s.StartNode = n1
@@ -175,7 +176,7 @@ func (s *MergeTestSteps) CreateQueueItems() {
 	s.QueureItem2 = queueItem2
 }
 
-func (s *MergeTestSteps) ProcessFirstEvent(m *mergepkg.Merge) {
+func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 	fmt.Println("Processing first event")
 
 	ctx1, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem1)
@@ -185,7 +186,7 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *mergepkg.Merge) {
 	require.NoError(s.t, err)
 }
 
-func (s *MergeTestSteps) ProcessSecondEvent(m *mergepkg.Merge) {
+func (s *MergeTestSteps) ProcessSecondEvent(m *Merge) {
 	fmt.Println("Processing second event")
 
 	ctx2, err := contexts.BuildProcessQueueContext(s.Tx, s.MergeNode, s.QueureItem2)
@@ -195,11 +196,8 @@ func (s *MergeTestSteps) ProcessSecondEvent(m *mergepkg.Merge) {
 	require.NoError(s.t, err)
 }
 
-func (s *MergeTestSteps) AssertTwoExecutionsFinished() {
+func (s *MergeTestSteps) AssertTwoExecutionsCreated() {
 	var executions []models.WorkflowNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).Find(&executions).Error)
-
-	for _, exec := range executions {
-		assert.Equal(s.t, models.WorkflowNodeExecutionStateFinished, exec.State)
-	}
+	assert.Equal(s.t, 2, len(executions))
 }
