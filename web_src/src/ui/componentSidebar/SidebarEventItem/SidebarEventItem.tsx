@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ChildEvents, ChildEventsInfo } from "../../childEvents";
 import { SidebarEvent } from "../types";
 
@@ -33,7 +33,32 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onEventClick,
   tabData,
 }) => {
-  const [activeTab, setActiveTab] = useState<'current' | 'root' | 'payload'>('current');
+  // Determine default active tab based on available data
+  const getDefaultActiveTab = useCallback((): 'current' | 'root' | 'payload' => {
+    if (!tabData) return 'current';
+    if (tabData.current) return 'current';
+    if (tabData.root) return 'root';
+    if (tabData.payload) return 'payload';
+    return 'current';
+  }, [tabData]);
+
+  const [activeTab, setActiveTab] = useState<'current' | 'root' | 'payload'>(getDefaultActiveTab());
+
+  // Update active tab when tabData changes to ensure we always have a valid active tab
+  useEffect(() => {
+    const defaultTab = getDefaultActiveTab();
+    // Only update if current active tab is not available in the new tabData
+    if (tabData) {
+      if (activeTab === 'current' && !tabData.current) {
+        setActiveTab(defaultTab);
+      } else if (activeTab === 'root' && !tabData.root) {
+        setActiveTab(defaultTab);
+      } else if (activeTab === 'payload' && !tabData.payload) {
+        setActiveTab(defaultTab);
+      }
+    }
+  }, [tabData, activeTab, getDefaultActiveTab]);
+
   let EventIcon = resolveIcon("check");
   let EventColor = "text-green-700";
   let EventBackground = "bg-green-200";
@@ -169,8 +194,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
                 {Object.entries(tabData.current).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate">{key}:</span>
-                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate">{String(value)}</span>
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>{key}:</span>
+                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate" title={String(value)}>{String(value)}</span>
                   </div>
                 ))}
               </div>
@@ -180,8 +205,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
                 {Object.entries(tabData.root).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate">{key}:</span>
-                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate">{String(value)}</span>
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>{key}:</span>
+                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate" title={String(value)}>{String(value)}</span>
                   </div>
                 ))}
               </div>
@@ -203,8 +228,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
                 {Object.entries(event.values || {}).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate">{key}:</span>
-                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate">{value}</span>
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate" title={key}>{key}:</span>
+                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate" title={value}>{value}</span>
                   </div>
                 ))}
               </div>

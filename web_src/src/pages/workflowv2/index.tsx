@@ -345,10 +345,10 @@ export function WorkflowPageV2() {
         const eventValues = triggerRenderer.getRootEventValues(triggerEvent);
 
         tabData.current = {
+          ...eventValues,
           'Event ID': triggerEvent.id,
           'Node ID': triggerEvent.nodeId,
-          'Created': triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
-          ...eventValues,
+          'Created At': triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
         };
 
         // Payload tab: raw event data
@@ -379,21 +379,20 @@ export function WorkflowPageV2() {
         const flattened = flattenObject(execution.outputs);
         if (Object.keys(flattened).length > 0) {
           tabData.current = {
-            'Execution ID': execution.id,
-            'State': execution.state.replace("STATE_", "").toLowerCase(),
-            'Result': execution.result.replace("RESULT_", "").toLowerCase(),
-            'Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
             ...flattened,
+            'Execution ID': execution.id,
+            'Execution State': execution.state.replace("STATE_", "").toLowerCase(),
+            'Execution Result': execution.result.replace("RESULT_", "").toLowerCase(),
+            'Execution Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
           };
         }
       } else {
         // Fallback to basic execution data if no outputs
         tabData.current = {
           'Execution ID': execution.id,
-          'State': execution.state,
-          'Result': execution.result,
-          'Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
-          'Updated': execution.updatedAt ? new Date(execution.updatedAt).toLocaleString() : undefined,
+          'Execution State': execution.state,
+          'Execution Result': execution.result,
+          'Execution Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
         };
       }
 
@@ -404,10 +403,10 @@ export function WorkflowPageV2() {
         const rootEventValues = rootTriggerRenderer.getRootEventValues(execution.rootEvent);
 
         tabData.root = {
+          ...rootEventValues,
           'Event ID': execution.rootEvent.id,
           'Node ID': execution.rootEvent.nodeId,
-          'Created': execution.rootEvent.createdAt ? new Date(execution.rootEvent.createdAt).toLocaleString() : undefined,
-          ...rootEventValues,
+          'Created At': execution.rootEvent.createdAt ? new Date(execution.rootEvent.createdAt).toLocaleString() : undefined,
         };
       }
 
