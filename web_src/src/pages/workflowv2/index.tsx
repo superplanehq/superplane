@@ -184,10 +184,12 @@ export function WorkflowPageV2() {
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
 
-  // Initialize store from workflow.status on workflow load
+  // Initialize store from workflow.status on workflow load (only once per workflow)
+  const hasInitializedStoreRef = useRef<string | null>(null);
   useEffect(() => {
-    if (workflow) {
+    if (workflow?.metadata?.id && hasInitializedStoreRef.current !== workflow.metadata.id) {
       initializeFromWorkflow(workflow);
+      hasInitializedStoreRef.current = workflow.metadata.id;
     }
   }, [workflow, initializeFromWorkflow]);
 
