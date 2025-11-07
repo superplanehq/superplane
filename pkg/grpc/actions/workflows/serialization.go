@@ -50,7 +50,17 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		return nil
 	}
 
-	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, []models.WorkflowNodeExecution{})
+	executionIDs := make([]string, len(lastExecutions))
+	for i, execution := range lastExecutions {
+		executionIDs[i] = execution.ID.String()
+	}
+
+	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs)
+	if err != nil {
+		return nil
+	}
+
+	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, childExecutions)
 	if err != nil {
 		return nil
 	}

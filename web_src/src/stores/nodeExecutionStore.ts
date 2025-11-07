@@ -43,14 +43,23 @@ const emptyNodeData: NodeExecutionData = {
   isLoaded: false,
 };
 
-// Helper function to update a child execution within a parent
+/**
+ * Updates a child execution within the array of parent executions.
+ * 
+ * @param executions The array of parent executions.
+ * @param childExecution The child execution to update.
+ * @returns 
+ */
 function updateChildExecution(
   executions: WorkflowsWorkflowNodeExecution[],
   childExecution: WorkflowsWorkflowNodeExecution
 ): WorkflowsWorkflowNodeExecution[] {
   const parentIndex = executions.findIndex(e => e.id === childExecution.parentExecutionId);
 
-  // Parent not found yet - add as top-level temporarily (will be nested when parent arrives)
+  /*
+   * Parent not found yet.
+   * Add as top-level temporarily - will be nested when parent arrives.
+   */
   if (parentIndex < 0) {
     const existingIndex = executions.findIndex(e => e.id === childExecution.id);
     if (existingIndex >= 0) {
@@ -59,7 +68,9 @@ function updateChildExecution(
     return [childExecution, ...executions];
   }
 
-  // Parent found - update child within parent's childExecutions
+  /*
+   * Parent found - update child within parent's childExecutions.
+   */
   const parent = executions[parentIndex];
   const childExecutions = parent.childExecutions || [];
   const childIndex = childExecutions.findIndex(ce => ce.id === childExecution.id);
@@ -73,14 +84,22 @@ function updateChildExecution(
   );
 }
 
-// Helper function to update a parent execution
+/**
+ * Updates a parent execution within the array of parent executions.
+ * 
+ * @param executions The array of parent executions.
+ * @param parentExecution The parent execution to update.
+ * @returns The updated array of parent executions.
+ */
 function updateParentExecution(
   executions: WorkflowsWorkflowNodeExecution[],
   parentExecution: WorkflowsWorkflowNodeExecution
 ): WorkflowsWorkflowNodeExecution[] {
   const existingIndex = executions.findIndex(e => e.id === parentExecution.id);
 
-  // Update existing parent - preserve childExecutions
+  /*
+   * Update existing parent - preserve childExecutions
+   */
   if (existingIndex >= 0) {
     const existing = executions[existingIndex];
     const finalChildExecutions = parentExecution.childExecutions || existing.childExecutions || [];
@@ -91,15 +110,21 @@ function updateParentExecution(
     );
   }
 
-  // New parent - check for orphaned children that belong to it
+  /*
+   * New parent execution arriving.
+   * Check for orphaned children that belong to it
+   */
   const orphanedChildren = executions.filter(e => e.parentExecutionId === parentExecution.id);
-
   if (orphanedChildren.length === 0) {
-    // Ensure childExecutions is always an array, even if empty
-    return [{ ...parentExecution, childExecutions: parentExecution.childExecutions || [] }, ...executions];
+    return [
+      { ...parentExecution, childExecutions: parentExecution.childExecutions || [] },
+      ...executions
+    ];
   }
 
-  // Move orphaned children from top-level into parent
+  /*
+   * Move orphaned children from top-level into parent
+   */
   const withoutOrphans = executions.filter(e => e.parentExecutionId !== parentExecution.id);
   const parentWithChildren = {
     ...parentExecution,
