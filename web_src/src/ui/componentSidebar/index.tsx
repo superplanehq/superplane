@@ -1,20 +1,16 @@
 import { resolveIcon } from "@/lib/utils";
 import { TextAlignStart, X } from "lucide-react";
-import React, { JSX, useCallback, useEffect, useRef, useState } from "react";
-import { ChildEvents, ChildEventsInfo } from "../childEvents";
-import { ChildEventsState } from "../composite";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ChildEventsInfo } from "../childEvents";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
+import { SidebarEventItem } from "./SidebarEventItem";
+import { SidebarEvent } from "./types";
 
-interface SidebarEvent {
-  id: string;
-  title: string;
-  subtitle?: string;
-  state: ChildEventsState;
-  isOpen: boolean;
-  receivedAt?: Date;
-  values?: Record<string, string>;
-  childEventsInfo?: ChildEventsInfo;
+interface TabData {
+  current?: Record<string, any>;
+  root?: Record<string, any>;
+  payload?: any;
 }
 
 interface ComponentSidebarProps {
@@ -50,6 +46,9 @@ interface ComponentSidebarProps {
   onToggleView?: () => void;
   onDelete?: () => void;
   isCompactView?: boolean;
+
+  // Tab data function to get tab data for each event
+  getTabData?: (event: SidebarEvent) => TabData | undefined;
 }
 
 export const ComponentSidebar = ({
@@ -80,6 +79,7 @@ export const ComponentSidebar = ({
   onToggleView,
   onDelete,
   isCompactView = false,
+  getTabData,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
@@ -137,133 +137,13 @@ export const ComponentSidebar = ({
     }
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
-  const createEventItem = (event: SidebarEvent, index: number, variant: 'latest' | 'queue' = 'latest'): JSX.Element => {
-    let EventIcon = resolveIcon("check");
-    let EventColor = "text-green-700";
-    let EventBackground = "bg-green-200";
-    let iconBorderColor = "border-gray-700";
-    let iconSize = 8;
-    let iconContainerSize = 4;
-    let iconStrokeWidth = 3;
-    let animation = "";
-
-    switch (event.state) {
-      case "processed":
-        EventIcon = resolveIcon("check");
-        EventColor = "text-green-700";
-        EventBackground = "bg-green-200";
-        iconBorderColor = "border-green-700";
-        iconSize = 8;
-        break;
-      case "discarded":
-        EventIcon = resolveIcon("x");
-        EventColor = "text-red-700";
-        EventBackground = "bg-red-200";
-        iconBorderColor = "border-red-700";
-        iconSize = 8;
-        break;
-      case "waiting":
-        if (variant === 'queue') {
-          // Match node card styling (neutral grey + dashed icon)
-          EventIcon = resolveIcon("circle-dashed");
-          EventColor = "text-gray-500";
-          EventBackground = "bg-gray-100";
-          iconBorderColor = "";
-          iconSize = 20;
-          iconContainerSize = 5;
-          iconStrokeWidth = 2;
-          animation = "";
-        } else {
-          EventIcon = resolveIcon("refresh-cw");
-          EventColor = "text-blue-700";
-          EventBackground = "bg-blue-100";
-          iconBorderColor = "";
-          iconSize = 17;
-          iconContainerSize = 5;
-          iconStrokeWidth = 2;
-          animation = "animate-spin";
-        }
-        break;
-        break;
-      case "running":
-        EventIcon = resolveIcon("refresh-cw");
-        EventColor = "text-blue-700";
-        EventBackground = "bg-blue-100";
-        iconBorderColor = "";
-        iconSize = 17;
-        iconContainerSize = 5;
-        iconStrokeWidth = 2;
-        animation = "animate-spin";
-        break;
-    }
-
-    const isOpen = openEventIds.has(event.id) || event.isOpen;
-    return (
-      <div
-        key={event.title + index}
-        className={`flex flex-col items-center justify-between gap-1 px-2 py-1.5 rounded-md ${EventBackground} ${EventColor}`}
-      >
-        <div
-          className="flex items-center gap-3 rounded-md w-full min-w-0 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation();
-            // Toggle local expanded state (persist across re-renders)
-            setOpenEventIds(prev => {
-              const next = new Set(prev);
-              if (next.has(event.id)) next.delete(event.id); else next.add(event.id);
-              return next;
-            });
-            onEventClick?.(event);
-          }}
-        >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div
-              className={`w-${iconContainerSize} h-${iconContainerSize} flex-shrink-0 rounded-full flex items-center justify-center border-[1.5px] ${EventColor} ${iconBorderColor} ${animation}`}
-            >
-              <EventIcon size={iconSize} strokeWidth={iconStrokeWidth} className="thick   " />
-            </div>
-            <span className="truncate text-sm text-black font-medium">{event.title}</span>
-          </div>
-          {event.subtitle && (
-            <span className="text-sm text-gray-500 truncate flex-shrink-0 max-w-[40%]">{event.subtitle}</span>
-          )}
-        </div>
-        {isOpen &&
-          ((event.values && Object.entries(event.values).length > 0) ||
-            (event.childEventsInfo && event.childEventsInfo.count > 0)) && (
-            <div className="rounded-sm bg-white border-1 border-gray-200 text-gray-500 w-full">
-              {event.values && Object.entries(event.values).length > 0 && (
-                <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
-                  {Object.entries(event.values || {}).map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                      <span className="text-sm flex-shrink-0 text-right w-[25%]">{key}:</span>
-                      <span className="text-sm flex-1 truncate text-left w-[75%] hover:underline">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {event.childEventsInfo && event.childEventsInfo.count > 0 && (
-                <div
-                  className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${
-                    event.values && Object.entries(event.values).length > 0
-                      ? "border-t-1 border-gray-200"
-                      : " rounded-t-sm"
-                  }`}
-                >
-                  <ChildEvents
-                    childEventsInfo={event.childEventsInfo}
-                    onExpandChildEvents={onExpandChildEvents}
-                    onReRunChildEvents={onReRunChildEvents}
-                    className="font-medium"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-      </div>
-    );
-  };
+  const handleToggleOpen = useCallback((eventId: string) => {
+    setOpenEventIds(prev => {
+      const next = new Set(prev);
+      if (next.has(eventId)) next.delete(eventId); else next.add(eventId);
+      return next;
+    });
+  }, []);
 
   if (!isOpen) return null;
 
@@ -276,15 +156,13 @@ export const ComponentSidebar = ({
       {/* Resize handle */}
       <div
         onMouseDown={handleMouseDown}
-        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${
-          isResizing ? "bg-blue-50" : ""
-        }`}
+        className={`absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-blue-50 transition-colors flex items-center justify-center group ${isResizing ? "bg-blue-50" : ""
+          }`}
         style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${
-            isResizing ? "bg-blue-500" : ""
-          }`}
+          className={`w-1 h-12 rounded-full bg-gray-300 group-hover:bg-blue-500 transition-colors ${isResizing ? "bg-blue-500" : ""
+            }`}
         />
       </div>
       <div className="flex items-center justify-between gap-3 p-3 relative border-b-1 border-gray-200 bg-gray-50">
@@ -335,7 +213,20 @@ export const ComponentSidebar = ({
           ) : (
             <>
               {latestEvents.slice(0, 5).map((event, index) => {
-                return createEventItem(event, index, 'latest');
+                return (
+                  <SidebarEventItem
+                    key={event.id}
+                    event={event}
+                    index={index}
+                    variant="latest"
+                    isOpen={openEventIds.has(event.id) || event.isOpen}
+                    onToggleOpen={handleToggleOpen}
+                    onExpandChildEvents={onExpandChildEvents}
+                    onReRunChildEvents={onReRunChildEvents}
+                    onEventClick={onEventClick}
+                    tabData={getTabData?.(event)}
+                  />
+                );
               })}
               {moreInQueueCount > 0 && (
                 <button
@@ -359,7 +250,20 @@ export const ComponentSidebar = ({
             ) : (
               <>
                 {nextInQueueEvents.slice(0, 5).map((event, index) => {
-                  return createEventItem(event, index, 'queue');
+                  return (
+                    <SidebarEventItem
+                      key={event.id}
+                      event={event}
+                      index={index}
+                      variant="queue"
+                      isOpen={openEventIds.has(event.id) || event.isOpen}
+                      onToggleOpen={handleToggleOpen}
+                      onExpandChildEvents={onExpandChildEvents}
+                      onReRunChildEvents={onReRunChildEvents}
+                      onEventClick={onEventClick}
+                      tabData={getTabData?.(event)}
+                    />
+                  );
                 })}
                 {moreInQueueCount > 0 && (
                   <button

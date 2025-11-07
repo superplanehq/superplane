@@ -40,12 +40,15 @@ import {
   NewNodeData,
   NodeEditData,
   SidebarData,
+  SidebarEvent,
+  TabData,
 } from "@/ui/CanvasPage";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { formatTimeAgo } from "@/utils/date";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { flattenObject } from "@/lib/utils";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
 
@@ -323,6 +326,112 @@ export function WorkflowPageV2() {
       );
     },
     [workflow, blueprints, components, triggers, nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap],
+  );
+
+  const getTabData = useCallback(
+    (nodeId: string, event: SidebarEvent): TabData | undefined => {
+      const node = workflow?.nodes?.find((n) => n.id === nodeId);
+      if (!node) return undefined;
+
+      if (node.type === "TYPE_TRIGGER") {
+        const events = nodeEventsMap[nodeId] || [];
+        const triggerEvent = events.find((evt) => evt.id === event.id);
+
+        if (!triggerEvent) return undefined;
+
+        const tabData: TabData = {};
+        const triggerRenderer = getTriggerRenderer(node.trigger?.name || "");
+
+        const eventValues = triggerRenderer.getRootEventValues(triggerEvent);
+
+        tabData.current = {
+          ...eventValues,
+          'Event ID': triggerEvent.id,
+          'Node ID': triggerEvent.nodeId,
+          'Created At': triggerEvent.createdAt ? new Date(triggerEvent.createdAt).toLocaleString() : undefined,
+        };
+
+        // Payload tab: raw event data
+        const payload: Record<string, unknown> = {};
+
+        if (triggerEvent.data) {
+          payload.data = triggerEvent.data;
+        }
+
+        if (Object.keys(payload).length > 0) {
+          tabData.payload = payload;
+        }
+
+        return Object.keys(tabData).length > 0 ? tabData : undefined;
+      }
+
+      // Handle other components (non-triggers) - get execution for this event
+      const executions = nodeExecutionsMap[nodeId] || [];
+      const execution = executions.find((exec: WorkflowsWorkflowNodeExecution) => exec.id === event.id);
+
+      if (!execution) return undefined;
+
+      // Extract tab data from execution
+      const tabData: TabData = {};
+
+      // Current tab: flatten execution outputs for easy viewing
+      if (execution.outputs) {
+        const flattened = flattenObject(execution.outputs);
+        if (Object.keys(flattened).length > 0) {
+          tabData.current = {
+            ...flattened,
+            'Execution ID': execution.id,
+            'Execution State': execution.state.replace("STATE_", "").toLowerCase(),
+            'Execution Result': execution.result.replace("RESULT_", "").toLowerCase(),
+            'Execution Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
+          };
+        }
+      } else {
+        // Fallback to basic execution data if no outputs
+        tabData.current = {
+          'Execution ID': execution.id,
+          'Execution State': execution.state,
+          'Execution Result': execution.result,
+          'Execution Started': execution.createdAt ? new Date(execution.createdAt).toLocaleString() : undefined,
+        };
+      }
+
+      // Root tab: root event data
+      if (execution.rootEvent) {
+        const rootTriggerNode = workflow?.nodes?.find((n) => n.id === execution.rootEvent?.nodeId);
+        const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
+        const rootEventValues = rootTriggerRenderer.getRootEventValues(execution.rootEvent);
+
+        tabData.root = {
+          ...rootEventValues,
+          'Event ID': execution.rootEvent.id,
+          'Node ID': execution.rootEvent.nodeId,
+          'Created At': execution.rootEvent.createdAt ? new Date(execution.rootEvent.createdAt).toLocaleString() : undefined,
+        };
+      }
+
+      // Payload tab: execution inputs and outputs (raw data)
+      const payload: Record<string, unknown> = {};
+
+      if (execution.inputs) {
+        payload.inputs = execution.inputs;
+      }
+
+      if (execution.outputs) {
+        payload.outputs = execution.outputs;
+      }
+
+      if (execution.metadata) {
+        payload.metadata = execution.metadata;
+      }
+
+      if (Object.keys(payload).length > 0) {
+        tabData.payload = payload;
+      }
+
+      return Object.keys(tabData).length > 0 ? tabData : undefined;
+    },
+    [workflow, nodeExecutionsMap, nodeEventsMap],
   );
 
   const getNodeEditData = useCallback(
@@ -813,6 +922,7 @@ export function WorkflowPageV2() {
       organizationId={organizationId}
       onDirty={() => markUnsavedChange("structural")}
       getSidebarData={getSidebarData}
+      getTabData={getTabData}
       getNodeEditData={getNodeEditData}
       onNodeConfigurationSave={handleNodeConfigurationSave}
       onSave={handleSave}

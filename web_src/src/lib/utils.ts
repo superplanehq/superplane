@@ -51,3 +51,72 @@ export function splitBySpaces(input: string): string[] {
   const matches = input.match(regex);
   return matches || [];
 }
+
+/**
+ * Flattens a nested object structure by extracting values from arrays and nested objects.
+ * This is particularly useful for extracting data from complex API responses.
+ *
+ * @param obj - The object to flatten
+ * @param maxDepth - Maximum recursion depth to prevent infinite loops (default: 5)
+ * @returns A flattened object with primitive values
+ */
+export function flattenObject(obj: any, maxDepth: number = 5): Record<string, any> {
+  if (maxDepth <= 0 || obj === null || obj === undefined) {
+    return {};
+  }
+
+  function flatten(current: any, depth: number): Record<string, any> {
+    if (depth <= 0 || current === null || current === undefined) {
+      return {};
+    }
+
+    const flatResult: Record<string, any> = {};
+
+    if (Array.isArray(current)) {
+      // For arrays, flatten each element and merge results
+      current.forEach((item, index) => {
+        if (typeof item === 'object' && item !== null) {
+          const flattened = flatten(item, depth - 1);
+          Object.assign(flatResult, flattened);
+        } else if (item !== null && item !== undefined) {
+          flatResult[`item_${index}`] = item;
+        }
+      });
+    } else if (typeof current === 'object') {
+      // For objects, recursively flatten
+      for (const [key, value] of Object.entries(current)) {
+        if (value === null || value === undefined) {
+          continue;
+        }
+
+        if (typeof value === 'object') {
+          if (Array.isArray(value)) {
+            // Handle arrays
+            value.forEach((item, index) => {
+              if (typeof item === 'object' && item !== null) {
+                const flattened = flatten(item, depth - 1);
+                Object.assign(flatResult, flattened);
+              } else if (item !== null && item !== undefined) {
+                flatResult[`${key}_${index}`] = item;
+              }
+            });
+          } else {
+            // Handle nested objects
+            const flattened = flatten(value, depth - 1);
+            Object.assign(flatResult, flattened);
+          }
+        } else {
+          // Handle primitive values
+          flatResult[key] = value;
+        }
+      }
+    } else {
+      // Handle primitive values at root level
+      return { value: current };
+    }
+
+    return flatResult;
+  }
+
+  return flatten(obj, maxDepth);
+}
