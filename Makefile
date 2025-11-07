@@ -70,6 +70,9 @@ dev.start:
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm app /bin/bash
 
+check.db.structure:
+	bash ./scripts/verify_db_structure_clean.sh
+
 check.build.ui:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app bash -c "cd web_src && npm run build"
 

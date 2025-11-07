@@ -568,6 +568,19 @@ CREATE TABLE public.workflow_events (
 
 
 --
+-- Name: workflow_node_execution_kvs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_node_execution_kvs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    execution_id uuid NOT NULL,
+    key text NOT NULL,
+    value text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: workflow_node_executions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1027,6 +1040,14 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
+-- Name: workflow_node_execution_kvs workflow_node_execution_kvs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_kvs
+    ADD CONSTRAINT workflow_node_execution_kvs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_node_requests workflow_node_execution_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1121,13 +1142,6 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 --
 
 CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
-
-
---
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1261,6 +1275,13 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 --
 
 CREATE INDEX idx_workflow_events_workflow_node_id ON public.workflow_events USING btree (workflow_id, node_id);
+
+
+--
+-- Name: idx_workflow_node_execution_kvs_ekv; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_execution_kvs_ekv ON public.workflow_node_execution_kvs USING btree (execution_id, key, value);
 
 
 --
@@ -1529,6 +1550,14 @@ ALTER TABLE ONLY public.webhooks
 
 ALTER TABLE ONLY public.workflow_events
     ADD CONSTRAINT workflow_events_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_node_execution_kvs workflow_node_execution_kvs_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_execution_kvs
+    ADD CONSTRAINT workflow_node_execution_kvs_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
 
 
 --

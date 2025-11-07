@@ -1,4 +1,3 @@
--- superseded by 20251107100000 rename migration; kept for history
 CREATE TABLE IF NOT EXISTS workflow_node_execution_kvs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
