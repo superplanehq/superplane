@@ -104,7 +104,7 @@ func (w *WebhookProvisioner) processWebhook(tx *gorm.DB, webhook *models.Webhook
 
 	webhookMetadata, err := resourceManager.SetupWebhook(integrations.WebhookOptions{
 		Resource:      resource,
-		Configuration: webhook.Configuration,
+		Configuration: webhook.Configuration.Data(),
 		URL:           fmt.Sprintf("%s/api/v1/webhooks/%s", w.baseURL, webhook.ID.String()),
 		Secret:        secret,
 	})
