@@ -1,7 +1,13 @@
 import { resolveIcon } from "@/lib/utils";
-import React from "react";
+import React, { useState } from "react";
 import { ChildEvents, ChildEventsInfo } from "../../childEvents";
 import { SidebarEvent } from "../types";
+
+interface TabData {
+  current?: Record<string, any>;
+  root?: Record<string, any>;
+  payload?: any;
+}
 
 interface SidebarEventItemProps {
   event: SidebarEvent;
@@ -12,6 +18,7 @@ interface SidebarEventItemProps {
   onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
   onEventClick?: (event: SidebarEvent) => void;
+  tabData?: TabData;
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -23,7 +30,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onExpandChildEvents,
   onReRunChildEvents,
   onEventClick,
+  tabData,
 }) => {
+  const [activeTab, setActiveTab] = useState<'current' | 'root' | 'payload'>('current');
   let EventIcon = resolveIcon("check");
   let EventColor = "text-green-700";
   let EventBackground = "bg-green-200";
@@ -109,26 +118,105 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       </div>
       {isOpen &&
         ((event.values && Object.entries(event.values).length > 0) ||
-          (event.childEventsInfo && event.childEventsInfo.count > 0)) && (
-          <div className="rounded-sm bg-white border-1 border-gray-200 text-gray-500 w-full">
-            {event.values && Object.entries(event.values).length > 0 && (
+          (event.childEventsInfo && event.childEventsInfo.count > 0) ||
+          tabData) && (
+          <div className="rounded-sm bg-white border-1 border-gray-800 text-gray-500 w-full">
+            {/* Tab Navigation */}
+            {tabData && (
+              <div className="flex justify-between items-center border-b-1 border-gray-200">
+                <div className="flex">
+                  {tabData.current && (
+                    <button
+                      onClick={() => setActiveTab('current')}
+                      className={`px-5 py-1 text-sm font-medium ${activeTab === 'current'
+                        ? 'text-black border-b-1 border-black'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        }`}
+                    >
+                      Current
+                    </button>
+                  )}
+                  {tabData.root && (
+                    <button
+                      onClick={() => setActiveTab('root')}
+                      className={`px-5 py-1 text-sm font-medium ${activeTab === 'root'
+                        ? 'text-black border-b-1 border-black'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        }`}
+                    >
+                      Root
+                    </button>
+                  )}
+                </div>
+                {tabData.payload && (
+                  <button
+                    onClick={() => setActiveTab('payload')}
+                    className={`px-3 py-1 text-sm font-medium flex items-center gap-1 ${activeTab === 'payload'
+                      ? 'text-black border-b-1 border-black bg-gray-100'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200'
+                      }`}
+                  >
+                    {React.createElement(resolveIcon("code"), { size: 14 })}
+                    Payload
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Tab Content */}
+            {tabData && activeTab === 'current' && tabData.current && (
               <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
-                {Object.entries(event.values || {}).map(([key, value]) => (
+                {Object.entries(tabData.current).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                    <span className="text-sm flex-shrink-0 text-right w-[25%]">{key}:</span>
-                    <span className="text-sm flex-1 truncate text-left w-[75%] hover:underline">{value}</span>
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate">{key}:</span>
+                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate">{String(value)}</span>
                   </div>
                 ))}
               </div>
             )}
 
+            {tabData && activeTab === 'root' && tabData.root && (
+              <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
+                {Object.entries(tabData.root).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate">{key}:</span>
+                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {tabData && activeTab === 'payload' && tabData.payload && (
+              <div className="w-full px-2 py-2">
+                <pre className="text-xs bg-gray-50 p-2 rounded border overflow-x-auto">
+                  {typeof tabData.payload === 'string'
+                    ? tabData.payload
+                    : JSON.stringify(tabData.payload, null, 2)
+                  }
+                </pre>
+              </div>
+            )}
+
+            {/* Fallback to original values display if no tabData */}
+            {!tabData && event.values && Object.entries(event.values).length > 0 && (
+              <div className="w-full flex flex-col gap-1 items-center justify-between mt-1 px-2 py-2">
+                {Object.entries(event.values || {}).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                    <span className="text-sm flex-shrink-0 text-right w-[30%] truncate">{key}:</span>
+                    <span className="text-sm flex-1 truncate text-left w-[70%] hover:underline text-gray-800 truncate">{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Child Events */}
             {event.childEventsInfo && event.childEventsInfo.count > 0 && (
               <div
-                className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${
-                  event.values && Object.entries(event.values).length > 0
-                    ? "border-t-1 border-gray-200"
-                    : " rounded-t-sm"
-                }`}
+                className={`w-full bg-gray-100 rounded-b-sm px-4 py-3 ${((tabData && (tabData.current || tabData.root || tabData.payload)) ||
+                  (!tabData && event.values && Object.entries(event.values).length > 0))
+                  ? "border-t-1 border-gray-200"
+                  : " rounded-t-sm"
+                  }`}
               >
                 <ChildEvents
                   childEventsInfo={event.childEventsInfo}

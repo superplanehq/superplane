@@ -7,6 +7,12 @@ import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
 import { SidebarEvent } from "./types";
 
+interface TabData {
+  current?: Record<string, any>;
+  root?: Record<string, any>;
+  payload?: any;
+}
+
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;
@@ -40,6 +46,9 @@ interface ComponentSidebarProps {
   onToggleView?: () => void;
   onDelete?: () => void;
   isCompactView?: boolean;
+
+  // Tab data function to get tab data for each event
+  getTabData?: (event: SidebarEvent) => TabData | undefined;
 }
 
 export const ComponentSidebar = ({
@@ -70,6 +79,7 @@ export const ComponentSidebar = ({
   onToggleView,
   onDelete,
   isCompactView = false,
+  getTabData,
 }: ComponentSidebarProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
@@ -214,6 +224,7 @@ export const ComponentSidebar = ({
                     onExpandChildEvents={onExpandChildEvents}
                     onReRunChildEvents={onReRunChildEvents}
                     onEventClick={onEventClick}
+                    tabData={getTabData?.(event)}
                   />
                 );
               })}
@@ -250,6 +261,7 @@ export const ComponentSidebar = ({
                       onExpandChildEvents={onExpandChildEvents}
                       onReRunChildEvents={onReRunChildEvents}
                       onEventClick={onEventClick}
+                      tabData={getTabData?.(event)}
                     />
                   );
                 })}
