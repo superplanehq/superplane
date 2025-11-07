@@ -200,7 +200,7 @@ type ProcessQueueContext struct {
 	Input       any
 
 	// CreateExecution creates a pending execution for this queue item.
-	CreateExecution func() error
+	CreateExecution func() (uuid.UUID, error)
 
 	// DequeueItem marks the queue item as processed.
 	DequeueItem func() error

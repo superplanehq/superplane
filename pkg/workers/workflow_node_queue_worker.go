@@ -8,12 +8,10 @@ import (
 	"time"
 
 	"golang.org/x/sync/semaphore"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -85,7 +83,7 @@ func (w *WorkflowNodeQueueWorker) processNode(tx *gorm.DB, node *models.Workflow
 		return err
 	}
 
-	ctx, err := w.buildProcessQueueContext(tx, node, queueItem)
+	ctx, err := contexts.BuildProcessQueueContext(tx, node, queueItem)
 	if err != nil {
 		return err
 	}
@@ -121,95 +119,6 @@ func (w *WorkflowNodeQueueWorker) processComponentNode(ctx *components.ProcessQu
 	}
 
 	return comp.ProcessQueueItem(*ctx)
-}
-
-func (w *WorkflowNodeQueueWorker) findEvent(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem) (*models.WorkflowEvent, error) {
-	event, err := models.FindWorkflowEventInTransaction(tx, queueItem.EventID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find event %s: %w", queueItem.EventID, err)
-	}
-
-	return event, nil
-}
-
-func (w *WorkflowNodeQueueWorker) buildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem *models.WorkflowNodeQueueItem) (*components.ProcessQueueContext, error) {
-	event, err := w.findEvent(tx, queueItem)
-	if err != nil {
-		return nil, err
-	}
-
-	config, err := w.buildNodeConfig(tx, queueItem, node, event)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx := &components.ProcessQueueContext{
-		WorkflowID:    node.WorkflowID.String(),
-		NodeID:        node.NodeID,
-		Configuration: config,
-		RootEventID:   queueItem.RootEventID.String(),
-		EventID:       event.ID.String(),
-		Input:         event.Data.Data(),
-	}
-
-	ctx.CreateExecution = func() error {
-		now := time.Now()
-
-		execution := models.WorkflowNodeExecution{
-			WorkflowID:          queueItem.WorkflowID,
-			NodeID:              node.NodeID,
-			RootEventID:         queueItem.RootEventID,
-			EventID:             event.ID,
-			PreviousExecutionID: event.ExecutionID,
-			State:               models.WorkflowNodeExecutionStatePending,
-			Configuration:       datatypes.NewJSONType(config),
-			CreatedAt:           &now,
-			UpdatedAt:           &now,
-		}
-
-		err := tx.Create(&execution).Error
-		if err != nil {
-			return err
-		}
-
-		messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).PublishWithDelay(1 * time.Second)
-		return nil
-	}
-
-	ctx.DequeueItem = func() error {
-		return queueItem.Delete(tx)
-	}
-
-	ctx.UpdateNodeState = func(state string) error {
-		return node.UpdateState(tx, state)
-	}
-
-	ctx.DefaultProcessing = func() error {
-		var err error
-
-		err = ctx.CreateExecution()
-		if err != nil {
-			return err
-		}
-
-		err = ctx.DequeueItem()
-		if err != nil {
-			return err
-		}
-
-		return ctx.UpdateNodeState(models.WorkflowNodeStateProcessing)
-	}
-
-	return ctx, nil
-}
-
-func (w *WorkflowNodeQueueWorker) buildNodeConfig(tx *gorm.DB, queueItem *models.WorkflowNodeQueueItem, node *models.WorkflowNode, event *models.WorkflowEvent) (map[string]any, error) {
-	return contexts.
-		NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
-		WithRootEvent(&queueItem.RootEventID).
-		WithPreviousExecution(event.ExecutionID).
-		WithInput(event.Data.Data()).
-		Build(node.Configuration.Data())
 }
 
 func (w *WorkflowNodeQueueWorker) log(format string, v ...any) {
