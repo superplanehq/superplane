@@ -131,11 +131,16 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 	}
 
 	ctx.FindExecutionIDByKV = func(key string, value string) (uuid.UUID, bool, error) {
-		return uuid.Nil, false, nil
+		exec, err := models.FindNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
+		if err != nil {
+			return uuid.Nil, false, err
+		}
+
+		return exec.ID, true, nil
 	}
 
 	ctx.SetExecutionKV = func(execID uuid.UUID, key string, value string) error {
-		return models.CreateWorkflowNodeExecutionKVInTransaction(tx, execID, key, value)
+		return models.CreateWorkflowNodeExecutionKVInTransaction(tx, node.WorkflowID, node.NodeID, execID, key, value)
 	}
 
 	return ctx, nil
