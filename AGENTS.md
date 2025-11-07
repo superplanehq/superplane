@@ -14,7 +14,8 @@
 - Setup dev environment: `make dev.setup`
 - Run server: `make dev.start` - UI at http://localhost:8000
 - One-shot backend tests: `make test` (Golang).
-- Targeted backend tests: `make test TEST_PACKAGES=./pkg/workers`
+- Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
+- Targeted E2E tests: `make e2e E2E_TEST_PACKAGES=./test/e2e/workflows`
 - After updating UI code, always run `make check.build.ui` to verify everything is correct
 - After updating GoLang code, always check it with `make lint && make check.build.app`
 - To generate DB migrations, use `make db.migration.create NAME=<name>`. Always use dashes instead of underscores in the name. We do not write migrations to rollback, so leave the `*.down.sql` files empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>`, where DB_NAME can be `superplane_dev` or `superplane_test`

@@ -219,16 +219,23 @@ message UserRef {
 }
 
 message Workflow {
-  string id = 1;
-  string organization_id = 2;
-  string name = 3;
-  string description = 4;
-  google.protobuf.Timestamp created_at = 5;
-  google.protobuf.Timestamp updated_at = 6;
-  repeated Components.Node nodes = 7;
-  repeated Components.Edge edges = 8;
-  // Creator reference
-  UserRef created_by = 9;
+  message Metadata {
+    string id = 1;
+    string organization_id = 2;
+    string name = 3;
+    string description = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+    UserRef created_by = 7;
+  }
+
+  message Spec {
+    repeated Components.Node nodes = 1;
+    repeated Components.Edge edges = 2;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
 }
 
 message ListNodeEventsRequest {

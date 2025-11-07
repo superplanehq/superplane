@@ -22,6 +22,7 @@ func Test__WorkflowNodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
@@ -117,6 +118,7 @@ func Test__WorkflowNodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
@@ -188,6 +190,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,
@@ -260,6 +263,7 @@ func Test__WorkflowNodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
 	workflow, _ := support.CreateWorkflow(
 		t,
 		r.Organization.ID,
+		r.User,
 		[]models.WorkflowNode{
 			{
 				NodeID: triggerNode,

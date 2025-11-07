@@ -13,7 +13,6 @@ package openapi_client
 
 import (
 	"encoding/json"
-	"time"
 )
 
 // checks if the WorkflowsWorkflow type satisfies the MappedNullable interface at compile time
@@ -21,15 +20,8 @@ var _ MappedNullable = &WorkflowsWorkflow{}
 
 // WorkflowsWorkflow struct for WorkflowsWorkflow
 type WorkflowsWorkflow struct {
-	Id *string `json:"id,omitempty"`
-	OrganizationId *string `json:"organizationId,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Description *string `json:"description,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-	Nodes []ComponentsNode `json:"nodes,omitempty"`
-	Edges []ComponentsEdge `json:"edges,omitempty"`
-	CreatedBy *SuperplaneWorkflowsUserRef `json:"createdBy,omitempty"`
+	Metadata *WorkflowsWorkflowMetadata `json:"metadata,omitempty"`
+	Spec *WorkflowsWorkflowSpec `json:"spec,omitempty"`
 }
 
 // NewWorkflowsWorkflow instantiates a new WorkflowsWorkflow object
@@ -49,292 +41,68 @@ func NewWorkflowsWorkflowWithDefaults() *WorkflowsWorkflow {
 	return &this
 }
 
-// GetId returns the Id field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetId() string {
-	if o == nil || IsNil(o.Id) {
-		var ret string
+// GetMetadata returns the Metadata field value if set, zero value otherwise.
+func (o *WorkflowsWorkflow) GetMetadata() WorkflowsWorkflowMetadata {
+	if o == nil || IsNil(o.Metadata) {
+		var ret WorkflowsWorkflowMetadata
 		return ret
 	}
-	return *o.Id
+	return *o.Metadata
 }
 
-// GetIdOk returns a tuple with the Id field value if set, nil otherwise
+// GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetIdOk() (*string, bool) {
-	if o == nil || IsNil(o.Id) {
+func (o *WorkflowsWorkflow) GetMetadataOk() (*WorkflowsWorkflowMetadata, bool) {
+	if o == nil || IsNil(o.Metadata) {
 		return nil, false
 	}
-	return o.Id, true
+	return o.Metadata, true
 }
 
-// HasId returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasId() bool {
-	if o != nil && !IsNil(o.Id) {
+// HasMetadata returns a boolean if a field has been set.
+func (o *WorkflowsWorkflow) HasMetadata() bool {
+	if o != nil && !IsNil(o.Metadata) {
 		return true
 	}
 
 	return false
 }
 
-// SetId gets a reference to the given string and assigns it to the Id field.
-func (o *WorkflowsWorkflow) SetId(v string) {
-	o.Id = &v
+// SetMetadata gets a reference to the given WorkflowsWorkflowMetadata and assigns it to the Metadata field.
+func (o *WorkflowsWorkflow) SetMetadata(v WorkflowsWorkflowMetadata) {
+	o.Metadata = &v
 }
 
-// GetOrganizationId returns the OrganizationId field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetOrganizationId() string {
-	if o == nil || IsNil(o.OrganizationId) {
-		var ret string
+// GetSpec returns the Spec field value if set, zero value otherwise.
+func (o *WorkflowsWorkflow) GetSpec() WorkflowsWorkflowSpec {
+	if o == nil || IsNil(o.Spec) {
+		var ret WorkflowsWorkflowSpec
 		return ret
 	}
-	return *o.OrganizationId
+	return *o.Spec
 }
 
-// GetOrganizationIdOk returns a tuple with the OrganizationId field value if set, nil otherwise
+// GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetOrganizationIdOk() (*string, bool) {
-	if o == nil || IsNil(o.OrganizationId) {
+func (o *WorkflowsWorkflow) GetSpecOk() (*WorkflowsWorkflowSpec, bool) {
+	if o == nil || IsNil(o.Spec) {
 		return nil, false
 	}
-	return o.OrganizationId, true
+	return o.Spec, true
 }
 
-// HasOrganizationId returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasOrganizationId() bool {
-	if o != nil && !IsNil(o.OrganizationId) {
+// HasSpec returns a boolean if a field has been set.
+func (o *WorkflowsWorkflow) HasSpec() bool {
+	if o != nil && !IsNil(o.Spec) {
 		return true
 	}
 
 	return false
 }
 
-// SetOrganizationId gets a reference to the given string and assigns it to the OrganizationId field.
-func (o *WorkflowsWorkflow) SetOrganizationId(v string) {
-	o.OrganizationId = &v
-}
-
-// GetName returns the Name field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetName() string {
-	if o == nil || IsNil(o.Name) {
-		var ret string
-		return ret
-	}
-	return *o.Name
-}
-
-// GetNameOk returns a tuple with the Name field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetNameOk() (*string, bool) {
-	if o == nil || IsNil(o.Name) {
-		return nil, false
-	}
-	return o.Name, true
-}
-
-// HasName returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasName() bool {
-	if o != nil && !IsNil(o.Name) {
-		return true
-	}
-
-	return false
-}
-
-// SetName gets a reference to the given string and assigns it to the Name field.
-func (o *WorkflowsWorkflow) SetName(v string) {
-	o.Name = &v
-}
-
-// GetDescription returns the Description field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetDescription() string {
-	if o == nil || IsNil(o.Description) {
-		var ret string
-		return ret
-	}
-	return *o.Description
-}
-
-// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetDescriptionOk() (*string, bool) {
-	if o == nil || IsNil(o.Description) {
-		return nil, false
-	}
-	return o.Description, true
-}
-
-// HasDescription returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasDescription() bool {
-	if o != nil && !IsNil(o.Description) {
-		return true
-	}
-
-	return false
-}
-
-// SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *WorkflowsWorkflow) SetDescription(v string) {
-	o.Description = &v
-}
-
-// GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetCreatedAt() time.Time {
-	if o == nil || IsNil(o.CreatedAt) {
-		var ret time.Time
-		return ret
-	}
-	return *o.CreatedAt
-}
-
-// GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetCreatedAtOk() (*time.Time, bool) {
-	if o == nil || IsNil(o.CreatedAt) {
-		return nil, false
-	}
-	return o.CreatedAt, true
-}
-
-// HasCreatedAt returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasCreatedAt() bool {
-	if o != nil && !IsNil(o.CreatedAt) {
-		return true
-	}
-
-	return false
-}
-
-// SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
-func (o *WorkflowsWorkflow) SetCreatedAt(v time.Time) {
-	o.CreatedAt = &v
-}
-
-// GetUpdatedAt returns the UpdatedAt field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetUpdatedAt() time.Time {
-	if o == nil || IsNil(o.UpdatedAt) {
-		var ret time.Time
-		return ret
-	}
-	return *o.UpdatedAt
-}
-
-// GetUpdatedAtOk returns a tuple with the UpdatedAt field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetUpdatedAtOk() (*time.Time, bool) {
-	if o == nil || IsNil(o.UpdatedAt) {
-		return nil, false
-	}
-	return o.UpdatedAt, true
-}
-
-// HasUpdatedAt returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasUpdatedAt() bool {
-	if o != nil && !IsNil(o.UpdatedAt) {
-		return true
-	}
-
-	return false
-}
-
-// SetUpdatedAt gets a reference to the given time.Time and assigns it to the UpdatedAt field.
-func (o *WorkflowsWorkflow) SetUpdatedAt(v time.Time) {
-	o.UpdatedAt = &v
-}
-
-// GetNodes returns the Nodes field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetNodes() []ComponentsNode {
-	if o == nil || IsNil(o.Nodes) {
-		var ret []ComponentsNode
-		return ret
-	}
-	return o.Nodes
-}
-
-// GetNodesOk returns a tuple with the Nodes field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetNodesOk() ([]ComponentsNode, bool) {
-	if o == nil || IsNil(o.Nodes) {
-		return nil, false
-	}
-	return o.Nodes, true
-}
-
-// HasNodes returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasNodes() bool {
-	if o != nil && !IsNil(o.Nodes) {
-		return true
-	}
-
-	return false
-}
-
-// SetNodes gets a reference to the given []ComponentsNode and assigns it to the Nodes field.
-func (o *WorkflowsWorkflow) SetNodes(v []ComponentsNode) {
-	o.Nodes = v
-}
-
-// GetEdges returns the Edges field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetEdges() []ComponentsEdge {
-	if o == nil || IsNil(o.Edges) {
-		var ret []ComponentsEdge
-		return ret
-	}
-	return o.Edges
-}
-
-// GetEdgesOk returns a tuple with the Edges field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetEdgesOk() ([]ComponentsEdge, bool) {
-	if o == nil || IsNil(o.Edges) {
-		return nil, false
-	}
-	return o.Edges, true
-}
-
-// HasEdges returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasEdges() bool {
-	if o != nil && !IsNil(o.Edges) {
-		return true
-	}
-
-	return false
-}
-
-// SetEdges gets a reference to the given []ComponentsEdge and assigns it to the Edges field.
-func (o *WorkflowsWorkflow) SetEdges(v []ComponentsEdge) {
-	o.Edges = v
-}
-
-// GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
-func (o *WorkflowsWorkflow) GetCreatedBy() SuperplaneWorkflowsUserRef {
-	if o == nil || IsNil(o.CreatedBy) {
-		var ret SuperplaneWorkflowsUserRef
-		return ret
-	}
-	return *o.CreatedBy
-}
-
-// GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *WorkflowsWorkflow) GetCreatedByOk() (*SuperplaneWorkflowsUserRef, bool) {
-	if o == nil || IsNil(o.CreatedBy) {
-		return nil, false
-	}
-	return o.CreatedBy, true
-}
-
-// HasCreatedBy returns a boolean if a field has been set.
-func (o *WorkflowsWorkflow) HasCreatedBy() bool {
-	if o != nil && !IsNil(o.CreatedBy) {
-		return true
-	}
-
-	return false
-}
-
-// SetCreatedBy gets a reference to the given SuperplaneWorkflowsUserRef and assigns it to the CreatedBy field.
-func (o *WorkflowsWorkflow) SetCreatedBy(v SuperplaneWorkflowsUserRef) {
-	o.CreatedBy = &v
+// SetSpec gets a reference to the given WorkflowsWorkflowSpec and assigns it to the Spec field.
+func (o *WorkflowsWorkflow) SetSpec(v WorkflowsWorkflowSpec) {
+	o.Spec = &v
 }
 
 func (o WorkflowsWorkflow) MarshalJSON() ([]byte, error) {
@@ -347,32 +115,11 @@ func (o WorkflowsWorkflow) MarshalJSON() ([]byte, error) {
 
 func (o WorkflowsWorkflow) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Id) {
-		toSerialize["id"] = o.Id
+	if !IsNil(o.Metadata) {
+		toSerialize["metadata"] = o.Metadata
 	}
-	if !IsNil(o.OrganizationId) {
-		toSerialize["organizationId"] = o.OrganizationId
-	}
-	if !IsNil(o.Name) {
-		toSerialize["name"] = o.Name
-	}
-	if !IsNil(o.Description) {
-		toSerialize["description"] = o.Description
-	}
-	if !IsNil(o.CreatedAt) {
-		toSerialize["createdAt"] = o.CreatedAt
-	}
-	if !IsNil(o.UpdatedAt) {
-		toSerialize["updatedAt"] = o.UpdatedAt
-	}
-	if !IsNil(o.Nodes) {
-		toSerialize["nodes"] = o.Nodes
-	}
-	if !IsNil(o.Edges) {
-		toSerialize["edges"] = o.Edges
-	}
-	if !IsNil(o.CreatedBy) {
-		toSerialize["createdBy"] = o.CreatedBy
+	if !IsNil(o.Spec) {
+		toSerialize["spec"] = o.Spec
 	}
 	return toSerialize, nil
 }
