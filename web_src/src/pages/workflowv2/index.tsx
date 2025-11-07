@@ -182,7 +182,6 @@ export function WorkflowPageV2() {
   const storeVersion = useNodeExecutionStore((state) => state.version);
   const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
   const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
-  const refetchNodeData = useNodeExecutionStore((state) => state.refetchNodeData);
   const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
 
   // Initialize store from workflow.status on workflow load
@@ -216,44 +215,6 @@ export function WorkflowPageV2() {
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap };
   }, [storeVersion]);
 
-  const refetchEvents = useCallback(
-    (nodeId: string) => {
-      // Find the node type
-      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-
-      // Invalidate React Query cache (for when sidebar opens)
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.nodeEvent(workflowId!, nodeId, 10),
-      });
-
-      // Update Zustand store for real-time UI updates
-      refetchNodeData(workflowId!, nodeId, node.type!, queryClient);
-    },
-    [queryClient, workflowId, workflow?.spec?.nodes, refetchNodeData],
-  );
-
-  const refetchExecutions = useCallback(
-    (nodeId: string) => {
-      // Find the node type
-      const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-
-      // Invalidate React Query cache (for when sidebar opens)
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.nodeExecution(workflowId!, nodeId),
-      });
-
-      queryClient.invalidateQueries({
-        queryKey: workflowKeys.nodeQueueItem(workflowId!, nodeId),
-      });
-
-      // Update Zustand store for real-time UI updates
-      refetchNodeData(workflowId!, nodeId, node.type!, queryClient);
-    },
-    [queryClient, workflowId, workflow?.spec?.nodes, refetchNodeData],
-  );
-
   const saveWorkflowSnapshot = useCallback(
     (currentWorkflow: WorkflowsWorkflow) => {
       if (!initialWorkflowSnapshot) {
@@ -285,7 +246,7 @@ export function WorkflowPageV2() {
     }
   }, [initialWorkflowSnapshot, organizationId, workflowId, queryClient]);
 
-  useWorkflowWebsocket(workflowId!, organizationId!, refetchEvents, refetchExecutions);
+  useWorkflowWebsocket(workflowId!, organizationId!);
 
   // Warn user before leaving page with unsaved changes
   useEffect(() => {

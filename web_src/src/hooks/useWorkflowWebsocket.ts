@@ -8,8 +8,6 @@ const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'w
 export function useWorkflowWebsocket(
   workflowId: string,
   organizationId: string,
-  refetchEvents: (nodeId: string) => void,
-  refetchExecutions: (nodeId: string) => void,
 ): void {
   const nodeExecutionStore = useNodeExecutionStore();
 
@@ -34,11 +32,13 @@ export function useWorkflowWebsocket(
             const execution = payload as WorkflowsWorkflowNodeExecution;
             // For child executions (composite nodes), extract the parent nodeId
             // Pattern: parent-node-id:child-node-id -> use parent-node-id
-            const storeNodeId = execution.parentExecutionId && execution.nodeId.includes(':')
-              ? execution.nodeId.split(':')[0]
-              : execution.nodeId;
+            if (execution.nodeId) {
+              const storeNodeId = execution.parentExecutionId && execution.nodeId.includes(':')
+                ? execution.nodeId.split(':')[0]
+                : execution.nodeId;
 
-            nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
+              nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
+            }
           }
           break;
         default:
