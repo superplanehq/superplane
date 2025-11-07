@@ -42,8 +42,8 @@ func UpdateWorkflow(ctx context.Context, encryptor crypto.Encryptor, registry *r
 		//
 		// Update the workflow record first
 		//
-		existingWorkflow.Name = pbWorkflow.Name
-		existingWorkflow.Description = pbWorkflow.Description
+		existingWorkflow.Name = pbWorkflow.Metadata.Name
+		existingWorkflow.Description = pbWorkflow.Metadata.Description
 		existingWorkflow.UpdatedAt = &now
 		existingWorkflow.Edges = datatypes.NewJSONSlice(edges)
 		err := tx.Save(&existingWorkflow).Error

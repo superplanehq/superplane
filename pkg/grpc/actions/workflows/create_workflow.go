@@ -34,8 +34,8 @@ func CreateWorkflow(ctx context.Context, registry *registry.Registry, organizati
 	workflow := models.Workflow{
 		ID:             uuid.New(),
 		OrganizationID: uuid.MustParse(organizationID),
-		Name:           pbWorkflow.Name,
-		Description:    pbWorkflow.Description,
+		Name:           pbWorkflow.Metadata.Name,
+		Description:    pbWorkflow.Metadata.Description,
 		CreatedBy:      &createdBy,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,

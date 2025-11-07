@@ -283,7 +283,7 @@ func CreateWorkflowNodeExecution(
 	return &execution
 }
 
-func CreateWorkflow(t *testing.T, orgID uuid.UUID, nodes []models.WorkflowNode, edges []models.Edge) (*models.Workflow, []models.WorkflowNode) {
+func CreateWorkflow(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []models.WorkflowNode, edges []models.Edge) (*models.Workflow, []models.WorkflowNode) {
 	now := time.Now()
 
 	//
@@ -295,6 +295,7 @@ func CreateWorkflow(t *testing.T, orgID uuid.UUID, nodes []models.WorkflowNode, 
 		Name:           RandomName("workflow"),
 		Description:    "Test workflow",
 		Edges:          datatypes.NewJSONSlice(edges),
+		CreatedBy:      &userID,
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 	}

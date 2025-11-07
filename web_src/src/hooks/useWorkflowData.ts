@@ -85,10 +85,14 @@ export const useCreateWorkflow = (organizationId: string) => {
   return useMutation({
     mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[] }) => {
       const payload = {
-        name: data.name,
-        description: data.description || '',
-        nodes: data.nodes || [],
-        edges: data.edges || [],
+        metadata: {
+          name: data.name,
+          description: data.description || '',
+        },
+        spec: {
+          nodes: data.nodes || [],
+          edges: data.edges || [],
+        }
       }
 
       return await workflowsCreateWorkflow(
@@ -115,10 +119,14 @@ export const useUpdateWorkflow = (organizationId: string, workflowId: string) =>
           path: { id: workflowId },
           body: {
             workflow: {
-              name: data.name,
-              description: data.description || '',
-              nodes: data.nodes || [],
-              edges: data.edges || [],
+              metadata: {
+                name: data.name,
+                description: data.description || '',
+              },
+              spec: {
+                nodes: data.nodes || [],
+                edges: data.edges || [],
+              }
             }
           }
         })

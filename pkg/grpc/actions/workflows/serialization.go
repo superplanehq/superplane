@@ -45,30 +45,42 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 	}
 
 	return &pb.Workflow{
-		Id:             workflow.ID.String(),
-		OrganizationId: workflow.OrganizationID.String(),
-		Name:           workflow.Name,
-		Description:    workflow.Description,
-		CreatedAt:      timestamppb.New(*workflow.CreatedAt),
-		UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
-		Nodes:          actions.NodesToProto(nodes),
-		Edges:          actions.EdgesToProto(workflow.Edges),
-		CreatedBy:      createdBy,
+		Metadata: &pb.Workflow_Metadata{
+			Id:             workflow.ID.String(),
+			OrganizationId: workflow.OrganizationID.String(),
+			Name:           workflow.Name,
+			Description:    workflow.Description,
+			CreatedAt:      timestamppb.New(*workflow.CreatedAt),
+			UpdatedAt:      timestamppb.New(*workflow.UpdatedAt),
+			CreatedBy:      createdBy,
+		},
+		Spec: &pb.Workflow_Spec{
+			Nodes: actions.NodesToProto(nodes),
+			Edges: actions.EdgesToProto(workflow.Edges),
+		},
 	}
 }
 
 func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workflow) ([]models.Node, []models.Edge, error) {
-	if workflow.Name == "" {
+	if workflow.Metadata == nil {
+		return nil, nil, status.Error(codes.InvalidArgument, "workflow metadata is required")
+	}
+
+	if workflow.Metadata.Name == "" {
 		return nil, nil, status.Error(codes.InvalidArgument, "workflow name is required")
 	}
 
+	if workflow.Spec == nil {
+		return nil, nil, status.Error(codes.InvalidArgument, "workflow spec is required")
+	}
+
 	// Allow empty workflows
-	if len(workflow.Nodes) == 0 {
+	if len(workflow.Spec.Nodes) == 0 {
 		return []models.Node{}, []models.Edge{}, nil
 	}
 
 	nodeIDs := make(map[string]bool)
-	for i, node := range workflow.Nodes {
+	for i, node := range workflow.Spec.Nodes {
 		if node.Id == "" {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "node %d: id is required", i)
 		}
@@ -88,7 +100,7 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		}
 	}
 
-	for i, edge := range workflow.Edges {
+	for i, edge := range workflow.Spec.Edges {
 		if edge.SourceId == "" || edge.TargetId == "" {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: source_id and target_id are required", i)
 		}
@@ -102,11 +114,11 @@ func ParseWorkflow(registry *registry.Registry, orgID string, workflow *pb.Workf
 		}
 	}
 
-	if err := actions.CheckForCycles(workflow.Nodes, workflow.Edges); err != nil {
+	if err := actions.CheckForCycles(workflow.Spec.Nodes, workflow.Spec.Edges); err != nil {
 		return nil, nil, err
 	}
 
-	return actions.ProtoToNodes(workflow.Nodes), actions.ProtoToEdges(workflow.Edges), nil
+	return actions.ProtoToNodes(workflow.Spec.Nodes), actions.ProtoToEdges(workflow.Spec.Edges), nil
 }
 
 func validateNodeRef(registry *registry.Registry, organizationID string, node *compb.Node) error {

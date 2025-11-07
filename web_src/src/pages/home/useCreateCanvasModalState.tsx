@@ -23,9 +23,9 @@ export function useCreateCanvasModalState() {
       description: data.description,
     });
 
-    if (result?.data?.workflow?.id) {
+    if (result?.data?.workflow?.metadata?.id) {
       onClose();
-      navigate(`/${organizationId}/workflows/${result.data.workflow.id}`);
+      navigate(`/${organizationId}/workflows/${result.data.workflow.metadata.id}`);
     }
   };
 

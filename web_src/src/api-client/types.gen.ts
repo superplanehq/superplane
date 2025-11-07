@@ -816,15 +816,8 @@ export type WorkflowsUpdateWorkflowResponse = {
 };
 
 export type WorkflowsWorkflow = {
-    id?: string;
-    organizationId?: string;
-    name?: string;
-    description?: string;
-    createdAt?: string;
-    updatedAt?: string;
-    nodes?: Array<ComponentsNode>;
-    edges?: Array<ComponentsEdge>;
-    createdBy?: SuperplaneWorkflowsUserRef;
+    metadata?: WorkflowsWorkflowMetadata;
+    spec?: WorkflowsWorkflowSpec;
 };
 
 export type WorkflowsWorkflowEvent = {
@@ -836,6 +829,16 @@ export type WorkflowsWorkflowEvent = {
         [key: string]: unknown;
     };
     createdAt?: string;
+};
+
+export type WorkflowsWorkflowMetadata = {
+    id?: string;
+    organizationId?: string;
+    name?: string;
+    description?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    createdBy?: SuperplaneWorkflowsUserRef;
 };
 
 export type WorkflowsWorkflowNodeExecution = {
@@ -874,6 +877,11 @@ export type WorkflowsWorkflowNodeQueueItem = {
         [key: string]: unknown;
     };
     createdAt?: string;
+};
+
+export type WorkflowsWorkflowSpec = {
+    nodes?: Array<ComponentsNode>;
+    edges?: Array<ComponentsEdge>;
 };
 
 export type GooglerpcStatus = {
