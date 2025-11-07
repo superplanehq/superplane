@@ -11,6 +11,7 @@ interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
+  executionChain?: Array<{ name: string; completed: boolean; children?: Array<{ name: string; completed: boolean }> }>;
 }
 
 interface ComponentSidebarProps {

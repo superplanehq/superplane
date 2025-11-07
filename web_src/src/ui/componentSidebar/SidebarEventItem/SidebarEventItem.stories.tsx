@@ -332,3 +332,178 @@ export const LargePayload: Story = {
     },
   },
 }
+
+export const WithExecutionChain: Story = {
+  render: (args) => (
+    <ComponentWrapper>
+      <SidebarEventItem {...args} />
+    </ComponentWrapper>
+  ),
+  args: {
+    event: {
+      ...mockEvent,
+      title: 'Deployment Pipeline',
+      subtitle: 'Production deploy',
+      state: 'running' as const,
+    },
+    index: 0,
+    variant: 'latest',
+    isOpen: true,
+    tabData: {
+      current: {
+        'Status': 'Deploying',
+        'Progress': '60%',
+        'Started': '3 minutes ago',
+        'ETA': '2 minutes',
+      },
+      root: {
+        'Pipeline ID': 'deploy_prod_2024_001',
+        'Branch': 'main',
+        'Commit': 'a1b2c3d',
+        'Environment': 'production',
+      },
+      executionChain: [
+        { name: 'Build Docker Image', completed: true },
+        { name: 'Run Unit Tests', completed: true },
+        { name: 'Security Scan', completed: true },
+        { name: 'Deploy to Staging', completed: true },
+        { name: 'Integration Tests', completed: false },
+        { name: 'Deploy to Production', completed: false },
+        { name: 'Health Checks', completed: false },
+        { name: 'Update DNS', completed: false },
+      ],
+    },
+  },
+}
+
+export const WithExecutionChainFailed: Story = {
+  render: (args) => (
+    <ComponentWrapper>
+      <SidebarEventItem {...args} />
+    </ComponentWrapper>
+  ),
+  args: {
+    event: {
+      ...mockEvent,
+      title: 'Failed Deployment',
+      subtitle: 'Build failed',
+      state: 'discarded' as const,
+    },
+    index: 0,
+    variant: 'latest',
+    isOpen: true,
+    tabData: {
+      current: {
+        'Status': 'Failed',
+        'Error': 'Build compilation error',
+        'Started': '5 minutes ago',
+        'Failed at': '3 minutes ago',
+      },
+      root: {
+        'Pipeline ID': 'deploy_prod_2024_002',
+        'Branch': 'feature/new-api',
+        'Commit': 'x9y8z7w',
+        'Environment': 'production',
+      },
+      executionChain: [
+        { name: 'Build Docker Image', completed: true },
+        { name: 'Run Unit Tests', completed: true },
+        { name: 'Security Scan', completed: false },
+        { name: 'Deploy to Staging', completed: false },
+        { name: 'Integration Tests', completed: false },
+        { name: 'Deploy to Production', completed: false },
+      ],
+    },
+  },
+}
+
+export const WithNestedExecutionChain: Story = {
+  render: (args) => (
+    <ComponentWrapper>
+      <SidebarEventItem {...args} />
+    </ComponentWrapper>
+  ),
+  args: {
+    event: {
+      ...mockEvent,
+      title: 'Complex Deployment',
+      subtitle: 'Multi-service deployment',
+      state: 'running' as const,
+    },
+    index: 0,
+    variant: 'latest',
+    isOpen: true,
+    tabData: {
+      current: {
+        'Status': 'Deploying Services',
+        'Progress': '4/6 services',
+        'Started': '8 minutes ago',
+        'ETA': '5 minutes',
+      },
+      root: {
+        'Pipeline ID': 'deploy_multi_2024_003',
+        'Branch': 'release/v2.1.0',
+        'Commit': 'def456gh',
+        'Environment': 'production',
+      },
+      executionChain: [
+        {
+          name: 'Preparation Phase',
+          completed: true,
+          children: [
+            { name: 'Validate Configuration', completed: true },
+            { name: 'Check Dependencies', completed: true },
+            { name: 'Reserve Resources', completed: true },
+          ]
+        },
+        {
+          name: 'Build Phase',
+          completed: true,
+          children: [
+            { name: 'Build API Service', completed: true },
+            { name: 'Build Frontend', completed: true },
+            { name: 'Build Background Jobs', completed: true },
+            { name: 'Build Database Migrations', completed: true },
+          ]
+        },
+        {
+          name: 'Test Phase',
+          completed: true,
+          children: [
+            { name: 'Unit Tests', completed: true },
+            { name: 'Integration Tests', completed: true },
+            { name: 'Security Scan', completed: true },
+          ]
+        },
+        {
+          name: 'Deploy to Staging',
+          completed: false,
+          children: [
+            { name: 'Deploy Database', completed: true },
+            { name: 'Deploy API Service', completed: true },
+            { name: 'Deploy Frontend', completed: false },
+            { name: 'Deploy Background Jobs', completed: false },
+          ]
+        },
+        {
+          name: 'Staging Tests',
+          completed: false,
+          children: [
+            { name: 'Smoke Tests', completed: false },
+            { name: 'Performance Tests', completed: false },
+            { name: 'User Acceptance Tests', completed: false },
+          ]
+        },
+        {
+          name: 'Production Deployment',
+          completed: false,
+          children: [
+            { name: 'Blue-Green Switch', completed: false },
+            { name: 'Health Checks', completed: false },
+            { name: 'Monitor Metrics', completed: false },
+          ]
+        },
+      ],
+    },
+  },
+}
