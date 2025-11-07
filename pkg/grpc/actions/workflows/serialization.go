@@ -50,7 +50,17 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		return nil
 	}
 
-	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, []models.WorkflowNodeExecution{})
+	executionIDs := make([]string, len(lastExecutions))
+	for i, execution := range lastExecutions {
+		executionIDs[i] = execution.ID.String()
+	}
+
+	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs)
+	if err != nil {
+		return nil
+	}
+
+	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, childExecutions)
 	if err != nil {
 		return nil
 	}
@@ -81,8 +91,8 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 			Edges: actions.EdgesToProto(workflow.Edges),
 		},
 		Status: &pb.Workflow_Status{
-			LastExecutions:   serializedExecutions,
-			NextQueueItems:   serializedQueueItems,
+			LastExecutions: serializedExecutions,
+			NextQueueItems: serializedQueueItems,
 		},
 	}
 }

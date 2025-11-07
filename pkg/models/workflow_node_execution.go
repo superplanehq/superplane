@@ -491,6 +491,7 @@ func FindLastExecutionPerNode(workflowID uuid.UUID) ([]WorkflowNodeExecution, er
 			SELECT DISTINCT ON (node_id) *
 			FROM workflow_node_executions
 			WHERE workflow_id = ?
+			AND parent_execution_id IS NULL
 			ORDER BY node_id, created_at DESC
 		`, workflowID).
 		Scan(&executions).
