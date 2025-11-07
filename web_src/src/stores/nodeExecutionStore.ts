@@ -23,12 +23,15 @@ interface NodeExecutionData {
 interface NodeExecutionStore {
   // State
   data: Map<string, NodeExecutionData>;
+  version: number; // Version counter to track updates
 
   // Actions
   initializeFromWorkflow: (workflow: WorkflowsWorkflow) => void;
   loadNodeData: (workflowId: string, nodeId: string, nodeType: string, queryClient: QueryClient) => Promise<void>;
   refetchNodeData: (workflowId: string, nodeId: string, nodeType: string, queryClient: QueryClient) => Promise<void>;
   getNodeData: (nodeId: string) => NodeExecutionData;
+  updateNodeExecution: (nodeId: string, execution: WorkflowsWorkflowNodeExecution) => void;
+  updateNodeEvent: (nodeId: string, event: WorkflowsWorkflowEvent) => void;
   clear: () => void;
 }
 
@@ -40,8 +43,75 @@ const emptyNodeData: NodeExecutionData = {
   isLoaded: false,
 };
 
+// Helper function to update a child execution within a parent
+function updateChildExecution(
+  executions: WorkflowsWorkflowNodeExecution[],
+  childExecution: WorkflowsWorkflowNodeExecution
+): WorkflowsWorkflowNodeExecution[] {
+  const parentIndex = executions.findIndex(e => e.id === childExecution.parentExecutionId);
+
+  // Parent not found yet - add as top-level temporarily (will be nested when parent arrives)
+  if (parentIndex < 0) {
+    const existingIndex = executions.findIndex(e => e.id === childExecution.id);
+    if (existingIndex >= 0) {
+      return executions.map((e, i) => i === existingIndex ? childExecution : e);
+    }
+    return [childExecution, ...executions];
+  }
+
+  // Parent found - update child within parent's childExecutions
+  const parent = executions[parentIndex];
+  const childExecutions = parent.childExecutions || [];
+  const childIndex = childExecutions.findIndex(ce => ce.id === childExecution.id);
+
+  const updatedChildren = childIndex >= 0
+    ? childExecutions.map((ce, i) => i === childIndex ? childExecution : ce)
+    : [...childExecutions, childExecution];
+
+  return executions.map((e, i) =>
+    i === parentIndex ? { ...e, childExecutions: updatedChildren } : e
+  );
+}
+
+// Helper function to update a parent execution
+function updateParentExecution(
+  executions: WorkflowsWorkflowNodeExecution[],
+  parentExecution: WorkflowsWorkflowNodeExecution
+): WorkflowsWorkflowNodeExecution[] {
+  const existingIndex = executions.findIndex(e => e.id === parentExecution.id);
+
+  // Update existing parent - preserve childExecutions
+  if (existingIndex >= 0) {
+    const existing = executions[existingIndex];
+    const finalChildExecutions = parentExecution.childExecutions || existing.childExecutions || [];
+    return executions.map((e, i) =>
+      i === existingIndex
+        ? { ...parentExecution, childExecutions: finalChildExecutions }
+        : e
+    );
+  }
+
+  // New parent - check for orphaned children that belong to it
+  const orphanedChildren = executions.filter(e => e.parentExecutionId === parentExecution.id);
+
+  if (orphanedChildren.length === 0) {
+    // Ensure childExecutions is always an array, even if empty
+    return [{ ...parentExecution, childExecutions: parentExecution.childExecutions || [] }, ...executions];
+  }
+
+  // Move orphaned children from top-level into parent
+  const withoutOrphans = executions.filter(e => e.parentExecutionId !== parentExecution.id);
+  const parentWithChildren = {
+    ...parentExecution,
+    childExecutions: [...(parentExecution.childExecutions || []), ...orphanedChildren]
+  };
+
+  return [parentWithChildren, ...withoutOrphans];
+}
+
 export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
   data: new Map(),
+  version: 0,
 
   initializeFromWorkflow: (workflow) => {
     const initialData = new Map<string, NodeExecutionData>();
@@ -68,7 +138,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       });
     });
 
-    set({ data: initialData });
+    set({ data: initialData, version: get().version + 1 });
   },
 
   loadNodeData: async (workflowId, nodeId, nodeType, queryClient) => {
@@ -86,7 +156,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         ...(newData.get(nodeId) || emptyNodeData),
         isLoading: true,
       });
-      return { data: newData };
+      return { data: newData, version: state.version + 1 };
     });
 
     try {
@@ -113,7 +183,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
           isLoading: false,
           isLoaded: true,
         });
-        return { data: newData };
+        return { data: newData, version: state.version + 1 };
       });
     } catch (error) {
       console.error('Failed to load node data:', error);
@@ -125,7 +195,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         if (existing) {
           newData.set(nodeId, { ...existing, isLoading: false });
         }
-        return { data: newData };
+        return { data: newData, version: state.version + 1 };
       });
     }
   },
@@ -142,7 +212,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         ...existing,
         isLoading: true,
       });
-      return { data: newData };
+      return { data: newData, version: state.version + 1 };
     });
 
     try {
@@ -169,7 +239,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
           isLoading: false,
           isLoaded: true,
         });
-        return { data: newData };
+        return { data: newData, version: state.version + 1 };
       });
     } catch (error) {
       console.error('Failed to refetch node data:', error);
@@ -181,7 +251,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         if (existing) {
           newData.set(nodeId, { ...existing, isLoading: false });
         }
-        return { data: newData };
+        return { data: newData, version: state.version + 1 };
       });
     }
   },
@@ -190,7 +260,45 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
     return get().data.get(nodeId) || emptyNodeData;
   },
 
+  updateNodeExecution: (nodeId, execution) => {
+    set((state) => {
+      const newData = new Map(state.data);
+      const existing = newData.get(nodeId) || emptyNodeData;
+
+      const updatedExecutions = execution.parentExecutionId
+        ? updateChildExecution(existing.executions, execution)
+        : updateParentExecution(existing.executions, execution);
+
+      newData.set(nodeId, {
+        ...existing,
+        executions: updatedExecutions,
+        isLoaded: true,
+      });
+      return { data: newData, version: state.version + 1 };
+    });
+  },
+
+  updateNodeEvent: (nodeId, event) => {
+    set((state) => {
+      const newData = new Map(state.data);
+      const existing = newData.get(nodeId) || emptyNodeData;
+
+      // Add or update the event in the list
+      const existingIndex = existing.events.findIndex(e => e.id === event.id);
+      const updatedEvents = existingIndex >= 0
+        ? existing.events.map((e, i) => i === existingIndex ? event : e)
+        : [event, ...existing.events];
+
+      newData.set(nodeId, {
+        ...existing,
+        events: updatedEvents,
+        isLoaded: true,
+      });
+      return { data: newData, version: state.version + 1 };
+    });
+  },
+
   clear: () => {
-    set({ data: new Map() });
+    set({ data: new Map(), version: 0 });
   },
 }));

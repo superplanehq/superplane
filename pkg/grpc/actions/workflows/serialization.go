@@ -81,8 +81,8 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 			Edges: actions.EdgesToProto(workflow.Edges),
 		},
 		Status: &pb.Workflow_Status{
-			LastExecutions:   serializedExecutions,
-			NextQueueItems:   serializedQueueItems,
+			LastExecutions: serializedExecutions,
+			NextQueueItems: serializedQueueItems,
 		},
 	}
 }

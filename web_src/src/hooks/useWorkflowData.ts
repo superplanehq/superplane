@@ -178,8 +178,7 @@ export const useNodeExecutions = (
       )
       return response.data
     },
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
     enabled: !!workflowId && !!nodeId,
   })
 }
@@ -195,8 +194,7 @@ export const useWorkflowEvents = (workflowId: string) => {
       )
       return response.data
     },
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
     enabled: !!workflowId,
   })
 }
@@ -215,8 +213,7 @@ export const useEventExecutions = (workflowId: string, eventId: string | null) =
       )
       return response.data
     },
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
     enabled: !!workflowId && !!eventId,
   })
 }
@@ -236,8 +233,7 @@ export const useChildExecutions = (workflowId: string, executionId: string | nul
       )
       return response.data
     },
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
     enabled: !!workflowId && !!executionId,
   })
 }
@@ -256,8 +252,7 @@ export const useNodeQueueItems = (workflowId: string, nodeId: string) => {
       )
       return response.data
     },
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
     enabled: !!workflowId && !!nodeId,
   })
 }
@@ -284,8 +279,7 @@ export const nodeEventsQueryOptions = (
     )
     return response.data
   },
-  staleTime: 30 * 1000, // 30 seconds
-  gcTime: 5 * 60 * 1000, // 5 minutes
+  refetchOnWindowFocus: false,
   enabled: !!workflowId && !!nodeId,
 })
 
@@ -312,8 +306,7 @@ export const nodeExecutionsQueryOptions = (
     )
     return response.data
   },
-  staleTime: 30 * 1000, // 30 seconds
-  gcTime: 5 * 60 * 1000, // 5 minutes
+  refetchOnWindowFocus: false,
   enabled: !!workflowId && !!nodeId,
 })
 
@@ -333,8 +326,7 @@ export const nodeQueueItemsQueryOptions = (
     )
     return response.data
   },
-  staleTime: 30 * 1000, // 30 seconds
-  gcTime: 5 * 60 * 1000, // 5 minutes
+  refetchOnWindowFocus: false,
   enabled: !!workflowId && !!nodeId,
 })
 

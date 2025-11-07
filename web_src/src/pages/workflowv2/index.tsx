@@ -177,17 +177,23 @@ export function WorkflowPageV2() {
     persistedTriggerNodes.concat(persistedFilterNodes),
   );
 
-  // Use Zustand store for execution data
-  const nodeExecutionStore = useNodeExecutionStore();
+  // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
+  // Subscribe to version to ensure React detects all updates
+  const storeVersion = useNodeExecutionStore((state) => state.version);
+  const getNodeData = useNodeExecutionStore((state) => state.getNodeData);
+  const loadNodeDataMethod = useNodeExecutionStore((state) => state.loadNodeData);
+  const refetchNodeData = useNodeExecutionStore((state) => state.refetchNodeData);
+  const initializeFromWorkflow = useNodeExecutionStore((state) => state.initializeFromWorkflow);
 
   // Initialize store from workflow.status on workflow load
   useEffect(() => {
     if (workflow) {
-      nodeExecutionStore.initializeFromWorkflow(workflow);
+      initializeFromWorkflow(workflow);
     }
-  }, [workflow, nodeExecutionStore.initializeFromWorkflow]);
+  }, [workflow, initializeFromWorkflow]);
 
   // Build maps from store for canvas display (using initial data from workflow.status)
+  // Rebuild whenever store version changes (indicates data was updated)
   const { nodeExecutionsMap, nodeQueueItemsMap } = useMemo<{
     nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>;
     nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>;
@@ -195,7 +201,10 @@ export function WorkflowPageV2() {
     const executionsMap: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
     const queueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]> = {};
 
-    nodeExecutionStore.data.forEach((data, nodeId) => {
+    // Get current store data
+    const storeData = useNodeExecutionStore.getState().data;
+
+    storeData.forEach((data, nodeId) => {
       if (data.executions.length > 0) {
         executionsMap[nodeId] = data.executions;
       }
@@ -205,7 +214,7 @@ export function WorkflowPageV2() {
     });
 
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap };
-  }, [nodeExecutionStore.data]);
+  }, [storeVersion]);
 
   const refetchEvents = useCallback(
     (nodeId: string) => {
@@ -219,9 +228,9 @@ export function WorkflowPageV2() {
       });
 
       // Update Zustand store for real-time UI updates
-      nodeExecutionStore.refetchNodeData(workflowId!, nodeId, node.type!, queryClient);
+      refetchNodeData(workflowId!, nodeId, node.type!, queryClient);
     },
-    [queryClient, workflowId, workflow?.spec?.nodes, nodeExecutionStore],
+    [queryClient, workflowId, workflow?.spec?.nodes, refetchNodeData],
   );
 
   const refetchExecutions = useCallback(
@@ -240,9 +249,9 @@ export function WorkflowPageV2() {
       });
 
       // Update Zustand store for real-time UI updates
-      nodeExecutionStore.refetchNodeData(workflowId!, nodeId, node.type!, queryClient);
+      refetchNodeData(workflowId!, nodeId, node.type!, queryClient);
     },
-    [queryClient, workflowId, workflow?.spec?.nodes, nodeExecutionStore],
+    [queryClient, workflowId, workflow?.spec?.nodes, refetchNodeData],
   );
 
   const saveWorkflowSnapshot = useCallback(
@@ -343,7 +352,7 @@ export function WorkflowPageV2() {
       if (!node) return null;
 
       // Get current data from store (don't trigger load here - that's done in useEffect)
-      const nodeData = nodeExecutionStore.getNodeData(nodeId);
+      const nodeData = getNodeData(nodeId);
 
       // Build maps with current node data for sidebar
       const executionsMap = nodeData.executions.length > 0 ? { [nodeId]: nodeData.executions } : {};
@@ -369,7 +378,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [workflow, blueprints, components, triggers, nodeEventsMap, nodeExecutionStore],
+    [workflow, blueprints, components, triggers, nodeEventsMap, getNodeData],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -378,14 +387,14 @@ export function WorkflowPageV2() {
       const node = workflow?.spec?.nodes?.find((n) => n.id === nodeId);
       if (!node) return;
 
-      const nodeData = nodeExecutionStore.getNodeData(nodeId);
+      const nodeData = getNodeData(nodeId);
 
       // Trigger load if not already loaded or loading
       if (!nodeData.isLoaded && !nodeData.isLoading) {
-        nodeExecutionStore.loadNodeData(workflowId!, nodeId, node.type!, queryClient);
+        loadNodeDataMethod(workflowId!, nodeId, node.type!, queryClient);
       }
     },
-    [workflow?.spec?.nodes, workflowId, queryClient, nodeExecutionStore],
+    [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
   );
 
   const getTabData = useCallback(
@@ -1210,10 +1219,6 @@ function prepareCompositeNode(
       receivedAt: new Date(execution.createdAt!),
       state: getRunItemState(execution),
       values: rootTriggerRenderer.getRootEventValues(execution.rootEvent!),
-
-      //
-      // TODO: what is ChildEventsInfo.waitingInfos supposed to be???
-      //
       childEventsInfo: {
         count: execution.childExecutions?.length || 0,
         waitingInfos: [],
