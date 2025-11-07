@@ -44,6 +44,28 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		createdBy = &pb.UserRef{Id: idStr, Name: name}
 	}
 
+	// Fetch last executions per node
+	lastExecutions, err := models.FindLastExecutionPerNode(workflow.ID)
+	if err != nil {
+		return nil
+	}
+
+	serializedExecutions, err := SerializeNodeExecutions(lastExecutions, []models.WorkflowNodeExecution{})
+	if err != nil {
+		return nil
+	}
+
+	// Fetch next queue items per node
+	nextQueueItems, err := models.FindNextQueueItemPerNode(workflow.ID)
+	if err != nil {
+		return nil
+	}
+
+	serializedQueueItems, err := SerializeNodeQueueItems(nextQueueItems)
+	if err != nil {
+		return nil
+	}
+
 	return &pb.Workflow{
 		Metadata: &pb.Workflow_Metadata{
 			Id:             workflow.ID.String(),
@@ -57,6 +79,10 @@ func SerializeWorkflow(workflow *models.Workflow) *pb.Workflow {
 		Spec: &pb.Workflow_Spec{
 			Nodes: actions.NodesToProto(nodes),
 			Edges: actions.EdgesToProto(workflow.Edges),
+		},
+		Status: &pb.Workflow_Status{
+			LastExecutions:   serializedExecutions,
+			NextQueueItems:   serializedQueueItems,
 		},
 	}
 }

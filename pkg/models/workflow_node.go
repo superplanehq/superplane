@@ -212,3 +212,24 @@ func CountNodeQueueItems(workflowID uuid.UUID, nodeID string) (int64, error) {
 
 	return totalCount, nil
 }
+
+// FindNextQueueItemPerNode finds the next (oldest) queue item for each node in a workflow
+// using DISTINCT ON to get one queue item per node_id, ordered by created_at ASC
+func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]WorkflowNodeQueueItem, error) {
+	var queueItems []WorkflowNodeQueueItem
+	err := database.Conn().
+		Raw(`
+			SELECT DISTINCT ON (node_id) *
+			FROM workflow_node_queue_items
+			WHERE workflow_id = ?
+			ORDER BY node_id, created_at ASC
+		`, workflowID).
+		Scan(&queueItems).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return queueItems, nil
+}

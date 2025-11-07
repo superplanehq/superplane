@@ -100,5 +100,202 @@ func Test__DescribeWorkflow(t *testing.T) {
 		assert.Equal(t, "node-1", response.Workflow.Spec.Edges[0].SourceId)
 		assert.Equal(t, "node-2", response.Workflow.Spec.Edges[0].TargetId)
 		assert.Equal(t, "default", response.Workflow.Spec.Edges[0].Channel)
+
+		//
+		// Verify status structure exists (even if empty)
+		//
+		require.NotNil(t, response.Workflow.Status)
+		assert.NotNil(t, response.Workflow.Status.LastExecutions)
+		assert.NotNil(t, response.Workflow.Status.NextQueueItems)
+	})
+
+	t.Run("status includes last execution per node", func(t *testing.T) {
+		//
+		// Create a workflow with two nodes
+		//
+		workflow, _ := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.WorkflowNode{
+				{
+					NodeID: "node-1",
+					Name:   "First Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "node-2",
+					Name:   "Second Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		//
+		// Create events for executions
+		//
+		rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+		event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+
+		//
+		// Create multiple executions for node-1 (older one first)
+		//
+		oldExecution := support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent1.ID, event1.ID, nil)
+		// Wait a bit to ensure different timestamps
+		support.CreateWorkflowNodeExecution(t, workflow.ID, "node-1", rootEvent1.ID, event1.ID, nil)
+
+		//
+		// Create one execution for node-2
+		//
+		support.CreateWorkflowNodeExecution(t, workflow.ID, "node-2", rootEvent2.ID, event2.ID, nil)
+
+		//
+		// Describe the workflow
+		//
+		response, err := DescribeWorkflow(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Workflow.Status)
+
+		//
+		// Verify we get exactly one execution per node (the latest one)
+		//
+		assert.Len(t, response.Workflow.Status.LastExecutions, 2)
+
+		// Verify the latest execution for node-1 is NOT the old one
+		var node1Execution *models.WorkflowNodeExecution
+		var node2Execution *models.WorkflowNodeExecution
+		for _, exec := range response.Workflow.Status.LastExecutions {
+			if exec.NodeId == "node-1" {
+				node1Execution = &models.WorkflowNodeExecution{ID: uuid.MustParse(exec.Id)}
+			}
+			if exec.NodeId == "node-2" {
+				node2Execution = &models.WorkflowNodeExecution{ID: uuid.MustParse(exec.Id)}
+			}
+		}
+
+		require.NotNil(t, node1Execution)
+		require.NotNil(t, node2Execution)
+		assert.NotEqual(t, oldExecution.ID.String(), node1Execution.ID.String(), "Should return the latest execution, not the old one")
+	})
+
+	t.Run("status includes next queue item per node", func(t *testing.T) {
+		//
+		// Create a workflow with two nodes
+		//
+		workflow, _ := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.WorkflowNode{
+				{
+					NodeID: "node-1",
+					Name:   "First Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "node-2",
+					Name:   "Second Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		//
+		// Create events for queue items
+		//
+		rootEvent1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		event1 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		rootEvent2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+		event2 := support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+
+		//
+		// Create multiple queue items for node-1 (oldest one first)
+		//
+		support.CreateWorkflowQueueItem(t, workflow.ID, "node-1", rootEvent1.ID, event1.ID)
+		// Wait a bit to ensure different timestamps
+		support.CreateWorkflowQueueItem(t, workflow.ID, "node-1", rootEvent1.ID, event1.ID)
+
+		//
+		// Create one queue item for node-2
+		//
+		support.CreateWorkflowQueueItem(t, workflow.ID, "node-2", rootEvent2.ID, event2.ID)
+
+		//
+		// Describe the workflow
+		//
+		response, err := DescribeWorkflow(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Workflow.Status)
+
+		//
+		// Verify we get exactly one queue item per node (the oldest/next one)
+		//
+		assert.Len(t, response.Workflow.Status.NextQueueItems, 2)
+
+		// Verify each node has a queue item
+		var node1QueueItem *models.WorkflowNodeQueueItem
+		var node2QueueItem *models.WorkflowNodeQueueItem
+		for _, item := range response.Workflow.Status.NextQueueItems {
+			if item.NodeId == "node-1" {
+				node1QueueItem = &models.WorkflowNodeQueueItem{ID: uuid.MustParse(item.Id)}
+			}
+			if item.NodeId == "node-2" {
+				node2QueueItem = &models.WorkflowNodeQueueItem{ID: uuid.MustParse(item.Id)}
+			}
+		}
+
+		require.NotNil(t, node1QueueItem)
+		require.NotNil(t, node2QueueItem)
+	})
+
+	t.Run("status is empty when no executions or queue items exist", func(t *testing.T) {
+		//
+		// Create a workflow with nodes but no executions or queue items
+		//
+		workflow, _ := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.WorkflowNode{
+				{
+					NodeID: "node-1",
+					Name:   "First Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		//
+		// Describe the workflow
+		//
+		response, err := DescribeWorkflow(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Workflow.Status)
+
+		//
+		// Verify status exists but is empty
+		//
+		assert.Empty(t, response.Workflow.Status.LastExecutions)
+		assert.Empty(t, response.Workflow.Status.NextQueueItems)
 	})
 }

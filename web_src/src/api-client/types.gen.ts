@@ -818,6 +818,7 @@ export type WorkflowsUpdateWorkflowResponse = {
 export type WorkflowsWorkflow = {
     metadata?: WorkflowsWorkflowMetadata;
     spec?: WorkflowsWorkflowSpec;
+    status?: WorkflowsWorkflowStatus;
 };
 
 export type WorkflowsWorkflowEvent = {
@@ -882,6 +883,11 @@ export type WorkflowsWorkflowNodeQueueItem = {
 export type WorkflowsWorkflowSpec = {
     nodes?: Array<ComponentsNode>;
     edges?: Array<ComponentsEdge>;
+};
+
+export type WorkflowsWorkflowStatus = {
+    lastExecutions?: Array<WorkflowsWorkflowNodeExecution>;
+    nextQueueItems?: Array<WorkflowsWorkflowNodeQueueItem>;
 };
 
 export type GooglerpcStatus = {

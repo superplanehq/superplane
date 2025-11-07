@@ -234,8 +234,14 @@ message Workflow {
     repeated Components.Edge edges = 2;
   }
 
+  message Status {
+    repeated WorkflowNodeExecution last_executions = 1;
+    repeated WorkflowNodeQueueItem next_queue_items = 2;
+  }
+
   Metadata metadata = 1;
   Spec spec = 2;
+  Status status = 3;
 }
 
 message ListNodeEventsRequest {
