@@ -13,9 +13,9 @@ function red() {
   echo -e "\033[0;31m$1\033[0m"
 }
 
-git status --porcelain db/structure.sql | grep db/structure.sql > /dev/null
+git diff --exit-code -- db/structure.sql
 
-if [ $? -eq 0 ]; then
+if [ $? != 0 ]; then
   red ""
   red "Unexpected changes detected in db/structure.sql!"
   red ""
