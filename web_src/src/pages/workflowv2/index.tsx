@@ -22,6 +22,7 @@ import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import {
+  eventExecutionsQueryOptions,
   nodeEventsQueryOptions,
   nodeExecutionsQueryOptions,
   nodeQueueItemsQueryOptions,
@@ -193,6 +194,11 @@ export function WorkflowPageV2() {
     isLoading: nodeDataLoading,
   } = useCompositeNodeData(workflowId!, persistedNodesWithExecutions);
 
+  const {
+    executionChainMap,
+    isLoading: executionChainLoading,
+  } = useExecutionChainData(workflowId!, nodeExecutionsMap);
+
   const refetchEvents = useCallback(
     (nodeId: string) => {
       queryClient.invalidateQueries({
@@ -210,6 +216,12 @@ export function WorkflowPageV2() {
 
       queryClient.invalidateQueries({
         queryKey: workflowKeys.nodeQueueItem(workflowId!, nodeId),
+      });
+
+      // Invalidate all execution chain queries since they depend on root events
+      // which can be affected by any node execution changes
+      queryClient.invalidateQueries({
+        queryKey: workflowKeys.eventExecutions(),
       });
     },
     [queryClient, workflowId],
@@ -275,7 +287,8 @@ export function WorkflowPageV2() {
       blueprintsLoading ||
       componentsLoading ||
       nodeEventsLoading ||
-      nodeDataLoading
+      nodeDataLoading ||
+      executionChainLoading
     ) {
       return { nodes: [], edges: [] };
     }
@@ -307,6 +320,8 @@ export function WorkflowPageV2() {
     componentsLoading,
     nodeEventsLoading,
     nodeDataLoading,
+    executionChainLoading,
+    organizationId,
   ]);
 
   const getSidebarData = useCallback(
@@ -429,9 +444,86 @@ export function WorkflowPageV2() {
         tabData.payload = payload;
       }
 
+      // Execution Chain tab: get execution chain for the root event
+      if (execution.rootEvent?.id) {
+        const executionChain = executionChainMap[execution.rootEvent.id];
+        if (executionChain && executionChain.length > 0) {
+          // Get the current execution's timestamp for filtering
+          const currentExecutionTime = execution.createdAt ? new Date(execution.createdAt).getTime() : Date.now();
+
+          // Filter to only include executions that happened before or at the same time as current execution
+          const executionsUpToCurrent = executionChain.filter(exec => {
+            const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
+            return execTime <= currentExecutionTime;
+          });
+
+          // Sort the filtered executions by creation time to get chronological order
+          executionsUpToCurrent.sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeA - timeB;
+          });
+
+          // Group executions by node to create hierarchy
+          const nodeExecutions: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
+          executionsUpToCurrent.forEach(exec => {
+            const execNodeId = exec.nodeId || 'unknown';
+            if (!nodeExecutions[execNodeId]) {
+              nodeExecutions[execNodeId] = [];
+            }
+            nodeExecutions[execNodeId].push(exec);
+          });
+
+
+          // Convert to execution chain format, maintaining chronological order
+          const sortedNodeEntries = Object.values(nodeExecutions)
+            .flatMap((execs) => execs)
+            .sort((execsA, execsB) => {
+              // Sort by the earliest execution's createdAt in each node
+              const timeA = execsA.updatedAt ? new Date(execsA.updatedAt).getTime() : 0;
+              const timeB = execsB.updatedAt ? new Date(execsB.updatedAt).getTime() : 0;
+              return timeA - timeB;
+            });
+
+
+          const chainData = sortedNodeEntries.map((exec) => {
+
+
+            // Get the main execution (earliest one)
+            const nodeInfo = workflow?.nodes?.find(n => n.id === exec.nodeId);
+
+            // Map execution state to completion status
+            const getCompletionStatus = (exec: WorkflowsWorkflowNodeExecution) => {
+              if (exec.state === 'STATE_FINISHED' && exec.result === 'RESULT_PASSED') {
+                return true; // Completed successfully
+              }
+              return false; // Not completed (running, pending, or failed)
+            };
+
+            const mainItem = {
+              name: nodeInfo?.name || exec.nodeId,
+              completed: getCompletionStatus(exec),
+              children: exec?.childExecutions && exec.childExecutions.length > 1 ? exec.childExecutions.map(childExec => {
+                const childNodeInfo = workflow?.nodes?.find(n => n.id === childExec.nodeId);
+                return {
+                  name: childNodeInfo?.name || childExec.nodeId,
+                  completed: getCompletionStatus(childExec)
+                }
+              }) : undefined
+            };
+
+            return mainItem;
+          });
+
+          if (chainData.length > 0) {
+            tabData.executionChain = chainData;
+          }
+        }
+      }
+
       return Object.keys(tabData).length > 0 ? tabData : undefined;
     },
-    [workflow, nodeExecutionsMap, nodeEventsMap],
+    [workflow, nodeExecutionsMap, nodeEventsMap, executionChainMap],
   );
 
   const getNodeEditData = useCallback(
@@ -893,7 +985,8 @@ export function WorkflowPageV2() {
     blueprintsLoading ||
     componentsLoading ||
     nodeEventsLoading ||
-    nodeDataLoading
+    nodeDataLoading ||
+    executionChainLoading
   ) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -1025,6 +1118,43 @@ function useCompositeNodeData(workflowId: string, compositeNodes: ComponentsNode
   }, [queueItemResults, compositeNodes]);
 
   return { nodeExecutionsMap, nodeQueueItemsMap, isLoading };
+}
+
+function useExecutionChainData(workflowId: string, nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>) {
+  // Get all unique root event IDs from executions
+  const rootEventIds = useMemo(() => {
+    const eventIds = new Set<string>();
+    Object.values(nodeExecutionsMap).forEach(executions => {
+      executions.forEach(execution => {
+        if (execution.rootEvent?.id) {
+          eventIds.add(execution.rootEvent.id);
+        }
+      });
+    });
+    return Array.from(eventIds);
+  }, [nodeExecutionsMap]);
+
+  // Fetch execution chains for each unique root event
+  const executionChainResults = useQueries({
+    queries: rootEventIds.map((eventId) => eventExecutionsQueryOptions(workflowId, eventId)),
+  });
+
+  // Check if any queries are still loading
+  const isLoading = executionChainResults.some((result) => result.isLoading);
+
+  // Build map of eventId -> execution chain
+  const executionChainMap = useMemo(() => {
+    const map: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
+    rootEventIds.forEach((eventId, index) => {
+      const result = executionChainResults[index];
+      if (result.data?.executions && result.data.executions.length > 0) {
+        map[eventId] = result.data.executions;
+      }
+    });
+    return map;
+  }, [executionChainResults, rootEventIds]);
+
+  return { executionChainMap, isLoading };
 }
 
 function prepareData(
