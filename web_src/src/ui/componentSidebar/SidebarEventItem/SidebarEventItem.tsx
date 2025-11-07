@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon } from "@/lib/utils";
 import React, { useState } from "react";
 import { ChildEvents, ChildEventsInfo } from "../../childEvents";
@@ -128,7 +129,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   {tabData.current && (
                     <button
                       onClick={() => setActiveTab('current')}
-                      className={`px-5 py-1 text-sm font-medium ${activeTab === 'current'
+                      className={`px-5 py-1 text-sm font-medium rounded-tl-md  ${activeTab === 'current'
                         ? 'text-black border-b-1 border-black'
                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                         }`}
@@ -151,7 +152,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                 {tabData.payload && (
                   <button
                     onClick={() => setActiveTab('payload')}
-                    className={`px-3 py-1 text-sm font-medium flex items-center gap-1 ${activeTab === 'payload'
+                    className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1 ${activeTab === 'payload'
                       ? 'text-black border-b-1 border-black bg-gray-100'
                       : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200'
                       }`}

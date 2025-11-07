@@ -25,11 +25,17 @@ import { NodeConfigurationModal } from "./NodeConfigurationModal";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 
+export interface TabData {
+  current?: Record<string, any>;
+  root?: Record<string, any>;
+  payload?: any;
+}
+
 export interface SidebarEvent {
   id: string;
   title: string;
   subtitle?: string;
-  state: "processed" | "discarded" | "waiting";
+  state: "processed" | "discarded" | "waiting" | "running";
   isOpen: boolean;
   receivedAt?: Date;
   values?: Record<string, string>;
@@ -105,6 +111,7 @@ export interface CanvasPageProps {
 
   onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
   onNodeConfigurationSave?: (nodeId: string, configuration: Record<string, any>, nodeName: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -401,6 +408,7 @@ function CanvasPage(props: CanvasPageProps) {
           <Sidebar
             state={state}
             getSidebarData={props.getSidebarData}
+            getTabData={props.getTabData}
             onRun={handleNodeRun}
             onDuplicate={props.onDuplicate}
             onDocs={props.onDocs}
@@ -463,6 +471,7 @@ function CanvasPage(props: CanvasPageProps) {
 function Sidebar({
   state,
   getSidebarData,
+  getTabData,
   onRun,
   onDuplicate,
   onDocs,
@@ -475,6 +484,7 @@ function Sidebar({
 }: {
   state: CanvasPageState;
   getSidebarData?: (nodeId: string) => SidebarData | null;
+  getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
@@ -522,6 +532,7 @@ function Sidebar({
       iconBackground={sidebarData.iconBackground}
       moreInQueueCount={sidebarData.moreInQueueCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
+      getTabData={getTabData && state.componentSidebar.selectedNodeId ? (event) => getTabData(state.componentSidebar.selectedNodeId!, event) : undefined}
       onEventClick={(event) => {
         setLatestEvents((prev) => {
           return prev.map((e) => {
