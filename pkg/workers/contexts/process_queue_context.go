@@ -3,6 +3,7 @@ package contexts
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -34,7 +35,7 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		Input:         event.Data.Data(),
 	}
 
-	ctx.CreateExecution = func() error {
+	ctx.CreateExecution = func() (uuid.UUID, error) {
 		now := time.Now()
 
 		execution := models.WorkflowNodeExecution{
@@ -50,17 +51,17 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		}
 
 		if err := tx.Create(&execution).Error; err != nil {
-			return err
+			return uuid.Nil, err
 		}
 
 		messages.NewWorkflowExecutionCreatedMessage(execution.WorkflowID.String(), &execution).PublishWithDelay(1 * time.Second)
-		return nil
+		return execution.ID, nil
 	}
 
 	ctx.DequeueItem = func() error { return queueItem.Delete(tx) }
 	ctx.UpdateNodeState = func(state string) error { return node.UpdateState(tx, state) }
 	ctx.DefaultProcessing = func() error {
-		if err := ctx.CreateExecution(); err != nil {
+		if _, err := ctx.CreateExecution(); err != nil {
 			return err
 		}
 		if err := ctx.DequeueItem(); err != nil {
