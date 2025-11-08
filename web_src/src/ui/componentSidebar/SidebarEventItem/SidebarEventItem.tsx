@@ -4,11 +4,17 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ChildEvents, ChildEventsInfo } from "../../childEvents";
 import { SidebarEvent } from "../types";
 
+export enum ChainExecutionState {
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  RUNNING = 'running',
+}
+
 interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
-  executionChain?: Array<{ name: string; completed: boolean; children?: Array<{ name: string; completed: boolean }> }>;
+  executionChain?: Array<{ name: string; state: ChainExecutionState; children?: Array<{ name: string; state: string }> }>;
 }
 
 interface SidebarEventItemProps {
@@ -255,17 +261,17 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                     {/* Main execution */}
                     <div className="flex items-center gap-2 px-2 rounded-md w-full min-w-0">
                       <div className="flex-shrink-0">
-                        {execution.completed ? (
+                        {execution.state === ChainExecutionState.COMPLETED ? (
                           React.createElement(resolveIcon("circle-check"), {
                             size: 16,
                             className: "text-green-600"
                           })
-                        ) : event.state === 'discarded' ? (
+                        ) : execution.state === ChainExecutionState.FAILED ? (
                           React.createElement(resolveIcon("x"), {
                             size: 16,
                             className: "text-red-600"
                           })
-                        ) : event.state === 'running' ? (
+                        ) : execution.state === ChainExecutionState.RUNNING ? (
                           React.createElement(resolveIcon("refresh-cw"), {
                             size: 16,
                             className: "text-blue-600 animate-spin"
@@ -289,17 +295,17 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                           })}
                         </div>
                         <div className="flex-shrink-0">
-                          {child.completed ? (
+                          {child.state === ChainExecutionState.COMPLETED ? (
                             React.createElement(resolveIcon("circle-check"), {
                               size: 16,
                               className: "text-green-600"
                             })
-                          ) : event.state === 'discarded' ? (
+                          ) : child.state === ChainExecutionState.FAILED ? (
                             React.createElement(resolveIcon("x"), {
                               size: 16,
                               className: "text-red-600"
                             })
-                          ) : event.state === 'running' ? (
+                          ) : child.state === ChainExecutionState.RUNNING ? (
                             React.createElement(resolveIcon("refresh-cw"), {
                               size: 16,
                               className: "text-blue-600 animate-spin"

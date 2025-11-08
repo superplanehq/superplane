@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import React, { useState } from 'react'
-import { SidebarEventItem } from './SidebarEventItem'
+import { SidebarEventItem, ChainExecutionState } from './SidebarEventItem'
 import { SidebarEvent } from '../types'
 
 const meta: Meta<typeof SidebarEventItem> = {
@@ -363,14 +363,14 @@ export const WithExecutionChain: Story = {
         'Environment': 'production',
       },
       executionChain: [
-        { name: 'Build Docker Image', completed: true },
-        { name: 'Run Unit Tests', completed: true },
-        { name: 'Security Scan', completed: true },
-        { name: 'Deploy to Staging', completed: true },
-        { name: 'Integration Tests', completed: false },
-        { name: 'Deploy to Production', completed: false },
-        { name: 'Health Checks', completed: false },
-        { name: 'Update DNS', completed: false },
+        { name: 'Build Docker Image', state: ChainExecutionState.COMPLETED },
+        { name: 'Run Unit Tests', state: ChainExecutionState.COMPLETED },
+        { name: 'Security Scan', state: ChainExecutionState.COMPLETED },
+        { name: 'Deploy to Staging', state: ChainExecutionState.COMPLETED },
+        { name: 'Integration Tests', state: ChainExecutionState.RUNNING },
+        { name: 'Deploy to Production', state: ChainExecutionState.RUNNING },
+        { name: 'Health Checks', state: ChainExecutionState.RUNNING },
+        { name: 'Update DNS', state: ChainExecutionState.RUNNING },
       ],
     },
   },
@@ -406,12 +406,12 @@ export const WithExecutionChainFailed: Story = {
         'Environment': 'production',
       },
       executionChain: [
-        { name: 'Build Docker Image', completed: true },
-        { name: 'Run Unit Tests', completed: true },
-        { name: 'Security Scan', completed: false },
-        { name: 'Deploy to Staging', completed: false },
-        { name: 'Integration Tests', completed: false },
-        { name: 'Deploy to Production', completed: false },
+        { name: 'Build Docker Image', state: ChainExecutionState.COMPLETED },
+        { name: 'Run Unit Tests', state: ChainExecutionState.COMPLETED },
+        { name: 'Security Scan', state: ChainExecutionState.FAILED },
+        { name: 'Deploy to Staging', state: ChainExecutionState.RUNNING },
+        { name: 'Integration Tests', state: ChainExecutionState.RUNNING },
+        { name: 'Deploy to Production', state: ChainExecutionState.RUNNING },
       ],
     },
   },
@@ -449,58 +449,58 @@ export const WithNestedExecutionChain: Story = {
       executionChain: [
         {
           name: 'Preparation Phase',
-          completed: true,
+          state: ChainExecutionState.COMPLETED,
           children: [
-            { name: 'Validate Configuration', completed: true },
-            { name: 'Check Dependencies', completed: true },
-            { name: 'Reserve Resources', completed: true },
+            { name: 'Validate Configuration', state: ChainExecutionState.COMPLETED },
+            { name: 'Check Dependencies', state: ChainExecutionState.COMPLETED },
+            { name: 'Reserve Resources', state: ChainExecutionState.COMPLETED },
           ]
         },
         {
           name: 'Build Phase',
-          completed: true,
+          state: ChainExecutionState.COMPLETED,
           children: [
-            { name: 'Build API Service', completed: true },
-            { name: 'Build Frontend', completed: true },
-            { name: 'Build Background Jobs', completed: true },
-            { name: 'Build Database Migrations', completed: true },
+            { name: 'Build API Service', state: ChainExecutionState.COMPLETED },
+            { name: 'Build Frontend', state: ChainExecutionState.COMPLETED },
+            { name: 'Build Background Jobs', state: ChainExecutionState.COMPLETED },
+            { name: 'Build Database Migrations', state: ChainExecutionState.COMPLETED },
           ]
         },
         {
           name: 'Test Phase',
-          completed: true,
+          state: ChainExecutionState.COMPLETED,
           children: [
-            { name: 'Unit Tests', completed: true },
-            { name: 'Integration Tests', completed: true },
-            { name: 'Security Scan', completed: true },
+            { name: 'Unit Tests', state: ChainExecutionState.COMPLETED },
+            { name: 'Integration Tests', state: ChainExecutionState.COMPLETED },
+            { name: 'Security Scan', state: ChainExecutionState.COMPLETED },
           ]
         },
         {
           name: 'Deploy to Staging',
-          completed: false,
+          state: ChainExecutionState.RUNNING,
           children: [
-            { name: 'Deploy Database', completed: true },
-            { name: 'Deploy API Service', completed: true },
-            { name: 'Deploy Frontend', completed: false },
-            { name: 'Deploy Background Jobs', completed: false },
+            { name: 'Deploy Database', state: ChainExecutionState.COMPLETED },
+            { name: 'Deploy API Service', state: ChainExecutionState.COMPLETED },
+            { name: 'Deploy Frontend', state: ChainExecutionState.RUNNING },
+            { name: 'Deploy Background Jobs', state: ChainExecutionState.RUNNING },
           ]
         },
         {
           name: 'Staging Tests',
-          completed: false,
+          state: ChainExecutionState.RUNNING,
           children: [
-            { name: 'Smoke Tests', completed: false },
-            { name: 'Performance Tests', completed: false },
-            { name: 'User Acceptance Tests', completed: false },
+            { name: 'Smoke Tests', state: ChainExecutionState.RUNNING },
+            { name: 'Performance Tests', state: ChainExecutionState.RUNNING },
+            { name: 'User Acceptance Tests', state: ChainExecutionState.RUNNING },
           ]
         },
         {
           name: 'Production Deployment',
-          completed: false,
+          state: ChainExecutionState.RUNNING,
           children: [
-            { name: 'Blue-Green Switch', completed: false },
-            { name: 'Health Checks', completed: false },
-            { name: 'Monitor Metrics', completed: false },
+            { name: 'Blue-Green Switch', state: ChainExecutionState.RUNNING },
+            { name: 'Health Checks', state: ChainExecutionState.RUNNING },
+            { name: 'Monitor Metrics', state: ChainExecutionState.RUNNING },
           ]
         },
       ],

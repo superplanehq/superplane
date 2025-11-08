@@ -51,6 +51,7 @@ import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { flattenObject } from "@/lib/utils";
 import { getTriggerRenderer } from "./renderers";
 import { TriggerRenderer } from "./renderers/types";
+import { ChainExecutionState } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -514,28 +515,41 @@ export function WorkflowPageV2() {
             });
 
 
+          const nodesById = workflow?.spec?.nodes?.reduce((acc, node) => {
+            if (!node?.id) return acc;
+            acc[node.id] = node;
+            return acc;
+          }, {} as Record<string, ComponentsNode>);
+
           const chainData = sortedNodeEntries.map((exec) => {
 
-
             // Get the main execution (earliest one)
-            const nodeInfo = workflow?.spec?.nodes?.find((n: any) => n.id === exec.nodeId);
+            const nodeInfo = nodesById?.[exec.nodeId || ''];
 
-            // Map execution state to completion status
-            const getCompletionStatus = (exec: WorkflowsWorkflowNodeExecution) => {
-              if (exec.state === 'STATE_FINISHED' && exec.result === 'RESULT_PASSED') {
-                return true; // Completed successfully
+            const getSidebarEventItemState = (exec: WorkflowsWorkflowNodeExecution) => {
+              if (exec.state === 'STATE_FINISHED') {
+                if (exec.result === 'RESULT_PASSED') {
+                  return ChainExecutionState.COMPLETED; // Completed successfully
+                }
+                return ChainExecutionState.FAILED; // Not completed (running, pending, or failed)
+              };
+
+              if (exec.state === 'STATE_STARTED') {
+                return ChainExecutionState.RUNNING; // Not completed (running, pending, or failed)
               }
-              return false; // Not completed (running, pending, or failed)
+
+              return ChainExecutionState.FAILED;
             };
 
             const mainItem = {
               name: nodeInfo?.name || exec.nodeId || 'Unknown',
-              completed: getCompletionStatus(exec),
+              state: getSidebarEventItemState(exec),
+
               children: exec?.childExecutions && exec.childExecutions.length > 1 ? exec.childExecutions.map(childExec => {
-                const childNodeInfo = workflow?.spec?.nodes?.find((n: any) => n.id === childExec.nodeId);
+                const childNodeInfo = nodesById?.[childExec.nodeId || ''];
                 return {
                   name: childNodeInfo?.name || childExec.nodeId || 'Unknown',
-                  completed: getCompletionStatus(childExec)
+                  state: getSidebarEventItemState(childExec),
                 }
               }) : undefined
             };
