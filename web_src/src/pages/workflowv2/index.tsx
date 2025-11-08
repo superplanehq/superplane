@@ -1783,7 +1783,6 @@ function prepareMergeNode(
   node: ComponentsNode,
   components: ComponentsComponent[],
   nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>,
-  // Include queue items map to surface next item in merge component
   nodeQueueItemsMap?: Record<string, WorkflowsWorkflowNodeQueueItem[]>,
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
@@ -1800,7 +1799,7 @@ function prepareMergeNode(
     lastEvent = {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventState: getRunItemState(execution) === "success" ? ("success" as const) : ("failed" as const),
+      eventState: getRunItemState(execution)
     };
   }
 
