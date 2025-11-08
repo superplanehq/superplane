@@ -55,6 +55,24 @@ func Test__WorkflowNodeExecutionKV(t *testing.T) {
 		require.Error(t, err)
 		require.Equal(t, gorm.ErrRecordNotFound, err)
 	})
+
+	t.Run("FirstNodeExecutionByKVInTransaction ignores finished executions", func(t *testing.T) {
+		tx := database.Conn().Begin()
+		defer tx.Rollback()
+
+		exec := steps.CreateExecution()
+
+		err := CreateWorkflowNodeExecutionKVInTransaction(tx, exec.WorkflowID, exec.NodeID, exec.ID, "test-key", "test-value")
+		require.NoError(t, err)
+
+		// Mark execution as finished
+		exec.State = WorkflowNodeExecutionStateFinished
+		require.NoError(t, tx.Save(exec).Error)
+
+		_, err = FirstNodeExecutionByKVInTransaction(tx, exec.WorkflowID, exec.NodeID, "test-key", "test-value")
+		require.Error(t, err)
+		require.Equal(t, gorm.ErrRecordNotFound, err)
+	})
 }
 
 type WorkflowNodeExecutionKVTesSteps struct {
