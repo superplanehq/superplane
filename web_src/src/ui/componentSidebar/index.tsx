@@ -6,16 +6,8 @@ import { ChildEventsInfo } from "../childEvents";
 import { MetadataItem, MetadataList } from "../metadataList";
 import { SidebarActionsDropdown } from "./SidebarActionsDropdown";
 import { SidebarEventItem } from "./SidebarEventItem";
-import { ExecutionChainItem } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
-
-interface TabData {
-  current?: Record<string, any>;
-  root?: Record<string, any>;
-  payload?: any;
-  executionChain?: ExecutionChainItem[];
-}
-
+import { TabData } from "./SidebarEventItem/SidebarEventItem";
 interface ComponentSidebarProps {
   isOpen?: boolean;
   setIsOpen?: (isOpen: boolean) => void;

@@ -16,7 +16,7 @@ export interface ExecutionChainItem {
   children?: Array<{ name: string; state: ChainExecutionState }>;
 }
 
-interface TabData {
+export interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
