@@ -52,10 +52,15 @@ func (m *Merge) Execute(ctx components.ExecutionContext) error {
 func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
 	merge_group := ctx.RootEventID
 
+	fmt.Println("processing merge for group:", merge_group)
+
 	execID, err := m.findOrCreateExecution(ctx, merge_group)
 	if err != nil {
+		fmt.Println("error finding or creating execution:", err)
 		return err
 	}
+
+	fmt.Println("using execution ID:", execID)
 
 	if err := ctx.DequeueItem(); err != nil {
 		return err
