@@ -2,6 +2,7 @@ package merge
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -11,13 +12,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+// Merge is a component that passes its input downstream on
+// the default channel. The queue/worker layer is responsible
+// for aggregating inputs from multiple parents.
+
 func init() {
 	registry.RegisterComponent("merge", &Merge{})
 }
 
-// Merge is a component that passes its input downstream on
-// the default channel. The queue/worker layer is responsible
-// for aggregating inputs from multiple parents.
 type Merge struct{}
 
 func (m *Merge) Name() string        { return "merge" }
@@ -28,6 +30,13 @@ func (m *Merge) Color() string       { return "gray" }
 
 func (m *Merge) OutputChannels(configuration any) []components.OutputChannel {
 	return []components.OutputChannel{components.DefaultOutputChannel}
+}
+
+type Spec struct {
+	ExecutionTimeout struct {
+		Value int    `json:"value"`
+		Unit  string `json:"unit"`
+	} `json:"executionTimeout"`
 }
 
 func (m *Merge) Configuration() []configuration.Field {
@@ -68,17 +77,13 @@ func (m *Merge) Configuration() []configuration.Field {
 	}
 }
 
-func (m *Merge) Actions() []components.Action { return []components.Action{} }
+func (m *Merge) Actions() []components.Action {
+	return []components.Action{
+		{Name: "timeoutReached"},
+	}
+}
 
 func (m *Merge) Setup(ctx components.SetupContext) error {
-	return nil
-}
-
-func (m *Merge) HandleAction(ctx components.ActionContext) error {
-	return fmt.Errorf("merge does not support actions")
-}
-
-func (m *Merge) Execute(ctx components.ExecutionContext) error {
 	return nil
 }
 
@@ -109,7 +114,9 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
 	}
 
 	if len(md.EventIDs) >= incoming {
-		return m.FinishExecution(ctx, execID, mergeGroup, md)
+		return ctx.FinishExecution(execID, map[string][]any{
+			components.DefaultOutputChannel.Name: {md},
+		})
 	}
 
 	return nil
@@ -171,8 +178,47 @@ func (m *Merge) addEventToMetadata(ctx components.ProcessQueueContext, execID uu
 	return md, nil
 }
 
-func (m *Merge) FinishExecution(ctx components.ProcessQueueContext, execID uuid.UUID, mergeGroup string, md *ExecutionMetadata) error {
-	return ctx.FinishExecution(execID, map[string][]any{
-		components.DefaultOutputChannel.Name: {md},
-	})
+func (m *Merge) HandleAction(ctx components.ActionContext) error {
+	switch ctx.Name {
+	case "timeoutReached":
+		return m.HandleTimeout(ctx)
+	default:
+		return fmt.Errorf("merge does not support action: %s", ctx.Name)
+	}
+}
+
+func (m *Merge) HandleTimeout(ctx components.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		return nil
+	}
+
+	return ctx.ExecutionStateContext.Fail("timeoutReached", "Execution timed out waiting for other inputs")
+}
+
+func (m *Merge) Execute(ctx components.ExecutionContext) error {
+	spec := &Spec{}
+
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return err
+	}
+
+	interval := durationFrom(spec.ExecutionTimeout.Value, spec.ExecutionTimeout.Unit)
+	if interval > 0 {
+		return ctx.RequestContext.ScheduleActionCall("timeoutReached", map[string]any{}, interval)
+	}
+
+	return nil
+}
+
+func durationFrom(value int, unit string) time.Duration {
+	switch unit {
+	case "seconds":
+		return time.Duration(value) * time.Second
+	case "minutes":
+		return time.Duration(value) * time.Minute
+	case "hours":
+		return time.Duration(value) * time.Hour
+	default:
+		return 0
+	}
 }
