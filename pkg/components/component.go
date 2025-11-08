@@ -212,6 +212,19 @@ type ProcessQueueContext struct {
 	// Convenience method to avoid boilerplate in components that just want default behavior,
 	// where an execution is created and the item is dequeued.
 	DefaultProcessing func() error
+
+	// GetExecutionMetadata retrieves the execution metadata for a given execution ID.
+	GetExecutionMetadata func(uuid.UUID) (map[string]any, error)
+	SetExecutionMetadata func(uuid.UUID, any) error
+
+	// CountIncomingEdges returns the number of incoming edges for this node
+	CountIncomingEdges func() (int, error)
+
+	// FinishExecution marks the execution as finished with the provided outputs.
+	FinishExecution func(execID uuid.UUID, outputs map[string][]any) error
+
+	FindExecutionIDByKV func(key string, value string) (uuid.UUID, bool, error)
+	SetExecutionKV      func(execID uuid.UUID, key string, value string) error
 }
 
 type AuthContext interface {
