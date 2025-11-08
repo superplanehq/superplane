@@ -172,7 +172,6 @@ export function WorkflowPageV2() {
   // Execution chain data based on node executions from store
   const {
     executionChainMap,
-    isLoading: executionChainLoading,
   } = useExecutionChainData(workflowId!, nodeExecutionsMap);
 
 
@@ -234,8 +233,7 @@ export function WorkflowPageV2() {
       workflowLoading ||
       triggersLoading ||
       blueprintsLoading ||
-      componentsLoading ||
-      executionChainLoading
+      componentsLoading
     ) {
       return { nodes: [], edges: [] };
     }
@@ -265,7 +263,6 @@ export function WorkflowPageV2() {
     triggersLoading,
     blueprintsLoading,
     componentsLoading,
-    executionChainLoading,
     organizationId,
   ]);
 
@@ -320,21 +317,22 @@ export function WorkflowPageV2() {
     [workflow?.spec?.nodes, workflowId, queryClient, getNodeData, loadNodeDataMethod],
   );
 
+  const workflowEdges = useMemo(() => workflow?.spec?.edges || [], [workflow?.spec?.edges]);
+
   /**
    * Builds a topological path to find all nodes that should execute before the given target node.
    * This follows the directed graph structure of the workflow to determine execution order.
    */
   const getNodesBeforeTarget = useCallback(
     (targetNodeId: string): Set<string> => {
-      if (!workflow?.spec?.nodes || !workflow?.spec?.edges) {
+      if (workflowEdges.length === 0) {
         return new Set();
       }
 
-      const edges = workflow.spec.edges;
       const nodesBefore = new Set<string>();
 
       const incomingEdges = new Map<string, string[]>();
-      edges.forEach(edge => {
+      workflowEdges.forEach(edge => {
         if (!incomingEdges.has(edge.targetId!)) {
           incomingEdges.set(edge.targetId!, []);
         }
@@ -356,7 +354,7 @@ export function WorkflowPageV2() {
       dfs(targetNodeId);
       return nodesBefore;
     },
-    [workflow?.spec?.nodes, workflow?.spec?.edges]
+    [workflowEdges]
   );
 
   const getTabData = useCallback(
@@ -1015,8 +1013,7 @@ export function WorkflowPageV2() {
     workflowLoading ||
     triggersLoading ||
     blueprintsLoading ||
-    componentsLoading ||
-    executionChainLoading
+    componentsLoading
   ) {
     return (
       <div className="flex items-center justify-center h-screen">
