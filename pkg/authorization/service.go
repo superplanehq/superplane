@@ -151,8 +151,10 @@ func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName 
 		return fmt.Errorf("failed to delete group metadata: %w", err)
 	}
 
-	// Get policies to remove before entering transaction
-	// RemoveFilteredGroupingPolicy is not available on Transaction, so we query first
+	//
+	// casbin.Transaction does not expose RemoveFilteredGruopingPolicy,
+	// so we need to fetch them before.
+	//
 	groupRolePolicies, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
 	if err != nil {
 		tx.Rollback()
@@ -166,23 +168,27 @@ func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName 
 	}
 
 	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
+
+		//
 		// Remove group role assignments (group -> role -> domain)
+		//
 		for _, policy := range groupRolePolicies {
-			// Convert []string to []interface{} for variadic parameter
-			params := make([]interface{}, len(policy))
+			params := make([]any, len(policy))
 			for i, v := range policy {
 				params[i] = v
 			}
+
 			_, err := casbinTx.RemoveGroupingPolicy(params...)
 			if err != nil {
 				return fmt.Errorf("failed to remove group role assignment: %w", err)
 			}
 		}
 
+		//
 		// Remove users from group (user -> group -> domain)
+		//
 		for _, policy := range userGroupPolicies {
-			// Convert []string to []interface{} for variadic parameter
-			params := make([]interface{}, len(policy))
+			params := make([]any, len(policy))
 			for i, v := range policy {
 				params[i] = v
 			}
@@ -228,19 +234,15 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 	}
 
 	tx := database.Conn().Begin()
-	var updatedDisplayName, updatedDescription string
-	if displayName != "" {
-		updatedDisplayName = displayName
-	} else {
-		updatedDisplayName = currentGroupMetadata.DisplayName
-	}
-	if description != "" {
-		updatedDescription = description
-	} else {
-		updatedDescription = currentGroupMetadata.Description
-	}
+	err = models.UpsertGroupMetadataInTransaction(
+		tx,
+		groupName,
+		domainType,
+		domainID,
+		useIfNonEmpty(displayName, currentGroupMetadata.DisplayName),
+		useIfNonEmpty(description, currentGroupMetadata.Description),
+	)
 
-	err = models.UpsertGroupMetadataInTransaction(tx, groupName, domainType, domainID, updatedDisplayName, updatedDescription)
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to update group metadata: %w", err)
@@ -1142,8 +1144,11 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 		}
 	}
 
-	// Get policies to remove before entering transaction
-	// RemoveFilteredPolicy and RemoveFilteredGroupingPolicy are not available on Transaction
+	//
+	// RemoveFilteredPolicy and RemoveFilteredGroupingPolicy
+	// are not available in casbin.Transaction,
+	// so we need to fetch the policies before deleting them.
+	//
 	existingPoliciesToRemove, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 	if err != nil {
 		return fmt.Errorf("failed to get existing policies for role %s: %w", roleDefinition.Name, err)
@@ -1164,8 +1169,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
 		// Remove existing policies
 		for _, policy := range existingPoliciesToRemove {
-			// Convert []string to []interface{} for variadic parameter
-			params := make([]interface{}, len(policy))
+			params := make([]any, len(policy))
 			for i, v := range policy {
 				params[i] = v
 			}
@@ -1177,8 +1181,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 
 		// Remove existing inheritance
 		for _, policy := range existingGroupingPoliciesToRemove {
-			// Convert []string to []interface{} for variadic parameter
-			params := make([]interface{}, len(policy))
+			params := make([]any, len(policy))
 			for i, v := range policy {
 				params[i] = v
 			}
@@ -1228,8 +1231,11 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 		return fmt.Errorf("role %s not found in domain %s", roleName, domain)
 	}
 
-	// Get policies to remove before entering transaction
-	// RemoveFilteredPolicy and RemoveFilteredGroupingPolicy are not available on Transaction
+	//
+	// RemoveFilteredPolicy and RemoveFilteredGroupingPolicy
+	// are not available in casbin.Transaction,
+	// so we need to fetch the policies before deleting them.
+	//
 	policiesToRemove, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 	if err != nil {
 		return fmt.Errorf("failed to get policies for role %s: %w", roleName, err)
@@ -1255,8 +1261,7 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 	err = a.enforcer.WithTransaction(context.Background(), func(casbinTx *casbin.Transaction) error {
 		// Remove policies where this role is the subject
 		for _, policy := range policiesToRemove {
-			// Convert []string to []interface{} for variadic parameter
-			params := make([]interface{}, len(policy))
+			params := make([]any, len(policy))
 			for i, v := range policy {
 				params[i] = v
 			}
@@ -1268,8 +1273,7 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 
 		// Remove inheritance where this role inherits from others
 		for _, policy := range inheritancePoliciesToRemove {
-			// Convert []string to []interface{} for variadic parameter
-			params := make([]interface{}, len(policy))
+			params := make([]any, len(policy))
 			for i, v := range policy {
 				params[i] = v
 			}
@@ -1281,8 +1285,7 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 
 		// Remove users/groups assigned to this role
 		for _, policy := range usersWithRolePolicies {
-			// Convert []string to []interface{} for variadic parameter
-			params := make([]interface{}, len(policy))
+			params := make([]any, len(policy))
 			for i, v := range policy {
 				params[i] = v
 			}
@@ -1588,4 +1591,12 @@ func prefixUserID(userID string) string {
 
 func prefixDomain(domainType string, domainID string) string {
 	return fmt.Sprintf("%s:%s", domainType, domainID)
+}
+
+func useIfNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+
+	return b
 }
