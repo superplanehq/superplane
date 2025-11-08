@@ -204,3 +204,24 @@ func (e *WorkflowEvent) RoutedInTransaction(tx *gorm.DB) error {
 	e.State = WorkflowEventStateRouted
 	return tx.Save(e).Error
 }
+
+// FindLastEventPerNode finds the most recent event for each node in a workflow
+// using DISTINCT ON to get one event per node_id, ordered by created_at DESC
+func FindLastEventPerNode(workflowID uuid.UUID) ([]WorkflowEvent, error) {
+	var events []WorkflowEvent
+	err := database.Conn().
+		Raw(`
+			SELECT DISTINCT ON (node_id) *
+			FROM workflow_events
+			WHERE workflow_id = ?
+			ORDER BY node_id, created_at DESC
+		`, workflowID).
+		Scan(&events).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}

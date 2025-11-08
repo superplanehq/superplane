@@ -1,5 +1,5 @@
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { QueryClient, useQueries, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -23,7 +23,6 @@ import { organizationKeys, useOrganizationRoles, useOrganizationUsers } from "@/
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import {
-  nodeEventsQueryOptions,
   useTriggers,
   useUpdateWorkflow,
   useWorkflow,
@@ -75,14 +74,6 @@ export function WorkflowPageV2() {
   useOrganizationRoles(organizationId!);
 
   /**
-   * Track which node IDs have been persisted to the server.
-   * This helps us avoid unnecessary loading states when nodes
-   * are added to the workflow, but not persisted yet.
-   */
-  const [persistedNodeIds, setPersistedNodeIds] = useState<Set<string>>(new Set());
-  const isInitialLoadRef = useRef(true);
-
-  /**
    * Track if we've already done the initial fit to view.
    * This ref persists across re-renders to prevent viewport changes on save.
    */
@@ -129,53 +120,6 @@ export function WorkflowPageV2() {
   // Revert functionality - track initial workflow snapshot
   const [initialWorkflowSnapshot, setInitialWorkflowSnapshot] = useState<WorkflowsWorkflow | null>(null);
 
-  /**
-   * Initialize persisted node IDs when workflow is first loaded
-   * This must happen during render (not in useEffect) to ensure it's available for the query hooks.
-   */
-  if (workflow && isInitialLoadRef.current) {
-    const nodeIds = workflow.spec?.nodes?.map((n) => n.id!) || [];
-    setPersistedNodeIds(new Set(nodeIds));
-    isInitialLoadRef.current = false;
-  }
-
-  //
-  // Get last event for triggers
-  // Memoize to prevent unnecessary re-renders and query recreations
-  //
-  const triggerNodes = useMemo(
-    () => workflow?.spec?.nodes?.filter((node) => node.type === "TYPE_TRIGGER") || [],
-    [workflow?.spec?.nodes],
-  );
-
-  const componentNodes = useMemo(
-    () => workflow?.spec?.nodes?.filter((node) => node.type === "TYPE_COMPONENT") || [],
-    [workflow?.spec?.nodes],
-  );
-
-  const filterComponentNodes = useMemo(
-    () => componentNodes.filter((node) => node.component?.name === "filter"),
-    [componentNodes],
-  );
-
-  /**
-   * Filter to only include persisted nodes for data fetching
-   * This prevents unnecessary loading states when new nodes are added locally.
-   */
-  const persistedTriggerNodes = useMemo(
-    () => triggerNodes.filter((node) => persistedNodeIds.has(node.id!)),
-    [triggerNodes, persistedNodeIds],
-  );
-
-  const persistedFilterNodes = useMemo(
-    () => filterComponentNodes.filter((node) => persistedNodeIds.has(node.id!)),
-    [filterComponentNodes, persistedNodeIds],
-  );
-
-  const { eventsMap: nodeEventsMap, isLoading: nodeEventsLoading } = useTriggerNodeEvents(
-    workflowId!,
-    persistedTriggerNodes.concat(persistedFilterNodes),
-  );
 
   // Use Zustand store for execution data - extract only the methods to avoid recreating callbacks
   // Subscribe to version to ensure React detects all updates
@@ -193,14 +137,16 @@ export function WorkflowPageV2() {
     }
   }, [workflow, initializeFromWorkflow]);
 
-  // Build maps from store for canvas display (using initial data from workflow.status)
+  // Build maps from store for canvas display (using initial data from workflow.status and websocket updates)
   // Rebuild whenever store version changes (indicates data was updated)
-  const { nodeExecutionsMap, nodeQueueItemsMap } = useMemo<{
+  const { nodeExecutionsMap, nodeQueueItemsMap, nodeEventsMap } = useMemo<{
     nodeExecutionsMap: Record<string, WorkflowsWorkflowNodeExecution[]>;
     nodeQueueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]>;
+    nodeEventsMap: Record<string, WorkflowsWorkflowEvent[]>;
   }>(() => {
     const executionsMap: Record<string, WorkflowsWorkflowNodeExecution[]> = {};
     const queueItemsMap: Record<string, WorkflowsWorkflowNodeQueueItem[]> = {};
+    const eventsMap: Record<string, WorkflowsWorkflowEvent[]> = {};
 
     // Get current store data
     const storeData = useNodeExecutionStore.getState().data;
@@ -212,9 +158,12 @@ export function WorkflowPageV2() {
       if (data.queueItems.length > 0) {
         queueItemsMap[nodeId] = data.queueItems;
       }
+      if (data.events.length > 0) {
+        eventsMap[nodeId] = data.events;
+      }
     });
 
-    return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap };
+    return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
 
   const saveWorkflowSnapshot = useCallback(
@@ -275,8 +224,7 @@ export function WorkflowPageV2() {
       workflowLoading ||
       triggersLoading ||
       blueprintsLoading ||
-      componentsLoading ||
-      nodeEventsLoading
+      componentsLoading
     ) {
       return { nodes: [], edges: [] };
     }
@@ -306,7 +254,6 @@ export function WorkflowPageV2() {
     triggersLoading,
     blueprintsLoading,
     componentsLoading,
-    nodeEventsLoading,
   ]);
 
   const getSidebarData = useCallback(
@@ -899,17 +846,6 @@ export function WorkflowPageV2() {
         return node;
       });
 
-      // Save previous state for rollback
-      const previousWorkflow = queryClient.getQueryData(workflowKeys.detail(organizationId, workflowId));
-
-      // Optimistically update the cache to prevent flicker
-      const updatedWorkflow = {
-        ...workflow,
-        nodes: updatedNodes,
-      };
-
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-
       try {
         await updateWorkflowMutation.mutateAsync({
           name: workflow.metadata?.name!,
@@ -917,10 +853,6 @@ export function WorkflowPageV2() {
           nodes: updatedNodes,
           edges: workflow.spec?.edges,
         });
-
-        // Update persisted node IDs after successful save
-        const nodeIds = updatedNodes?.map((n) => n.id!) || [];
-        setPersistedNodeIds(new Set(nodeIds));
 
         showSuccessToast("Canvas changes saved");
         setHasUnsavedChanges(false);
@@ -932,14 +864,9 @@ export function WorkflowPageV2() {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
-
-        // Rollback to previous state on error
-        if (previousWorkflow) {
-          queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), previousWorkflow);
-        }
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient],
+    [workflow, organizationId, workflowId, updateWorkflowMutation],
   );
 
   // Show loading indicator while data is being fetched
@@ -947,8 +874,7 @@ export function WorkflowPageV2() {
     workflowLoading ||
     triggersLoading ||
     blueprintsLoading ||
-    componentsLoading ||
-    nodeEventsLoading
+    componentsLoading
   ) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -1016,31 +942,6 @@ export function WorkflowPageV2() {
     />
   );
 }
-
-function useTriggerNodeEvents(workflowId: string, triggerNodes: ComponentsNode[]) {
-  const results = useQueries({
-    queries: triggerNodes.map((node) => nodeEventsQueryOptions(workflowId, node.id!, { limit: 10 })),
-  });
-
-  // Check if any queries are still loading
-  const isLoading = results.some((result) => result.isLoading);
-
-  // Build a map of nodeId -> last event
-  // Memoize to prevent unnecessary re-renders downstream
-  const eventsMap = useMemo(() => {
-    const map: Record<string, WorkflowsWorkflowEvent[]> = {};
-    triggerNodes.forEach((node, index) => {
-      const result = results[index];
-      if (result.data?.events && result.data.events.length > 0) {
-        map[node.id!] = result.data.events;
-      }
-    });
-    return map;
-  }, [results, triggerNodes]);
-
-  return { eventsMap, isLoading };
-}
-
 
 function prepareData(
   workflow: WorkflowsWorkflow,

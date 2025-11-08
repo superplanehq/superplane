@@ -107,6 +107,7 @@ func Test__DescribeWorkflow(t *testing.T) {
 		require.NotNil(t, response.Workflow.Status)
 		assert.NotNil(t, response.Workflow.Status.LastExecutions)
 		assert.NotNil(t, response.Workflow.Status.NextQueueItems)
+		assert.NotNil(t, response.Workflow.Status.LastEvents)
 	})
 
 	t.Run("status includes last execution per node", func(t *testing.T) {
@@ -264,6 +265,76 @@ func Test__DescribeWorkflow(t *testing.T) {
 		require.NotNil(t, node2QueueItem)
 	})
 
+	t.Run("status includes last event per node", func(t *testing.T) {
+		//
+		// Create a workflow with two nodes
+		//
+		workflow, _ := support.CreateWorkflow(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.WorkflowNode{
+				{
+					NodeID: "node-1",
+					Name:   "First Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+				{
+					NodeID: "node-2",
+					Name:   "Second Node",
+					Type:   models.NodeTypeComponent,
+					Ref: datatypes.NewJSONType(models.NodeRef{
+						Component: &models.ComponentRef{Name: "noop"},
+					}),
+				},
+			},
+			[]models.Edge{},
+		)
+
+		//
+		// Create multiple events for node-1 (older one first)
+		//
+		oldEvent := support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+		// Wait a bit to ensure different timestamps
+		support.EmitWorkflowEventForNode(t, workflow.ID, "node-1", "default", nil)
+
+		//
+		// Create one event for node-2
+		//
+		support.EmitWorkflowEventForNode(t, workflow.ID, "node-2", "default", nil)
+
+		//
+		// Describe the workflow
+		//
+		response, err := DescribeWorkflow(context.Background(), r.Registry, r.Organization.ID.String(), workflow.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response.Workflow.Status)
+
+		//
+		// Verify we get exactly one event per node (the latest one)
+		//
+		assert.Len(t, response.Workflow.Status.LastEvents, 2)
+
+		// Verify the latest event for node-1 is NOT the old one
+		var node1Event *models.WorkflowEvent
+		var node2Event *models.WorkflowEvent
+		for _, event := range response.Workflow.Status.LastEvents {
+			if event.NodeId == "node-1" {
+				node1Event = &models.WorkflowEvent{ID: uuid.MustParse(event.Id)}
+			}
+			if event.NodeId == "node-2" {
+				node2Event = &models.WorkflowEvent{ID: uuid.MustParse(event.Id)}
+			}
+		}
+
+		require.NotNil(t, node1Event)
+		require.NotNil(t, node2Event)
+		assert.NotEqual(t, oldEvent.ID.String(), node1Event.ID.String(), "Should return the latest event, not the old one")
+	})
+
 	t.Run("status is empty when no executions or queue items exist", func(t *testing.T) {
 		//
 		// Create a workflow with nodes but no executions or queue items
@@ -297,5 +368,6 @@ func Test__DescribeWorkflow(t *testing.T) {
 		//
 		assert.Empty(t, response.Workflow.Status.LastExecutions)
 		assert.Empty(t, response.Workflow.Status.NextQueueItems)
+		assert.Empty(t, response.Workflow.Status.LastEvents)
 	})
 }
