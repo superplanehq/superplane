@@ -45,8 +45,6 @@ func (m *Merge) HandleAction(ctx components.ActionContext) error {
 }
 
 func (m *Merge) Execute(ctx components.ExecutionContext) error {
-	// do nothing, all work is essentially done in the ProcessQueueItem
-	// Eventually, we will add timeout handling here
 	return nil
 }
 

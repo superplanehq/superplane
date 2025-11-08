@@ -277,6 +277,11 @@ func (e *WorkflowNodeExecution) Start() error {
 	return e.StartInTransaction(database.Conn())
 }
 
+func (e *WorkflowNodeExecution) IsMergeNode(node *WorkflowNode) bool {
+	ref := node.Ref.Data()
+	return ref.Component != nil && ref.Component.Name == "merge"
+}
+
 func (e *WorkflowNodeExecution) StartInTransaction(tx *gorm.DB) error {
 	//
 	// Update the workflow node state to processing.
@@ -286,7 +291,17 @@ func (e *WorkflowNodeExecution) StartInTransaction(tx *gorm.DB) error {
 		return err
 	}
 
-	if node != nil {
+	//
+	// TODO:
+	//
+	// It is not correct to check here if it is a "merge" node.
+	// It should not be part of the engine.
+	//
+	// For now, we keep this behavior here to avoid changing too much logic at once.
+	// Next step is to move this logic to the component level and let the component
+	// decide if it wants to update the node state when an execution starts.
+	//
+	if node != nil && !e.IsMergeNode(node) {
 		err = node.UpdateState(tx, WorkflowNodeStateProcessing)
 		if err != nil {
 			return err
