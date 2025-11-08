@@ -846,17 +846,6 @@ export function WorkflowPageV2() {
         return node;
       });
 
-      // Save previous state for rollback
-      const previousWorkflow = queryClient.getQueryData(workflowKeys.detail(organizationId, workflowId));
-
-      // Optimistically update the cache to prevent flicker
-      const updatedWorkflow = {
-        ...workflow,
-        nodes: updatedNodes,
-      };
-
-      queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), updatedWorkflow);
-
       try {
         await updateWorkflowMutation.mutateAsync({
           name: workflow.metadata?.name!,
@@ -875,14 +864,9 @@ export function WorkflowPageV2() {
         console.error("Failed to save changes to the canvas:", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
         showErrorToast(errorMessage);
-
-        // Rollback to previous state on error
-        if (previousWorkflow) {
-          queryClient.setQueryData(workflowKeys.detail(organizationId, workflowId), previousWorkflow);
-        }
       }
     },
-    [workflow, organizationId, workflowId, updateWorkflowMutation, queryClient],
+    [workflow, organizationId, workflowId, updateWorkflowMutation],
   );
 
   // Show loading indicator while data is being fetched
