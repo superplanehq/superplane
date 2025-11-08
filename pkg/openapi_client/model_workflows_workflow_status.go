@@ -22,6 +22,7 @@ var _ MappedNullable = &WorkflowsWorkflowStatus{}
 type WorkflowsWorkflowStatus struct {
 	LastExecutions []WorkflowsWorkflowNodeExecution `json:"lastExecutions,omitempty"`
 	NextQueueItems []WorkflowsWorkflowNodeQueueItem `json:"nextQueueItems,omitempty"`
+	LastEvents []WorkflowsWorkflowEvent `json:"lastEvents,omitempty"`
 }
 
 // NewWorkflowsWorkflowStatus instantiates a new WorkflowsWorkflowStatus object
@@ -105,6 +106,38 @@ func (o *WorkflowsWorkflowStatus) SetNextQueueItems(v []WorkflowsWorkflowNodeQue
 	o.NextQueueItems = v
 }
 
+// GetLastEvents returns the LastEvents field value if set, zero value otherwise.
+func (o *WorkflowsWorkflowStatus) GetLastEvents() []WorkflowsWorkflowEvent {
+	if o == nil || IsNil(o.LastEvents) {
+		var ret []WorkflowsWorkflowEvent
+		return ret
+	}
+	return o.LastEvents
+}
+
+// GetLastEventsOk returns a tuple with the LastEvents field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *WorkflowsWorkflowStatus) GetLastEventsOk() ([]WorkflowsWorkflowEvent, bool) {
+	if o == nil || IsNil(o.LastEvents) {
+		return nil, false
+	}
+	return o.LastEvents, true
+}
+
+// HasLastEvents returns a boolean if a field has been set.
+func (o *WorkflowsWorkflowStatus) HasLastEvents() bool {
+	if o != nil && !IsNil(o.LastEvents) {
+		return true
+	}
+
+	return false
+}
+
+// SetLastEvents gets a reference to the given []WorkflowsWorkflowEvent and assigns it to the LastEvents field.
+func (o *WorkflowsWorkflowStatus) SetLastEvents(v []WorkflowsWorkflowEvent) {
+	o.LastEvents = v
+}
+
 func (o WorkflowsWorkflowStatus) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o WorkflowsWorkflowStatus) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.NextQueueItems) {
 		toSerialize["nextQueueItems"] = o.NextQueueItems
+	}
+	if !IsNil(o.LastEvents) {
+		toSerialize["lastEvents"] = o.LastEvents
 	}
 	return toSerialize, nil
 }

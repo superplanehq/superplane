@@ -888,6 +888,7 @@ export type WorkflowsWorkflowSpec = {
 export type WorkflowsWorkflowStatus = {
     lastExecutions?: Array<WorkflowsWorkflowNodeExecution>;
     nextQueueItems?: Array<WorkflowsWorkflowNodeQueueItem>;
+    lastEvents?: Array<WorkflowsWorkflowEvent>;
 };
 
 export type GooglerpcStatus = {

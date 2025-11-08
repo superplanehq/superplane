@@ -4777,6 +4777,13 @@
             "type": "object",
             "$ref": "#/definitions/WorkflowsWorkflowNodeQueueItem"
           }
+        },
+        "lastEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/WorkflowsWorkflowEvent"
+          }
         }
       }
     },

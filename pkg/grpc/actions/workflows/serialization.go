@@ -95,6 +95,17 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workfl
 		return nil
 	}
 
+	// Fetch last events per node
+	lastEvents, err := models.FindLastEventPerNode(workflow.ID)
+	if err != nil {
+		return nil
+	}
+
+	serializedEvents, err := SerializeWorkflowEvents(lastEvents)
+	if err != nil {
+		return nil
+	}
+
 	return &pb.Workflow{
 		Metadata: &pb.Workflow_Metadata{
 			Id:             workflow.ID.String(),
@@ -112,6 +123,7 @@ func SerializeWorkflow(workflow *models.Workflow, includeStatus bool) *pb.Workfl
 		Status: &pb.Workflow_Status{
 			LastExecutions: serializedExecutions,
 			NextQueueItems: serializedQueueItems,
+			LastEvents:     serializedEvents,
 		},
 	}
 }
