@@ -526,10 +526,11 @@ export function WorkflowPageV2() {
             const mainItem = {
               name: nodeInfo?.name || exec.nodeId || 'Unknown',
               state: getSidebarEventItemState(exec),
-              children: exec?.childExecutions && exec.childExecutions.length > 1 ? exec.childExecutions.map(childExec => {
-                const childNodeInfo = nodesById?.[childExec.nodeId || ''];
+              children: exec?.childExecutions && exec.childExecutions.length > 0 ? exec.childExecutions.map(childExec => {
+                const childNodeId = childExec?.nodeId?.split(":")?.at(-1);
+
                 return {
-                  name: childNodeInfo?.name || childExec.nodeId || 'Unknown',
+                  name: childNodeId || 'Unknown',
                   state: getSidebarEventItemState(childExec),
                 }
               }) : undefined
