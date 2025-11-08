@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,22 +69,8 @@ func FindWorkflowNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*Workfl
 }
 
 func ListWorkflowNodesReady() ([]WorkflowNode, error) {
-	var nodesdebug []WorkflowNode
-	err := database.Conn().
-		Where("type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
-		Find(&nodesdebug).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, n := range nodesdebug {
-		fmt.Println("Node:", n.NodeID, "State:", n.State, "Type:", n.Type)
-	}
-
 	var nodes []WorkflowNode
-	err = database.Conn().
+	err := database.Conn().
 		Where("state = ?", WorkflowNodeStateReady).
 		Where("type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
 		Find(&nodes).
