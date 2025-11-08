@@ -18,6 +18,10 @@ func NewExecutionStateContext(tx *gorm.DB, execution *models.WorkflowNodeExecuti
 	return &ExecutionStateContext{tx: tx, execution: execution}
 }
 
+func (s *ExecutionStateContext) IsFinished() bool {
+	return s.execution.State == models.WorkflowNodeExecutionStateFinished
+}
+
 func (s *ExecutionStateContext) Pass(outputs map[string][]any) error {
 	events, err := s.execution.PassInTransaction(s.tx, outputs)
 	if err != nil {

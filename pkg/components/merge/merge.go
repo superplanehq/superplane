@@ -181,9 +181,17 @@ func (m *Merge) addEventToMetadata(ctx components.ProcessQueueContext, execID uu
 func (m *Merge) HandleAction(ctx components.ActionContext) error {
 	switch ctx.Name {
 	case "timeoutReached":
-		return ctx.ExecutionStateContext.Fail("timeoutReached", "Execution timed out waiting for other inputs")
+		return m.HandleTimeout(ctx)
 	default:
 		return fmt.Errorf("merge does not support action: %s", ctx.Name)
+	}
+}
+
+func (m *Merge) HandleTimeout(ctx components.ActionContext) error {
+	if ctx.ExecutionStateContext.IsFinished() {
+		return nil
+	} else {
+		return ctx.ExecutionStateContext.Fail("timeoutReached", "Execution timed out waiting for other inputs")
 	}
 }
 
