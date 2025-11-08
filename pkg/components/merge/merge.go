@@ -7,6 +7,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -58,6 +59,10 @@ func (m *Merge) ProcessQueueItem(ctx components.ProcessQueueContext) error {
 	}
 
 	if err := ctx.DequeueItem(); err != nil {
+		return err
+	}
+
+	if err := ctx.UpdateNodeState(models.WorkflowNodeStateReady); err != nil {
 		return err
 	}
 

@@ -59,8 +59,14 @@ func BuildProcessQueueContext(tx *gorm.DB, node *models.WorkflowNode, queueItem 
 		return execution.ID, nil
 	}
 
-	ctx.DequeueItem = func() error { return queueItem.Delete(tx) }
-	ctx.UpdateNodeState = func(state string) error { return node.UpdateState(tx, state) }
+	ctx.DequeueItem = func() error {
+		return queueItem.Delete(tx)
+	}
+
+	ctx.UpdateNodeState = func(state string) error {
+		return node.UpdateState(tx, state)
+	}
+
 	ctx.DefaultProcessing = func() error {
 		if _, err := ctx.CreateExecution(); err != nil {
 			return err

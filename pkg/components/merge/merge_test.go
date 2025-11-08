@@ -26,10 +26,12 @@ func Test_Merge(t *testing.T) {
 	steps.ProcessFirstEvent(m)
 	steps.AssertNodeExecutionCount(1)
 	steps.AssertExecutionPending()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
 
 	steps.ProcessSecondEvent(m)
 	steps.AssertNodeExecutionCount(1)
 	steps.AssertExecutionFinished()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
 
 	steps.AssertQueueIsEmpty()
 }
@@ -228,4 +230,10 @@ func (s *MergeTestSteps) AssertQueueIsEmpty() {
 	var count int64
 	require.NoError(s.t, s.Tx.Model(&models.WorkflowNodeQueueItem{}).Where("node_id = ?", s.MergeNode.NodeID).Count(&count).Error)
 	assert.Equal(s.t, int64(0), count)
+}
+
+func (s *MergeTestSteps) AssertNodeIsAllowedToProcessNextQueueItem() {
+	var node models.WorkflowNode
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&node).Error)
+	assert.Equal(s.t, models.WorkflowNodeStateReady, node.State)
 }
