@@ -10,6 +10,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { isFieldRequired, validateFieldValue } from "@/utils/components";
 
 interface NodeConfigurationModalProps {
+  mode: "create" | "edit";
   isOpen: boolean;
   onClose: () => void;
   nodeName: string;
@@ -22,6 +23,7 @@ interface NodeConfigurationModalProps {
 }
 
 export function NodeConfigurationModal({
+  mode,
   isOpen,
   onClose,
   nodeName,
@@ -141,6 +143,7 @@ export function NodeConfigurationModal({
   };
 
   const displayLabel = nodeLabel || nodeName || "Node configuration";
+  const title = mode === "edit" ? `Edit ${displayLabel}` : `New ${displayLabel}`;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -150,7 +153,7 @@ export function NodeConfigurationModal({
         aria-describedby={undefined} /* Disable DialogDescription */
       >
         <DialogHeader className="px-6 pt-6 pb-0 text-left">
-          <DialogTitle>New {displayLabel}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[80vh]">
           <div className="p-6">
@@ -158,8 +161,9 @@ export function NodeConfigurationModal({
               {/* Node identification section */}
               <div className="flex flex-col  gap-2 h-[60px]">
                 <Label
-                  className={`min-w-[100px] text-left ${showValidation && validationErrors.has("nodeName") ? "text-red-600 dark:text-red-400" : ""
-                    }`}
+                  className={`min-w-[100px] text-left ${
+                    showValidation && validationErrors.has("nodeName") ? "text-red-600 dark:text-red-400" : ""
+                  }`}
                 >
                   Node Name
                   <span className="text-red-500 ml-1">*</span>
@@ -174,8 +178,9 @@ export function NodeConfigurationModal({
                   onChange={(e) => setCurrentNodeName(e.target.value)}
                   placeholder="Enter a name for this node"
                   autoFocus
-                  className={`flex-1 ${showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
-                    }`}
+                  className={`flex-1 ${
+                    showValidation && validationErrors.has("nodeName") ? "border-red-500 border-2" : ""
+                  }`}
                 />
               </div>
 
@@ -221,7 +226,7 @@ export function NodeConfigurationModal({
                 Cancel
               </Button>
               <Button data-testid="add-node-button" variant="default" onClick={handleSave}>
-                Add
+                {mode === "edit" ? "Save" : "Add"}
               </Button>
             </DialogFooter>
           </div>

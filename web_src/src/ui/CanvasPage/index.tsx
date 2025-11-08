@@ -8,14 +8,15 @@ import {
   type Node as ReactFlowNode,
 } from "@xyflow/react";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ConfigurationField } from "@/api-client";
 import { AiSidebar } from "../ai";
 import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import type { ChildEventsInfo } from "../childEvents";
 import { ComponentSidebar } from "../componentSidebar";
+import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import type { MetadataItem } from "../metadataList";
 import { ViewToggle } from "../ViewToggle";
@@ -26,7 +27,6 @@ import { Header, type BreadcrumbItem } from "./Header";
 import { NodeConfigurationModal } from "./NodeConfigurationModal";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 
 export interface SidebarEvent {
   id: string;
@@ -289,18 +289,15 @@ function CanvasPage(props: CanvasPageProps) {
     [emitModalData, props],
   );
 
-  const handleBuildingBlockDrop = useCallback(
-    (block: BuildingBlock, position?: { x: number; y: number }) => {
-      setNewNodeData({
-        buildingBlock: block,
-        nodeName: block.name || "",
-        displayLabel: block.label || block.name || "",
-        configuration: {},
-        position,
-      });
-    },
-    [],
-  );
+  const handleBuildingBlockDrop = useCallback((block: BuildingBlock, position?: { x: number; y: number }) => {
+    setNewNodeData({
+      buildingBlock: block,
+      nodeName: block.name || "",
+      displayLabel: block.label || block.name || "",
+      configuration: {},
+      position,
+    });
+  }, []);
 
   const handleSidebarToggle = useCallback(
     (open: boolean) => {
@@ -424,6 +421,7 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Edit existing node modal */}
       {editingNodeData && (
         <NodeConfigurationModal
+          mode="edit"
           isOpen={true}
           onClose={() => setEditingNodeData(null)}
           nodeName={editingNodeData.nodeName}
@@ -439,6 +437,7 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Add new node modal */}
       {newNodeData && (
         <NodeConfigurationModal
+          mode="create"
           isOpen={true}
           onClose={() => setNewNodeData(null)}
           nodeName={newNodeData.nodeName}
@@ -530,7 +529,10 @@ function Sidebar({
   // Show loading state when data is being fetched
   if (sidebarData.isLoading) {
     return (
-      <div className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl" style={{ width: '420px' }}>
+      <div
+        className="border-l-1 border-gray-200 border-border absolute right-0 top-0 h-full z-20 overflow-y-auto overflow-x-hidden bg-white shadow-2xl"
+        style={{ width: "420px" }}
+      >
         <div className="flex items-center justify-center h-full">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -555,7 +557,11 @@ function Sidebar({
       iconBackground={sidebarData.iconBackground}
       moreInQueueCount={sidebarData.moreInQueueCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
-      getTabData={getTabData && state.componentSidebar.selectedNodeId ? (event) => getTabData(state.componentSidebar.selectedNodeId!, event) : undefined}
+      getTabData={
+        getTabData && state.componentSidebar.selectedNodeId
+          ? (event) => getTabData(state.componentSidebar.selectedNodeId!, event)
+          : undefined
+      }
       onEventClick={(event) => {
         setLatestEvents((prev) => {
           return prev.map((e) => {
