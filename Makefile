@@ -88,6 +88,9 @@ ui.setup:
 ui.start:
 	npm run storybook
 
+format.js:
+	cd web_src && npm run format
+
 #
 # Database target helpers
 #
