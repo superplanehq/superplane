@@ -26,13 +26,13 @@ import { Header, type BreadcrumbItem } from "./Header";
 import { NodeConfigurationModal } from "./NodeConfigurationModal";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { ChainExecutionState } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
+import { ExecutionChainItem } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 
 export interface TabData {
   current?: Record<string, any>;
   root?: Record<string, any>;
   payload?: any;
-  executionChain?: Array<{ name: string; state: ChainExecutionState; children?: Array<{ name: string; state: ChainExecutionState }> }>;
+  executionChain?: ExecutionChainItem[];
 }
 
 export interface SidebarEvent {
